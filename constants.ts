@@ -1,10 +1,10 @@
 
-import { DICTIONARY_RAW } from './dictionary';
+import DICTIONARY_RAW from './dictionary.txt?raw';
 
-// Process the raw dictionary string
+// Process the raw dictionary string (one word per line)
 const RAW_WORDS = DICTIONARY_RAW
   .toUpperCase()
-  .split(/\s+/)
+  .split(/\r?\n/)
   .map(w => w.trim())
   .filter(w => w.length >= 3 && w.length <= 6 && /^[A-Z]+$/.test(w));
 
