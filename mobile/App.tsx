@@ -12,7 +12,10 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import { v4 as uuidv4 } from 'uuid';
+
+// Simple ID generator (React Native compatible)
+let idCounter = 0;
+const generateId = () => `id_${Date.now()}_${idCounter++}`;
 import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { generateLocalPuzzle, validateWord } from './src/services/localGenerator';
@@ -49,10 +52,10 @@ export default function App() {
     wordLength: number = 4
   ) => {
     const newRows: RowData[] = words.map(word => ({
-      id: uuidv4(),
+      id: generateId(),
       originalWord: word,
       words: word.split('').map(char => ({
-        id: uuidv4(),
+        id: generateId(),
         char: char,
         isLocked: false,
       })),
@@ -79,11 +82,23 @@ export default function App() {
     }
 
     try {
-      await new Promise(r => setTimeout(r, 600));
-      const puzzle = await generateLocalPuzzle(selectedDifficulty);
+      // Short delay for UI feedback
+      await new Promise(r => setTimeout(r, 300));
+
+      // Wrap generation in a timeout for mobile devices
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Generation timeout')), 4000)
+      );
+
+      const puzzle = await Promise.race([
+        generateLocalPuzzle(selectedDifficulty),
+        timeoutPromise
+      ]);
+
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength);
     } catch (localErr) {
-      console.log("Local generation failed, using fallback...");
+      console.log("Local generation failed, using fallback:", localErr);
+      // Use fallback puzzles immediately
       if (selectedDifficulty === 'HARD') {
         initGame(FALLBACK_PUZZLE_HARD, "Challenge Mode", undefined, 5);
       } else if (selectedDifficulty === 'EASY') {
