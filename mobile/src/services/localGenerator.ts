@@ -354,8 +354,8 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
     baseArray: Array.from(WORD_SETS[wordLength])
   };
 
-  const GLOBAL_TIMEOUT = 5000;
-  const CANDIDATES_TO_GENERATE = 5; // Generate multiple puzzles, pick best
+  const GLOBAL_TIMEOUT = 2500; // Reduced for mobile performance
+  const CANDIDATES_TO_GENERATE = 2; // Fewer candidates on mobile for speed
   const generatedPuzzles: GeneratedPuzzle[] = [];
 
   const state: GenState = {
