@@ -1,0 +1,5 @@
+{
+  "name": "WordShift",
+  "description": "A linguistic puzzle game where you shift letters down a column of words. Transform 4-letter words into new valid words by cascading letters from top to bottom.",
+  "requestFramePermissions": []
+}
