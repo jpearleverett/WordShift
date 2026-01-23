@@ -20,6 +20,7 @@ import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti } from './src/components/Confetti';
+import { HomeScreen } from './src/components/home';
 import { CandyColors } from './src/theme/colors';
 import { generateLocalPuzzle } from './src/services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from './src/constants';
@@ -29,6 +30,15 @@ import {
   getCumulativeStats,
   CumulativeStats,
 } from './src/services/starRating';
+import {
+  awardPuzzleAmber,
+  getAmberBalance,
+  getCurrentPhase,
+} from './src/services/amberCurrency';
+import { AMBER_REWARDS, DialoguePhase } from './src/types/homeWorld';
+
+// App screen type
+type AppScreen = 'home' | 'puzzle';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -313,6 +323,9 @@ const Toast: React.FC<{ message: string; isError: boolean }> = ({ message, isErr
 };
 
 export default function App() {
+  // Screen navigation
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
+
   const [rows, setRows] = useState<RowData[]>([]);
   const [activeRowIndex, setActiveRowIndex] = useState(0);
   const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
@@ -337,13 +350,33 @@ export default function App() {
   const [earnedStars, setEarnedStars] = useState(0);
   const [cumulativeStats, setCumulativeStats] = useState<CumulativeStats | null>(null);
 
+  // Amber currency tracking
+  const [amberEarned, setAmberEarned] = useState(0);
+  const [amberBalance, setAmberBalance] = useState(0);
+  const [phaseChanged, setPhaseChanged] = useState(false);
+  const [newPhase, setNewPhase] = useState<DialoguePhase>(0);
+
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
 
   useEffect(() => {
-    startNewGame('MEDIUM');
-    // Load cumulative stats
+    // Load cumulative stats and amber balance
     getCumulativeStats().then(setCumulativeStats);
+    getAmberBalance().then(setAmberBalance);
+    getCurrentPhase().then(setNewPhase);
   }, []);
+
+  // Start puzzle when navigating to puzzle screen
+  const handlePlayPuzzle = () => {
+    setCurrentScreen('puzzle');
+    startNewGame(difficulty);
+  };
+
+  // Return to home screen
+  const handleGoHome = () => {
+    setCurrentScreen('home');
+    setGameState(GameState.IDLE);
+    setShowConfetti(false);
+  };
 
   const initGame = (
     words: string[],
@@ -528,9 +561,19 @@ export default function App() {
       // Calculate stars and record completion
       const stars = calculateStars(hintsUsed, invalidAttempts);
       setEarnedStars(stars);
-      recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts).then(() => {
+
+      // Record completion and award amber
+      Promise.all([
+        recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts),
+        awardPuzzleAmber(difficulty, stars),
+      ]).then(([_, amberResult]) => {
         // Refresh cumulative stats
         getCumulativeStats().then(setCumulativeStats);
+        // Update amber display
+        setAmberEarned(amberResult.amount);
+        setAmberBalance(amberResult.newBalance);
+        setPhaseChanged(amberResult.phaseChanged);
+        setNewPhase(amberResult.newPhase);
       });
 
       setMessage("Sweet Victory!");
@@ -568,9 +611,33 @@ export default function App() {
   const handleNextLevel = () => {
     setShowConfetti(false);
     setLevel(prev => prev + 1);
+    setAmberEarned(0);
+    setPhaseChanged(false);
     startNewGame();
   };
 
+  const handleReturnHome = () => {
+    setShowConfetti(false);
+    setAmberEarned(0);
+    setPhaseChanged(false);
+    setCurrentScreen('home');
+    setGameState(GameState.IDLE);
+  };
+
+  // Render home screen
+  if (currentScreen === 'home') {
+    return (
+      <>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <HomeScreen
+          onPlayPuzzle={handlePlayPuzzle}
+          onAmberChange={setAmberBalance}
+        />
+      </>
+    );
+  }
+
+  // Render puzzle screen
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -583,6 +650,13 @@ export default function App() {
 
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerHomeButton}
+          onPress={handleGoHome}
+        >
+          <Text style={styles.headerHomeText}>🏠</Text>
+        </TouchableOpacity>
+
         <AnimatedLogo />
 
         <TouchableOpacity
@@ -813,6 +887,21 @@ export default function App() {
             </Text>
             <Text style={styles.victorySubtitle}>Level {level} Complete</Text>
 
+            {/* Amber earned */}
+            <View style={styles.amberEarnedContainer}>
+              <Text style={styles.amberEarnedIcon}>💎</Text>
+              <Text style={styles.amberEarnedText}>+{amberEarned} Amber</Text>
+            </View>
+
+            {/* Phase change notification */}
+            {phaseChanged && (
+              <View style={styles.phaseChangeContainer}>
+                <Text style={styles.phaseChangeText}>
+                  Your friends have new things to say...
+                </Text>
+              </View>
+            )}
+
             {/* Performance feedback */}
             <Text style={styles.victoryFeedback}>
               {earnedStars === 3
@@ -831,8 +920,8 @@ export default function App() {
               </View>
               <View style={styles.victoryStatDivider} />
               <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>{rows.length - 1}</Text>
-                <Text style={styles.victoryStatLabel}>Moves</Text>
+                <Text style={styles.victoryStatValue}>💎 {amberBalance}</Text>
+                <Text style={styles.victoryStatLabel}>Total Amber</Text>
               </View>
             </View>
 
@@ -854,13 +943,23 @@ export default function App() {
               </View>
             )}
 
-            <TouchableOpacity
-              style={styles.nextLevelButton}
-              onPress={handleNextLevel}
-            >
-              <View style={styles.buttonShine} />
-              <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
-            </TouchableOpacity>
+            {/* Action buttons */}
+            <View style={styles.victoryButtonRow}>
+              <TouchableOpacity
+                style={styles.homeButton}
+                onPress={handleReturnHome}
+              >
+                <Text style={styles.homeButtonText}>🏠 HOME</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.nextLevelButton}
+                onPress={handleNextLevel}
+              >
+                <View style={styles.buttonShine} />
+                <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -925,6 +1024,18 @@ const styles = StyleSheet.create({
   logoSparkle3: {
     bottom: -3,
     left: 60,
+  },
+  headerHomeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  headerHomeText: {
+    fontSize: 20,
   },
   helpButton: {
     width: 40,
@@ -1467,7 +1578,7 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.pink.main,
     borderRadius: 20,
     paddingVertical: 18,
-    paddingHorizontal: 48,
+    paddingHorizontal: 32,
     overflow: 'hidden',
     shadowColor: CandyColors.pink.main,
     shadowOffset: { width: 0, height: 6 },
@@ -1477,8 +1588,61 @@ const styles = StyleSheet.create({
   },
   nextLevelButtonText: {
     color: CandyColors.white,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
     letterSpacing: 2,
+  },
+
+  // Amber earned display
+  amberEarnedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CandyColors.yellow.light,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  amberEarnedIcon: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  amberEarnedText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: CandyColors.yellow.shadow,
+  },
+
+  // Phase change notification
+  phaseChangeContainer: {
+    backgroundColor: CandyColors.purple.light + '30',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  phaseChangeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: CandyColors.purple.main,
+    fontStyle: 'italic',
+  },
+
+  // Victory button row
+  victoryButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  homeButton: {
+    backgroundColor: CandyColors.gray[200],
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
+  homeButtonText: {
+    color: CandyColors.gray[600],
+    fontSize: 16,
+    fontWeight: '800',
   },
 });

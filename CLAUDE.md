@@ -1,6 +1,6 @@
 # WordShift - Claude Code Context
 
-A word puzzle game where players shift letters between words to form valid English words. Features a vibrant Candy Crush-inspired visual style.
+A word puzzle game where players shift letters between words to form valid English words. Features a vibrant Candy Crush-inspired visual style and a home screen with unlockable animal characters whose dialogue evolves from cheerful to existential dread.
 
 ## Quick Commands
 
@@ -15,7 +15,7 @@ npx expo start --clear  # Clear cache and start
 
 - **Framework**: React Native with Expo SDK 54
 - **Language**: TypeScript
-- **Navigation**: Single-screen game (no router)
+- **Navigation**: Home screen ↔ Puzzle screen (state-based)
 - **State**: React useState/useEffect (no external state library)
 - **Target**: iOS and Android via Expo Go
 
@@ -23,22 +23,34 @@ npx expo start --clear  # Clear cache and start
 
 ```
 mobile/
-├── App.tsx                      # Main game component, all game logic
+├── App.tsx                      # Main app with screen navigation (home/puzzle)
 ├── src/
-│   ├── types.ts                 # TypeScript interfaces
+│   ├── types.ts                 # TypeScript interfaces for puzzle game
+│   ├── types/
+│   │   └── homeWorld.ts         # Types for home screen (animals, rooms, currency)
 │   ├── constants.ts             # Word lists by length (3-6 letters)
 │   ├── dictionary.ts            # 8000+ word dictionary for validation
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout for slots
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling
 │   │   ├── AnimatedBackground.tsx  # Floating particles/decorations background
-│   │   └── Confetti.tsx         # Win celebration confetti effect
+│   │   ├── Confetti.tsx         # Win celebration confetti effect
+│   │   └── home/
+│   │       ├── HomeScreen.tsx   # Main home screen with animal house
+│   │       ├── HouseWorld.tsx   # Zoomable/pannable house view
+│   │       ├── RoomView.tsx     # Individual room with decorations
+│   │       ├── AnimalSprite.tsx # Animated animal characters
+│   │       └── index.ts         # Home component exports
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette and tile color system
 │   └── services/
-│       ├── localGenerator.ts    # Puzzle generation algorithm
+│       ├── localGenerator.ts    # Puzzle generation with dread word progression
 │       ├── wordHistory.ts       # Word history tracking for diversity
-│       └── starRating.ts        # Star rating system and cumulative stats
+│       ├── starRating.ts        # Star rating system and cumulative stats
+│       ├── amberCurrency.ts     # Amber currency system with persistence
+│       ├── animalDialogue.ts    # Animal dialogue content by phase (0-4), 52 per animal
+│       ├── dialogueSession.ts   # Dialogue session system with cooldowns
+│       └── homeWorldData.ts     # Room/animal definitions and unlock progression
 ```
 
 ## Game Mechanics
@@ -48,6 +60,106 @@ mobile/
 3. Drop letter into next word → word grows by 1 letter
 4. Both resulting words must be valid English words
 5. Progress through all rows to win
+
+## Home Screen & Animal House
+
+The home screen features a multi-story house with unlockable rooms and animal characters.
+
+### Currency System (Amber)
+
+- Players earn **Amber** (💎) by completing puzzles
+- Rewards scale by difficulty: EASY=5, MEDIUM=10, HARD=20
+- Bonus amber for 3-star performances (+50%) or 2-star (+25%)
+- Amber is spent to unlock new characters and rooms
+
+### Animal Characters
+
+10 unique animals, each with their own room and personality:
+- **Red Panda (Bamboo)** - Zen/contemplative, bamboo attic
+- **Axolotl (Axel)** - Dreamy, aquarium room
+- **Pangolin (Panko)** - Practical chef, rustic kitchen
+- **Sloth (Sloane)** - Slow observer, jungle hammock
+- **Fennec Fox (Fennick)** - Alert listener, desert camp
+- **Fox (Ember)** - Introspective, cozy den with fireplace
+- **Owl (Archimedes)** - Scholar, study full of books
+- **Capybara (Chill)** - Seemingly calm, office
+- **Wombat (Warren)** - Grounded digger, underground burrow
+- **Rabbit (Thyme)** - Anxious, garden patio
+
+### Dialogue Progression (Phases 0-4)
+
+Animal dialogue evolves as players complete puzzles:
+- **Phase 0 (0+ puzzles)**: Happy, friendly, light
+- **Phase 1 (10+ puzzles)**: Curious, slightly philosophical
+- **Phase 2 (25+ puzzles)**: Questioning existence
+- **Phase 3 (50+ puzzles)**: Existential dread
+- **Phase 4 (100+ puzzles)**: Complete philosophical crisis
+
+Each animal has unique dialogue fitting their personality (owl becomes intellectual crisis, sloth has slow-motion dread, etc.)
+
+**Dialogue Count**: 52 dialogues per animal (520 total)
+- Phase 0: 12 dialogues (happy, friendly)
+- Phases 1-4: 10 dialogues each (progressively darker)
+
+### Dialogue Session System
+
+Animals have conversation sessions with cooldown periods to pace interactions:
+
+**Session Parameters** (in `dialogueSession.ts`):
+- Session duration: 2.5 minutes
+- Max dialogues per session: 10
+- Cooldown after session: 5 minutes
+- Min interval between dialogues: 3 seconds
+
+**Session Flow**:
+1. Player taps animal → starts session if available
+2. Session timer begins (2.5 min)
+3. Player can have up to 10 dialogues during session
+4. Session ends when: time expires, max dialogues reached, or player leaves
+5. Cooldown begins → animal unavailable for 5 minutes
+6. After cooldown → animal available again
+
+**UI Indicators**:
+- Session status bar shows time/dialogues remaining
+- Cooldown toast appears when animal is unavailable
+- Session persists via AsyncStorage (survives app restart)
+
+### Unlock Progression
+
+Alternates between characters and rooms:
+1. Red Panda + Bamboo Attic (starter, free)
+2. Axolotl (25 amber) → Aquarium (40 amber)
+3. Pangolin (50 amber) → Kitchen (65 amber)
+4. ...continues with increasing costs
+
+**Unlock Sequence Validation**:
+- Animals must be unlocked before their corresponding rooms
+- Previous unlock in sequence must be completed first
+- `isUnlockAvailable()` function validates prerequisites
+- UI shows reason if unlock is blocked (e.g., "Unlock Axel first")
+
+### House & Room Visuals
+
+**House Structure** (`HouseWorld.tsx`):
+- Multi-story house with roof shingles, chimney with smoke
+- Attic window, foundation with stone pattern
+- Animated clouds in sky, sun, birds
+- Ground decorations: flowers, mushrooms, path, fence
+- Trees flanking the house
+- Pinch-to-zoom support via PanResponder
+
+**Room Decorations** (`RoomView.tsx`):
+- Each room theme has 6-7 furniture/decoration items
+- Items positioned at: wall-left/center/right, floor-left/center/right, corners
+- Sizes: small (14px), medium (20px), large (28px)
+- Some rooms have windows (study, kitchen, cozy_den)
+- Wall and floor patterns for themed textures
+
+### Word Theme Evolution
+
+Puzzle words gradually shift to match the existential theme:
+- Phase 0: Fun words (SPARK, FLAME, TIGER)
+- Higher phases: Dread words preferred (VOID, FADE, DOOM, ABYSS)
 
 ## Key Architecture
 
@@ -148,6 +260,39 @@ Key functions:
 - `getCumulativeStats()` - Load lifetime stats
 - `clearStats()` - Reset all stats (for testing)
 
+### Dialogue Session System (`dialogueSession.ts`)
+
+Manages timed dialogue sessions with cooldown periods:
+
+**Configuration Constants**:
+```typescript
+DIALOGUE_SESSION_CONFIG = {
+  SESSION_DURATION_MS: 2.5 * 60 * 1000,   // 2.5 minutes
+  COOLDOWN_DURATION_MS: 5 * 60 * 1000,    // 5 minutes
+  MIN_DIALOGUE_INTERVAL_MS: 3000,          // 3 seconds
+  DIALOGUES_PER_SESSION: 10,               // Max per session
+}
+```
+
+**Key Types**:
+```typescript
+interface DialogueSession {
+  animalId: string;
+  sessionStartTime: number;
+  lastDialogueTime: number;
+  dialoguesInSession: number;
+  cooldownEndTime: number | null;
+}
+```
+
+**Key Functions**:
+- `checkDialogueAvailability(animalId)` - Returns availability status and time remaining
+- `recordDialogue(animalId)` - Record a dialogue, start/continue session
+- `endSession(animalId)` - End session and start cooldown
+- `getSessionStatus(animalId)` - Get 'available' | 'in_session' | 'cooldown' status
+- `formatTimeRemaining(seconds)` - Format time for display (e.g., "2m 30s")
+- `loadDialogueSessions()` - Load sessions from AsyncStorage on app start
+
 ### Word Dictionaries (`constants.ts`)
 
 Words organized by length in arrays:
@@ -157,6 +302,7 @@ Words organized by length in arrays:
 ### Game State (`App.tsx`)
 
 Key state variables:
+- `currentScreen` - 'home' | 'puzzle' (navigation state)
 - `rows` - Current puzzle words with letter states
 - `selectedTile` - Currently picked letter
 - `currentRowIndex` - Active row being solved
@@ -166,6 +312,9 @@ Key state variables:
 - `hintsUsed` - Count of hints used this puzzle (for star rating)
 - `earnedStars` - Stars earned on current puzzle (1-3)
 - `cumulativeStats` - Lifetime stats loaded from storage
+- `amberEarned` - Amber earned from current puzzle
+- `amberBalance` - Total amber balance
+- `phaseChanged` - Whether completing puzzle triggered phase transition
 
 ## Coding Conventions
 
@@ -205,6 +354,35 @@ Edit `calculateStars()` function in `starRating.ts`:
 ### Adding new tile colors
 Add to `tileColors` array in `theme/colors.ts`
 
+### Home Screen - Adding new animals
+1. Add animal type to `AnimalType` in `types/homeWorld.ts`
+2. Add dialogue entries in `animalDialogue.ts` (all 5 phases)
+3. Add animal definition in `ANIMALS` array in `homeWorldData.ts`
+4. Add room definition in `ROOMS` array
+5. Add unlock entries in `UNLOCK_PROGRESSION`
+
+### Home Screen - Adjusting amber rewards
+Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
+- EASY: 5 → change for easier/harder progression
+- MEDIUM: 10
+- HARD: 20
+
+### Home Screen - Adjusting dialogue phases
+Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
+- Default: [0, 10, 25, 50, 100] puzzles for phases 0-4
+- Lower values = faster descent into existential dread
+
+### Home Screen - Adding dread words
+Edit `DREAD_WORDS` set in `localGenerator.ts` to add/remove words
+that appear more frequently at higher phases
+
+### Home Screen - Adjusting dialogue sessions
+Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
+- `SESSION_DURATION_MS` - How long a session lasts (default: 2.5 min)
+- `COOLDOWN_DURATION_MS` - Rest period after session (default: 5 min)
+- `MIN_DIALOGUE_INTERVAL_MS` - Time between dialogues (default: 3s)
+- `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 10)
+
 ## Testing
 
 Test on physical device via Expo Go app:
@@ -213,6 +391,12 @@ Test on physical device via Expo Go app:
 3. Test all three difficulty modes
 4. Verify puzzle generation doesn't hang (should complete in <3s)
 5. Test DROP row arc layout with different word lengths
+6. Test home screen features:
+   - Tap animals to start dialogue sessions
+   - Verify session timer and dialogue count display
+   - Verify cooldown appears after session ends
+   - Test unlock sequence (can't unlock room before animal)
+   - Test pinch-to-zoom on house view
 
 ## Known Constraints
 
@@ -220,3 +404,5 @@ Test on physical device via Expo Go app:
 - 4s wrapper timeout in App.tsx as fallback
 - Dictionary limited to common English words (no proper nouns, abbreviations)
 - Arc layout uses `overflow: visible` - elements can extend beyond row container
+- Dialogue sessions persist across app restarts (cooldowns continue)
+- House view supports pinch-to-zoom via PanResponder (basic implementation)
