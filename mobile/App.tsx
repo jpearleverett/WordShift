@@ -8,7 +8,6 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
   Dimensions,
 } from 'react-native';
@@ -241,8 +240,8 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFF0F5" />
+    <View style={styles.container}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       {/* Background gradient simulation */}
       <View style={styles.backgroundGradient} />
@@ -431,7 +430,7 @@ export default function App() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -477,7 +476,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 60,
+    paddingBottom: 12,
     zIndex: 100,
   },
   titleContainer: {
@@ -620,10 +620,12 @@ const styles = StyleSheet.create({
   gameArea: {
     flex: 1,
     paddingHorizontal: 8,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 20,
   },
   rowsContainer: {
-    paddingVertical: 20,
+    paddingVertical: 16,
+    paddingBottom: 40,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
