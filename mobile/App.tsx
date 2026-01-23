@@ -23,6 +23,12 @@ import { Confetti } from './src/components/Confetti';
 import { CandyColors } from './src/theme/colors';
 import { generateLocalPuzzle } from './src/services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from './src/constants';
+import {
+  calculateStars,
+  recordPuzzleCompletion,
+  getCumulativeStats,
+  CumulativeStats,
+} from './src/services/starRating';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -325,10 +331,18 @@ export default function App() {
   const [streak, setStreak] = useState(0);
   const [level, setLevel] = useState(1);
 
+  // Star rating tracking
+  const [invalidAttempts, setInvalidAttempts] = useState(0);
+  const [hintsUsed, setHintsUsed] = useState(0);
+  const [earnedStars, setEarnedStars] = useState(0);
+  const [cumulativeStats, setCumulativeStats] = useState<CumulativeStats | null>(null);
+
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
 
   useEffect(() => {
     startNewGame('MEDIUM');
+    // Load cumulative stats
+    getCumulativeStats().then(setCumulativeStats);
   }, []);
 
   const initGame = (
@@ -356,6 +370,10 @@ export default function App() {
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
     setCurrentWordLength(wordLength);
+    // Reset star rating tracking for new puzzle
+    setInvalidAttempts(0);
+    setHintsUsed(0);
+    setEarnedStars(0);
   };
 
   const startNewGame = async (selectedDifficulty: Difficulty = difficulty) => {
@@ -430,6 +448,7 @@ export default function App() {
     );
 
     if (relevantStep) {
+      setHintsUsed(prev => prev + 1);
       setMessage(`Try the letter: ${relevantStep.letterToMove}`);
     } else {
       setMessage("Hmm, try undoing a move!");
@@ -473,6 +492,7 @@ export default function App() {
     if (!isSourceValid) {
       shakeError(`"${sourceWordStr}" isn't a word!`);
       setStreak(0);
+      setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return;
     }
@@ -481,6 +501,7 @@ export default function App() {
     if (!isTargetValid) {
       shakeError(`"${targetWordStr}" isn't a word!`);
       setStreak(0);
+      setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return;
     }
@@ -504,6 +525,14 @@ export default function App() {
 
     const maxMoves = rows.length - 1;
     if (activeRowIndex === maxMoves - 1) {
+      // Calculate stars and record completion
+      const stars = calculateStars(hintsUsed, invalidAttempts);
+      setEarnedStars(stars);
+      recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts).then(() => {
+        // Refresh cumulative stats
+        getCumulativeStats().then(setCumulativeStats);
+      });
+
       setMessage("Sweet Victory!");
       setGameState(GameState.WON);
       setShowConfetti(true);
@@ -766,15 +795,34 @@ export default function App() {
             <View style={styles.victoryGlow} />
             <View style={styles.modalShine} />
 
-            {/* Stars */}
+            {/* Stars - show earned vs empty */}
             <View style={styles.starsContainer}>
-              <Text style={styles.victoryStar}>⭐</Text>
-              <Text style={[styles.victoryStar, styles.victoryStarBig]}>⭐</Text>
-              <Text style={styles.victoryStar}>⭐</Text>
+              <Text style={[styles.victoryStar, earnedStars < 1 && styles.victoryStarEmpty]}>
+                {earnedStars >= 1 ? '⭐' : '☆'}
+              </Text>
+              <Text style={[styles.victoryStar, styles.victoryStarBig, earnedStars < 2 && styles.victoryStarEmpty]}>
+                {earnedStars >= 2 ? '⭐' : '☆'}
+              </Text>
+              <Text style={[styles.victoryStar, earnedStars < 3 && styles.victoryStarEmpty]}>
+                {earnedStars >= 3 ? '⭐' : '☆'}
+              </Text>
             </View>
 
-            <Text style={styles.victoryTitle}>SWEET!</Text>
+            <Text style={styles.victoryTitle}>
+              {earnedStars === 3 ? 'PERFECT!' : earnedStars === 2 ? 'SWEET!' : 'NICE!'}
+            </Text>
             <Text style={styles.victorySubtitle}>Level {level} Complete</Text>
+
+            {/* Performance feedback */}
+            <Text style={styles.victoryFeedback}>
+              {earnedStars === 3
+                ? 'No hints, minimal mistakes!'
+                : earnedStars === 2
+                ? hintsUsed > 0
+                  ? `Used ${hintsUsed} hint${hintsUsed > 1 ? 's' : ''}`
+                  : `${invalidAttempts} wrong attempt${invalidAttempts > 1 ? 's' : ''}`
+                : `${hintsUsed} hint${hintsUsed !== 1 ? 's' : ''}, ${invalidAttempts} mistake${invalidAttempts !== 1 ? 's' : ''}`}
+            </Text>
 
             <View style={styles.victoryStats}>
               <View style={styles.victoryStatItem}>
@@ -787,6 +835,24 @@ export default function App() {
                 <Text style={styles.victoryStatLabel}>Moves</Text>
               </View>
             </View>
+
+            {/* Cumulative stats */}
+            {cumulativeStats && (
+              <View style={styles.cumulativeStats}>
+                <View style={styles.cumulativeStatItem}>
+                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalStars}</Text>
+                  <Text style={styles.cumulativeStatLabel}>Total Stars</Text>
+                </View>
+                <View style={styles.cumulativeStatItem}>
+                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.threeStarCount}</Text>
+                  <Text style={styles.cumulativeStatLabel}>Perfect</Text>
+                </View>
+                <View style={styles.cumulativeStatItem}>
+                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalPuzzlesCompleted}</Text>
+                  <Text style={styles.cumulativeStatLabel}>Puzzles</Text>
+                </View>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.nextLevelButton}
@@ -1319,6 +1385,9 @@ const styles = StyleSheet.create({
     fontSize: 52,
     marginBottom: 4,
   },
+  victoryStarEmpty: {
+    opacity: 0.3,
+  },
   victoryTitle: {
     fontSize: 42,
     fontWeight: '900',
@@ -1332,7 +1401,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: CandyColors.gray[500],
-    marginBottom: 20,
+    marginBottom: 4,
+  },
+  victoryFeedback: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: CandyColors.gray[400],
+    marginBottom: 16,
   },
   victoryStats: {
     flexDirection: 'row',
@@ -1364,6 +1439,29 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: CandyColors.gray[200],
     borderRadius: 1,
+  },
+  cumulativeStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginBottom: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: CandyColors.gray[200],
+  },
+  cumulativeStatItem: {
+    alignItems: 'center',
+  },
+  cumulativeStatValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: CandyColors.purple.main,
+  },
+  cumulativeStatLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: CandyColors.gray[400],
+    marginTop: 2,
   },
   nextLevelButton: {
     backgroundColor: CandyColors.pink.main,
