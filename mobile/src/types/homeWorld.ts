@@ -186,16 +186,18 @@ export interface DialogueSession {
 
 /**
  * Dialogue session constants (puzzle-based)
+ * Pacing designed for 10-15 hour total gameplay
  */
 export const DIALOGUE_SESSION_CONFIG = {
   // Number of dialogues allowed per session before cooldown
-  DIALOGUES_PER_SESSION: 8,
+  DIALOGUES_PER_SESSION: 6,
   // Number of puzzles required before next session is available
-  PUZZLES_BETWEEN_SESSIONS: 3,
+  PUZZLES_BETWEEN_SESSIONS: 5,
 };
 
 /**
  * Phase descriptions for UI
+ * Phases are spread across ~300 puzzles for extended gameplay
  */
 export const PHASE_DESCRIPTIONS: Record<DialoguePhase, { title: string; mood: string }> = {
   0: { title: 'Bright Days', mood: 'Everything seems wonderful!' },
@@ -207,8 +209,9 @@ export const PHASE_DESCRIPTIONS: Record<DialoguePhase, { title: string; mood: st
 
 /**
  * Puzzle thresholds for phase transitions
+ * Extended for 10-15 hour gameplay (targeting ~300-350 total puzzles)
  */
-export const PHASE_THRESHOLDS = [0, 10, 25, 50, 100];
+export const PHASE_THRESHOLDS = [0, 25, 75, 150, 250];
 
 /**
  * Amber rewards by difficulty
@@ -220,18 +223,51 @@ export const AMBER_REWARDS: AmberReward = {
 };
 
 /**
+ * Milestone bonuses - reward players at key puzzle counts
+ * Keeps progression feeling rewarding during longer gameplay
+ */
+export const MILESTONE_BONUSES: { puzzles: number; amber: number; message: string }[] = [
+  { puzzles: 10, amber: 25, message: 'First steps!' },
+  { puzzles: 25, amber: 50, message: 'Getting the hang of it!' },
+  { puzzles: 50, amber: 75, message: 'Puzzle enthusiast!' },
+  { puzzles: 75, amber: 100, message: 'Word wizard!' },
+  { puzzles: 100, amber: 150, message: 'Century milestone!' },
+  { puzzles: 150, amber: 200, message: 'Dedicated player!' },
+  { puzzles: 200, amber: 250, message: 'True dedication!' },
+  { puzzles: 250, amber: 300, message: 'Quarter thousand!' },
+  { puzzles: 300, amber: 400, message: 'Master puzzler!' },
+  { puzzles: 350, amber: 500, message: 'The journey continues...' },
+];
+
+/**
+ * Check if a milestone was just reached
+ */
+export function checkMilestone(puzzleCount: number): { amber: number; message: string } | null {
+  const milestone = MILESTONE_BONUSES.find(m => m.puzzles === puzzleCount);
+  return milestone ? { amber: milestone.amber, message: milestone.message } : null;
+}
+
+/**
+ * Get next upcoming milestone
+ */
+export function getNextMilestone(puzzleCount: number): { puzzles: number; amber: number } | null {
+  const next = MILESTONE_BONUSES.find(m => m.puzzles > puzzleCount);
+  return next ? { puzzles: next.puzzles, amber: next.amber } : null;
+}
+
+/**
  * Streak bonus configuration
  * Higher streaks = more bonus amber
  */
 export const STREAK_BONUSES = {
   // Minimum streak to start getting bonuses
   MIN_STREAK_FOR_BONUS: 2,
-  // Bonus per streak day (e.g., 5% per day)
-  BONUS_PER_STREAK: 0.05,
-  // Maximum bonus percentage (e.g., 50% cap)
-  MAX_BONUS_PERCENTAGE: 0.5,
+  // Bonus per streak day (e.g., 10% per day for faster progression)
+  BONUS_PER_STREAK: 0.10,
+  // Maximum bonus percentage (e.g., 100% cap = double rewards at 10+ day streak)
+  MAX_BONUS_PERCENTAGE: 1.0,
   // Days of inactivity before streak resets
-  STREAK_RESET_DAYS: 1,
+  STREAK_RESET_DAYS: 2,
 };
 
 /**

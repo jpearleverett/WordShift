@@ -1,10 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
   Dimensions,
   Animated,
   Text,
+  Easing,
 } from 'react-native';
 import {
   GestureHandlerRootView,
@@ -20,6 +21,308 @@ import { CandyColors } from '../../theme/colors';
 import { isOnCooldown } from '../../services/dialogueSession';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTICLE SYSTEM - Floating sparkles, leaves, fireflies
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface Particle {
+  id: number;
+  x: Animated.Value;
+  y: Animated.Value;
+  opacity: Animated.Value;
+  scale: Animated.Value;
+  rotation: Animated.Value;
+  emoji: string;
+  duration: number;
+}
+
+const PARTICLE_EMOJIS_BY_PHASE: Record<number, string[]> = {
+  0: ['✨', '🌸', '🍃', '💛', '⭐'],
+  1: ['✨', '🍂', '🌙', '💫'],
+  2: ['🍂', '🌙', '💭', '🌫️'],
+  3: ['🌙', '👁️', '🌫️', '💀'],
+  4: ['💀', '👁️', '🌑', '⚫', '🔮'],
+};
+
+const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
+  useEffect(() => {
+    const startX = Math.random() * SCREEN_WIDTH;
+    const endX = startX + (Math.random() - 0.5) * 100;
+
+    particle.x.setValue(startX);
+    particle.y.setValue(SCREEN_HEIGHT + 20);
+    particle.opacity.setValue(0);
+    particle.scale.setValue(0.3 + Math.random() * 0.5);
+
+    Animated.parallel([
+      // Float up
+      Animated.timing(particle.y, {
+        toValue: -50,
+        duration: particle.duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+      // Gentle sway
+      Animated.timing(particle.x, {
+        toValue: endX,
+        duration: particle.duration,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      }),
+      // Fade in then out
+      Animated.sequence([
+        Animated.timing(particle.opacity, {
+          toValue: 0.8,
+          duration: particle.duration * 0.2,
+          useNativeDriver: true,
+        }),
+        Animated.timing(particle.opacity, {
+          toValue: 0.8,
+          duration: particle.duration * 0.6,
+          useNativeDriver: true,
+        }),
+        Animated.timing(particle.opacity, {
+          toValue: 0,
+          duration: particle.duration * 0.2,
+          useNativeDriver: true,
+        }),
+      ]),
+      // Gentle rotation
+      Animated.timing(particle.rotation, {
+        toValue: Math.random() > 0.5 ? 360 : -360,
+        duration: particle.duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const rotate = particle.rotation.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        transform: [
+          { translateX: particle.x },
+          { translateY: particle.y },
+          { scale: particle.scale },
+          { rotate },
+        ],
+        opacity: particle.opacity,
+      }}
+      pointerEvents="none"
+    >
+      <Text style={{ fontSize: 16 }}>{particle.emoji}</Text>
+    </Animated.View>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SMOKE PUFF ANIMATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
+  const y = useRef(new Animated.Value(0)).current;
+  const x = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.5)).current;
+
+  useEffect(() => {
+    const animate = () => {
+      y.setValue(0);
+      x.setValue(0);
+      opacity.setValue(0);
+      scale.setValue(0.5);
+
+      Animated.parallel([
+        Animated.timing(y, {
+          toValue: -40,
+          duration: 3000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+          delay,
+        }),
+        Animated.timing(x, {
+          toValue: 15 + Math.random() * 10,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          delay,
+        }),
+        Animated.sequence([
+          Animated.timing(opacity, {
+            toValue: 0.6,
+            duration: 500,
+            useNativeDriver: true,
+            delay,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 2500,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.timing(scale, {
+          toValue: 1.5,
+          duration: 3000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+          delay,
+        }),
+      ]).start(() => animate());
+    };
+
+    animate();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        transform: [{ translateX: x }, { translateY: y }, { scale }],
+        opacity,
+      }}
+    >
+      <Text style={{ fontSize: 20, color: '#999' }}>💨</Text>
+    </Animated.View>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FLYING BIRD ANIMATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ startDelay, yPosition }) => {
+  const x = useRef(new Animated.Value(-50)).current;
+  const y = useRef(new Animated.Value(yPosition)).current;
+  const flapRotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = () => {
+      const goingRight = Math.random() > 0.5;
+      x.setValue(goingRight ? -50 : SCREEN_WIDTH + 50);
+      y.setValue(yPosition + (Math.random() - 0.5) * 40);
+
+      // Wing flapping
+      const flapAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flapRotation, {
+            toValue: 1,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.timing(flapRotation, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      flapAnimation.start();
+
+      Animated.timing(x, {
+        toValue: goingRight ? SCREEN_WIDTH + 50 : -50,
+        duration: 8000 + Math.random() * 4000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+        delay: startDelay,
+      }).start(() => {
+        flapAnimation.stop();
+        setTimeout(animate, 5000 + Math.random() * 10000);
+      });
+    };
+
+    animate();
+  }, []);
+
+  const scaleY = flapRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.6],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        transform: [{ translateX: x }, { translateY: y }, { scaleY }],
+      }}
+      pointerEvents="none"
+    >
+      <Text style={{ fontSize: 18 }}>🐦</Text>
+    </Animated.View>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHOOTING STAR (appears at higher phases)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ShootingStar: React.FC = () => {
+  const x = useRef(new Animated.Value(0)).current;
+  const y = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = () => {
+      const startX = Math.random() * SCREEN_WIDTH;
+      x.setValue(startX);
+      y.setValue(20 + Math.random() * 60);
+      opacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(x, {
+          toValue: startX + 150,
+          duration: 800,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(y, {
+          toValue: 100 + Math.random() * 50,
+          duration: 800,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start(() => {
+        // Random delay before next shooting star
+        setTimeout(animate, 10000 + Math.random() * 20000);
+      });
+    };
+
+    // Start after random delay
+    setTimeout(animate, 5000 + Math.random() * 10000);
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        transform: [{ translateX: x }, { translateY: y }],
+        opacity,
+      }}
+      pointerEvents="none"
+    >
+      <Text style={{ fontSize: 14 }}>⭐</Text>
+    </Animated.View>
+  );
+};
 
 // House dimensions (2-column layout)
 const ROOM_WIDTH = 140;
@@ -62,10 +365,108 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const baseTranslateX = useRef(0);
   const baseTranslateY = useRef(0);
 
+  // Particle system state
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const particleIdRef = useRef(0);
+
+  // Sun animation
+  const sunPulse = useRef(new Animated.Value(1)).current;
+  const sunRotation = useRef(new Animated.Value(0)).current;
+
+  // Tree sway animation
+  const treeSway = useRef(new Animated.Value(0)).current;
+
   // Cloud animations
   const cloud1X = useRef(new Animated.Value(-100)).current;
   const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
   const cloud3X = useRef(new Animated.Value(SCREEN_WIDTH / 2)).current;
+
+  // Spawn particles based on phase
+  useEffect(() => {
+    const spawnParticle = () => {
+      const emojis = PARTICLE_EMOJIS_BY_PHASE[currentPhase] || PARTICLE_EMOJIS_BY_PHASE[0];
+      const newParticle: Particle = {
+        id: particleIdRef.current++,
+        x: new Animated.Value(0),
+        y: new Animated.Value(0),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(1),
+        rotation: new Animated.Value(0),
+        emoji: emojis[Math.floor(Math.random() * emojis.length)],
+        duration: 8000 + Math.random() * 6000,
+      };
+
+      setParticles(prev => [...prev.slice(-8), newParticle]); // Keep max 8 particles
+    };
+
+    // Spawn particles more frequently at lower phases (happy), less at higher (dread)
+    const spawnRate = currentPhase >= 3 ? 4000 : currentPhase >= 2 ? 3000 : 2000;
+    const interval = setInterval(spawnParticle, spawnRate);
+    spawnParticle(); // Spawn one immediately
+
+    return () => clearInterval(interval);
+  }, [currentPhase]);
+
+  // Sun pulsing animation
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sunPulse, {
+          toValue: 1.15,
+          duration: 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sunPulse, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const rotateAnimation = Animated.loop(
+      Animated.timing(sunRotation, {
+        toValue: 360,
+        duration: 60000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    if (currentPhase < 3) {
+      pulseAnimation.start();
+      rotateAnimation.start();
+    }
+
+    return () => {
+      pulseAnimation.stop();
+      rotateAnimation.stop();
+    };
+  }, [currentPhase]);
+
+  // Tree sway animation
+  useEffect(() => {
+    const swayAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(treeSway, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(treeSway, {
+          toValue: -1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    swayAnimation.start();
+    return () => swayAnimation.stop();
+  }, []);
 
   useEffect(() => {
     const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
@@ -84,6 +485,28 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
     animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
   }, []);
+
+  // Get sky colors based on phase
+  const getSkyColors = useMemo(() => {
+    switch (currentPhase) {
+      case 0: return { top: '#87CEEB', middle: '#B0E0E6', bottom: '#E0F6FF' };
+      case 1: return { top: '#6BB3D9', middle: '#A8D4E6', bottom: '#D4E9F2' };
+      case 2: return { top: '#5A7A8A', middle: '#8BA5B5', bottom: '#B5C5CF' };
+      case 3: return { top: '#3D4F5F', middle: '#5A6B7A', bottom: '#7A8B9A' };
+      case 4: return { top: '#1A1A2E', middle: '#2D2D44', bottom: '#3D3D5C' };
+      default: return { top: '#87CEEB', middle: '#B0E0E6', bottom: '#E0F6FF' };
+    }
+  }, [currentPhase]);
+
+  const treeSwayRotate = treeSway.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-2deg', '2deg'],
+  });
+
+  const sunRotate = sunRotation.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+  });
 
   // Get only unlocked rooms, sorted by floor
   const unlockedRooms = rooms
@@ -175,35 +598,98 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Fixed sky background */}
+      {/* Fixed sky background with phase-based colors */}
       <View style={styles.skyBackground}>
-        <View style={styles.skyTop} />
-        <View style={styles.skyMiddle} />
-        <View style={styles.skyBottom} />
+        <View style={[styles.skyTop, { backgroundColor: getSkyColors.top }]} />
+        <View style={[styles.skyMiddle, { backgroundColor: getSkyColors.middle }]} />
+        <View style={[styles.skyBottom, { backgroundColor: getSkyColors.bottom }]} />
       </View>
 
-      {/* Animated clouds - fixed to screen */}
+      {/* Floating particles */}
+      {particles.map(particle => (
+        <FloatingParticle key={particle.id} particle={particle} />
+      ))}
+
+      {/* Shooting stars (only at higher phases) */}
+      {currentPhase >= 2 && <ShootingStar />}
+      {currentPhase >= 3 && <ShootingStar />}
+      {currentPhase >= 4 && <ShootingStar />}
+
+      {/* Flying birds */}
+      <FlyingBird startDelay={0} yPosition={80} />
+      <FlyingBird startDelay={3000} yPosition={50} />
+      {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
+
+      {/* Animated clouds - fixed to screen, darker at higher phases */}
       <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
-        <Text style={styles.cloudEmoji}>☁️</Text>
+        <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
       </Animated.View>
       <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
-        <Text style={styles.cloudEmoji}>☁️</Text>
-        <Text style={[styles.cloudEmoji, { marginLeft: 25 }]}>☁️</Text>
+        <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+        <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
       </Animated.View>
       <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
-        <Text style={[styles.cloudEmoji, { fontSize: 38 }]}>☁️</Text>
+        <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
       </Animated.View>
 
-      {/* Sun - fixed position */}
-      <View style={styles.sun} pointerEvents="none">
-        <Text style={styles.sunEmoji}>☀️</Text>
-      </View>
+      {/* Sun with animated rays - hidden at phase 4 */}
+      {currentPhase < 4 && (
+        <Animated.View
+          style={[
+            styles.sun,
+            {
+              transform: [
+                { scale: sunPulse },
+                { rotate: sunRotate },
+              ],
+              opacity: currentPhase >= 3 ? 0.4 : 1,
+            }
+          ]}
+          pointerEvents="none"
+        >
+          <View style={styles.sunRays}>
+            {[...Array(8)].map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.sunRay,
+                  { transform: [{ rotate: `${i * 45}deg` }] }
+                ]}
+              />
+            ))}
+          </View>
+          <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
+        </Animated.View>
+      )}
 
-      {/* Birds - fixed position */}
-      <View style={styles.birds} pointerEvents="none">
-        <Text style={styles.birdEmoji}>🐦</Text>
-        <Text style={[styles.birdEmoji, { marginLeft: 12, marginTop: -6 }]}>🐦</Text>
-      </View>
+      {/* Moon for phase 4 */}
+      {currentPhase >= 4 && (
+        <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
+          <Text style={styles.sunEmoji}>🌑</Text>
+        </View>
+      )}
+
+      {/* Stars at night (phase 3-4) */}
+      {currentPhase >= 3 && (
+        <View style={styles.starsContainer} pointerEvents="none">
+          {[...Array(12)].map((_, i) => (
+            <Text
+              key={i}
+              style={[
+                styles.star,
+                {
+                  left: `${10 + (i * 7) % 80}%`,
+                  top: `${5 + (i * 11) % 15}%`,
+                  opacity: 0.3 + Math.random() * 0.5,
+                  fontSize: 8 + Math.random() * 6,
+                }
+              ]}
+            >
+              ✦
+            </Text>
+          ))}
+        </View>
+      )}
 
       {/* Gesture handlers with simultaneous recognition */}
       <PanGestureHandler
@@ -244,19 +730,33 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 </View>
               </View>
 
-              {/* Trees on left side */}
-              <View style={[styles.treeGroup, styles.leftTrees]} pointerEvents="none">
+              {/* Trees on left side with sway animation */}
+              <Animated.View
+                style={[
+                  styles.treeGroup,
+                  styles.leftTrees,
+                  { transform: [{ rotate: treeSwayRotate }] }
+                ]}
+                pointerEvents="none"
+              >
                 <Text style={styles.treeEmoji}>🌳</Text>
                 <Text style={styles.smallTreeEmoji}>🌲</Text>
                 <Text style={styles.bushEmoji}>🌿</Text>
-              </View>
+              </Animated.View>
 
-              {/* Trees on right side */}
-              <View style={[styles.treeGroup, styles.rightTrees]} pointerEvents="none">
+              {/* Trees on right side with sway animation */}
+              <Animated.View
+                style={[
+                  styles.treeGroup,
+                  styles.rightTrees,
+                  { transform: [{ rotate: treeSwayRotate }] }
+                ]}
+                pointerEvents="none"
+              >
                 <Text style={styles.treeEmoji}>🌳</Text>
                 <Text style={styles.smallTreeEmoji}>🌲</Text>
                 <Text style={styles.bushEmoji}>🌿</Text>
-              </View>
+              </Animated.View>
 
               {/* Fence */}
               <View style={styles.fence} pointerEvents="none">
@@ -272,7 +772,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   <View style={styles.chimney}>
                     <View style={styles.chimneyBody} />
                     <View style={styles.chimneyTop} />
-                    <Text style={styles.smokeEmoji}>💨</Text>
+                    {/* Animated smoke puffs */}
+                    <View style={styles.smokeContainer}>
+                      <SmokePuff delay={0} />
+                      <SmokePuff delay={1000} />
+                      <SmokePuff delay={2000} />
+                    </View>
                   </View>
                   <View style={styles.roofMain}>
                     <View style={styles.roofPattern}>
@@ -422,12 +927,51 @@ const styles = StyleSheet.create({
     top: 15,
     right: 20,
     zIndex: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sunEmoji: {
     fontSize: 50,
+    zIndex: 2,
+  },
+  sunRays: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sunRay: {
+    position: 'absolute',
+    width: 3,
+    height: 40,
+    backgroundColor: '#FFD700',
+    opacity: 0.4,
+    borderRadius: 2,
   },
 
-  // Birds - fixed
+  // Stars for night sky
+  starsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 150,
+  },
+  star: {
+    position: 'absolute',
+    color: '#FFFFFF',
+  },
+
+  // Smoke container
+  smokeContainer: {
+    position: 'absolute',
+    top: -20,
+    left: 5,
+  },
+
+  // Birds - removed static, now using FlyingBird component
   birds: {
     position: 'absolute',
     top: 50,

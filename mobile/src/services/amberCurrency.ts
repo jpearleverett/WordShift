@@ -8,6 +8,7 @@ import {
   DialoguePhase,
   STREAK_BONUSES,
   calculateStreakMultiplier,
+  checkMilestone,
 } from '../types/homeWorld';
 
 const PROGRESS_STORAGE_KEY = 'wordshift_home_progress';
@@ -148,6 +149,8 @@ export async function awardPuzzleAmber(
   amount: number;
   baseAmount: number;
   streakBonus: number;
+  milestoneBonus: number;
+  milestoneMessage: string | null;
   newBalance: number;
   phaseChanged: boolean;
   newPhase: DialoguePhase;
@@ -179,6 +182,25 @@ export async function awardPuzzleAmber(
   progress.totalAmberEarned += totalAmount;
   progress.puzzlesSolved += 1;
 
+  // Check for milestone bonus
+  const milestone = checkMilestone(progress.puzzlesSolved);
+  let milestoneBonus = 0;
+  let milestoneMessage: string | null = null;
+  if (milestone) {
+    milestoneBonus = milestone.amber;
+    milestoneMessage = milestone.message;
+    progress.amber += milestoneBonus;
+    progress.totalAmberEarned += milestoneBonus;
+
+    // Record milestone transaction separately
+    await recordTransaction({
+      amount: milestoneBonus,
+      type: 'earn',
+      source: `milestone_${progress.puzzlesSolved}`,
+      timestamp: Date.now(),
+    });
+  }
+
   // Check for phase transition
   const previousPhase = progress.currentPhase;
   const newPhase = calculatePhase(progress.puzzlesSolved);
@@ -193,7 +215,7 @@ export async function awardPuzzleAmber(
   progressCache = progress;
   await saveProgress();
 
-  // Record transaction
+  // Record puzzle transaction
   await recordTransaction({
     amount: totalAmount,
     type: 'earn',
@@ -205,6 +227,8 @@ export async function awardPuzzleAmber(
     amount: totalAmount,
     baseAmount,
     streakBonus,
+    milestoneBonus,
+    milestoneMessage,
     newBalance: progress.amber,
     phaseChanged,
     newPhase,

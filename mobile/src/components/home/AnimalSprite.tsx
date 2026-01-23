@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,83 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
+
+// Emotion bubble emojis based on phase
+const EMOTION_BUBBLES: Record<number, string[]> = {
+  0: ['💕', '✨', '💖', '🌟', '💫', '🎵', '💛'],
+  1: ['💭', '❓', '🤔', '💫', '✨'],
+  2: ['💭', '😰', '💧', '❓', '🌫️'],
+  3: ['😰', '💧', '👁️', '💀', '🌑'],
+  4: ['💀', '👁️', '🌑', '⚫', '😱'],
+};
+
+// Z's animation component for sleeping animals
+const SleepingZs: React.FC = () => {
+  const z1Y = useRef(new Animated.Value(0)).current;
+  const z2Y = useRef(new Animated.Value(0)).current;
+  const z3Y = useRef(new Animated.Value(0)).current;
+  const z1Opacity = useRef(new Animated.Value(0)).current;
+  const z2Opacity = useRef(new Animated.Value(0)).current;
+  const z3Opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateZ = (y: Animated.Value, opacity: Animated.Value, delay: number) => {
+      const animate = () => {
+        y.setValue(0);
+        opacity.setValue(0);
+        Animated.parallel([
+          Animated.timing(y, {
+            toValue: -25,
+            duration: 2000,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+            delay,
+          }),
+          Animated.sequence([
+            Animated.timing(opacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+              delay,
+            }),
+            Animated.timing(opacity, {
+              toValue: 0,
+              duration: 1700,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]).start(() => animate());
+      };
+      animate();
+    };
+
+    animateZ(z1Y, z1Opacity, 0);
+    animateZ(z2Y, z2Opacity, 600);
+    animateZ(z3Y, z3Opacity, 1200);
+  }, []);
+
+  return (
+    <View style={sleepStyles.container}>
+      <Animated.Text style={[sleepStyles.z, sleepStyles.z1, { transform: [{ translateY: z1Y }], opacity: z1Opacity }]}>
+        z
+      </Animated.Text>
+      <Animated.Text style={[sleepStyles.z, sleepStyles.z2, { transform: [{ translateY: z2Y }], opacity: z2Opacity }]}>
+        Z
+      </Animated.Text>
+      <Animated.Text style={[sleepStyles.z, sleepStyles.z3, { transform: [{ translateY: z3Y }], opacity: z3Opacity }]}>
+        Z
+      </Animated.Text>
+    </View>
+  );
+};
+
+const sleepStyles = StyleSheet.create({
+  container: { position: 'absolute', top: -10, right: -5 },
+  z: { position: 'absolute', fontWeight: 'bold', color: CandyColors.purple.main },
+  z1: { fontSize: 10, right: 0 },
+  z2: { fontSize: 12, right: 8, top: -5 },
+  z3: { fontSize: 14, right: 16, top: -12 },
+});
 
 interface AnimalSpriteProps {
   animal: Animal;
@@ -62,7 +139,155 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const scaleX = useRef(new Animated.Value(1)).current;
   const notificationPulse = useRef(new Animated.Value(1)).current;
 
+  // New juice animations
+  const tapScale = useRef(new Animated.Value(1)).current;
+  const breatheScale = useRef(new Animated.Value(1)).current;
+  const emotionOpacity = useRef(new Animated.Value(0)).current;
+  const emotionY = useRef(new Animated.Value(0)).current;
+  const wiggleRotation = useRef(new Animated.Value(0)).current;
+
   const [isMoving, setIsMoving] = useState(false);
+  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+
+  // Breathing animation (subtle scale pulse)
+  useEffect(() => {
+    const breatheAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheScale, {
+          toValue: 1.05,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(breatheScale, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    breatheAnimation.start();
+    return () => breatheAnimation.stop();
+  }, []);
+
+  // Random emotion bubble popup
+  useEffect(() => {
+    if (isOnCooldown) return; // No emotions while sleeping
+
+    const showEmotion = () => {
+      const emojis = EMOTION_BUBBLES[currentPhase] || EMOTION_BUBBLES[0];
+      setCurrentEmotion(emojis[Math.floor(Math.random() * emojis.length)]);
+      emotionY.setValue(0);
+      emotionOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(emotionY, {
+          toValue: -30,
+          duration: 2000,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(emotionOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.delay(1200),
+          Animated.timing(emotionOpacity, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    };
+
+    // Show emotion randomly every 8-15 seconds
+    const interval = setInterval(() => {
+      if (Math.random() > 0.5) showEmotion();
+    }, 8000 + Math.random() * 7000);
+
+    return () => clearInterval(interval);
+  }, [currentPhase, isOnCooldown]);
+
+  // Tap reaction animation
+  const handlePress = useCallback(() => {
+    // Squish and bounce
+    Animated.sequence([
+      Animated.timing(tapScale, {
+        toValue: 0.85,
+        duration: 80,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.spring(tapScale, {
+        toValue: 1,
+        friction: 3,
+        tension: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Wiggle
+    Animated.sequence([
+      Animated.timing(wiggleRotation, {
+        toValue: 1,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(wiggleRotation, {
+        toValue: -1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(wiggleRotation, {
+        toValue: 0.5,
+        duration: 75,
+        useNativeDriver: true,
+      }),
+      Animated.timing(wiggleRotation, {
+        toValue: 0,
+        duration: 75,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Show a happy emotion on tap
+    const emojis = currentPhase >= 3 ? ['😰', '💧'] : ['💕', '✨', '💖'];
+    setCurrentEmotion(emojis[Math.floor(Math.random() * emojis.length)]);
+    emotionY.setValue(0);
+    emotionOpacity.setValue(0);
+    Animated.parallel([
+      Animated.timing(emotionY, {
+        toValue: -35,
+        duration: 1500,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(emotionOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.delay(800),
+        Animated.timing(emotionOpacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
+    onPress(animal);
+  }, [animal, onPress, currentPhase]);
+
+  const wiggleRotate = wiggleRotation.interpolate({
+    inputRange: [-1, 0, 1],
+    outputRange: ['-8deg', '0deg', '8deg'],
+  });
 
   // Walking animation - random movement within room bounds
   useEffect(() => {
@@ -213,23 +438,52 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       ]}
     >
       <TouchableOpacity
-        onPress={() => onPress(animal)}
-        activeOpacity={0.8}
+        onPress={handlePress}
+        activeOpacity={1}
         style={styles.touchable}
       >
         <Animated.View
           style={[
             styles.spriteContainer,
-            { transform: [{ scaleX }] },
+            {
+              transform: [
+                { scaleX },
+                { scale: Animated.multiply(tapScale, breatheScale) },
+                { rotate: wiggleRotate },
+              ],
+            },
           ]}
         >
-          {/* Shadow */}
-          <View style={styles.shadow} />
+          {/* Shadow - scales with tap */}
+          <Animated.View
+            style={[
+              styles.shadow,
+              { transform: [{ scaleX: tapScale }] },
+            ]}
+          />
 
           {/* Animal body */}
           <View style={[styles.body, { borderColor: getMoodColor() }]}>
             <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
           </View>
+
+          {/* Emotion bubble */}
+          {currentEmotion && (
+            <Animated.View
+              style={[
+                styles.emotionBubble,
+                {
+                  transform: [{ translateY: emotionY }],
+                  opacity: emotionOpacity,
+                },
+              ]}
+            >
+              <Text style={styles.emotionEmoji}>{currentEmotion}</Text>
+            </Animated.View>
+          )}
+
+          {/* Sleeping Z's when on cooldown */}
+          {isOnCooldown && <SleepingZs />}
 
           {/* New dialogue indicator - hidden when on cooldown */}
           {animal.hasNewDialogue && !isOnCooldown && (
@@ -243,9 +497,17 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             </Animated.View>
           )}
 
-          {/* Name tag */}
-          <View style={styles.nameTag}>
-            <Text style={styles.nameText}>{animal.name}</Text>
+          {/* Name tag with phase-based style */}
+          <View style={[
+            styles.nameTag,
+            currentPhase >= 3 && styles.nameTagDark,
+          ]}>
+            <Text style={[
+              styles.nameText,
+              currentPhase >= 3 && styles.nameTextDark,
+            ]}>
+              {animal.name}
+            </Text>
           </View>
         </Animated.View>
       </TouchableOpacity>
@@ -323,6 +585,24 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontSize: 10,
     fontWeight: '700',
+  },
+  nameTagDark: {
+    backgroundColor: CandyColors.purple.dark,
+  },
+  nameTextDark: {
+    color: CandyColors.gray[300],
+  },
+  emotionBubble: {
+    position: 'absolute',
+    top: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emotionEmoji: {
+    fontSize: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
 

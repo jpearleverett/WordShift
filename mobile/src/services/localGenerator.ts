@@ -190,25 +190,101 @@ const FUN_WORDS = new Set([
 ]);
 
 // Existential dread words - gradually introduced at higher phases
+// These words get bonus scoring at higher phases to create thematic puzzles
 const DREAD_WORDS = new Set([
-  // Phase 1 - Curious/wondering
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 1 - CURIOSITY & WONDERING (Subtle philosophical undertones)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Questioning
   'THINK', 'PONDER', 'WONDER', 'DOUBT', 'MAYBE', 'COULD', 'MIGHT', 'SEEM',
-  'DRIFT', 'WANDER', 'LOST', 'SEEK', 'FIND', 'QUESTION', 'ASK', 'WHY',
-  // Phase 2 - Questioning existence
-  'VOID', 'EMPTY', 'HOLLOW', 'SHELL', 'FADE', 'WANE', 'DECAY', 'WILT',
-  'ALONE', 'APART', 'DETACH', 'FLOAT', 'DRIFT', 'SINK', 'FALL', 'DROP',
-  'TIME', 'PASS', 'FLEETING', 'BRIEF', 'SHORT', 'GONE', 'PAST', 'WAS',
-  // Phase 3 - Existential dread
-  'DREAD', 'FEAR', 'DARK', 'COLD', 'NUMB', 'BLANK', 'STILL', 'QUIET',
-  'END', 'FINAL', 'LAST', 'CEASE', 'STOP', 'HALT', 'DONE', 'OVER',
-  'DUST', 'ASH', 'SHADOW', 'SHADE', 'GHOST', 'ECHO', 'TRACE', 'REMAIN',
-  'VAST', 'INFINITE', 'ETERNAL', 'FOREVER', 'NEVER', 'ALWAYS', 'ENDLESS',
-  // Phase 4 - Complete crisis
-  'DOOM', 'OBLIVION', 'ABYSS', 'CHASM', 'RIFT', 'TEAR', 'REND', 'BREAK',
-  'NOTHING', 'ZERO', 'NULL', 'BLANK', 'VOID', 'ABSENCE', 'LACK', 'WANT',
+  'ASK', 'WHY', 'HOW', 'WHAT', 'WHEN', 'WHERE', 'WHO', 'QUERY',
+  // Searching
+  'DRIFT', 'WANDER', 'LOST', 'SEEK', 'FIND', 'SEARCH', 'QUEST', 'HUNT',
+  'ROAM', 'STRAY', 'MEANDER', 'EXPLORE', 'PROBE', 'SCAN', 'TRACE',
+  // Perception
+  'SENSE', 'FEEL', 'NOTICE', 'WATCH', 'GAZE', 'PEER', 'GLIMPSE', 'VIEW',
+  'AWARE', 'ALERT', 'AWAKE', 'KNOW', 'LEARN', 'GRASP', 'REALIZE',
+  // Change
+  'SHIFT', 'CHANGE', 'MORPH', 'ALTER', 'VARY', 'FLUX', 'FLOW', 'TURN',
+  'GROW', 'SHRINK', 'EXPAND', 'CONTRACT', 'SWELL', 'PULSE', 'CYCLE',
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 2 - QUESTIONING EXISTENCE (Impermanence & isolation)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Emptiness
+  'VOID', 'EMPTY', 'HOLLOW', 'SHELL', 'HUSK', 'VACANT', 'BARREN', 'BARE',
+  'BLANK', 'NULL', 'ZERO', 'NONE', 'LACK', 'WANT', 'NEED', 'MISS',
+  // Decay
+  'FADE', 'WANE', 'DECAY', 'WILT', 'ROT', 'RUST', 'ERODE', 'WEAR',
+  'CRUMBLE', 'FLAKE', 'PEEL', 'CRACK', 'CHIP', 'BREAK', 'FRAY', 'TATTER',
+  // Isolation
+  'ALONE', 'APART', 'DETACH', 'SPLIT', 'SEVER', 'CUT', 'DIVIDE', 'PART',
+  'LONE', 'SOLO', 'SINGLE', 'ONLY', 'SOLE', 'MERE', 'REMOTE', 'DISTANT',
+  // Movement/Falling
+  'FLOAT', 'SINK', 'FALL', 'DROP', 'PLUNGE', 'DIVE', 'TUMBLE', 'SLIDE',
+  'SLIP', 'TRIP', 'STUMBLE', 'TOPPLE', 'CRASH', 'LAND', 'SETTLE', 'REST',
+  // Time
+  'TIME', 'PASS', 'BRIEF', 'SHORT', 'GONE', 'PAST', 'WAS', 'WERE',
+  'MOMENT', 'INSTANT', 'FLASH', 'BLINK', 'SWIFT', 'QUICK', 'HASTY', 'RUSH',
+  'AGE', 'ERA', 'EPOCH', 'SPAN', 'TERM', 'PHASE', 'STAGE', 'CYCLE',
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 3 - EXISTENTIAL DREAD (Mortality & darkness)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Fear & Dread
+  'DREAD', 'FEAR', 'FRIGHT', 'TERROR', 'HORROR', 'PANIC', 'ALARM', 'SHOCK',
+  'WORRY', 'FRET', 'ANGST', 'STRESS', 'STRAIN', 'TENSE', 'RIGID', 'STIFF',
+  // Darkness & Cold
+  'DARK', 'COLD', 'CHILL', 'FROST', 'ICE', 'FREEZE', 'FRIGID', 'COOL',
+  'BLACK', 'NIGHT', 'SHADE', 'SHADOW', 'GLOOM', 'MURKY', 'DIM', 'FAINT',
+  // Stillness & Silence
+  'NUMB', 'STILL', 'QUIET', 'HUSH', 'MUTE', 'SILENT', 'CALM', 'PEACE',
+  'STATIC', 'FROZEN', 'FIXED', 'STUCK', 'HALT', 'STOP', 'PAUSE', 'WAIT',
+  // Endings
+  'END', 'FINAL', 'LAST', 'CEASE', 'DONE', 'OVER', 'FINISH', 'CLOSE',
+  'COMPLETE', 'CONCLUDE', 'TERMINATE', 'EXPIRE', 'LAPSE', 'ELAPSE',
+  // Death imagery
+  'DUST', 'ASH', 'GHOST', 'HAUNT', 'SPIRIT', 'SOUL', 'WRAITH', 'SHADE',
+  'GRAVE', 'TOMB', 'CRYPT', 'BURIAL', 'MOURN', 'GRIEVE', 'WEEP', 'SOB',
+  'BONE', 'SKULL', 'CORPSE', 'REMAINS', 'RELIC', 'FOSSIL', 'TRACE', 'MARK',
+  // Remnants
+  'ECHO', 'REMAIN', 'LINGER', 'PERSIST', 'ENDURE', 'SURVIVE', 'OUTLAST',
+  'MEMORY', 'RECALL', 'RECORD', 'ARCHIVE', 'LEGACY', 'HEIR',
+  // Vastness
+  'VAST', 'HUGE', 'IMMENSE', 'MASSIVE', 'ENDLESS', 'BOUNDLESS', 'INFINITE',
+  'ETERNAL', 'FOREVER', 'NEVER', 'ALWAYS', 'CONSTANT', 'PERPETUAL',
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 4 - COMPLETE CRISIS (Cosmic horror & finality)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Destruction
+  'DOOM', 'RUIN', 'RAVAGE', 'WRECK', 'DESTROY', 'ANNIHILATE', 'OBLITERATE',
+  'ABYSS', 'CHASM', 'RIFT', 'TEAR', 'REND', 'SHATTER', 'SMASH', 'CRUSH',
+  'COLLAPSE', 'IMPLODE', 'EXPLODE', 'BURST', 'RUPTURE', 'FRACTURE',
+  // Nothingness
+  'NOTHING', 'OBLIVION', 'ABSENCE', 'VACUUM', 'EMPTY', 'HOLLOW', 'VOID',
+  'FORMLESS', 'SHAPELESS', 'NAMELESS', 'FACELESS', 'UNKNOWN', 'UNSEEN',
+  // Truth & Illusion
   'TRUTH', 'REAL', 'FAKE', 'FALSE', 'LIE', 'MASK', 'VEIL', 'HIDE',
-  'WAKE', 'SLEEP', 'DREAM', 'NIGHTMARE', 'VISION', 'ILLUSION', 'MIRAGE',
-  'HORIZON', 'EDGE', 'BRINK', 'VERGE', 'THRESHOLD', 'GATE', 'DOOR', 'PORTAL'
+  'DECEIVE', 'TRICK', 'FOOL', 'SHAM', 'FRAUD', 'HOAX', 'RUSE', 'GUISE',
+  // Dreams & Unreality
+  'WAKE', 'SLEEP', 'DREAM', 'VISION', 'MIRAGE', 'PHANTOM', 'SPECTER',
+  'DELUSION', 'FANCY', 'WHIM', 'FIGMENT', 'FANTASY', 'REVERIE',
+  // Boundaries & Thresholds
+  'HORIZON', 'EDGE', 'BRINK', 'VERGE', 'BORDER', 'MARGIN', 'RIM', 'FRINGE',
+  'LIMIT', 'BOUND', 'EXTENT', 'REACH', 'SCOPE', 'RANGE', 'SPAN',
+  'GATE', 'DOOR', 'PORTAL', 'PASSAGE', 'THRESHOLD', 'ENTRY', 'EXIT',
+  // Cosmic/Existential
+  'COSMOS', 'SPACE', 'STAR', 'MOON', 'SUN', 'PLANET', 'ORBIT', 'SPHERE',
+  'INFINITE', 'ETERNAL', 'TIMELESS', 'AGELESS', 'DEATHLESS', 'UNDYING',
+  'MORTAL', 'FINITE', 'FLEETING', 'TRANSIENT', 'BRIEF', 'MOMENTARY',
+  // Transformation
+  'BECOME', 'TRANSFORM', 'TRANSMUTE', 'CONVERT', 'SHIFT', 'MORPH', 'EVOLVE',
+  'DISSOLVE', 'MELT', 'FADE', 'VANISH', 'DISAPPEAR', 'EVAPORATE', 'DISPERSE',
+  // Final words
+  'FAREWELL', 'GOODBYE', 'ADIEU', 'PARTING', 'LEAVE', 'DEPART', 'GO',
+  'ACCEPT', 'SUBMIT', 'YIELD', 'SURRENDER', 'RELEASE', 'LET', 'ALLOW',
+  'PEACE', 'REST', 'SLEEP', 'SLUMBER', 'REPOSE', 'QUIET', 'STILL', 'CALM'
 ]);
 
 // Current phase for word selection (cached, updated during generation)
