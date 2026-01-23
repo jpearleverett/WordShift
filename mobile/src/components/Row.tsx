@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,18 +6,18 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  ScrollView,
-  Dimensions,
-  LayoutChangeEvent,
 } from 'react-native';
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
 import { CandyColors } from '../theme/colors';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
-const MAX_ROW_CONTENT_WIDTH = SCREEN_WIDTH - (ROW_HORIZONTAL_MARGIN * 2) - (ROW_PADDING * 2);
+
+// Arc layout configuration
+const ARC_HEIGHT = 25; // How much the arc curves down at edges
+const COMPACT_TILE_SCALE = 0.78; // Scale down tiles in DROP row to fit
+const COMPACT_SLOT_WIDTH = 22; // Smaller slots for arc layout
 
 interface RowProps {
   rowData: RowData;
@@ -30,7 +30,7 @@ interface RowProps {
 }
 
 // Animated drop slot component
-const Slot: React.FC<{ onPress: () => void; index: number }> = ({ onPress, index }) => {
+const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> = ({ onPress, index, compact = false }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -144,97 +144,28 @@ const Slot: React.FC<{ onPress: () => void; index: number }> = ({ onPress, index
         />
 
         {/* Main slot */}
-        <View style={styles.slot}>
+        <View style={[styles.slot, compact && styles.slotCompact]}>
           {/* Inner shimmer */}
           <View style={styles.slotShimmer} />
 
           {/* Plus icon */}
-          <View style={styles.plusContainer}>
-            <View style={styles.plusHorizontal} />
-            <View style={styles.plusVertical} />
+          <View style={[styles.plusContainer, compact && styles.plusContainerCompact]}>
+            <View style={[styles.plusHorizontal, compact && styles.plusHorizontalCompact]} />
+            <View style={[styles.plusVertical, compact && styles.plusVerticalCompact]} />
           </View>
 
-          {/* Corner decorations */}
-          <View style={[styles.cornerDot, styles.cornerTopLeft]} />
-          <View style={[styles.cornerDot, styles.cornerTopRight]} />
-          <View style={[styles.cornerDot, styles.cornerBottomLeft]} />
-          <View style={[styles.cornerDot, styles.cornerBottomRight]} />
+          {/* Corner decorations - hide in compact mode */}
+          {!compact && (
+            <>
+              <View style={[styles.cornerDot, styles.cornerTopLeft]} />
+              <View style={[styles.cornerDot, styles.cornerTopRight]} />
+              <View style={[styles.cornerDot, styles.cornerBottomLeft]} />
+              <View style={[styles.cornerDot, styles.cornerBottomRight]} />
+            </>
+          )}
         </View>
       </Animated.View>
     </TouchableOpacity>
-  );
-};
-
-// Edge fade indicator component
-const EdgeFade: React.FC<{ side: 'left' | 'right'; visible: boolean }> = ({ side, visible }) => {
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(opacityAnim, {
-      toValue: visible ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-
-    if (visible) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0,
-            duration: 1000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-
-    return () => pulseAnim.stopAnimation();
-  }, [visible]);
-
-  const arrowTranslate = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: side === 'left' ? [0, -4] : [0, 4],
-  });
-
-  return (
-    <Animated.View
-      style={[
-        styles.edgeFade,
-        side === 'left' ? styles.edgeFadeLeft : styles.edgeFadeRight,
-        { opacity: opacityAnim },
-      ]}
-      pointerEvents="none"
-    >
-      {/* Gradient simulation with multiple layers */}
-      <View style={[
-        styles.edgeFadeGradient,
-        side === 'left' ? styles.edgeFadeGradientLeft : styles.edgeFadeGradientRight,
-      ]}>
-        <View style={[styles.gradientLayer, styles.gradientLayer1, side === 'right' && styles.gradientLayerFlip]} />
-        <View style={[styles.gradientLayer, styles.gradientLayer2, side === 'right' && styles.gradientLayerFlip]} />
-        <View style={[styles.gradientLayer, styles.gradientLayer3, side === 'right' && styles.gradientLayerFlip]} />
-      </View>
-
-      {/* Animated scroll hint arrow */}
-      <Animated.View
-        style={[
-          styles.scrollHintArrow,
-          { transform: [{ translateX: arrowTranslate }] },
-        ]}
-      >
-        <Text style={styles.scrollHintArrowText}>
-          {side === 'left' ? '‹' : '›'}
-        </Text>
-      </Animated.View>
-    </Animated.View>
   );
 };
 
@@ -252,31 +183,11 @@ export const Row: React.FC<RowProps> = ({
   const isCompleted = rowIndex < activeRowIndex;
   const showSlots = isTarget && selectedLetter && !isProcessing;
 
-  // Scroll state
-  const scrollViewRef = useRef<ScrollView>(null);
-  const [contentWidth, setContentWidth] = useState(0);
-  const [containerWidth, setContainerWidth] = useState(MAX_ROW_CONTENT_WIDTH);
-  const [scrollPosition, setScrollPosition] = useState(0);
-
-  const canScrollLeft = scrollPosition > 5;
-  const canScrollRight = contentWidth > containerWidth && scrollPosition < (contentWidth - containerWidth - 5);
-  const needsScroll = contentWidth > containerWidth;
-
   // Animation values
   const scaleAnim = useRef(new Animated.Value(isSource ? 1 : 0.9)).current;
   const opacityAnim = useRef(new Animated.Value(isSource ? 1 : 0.3)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
-
-  // Auto-center when content changes (e.g., slots appear)
-  useEffect(() => {
-    if (needsScroll && scrollViewRef.current) {
-      const centerOffset = Math.max(0, (contentWidth - containerWidth) / 2);
-      setTimeout(() => {
-        scrollViewRef.current?.scrollTo({ x: centerOffset, animated: true });
-      }, 100);
-    }
-  }, [showSlots, contentWidth, containerWidth, needsScroll]);
 
   useEffect(() => {
     // Animate row transitions
@@ -364,53 +275,115 @@ export const Row: React.FC<RowProps> = ({
     };
   }, [isSource, isTarget, isCompleted]);
 
-  const handleContentLayout = (event: LayoutChangeEvent) => {
-    setContentWidth(event.nativeEvent.layout.width);
+  // Calculate arc positions for elements
+  const calculateArcPosition = (index: number, totalElements: number) => {
+    // Position along the arc from -1 to 1 (left to right)
+    const normalizedPos = totalElements > 1
+      ? (index / (totalElements - 1)) * 2 - 1
+      : 0;
+
+    // Parabolic curve: y = x^2 creates a U-shape (bowl)
+    const yOffset = normalizedPos * normalizedPos * ARC_HEIGHT;
+
+    // Rotation: tilt elements to follow the arc tangent
+    const rotation = normalizedPos * 8; // degrees
+
+    return { yOffset, rotation };
   };
 
-  const handleContainerLayout = (event: LayoutChangeEvent) => {
-    setContainerWidth(event.nativeEvent.layout.width);
-  };
-
-  const handleScroll = (event: any) => {
-    setScrollPosition(event.nativeEvent.contentOffset.x);
-  };
-
-  const renderContent = () => {
-    const elements: React.ReactNode[] = [];
+  // Render arc layout for DROP row with slots
+  const renderArcContent = () => {
     const letters = rowData.words;
+    const totalElements = letters.length * 2 + 1; // slots between and around letters
 
-    // Target row with slots for dropping
-    if (showSlots) {
-      elements.push(<Slot key="slot-start" onPress={() => onSlotPress(0)} index={0} />);
-      letters.forEach((letter, index) => {
-        elements.push(
+    const elements: React.ReactNode[] = [];
+    let elementIndex = 0;
+
+    // Start with first slot
+    const firstPos = calculateArcPosition(elementIndex, totalElements);
+    elements.push(
+      <Animated.View
+        key="slot-start"
+        style={[
+          styles.arcElement,
+          {
+            transform: [
+              { translateY: firstPos.yOffset },
+              { rotate: `${firstPos.rotation}deg` },
+            ],
+          },
+        ]}
+      >
+        <Slot onPress={() => onSlotPress(0)} index={0} compact />
+      </Animated.View>
+    );
+    elementIndex++;
+
+    // Alternate: letter, slot, letter, slot...
+    letters.forEach((letter, letterIdx) => {
+      // Letter
+      const letterPos = calculateArcPosition(elementIndex, totalElements);
+      elements.push(
+        <Animated.View
+          key={letter.id}
+          style={[
+            styles.arcElement,
+            styles.arcTileElement,
+            {
+              transform: [
+                { translateY: letterPos.yOffset },
+                { rotate: `${letterPos.rotation}deg` },
+                { scale: COMPACT_TILE_SCALE },
+              ],
+            },
+          ]}
+        >
           <LetterTile
-            key={letter.id}
             letter={letter}
             highlight={letter.isLocked ? 'locked' : 'default'}
           />
-        );
-        elements.push(
-          <Slot key={`slot-${index + 1}`} onPress={() => onSlotPress(index + 1)} index={index + 1} />
-        );
-      });
-    } else {
-      // Standard display
-      letters.forEach((letter) => {
-        elements.push(
-          <LetterTile
-            key={letter.id}
-            letter={letter}
-            isSelected={selectedLetter?.id === letter.id}
-            isInteractable={isSource && !isProcessing && !letter.isLocked}
-            highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
-            onPress={() => onLetterPress(letter, rowIndex)}
-          />
-        );
-      });
-    }
+        </Animated.View>
+      );
+      elementIndex++;
+
+      // Slot after letter
+      const slotPos = calculateArcPosition(elementIndex, totalElements);
+      elements.push(
+        <Animated.View
+          key={`slot-${letterIdx + 1}`}
+          style={[
+            styles.arcElement,
+            {
+              transform: [
+                { translateY: slotPos.yOffset },
+                { rotate: `${slotPos.rotation}deg` },
+              ],
+            },
+          ]}
+        >
+          <Slot onPress={() => onSlotPress(letterIdx + 1)} index={letterIdx + 1} compact />
+        </Animated.View>
+      );
+      elementIndex++;
+    });
+
     return elements;
+  };
+
+  const renderContent = () => {
+    const letters = rowData.words;
+
+    // Standard display for non-target rows
+    return letters.map((letter) => (
+      <LetterTile
+        key={letter.id}
+        letter={letter}
+        isSelected={selectedLetter?.id === letter.id}
+        isInteractable={isSource && !isProcessing && !letter.isLocked}
+        highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
+        onPress={() => onLetterPress(letter, rowIndex)}
+      />
+    ));
   };
 
   const glowOpacity = glowAnim.interpolate({
@@ -476,39 +449,21 @@ export const Row: React.FC<RowProps> = ({
           </>
         )}
 
-        {/* Scrollable content area */}
-        <View style={styles.scrollWrapper} onLayout={handleContainerLayout}>
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-            contentContainerStyle={styles.scrollContent}
-            bounces={needsScroll}
-            scrollEnabled={needsScroll}
-          >
-            <View style={styles.lettersContainer} onLayout={handleContentLayout}>
+        {/* Content area */}
+        <View style={styles.contentWrapper}>
+          {showSlots ? (
+            // Arc layout for DROP row - shows all slots without scrolling
+            <View style={styles.arcContainer}>
+              {renderArcContent()}
+            </View>
+          ) : (
+            // Standard centered layout for other rows
+            <View style={styles.lettersContainer}>
               {renderContent()}
             </View>
-          </ScrollView>
-
-          {/* Edge fade indicators */}
-          {showSlots && (
-            <>
-              <EdgeFade side="left" visible={canScrollLeft} />
-              <EdgeFade side="right" visible={canScrollRight} />
-            </>
           )}
         </View>
       </View>
-
-      {/* Scroll hint text for target row */}
-      {showSlots && needsScroll && (
-        <Animated.View style={styles.scrollHintContainer}>
-          <Text style={styles.scrollHintText}>← swipe to see all slots →</Text>
-        </Animated.View>
-      )}
     </Animated.View>
   );
 };
@@ -534,13 +489,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
 
-  // Scroll wrapper
-  scrollWrapper: {
+  // Content wrapper
+  contentWrapper: {
     position: 'relative',
     borderRadius: 24,
     overflow: 'hidden',
-  },
-  scrollContent: {
     paddingVertical: 16,
     paddingHorizontal: ROW_PADDING,
   },
@@ -548,6 +501,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Arc layout for DROP row
+  arcContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    paddingTop: 8,
+    paddingBottom: ARC_HEIGHT + 8,
+  },
+  arcElement: {
+    alignItems: 'center',
+  },
+  arcTileElement: {
+    marginHorizontal: -2, // Tighter spacing for scaled tiles
   },
 
   // Row variants
@@ -674,86 +642,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
-  // Edge fade indicators
-  edgeFade: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  edgeFadeLeft: {
-    left: 0,
-  },
-  edgeFadeRight: {
-    right: 0,
-  },
-  edgeFadeGradient: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 48,
-    flexDirection: 'row',
-  },
-  edgeFadeGradientLeft: {
-    left: 0,
-  },
-  edgeFadeGradientRight: {
-    right: 0,
-    flexDirection: 'row-reverse',
-  },
-  gradientLayer: {
-    height: '100%',
-  },
-  gradientLayer1: {
-    width: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  },
-  gradientLayer2: {
-    width: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  gradientLayer3: {
-    width: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  gradientLayerFlip: {
-    // Handled by flexDirection: row-reverse on parent
-  },
-  scrollHintArrow: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: CandyColors.pink.main,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: CandyColors.pink.main,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  scrollHintArrowText: {
-    color: CandyColors.white,
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: -2,
-  },
-
-  // Scroll hint text
-  scrollHintContainer: {
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  scrollHintText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.6)',
-    letterSpacing: 0.5,
-  },
-
   // Slot styles
   slotOuter: {
     marginHorizontal: 2,
@@ -778,6 +666,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
+  slotCompact: {
+    width: COMPACT_SLOT_WIDTH,
+    height: 44,
+    borderRadius: 10,
+  },
   slotShimmer: {
     position: 'absolute',
     top: 0,
@@ -794,6 +687,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  plusContainerCompact: {
+    width: 12,
+    height: 12,
+  },
   plusHorizontal: {
     position: 'absolute',
     width: 12,
@@ -801,12 +698,20 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.pink.main,
     borderRadius: 2,
   },
+  plusHorizontalCompact: {
+    width: 10,
+    height: 2,
+  },
   plusVertical: {
     position: 'absolute',
     width: 3,
     height: 12,
     backgroundColor: CandyColors.pink.main,
     borderRadius: 2,
+  },
+  plusVerticalCompact: {
+    width: 2,
+    height: 10,
   },
   cornerDot: {
     position: 'absolute',
