@@ -1,20 +1,60 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# WordShift
 
-# Run and deploy your AI Studio app
+A word puzzle game where you shift letters between words to transform them into new words.
 
-This contains everything you need to run your app locally.
+## Game Overview
 
-View your app in AI Studio: https://ai.studio/apps/drive/18OjCAGdkzkmzf_oA3BDMScW6m_fHXk7j
+Pick a letter from the current word, drop it into the next word to form a valid English word, and progress through the puzzle chain. Each level presents a unique challenge with carefully crafted puzzles that avoid boring transformations.
 
-## Run Locally
+## Mobile App (Expo)
 
-**Prerequisites:**  Node.js
+The game is built as a React Native app using Expo SDK 54.
 
+### Prerequisites
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- Node.js 18+
+- Expo Go app on your phone
+- Phone and dev machine on same WiFi network
+
+### Quick Start
+
+```bash
+cd mobile
+npm install
+npx expo start
+```
+
+Then scan the QR code with Expo Go on your device.
+
+### Project Structure
+
+```
+mobile/
+├── App.tsx                 # Main app component
+├── src/
+│   ├── types.ts           # TypeScript interfaces
+│   ├── constants.ts       # Word lists and fallbacks
+│   ├── dictionary.ts      # 8000+ word dictionary
+│   ├── components/
+│   │   ├── Row.tsx        # Game row component
+│   │   └── LetterTile.tsx # Individual letter tile
+│   └── services/
+│       └── localGenerator.ts  # Puzzle generation algorithm
+├── assets/                # App icons and splash
+├── app.json              # Expo configuration
+└── package.json          # Dependencies
+```
+
+## Puzzle Generation
+
+The puzzle generator creates engaging word chains with:
+
+- **Anti-boring detection**: Heavily penalizes obvious suffix transforms (S, ED, ER, ING, LY)
+- **Middle-position preference**: Favors letter moves to/from middle of words
+- **Surprise scoring**: Rewards unexpected letter placements
+- **Semantic journey**: Bonus for puzzles traversing multiple word categories
+- **Quality threshold**: Only accepts puzzles scoring above minimum engagement level
+
+## Dictionary
+
+The game uses `dictionary.txt` containing 20,855 valid English words for puzzle generation and word validation.
