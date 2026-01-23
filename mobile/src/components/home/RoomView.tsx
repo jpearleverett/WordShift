@@ -18,6 +18,7 @@ interface RoomViewProps {
   onAnimalPress: (animal: Animal) => void;
   onRoomPress: (room: Room) => void;
   currentPhase: DialoguePhase;
+  isAnimalOnCooldown?: boolean;
 }
 
 // Decoration with position and size info
@@ -160,6 +161,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   onAnimalPress,
   onRoomPress,
   currentPhase,
+  isAnimalOnCooldown = false,
 }) => {
   const themeColors = ROOM_THEME_COLORS[room.theme];
   const furniture = ROOM_FURNITURE[room.theme];
@@ -268,6 +270,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
           roomHeight={height}
           onPress={onAnimalPress}
           currentPhase={currentPhase}
+          isOnCooldown={isAnimalOnCooldown}
         />
       )}
 
