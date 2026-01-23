@@ -17,6 +17,7 @@ interface AnimalSpriteProps {
   roomHeight: number;
   onPress: (animal: Animal) => void;
   currentPhase: DialoguePhase;
+  isOnCooldown?: boolean;
 }
 
 // Animation speeds by animal type (slower = more movement time)
@@ -53,6 +54,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   roomHeight,
   onPress,
   currentPhase,
+  isOnCooldown = false,
 }) => {
   const posX = useRef(new Animated.Value(animal.position.x)).current;
   const posY = useRef(new Animated.Value(animal.position.y)).current;
@@ -229,8 +231,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
           </View>
 
-          {/* New dialogue indicator */}
-          {animal.hasNewDialogue && (
+          {/* New dialogue indicator - hidden when on cooldown */}
+          {animal.hasNewDialogue && !isOnCooldown && (
             <Animated.View
               style={[
                 styles.notificationBadge,

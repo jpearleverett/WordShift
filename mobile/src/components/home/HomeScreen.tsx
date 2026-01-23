@@ -45,8 +45,9 @@ import {
   endSession,
   getSessionStatus,
   formatTimeRemaining,
+  updatePuzzleCount,
+  isOnCooldown,
 } from '../../services/dialogueSession';
-import { DIALOGUE_SESSION_CONFIG } from '../../types/homeWorld';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -72,8 +73,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
   const [sessionInfo, setSessionInfo] = useState<{
     status: 'available' | 'in_session' | 'cooldown';
-    timeRemaining?: number;
     dialoguesRemaining?: number;
+    puzzlesRemaining?: number;
   } | null>(null);
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
   const [unlockAvailability, setUnlockAvailability] = useState<{
@@ -96,16 +97,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     loadDialogueSessions(); // Load session data
   }, []);
 
-  // Timer for updating session status display
+  // Update session status when selected animal changes
   useEffect(() => {
-    if (!selectedAnimal) return;
-
-    const interval = setInterval(() => {
+    if (selectedAnimal) {
       const status = getSessionStatus(selectedAnimal.id);
       setSessionInfo(status);
-    }, 1000);
-
-    return () => clearInterval(interval);
+    }
   }, [selectedAnimal]);
 
   // Timer for dismissing cooldown message
@@ -126,6 +123,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       getNextUnlock(),
       getUnlockStatus(),
     ]);
+
+    // Update puzzle count for dialogue session system
+    updatePuzzleCount(progressData.puzzlesSolved);
 
     setProgress(progressData);
     setRooms(roomsData);
@@ -182,12 +182,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const availability = checkDialogueAvailability(animal.id);
 
     if (!availability.available) {
-      // Show cooldown message
-      if (availability.cooldownRemaining) {
-        setCooldownMessage(
-          `${animal.name} needs to rest. Come back in ${formatTimeRemaining(availability.cooldownRemaining)}!`
-        );
-      }
+      // Show cooldown message (vague, doesn't reveal puzzle count)
+      setCooldownMessage(
+        `${animal.name} needs some quiet time. Play more puzzles and come back!`
+      );
       return;
     }
 
@@ -217,11 +215,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (!availability.available && availability.reason !== 'max_dialogues') {
       // Session ended, close dialogue
       handleCloseDialogue();
-      if (availability.cooldownRemaining) {
-        setCooldownMessage(
-          `${selectedAnimal.name} is tired. Come back in ${formatTimeRemaining(availability.cooldownRemaining)}!`
-        );
-      }
+      setCooldownMessage(
+        `${selectedAnimal.name} wants to rest now. Come back after solving some puzzles!`
+      );
       return;
     }
 
@@ -475,16 +471,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {selectedAnimal && (
               <>
                 {/* Session status bar */}
-                {sessionInfo && sessionInfo.status === 'in_session' && (
+                {sessionInfo && sessionInfo.status === 'in_session' && sessionInfo.dialoguesRemaining !== undefined && (
                   <View style={styles.sessionBar}>
                     <Text style={styles.sessionBarText}>
-                      Session: {sessionInfo.timeRemaining ? formatTimeRemaining(sessionInfo.timeRemaining) : '--'}
+                      {sessionInfo.dialoguesRemaining > 3
+                        ? `${selectedAnimal.name} has lots to say!`
+                        : sessionInfo.dialoguesRemaining > 0
+                          ? `${selectedAnimal.name} is getting tired...`
+                          : `${selectedAnimal.name} needs to rest soon`}
                     </Text>
-                    {sessionInfo.dialoguesRemaining !== undefined && (
-                      <Text style={styles.sessionBarText}>
-                        {sessionInfo.dialoguesRemaining} messages left
-                      </Text>
-                    )}
                   </View>
                 )}
 
