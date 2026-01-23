@@ -107,7 +107,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   };
 
   const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.oldState === State.ACTIVE) {
+    if (event.nativeEvent.state === State.END) {
       const currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
       baseScale.current = currentScale;
       lastScale.current = currentScale;
@@ -141,7 +141,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   };
 
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.oldState === State.ACTIVE) {
+    if (event.nativeEvent.state === State.END) {
       const { translationX, translationY } = event.nativeEvent;
       const maxTranslate = 150 * lastScale.current;
 
@@ -184,17 +184,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         <Text style={[styles.birdEmoji, { marginLeft: 12, marginTop: -6 }]}>🐦</Text>
       </View>
 
-      {/* Ground layer - fixed at bottom */}
-      <View style={styles.groundLayer} pointerEvents="none">
-        <View style={styles.grassStrip} />
-        <View style={styles.dirtStrip} />
-        <View style={styles.groundDecorations}>
-          {['🍄', '🌸', '🌷', '🌻', '🌺', '🌼', '🌸', '🌷', '🍄'].map((emoji, i) => (
-            <Text key={i} style={styles.groundEmoji}>{emoji}</Text>
-          ))}
-        </View>
-      </View>
-
       {/* Gesture handlers with simultaneous recognition */}
       <PanGestureHandler
         ref={panRef}
@@ -223,6 +212,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
+              {/* Ground layer - moves with house */}
+              <View style={styles.groundLayer} pointerEvents="none">
+                <View style={styles.grassStrip} />
+                <View style={styles.dirtStrip} />
+                <View style={styles.groundDecorations}>
+                  {['🍄', '🌸', '🌷', '🌻', '🌺', '🌼', '🌸', '🌷', '🍄'].map((emoji, i) => (
+                    <Text key={i} style={styles.groundEmoji}>{emoji}</Text>
+                  ))}
+                </View>
+              </View>
+
               {/* Trees on left side */}
               <View style={[styles.treeGroup, styles.leftTrees]} pointerEvents="none">
                 <Text style={styles.treeEmoji}>🌳</Text>
@@ -378,36 +378,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  // Ground layer - fixed at bottom of screen
-  groundLayer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 150,
-    zIndex: 1,
-  },
-  grassStrip: {
-    height: 50,
-    backgroundColor: '#32CD32',
-  },
-  dirtStrip: {
-    flex: 1,
-    backgroundColor: '#8B4513',
-  },
-  groundDecorations: {
-    position: 'absolute',
-    top: 12,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-  },
-  groundEmoji: {
-    fontSize: 18,
-  },
-
   // Gesture container
   gestureContainer: {
     flex: 1,
@@ -419,7 +389,36 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingBottom: 130,
+  },
+
+  // Ground layer - at bottom of transform container
+  groundLayer: {
+    position: 'absolute',
+    bottom: 0,
+    left: -SCREEN_WIDTH, // Extend beyond screen for pan
+    right: -SCREEN_WIDTH,
+    width: SCREEN_WIDTH * 3, // Wide enough for panning
+    height: 180,
+  },
+  grassStrip: {
+    height: 60,
+    backgroundColor: '#32CD32',
+  },
+  dirtStrip: {
+    flex: 1,
+    backgroundColor: '#8B4513',
+  },
+  groundDecorations: {
+    position: 'absolute',
+    top: 15,
+    left: SCREEN_WIDTH, // Center the decorations
+    width: SCREEN_WIDTH,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+  },
+  groundEmoji: {
+    fontSize: 22,
   },
 
   // Trees
@@ -429,11 +428,11 @@ const styles = StyleSheet.create({
   },
   leftTrees: {
     left: 15,
-    bottom: 5,
+    bottom: 160,
   },
   rightTrees: {
     right: 15,
-    bottom: 5,
+    bottom: 160,
   },
   treeEmoji: {
     fontSize: 55,
@@ -450,7 +449,7 @@ const styles = StyleSheet.create({
   // Fence
   fence: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 175,
     left: 25,
     flexDirection: 'row',
     gap: 8,
@@ -467,6 +466,7 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
+    marginBottom: 120, // Sit on top of ground
   },
 
   // Roof

@@ -43,6 +43,7 @@ export interface Animal {
   isUnlocked: boolean;
   currentDialogueIndex: number;
   hasNewDialogue: boolean;
+  hasSeenIntro: boolean; // Whether the intro dialogue has been shown
   lastInteraction: number | null;
   // Animation state
   position: { x: number; y: number };
@@ -113,6 +114,11 @@ export interface HomeWorldProgress {
   // Tracking for phase transitions
   phasePuzzleThresholds: number[];
   lastDialogueRead: { [animalId: string]: number };
+  // Track which animals have had their intro dialogue shown
+  introsSeen: string[];
+  // Streak tracking for bonus amber
+  currentStreak: number;
+  lastPlayDate: string | null; // ISO date string (YYYY-MM-DD)
 }
 
 /**
@@ -214,3 +220,34 @@ export const AMBER_REWARDS: AmberReward = {
   MEDIUM: 10,
   HARD: 20,
 };
+
+/**
+ * Streak bonus configuration
+ * Higher streaks = more bonus amber
+ */
+export const STREAK_BONUSES = {
+  // Minimum streak to start getting bonuses
+  MIN_STREAK_FOR_BONUS: 2,
+  // Bonus per streak day (e.g., 5% per day)
+  BONUS_PER_STREAK: 0.05,
+  // Maximum bonus percentage (e.g., 50% cap)
+  MAX_BONUS_PERCENTAGE: 0.5,
+  // Days of inactivity before streak resets
+  STREAK_RESET_DAYS: 1,
+};
+
+/**
+ * Calculate streak bonus multiplier
+ * @param streak Current streak count
+ * @returns Multiplier (e.g., 1.15 for 15% bonus)
+ */
+export function calculateStreakMultiplier(streak: number): number {
+  if (streak < STREAK_BONUSES.MIN_STREAK_FOR_BONUS) {
+    return 1;
+  }
+  const bonusPercentage = Math.min(
+    (streak - 1) * STREAK_BONUSES.BONUS_PER_STREAK,
+    STREAK_BONUSES.MAX_BONUS_PERCENTAGE
+  );
+  return 1 + bonusPercentage;
+}

@@ -34,8 +34,9 @@ import {
   awardPuzzleAmber,
   getAmberBalance,
   getCurrentPhase,
+  getStreakInfo,
 } from './src/services/amberCurrency';
-import { AMBER_REWARDS, DialoguePhase } from './src/types/homeWorld';
+import { AMBER_REWARDS, DialoguePhase, calculateStreakMultiplier } from './src/types/homeWorld';
 
 // App screen type
 type AppScreen = 'home' | 'puzzle';
@@ -355,6 +356,8 @@ export default function App() {
   const [amberBalance, setAmberBalance] = useState(0);
   const [phaseChanged, setPhaseChanged] = useState(false);
   const [newPhase, setNewPhase] = useState<DialoguePhase>(0);
+  const [streakBonus, setStreakBonus] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
 
@@ -574,6 +577,8 @@ export default function App() {
         setAmberBalance(amberResult.newBalance);
         setPhaseChanged(amberResult.phaseChanged);
         setNewPhase(amberResult.newPhase);
+        setStreakBonus(amberResult.streakBonus);
+        setCurrentStreak(amberResult.currentStreak);
       });
 
       setMessage("Sweet Victory!");
@@ -613,6 +618,7 @@ export default function App() {
     setLevel(prev => prev + 1);
     setAmberEarned(0);
     setPhaseChanged(false);
+    setStreakBonus(0);
     startNewGame();
   };
 
@@ -620,6 +626,7 @@ export default function App() {
     setShowConfetti(false);
     setAmberEarned(0);
     setPhaseChanged(false);
+    setStreakBonus(0);
     setCurrentScreen('home');
     setGameState(GameState.IDLE);
   };
@@ -891,7 +898,20 @@ export default function App() {
             <View style={styles.amberEarnedContainer}>
               <Text style={styles.amberEarnedIcon}>💎</Text>
               <Text style={styles.amberEarnedText}>+{amberEarned} Amber</Text>
+              {streakBonus > 0 && (
+                <Text style={styles.streakBonusText}>
+                  (+{streakBonus} streak bonus!)
+                </Text>
+              )}
             </View>
+
+            {/* Streak display */}
+            {currentStreak > 1 && (
+              <View style={styles.winStreakContainer}>
+                <Text style={styles.winStreakEmoji}>🔥</Text>
+                <Text style={styles.winStreakText}>{currentStreak} Day Streak!</Text>
+              </View>
+            )}
 
             {/* Phase change notification */}
             {phaseChanged && (
@@ -1611,6 +1631,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     color: CandyColors.yellow.shadow,
+  },
+  streakBonusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: CandyColors.orange.main,
+    marginLeft: 8,
+  },
+
+  // Win screen streak display
+  winStreakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CandyColors.orange.light,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  winStreakEmoji: {
+    fontSize: 20,
+    marginRight: 6,
+  },
+  winStreakText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: CandyColors.orange.dark,
   },
 
   // Phase change notification

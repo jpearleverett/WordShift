@@ -6,6 +6,8 @@ import {
   AMBER_REWARDS,
   PHASE_THRESHOLDS,
   DialoguePhase,
+  STREAK_BONUSES,
+  calculateStreakMultiplier,
 } from '../types/homeWorld';
 
 const PROGRESS_STORAGE_KEY = 'wordshift_home_progress';
@@ -28,7 +30,70 @@ function getDefaultProgress(): HomeWorldProgress {
     puzzlesSolved: 0,
     phasePuzzleThresholds: [...PHASE_THRESHOLDS],
     lastDialogueRead: {},
+    introsSeen: [], // Track which animals have had their intro shown
+    currentStreak: 0,
+    lastPlayDate: null,
   };
+}
+
+/**
+ * Get today's date as ISO string (YYYY-MM-DD)
+ */
+function getTodayDateString(): string {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+}
+
+/**
+ * Check if a date string is yesterday
+ */
+function isYesterday(dateString: string): boolean {
+  const date = new Date(dateString);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return date.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
+}
+
+/**
+ * Check if a date string is today
+ */
+function isToday(dateString: string): boolean {
+  return dateString === getTodayDateString();
+}
+
+/**
+ * Update streak based on play activity
+ * Should be called when a puzzle is completed
+ */
+async function updateStreak(): Promise<number> {
+  const progress = await loadProgress();
+  const today = getTodayDateString();
+
+  // Handle missing streak data (migration)
+  if (progress.currentStreak === undefined) {
+    progress.currentStreak = 0;
+  }
+
+  if (!progress.lastPlayDate) {
+    // First play ever - start streak at 1
+    progress.currentStreak = 1;
+    progress.lastPlayDate = today;
+  } else if (isToday(progress.lastPlayDate)) {
+    // Already played today - streak unchanged
+    // Just return current streak
+  } else if (isYesterday(progress.lastPlayDate)) {
+    // Played yesterday - continue streak
+    progress.currentStreak += 1;
+    progress.lastPlayDate = today;
+  } else {
+    // Missed a day - reset streak
+    progress.currentStreak = 1;
+    progress.lastPlayDate = today;
+  }
+
+  progressCache = progress;
+  await saveProgress();
+  return progress.currentStreak;
 }
 
 /**
@@ -79,22 +144,39 @@ export async function getAmberBalance(): Promise<number> {
 export async function awardPuzzleAmber(
   difficulty: Difficulty,
   starsEarned: number
-): Promise<{ amount: number; newBalance: number; phaseChanged: boolean; newPhase: DialoguePhase }> {
+): Promise<{
+  amount: number;
+  baseAmount: number;
+  streakBonus: number;
+  newBalance: number;
+  phaseChanged: boolean;
+  newPhase: DialoguePhase;
+  currentStreak: number;
+}> {
   const progress = await loadProgress();
 
-  // Base reward by difficulty
-  let amount = AMBER_REWARDS[difficulty];
+  // Update streak first
+  const currentStreak = await updateStreak();
 
-  // Bonus for 3 stars: +50%
+  // Base reward by difficulty
+  let baseAmount = AMBER_REWARDS[difficulty];
+
+  // Star bonuses
   if (starsEarned === 3) {
-    amount = Math.floor(amount * 1.5);
+    // 3 stars: +50%
+    baseAmount = Math.floor(baseAmount * 1.5);
   } else if (starsEarned === 2) {
     // 2 stars: +25%
-    amount = Math.floor(amount * 1.25);
+    baseAmount = Math.floor(baseAmount * 1.25);
   }
 
-  progress.amber += amount;
-  progress.totalAmberEarned += amount;
+  // Apply streak bonus
+  const streakMultiplier = calculateStreakMultiplier(currentStreak);
+  const totalAmount = Math.floor(baseAmount * streakMultiplier);
+  const streakBonus = totalAmount - baseAmount;
+
+  progress.amber += totalAmount;
+  progress.totalAmberEarned += totalAmount;
   progress.puzzlesSolved += 1;
 
   // Check for phase transition
@@ -113,17 +195,20 @@ export async function awardPuzzleAmber(
 
   // Record transaction
   await recordTransaction({
-    amount,
+    amount: totalAmount,
     type: 'earn',
-    source: `puzzle_${difficulty.toLowerCase()}`,
+    source: `puzzle_${difficulty.toLowerCase()}${streakBonus > 0 ? `_streak${currentStreak}` : ''}`,
     timestamp: Date.now(),
   });
 
   return {
-    amount,
+    amount: totalAmount,
+    baseAmount,
+    streakBonus,
     newBalance: progress.amber,
     phaseChanged,
     newPhase,
+    currentStreak,
   };
 }
 
@@ -263,6 +348,54 @@ export async function markDialogueRead(animalId: string, dialogueIndex: number):
   progress.lastDialogueRead[animalId] = dialogueIndex;
   progressCache = progress;
   await saveProgress();
+}
+
+/**
+ * Check if an animal's intro dialogue has been seen
+ */
+export async function hasSeenIntro(animalId: string): Promise<boolean> {
+  const progress = await loadProgress();
+  // Handle old progress data that doesn't have introsSeen array
+  if (!progress.introsSeen) {
+    progress.introsSeen = [];
+  }
+  return progress.introsSeen.includes(animalId);
+}
+
+/**
+ * Mark an animal's intro dialogue as seen
+ */
+export async function markIntroSeen(animalId: string): Promise<void> {
+  const progress = await loadProgress();
+  // Handle old progress data that doesn't have introsSeen array
+  if (!progress.introsSeen) {
+    progress.introsSeen = [];
+  }
+  if (!progress.introsSeen.includes(animalId)) {
+    progress.introsSeen.push(animalId);
+    progressCache = progress;
+    await saveProgress();
+  }
+}
+
+/**
+ * Get current streak info
+ */
+export async function getStreakInfo(): Promise<{
+  currentStreak: number;
+  lastPlayDate: string | null;
+  streakMultiplier: number;
+  bonusPercentage: number;
+}> {
+  const progress = await loadProgress();
+  const streak = progress.currentStreak || 0;
+  const multiplier = calculateStreakMultiplier(streak);
+  return {
+    currentStreak: streak,
+    lastPlayDate: progress.lastPlayDate || null,
+    streakMultiplier: multiplier,
+    bonusPercentage: Math.round((multiplier - 1) * 100),
+  };
 }
 
 /**

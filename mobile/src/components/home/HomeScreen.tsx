@@ -16,6 +16,8 @@ import {
   loadProgress,
   getFullProgress,
   markDialogueRead,
+  markIntroSeen,
+  hasSeenIntro,
 } from '../../services/amberCurrency';
 import {
   ROOMS,
@@ -33,6 +35,8 @@ import {
   hasMoreDialogues,
   getTotalDialogueCount,
   ANIMAL_INFO,
+  getIntroDialogueLine,
+  getIntroDialogueCount,
 } from '../../services/animalDialogue';
 import {
   loadDialogueSessions,
@@ -76,6 +80,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     available: boolean;
     reason?: string;
   } | null>(null);
+
+  // Intro dialogue state
+  const [showIntroDialogue, setShowIntroDialogue] = useState(false);
+  const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
+  const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -292,8 +301,72 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       await loadAllData();
       setShowShop(false);
       setShowRoomUnlock(null);
+      setShowInvitePrompt(false);
       onAmberChange?.(progress!.amber - unlock.cost);
+
+      // If we just unlocked a character, show their intro dialogue
+      if (unlock.type === 'character') {
+        const animal = ANIMALS.find(a => a.id === unlock.targetId);
+        if (animal) {
+          // Small delay to let the UI update first
+          setTimeout(() => {
+            setIntroAnimal(animal);
+            setIntroDialogueIndex(0);
+            setShowIntroDialogue(true);
+          }, 300);
+        }
+      }
     }
+  };
+
+  // Handle advancing intro dialogue
+  const handleAdvanceIntroDialogue = async () => {
+    if (!introAnimal) return;
+
+    const totalIntro = getIntroDialogueCount(introAnimal.type);
+    const nextIndex = introDialogueIndex + 1;
+
+    if (nextIndex < totalIntro) {
+      // More intro lines to show
+      setIntroDialogueIndex(nextIndex);
+    } else {
+      // Intro complete - mark as seen and close
+      await markIntroSeen(introAnimal.id);
+      setShowIntroDialogue(false);
+      setIntroAnimal(null);
+      setIntroDialogueIndex(0);
+    }
+  };
+
+  // Handle closing intro dialogue
+  const handleCloseIntroDialogue = async () => {
+    if (introAnimal) {
+      // Mark intro as seen even if closed early
+      await markIntroSeen(introAnimal.id);
+    }
+    setShowIntroDialogue(false);
+    setIntroAnimal(null);
+    setIntroDialogueIndex(0);
+  };
+
+  // Get current intro dialogue text
+  const getCurrentIntroText = (): string => {
+    if (!introAnimal) return '';
+    return getIntroDialogueLine(introAnimal.type, introDialogueIndex) || '';
+  };
+
+  // Get intro dialogue progress text
+  const getIntroProgress = (): string => {
+    if (!introAnimal) return '';
+    const current = introDialogueIndex + 1;
+    const total = getIntroDialogueCount(introAnimal.type);
+    return `${current}/${total}`;
+  };
+
+  // Check if there are more intro dialogues
+  const hasMoreIntroDialogues = (): boolean => {
+    if (!introAnimal) return false;
+    return introDialogueIndex + 1 < getIntroDialogueCount(introAnimal.type);
   };
 
   // Get current dialogue text
@@ -661,6 +734,55 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </>
               );
             })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Intro Dialogue Modal */}
+      <Modal
+        visible={showIntroDialogue}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseIntroDialogue}
+      >
+        <View style={styles.centeredOverlay}>
+          <View
+            style={styles.introDialogueModal}
+            onStartShouldSetResponder={() => true}
+          >
+            {introAnimal && (
+              <>
+                {/* Animal portrait */}
+                <View style={styles.introPortraitContainer}>
+                  <Text style={styles.introPortraitEmoji}>
+                    {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
+                  </Text>
+                </View>
+
+                <Text style={styles.introAnimalName}>{introAnimal.name}</Text>
+                <Text style={styles.introAnimalTitle}>
+                  {ANIMAL_INFO[introAnimal.type]?.description}
+                </Text>
+
+                {/* Dialogue text */}
+                <View style={styles.introDialogueBubble}>
+                  <Text style={styles.introDialogueText}>{getCurrentIntroText()}</Text>
+                </View>
+
+                {/* Progress and continue */}
+                <View style={styles.introDialogueFooter}>
+                  <Text style={styles.introDialogueProgress}>{getIntroProgress()}</Text>
+                  <TouchableOpacity
+                    style={styles.introContinueButton}
+                    onPress={handleAdvanceIntroDialogue}
+                  >
+                    <Text style={styles.introContinueButtonText}>
+                      {hasMoreIntroDialogues() ? 'Continue' : 'Welcome!'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -1052,6 +1174,93 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[500],
     fontSize: 14,
     fontWeight: '600',
+  },
+
+  // Intro dialogue modal styles
+  introDialogueModal: {
+    backgroundColor: CandyColors.white,
+    borderRadius: 30,
+    padding: 30,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+    maxWidth: 380,
+    width: '90%',
+  },
+  introPortraitContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: CandyColors.purple.light,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: CandyColors.purple.main,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  introPortraitEmoji: {
+    fontSize: 50,
+  },
+  introAnimalName: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: CandyColors.purple.main,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  introAnimalTitle: {
+    fontSize: 14,
+    color: CandyColors.gray[500],
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  introDialogueBubble: {
+    backgroundColor: CandyColors.gray[100],
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    width: '100%',
+  },
+  introDialogueText: {
+    fontSize: 16,
+    color: CandyColors.gray[700],
+    lineHeight: 24,
+    textAlign: 'center',
+  },
+  introDialogueFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  introDialogueProgress: {
+    fontSize: 14,
+    color: CandyColors.gray[400],
+    fontWeight: '600',
+  },
+  introContinueButton: {
+    backgroundColor: CandyColors.green.main,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowColor: CandyColors.green.dark,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  introContinueButtonText: {
+    color: CandyColors.white,
+    fontSize: 16,
+    fontWeight: '800',
   },
 });
 
