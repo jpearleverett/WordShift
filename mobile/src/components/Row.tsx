@@ -14,11 +14,11 @@ import { CandyColors } from '../theme/colors';
 const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
 
-// Fan layout configuration - elegant arc with interleaved slots
-const FAN_ROTATION = 8; // Max rotation in degrees for edge elements
-const ARC_DEPTH = 18; // How much the arc curves (center lifts up)
-const TILE_SCALE = 0.82; // Slightly smaller tiles to fit with slots
-const MINI_SLOT_WIDTH = 18; // Narrow slots that fit between letters
+// Arc layout configuration
+const ARC_ROTATION = 6; // Max rotation in degrees for edge elements
+const ARC_LIFT = 12; // How much center elements lift up
+const SLOT_WIDTH = 20; // Width of drop slots
+const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
 
 interface RowProps {
   rowData: RowData;
@@ -189,6 +189,7 @@ export const Row: React.FC<RowProps> = ({
   const opacityAnim = useRef(new Animated.Value(isSource ? 1 : 0.3)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
 
   useEffect(() => {
     // Animate row transitions
@@ -276,74 +277,81 @@ export const Row: React.FC<RowProps> = ({
     };
   }, [isSource, isTarget, isCompleted]);
 
-  // Calculate arc position for any element in the interleaved sequence
-  // Returns yOffset (negative = up) and rotation
-  const calculateArcPosition = (index: number, totalElements: number) => {
+  // Animate arc when slots appear/disappear
+  useEffect(() => {
+    Animated.spring(arcAnim, {
+      toValue: showSlots ? 1 : 0,
+      friction: 8,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+  }, [showSlots]);
+
+  // Calculate arc multipliers for position in sequence
+  const getArcMultipliers = (index: number, totalElements: number) => {
     const normalizedPos = totalElements > 1
       ? (index / (totalElements - 1)) * 2 - 1  // -1 to 1
       : 0;
 
-    // Inverted parabola: center is highest (negative Y = up in RN)
-    const yOffset = (normalizedPos * normalizedPos - 1) * ARC_DEPTH;
+    // Inverted parabola: center lifts up (negative Y)
+    const yMultiplier = (normalizedPos * normalizedPos - 1) * ARC_LIFT;
 
-    // Rotation follows the arc tangent - edges tilt outward
-    const rotation = normalizedPos * FAN_ROTATION;
+    // Rotation: edges tilt outward
+    const rotationMultiplier = normalizedPos * ARC_ROTATION;
 
-    return { yOffset, rotation, normalizedPos };
+    return { yMultiplier, rotationMultiplier };
   };
 
-  // Render interleaved fan layout: [slot][letter][slot][letter]...[slot]
-  const renderFanContent = () => {
+  // Render interleaved arc layout: [slot][letter][slot][letter]...[slot]
+  const renderArcContent = () => {
     const letters = rowData.words;
-    const totalElements = letters.length * 2 + 1; // slots + letters interleaved
+    const totalElements = letters.length * 2 + 1;
     const elements: React.ReactNode[] = [];
 
     for (let i = 0; i < totalElements; i++) {
       const isSlot = i % 2 === 0;
-      const pos = calculateArcPosition(i, totalElements);
+      const { yMultiplier, rotationMultiplier } = getArcMultipliers(i, totalElements);
+
+      // Animated transforms - multiply by arcAnim for smooth transition
+      const translateY = arcAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, yMultiplier],
+      });
+      const rotate = arcAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', `${rotationMultiplier}deg`],
+      });
 
       if (isSlot) {
-        // Slot element
         const slotIndex = i / 2;
         elements.push(
-          <View
+          <Animated.View
             key={`slot-${slotIndex}`}
             style={[
               styles.arcSlotWrapper,
-              {
-                transform: [
-                  { translateY: pos.yOffset },
-                  { rotate: `${pos.rotation}deg` },
-                ],
-              },
+              { transform: [{ translateY }, { rotate }] },
             ]}
           >
             <Slot onPress={() => onSlotPress(slotIndex)} index={slotIndex} compact />
-          </View>
+          </Animated.View>
         );
       } else {
-        // Letter element
         const letterIndex = Math.floor(i / 2);
         const letter = letters[letterIndex];
+        // No wrapper View - LetterTile renders directly with animation
         elements.push(
-          <View
+          <Animated.View
             key={letter.id}
             style={[
               styles.arcLetterWrapper,
-              {
-                transform: [
-                  { translateY: pos.yOffset },
-                  { rotate: `${pos.rotation}deg` },
-                  { scale: TILE_SCALE },
-                ],
-              },
+              { transform: [{ translateY }, { rotate }] },
             ]}
           >
             <LetterTile
               letter={letter}
               highlight={letter.isLocked ? 'locked' : 'default'}
             />
-          </View>
+          </Animated.View>
         );
       }
     }
@@ -431,11 +439,11 @@ export const Row: React.FC<RowProps> = ({
         )}
 
         {/* Content area */}
-        <View style={[styles.contentWrapper, showSlots && styles.contentWrapperFan]}>
+        <View style={[styles.contentWrapper, showSlots && styles.contentWrapperArc]}>
           {showSlots ? (
-            // Fan layout for DROP row - interleaved arc of slots and letters
+            // Arc layout for DROP row - letters overflow container
             <View style={styles.arcRow}>
-              {renderFanContent()}
+              {renderArcContent()}
             </View>
           ) : (
             // Standard centered layout for other rows
@@ -481,8 +489,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: ROW_PADDING,
   },
-  contentWrapperFan: {
-    overflow: 'visible', // Allow letters to pop out!
+  contentWrapperArc: {
+    overflow: 'visible', // Allow letters to pop OUT of container
   },
   lettersContainer: {
     flexDirection: 'row',
@@ -490,20 +498,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Arc layout for DROP row - single interleaved row
+  // Arc layout for DROP row - content overflows upward
   arcRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end', // Align to bottom so arc curves upward
+    alignItems: 'center', // Center vertically - slots and letters aligned
     justifyContent: 'center',
-    paddingBottom: 4, // Space for arc overhang
-    paddingTop: ARC_DEPTH + 8, // Space for lifted center elements
-    marginHorizontal: 8, // Prevent edge clipping
+    // No extra padding - container stays same size, content overflows
   },
   arcLetterWrapper: {
-    marginHorizontal: -4, // Slight overlap for tighter spacing
+    marginHorizontal: -3, // Slight overlap for tighter spacing
   },
   arcSlotWrapper: {
-    marginHorizontal: -2, // Tight spacing for slots
+    marginHorizontal: 1, // Small gap around slots
   },
 
   // Row variants
@@ -655,9 +661,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   slotCompact: {
-    width: MINI_SLOT_WIDTH,
-    height: 40,
-    borderRadius: 8,
+    width: SLOT_WIDTH,
+    height: SLOT_HEIGHT,
+    borderRadius: 10,
   },
   slotShimmer: {
     position: 'absolute',
@@ -676,8 +682,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   plusContainerCompact: {
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
   },
   plusHorizontal: {
     position: 'absolute',
@@ -687,7 +693,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   plusHorizontalCompact: {
-    width: 8,
+    width: 10,
     height: 2,
   },
   plusVertical: {
@@ -699,7 +705,7 @@ const styles = StyleSheet.create({
   },
   plusVerticalCompact: {
     width: 2,
-    height: 8,
+    height: 10,
   },
   cornerDot: {
     position: 'absolute',
