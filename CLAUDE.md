@@ -36,7 +36,8 @@ mobile/
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette and tile color system
 │   └── services/
-│       └── localGenerator.ts    # Puzzle generation algorithm
+│       ├── localGenerator.ts    # Puzzle generation algorithm
+│       └── wordHistory.ts       # Word history tracking for diversity
 ```
 
 ## Game Mechanics
@@ -84,12 +85,36 @@ The generator creates word chains using DFS with quality scoring:
 - **Semantic journey**: Bonus for traversing different word categories (animals→food→nature)
 - **Quality threshold**: Rejects puzzles scoring below 45/100
 - **Multi-candidate**: Generates 3 puzzles, selects highest scoring
+- **Word history integration**: Penalizes/excludes recently used words for diversity
 
 Key functions:
 - `generateLocalPuzzle(difficulty)` - Main entry point
 - `findPath()` - Recursive DFS to find valid word chains
-- `scorePuzzleChain()` - Evaluates puzzle quality
+- `scorePuzzleChain()` - Evaluates puzzle quality (includes freshness scoring)
 - `getBoringTransformPenalty()` - Penalizes obvious suffix/prefix moves
+- `scoreWordInterestingness()` - Scores words by interest + freshness
+
+### Word History (`wordHistory.ts`)
+
+Tracks recently used words to ensure puzzle diversity across sessions:
+
+- **AsyncStorage persistence**: History survives app restarts
+- **Tracks ~100 puzzles**: Stores last ~500 words (5 words/puzzle average)
+- **Hard cooldown (15 puzzles)**: Words completely excluded from generation
+- **Soft cooldown (15-40 puzzles)**: Decaying penalty (50→10 points)
+- **Freshness bonus**: Never-seen words get +5 score boost
+
+Key functions:
+- `getWordHistoryWithRecency()` - Returns Map<word, puzzlesAgo>
+- `calculateFreshnessPenalty(word, recencyMap)` - Returns 0-100 penalty
+- `isInHardCooldown(word, recencyMap)` - Check if word should be excluded
+- `recordPuzzleWords(words)` - Save words after puzzle generation
+- `clearWordHistory()` - Reset history (for testing)
+
+Cooldown constants (at top of file):
+- `HARD_COOLDOWN = 15` - Puzzles before word can reappear
+- `SOFT_COOLDOWN = 40` - Puzzles before penalty fully decays
+- `MAX_HISTORY_SIZE = 100` - Max puzzles tracked
 
 ### Word Dictionaries (`constants.ts`)
 
@@ -122,6 +147,12 @@ Edit `SEMANTIC_CLUSTERS` in `localGenerator.ts`
 
 ### Adjusting puzzle difficulty
 Modify scoring weights in `scorePuzzleChain()` or `MIN_ACCEPTABLE_SCORE` threshold
+
+### Adjusting word diversity/cooldowns
+Edit constants at top of `wordHistory.ts`:
+- `HARD_COOLDOWN` - Puzzles before word can reappear (default: 15)
+- `SOFT_COOLDOWN` - Puzzles before penalty fully decays (default: 40)
+- `MAX_HISTORY_SIZE` - How many puzzles of history to track (default: 100)
 
 ### UI adjustments
 - Tile sizes/styling: `LetterTile.tsx` styles
