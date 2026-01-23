@@ -37,7 +37,8 @@ mobile/
 │   │   └── colors.ts            # CandyColors palette and tile color system
 │   └── services/
 │       ├── localGenerator.ts    # Puzzle generation algorithm
-│       └── wordHistory.ts       # Word history tracking for diversity
+│       ├── wordHistory.ts       # Word history tracking for diversity
+│       └── starRating.ts        # Star rating system and cumulative stats
 ```
 
 ## Game Mechanics
@@ -116,6 +117,37 @@ Cooldown constants (at top of file):
 - `SOFT_COOLDOWN = 40` - Puzzles before penalty fully decays
 - `MAX_HISTORY_SIZE = 100` - Max puzzles tracked
 
+### Star Rating System (`starRating.ts`)
+
+Grades puzzle performance without time pressure. Stars are awarded based on hints and mistakes:
+
+**Star Thresholds:**
+- **3 stars (PERFECT)**: 0 hints, 0-1 invalid attempts
+- **2 stars (SWEET)**: 1 hint OR 2-3 invalid attempts
+- **1 star (NICE)**: 2+ hints OR 4+ invalid attempts
+
+**Design Philosophy:**
+- Stars are a "grade" on performance, not a replay target
+- Each puzzle is one-shot (like Wordle) - no replaying for better stars
+- Forward momentum: "Try to do better on the next one"
+- Non-stressful: no timer, always completable
+
+**Tracked Metrics:**
+- `invalidAttempts` - Incremented when player tries invalid word combinations
+- `hintsUsed` - Incremented when player uses hint button (only counts helpful hints)
+
+**Cumulative Stats (persisted via AsyncStorage):**
+- `totalPuzzlesCompleted` - Total games finished
+- `totalStars` - Sum of all stars earned
+- `threeStarCount` / `twoStarCount` / `oneStarCount` - Breakdown by rating
+- `byDifficulty` - Per-difficulty stats (EASY/MEDIUM/HARD)
+
+Key functions:
+- `calculateStars(hintsUsed, invalidAttempts)` - Returns 1-3 stars
+- `recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts)` - Save after win
+- `getCumulativeStats()` - Load lifetime stats
+- `clearStats()` - Reset all stats (for testing)
+
 ### Word Dictionaries (`constants.ts`)
 
 Words organized by length in arrays:
@@ -130,6 +162,10 @@ Key state variables:
 - `currentRowIndex` - Active row being solved
 - `gamePhase` - 'playing' | 'won'
 - `difficulty` - 'EASY' (3 rows) | 'MEDIUM' (4 rows) | 'HARD' (5 rows, 5-letter words)
+- `invalidAttempts` - Count of wrong moves this puzzle (for star rating)
+- `hintsUsed` - Count of hints used this puzzle (for star rating)
+- `earnedStars` - Stars earned on current puzzle (1-3)
+- `cumulativeStats` - Lifetime stats loaded from storage
 
 ## Coding Conventions
 
@@ -153,6 +189,11 @@ Edit constants at top of `wordHistory.ts`:
 - `HARD_COOLDOWN` - Puzzles before word can reappear (default: 15)
 - `SOFT_COOLDOWN` - Puzzles before penalty fully decays (default: 40)
 - `MAX_HISTORY_SIZE` - How many puzzles of history to track (default: 100)
+
+### Adjusting star rating thresholds
+Edit `calculateStars()` function in `starRating.ts`:
+- Current: 3 stars = 0 hints + ≤1 mistake, 2 stars = 1 hint OR 2-3 mistakes, 1 star = rest
+- Modify the conditionals to adjust difficulty of earning stars
 
 ### UI adjustments
 - Tile sizes/styling: `LetterTile.tsx` styles
