@@ -241,7 +241,7 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <StatusBar hidden={true} />
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
 
       {/* Background gradient simulation */}
       <View style={styles.backgroundGradient} />
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 48,
+    paddingTop: 60,
     paddingBottom: 12,
     zIndex: 100,
   },
