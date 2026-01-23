@@ -278,14 +278,26 @@ export const Row: React.FC<RowProps> = ({
   }, [isSource, isTarget, isCompleted]);
 
   // Animate arc when slots appear/disappear - smooth glide effect
+  // Depends on both showSlots AND selectedLetter to replay animation on each selection
   useEffect(() => {
-    Animated.timing(arcAnim, {
-      toValue: showSlots ? 1 : 0,
-      duration: 450, // Visible glide animation
-      easing: Easing.out(Easing.cubic), // Smooth deceleration
-      useNativeDriver: true,
-    }).start();
-  }, [showSlots]);
+    if (showSlots) {
+      // Reset to 0 first, then animate to 1 - ensures animation replays each time
+      arcAnim.setValue(0);
+      Animated.timing(arcAnim, {
+        toValue: 1,
+        duration: 450, // Visible glide animation
+        easing: Easing.out(Easing.cubic), // Smooth deceleration
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(arcAnim, {
+        toValue: 0,
+        duration: 300, // Faster collapse
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showSlots, selectedLetter?.id]);
 
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
@@ -510,10 +522,11 @@ const styles = StyleSheet.create({
     // No extra padding - container stays same size, content overflows
   },
   arcLetterWrapper: {
-    marginHorizontal: -5, // Overlap letters for tighter spacing
+    marginHorizontal: -3, // 10% more separation than before (-5 -> -3)
   },
   arcSlotWrapper: {
-    marginHorizontal: -2, // Minimal gap - slots nestle between letters
+    marginHorizontal: -1, // Minimal gap - slots nestle between letters
+    zIndex: 10, // Bring slots to front (on top of letters)
   },
 
   // Row variants
@@ -650,10 +663,10 @@ const styles = StyleSheet.create({
     left: -3,
     right: -3,
     bottom: -3,
-    borderTopLeftRadius: 11, // Match narrower wedge shape
-    borderTopRightRadius: 11,
-    borderBottomLeftRadius: 7,
-    borderBottomRightRadius: 7,
+    borderTopLeftRadius: 9, // Match trapezoid shape
+    borderTopRightRadius: 9,
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
     backgroundColor: CandyColors.pink.main,
   },
   slot: {
@@ -668,16 +681,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   slotCompact: {
-    width: SLOT_WIDTH, // Narrow to keep letters close
+    width: SLOT_WIDTH + 4, // Slightly wider for trapezoid visibility
     height: SLOT_HEIGHT,
-    borderTopLeftRadius: 8, // Slightly rounded top
-    borderTopRightRadius: 8,
-    borderBottomLeftRadius: 4, // Narrower tapered bottom
-    borderBottomRightRadius: 4,
-    // Transform to create wedge/tapered effect
+    borderTopLeftRadius: 6, // Rounded top corners
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 3, // Smaller bottom corners for taper
+    borderBottomRightRadius: 3,
+    // Transform to create upside-down trapezoid effect (wider top, narrower bottom)
     transform: [
-      { perspective: 200 },
-      { rotateX: '10deg' }, // Tilts to make top appear wider than bottom
+      { perspective: 120 }, // Closer perspective for more pronounced effect
+      { rotateX: '18deg' }, // More tilt to make top visibly wider than bottom
     ],
   },
   slotShimmer: {
