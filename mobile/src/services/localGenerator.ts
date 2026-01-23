@@ -23,39 +23,162 @@ export const validateWord = (word: string): boolean => {
 };
 
 // ============================================================================
+// ANTI-BORING PATTERNS - Block obvious/cheap transformations
+// ============================================================================
+
+// Letters that are BORING when moved to/from word edges
+const BORING_SUFFIX_LETTERS = new Set(['S', 'D', 'R', 'Y', 'E']);
+const BORING_PREFIX_LETTERS = new Set(['A', 'I', 'U', 'E', 'O']);
+
+// Common boring suffixes to detect (when removing creates these patterns)
+const BORING_ENDINGS = ['ED', 'ER', 'LY', 'ES', 'EN', 'AL'];
+const BORING_BEGINNINGS = ['RE', 'UN', 'IN', 'DE'];
+
+/**
+ * Check if a move is a boring suffix/prefix transformation
+ * Returns a penalty score (higher = more boring, should be subtracted)
+ */
+function getBoringTransformPenalty(
+  sourceWord: string,
+  charIndex: number,
+  char: string,
+  targetWord: string,
+  insertionIndex: number
+): number {
+  let penalty = 0;
+  const sourceLen = sourceWord.length;
+  const targetLen = targetWord.length;
+
+  // === REMOVING FROM SOURCE ===
+
+  // HEAVILY penalize removing S from end (pluralization)
+  if (char === 'S' && charIndex === sourceLen - 1) {
+    penalty += 60; // Was 20, now much stronger
+  }
+
+  // Penalize removing D from end (past tense -ED)
+  if (char === 'D' && charIndex === sourceLen - 1 && sourceWord[sourceLen - 2] === 'E') {
+    penalty += 50;
+  }
+
+  // Penalize removing R from end (comparative -ER)
+  if (char === 'R' && charIndex === sourceLen - 1 && sourceWord[sourceLen - 2] === 'E') {
+    penalty += 40;
+  }
+
+  // Penalize removing G from end when it's part of -ING
+  if (char === 'G' && charIndex === sourceLen - 1 &&
+      sourceLen >= 3 && sourceWord.slice(-3) === 'ING') {
+    penalty += 45;
+  }
+
+  // Penalize removing N from end when followed by G (part of -ING removal sequence)
+  if (char === 'N' && charIndex === sourceLen - 1 &&
+      sourceLen >= 2 && sourceWord[sourceLen - 2] === 'I') {
+    penalty += 35;
+  }
+
+  // Penalize removing Y from end (adverb -LY suffix)
+  if (char === 'Y' && charIndex === sourceLen - 1 &&
+      sourceLen >= 2 && sourceWord[sourceLen - 2] === 'L') {
+    penalty += 40;
+  }
+
+  // Penalize removing from position 0 (prefix removal)
+  if (charIndex === 0 && BORING_PREFIX_LETTERS.has(char)) {
+    penalty += 25;
+  }
+
+  // === INSERTING INTO TARGET ===
+
+  // HEAVILY penalize inserting S at end (making plural)
+  if (char === 'S' && insertionIndex === targetLen) {
+    penalty += 70; // This is the most boring move possible
+  }
+
+  // Penalize inserting at position 0 (adding prefix)
+  if (insertionIndex === 0) {
+    penalty += 20;
+  }
+
+  // Penalize inserting at end (adding suffix)
+  if (insertionIndex === targetLen && BORING_SUFFIX_LETTERS.has(char)) {
+    penalty += 35;
+  }
+
+  // Penalize inserting G at end to form -ING
+  if (char === 'G' && insertionIndex === targetLen &&
+      targetLen >= 2 && targetWord.slice(-2) === 'IN') {
+    penalty += 50;
+  }
+
+  // Penalize inserting Y at end to form -LY (adverb)
+  if (char === 'Y' && insertionIndex === targetLen &&
+      targetLen >= 1 && targetWord[targetLen - 1] === 'L') {
+    penalty += 45;
+  }
+
+  return penalty;
+}
+
+/**
+ * Check if the transformation creates an anagram-like result (same letters rearranged)
+ * This is boring because it doesn't feel like a real transformation
+ */
+function isAnagramLike(word1: string, word2: string): boolean {
+  const sorted1 = word1.split('').sort().join('');
+  const sorted2 = word2.split('').sort().join('');
+  // If more than 80% of letters are shared, it's anagram-like
+  const shared = [...sorted1].filter((c, i) => sorted2[i] === c).length;
+  return shared >= Math.min(sorted1.length, sorted2.length) * 0.8;
+}
+
+// ============================================================================
 // WORD INTERESTINGNESS SCORING
 // ============================================================================
 
 // Letters that make words more interesting (less common, more visually striking)
 const INTERESTING_LETTERS = new Set(['Q', 'X', 'Z', 'J', 'K', 'V', 'W', 'Y']);
+const VOWELS = new Set(['A', 'E', 'I', 'O', 'U']);
 const VERY_COMMON_LETTERS = new Set(['E', 'T', 'A', 'O', 'I', 'N', 'S', 'R']);
 
 // Boring words to avoid (very common filler words)
 const BORING_WORDS = new Set([
   'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HAD',
   'HER', 'WAS', 'ONE', 'OUR', 'OUT', 'HAS', 'HIS', 'HOW', 'ITS', 'MAY',
-  'NEW', 'NOW', 'OLD', 'SEE', 'WAY', 'WHO', 'DID', 'GET', 'HAS', 'HIM',
-  'HIS', 'HOW', 'MAN', 'NEW', 'NOW', 'OLD', 'SEE', 'TWO', 'WAY', 'WHO',
-  'BOY', 'DID', 'ITS', 'LET', 'PUT', 'SAY', 'SHE', 'TOO', 'USE', 'DAD',
+  'NEW', 'NOW', 'OLD', 'SEE', 'WAY', 'WHO', 'DID', 'GET', 'HIM',
+  'MAN', 'TWO', 'BOY', 'LET', 'PUT', 'SAY', 'SHE', 'TOO', 'USE', 'DAD',
   'MOM', 'SIS', 'BRO', 'THAT', 'WITH', 'HAVE', 'THIS', 'WILL', 'YOUR',
-  'FROM', 'THEY', 'BEEN', 'HAVE', 'MANY', 'SOME', 'THEM', 'THAN', 'INTO',
+  'FROM', 'THEY', 'BEEN', 'MANY', 'SOME', 'THEM', 'THAN', 'INTO',
   'JUST', 'OVER', 'SUCH', 'MAKE', 'LIKE', 'BACK', 'ONLY', 'COME', 'MADE',
   'AFTER', 'THINK', 'THESE', 'WOULD', 'ABOUT', 'COULD', 'WHICH', 'THEIR',
   'THERE', 'BEING', 'OTHER'
 ]);
 
-// Fun/evocative words to prefer
+// Fun/evocative words to prefer - expanded list
 const FUN_WORDS = new Set([
+  // Fantasy/Magic
   'GHOST', 'MAGIC', 'SPARK', 'BLAZE', 'STORM', 'FLAME', 'FROST', 'SWIFT',
   'BRAVE', 'QUEST', 'DREAM', 'CROWN', 'JEWEL', 'ROYAL', 'NIGHT', 'LIGHT',
   'SHINE', 'GLOW', 'FLASH', 'TRICK', 'CHARM', 'SPELL', 'WITCH', 'DEMON',
-  'ANGEL', 'FAIRY', 'PIXIE', 'BEAST', 'DRAGON', 'TIGER', 'SHARK', 'EAGLE',
-  'SNAKE', 'WOLF', 'LION', 'BEAR', 'HAWK', 'JAZZ', 'FUNK', 'ROCK', 'PUNK',
-  'GOLD', 'SILVER', 'RUBY', 'PEARL', 'ONYX', 'JADE', 'OPAL', 'CRYSTAL',
-  'BLADE', 'SWORD', 'ARROW', 'SPEAR', 'SHIELD', 'ARMOR', 'HELM', 'CAPE',
-  'CLOAK', 'ROBE', 'WAND', 'STAFF', 'ORB', 'GEM', 'RUNE', 'GLYPH', 'SIGIL',
-  'ZAP', 'ZIP', 'ZOOM', 'FIZZ', 'BUZZ', 'JAZZ', 'JINX', 'JOLT', 'JUMBO',
-  'QUIRK', 'QUAKE', 'QUEST', 'QUICK', 'QUIET', 'QUILL', 'QUOTE', 'QUOTA'
+  'ANGEL', 'FAIRY', 'PIXIE', 'BEAST', 'RUNE', 'GLYPH',
+  // Animals
+  'TIGER', 'SHARK', 'EAGLE', 'SNAKE', 'WOLF', 'LION', 'BEAR', 'HAWK',
+  'DRAGON', 'WHALE', 'RAVEN', 'COBRA', 'VIPER', 'ORCA', 'LYNX', 'CRANE',
+  // Gems/Precious
+  'GOLD', 'RUBY', 'PEARL', 'ONYX', 'JADE', 'OPAL', 'AMBER', 'TOPAZ',
+  // Action/Power
+  'BLADE', 'SWORD', 'ARROW', 'SPEAR', 'POWER', 'FORCE', 'CLASH', 'CRUSH',
+  'BLAST', 'STRIKE', 'SMASH', 'CRASH', 'BURST', 'SURGE', 'PULSE',
+  // Sound/Energy
+  'ZAP', 'ZIP', 'ZOOM', 'FIZZ', 'BUZZ', 'JAZZ', 'JINX', 'JOLT',
+  'QUIRK', 'QUAKE', 'QUICK', 'WHIRL', 'SWIRL', 'TWIST', 'FLICK',
+  // Nature/Elements
+  'FROST', 'FLAME', 'FLOOD', 'WIND', 'STORM', 'RAIN', 'SNOW', 'LAVA',
+  'THORN', 'BLOOM', 'GROVE', 'CLIFF', 'PEAK', 'DUNE', 'CAVE', 'REEF',
+  // Mystery/Dark
+  'DARK', 'VOID', 'SHADE', 'DUSK', 'DAWN', 'MIST', 'HAZE', 'GLOOM',
+  'CRYPT', 'TOMB', 'HAUNT', 'CURSE', 'DOOM', 'FATE', 'OMEN'
 ]);
 
 /**
@@ -67,46 +190,53 @@ function scoreWordInterestingness(word: string, wordLength: number): number {
 
   // Penalize boring common words heavily
   if (BORING_WORDS.has(word)) {
-    score -= 30;
+    score -= 35;
   }
 
   // Bonus for fun/evocative words
   if (FUN_WORDS.has(word)) {
-    score += 25;
+    score += 30;
   }
 
   // Score based on letter composition
   let interestingLetterCount = 0;
   let veryCommonLetterCount = 0;
+  let vowelCount = 0;
   const uniqueLetters = new Set(word.split(''));
 
   for (const letter of word) {
     if (INTERESTING_LETTERS.has(letter)) interestingLetterCount++;
     if (VERY_COMMON_LETTERS.has(letter)) veryCommonLetterCount++;
+    if (VOWELS.has(letter)) vowelCount++;
   }
 
   // Bonus for interesting letters
-  score += interestingLetterCount * 8;
+  score += interestingLetterCount * 10;
 
   // Small penalty for too many common letters
   if (veryCommonLetterCount >= word.length - 1) {
-    score -= 10;
+    score -= 15;
   }
 
   // Bonus for letter variety (no repeated letters)
   if (uniqueLetters.size === word.length) {
+    score += 8;
+  }
+
+  // Slight bonus for balanced vowel/consonant ratio
+  const vowelRatio = vowelCount / word.length;
+  if (vowelRatio >= 0.3 && vowelRatio <= 0.5) {
     score += 5;
   }
 
   // Use word position in dictionary as proxy for rarity
-  // Words later in dictionary (less common) get slight bonus
   const wordArray = WORD_ARRAYS[wordLength];
   if (wordArray) {
     const index = wordArray.indexOf(word);
     if (index > wordArray.length * 0.7) {
-      score += 10; // Rarer word bonus
+      score += 12; // Rarer word bonus
     } else if (index < wordArray.length * 0.1) {
-      score -= 5; // Very common word penalty
+      score -= 8; // Very common word penalty
     }
   }
 
@@ -114,12 +244,63 @@ function scoreWordInterestingness(word: string, wordLength: number): number {
 }
 
 // ============================================================================
-// MOVE QUALITY SCORING
+// TRANSFORMATION SURPRISE SCORING
+// ============================================================================
+
+/**
+ * Score how "surprising" a transformation is
+ * Higher = more aha! moment potential
+ */
+function scoreTransformationSurprise(
+  sourceWord: string,
+  targetWord: string,
+  movedLetter: string,
+  insertionIndex: number
+): number {
+  let score = 50;
+
+  // Bonus if the letter moves to the middle (unexpected position)
+  const middleStart = Math.floor(targetWord.length / 3);
+  const middleEnd = Math.ceil((targetWord.length * 2) / 3);
+  if (insertionIndex >= middleStart && insertionIndex <= middleEnd) {
+    score += 20;
+  }
+
+  // Bonus if consonant moves into vowel-heavy area or vice versa
+  const isVowel = VOWELS.has(movedLetter);
+  const surroundingArea = targetWord.slice(
+    Math.max(0, insertionIndex - 1),
+    insertionIndex + 2
+  );
+  const surroundingVowels = [...surroundingArea].filter(c => VOWELS.has(c)).length;
+  const surroundingVowelRatio = surroundingVowels / surroundingArea.length;
+
+  if (isVowel && surroundingVowelRatio < 0.3) {
+    score += 15; // Vowel into consonant-heavy area
+  } else if (!isVowel && surroundingVowelRatio > 0.6) {
+    score += 15; // Consonant into vowel-heavy area
+  }
+
+  // Penalize if anagram-like (same letters just rearranged)
+  if (isAnagramLike(sourceWord, targetWord)) {
+    score -= 25;
+  }
+
+  // Bonus for interesting letter being moved
+  if (INTERESTING_LETTERS.has(movedLetter)) {
+    score += 15;
+  }
+
+  return Math.max(0, Math.min(100, score));
+}
+
+// ============================================================================
+// MOVE QUALITY SCORING (Enhanced)
 // ============================================================================
 
 /**
  * Score the quality of a letter move (0-100)
- * Considers: position variety, avoiding boring transforms
+ * Now includes anti-boring and surprise scoring
  */
 function scoreMoveQuality(
   sourceWord: string,
@@ -131,70 +312,55 @@ function scoreMoveQuality(
   let score = 50;
   const char = sourceWord[charIndex];
 
+  // === Anti-Boring Penalty ===
+  const boringPenalty = getBoringTransformPenalty(
+    sourceWord, charIndex, char, targetWord, insertionIndex
+  );
+  score -= boringPenalty;
+
   // === Position Variety ===
-  // Normalize position to 0 (start), 1 (middle), 2 (end)
   const normalizedSourcePos = charIndex === 0 ? 0 :
                               charIndex === sourceWord.length - 1 ? 2 : 1;
 
-  // Bonus if this position hasn't been used recently
   if (!previousMovePositions.includes(normalizedSourcePos)) {
     score += 15;
   }
 
-  // Extra bonus for middle positions (more interesting)
+  // Strong bonus for middle positions
   if (normalizedSourcePos === 1) {
-    score += 10;
+    score += 20;
   }
 
-  // === Avoid Boring Transformations ===
-
-  // Penalize if just adding/removing 'S' at end (pluralization)
-  if (char === 'S' && charIndex === sourceWord.length - 1) {
-    score -= 20;
-  }
-
-  // Penalize if just adding common suffixes/prefixes
-  if (charIndex === 0 && ['A', 'I'].includes(char)) {
-    score -= 10; // Common prefix removal
-  }
-
-  // Bonus if the letter lands in the middle of the target (more transformative)
-  const normalizedTargetPos = insertionIndex === 0 ? 0 :
-                              insertionIndex === targetWord.length ? 2 : 1;
-  if (normalizedTargetPos === 1) {
-    score += 10;
-  }
-
-  // Bonus for "surprising" letter (less common)
-  if (INTERESTING_LETTERS.has(char)) {
-    score += 10;
-  }
+  // === Transformation Surprise ===
+  const surpriseScore = scoreTransformationSurprise(
+    sourceWord, targetWord, char, insertionIndex
+  );
+  score += (surpriseScore - 50) * 0.5; // Weight it at 50%
 
   return Math.max(0, Math.min(100, score));
 }
 
 // ============================================================================
-// CHAIN/PUZZLE QUALITY SCORING
+// SEMANTIC DISTANCE & JOURNEY SCORING (Enhanced)
 // ============================================================================
 
-// Simple phonetic/visual similarity groups for semantic distance estimation
+// Semantic clusters for journey scoring
 const SEMANTIC_CLUSTERS: Record<string, Set<string>> = {
-  animals: new Set(['CAT', 'DOG', 'BAT', 'RAT', 'PIG', 'COW', 'HEN', 'ANT', 'BEE', 'OWL', 'FOX', 'ELK', 'EMU', 'APE', 'BEAR', 'BIRD', 'BOAR', 'BULL', 'CALF', 'CARP', 'CLAM', 'COLT', 'CRAB', 'CROW', 'DEER', 'DOVE', 'DUCK', 'FAWN', 'FISH', 'FLEA', 'FOAL', 'FROG', 'GOAT', 'GULL', 'HARE', 'HAWK', 'LAMB', 'LARK', 'LION', 'LYNX', 'MINK', 'MOLE', 'MOTH', 'MULE', 'NEWT', 'ORCA', 'PONY', 'PUMA', 'SEAL', 'SLUG', 'SWAN', 'TOAD', 'WASP', 'WOLF', 'WORM', 'ZEBRA', 'EAGLE', 'HORSE', 'MOUSE', 'OTTER', 'PANDA', 'SHARK', 'SHEEP', 'SKUNK', 'SLOTH', 'SNAIL', 'SNAKE', 'SQUID', 'STORK', 'TIGER', 'TROUT', 'WHALE', 'BISON']),
+  animals: new Set(['CAT', 'DOG', 'BAT', 'RAT', 'PIG', 'COW', 'HEN', 'ANT', 'BEE', 'OWL', 'FOX', 'ELK', 'EMU', 'APE', 'BEAR', 'BIRD', 'BOAR', 'BULL', 'CALF', 'CARP', 'CLAM', 'COLT', 'CRAB', 'CROW', 'DEER', 'DOVE', 'DUCK', 'FAWN', 'FISH', 'FLEA', 'FOAL', 'FROG', 'GOAT', 'GULL', 'HARE', 'HAWK', 'LAMB', 'LARK', 'LION', 'LYNX', 'MINK', 'MOLE', 'MOTH', 'MULE', 'NEWT', 'ORCA', 'PONY', 'PUMA', 'SEAL', 'SLUG', 'SWAN', 'TOAD', 'WASP', 'WOLF', 'WORM', 'ZEBRA', 'EAGLE', 'HORSE', 'MOUSE', 'OTTER', 'PANDA', 'SHARK', 'SHEEP', 'SKUNK', 'SLOTH', 'SNAIL', 'SNAKE', 'SQUID', 'STORK', 'TIGER', 'TROUT', 'WHALE', 'BISON', 'RAVEN', 'CRANE', 'VIPER', 'COBRA']),
 
-  food: new Set(['EAT', 'ATE', 'PIE', 'JAM', 'HAM', 'EGG', 'NUT', 'PEA', 'TEA', 'BAKE', 'BEAN', 'BEEF', 'BITE', 'BOWL', 'BREW', 'CAKE', 'CHEW', 'CHIP', 'CHOP', 'COOK', 'CORN', 'CRAB', 'DINE', 'DISH', 'FEED', 'FISH', 'FOOD', 'FORK', 'LIME', 'MEAL', 'MEAT', 'MENU', 'MILK', 'MINT', 'OATS', 'PEAR', 'PLUM', 'PORK', 'RICE', 'SALT', 'SOUP', 'TART', 'TOAST', 'APPLE', 'BACON', 'BREAD', 'CANDY', 'CREAM', 'FEAST', 'FRUIT', 'GRAPE', 'HONEY', 'JUICE', 'LEMON', 'LUNCH', 'OLIVE', 'ONION', 'PASTA', 'PEACH', 'PIZZA', 'SALAD', 'SAUCE', 'SPICE', 'STEAK', 'SUGAR', 'SWEET', 'SYRUP', 'TASTE', 'TREAT', 'WHEAT']),
+  food: new Set(['EAT', 'ATE', 'PIE', 'JAM', 'HAM', 'EGG', 'NUT', 'PEA', 'TEA', 'BAKE', 'BEAN', 'BEEF', 'BITE', 'BOWL', 'BREW', 'CAKE', 'CHEW', 'CHIP', 'CHOP', 'COOK', 'CORN', 'DINE', 'DISH', 'FEED', 'FOOD', 'FORK', 'LIME', 'MEAL', 'MEAT', 'MENU', 'MILK', 'MINT', 'OATS', 'PEAR', 'PLUM', 'PORK', 'RICE', 'SALT', 'SOUP', 'TART', 'TOAST', 'APPLE', 'BACON', 'BREAD', 'CANDY', 'CREAM', 'FEAST', 'FRUIT', 'GRAPE', 'HONEY', 'JUICE', 'LEMON', 'LUNCH', 'OLIVE', 'ONION', 'PASTA', 'PEACH', 'PIZZA', 'SALAD', 'SAUCE', 'SPICE', 'STEAK', 'SUGAR', 'SWEET', 'SYRUP', 'TASTE', 'TREAT', 'WHEAT']),
 
-  nature: new Set(['SUN', 'SKY', 'SEA', 'BAY', 'DEW', 'FOG', 'ICE', 'MUD', 'OAK', 'ASH', 'ELM', 'FIR', 'IVY', 'BARK', 'BIRD', 'BUSH', 'CAVE', 'CLAY', 'COAL', 'DAWN', 'DUNE', 'DUST', 'FARM', 'FERN', 'FIRE', 'GALE', 'GLEN', 'GOLD', 'GULF', 'HAIL', 'HEAT', 'HILL', 'LAKE', 'LAND', 'LEAF', 'MOON', 'MOSS', 'PALM', 'PEAK', 'PINE', 'POND', 'RAIN', 'REEF', 'ROCK', 'ROOT', 'ROSE', 'SAND', 'SEED', 'SNOW', 'SOIL', 'STAR', 'STEM', 'TIDE', 'TREE', 'VALE', 'VINE', 'WAVE', 'WEED', 'WIND', 'WOOD', 'BEACH', 'BLOOM', 'BROOK', 'CLIFF', 'CLOUD', 'COAST', 'CORAL', 'CREEK', 'EARTH', 'FIELD', 'FLAME', 'FLORA', 'FROST', 'GRASS', 'GROVE', 'MARSH', 'OCEAN', 'PLANT', 'RIVER', 'SHORE', 'STORM', 'SWAMP', 'THORN', 'WATER', 'WOODS']),
+  nature: new Set(['SUN', 'SKY', 'SEA', 'BAY', 'DEW', 'FOG', 'ICE', 'MUD', 'OAK', 'ASH', 'ELM', 'FIR', 'IVY', 'BARK', 'BUSH', 'CAVE', 'CLAY', 'COAL', 'DAWN', 'DUNE', 'DUST', 'FARM', 'FERN', 'FIRE', 'GALE', 'GLEN', 'GOLD', 'GULF', 'HAIL', 'HEAT', 'HILL', 'LAKE', 'LAND', 'LEAF', 'MOON', 'MOSS', 'PALM', 'PEAK', 'PINE', 'POND', 'RAIN', 'REEF', 'ROCK', 'ROOT', 'ROSE', 'SAND', 'SEED', 'SNOW', 'SOIL', 'STAR', 'STEM', 'TIDE', 'TREE', 'VALE', 'VINE', 'WAVE', 'WEED', 'WIND', 'WOOD', 'BEACH', 'BLOOM', 'BROOK', 'CLIFF', 'CLOUD', 'COAST', 'CORAL', 'CREEK', 'EARTH', 'FIELD', 'FLAME', 'FLORA', 'FROST', 'GRASS', 'GROVE', 'MARSH', 'OCEAN', 'PLANT', 'RIVER', 'SHORE', 'STORM', 'SWAMP', 'THORN', 'WATER', 'WOODS', 'LAVA', 'MIST', 'HAZE']),
 
-  body: new Set(['ARM', 'EAR', 'EYE', 'GUM', 'GUT', 'HIP', 'JAW', 'LEG', 'LIP', 'RIB', 'TOE', 'BACK', 'BODY', 'BONE', 'BROW', 'CHIN', 'FACE', 'FIST', 'FOOT', 'HAIR', 'HAND', 'HEAD', 'HEEL', 'KNEE', 'LIMB', 'LUNG', 'NAIL', 'NECK', 'NOSE', 'PALM', 'SHIN', 'SKIN', 'SKULL', 'SPINE', 'TEETH', 'THUMB', 'WAIST', 'WRIST', 'ANKLE', 'BRAIN', 'CHEEK', 'CHEST', 'ELBOW', 'HEART', 'MOUTH', 'NERVE', 'ORGAN', 'SPINE', 'THIGH', 'TOOTH', 'TRUNK']),
+  body: new Set(['ARM', 'EAR', 'EYE', 'GUM', 'GUT', 'HIP', 'JAW', 'LEG', 'LIP', 'RIB', 'TOE', 'BACK', 'BODY', 'BONE', 'BROW', 'CHIN', 'FACE', 'FIST', 'FOOT', 'HAIR', 'HAND', 'HEAD', 'HEEL', 'KNEE', 'LIMB', 'LUNG', 'NAIL', 'NECK', 'NOSE', 'PALM', 'SHIN', 'SKIN', 'SKULL', 'SPINE', 'TEETH', 'THUMB', 'WAIST', 'WRIST', 'ANKLE', 'BRAIN', 'CHEEK', 'CHEST', 'ELBOW', 'HEART', 'MOUTH', 'NERVE', 'ORGAN', 'THIGH', 'TOOTH', 'TRUNK']),
 
-  colors: new Set(['RED', 'TAN', 'AQUA', 'BLUE', 'CYAN', 'GOLD', 'GRAY', 'GREY', 'JADE', 'LIME', 'NAVY', 'PINK', 'PLUM', 'ROSE', 'RUBY', 'RUST', 'TEAL', 'AMBER', 'BLACK', 'BLUSH', 'BROWN', 'CORAL', 'CREAM', 'GREEN', 'IVORY', 'LEMON', 'LILAC', 'MAUVE', 'OLIVE', 'PEACH', 'WHITE', 'YELLOW', 'ORANGE', 'PURPLE', 'SILVER', 'VIOLET']),
+  colors: new Set(['RED', 'TAN', 'AQUA', 'BLUE', 'CYAN', 'GOLD', 'GRAY', 'GREY', 'JADE', 'LIME', 'NAVY', 'PINK', 'PLUM', 'ROSE', 'RUBY', 'RUST', 'TEAL', 'AMBER', 'BLACK', 'BLUSH', 'BROWN', 'CORAL', 'CREAM', 'GREEN', 'IVORY', 'LEMON', 'LILAC', 'MAUVE', 'OLIVE', 'PEACH', 'WHITE', 'ORANGE', 'PURPLE', 'SILVER', 'VIOLET']),
 
-  home: new Set(['BED', 'CUP', 'JAR', 'JUG', 'KEY', 'LID', 'MAT', 'MOP', 'MUG', 'PAN', 'PIN', 'POT', 'RUG', 'TUB', 'URN', 'BATH', 'BELL', 'BOLT', 'BOWL', 'BULB', 'DESK', 'DOOR', 'FORK', 'GATE', 'HALL', 'HOME', 'HOOK', 'IRON', 'KNOB', 'LAMP', 'LOCK', 'NAIL', 'OVEN', 'PAIL', 'PIPE', 'PLUG', 'RACK', 'ROOF', 'ROOM', 'ROPE', 'SHELF', 'SINK', 'SOFA', 'TILE', 'VASE', 'WALL', 'YARD', 'BASIN', 'BENCH', 'BLIND', 'BROOM', 'BRUSH', 'CHAIR', 'CHEST', 'CLOCK', 'COUCH', 'CRATE', 'DRAPE', 'FENCE', 'FLAME', 'FLOOR', 'FRAME', 'GLASS', 'HOUSE', 'KNIFE', 'LATCH', 'LIGHT', 'LINEN', 'PIANO', 'PLATE', 'PORCH', 'SHEET', 'SPOON', 'STAIR', 'STOOL', 'STOVE', 'TABLE', 'TORCH', 'TOWEL', 'TRUNK'])
+  home: new Set(['BED', 'CUP', 'JAR', 'JUG', 'KEY', 'LID', 'MAT', 'MOP', 'MUG', 'PAN', 'PIN', 'POT', 'RUG', 'TUB', 'URN', 'BATH', 'BELL', 'BOLT', 'BOWL', 'BULB', 'DESK', 'DOOR', 'FORK', 'GATE', 'HALL', 'HOME', 'HOOK', 'IRON', 'KNOB', 'LAMP', 'LOCK', 'NAIL', 'OVEN', 'PAIL', 'PIPE', 'PLUG', 'RACK', 'ROOF', 'ROOM', 'ROPE', 'SHELF', 'SINK', 'SOFA', 'TILE', 'VASE', 'WALL', 'YARD', 'BASIN', 'BENCH', 'BLIND', 'BROOM', 'BRUSH', 'CHAIR', 'CHEST', 'CLOCK', 'COUCH', 'CRATE', 'DRAPE', 'FENCE', 'FLOOR', 'FRAME', 'GLASS', 'HOUSE', 'KNIFE', 'LATCH', 'LIGHT', 'LINEN', 'PIANO', 'PLATE', 'PORCH', 'SHEET', 'SPOON', 'STAIR', 'STOOL', 'STOVE', 'TABLE', 'TORCH', 'TOWEL']),
+
+  action: new Set(['RUN', 'HIT', 'CUT', 'DIG', 'FLY', 'RIP', 'SIT', 'WIN', 'BANG', 'BASH', 'BEAT', 'BLOW', 'BURN', 'CALL', 'DASH', 'DIVE', 'DRAG', 'DRAW', 'DROP', 'DUMP', 'FALL', 'FLEE', 'FLIP', 'GRAB', 'GRIP', 'HACK', 'HAUL', 'HIDE', 'HOLD', 'HUNT', 'HURT', 'JUMP', 'KICK', 'KILL', 'LEAD', 'LEAP', 'LIFT', 'LOST', 'MOVE', 'OPEN', 'PASS', 'PICK', 'PLAY', 'PULL', 'PUSH', 'READ', 'REST', 'RIDE', 'RISE', 'ROLL', 'RUSH', 'SAVE', 'SEEK', 'SHOW', 'SHUT', 'SINK', 'SKIP', 'SLAM', 'SLIP', 'SNAP', 'SPIN', 'STAY', 'STEP', 'STOP', 'SWIM', 'TAKE', 'TALK', 'TEAR', 'TELL', 'TOSS', 'TRAP', 'TRIP', 'TURN', 'WALK', 'WARN', 'WASH', 'WORK', 'WRAP', 'CLASH', 'CLIMB', 'CRAWL', 'DANCE', 'DRIVE', 'FIGHT', 'FLOAT', 'MARCH', 'REACH', 'SHAKE', 'SHOOT', 'SHOUT', 'SLIDE', 'SPEAK', 'STAND', 'STEAL', 'SWING', 'THROW', 'TOUCH', 'WATCH', 'WRITE'])
 };
 
-/**
- * Get semantic cluster for a word (or null if not in any cluster)
- */
 function getSemanticCluster(word: string): string | null {
   for (const [cluster, words] of Object.entries(SEMANTIC_CLUSTERS)) {
     if (words.has(word)) return cluster;
@@ -210,14 +376,14 @@ function calculateSemanticDistance(word1: string, word2: string): number {
   const cluster1 = getSemanticCluster(word1);
   const cluster2 = getSemanticCluster(word2);
 
-  // Both in same cluster = low distance
+  // Both in same cluster = low distance (boring)
   if (cluster1 && cluster1 === cluster2) {
-    return 20;
+    return 15;
   }
 
-  // Both in different clusters = high distance (best!)
+  // Both in different clusters = high distance (great!)
   if (cluster1 && cluster2 && cluster1 !== cluster2) {
-    return 90;
+    return 95;
   }
 
   // One or both not in clusters - use letter similarity as fallback
@@ -226,13 +392,27 @@ function calculateSemanticDistance(word1: string, word2: string): number {
   const intersection = new Set([...letters1].filter(x => letters2.has(x)));
   const union = new Set([...letters1, ...letters2]);
 
-  // Jaccard distance (inverse of similarity)
   const similarity = intersection.size / union.size;
-  return Math.round((1 - similarity) * 70) + 15; // Scale to 15-85 range
+  return Math.round((1 - similarity) * 70) + 15;
+}
+
+/**
+ * Score the "semantic journey" of a puzzle chain
+ * Bonus for traversing multiple semantic clusters
+ */
+function scoreSemanticJourney(chain: PathNode[]): number {
+  const clusters = chain.map(node => getSemanticCluster(node.word)).filter(c => c !== null);
+  const uniqueClusters = new Set(clusters);
+
+  // Bonus for visiting multiple clusters
+  if (uniqueClusters.size >= 3) return 30;
+  if (uniqueClusters.size >= 2) return 15;
+  return 0;
 }
 
 /**
  * Score an entire puzzle chain (0-100)
+ * Enhanced with journey scoring and stricter boring penalties
  */
 function scorePuzzleChain(chain: PathNode[]): number {
   if (chain.length < 2) return 0;
@@ -240,17 +420,19 @@ function scorePuzzleChain(chain: PathNode[]): number {
   let totalScore = 0;
   const movePositions: number[] = [];
 
-  // Score individual words
+  // Score individual words (25% weight)
   const wordScores = chain.map(node => {
     const len = node.word.length;
     return scoreWordInterestingness(node.word, len);
   });
   const avgWordScore = wordScores.reduce((a, b) => a + b, 0) / wordScores.length;
-  totalScore += avgWordScore * 0.3; // 30% weight
+  totalScore += avgWordScore * 0.25;
 
-  // Score moves
+  // Score moves (35% weight) - increased from 30%
   let moveScoreSum = 0;
   let moveCount = 0;
+  let hasBoringMove = false;
+
   for (let i = 0; i < chain.length - 1; i++) {
     const node = chain[i];
     if (node.letterToGive && node.moveFromIndex !== undefined) {
@@ -262,29 +444,42 @@ function scorePuzzleChain(chain: PathNode[]): number {
         node.moveToIndex || 0,
         movePositions
       );
+
+      // Track if any move is very boring
+      if (moveScore < 20) hasBoringMove = true;
+
       moveScoreSum += moveScore;
       moveCount++;
 
-      // Track position for variety scoring
       const normalizedPos = node.moveFromIndex === 0 ? 0 :
                            node.moveFromIndex === node.word.length - 1 ? 2 : 1;
       movePositions.push(normalizedPos);
     }
   }
+
   if (moveCount > 0) {
-    totalScore += (moveScoreSum / moveCount) * 0.3; // 30% weight
+    totalScore += (moveScoreSum / moveCount) * 0.35;
   }
 
-  // Score semantic distance (start to end)
+  // Heavy penalty if any move is boring
+  if (hasBoringMove) {
+    totalScore -= 20;
+  }
+
+  // Score semantic distance start→end (20% weight)
   const startWord = chain[0].word;
   const endWord = chain[chain.length - 1].word;
   const semanticScore = calculateSemanticDistance(startWord, endWord);
-  totalScore += semanticScore * 0.25; // 25% weight
+  totalScore += semanticScore * 0.20;
 
-  // Bonus for position variety across the chain
+  // Score semantic journey (10% weight) - NEW
+  const journeyScore = scoreSemanticJourney(chain);
+  totalScore += journeyScore * 0.10;
+
+  // Position variety bonus (10% weight)
   const uniquePositions = new Set(movePositions).size;
-  const positionVarietyBonus = (uniquePositions / 3) * 15; // Up to 15 points
-  totalScore += positionVarietyBonus; // 15% weight
+  const positionVarietyBonus = (uniquePositions / 3) * 10;
+  totalScore += positionVarietyBonus;
 
   return Math.round(Math.max(0, Math.min(100, totalScore)));
 }
@@ -327,13 +522,11 @@ interface GeneratedPuzzle {
 function weightedShuffle(words: string[], wordLength: number): string[] {
   const scored = words.map(word => ({
     word,
-    score: scoreWordInterestingness(word, wordLength) + Math.random() * 30 // Add randomness
+    score: scoreWordInterestingness(word, wordLength) + Math.random() * 30
   }));
 
-  // Sort by score descending, then take a mix
   scored.sort((a, b) => b.score - a.score);
 
-  // Take top 60% by score, shuffle them for variety
   const topCount = Math.ceil(scored.length * 0.6);
   const topWords = shuffle(scored.slice(0, topCount).map(s => s.word));
   const restWords = shuffle(scored.slice(topCount).map(s => s.word));
@@ -342,11 +535,9 @@ function weightedShuffle(words: string[], wordLength: number): string[] {
 }
 
 export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Promise<PuzzleConfig> => {
-  // Config based on difficulty
   const targetRows = difficulty === 'EASY' ? 3 : difficulty === 'MEDIUM' ? 4 : 5;
   const wordLength = difficulty === 'HARD' ? 5 : 4;
 
-  // Select dictionaries based on word length
   const dicts = {
     min: WORD_SETS[wordLength - 1],
     base: WORD_SETS[wordLength],
@@ -354,8 +545,9 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
     baseArray: Array.from(WORD_SETS[wordLength])
   };
 
-  const GLOBAL_TIMEOUT = 2500; // Reduced for mobile performance
-  const CANDIDATES_TO_GENERATE = 2; // Fewer candidates on mobile for speed
+  const GLOBAL_TIMEOUT = 2500;
+  const CANDIDATES_TO_GENERATE = 3; // Generate 3 candidates for better selection
+  const MIN_ACCEPTABLE_SCORE = 45; // Reject puzzles below this threshold
   const generatedPuzzles: GeneratedPuzzle[] = [];
 
   const state: GenState = {
@@ -363,12 +555,9 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
     lastYieldTime: Date.now()
   };
 
-  // Use weighted shuffle for smarter starting word selection
   const candidatesW1 = weightedShuffle(dicts.baseArray, wordLength);
-  const attemptsPerCandidate = 20;
   let candidateIndex = 0;
 
-  // Generate multiple puzzle candidates
   while (generatedPuzzles.length < CANDIDATES_TO_GENERATE &&
          candidateIndex < candidatesW1.length &&
          Date.now() - state.startTime < GLOBAL_TIMEOUT) {
@@ -376,7 +565,6 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
     const w1 = candidatesW1[candidateIndex];
     candidateIndex++;
 
-    // Try to find a valid path starting from this word
     const path = await findPath(
       [{ word: w1, tempState: w1 }],
       targetRows,
@@ -384,21 +572,24 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
       dicts,
       GLOBAL_TIMEOUT,
       state,
-      [] // previous move positions
+      []
     );
 
     if (path) {
       const score = scorePuzzleChain(path);
-      generatedPuzzles.push({ chain: path, score });
 
-      // Early exit if we found a great puzzle
-      if (score >= 75 && generatedPuzzles.length >= 2) {
-        break;
+      // Only accept puzzles above minimum threshold
+      if (score >= MIN_ACCEPTABLE_SCORE) {
+        generatedPuzzles.push({ chain: path, score });
+
+        // Early exit if we found a great puzzle
+        if (score >= 70 && generatedPuzzles.length >= 2) {
+          break;
+        }
       }
     }
   }
 
-  // Pick the best puzzle
   if (generatedPuzzles.length === 0) {
     throw new Error("Could not generate valid puzzle locally");
   }
@@ -407,7 +598,6 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
   const bestPuzzle = generatedPuzzles[0];
   const path = bestPuzzle.chain;
 
-  // Convert path to solution format
   const words = path.map(n => n.word);
   const solution: PuzzleSolutionStep[] = [];
 
@@ -474,7 +664,6 @@ async function findPath(
   for (let j = 0; j < currentTempWord.length; j++) {
     const charToMove = currentTempWord[j];
 
-    // Constraint: Don't move the letter just received
     if (currentNode.letterReceived && charToMove === currentNode.letterReceived) continue;
 
     const remainder = currentTempWord.slice(0, j) + currentTempWord.slice(j + 1);
@@ -483,28 +672,27 @@ async function findPath(
     if (isValidRemainder) {
       if (usedWords.has(remainder)) continue;
 
-      // Calculate base move score for prioritization
       const normalizedPos = j === 0 ? 0 : j === currentTempWord.length - 1 ? 2 : 1;
       let moveScore = 50;
 
-      // Prefer positions not used before
       if (!previousMovePositions.includes(normalizedPos)) {
         moveScore += 20;
       }
 
-      // Prefer middle positions
+      // STRONG preference for middle positions
       if (normalizedPos === 1) {
-        moveScore += 15;
+        moveScore += 25;
+      } else {
+        moveScore -= 10; // Penalize edge positions
       }
 
-      // Penalize boring S removal at end
+      // Apply boring transform penalties at search time
       if (charToMove === 'S' && j === currentTempWord.length - 1) {
-        moveScore -= 25;
+        moveScore -= 40; // Heavy penalty for S at end
       }
 
-      // Bonus for interesting letters
       if (INTERESTING_LETTERS.has(charToMove)) {
-        moveScore += 10;
+        moveScore += 15;
       }
 
       validMoves.push({ charToMove, charIndex: j, remainder, moveScore });
@@ -512,16 +700,14 @@ async function findPath(
   }
 
   // Sort by move score (best first) with some randomness
-  validMoves.sort((a, b) => (b.moveScore + Math.random() * 20) - (a.moveScore + Math.random() * 20));
+  validMoves.sort((a, b) => (b.moveScore + Math.random() * 15) - (a.moveScore + Math.random() * 15));
 
-  // Try moves in quality order
   for (const move of validMoves) {
     if (Date.now() - state.startTime > timeoutLimit) return null;
 
     const { charToMove, charIndex, remainder } = move;
     const normalizedSourcePos = charIndex === 0 ? 0 : charIndex === currentTempWord.length - 1 ? 2 : 1;
 
-    // Find candidate next words, scored by quality
     const potentialNextWords: {
       word: string,
       tempState: string,
@@ -532,29 +718,41 @@ async function findPath(
     for (const w of dicts.baseArray) {
       if (usedWords.has(w)) continue;
 
-      // Check insertion positions
       for (let k = 0; k <= w.length; k++) {
         const combined = w.slice(0, k) + charToMove + w.slice(k);
         if (dicts.max.has(combined) && !usedWords.has(combined)) {
-          // Score this candidate
           const wordScore = scoreWordInterestingness(w, w.length);
+
+          // Calculate insertion quality
+          let insertionScore = 0;
           const normalizedTargetPos = k === 0 ? 0 : k === w.length ? 2 : 1;
-          const insertionBonus = normalizedTargetPos === 1 ? 10 : 0;
+
+          // STRONG bonus for middle insertion
+          if (normalizedTargetPos === 1) {
+            insertionScore += 25;
+          } else {
+            insertionScore -= 15; // Penalize edge insertions
+          }
+
+          // Apply boring transform penalty (strong weight during search)
+          const boringPenalty = getBoringTransformPenalty(
+            currentTempWord, charIndex, charToMove, w, k
+          );
+          insertionScore -= boringPenalty * 0.8;
 
           potentialNextWords.push({
             word: w,
             tempState: combined,
             insertionIndex: k,
-            score: wordScore + insertionBonus + Math.random() * 15
+            score: wordScore + insertionScore + Math.random() * 10
           });
-          break; // Only need one valid insertion per word
+          break;
         }
       }
     }
 
-    // Sort by score and take top candidates
     potentialNextWords.sort((a, b) => b.score - a.score);
-    const candidatesToExplore = potentialNextWords.slice(0, 30);
+    const candidatesToExplore = potentialNextWords.slice(0, 25);
 
     for (const nextCandidate of candidatesToExplore) {
       if (Date.now() - state.startTime > timeoutLimit) return null;
