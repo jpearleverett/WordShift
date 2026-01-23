@@ -358,6 +358,8 @@ export default function App() {
   const [newPhase, setNewPhase] = useState<DialoguePhase>(0);
   const [streakBonus, setStreakBonus] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
+  const [milestoneBonus, setMilestoneBonus] = useState(0);
+  const [milestoneMessage, setMilestoneMessage] = useState<string | null>(null);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
 
@@ -579,6 +581,9 @@ export default function App() {
         setNewPhase(amberResult.newPhase);
         setStreakBonus(amberResult.streakBonus);
         setCurrentStreak(amberResult.currentStreak);
+        // Milestone bonus
+        setMilestoneBonus(amberResult.milestoneBonus);
+        setMilestoneMessage(amberResult.milestoneMessage);
       });
 
       setMessage("Sweet Victory!");
@@ -619,6 +624,8 @@ export default function App() {
     setAmberEarned(0);
     setPhaseChanged(false);
     setStreakBonus(0);
+    setMilestoneBonus(0);
+    setMilestoneMessage(null);
     startNewGame();
   };
 
@@ -627,6 +634,8 @@ export default function App() {
     setAmberEarned(0);
     setPhaseChanged(false);
     setStreakBonus(0);
+    setMilestoneBonus(0);
+    setMilestoneMessage(null);
     setCurrentScreen('home');
     setGameState(GameState.IDLE);
   };
@@ -910,6 +919,15 @@ export default function App() {
               <View style={styles.winStreakContainer}>
                 <Text style={styles.winStreakEmoji}>🔥</Text>
                 <Text style={styles.winStreakText}>{currentStreak} Day Streak!</Text>
+              </View>
+            )}
+
+            {/* Milestone bonus */}
+            {milestoneBonus > 0 && milestoneMessage && (
+              <View style={styles.milestoneContainer}>
+                <Text style={styles.milestoneEmoji}>🏆</Text>
+                <Text style={styles.milestoneMessage}>{milestoneMessage}</Text>
+                <Text style={styles.milestoneBonus}>+{milestoneBonus} Bonus Amber!</Text>
               </View>
             )}
 
@@ -1657,6 +1675,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: CandyColors.orange.dark,
+  },
+
+  // Milestone bonus
+  milestoneContainer: {
+    alignItems: 'center',
+    backgroundColor: CandyColors.yellow.light,
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  milestoneEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  milestoneMessage: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: CandyColors.yellow.dark,
+    marginBottom: 2,
+  },
+  milestoneBonus: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: CandyColors.green.dark,
   },
 
   // Phase change notification

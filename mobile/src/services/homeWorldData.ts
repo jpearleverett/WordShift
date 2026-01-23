@@ -291,6 +291,10 @@ export const ANIMALS: Animal[] = [
  * Building grows from ground floor up
  */
 export const UNLOCK_PROGRESSION: Unlockable[] = [
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EARLY GAME (Puzzles 1-50) - Quick unlocks to hook the player
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // 1. First: Invite Ember the Fox into the starter room (FREE!)
   {
     id: 'unlock_fox',
@@ -307,7 +311,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_kitchen',
     type: 'room',
-    cost: 30,
+    cost: 50,
     isUnlocked: false,
     order: 2,
     targetId: 'kitchen',
@@ -319,7 +323,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_pangolin',
     type: 'character',
-    cost: 25,
+    cost: 40,
     isUnlocked: false,
     order: 3,
     targetId: 'pangolin',
@@ -327,11 +331,15 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     description: 'A chef who curls into philosophical balls',
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EARLY-MID GAME (Puzzles 50-120) - Building momentum
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // 4. Build the Study
   {
     id: 'unlock_study',
     type: 'room',
-    cost: 50,
+    cost: 100,
     isUnlocked: false,
     order: 4,
     targetId: 'study',
@@ -343,7 +351,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_owl',
     type: 'character',
-    cost: 40,
+    cost: 80,
     isUnlocked: false,
     order: 5,
     targetId: 'owl',
@@ -355,7 +363,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_aquarium',
     type: 'room',
-    cost: 75,
+    cost: 140,
     isUnlocked: false,
     order: 6,
     targetId: 'aquarium',
@@ -367,7 +375,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_axolotl',
     type: 'character',
-    cost: 50,
+    cost: 110,
     isUnlocked: false,
     order: 7,
     targetId: 'axolotl',
@@ -375,11 +383,15 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     description: 'A dreamy creature who never grew up',
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MID GAME (Puzzles 120-200) - The house grows, darkness creeps in
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // 8. Build the Jungle Room
   {
     id: 'unlock_jungle',
     type: 'room',
-    cost: 100,
+    cost: 200,
     isUnlocked: false,
     order: 8,
     targetId: 'jungle_room',
@@ -391,7 +403,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_sloth',
     type: 'character',
-    cost: 75,
+    cost: 160,
     isUnlocked: false,
     order: 9,
     targetId: 'sloth',
@@ -403,7 +415,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_desert',
     type: 'room',
-    cost: 125,
+    cost: 225,
     isUnlocked: false,
     order: 10,
     targetId: 'desert_room',
@@ -415,7 +427,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_fennec',
     type: 'character',
-    cost: 100,
+    cost: 185,
     isUnlocked: false,
     order: 11,
     targetId: 'fennec_fox',
@@ -423,11 +435,15 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     description: 'Hears everything, understands too much',
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LATE-MID GAME (Puzzles 200-280) - Existential dread intensifies
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // 12. Build the Office
   {
     id: 'unlock_office',
     type: 'room',
-    cost: 150,
+    cost: 275,
     isUnlocked: false,
     order: 12,
     targetId: 'office',
@@ -439,7 +455,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_capybara',
     type: 'character',
-    cost: 125,
+    cost: 225,
     isUnlocked: false,
     order: 13,
     targetId: 'capybara',
@@ -451,7 +467,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_burrow',
     type: 'room',
-    cost: 175,
+    cost: 325,
     isUnlocked: false,
     order: 14,
     targetId: 'burrow',
@@ -463,7 +479,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_wombat',
     type: 'character',
-    cost: 150,
+    cost: 275,
     isUnlocked: false,
     order: 15,
     targetId: 'wombat',
@@ -471,11 +487,15 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     description: 'Digs deep, finds what shouldn\'t be found',
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // END GAME (Puzzles 280-350+) - Final revelations
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // 16. Build the Garden
   {
     id: 'unlock_garden',
     type: 'room',
-    cost: 200,
+    cost: 400,
     isUnlocked: false,
     order: 16,
     targetId: 'garden',
@@ -487,7 +507,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_rabbit',
     type: 'character',
-    cost: 175,
+    cost: 325,
     isUnlocked: false,
     order: 17,
     targetId: 'rabbit',
@@ -499,7 +519,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_bamboo_attic',
     type: 'room',
-    cost: 250,
+    cost: 475,
     isUnlocked: false,
     order: 18,
     targetId: 'bamboo_attic',
@@ -507,11 +527,11 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     description: 'The highest place, closest to the sky',
   },
 
-  // 19. Invite Bamboo the Red Panda
+  // 19. Invite Bamboo the Red Panda (FINAL UNLOCK)
   {
     id: 'unlock_red_panda',
     type: 'character',
-    cost: 200,
+    cost: 400,
     isUnlocked: false,
     order: 19,
     targetId: 'red_panda',
