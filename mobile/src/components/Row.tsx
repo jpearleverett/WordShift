@@ -17,8 +17,7 @@ const ROW_PADDING = 8;
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
 const ARC_LIFT = 18; // How much center elements lift up relative to edges
-const SLOT_WIDTH_TOP = 24; // Wider at top for wedge shape
-const SLOT_WIDTH_BOTTOM = 14; // Narrower at bottom for wedge shape
+const SLOT_WIDTH = 14; // Narrow slots to keep letters close together
 const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
 
 interface RowProps {
@@ -511,10 +510,10 @@ const styles = StyleSheet.create({
     // No extra padding - container stays same size, content overflows
   },
   arcLetterWrapper: {
-    marginHorizontal: -3, // Slight overlap for tighter spacing
+    marginHorizontal: -5, // Overlap letters for tighter spacing
   },
   arcSlotWrapper: {
-    marginHorizontal: 1, // Small gap around slots
+    marginHorizontal: -2, // Minimal gap - slots nestle between letters
   },
 
   // Row variants
@@ -647,14 +646,14 @@ const styles = StyleSheet.create({
   },
   slotGlow: {
     position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderTopLeftRadius: 16, // Match wedge shape
-    borderTopRightRadius: 16,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
+    top: -3,
+    left: -3,
+    right: -3,
+    bottom: -3,
+    borderTopLeftRadius: 11, // Match narrower wedge shape
+    borderTopRightRadius: 11,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 7,
     backgroundColor: CandyColors.pink.main,
   },
   slot: {
@@ -669,16 +668,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   slotCompact: {
-    width: SLOT_WIDTH_TOP, // Base width
+    width: SLOT_WIDTH, // Narrow to keep letters close
     height: SLOT_HEIGHT,
-    borderTopLeftRadius: 12, // Wider rounded top
-    borderTopRightRadius: 12,
-    borderBottomLeftRadius: 6, // Narrower tapered bottom
-    borderBottomRightRadius: 6,
-    // Transform to create true wedge/tapered effect
+    borderTopLeftRadius: 8, // Slightly rounded top
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 4, // Narrower tapered bottom
+    borderBottomRightRadius: 4,
+    // Transform to create wedge/tapered effect
     transform: [
       { perspective: 200 },
-      { rotateX: '8deg' }, // Tilts to make top appear wider
+      { rotateX: '10deg' }, // Tilts to make top appear wider than bottom
     ],
   },
   slotShimmer: {
@@ -688,8 +687,8 @@ const styles = StyleSheet.create({
     right: 0,
     height: '40%',
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderTopLeftRadius: 12, // Match wedge top radius
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: 8, // Match compact slot top radius
+    borderTopRightRadius: 8,
   },
   plusContainer: {
     width: 16,
@@ -698,8 +697,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   plusContainerCompact: {
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
   },
   plusHorizontal: {
     position: 'absolute',
@@ -709,7 +708,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   plusHorizontalCompact: {
-    width: 10,
+    width: 8,
     height: 2,
   },
   plusVertical: {
@@ -721,7 +720,7 @@ const styles = StyleSheet.create({
   },
   plusVerticalCompact: {
     width: 2,
-    height: 10,
+    height: 8,
   },
   cornerDot: {
     position: 'absolute',
