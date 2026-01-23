@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -10,6 +9,8 @@ import {
   ActivityIndicator,
   StatusBar,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 
 // Simple ID generator (React Native compatible)
@@ -17,10 +18,293 @@ let idCounter = 0;
 const generateId = () => `id_${Date.now()}_${idCounter++}`;
 import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
-import { generateLocalPuzzle, validateWord } from './src/services/localGenerator';
+import { AnimatedBackground } from './src/components/AnimatedBackground';
+import { Confetti } from './src/components/Confetti';
+import { CandyColors } from './src/theme/colors';
+import { generateLocalPuzzle } from './src/services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from './src/constants';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Animated Action Button Component
+const ActionButton: React.FC<{
+  icon: string;
+  label: string;
+  colors: { bg: string; border: string; glow: string };
+  onPress: () => void;
+  disabled: boolean;
+}> = ({ icon, label, colors, onPress, disabled }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!disabled) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: false,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0,
+            duration: 1500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    }
+    return () => glowAnim.stopAnimation();
+  }, [disabled]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      friction: 5,
+      tension: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 150,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.6],
+  });
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+      activeOpacity={1}
+    >
+      <Animated.View
+        style={[
+          styles.actionButton,
+          disabled && styles.actionButtonDisabled,
+          { transform: [{ scale: scaleAnim }] },
+        ]}
+      >
+        {/* Glow effect */}
+        {!disabled && (
+          <Animated.View
+            style={[
+              styles.actionButtonGlow,
+              { backgroundColor: colors.glow, opacity: glowOpacity },
+            ]}
+          />
+        )}
+
+        {/* Button body */}
+        <View
+          style={[
+            styles.actionButtonIcon,
+            { backgroundColor: colors.bg },
+          ]}
+        >
+          {/* Top bevel */}
+          <View style={styles.actionButtonBevel} />
+
+          {/* Icon */}
+          <Text style={styles.actionButtonIconText}>{icon}</Text>
+        </View>
+
+        {/* 3D edge */}
+        <View
+          style={[
+            styles.actionButtonEdge,
+            { backgroundColor: colors.border },
+          ]}
+        />
+
+        {/* Label */}
+        <Text style={styles.actionButtonLabel}>{label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+// Animated Logo Component
+const AnimatedLogo: React.FC = () => {
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Subtle bounce
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: -3,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // Very subtle rotation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotateAnim, {
+          toValue: -1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const rotate = rotateAnim.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-1deg', '1deg'],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.logoContainer,
+        {
+          transform: [
+            { translateY: bounceAnim },
+            { rotate },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.logoInner}>
+        <Text style={styles.logoWord}>WORD</Text>
+        <Text style={styles.logoShift}>SHIFT</Text>
+      </View>
+      {/* Sparkle decorations */}
+      <View style={[styles.logoSparkle, styles.logoSparkle1]} />
+      <View style={[styles.logoSparkle, styles.logoSparkle2]} />
+      <View style={[styles.logoSparkle, styles.logoSparkle3]} />
+    </Animated.View>
+  );
+};
+
+// Streak Counter Component
+const StreakCounter: React.FC<{ streak: number; level: number }> = ({ streak, level }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (streak > 0) {
+      Animated.sequence([
+        Animated.spring(scaleAnim, {
+          toValue: 1.3,
+          friction: 3,
+          tension: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [streak]);
+
+  return (
+    <View style={styles.statsContainer}>
+      <View style={styles.statBox}>
+        <Text style={styles.statLabel}>LEVEL</Text>
+        <View style={styles.statValueContainer}>
+          <Text style={styles.statValue}>{level}</Text>
+        </View>
+      </View>
+      <Animated.View style={[styles.statBox, { transform: [{ scale: scaleAnim }] }]}>
+        <Text style={styles.statLabel}>STREAK</Text>
+        <View style={[styles.statValueContainer, styles.streakContainer]}>
+          <Text style={styles.statValue}>{streak}</Text>
+          {streak >= 3 && <Text style={styles.fireEmoji}>🔥</Text>}
+        </View>
+      </Animated.View>
+    </View>
+  );
+};
+
+// Toast Message Component
+const Toast: React.FC<{ message: string; isError: boolean }> = ({ message, isError }) => {
+  const slideAnim = useRef(new Animated.Value(-20)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    slideAnim.setValue(-20);
+    opacityAnim.setValue(0);
+
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 5,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    if (isError) {
+      Animated.sequence([
+        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [message, isError]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.toast,
+        isError ? styles.toastError : styles.toastNormal,
+        {
+          transform: [
+            { translateY: slideAnim },
+            { translateX: shakeAnim },
+          ],
+          opacity: opacityAnim,
+        },
+      ]}
+    >
+      <View style={styles.toastShine} />
+      <Text style={[styles.toastText, isError && styles.toastTextError]}>
+        {message}
+      </Text>
+    </Animated.View>
+  );
+};
 
 export default function App() {
   const [rows, setRows] = useState<RowData[]>([]);
@@ -37,6 +321,9 @@ export default function App() {
   const [currentWordLength, setCurrentWordLength] = useState(4);
   const [showRules, setShowRules] = useState(false);
   const [showDifficultyMenu, setShowDifficultyMenu] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [streak, setStreak] = useState(0);
+  const [level, setLevel] = useState(1);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
 
@@ -81,10 +368,8 @@ export default function App() {
     }
 
     try {
-      // Short delay for UI feedback
       await new Promise(r => setTimeout(r, 300));
 
-      // Wrap generation in a timeout for mobile devices
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Generation timeout')), 4000)
       );
@@ -97,7 +382,6 @@ export default function App() {
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength);
     } catch (localErr) {
       console.log("Local generation failed, using fallback:", localErr);
-      // Use fallback puzzles immediately
       if (selectedDifficulty === 'HARD') {
         initGame(FALLBACK_PUZZLE_HARD, "Challenge Mode", undefined, 5);
       } else if (selectedDifficulty === 'EASY') {
@@ -112,7 +396,7 @@ export default function App() {
     if (gameState !== GameState.PLAYING) return;
     if (rowIndex !== activeRowIndex) return;
     if (letter.isLocked) {
-      shakeError("Locked letter!");
+      shakeError("That letter is locked!");
       return;
     }
 
@@ -126,7 +410,7 @@ export default function App() {
 
   const shakeError = (msg: string) => {
     setError(msg);
-    setTimeout(() => setError(null), 1500);
+    setTimeout(() => setError(null), 2000);
   };
 
   const checkValidation = (word: string): boolean => {
@@ -146,9 +430,9 @@ export default function App() {
     );
 
     if (relevantStep) {
-      setMessage(`Try moving: ${relevantStep.letterToMove}`);
+      setMessage(`Try the letter: ${relevantStep.letterToMove}`);
     } else {
-      setMessage("Try undoing previous moves.");
+      setMessage("Hmm, try undoing a move!");
     }
   };
 
@@ -174,27 +458,29 @@ export default function App() {
     const expectedTargetLength = currentWordLength + 1;
 
     if (sourceWordStr.length !== expectedSourceLength) {
-      shakeError(`Source needs ${expectedSourceLength} letters`);
+      shakeError(`Need ${expectedSourceLength} letters!`);
       setIsProcessing(false);
       return;
     }
 
     if (targetWordStr.length !== expectedTargetLength) {
-      shakeError(`Target needs ${expectedTargetLength} letters`);
+      shakeError(`Need ${expectedTargetLength} letters!`);
       setIsProcessing(false);
       return;
     }
 
     const isSourceValid = checkValidation(sourceWordStr);
     if (!isSourceValid) {
-      shakeError(`"${sourceWordStr}" is not a word!`);
+      shakeError(`"${sourceWordStr}" isn't a word!`);
+      setStreak(0);
       setIsProcessing(false);
       return;
     }
 
     const isTargetValid = checkValidation(targetWordStr);
     if (!isTargetValid) {
-      shakeError(`"${targetWordStr}" is not a word!`);
+      shakeError(`"${targetWordStr}" isn't a word!`);
+      setStreak(0);
       setIsProcessing(false);
       return;
     }
@@ -214,14 +500,24 @@ export default function App() {
     setRows(newRows);
     setSelectedLetter(null);
     setError(null);
+    setStreak(prev => prev + 1);
 
     const maxMoves = rows.length - 1;
     if (activeRowIndex === maxMoves - 1) {
       setMessage("Sweet Victory!");
       setGameState(GameState.WON);
+      setShowConfetti(true);
     } else {
       setActiveRowIndex(prev => prev + 1);
-      setMessage("Tasty! Keep going.");
+      const messages = [
+        "Delicious!",
+        "Tasty move!",
+        "Sweet!",
+        "Yummy!",
+        "Perfect!",
+        "Brilliant!",
+      ];
+      setMessage(messages[Math.floor(Math.random() * messages.length)]);
     }
 
     setIsProcessing(false);
@@ -236,34 +532,54 @@ export default function App() {
     setGameState(GameState.PLAYING);
     setSelectedLetter(null);
     setError(null);
-    setMessage("Oops! Let's try that again.");
+    setMessage("Let's try again!");
+    setStreak(prev => Math.max(0, prev - 1));
+  };
+
+  const handleNextLevel = () => {
+    setShowConfetti(false);
+    setLevel(prev => prev + 1);
+    startNewGame();
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Background gradient simulation */}
-      <View style={styles.backgroundGradient} />
+      {/* Animated Background */}
+      <AnimatedBackground />
+
+      {/* Confetti celebration */}
+      <Confetti active={showConfetti} />
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>WORD</Text>
-          <Text style={styles.titleAccent}>SHIFT</Text>
-          <TouchableOpacity
-            style={styles.helpButton}
-            onPress={() => setShowRules(true)}
-          >
-            <Text style={styles.helpButtonText}>?</Text>
-          </TouchableOpacity>
-        </View>
+        <AnimatedLogo />
+
+        <TouchableOpacity
+          style={styles.helpButton}
+          onPress={() => setShowRules(true)}
+        >
+          <View style={styles.helpButtonShine} />
+          <Text style={styles.helpButtonText}>?</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <StreakCounter streak={streak} level={level} />
 
         <TouchableOpacity
           style={styles.difficultyButton}
           onPress={() => setShowDifficultyMenu(!showDifficultyMenu)}
         >
-          <View style={styles.difficultyDot} />
+          <View style={styles.difficultyButtonShine} />
+          <View style={[
+            styles.difficultyDot,
+            difficulty === 'EASY' && styles.difficultyDotEasy,
+            difficulty === 'MEDIUM' && styles.difficultyDotMedium,
+            difficulty === 'HARD' && styles.difficultyDotHard,
+          ]} />
           <Text style={styles.difficultyText}>{difficulty}</Text>
           <Text style={styles.difficultyArrow}>▼</Text>
         </TouchableOpacity>
@@ -279,6 +595,12 @@ export default function App() {
                 ]}
                 onPress={() => startNewGame(d)}
               >
+                <View style={[
+                  styles.difficultyMenuDot,
+                  d === 'EASY' && styles.difficultyDotEasy,
+                  d === 'MEDIUM' && styles.difficultyDotMedium,
+                  d === 'HARD' && styles.difficultyDotHard,
+                ]} />
                 <Text
                   style={[
                     styles.difficultyMenuText,
@@ -295,18 +617,17 @@ export default function App() {
 
       {/* Toast Message */}
       <View style={styles.toastContainer}>
-        <View style={[styles.toast, error ? styles.toastError : styles.toastNormal]}>
-          <Text style={[styles.toastText, error ? styles.toastTextError : null]}>
-            {error || message}
-          </Text>
-        </View>
+        <Toast message={error || message} isError={!!error} />
       </View>
 
       {/* Game Area */}
       <View style={styles.gameArea}>
         {(gameState === GameState.LOADING || isProcessing) && (
           <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#EC4899" />
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={CandyColors.pink.main} />
+              <Text style={styles.loadingText}>Mixing words...</Text>
+            </View>
           </View>
         )}
 
@@ -334,24 +655,33 @@ export default function App() {
         <ActionButton
           icon="↩"
           label="UNDO"
-          color="#FBBF24"
-          borderColor="#D97706"
+          colors={{
+            bg: CandyColors.yellow.main,
+            border: CandyColors.yellow.shadow,
+            glow: CandyColors.yellow.glow,
+          }}
           onPress={handleUndo}
           disabled={history.length === 0 || gameState === GameState.WON}
         />
         <ActionButton
           icon="💡"
           label="HINT"
-          color="#38BDF8"
-          borderColor="#0284C7"
+          colors={{
+            bg: CandyColors.blue.main,
+            border: CandyColors.blue.shadow,
+            glow: CandyColors.blue.glow,
+          }}
           onPress={handleHint}
           disabled={gameState !== GameState.PLAYING}
         />
         <ActionButton
           icon="🔄"
-          label="RESET"
-          color="#F87171"
-          borderColor="#DC2626"
+          label="NEW"
+          colors={{
+            bg: CandyColors.green.main,
+            border: CandyColors.green.shadow,
+            glow: CandyColors.green.glow,
+          }}
           onPress={() => startNewGame()}
           disabled={false}
         />
@@ -365,6 +695,9 @@ export default function App() {
           onPress={() => setShowRules(false)}
         >
           <View style={styles.rulesModal} onStartShouldSetResponder={() => true}>
+            {/* Modal shine */}
+            <View style={styles.modalShine} />
+
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowRules(false)}
@@ -375,32 +708,42 @@ export default function App() {
             <Text style={styles.rulesTitle}>HOW TO PLAY</Text>
 
             <View style={styles.ruleItem}>
-              <View style={[styles.ruleNumber, { backgroundColor: '#FCE7F3' }]}>
-                <Text style={[styles.ruleNumberText, { color: '#EC4899' }]}>1</Text>
+              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.pink.light }]}>
+                <Text style={[styles.ruleNumberText, { color: CandyColors.pink.dark }]}>1</Text>
               </View>
               <View style={styles.ruleContent}>
                 <Text style={styles.ruleHeading}>Pick a Letter</Text>
-                <Text style={styles.ruleDesc}>Tap a candy tile in the bright active row.</Text>
+                <Text style={styles.ruleDesc}>Tap any colorful tile in the active row.</Text>
               </View>
             </View>
 
             <View style={styles.ruleItem}>
-              <View style={[styles.ruleNumber, { backgroundColor: '#E0F2FE' }]}>
-                <Text style={[styles.ruleNumberText, { color: '#0EA5E9' }]}>2</Text>
+              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.blue.light }]}>
+                <Text style={[styles.ruleNumberText, { color: CandyColors.blue.dark }]}>2</Text>
               </View>
               <View style={styles.ruleContent}>
                 <Text style={styles.ruleHeading}>Drop it Down</Text>
-                <Text style={styles.ruleDesc}>Tap a slot below to move it.</Text>
+                <Text style={styles.ruleDesc}>Tap a + slot to place your letter.</Text>
               </View>
             </View>
 
             <View style={styles.ruleItem}>
-              <View style={[styles.ruleNumber, { backgroundColor: '#FEF3C7' }]}>
-                <Text style={[styles.ruleNumberText, { color: '#F59E0B' }]}>3</Text>
+              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.yellow.light }]}>
+                <Text style={[styles.ruleNumberText, { color: CandyColors.yellow.shadow }]}>3</Text>
               </View>
               <View style={styles.ruleContent}>
-                <Text style={styles.ruleHeading}>Make Words</Text>
-                <Text style={styles.ruleDesc}>Both words created must be valid!</Text>
+                <Text style={styles.ruleHeading}>Make Real Words</Text>
+                <Text style={styles.ruleDesc}>Both words must be valid English!</Text>
+              </View>
+            </View>
+
+            <View style={styles.ruleItem}>
+              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.green.light }]}>
+                <Text style={[styles.ruleNumberText, { color: CandyColors.green.dark }]}>4</Text>
+              </View>
+              <View style={styles.ruleContent}>
+                <Text style={styles.ruleHeading}>Complete All Rows</Text>
+                <Text style={styles.ruleDesc}>Work through every row to win!</Text>
               </View>
             </View>
 
@@ -408,7 +751,8 @@ export default function App() {
               style={styles.gotItButton}
               onPress={() => setShowRules(false)}
             >
-              <Text style={styles.gotItButtonText}>GOT IT!</Text>
+              <View style={styles.buttonShine} />
+              <Text style={styles.gotItButtonText}>LET'S PLAY!</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -418,13 +762,37 @@ export default function App() {
       <Modal visible={gameState === GameState.WON} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.victoryModal}>
-            <Text style={styles.victoryEmoji}>🧁</Text>
-            <Text style={styles.victoryTitle}>DELICIOUS!</Text>
-            <Text style={styles.victorySubtitle}>Puzzle Completed</Text>
+            {/* Decorative elements */}
+            <View style={styles.victoryGlow} />
+            <View style={styles.modalShine} />
+
+            {/* Stars */}
+            <View style={styles.starsContainer}>
+              <Text style={styles.victoryStar}>⭐</Text>
+              <Text style={[styles.victoryStar, styles.victoryStarBig]}>⭐</Text>
+              <Text style={styles.victoryStar}>⭐</Text>
+            </View>
+
+            <Text style={styles.victoryTitle}>SWEET!</Text>
+            <Text style={styles.victorySubtitle}>Level {level} Complete</Text>
+
+            <View style={styles.victoryStats}>
+              <View style={styles.victoryStatItem}>
+                <Text style={styles.victoryStatValue}>{streak}</Text>
+                <Text style={styles.victoryStatLabel}>Streak</Text>
+              </View>
+              <View style={styles.victoryStatDivider} />
+              <View style={styles.victoryStatItem}>
+                <Text style={styles.victoryStatValue}>{rows.length - 1}</Text>
+                <Text style={styles.victoryStatLabel}>Moves</Text>
+              </View>
+            </View>
+
             <TouchableOpacity
               style={styles.nextLevelButton}
-              onPress={() => startNewGame()}
+              onPress={handleNextLevel}
             >
+              <View style={styles.buttonShine} />
               <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
             </TouchableOpacity>
           </View>
@@ -434,40 +802,10 @@ export default function App() {
   );
 }
 
-// Action Button Component
-const ActionButton: React.FC<{
-  icon: string;
-  label: string;
-  color: string;
-  borderColor: string;
-  onPress: () => void;
-  disabled: boolean;
-}> = ({ icon, label, color, borderColor, onPress, disabled }) => (
-  <TouchableOpacity
-    style={[styles.actionButton, disabled && styles.actionButtonDisabled]}
-    onPress={onPress}
-    disabled={disabled}
-    activeOpacity={0.7}
-  >
-    <View style={[styles.actionButtonIcon, { backgroundColor: color, borderBottomColor: borderColor }]}>
-      <Text style={styles.actionButtonIconText}>{icon}</Text>
-    </View>
-    <Text style={styles.actionButtonLabel}>{label}</Text>
-  </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF0F5',
-  },
-  backgroundGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#FFF0F5',
+    backgroundColor: CandyColors.purple.main,
   },
 
   // Header
@@ -476,152 +814,257 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 12,
+    paddingTop: 50,
+    paddingBottom: 8,
     zIndex: 100,
   },
-  titleContainer: {
+  logoContainer: {
+    position: 'relative',
+  },
+  logoInner: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  title: {
-    fontSize: 28,
+  logoWord: {
+    fontSize: 32,
     fontWeight: '900',
-    color: '#7C3AED',
-    textShadowColor: 'rgba(0,0,0,0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 0,
-  },
-  titleAccent: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#EC4899',
-    textShadowColor: 'rgba(0,0,0,0.1)',
+    color: CandyColors.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 0,
+    textShadowRadius: 4,
+  },
+  logoShift: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: CandyColors.yellow.main,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  logoSparkle: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    backgroundColor: CandyColors.white,
+    borderRadius: 4,
+  },
+  logoSparkle1: {
+    top: -5,
+    left: 20,
+  },
+  logoSparkle2: {
+    top: 5,
+    right: -10,
+  },
+  logoSparkle3: {
+    bottom: -3,
+    left: 60,
   },
   helpButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    overflow: 'hidden',
+  },
+  helpButtonShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   helpButtonText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: CandyColors.white,
+  },
+
+  // Stats Row
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    zIndex: 100,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statBox: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.7)',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  statValueContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    minWidth: 50,
+    alignItems: 'center',
+  },
+  streakContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statValue: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#EC4899',
+    color: CandyColors.white,
+  },
+  fireEmoji: {
+    fontSize: 14,
+    marginLeft: 4,
   },
 
   // Difficulty selector
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  difficultyButtonShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   difficultyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4ADE80',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     marginRight: 8,
+  },
+  difficultyDotEasy: {
+    backgroundColor: CandyColors.green.main,
+  },
+  difficultyDotMedium: {
+    backgroundColor: CandyColors.yellow.main,
+  },
+  difficultyDotHard: {
+    backgroundColor: CandyColors.red.main,
   },
   difficultyText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#9333EA',
-    marginRight: 4,
+    fontWeight: '800',
+    color: CandyColors.white,
+    marginRight: 6,
   },
   difficultyArrow: {
     fontSize: 8,
-    color: '#9333EA',
-    opacity: 0.5,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   difficultyMenu: {
     position: 'absolute',
     right: 20,
-    top: 60,
-    backgroundColor: '#FFFFFF',
+    top: 52,
+    backgroundColor: CandyColors.white,
     borderRadius: 16,
     padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: CandyColors.purple.dark,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
     zIndex: 200,
   },
   difficultyMenuItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 12,
     marginBottom: 4,
   },
   difficultyMenuItemActive: {
-    backgroundColor: '#F3E8FF',
+    backgroundColor: CandyColors.purple.light + '30',
+  },
+  difficultyMenuDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
   },
   difficultyMenuText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
+    color: CandyColors.gray[600],
   },
   difficultyMenuTextActive: {
-    color: '#9333EA',
+    color: CandyColors.purple.main,
   },
 
   // Toast
   toastContainer: {
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingVertical: 8,
     zIndex: 50,
   },
   toast: {
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 6,
+  },
+  toastShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   toastNormal: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CandyColors.white,
+    shadowColor: CandyColors.purple.main,
   },
   toastError: {
-    backgroundColor: '#F87171',
-    transform: [{ rotate: '1deg' }],
+    backgroundColor: CandyColors.red.main,
+    shadowColor: CandyColors.red.dark,
   },
   toastText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#9333EA',
+    color: CandyColors.purple.main,
   },
   toastTextError: {
-    color: '#FFFFFF',
+    color: CandyColors.white,
   },
 
   // Game area
   gameArea: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     justifyContent: 'flex-start',
-    paddingTop: 20,
+    paddingTop: 10,
   },
   rowsContainer: {
     paddingVertical: 16,
@@ -629,195 +1072,315 @@ const styles = StyleSheet.create({
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
     borderRadius: 24,
+  },
+  loadingBox: {
+    backgroundColor: CandyColors.white,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: CandyColors.purple.dark,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '700',
+    color: CandyColors.purple.main,
   },
 
   // Controls
   controls: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    gap: 24,
+    paddingVertical: 16,
+    paddingBottom: 30,
+    gap: 20,
   },
   actionButton: {
     alignItems: 'center',
+    position: 'relative',
   },
   actionButtonDisabled: {
     opacity: 0.5,
   },
+  actionButtonGlow: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: 20,
+    borderRadius: 20,
+  },
   actionButtonIcon: {
     width: 64,
-    height: 64,
-    borderRadius: 16,
+    height: 56,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    borderBottomWidth: 6,
-    shadowColor: '#000',
+    overflow: 'hidden',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
+  },
+  actionButtonBevel: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+  },
+  actionButtonEdge: {
+    position: 'absolute',
+    bottom: 16,
+    left: 4,
+    right: 4,
+    height: 8,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    zIndex: -1,
   },
   actionButtonIconText: {
     fontSize: 28,
   },
   actionButtonLabel: {
-    marginTop: 8,
+    marginTop: 12,
     fontSize: 10,
     fontWeight: '900',
-    color: '#94A3B8',
-    letterSpacing: 1,
+    color: 'rgba(255, 255, 255, 0.8)',
+    letterSpacing: 1.5,
   },
 
   // Modals
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(88, 28, 135, 0.4)',
+    backgroundColor: 'rgba(76, 29, 149, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
+  modalShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+  },
 
   // Rules modal
   rulesModal: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CandyColors.white,
     borderRadius: 32,
-    padding: 32,
+    padding: 28,
     width: '100%',
     maxWidth: 340,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowColor: CandyColors.purple.dark,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 32,
+    elevation: 20,
+    overflow: 'hidden',
   },
   closeButton: {
     position: 'absolute',
     top: 16,
     right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: CandyColors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
   },
   closeButtonText: {
-    fontSize: 16,
-    color: '#94A3B8',
+    fontSize: 18,
+    color: CandyColors.gray[400],
     fontWeight: '700',
   },
   rulesTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '900',
-    color: '#9333EA',
+    color: CandyColors.purple.main,
     textAlign: 'center',
     marginBottom: 24,
   },
   ruleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   ruleNumber: {
-    width: 40,
-    height: 40,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   ruleNumberText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
   },
   ruleContent: {
     flex: 1,
   },
   ruleHeading: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#334155',
+    fontSize: 16,
+    fontWeight: '800',
+    color: CandyColors.gray[700],
     marginBottom: 2,
   },
   ruleDesc: {
-    fontSize: 12,
-    color: '#94A3B8',
+    fontSize: 13,
+    color: CandyColors.gray[500],
   },
   gotItButton: {
-    backgroundColor: '#9333EA',
-    borderRadius: 16,
+    backgroundColor: CandyColors.purple.main,
+    borderRadius: 18,
     paddingVertical: 16,
-    marginTop: 16,
-    shadowColor: '#9333EA',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginTop: 12,
+    overflow: 'hidden',
+    shadowColor: CandyColors.purple.main,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  buttonShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   gotItButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: CandyColors.white,
+    fontSize: 17,
     fontWeight: '900',
     textAlign: 'center',
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
 
   // Victory modal
   victoryModal: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CandyColors.white,
     borderRadius: 40,
     padding: 32,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 300,
-    borderWidth: 4,
-    borderColor: '#FCE7F3',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 12,
+    maxWidth: 320,
+    shadowColor: CandyColors.purple.dark,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 32,
+    elevation: 20,
+    overflow: 'hidden',
   },
-  victoryEmoji: {
-    fontSize: 72,
+  victoryGlow: {
+    position: 'absolute',
+    top: -50,
+    left: -50,
+    right: -50,
+    height: 200,
+    backgroundColor: CandyColors.yellow.light,
+    opacity: 0.3,
+    borderRadius: 100,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     marginBottom: 16,
   },
+  victoryStar: {
+    fontSize: 36,
+    marginHorizontal: 4,
+  },
+  victoryStarBig: {
+    fontSize: 52,
+    marginBottom: 4,
+  },
   victoryTitle: {
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: '900',
-    color: '#EC4899',
+    color: CandyColors.pink.main,
     marginBottom: 8,
+    textShadowColor: CandyColors.pink.shadow,
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 0,
   },
   victorySubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: CandyColors.gray[500],
+    marginBottom: 20,
+  },
+  victoryStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CandyColors.gray[50],
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     marginBottom: 24,
   },
+  victoryStatItem: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  victoryStatValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: CandyColors.purple.main,
+  },
+  victoryStatLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: CandyColors.gray[400],
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  victoryStatDivider: {
+    width: 2,
+    height: 40,
+    backgroundColor: CandyColors.gray[200],
+    borderRadius: 1,
+  },
   nextLevelButton: {
-    backgroundColor: '#EC4899',
-    borderRadius: 16,
-    paddingVertical: 16,
+    backgroundColor: CandyColors.pink.main,
+    borderRadius: 20,
+    paddingVertical: 18,
     paddingHorizontal: 48,
-    borderBottomWidth: 4,
-    borderBottomColor: '#9333EA',
-    shadowColor: '#EC4899',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    overflow: 'hidden',
+    shadowColor: CandyColors.pink.main,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   nextLevelButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: CandyColors.white,
+    fontSize: 18,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
 });
