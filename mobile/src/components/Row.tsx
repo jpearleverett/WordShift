@@ -186,12 +186,12 @@ const styles = StyleSheet.create({
 
   // Slot styles
   slot: {
-    width: 28,
-    height: 52,
+    width: 22,
+    height: 46,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#F9A8D4',
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#FDF2F8',
     justifyContent: 'center',
     alignItems: 'center',
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   slotPlus: {
     color: '#F9A8D4',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
   },
 });
