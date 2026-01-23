@@ -1,6 +1,12 @@
 
 import { WORDS_3, WORDS_4, WORDS_5, WORDS_6, COMMON_WORDS } from '../constants';
 import { PuzzleConfig, PuzzleSolutionStep, Difficulty } from '../types';
+import {
+  getWordHistoryWithRecency,
+  calculateFreshnessPenalty,
+  isInHardCooldown,
+  recordPuzzleWords,
+} from './wordHistory';
 
 // Organize sets for dynamic access
 const WORD_SETS: Record<number, Set<string>> = {
@@ -184,9 +190,20 @@ const FUN_WORDS = new Set([
 /**
  * Score how "interesting" a word is (0-100)
  * Higher = more interesting/fun to play with
+ * Now includes freshness penalty based on word history
  */
-function scoreWordInterestingness(word: string, wordLength: number): number {
+function scoreWordInterestingness(
+  word: string,
+  wordLength: number,
+  recencyMap?: Map<string, number>
+): number {
   let score = 50; // Base score
+
+  // Apply freshness penalty if history is available
+  if (recencyMap) {
+    const freshnessPenalty = calculateFreshnessPenalty(word, recencyMap);
+    score -= freshnessPenalty;
+  }
 
   // Penalize boring common words heavily
   if (BORING_WORDS.has(word)) {
@@ -412,18 +429,18 @@ function scoreSemanticJourney(chain: PathNode[]): number {
 
 /**
  * Score an entire puzzle chain (0-100)
- * Enhanced with journey scoring and stricter boring penalties
+ * Enhanced with journey scoring, stricter boring penalties, and freshness
  */
-function scorePuzzleChain(chain: PathNode[]): number {
+function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, number>): number {
   if (chain.length < 2) return 0;
 
   let totalScore = 0;
   const movePositions: number[] = [];
 
-  // Score individual words (25% weight)
+  // Score individual words (25% weight) - includes freshness penalty
   const wordScores = chain.map(node => {
     const len = node.word.length;
-    return scoreWordInterestingness(node.word, len);
+    return scoreWordInterestingness(node.word, len, recencyMap);
   });
   const avgWordScore = wordScores.reduce((a, b) => a + b, 0) / wordScores.length;
   totalScore += avgWordScore * 0.25;
@@ -518,11 +535,21 @@ interface GeneratedPuzzle {
 
 /**
  * Weight candidates by interestingness score for smarter selection
+ * Filters out words in hard cooldown and penalizes recently used words
  */
-function weightedShuffle(words: string[], wordLength: number): string[] {
-  const scored = words.map(word => ({
+function weightedShuffle(
+  words: string[],
+  wordLength: number,
+  recencyMap?: Map<string, number>
+): string[] {
+  // Filter out words in hard cooldown
+  const availableWords = recencyMap
+    ? words.filter(word => !isInHardCooldown(word, recencyMap))
+    : words;
+
+  const scored = availableWords.map(word => ({
     word,
-    score: scoreWordInterestingness(word, wordLength) + Math.random() * 30
+    score: scoreWordInterestingness(word, wordLength, recencyMap) + Math.random() * 30
   }));
 
   scored.sort((a, b) => b.score - a.score);
@@ -537,6 +564,9 @@ function weightedShuffle(words: string[], wordLength: number): string[] {
 export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Promise<PuzzleConfig> => {
   const targetRows = difficulty === 'EASY' ? 3 : difficulty === 'MEDIUM' ? 4 : 5;
   const wordLength = difficulty === 'HARD' ? 5 : 4;
+
+  // Load word history for diversity scoring
+  const recencyMap = await getWordHistoryWithRecency();
 
   const dicts = {
     min: WORD_SETS[wordLength - 1],
@@ -555,7 +585,8 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
     lastYieldTime: Date.now()
   };
 
-  const candidatesW1 = weightedShuffle(dicts.baseArray, wordLength);
+  // Weight and filter words based on history
+  const candidatesW1 = weightedShuffle(dicts.baseArray, wordLength, recencyMap);
   let candidateIndex = 0;
 
   while (generatedPuzzles.length < CANDIDATES_TO_GENERATE &&
@@ -572,11 +603,12 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
       dicts,
       GLOBAL_TIMEOUT,
       state,
-      []
+      [],
+      recencyMap
     );
 
     if (path) {
-      const score = scorePuzzleChain(path);
+      const score = scorePuzzleChain(path, recencyMap);
 
       // Only accept puzzles above minimum threshold
       if (score >= MIN_ACCEPTABLE_SCORE) {
@@ -599,6 +631,10 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
   const path = bestPuzzle.chain;
 
   const words = path.map(n => n.word);
+
+  // Record these words in history for future diversity
+  await recordPuzzleWords(words);
+
   const solution: PuzzleSolutionStep[] = [];
 
   for (let s = 0; s < path.length - 1; s++) {
@@ -624,6 +660,7 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
 
 /**
  * Recursive Depth-First Search with quality awareness
+ * Now considers word history for diversity
  */
 async function findPath(
   chain: PathNode[],
@@ -632,7 +669,8 @@ async function findPath(
   dicts: { min: Set<string>, base: Set<string>, max: Set<string>, baseArray: string[] },
   timeoutLimit: number,
   state: GenState,
-  previousMovePositions: number[]
+  previousMovePositions: number[],
+  recencyMap?: Map<string, number>
 ): Promise<PathNode[] | null> {
   const now = Date.now();
   if (now - state.startTime > timeoutLimit) {
@@ -718,10 +756,14 @@ async function findPath(
     for (const w of dicts.baseArray) {
       if (usedWords.has(w)) continue;
 
+      // Skip words in hard cooldown for diversity
+      if (recencyMap && isInHardCooldown(w, recencyMap)) continue;
+
       for (let k = 0; k <= w.length; k++) {
         const combined = w.slice(0, k) + charToMove + w.slice(k);
         if (dicts.max.has(combined) && !usedWords.has(combined)) {
-          const wordScore = scoreWordInterestingness(w, w.length);
+          // Include recency in word scoring
+          const wordScore = scoreWordInterestingness(w, w.length, recencyMap);
 
           // Calculate insertion quality
           let insertionScore = 0;
@@ -785,7 +827,8 @@ async function findPath(
         dicts,
         timeoutLimit,
         state,
-        newMovePositions
+        newMovePositions,
+        recencyMap
       );
 
       if (result) return result;
