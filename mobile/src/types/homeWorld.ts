@@ -169,6 +169,28 @@ export interface AmberTransaction {
 }
 
 /**
+ * Dialogue session state for an animal
+ * Sessions last 2-3 minutes, then require a cooldown
+ */
+export interface DialogueSession {
+  animalId: string;
+  sessionStartTime: number;      // When the session started
+  lastDialogueTime: number;      // When the last dialogue was shown
+  dialoguesInSession: number;    // How many dialogues shown this session
+  cooldownEndTime: number | null; // When the cooldown ends (null if not in cooldown)
+}
+
+/**
+ * Dialogue session constants
+ */
+export const DIALOGUE_SESSION_CONFIG = {
+  SESSION_DURATION_MS: 2.5 * 60 * 1000,   // 2.5 minutes active session
+  COOLDOWN_DURATION_MS: 5 * 60 * 1000,    // 5 minute cooldown
+  MIN_DIALOGUE_INTERVAL_MS: 3000,          // Min 3 seconds between dialogues
+  DIALOGUES_PER_SESSION: 10,               // Max dialogues per session
+};
+
+/**
  * Phase descriptions for UI
  */
 export const PHASE_DESCRIPTIONS: Record<DialoguePhase, { title: string; mood: string }> = {

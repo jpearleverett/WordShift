@@ -26,6 +26,7 @@ import {
   getNextUnlock,
   purchaseUnlock,
   getUnlockStatus,
+  isUnlockAvailable,
 } from '../../services/homeWorldData';
 import {
   getCurrentDialogue,
@@ -33,6 +34,15 @@ import {
   getTotalDialogueCount,
   ANIMAL_INFO,
 } from '../../services/animalDialogue';
+import {
+  loadDialogueSessions,
+  checkDialogueAvailability,
+  recordDialogue,
+  endSession,
+  getSessionStatus,
+  formatTimeRemaining,
+} from '../../services/dialogueSession';
+import { DIALOGUE_SESSION_CONFIG } from '../../types/homeWorld';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -54,6 +64,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
   const [nextUnlock, setNextUnlock] = useState<Unlockable | null>(null);
   const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
+  const [sessionInfo, setSessionInfo] = useState<{
+    status: 'available' | 'in_session' | 'cooldown';
+    timeRemaining?: number;
+    dialoguesRemaining?: number;
+  } | null>(null);
+  const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
+  const [unlockAvailability, setUnlockAvailability] = useState<{
+    available: boolean;
+    reason?: string;
+  } | null>(null);
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -62,7 +82,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Load data on mount
   useEffect(() => {
     loadAllData();
+    loadDialogueSessions(); // Load session data
   }, []);
+
+  // Timer for updating session status display
+  useEffect(() => {
+    if (!selectedAnimal) return;
+
+    const interval = setInterval(() => {
+      const status = getSessionStatus(selectedAnimal.id);
+      setSessionInfo(status);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [selectedAnimal]);
+
+  // Timer for dismissing cooldown message
+  useEffect(() => {
+    if (cooldownMessage) {
+      const timeout = setTimeout(() => {
+        setCooldownMessage(null);
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [cooldownMessage]);
 
   const loadAllData = async () => {
     const [progressData, roomsData, animalsData, unlock, unlocks] = await Promise.all([
@@ -78,6 +121,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setAnimals(animalsData);
     setNextUnlock(unlock);
     setAllUnlocks(unlocks);
+
+    // Check availability of next unlock
+    if (unlock) {
+      const availability = await isUnlockAvailable(unlock.id);
+      setUnlockAvailability(availability);
+    } else {
+      setUnlockAvailability(null);
+    }
   };
 
   // Animate amber when it changes
@@ -100,8 +151,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Handle animal tap
   const handleAnimalPress = (animal: Animal) => {
+    // Check if dialogue is available
+    const availability = checkDialogueAvailability(animal.id);
+
+    if (!availability.available) {
+      // Show cooldown message
+      if (availability.cooldownRemaining) {
+        setCooldownMessage(
+          `${animal.name} needs to rest. Come back in ${formatTimeRemaining(availability.cooldownRemaining)}!`
+        );
+      }
+      return;
+    }
+
     setSelectedAnimal(animal);
     setShowDialogue(true);
+
+    // Update session info
+    const status = getSessionStatus(animal.id);
+    setSessionInfo(status);
 
     // Animate dialogue modal in
     dialogueSlide.setValue(0);
@@ -117,6 +185,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleAdvanceDialogue = async () => {
     if (!selectedAnimal || !progress) return;
 
+    // Check session availability before continuing
+    const availability = checkDialogueAvailability(selectedAnimal.id);
+    if (!availability.available && availability.reason !== 'max_dialogues') {
+      // Session ended, close dialogue
+      handleCloseDialogue();
+      if (availability.cooldownRemaining) {
+        setCooldownMessage(
+          `${selectedAnimal.name} is tired. Come back in ${formatTimeRemaining(availability.cooldownRemaining)}!`
+        );
+      }
+      return;
+    }
+
     const hasMore = hasMoreDialogues(
       selectedAnimal.type,
       selectedAnimal.currentDialogueIndex,
@@ -124,6 +205,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
 
     if (hasMore) {
+      // Record this dialogue in the session
+      await recordDialogue(selectedAnimal.id);
+
+      // Update session info
+      const status = getSessionStatus(selectedAnimal.id);
+      setSessionInfo(status);
+
+      // Check if session hit max dialogues
+      if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
+        handleCloseDialogue();
+        setCooldownMessage(
+          `${selectedAnimal.name} wants to rest now. Come back later for more conversation!`
+        );
+        return;
+      }
+
       // Advance to next dialogue
       const newIndex = selectedAnimal.currentDialogueIndex + 1;
       await markDialogueRead(selectedAnimal.id, newIndex);
@@ -140,10 +237,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         prev ? { ...prev, currentDialogueIndex: newIndex, hasNewDialogue: false } : null
       );
     } else {
-      // Close dialogue
-      setShowDialogue(false);
-      setSelectedAnimal(null);
+      // No more dialogues - close
+      handleCloseDialogue();
     }
+  };
+
+  // Handle closing dialogue (and ending session)
+  const handleCloseDialogue = async () => {
+    if (selectedAnimal) {
+      await endSession(selectedAnimal.id);
+    }
+    setShowDialogue(false);
+    setSelectedAnimal(null);
+    setSessionInfo(null);
   };
 
   // Handle room tap (for locked rooms)
@@ -231,17 +337,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRoomPress={handleRoomPress}
       />
 
+      {/* Cooldown Message Toast */}
+      {cooldownMessage && (
+        <View style={styles.cooldownToast}>
+          <Text style={styles.cooldownToastText}>{cooldownMessage}</Text>
+        </View>
+      )}
+
       {/* Dialogue Modal */}
       <Modal
         visible={showDialogue}
         transparent
         animationType="none"
-        onRequestClose={() => setShowDialogue(false)}
+        onRequestClose={handleCloseDialogue}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowDialogue(false)}
+          onPress={handleCloseDialogue}
         >
           <Animated.View
             style={[
@@ -262,6 +375,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {selectedAnimal && (
               <>
+                {/* Session status bar */}
+                {sessionInfo && sessionInfo.status === 'in_session' && (
+                  <View style={styles.sessionBar}>
+                    <Text style={styles.sessionBarText}>
+                      Session: {sessionInfo.timeRemaining ? formatTimeRemaining(sessionInfo.timeRemaining) : '--'}
+                    </Text>
+                    {sessionInfo.dialoguesRemaining !== undefined && (
+                      <Text style={styles.sessionBarText}>
+                        {sessionInfo.dialoguesRemaining} messages left
+                      </Text>
+                    )}
+                  </View>
+                )}
+
                 {/* Animal portrait */}
                 <View style={styles.portraitContainer}>
                   <Text style={styles.portraitEmoji}>
@@ -338,17 +465,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Text style={styles.unlockCost}>
                       💎 {nextUnlock.cost} amber
                     </Text>
+                    {unlockAvailability && !unlockAvailability.available && (
+                      <Text style={styles.unlockBlockedText}>
+                        {unlockAvailability.reason}
+                      </Text>
+                    )}
                   </View>
                   <TouchableOpacity
                     style={[
                       styles.buyButton,
-                      progress.amber < nextUnlock.cost && styles.buyButtonDisabled,
+                      (progress.amber < nextUnlock.cost ||
+                       (unlockAvailability && !unlockAvailability.available)) &&
+                        styles.buyButtonDisabled,
                     ]}
                     onPress={() => handlePurchase(nextUnlock)}
-                    disabled={progress.amber < nextUnlock.cost}
+                    disabled={
+                      progress.amber < nextUnlock.cost ||
+                      (unlockAvailability !== null && !unlockAvailability.available)
+                    }
                   >
                     <Text style={styles.buyButtonText}>
-                      {progress.amber >= nextUnlock.cost ? 'Unlock' : 'Need More'}
+                      {unlockAvailability && !unlockAvailability.available
+                        ? 'Locked'
+                        : progress.amber >= nextUnlock.cost
+                          ? 'Unlock'
+                          : 'Need More'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -637,6 +778,13 @@ const styles = StyleSheet.create({
     color: CandyColors.yellow.dark,
     marginTop: 6,
   },
+  unlockBlockedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: CandyColors.orange.main,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   buyButton: {
     backgroundColor: CandyColors.green.main,
     paddingHorizontal: 16,
@@ -689,6 +837,46 @@ const styles = StyleSheet.create({
     color: CandyColors.yellow.dark,
     textAlign: 'center',
     marginTop: 16,
+  },
+
+  // Session status bar
+  sessionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: CandyColors.purple.light,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  sessionBarText: {
+    color: CandyColors.purple.dark,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // Cooldown toast
+  cooldownToast: {
+    position: 'absolute',
+    top: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: CandyColors.orange.main,
+    borderRadius: 16,
+    padding: 16,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  cooldownToastText: {
+    color: CandyColors.white,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
 

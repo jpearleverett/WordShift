@@ -472,7 +472,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
 ];
 
 /**
- * Get the next available unlock
+ * Get the next available unlock (respects unlock sequence)
  */
 export async function getNextUnlock(): Promise<Unlockable | null> {
   const progress = await loadProgress();
@@ -483,7 +483,14 @@ export async function getNextUnlock(): Promise<Unlockable | null> {
       : progress.unlockedRooms.includes(unlock.targetId);
 
     if (!isTargetUnlocked) {
-      return unlock;
+      // Check if this unlock is available
+      const availability = await isUnlockAvailable(unlock.id);
+      if (availability.available) {
+        return unlock;
+      }
+      // If not available, return the first unavailable one anyway
+      // so the UI can show what's next (even if blocked)
+      return { ...unlock, isUnlocked: false };
     }
   }
 
@@ -505,6 +512,67 @@ export async function getUnlockStatus(): Promise<Unlockable[]> {
 }
 
 /**
+ * Get the animal associated with a room
+ */
+function getAnimalForRoom(roomId: string): string | null {
+  const room = ROOMS.find(r => r.id === roomId);
+  return room?.animalId || null;
+}
+
+/**
+ * Check if an unlock is available (previous unlocks done, animal unlocked for room)
+ */
+export async function isUnlockAvailable(unlockId: string): Promise<{
+  available: boolean;
+  reason?: string;
+}> {
+  const progress = await loadProgress();
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
+
+  if (!unlock) {
+    return { available: false, reason: 'Invalid unlock ID' };
+  }
+
+  // Check if already unlocked
+  const isTargetUnlocked = unlock.type === 'character'
+    ? progress.unlockedAnimals.includes(unlock.targetId)
+    : progress.unlockedRooms.includes(unlock.targetId);
+
+  if (isTargetUnlocked) {
+    return { available: false, reason: 'Already unlocked' };
+  }
+
+  // Check if all previous unlocks are done
+  const previousUnlocks = UNLOCK_PROGRESSION.filter(u => u.order < unlock.order);
+  for (const prev of previousUnlocks) {
+    const isPrevUnlocked = prev.type === 'character'
+      ? progress.unlockedAnimals.includes(prev.targetId)
+      : progress.unlockedRooms.includes(prev.targetId);
+
+    if (!isPrevUnlocked) {
+      return {
+        available: false,
+        reason: `Must unlock ${prev.name} first`,
+      };
+    }
+  }
+
+  // For room unlocks, check if the animal for that room is unlocked
+  if (unlock.type === 'room') {
+    const animalId = getAnimalForRoom(unlock.targetId);
+    if (animalId && !progress.unlockedAnimals.includes(animalId)) {
+      const animal = ANIMALS.find(a => a.id === animalId);
+      return {
+        available: false,
+        reason: `Must unlock ${animal?.name || 'the animal'} first`,
+      };
+    }
+  }
+
+  return { available: true };
+}
+
+/**
  * Attempt to purchase an unlock
  */
 export async function purchaseUnlock(unlockId: string): Promise<{
@@ -514,6 +582,12 @@ export async function purchaseUnlock(unlockId: string): Promise<{
   const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
   if (!unlock) {
     return { success: false, error: 'Invalid unlock ID' };
+  }
+
+  // Check if unlock is available (sequence validation)
+  const availability = await isUnlockAvailable(unlockId);
+  if (!availability.available) {
+    return { success: false, error: availability.reason };
   }
 
   const affordable = await canAfford(unlock.cost);
