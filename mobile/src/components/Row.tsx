@@ -15,9 +15,10 @@ const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
 
 // Arc layout configuration
-const ARC_ROTATION = 6; // Max rotation in degrees for edge elements
-const ARC_LIFT = 12; // How much center elements lift up
-const SLOT_WIDTH = 20; // Width of drop slots
+const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
+const ARC_LIFT = 18; // How much center elements lift up relative to edges
+const SLOT_WIDTH_TOP = 24; // Wider at top for wedge shape
+const SLOT_WIDTH_BOTTOM = 14; // Narrower at bottom for wedge shape
 const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
 
 interface RowProps {
@@ -277,12 +278,12 @@ export const Row: React.FC<RowProps> = ({
     };
   }, [isSource, isTarget, isCompleted]);
 
-  // Animate arc when slots appear/disappear
+  // Animate arc when slots appear/disappear - smooth glide effect
   useEffect(() => {
-    Animated.spring(arcAnim, {
+    Animated.timing(arcAnim, {
       toValue: showSlots ? 1 : 0,
-      friction: 8,
-      tension: 100,
+      duration: 450, // Visible glide animation
+      easing: Easing.out(Easing.cubic), // Smooth deceleration
       useNativeDriver: true,
     }).start();
   }, [showSlots]);
@@ -293,10 +294,14 @@ export const Row: React.FC<RowProps> = ({
       ? (index / (totalElements - 1)) * 2 - 1  // -1 to 1
       : 0;
 
-    // Inverted parabola: center lifts up (negative Y)
-    const yMultiplier = (normalizedPos * normalizedPos - 1) * ARC_LIFT;
+    // Inverted parabola centered in container:
+    // Raw parabola: normalizedPos^2 - 1 goes from 0 (edges) to -1 (center)
+    // Multiply by ARC_LIFT: edges at 0, center at -ARC_LIFT
+    // Offset by ARC_LIFT/2 to center: edges at +ARC_LIFT/2, center at -ARC_LIFT/2
+    const rawParabola = (normalizedPos * normalizedPos - 1) * ARC_LIFT;
+    const yMultiplier = rawParabola + ARC_LIFT / 2;
 
-    // Rotation: edges tilt outward
+    // Rotation: edges tilt outward (steeper fan)
     const rotationMultiplier = normalizedPos * ARC_ROTATION;
 
     return { yMultiplier, rotationMultiplier };
@@ -646,7 +651,10 @@ const styles = StyleSheet.create({
     left: -4,
     right: -4,
     bottom: -4,
-    borderRadius: 14,
+    borderTopLeftRadius: 16, // Match wedge shape
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
     backgroundColor: CandyColors.pink.main,
   },
   slot: {
@@ -661,9 +669,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   slotCompact: {
-    width: SLOT_WIDTH,
+    width: SLOT_WIDTH_TOP, // Base width
     height: SLOT_HEIGHT,
-    borderRadius: 10,
+    borderTopLeftRadius: 12, // Wider rounded top
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 6, // Narrower tapered bottom
+    borderBottomRightRadius: 6,
+    // Transform to create true wedge/tapered effect
+    transform: [
+      { perspective: 200 },
+      { rotateX: '8deg' }, // Tilts to make top appear wider
+    ],
   },
   slotShimmer: {
     position: 'absolute',
@@ -672,8 +688,8 @@ const styles = StyleSheet.create({
     right: 0,
     height: '40%',
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
+    borderTopLeftRadius: 12, // Match wedge top radius
+    borderTopRightRadius: 12,
   },
   plusContainer: {
     width: 16,
