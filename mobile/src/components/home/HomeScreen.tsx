@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
 import { Animal, Room, DialoguePhase, HomeWorldProgress, Unlockable } from '../../types/homeWorld';
@@ -21,6 +20,7 @@ import {
 import {
   ROOMS,
   ANIMALS,
+  ANIMAL_EMOJIS,
   getRoomsWithStatus,
   getAnimalsWithStatus,
   getNextUnlock,
@@ -62,6 +62,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showDialogue, setShowDialogue] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
+  const [showInvitePrompt, setShowInvitePrompt] = useState(false);
+  const [showBuildPrompt, setShowBuildPrompt] = useState(false);
   const [nextUnlock, setNextUnlock] = useState<Unlockable | null>(null);
   const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
   const [sessionInfo, setSessionInfo] = useState<{
@@ -128,6 +130,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setUnlockAvailability(availability);
     } else {
       setUnlockAvailability(null);
+    }
+
+    // Check if there's an empty room waiting for an animal (first-time invite prompt)
+    const unlockedRooms = roomsData.filter(r => r.isUnlocked);
+    const unlockedAnimalIds = animalsData.filter(a => a.isUnlocked).map(a => a.id);
+    const hasEmptyRoom = unlockedRooms.some(room => {
+      const roomAnimal = animalsData.find(a => a.roomId === room.id);
+      return roomAnimal && !unlockedAnimalIds.includes(roomAnimal.id);
+    });
+
+    // Show invite prompt if there's an empty room and the next unlock is a character
+    if (hasEmptyRoom && unlock && unlock.type === 'character' && unlock.cost === 0) {
+      // First-time experience: show invite prompt
+      setShowInvitePrompt(true);
+    } else {
+      setShowInvitePrompt(false);
     }
   };
 
@@ -252,10 +270,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setSessionInfo(null);
   };
 
-  // Handle room tap (for locked rooms)
+  // Handle room tap (for locked rooms or rooms needing animals)
   const handleRoomPress = (room: Room) => {
     if (!room.isUnlocked) {
       setShowRoomUnlock(room);
+      return;
+    }
+
+    // Check if room needs an animal
+    const roomAnimal = animals.find(a => a.roomId === room.id);
+    if (roomAnimal && !roomAnimal.isUnlocked && nextUnlock && nextUnlock.targetId === roomAnimal.id) {
+      // Show invite prompt for this animal
+      setShowInvitePrompt(true);
     }
   };
 
@@ -298,7 +324,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header with amber and play button */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -565,7 +591,80 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+
+      {/* Animal Invite Prompt */}
+      <Modal
+        visible={showInvitePrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowInvitePrompt(false)}
+      >
+        <View style={styles.centeredOverlay}>
+          <View
+            style={styles.inviteModal}
+            onStartShouldSetResponder={() => true}
+          >
+            {nextUnlock && nextUnlock.type === 'character' && (() => {
+              const animalData = ANIMALS.find(a => a.id === nextUnlock.targetId);
+              const animalEmoji = animalData ? ANIMAL_EMOJIS[animalData.type] : '🐾';
+              const isFirstAnimal = progress?.unlockedAnimals.length === 0;
+
+              return (
+                <>
+                  <Text style={styles.inviteEmoji}>{animalEmoji}</Text>
+                  <Text style={styles.inviteTitle}>
+                    {isFirstAnimal ? 'A Visitor Approaches!' : 'A New Friend!'}
+                  </Text>
+                  <Text style={styles.inviteText}>
+                    {nextUnlock.description}
+                  </Text>
+                  <Text style={styles.inviteText}>
+                    {isFirstAnimal
+                      ? 'Would you like to invite them into your cozy den?'
+                      : `Would you like to welcome ${nextUnlock.name.split(' ')[0]} to your growing home?`
+                    }
+                  </Text>
+
+                  {nextUnlock.cost > 0 && (
+                    <Text style={styles.inviteCost}>
+                      Cost: 💎 {nextUnlock.cost} amber
+                    </Text>
+                  )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.inviteButton,
+                      progress && progress.amber < nextUnlock.cost && styles.inviteButtonDisabled
+                    ]}
+                    onPress={async () => {
+                      await handlePurchase(nextUnlock);
+                      setShowInvitePrompt(false);
+                    }}
+                    disabled={progress ? progress.amber < nextUnlock.cost : false}
+                  >
+                    <Text style={styles.inviteButtonText}>
+                      {nextUnlock.cost === 0
+                        ? 'Welcome, Friend! 🏠'
+                        : progress && progress.amber >= nextUnlock.cost
+                          ? `Invite ${nextUnlock.name.split(' ')[0]}! 🏠`
+                          : 'Need More Amber'
+                      }
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.inviteCloseButton}
+                    onPress={() => setShowInvitePrompt(false)}
+                  >
+                    <Text style={styles.inviteCloseButtonText}>Maybe Later</Text>
+                  </TouchableOpacity>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
@@ -590,7 +689,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 50,
+    paddingBottom: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   amberContainer: {
@@ -654,6 +754,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+  },
+  centeredOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dialogueModal: {
     backgroundColor: CandyColors.white,
@@ -877,6 +983,75 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
+  },
+
+  // Invite modal styles
+  inviteModal: {
+    backgroundColor: CandyColors.white,
+    borderRadius: 30,
+    padding: 30,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  inviteEmoji: {
+    fontSize: 80,
+    marginBottom: 16,
+  },
+  inviteTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: CandyColors.purple.main,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  inviteText: {
+    fontSize: 16,
+    color: CandyColors.gray[600],
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 12,
+    paddingHorizontal: 10,
+  },
+  inviteButton: {
+    backgroundColor: CandyColors.green.main,
+    paddingHorizontal: 30,
+    paddingVertical: 16,
+    borderRadius: 25,
+    marginTop: 16,
+    shadowColor: CandyColors.green.dark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  inviteButtonDisabled: {
+    backgroundColor: CandyColors.gray[400],
+    shadowColor: CandyColors.gray[500],
+  },
+  inviteButtonText: {
+    color: CandyColors.white,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  inviteCost: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: CandyColors.yellow.dark,
+    marginTop: 12,
+  },
+  inviteCloseButton: {
+    marginTop: 16,
+    paddingVertical: 10,
+  },
+  inviteCloseButtonText: {
+    color: CandyColors.gray[500],
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -74,17 +74,17 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 
 ### Animal Characters
 
-10 unique animals, each with their own room and personality:
-- **Red Panda (Bamboo)** - Zen/contemplative, bamboo attic
-- **Axolotl (Axel)** - Dreamy, aquarium room
+10 unique animals, each with their own room and personality (listed in unlock order):
+- **Fox (Ember)** - Introspective, cozy den with fireplace (STARTER - free to invite)
 - **Pangolin (Panko)** - Practical chef, rustic kitchen
-- **Sloth (Sloane)** - Slow observer, jungle hammock
-- **Fennec Fox (Fennick)** - Alert listener, desert camp
-- **Fox (Ember)** - Introspective, cozy den with fireplace
 - **Owl (Archimedes)** - Scholar, study full of books
+- **Axolotl (Axel)** - Dreamy, aquarium room
 - **Capybara (Chill)** - Seemingly calm, office
+- **Fennec Fox (Fennick)** - Alert listener, desert camp
+- **Sloth (Sloane)** - Slow observer, jungle hammock
 - **Wombat (Warren)** - Grounded digger, underground burrow
 - **Rabbit (Thyme)** - Anxious, garden patio
+- **Red Panda (Bamboo)** - Zen/contemplative, bamboo attic (final unlock)
 
 ### Dialogue Progression (Phases 0-4)
 
@@ -124,28 +124,42 @@ Animals have conversation sessions with cooldown periods to pace interactions:
 - Cooldown toast appears when animal is unavailable
 - Session persists via AsyncStorage (survives app restart)
 
-### Unlock Progression
+### House Building System (Bottom-Up)
 
-Alternates between characters and rooms:
-1. Red Panda + Bamboo Attic (starter, free)
-2. Axolotl (25 amber) → Aquarium (40 amber)
-3. Pangolin (50 amber) → Kitchen (65 amber)
-4. ...continues with increasing costs
+The house is built from the ground up, one room at a time:
+
+**Starting State**:
+- Player starts with one empty room (Cozy Den) on the ground floor
+- No animals unlocked - must invite the first one
+- House only shows unlocked rooms (single vertical stack)
+
+**Unlock Flow**: Invite animal → Build room → Invite animal → Build room...
+1. **Fox (Ember)** - FREE to invite into Cozy Den (starter)
+2. **Kitchen** - 30 amber to build above Cozy Den
+3. **Pangolin (Panko)** - 25 amber to invite into Kitchen
+4. **Study** - 50 amber to build
+5. **Owl (Archimedes)** - 40 amber to invite
+6. ...continues alternating rooms and animals
+
+**Invite System**:
+- Empty rooms show "Tap to Invite!" indicator
+- Tapping opens invite modal with animal info and cost
+- First animal (Fox) is free to introduce house-building lore
+- Fox's opening dialogue explains the amber/building mechanic
 
 **Unlock Sequence Validation**:
-- Animals must be unlocked before their corresponding rooms
-- Previous unlock in sequence must be completed first
+- Can only invite an animal if their room exists
+- Can only build a room if previous animal is invited
 - `isUnlockAvailable()` function validates prerequisites
-- UI shows reason if unlock is blocked (e.g., "Unlock Axel first")
+- UI shows reason if unlock is blocked (e.g., "Invite Panko first")
 
 ### House & Room Visuals
 
 **House Structure** (`HouseWorld.tsx`):
-- Multi-story house with roof shingles, chimney with smoke
-- Attic window, foundation with stone pattern
-- Animated clouds in sky, sun, birds
-- Ground decorations: flowers, mushrooms, path, fence
-- Trees flanking the house
+- Single column of rooms stacked vertically (bottom-up)
+- Only unlocked rooms are rendered
+- Rooms sorted by floor number (ground = 0, increasing upward)
+- Dynamic height based on number of unlocked rooms
 - Pinch-to-zoom support via PanResponder
 
 **Room Decorations** (`RoomView.tsx`):
@@ -350,6 +364,7 @@ Edit `calculateStars()` function in `starRating.ts`:
 - Arc/fan effect: Constants at top of `Row.tsx` (ARC_ROTATION, ARC_LIFT, SLOT_WIDTH, SLOT_HEIGHT)
 - Color palette: `theme/colors.ts`
 - Game container: `App.tsx` styles object
+- Status bar handling: Use `paddingTop: 50` on headers (not SafeAreaView) for Android compatibility
 
 ### Adding new tile colors
 Add to `tileColors` array in `theme/colors.ts`
@@ -392,10 +407,12 @@ Test on physical device via Expo Go app:
 4. Verify puzzle generation doesn't hang (should complete in <3s)
 5. Test DROP row arc layout with different word lengths
 6. Test home screen features:
+   - New game: starts with empty Cozy Den, invite prompt appears
+   - Invite Fox for free, verify intro dialogue about building
    - Tap animals to start dialogue sessions
    - Verify session timer and dialogue count display
    - Verify cooldown appears after session ends
-   - Test unlock sequence (can't unlock room before animal)
+   - Test unlock sequence (invite animal → build room → invite animal)
    - Test pinch-to-zoom on house view
 
 ## Known Constraints

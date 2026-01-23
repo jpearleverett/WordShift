@@ -3,23 +3,50 @@ import { loadProgress, unlockAnimal, unlockRoom, canAfford } from './amberCurren
 
 /**
  * Default room definitions
- * Layout: 5 floors, some split into 2 rooms
+ * Layout: Building grows from ground floor (row 0) upward
+ * Rooms are displayed bottom-to-top, built one at a time
  */
 export const ROOMS: Room[] = [
-  // Floor 4 (Top) - Bamboo Attic (full width)
+  // Ground Floor (Row 0) - Starting room (Cozy Den)
   {
-    id: 'bamboo_attic',
-    name: 'Bamboo Attic',
-    floor: 4,
-    isUnlocked: true, // Starter
-    theme: 'bamboo',
-    animalId: 'red_panda',
+    id: 'cozy_den',
+    name: 'Cozy Den',
+    floor: 0,
+    isUnlocked: true, // Starter room (empty at first)
+    theme: 'cozy_den',
+    animalId: 'fox',
     layoutPosition: { row: 0, col: 0 },
-    backgroundColor: '#90EE90',
-    accentColor: '#228B22',
+    backgroundColor: '#CD853F',
+    accentColor: '#8B4513',
   },
 
-  // Floor 3 - Aquarium and Kitchen
+  // Floor 1 (Row 1) - Kitchen
+  {
+    id: 'kitchen',
+    name: 'Rustic Kitchen',
+    floor: 1,
+    isUnlocked: false,
+    theme: 'kitchen',
+    animalId: 'pangolin',
+    layoutPosition: { row: 1, col: 0 },
+    backgroundColor: '#D2691E',
+    accentColor: '#8B4513',
+  },
+
+  // Floor 2 (Row 2) - Study
+  {
+    id: 'study',
+    name: 'Scholar\'s Study',
+    floor: 2,
+    isUnlocked: false,
+    theme: 'study',
+    animalId: 'owl',
+    layoutPosition: { row: 2, col: 0 },
+    backgroundColor: '#4A4A6A',
+    accentColor: '#2F2F4F',
+  },
+
+  // Floor 3 (Row 3) - Aquarium
   {
     id: 'aquarium',
     name: 'Aquarium Room',
@@ -27,138 +54,110 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'aquarium',
     animalId: 'axolotl',
-    layoutPosition: { row: 1, col: 0 },
+    layoutPosition: { row: 3, col: 0 },
     backgroundColor: '#87CEEB',
     accentColor: '#4682B4',
   },
-  {
-    id: 'kitchen',
-    name: 'Rustic Kitchen',
-    floor: 3,
-    isUnlocked: false,
-    theme: 'kitchen',
-    animalId: 'pangolin',
-    layoutPosition: { row: 1, col: 1 },
-    backgroundColor: '#D2691E',
-    accentColor: '#8B4513',
-  },
 
-  // Floor 2 - Jungle and Desert
+  // Floor 4 (Row 4) - Jungle Room
   {
     id: 'jungle_room',
     name: 'Jungle Hammock',
-    floor: 2,
+    floor: 4,
     isUnlocked: false,
     theme: 'jungle',
     animalId: 'sloth',
-    layoutPosition: { row: 2, col: 0 },
+    layoutPosition: { row: 4, col: 0 },
     backgroundColor: '#32CD32',
     accentColor: '#006400',
   },
+
+  // Floor 5 (Row 5) - Desert Room
   {
     id: 'desert_room',
     name: 'Desert Camp',
-    floor: 2,
+    floor: 5,
     isUnlocked: false,
     theme: 'desert',
     animalId: 'fennec_fox',
-    layoutPosition: { row: 2, col: 1 },
+    layoutPosition: { row: 5, col: 0 },
     backgroundColor: '#F4A460',
     accentColor: '#DAA520',
   },
 
-  // Floor 1 - Den and Study
-  {
-    id: 'cozy_den',
-    name: 'Cozy Den',
-    floor: 1,
-    isUnlocked: false,
-    theme: 'cozy_den',
-    animalId: 'fox',
-    layoutPosition: { row: 3, col: 0 },
-    backgroundColor: '#CD853F',
-    accentColor: '#8B4513',
-  },
-  {
-    id: 'study',
-    name: 'Scholar\'s Study',
-    floor: 1,
-    isUnlocked: false,
-    theme: 'study',
-    animalId: 'owl',
-    layoutPosition: { row: 3, col: 1 },
-    backgroundColor: '#4A4A6A',
-    accentColor: '#2F2F4F',
-  },
-
-  // Floor 0 (Ground) - Office and Cave
+  // Floor 6 (Row 6) - Office
   {
     id: 'office',
     name: 'Chill Office',
-    floor: 0,
+    floor: 6,
     isUnlocked: false,
     theme: 'office',
     animalId: 'capybara',
-    layoutPosition: { row: 4, col: 0 },
+    layoutPosition: { row: 6, col: 0 },
     backgroundColor: '#708090',
     accentColor: '#2F4F4F',
   },
+
+  // Floor 7 (Row 7) - Underground Burrow
   {
     id: 'burrow',
     name: 'Underground Burrow',
-    floor: 0,
+    floor: 7,
     isUnlocked: false,
     theme: 'burrow',
     animalId: 'wombat',
-    layoutPosition: { row: 4, col: 1 },
+    layoutPosition: { row: 7, col: 0 },
     backgroundColor: '#8B7355',
     accentColor: '#5C4033',
   },
 
-  // Garden (Outdoor) - Ground level extension
+  // Floor 8 (Row 8) - Garden Patio
   {
     id: 'garden',
     name: 'Garden Patio',
-    floor: -1,
+    floor: 8,
     isUnlocked: false,
     theme: 'garden',
     animalId: 'rabbit',
-    layoutPosition: { row: 5, col: 0 },
+    layoutPosition: { row: 8, col: 0 },
     backgroundColor: '#98FB98',
+    accentColor: '#228B22',
+  },
+
+  // Floor 9 (Row 9) - Bamboo Attic (Top)
+  {
+    id: 'bamboo_attic',
+    name: 'Bamboo Attic',
+    floor: 9,
+    isUnlocked: false,
+    theme: 'bamboo',
+    animalId: 'red_panda',
+    layoutPosition: { row: 9, col: 0 },
+    backgroundColor: '#90EE90',
     accentColor: '#228B22',
   },
 ];
 
 /**
  * Default animal definitions
+ * Animals are unlocked one at a time - first animal is invited into the starter room
  */
 export const ANIMALS: Animal[] = [
+  // First animal to invite (ground floor - cozy_den)
   {
-    id: 'red_panda',
-    type: 'red_panda',
-    name: 'Bamboo',
-    roomId: 'bamboo_attic',
-    isUnlocked: true, // Starter
+    id: 'fox',
+    type: 'fox',
+    name: 'Ember',
+    roomId: 'cozy_den',
+    isUnlocked: false, // Must be invited first!
     currentDialogueIndex: 0,
     hasNewDialogue: true,
     lastInteraction: null,
-    position: { x: 50, y: 50 },
+    position: { x: 45, y: 50 },
     isWalking: false,
     direction: 'right',
   },
-  {
-    id: 'axolotl',
-    type: 'axolotl',
-    name: 'Axel',
-    roomId: 'aquarium',
-    isUnlocked: false,
-    currentDialogueIndex: 0,
-    hasNewDialogue: true,
-    lastInteraction: null,
-    position: { x: 40, y: 60 },
-    isWalking: false,
-    direction: 'right',
-  },
+  // Floor 1 - Kitchen
   {
     id: 'pangolin',
     type: 'pangolin',
@@ -172,45 +171,7 @@ export const ANIMALS: Animal[] = [
     isWalking: false,
     direction: 'left',
   },
-  {
-    id: 'sloth',
-    type: 'sloth',
-    name: 'Sloane',
-    roomId: 'jungle_room',
-    isUnlocked: false,
-    currentDialogueIndex: 0,
-    hasNewDialogue: true,
-    lastInteraction: null,
-    position: { x: 50, y: 40 },
-    isWalking: false,
-    direction: 'right',
-  },
-  {
-    id: 'fennec_fox',
-    type: 'fennec_fox',
-    name: 'Fennick',
-    roomId: 'desert_room',
-    isUnlocked: false,
-    currentDialogueIndex: 0,
-    hasNewDialogue: true,
-    lastInteraction: null,
-    position: { x: 55, y: 55 },
-    isWalking: false,
-    direction: 'left',
-  },
-  {
-    id: 'fox',
-    type: 'fox',
-    name: 'Ember',
-    roomId: 'cozy_den',
-    isUnlocked: false,
-    currentDialogueIndex: 0,
-    hasNewDialogue: true,
-    lastInteraction: null,
-    position: { x: 45, y: 50 },
-    isWalking: false,
-    direction: 'right',
-  },
+  // Floor 2 - Study
   {
     id: 'owl',
     type: 'owl',
@@ -224,6 +185,49 @@ export const ANIMALS: Animal[] = [
     isWalking: false,
     direction: 'left',
   },
+  // Floor 3 - Aquarium
+  {
+    id: 'axolotl',
+    type: 'axolotl',
+    name: 'Axel',
+    roomId: 'aquarium',
+    isUnlocked: false,
+    currentDialogueIndex: 0,
+    hasNewDialogue: true,
+    lastInteraction: null,
+    position: { x: 40, y: 60 },
+    isWalking: false,
+    direction: 'right',
+  },
+  // Floor 4 - Jungle
+  {
+    id: 'sloth',
+    type: 'sloth',
+    name: 'Sloane',
+    roomId: 'jungle_room',
+    isUnlocked: false,
+    currentDialogueIndex: 0,
+    hasNewDialogue: true,
+    lastInteraction: null,
+    position: { x: 50, y: 40 },
+    isWalking: false,
+    direction: 'right',
+  },
+  // Floor 5 - Desert
+  {
+    id: 'fennec_fox',
+    type: 'fennec_fox',
+    name: 'Fennick',
+    roomId: 'desert_room',
+    isUnlocked: false,
+    currentDialogueIndex: 0,
+    hasNewDialogue: true,
+    lastInteraction: null,
+    position: { x: 55, y: 55 },
+    isWalking: false,
+    direction: 'left',
+  },
+  // Floor 6 - Office
   {
     id: 'capybara',
     type: 'capybara',
@@ -237,6 +241,7 @@ export const ANIMALS: Animal[] = [
     isWalking: false,
     direction: 'right',
   },
+  // Floor 7 - Burrow
   {
     id: 'wombat',
     type: 'wombat',
@@ -250,6 +255,7 @@ export const ANIMALS: Animal[] = [
     isWalking: false,
     direction: 'left',
   },
+  // Floor 8 - Garden
   {
     id: 'rabbit',
     type: 'rabbit',
@@ -263,211 +269,254 @@ export const ANIMALS: Animal[] = [
     isWalking: false,
     direction: 'right',
   },
+  // Floor 9 - Bamboo Attic (Top)
+  {
+    id: 'red_panda',
+    type: 'red_panda',
+    name: 'Bamboo',
+    roomId: 'bamboo_attic',
+    isUnlocked: false,
+    currentDialogueIndex: 0,
+    hasNewDialogue: true,
+    lastInteraction: null,
+    position: { x: 50, y: 50 },
+    isWalking: false,
+    direction: 'right',
+  },
 ];
 
 /**
  * Unlock progression order
- * Alternates: character -> room -> character -> room
+ * Flow: invite animal → build next room → invite animal → build room
+ * Building grows from ground floor up
  */
 export const UNLOCK_PROGRESSION: Unlockable[] = [
-  // Already unlocked: red_panda + bamboo_attic
-
-  // First unlock tier (cheap)
+  // 1. First: Invite Ember the Fox into the starter room (FREE!)
   {
-    id: 'unlock_axolotl',
+    id: 'unlock_fox',
     type: 'character',
-    cost: 25,
+    cost: 0, // Free to start the journey
     isUnlocked: false,
     order: 1,
-    targetId: 'axolotl',
-    name: 'Axel the Axolotl',
-    description: 'A dreamy creature who never grew up',
-  },
-  {
-    id: 'unlock_aquarium',
-    type: 'room',
-    cost: 40,
-    isUnlocked: false,
-    order: 2,
-    targetId: 'aquarium',
-    name: 'Aquarium Room',
-    description: 'A watery haven for aquatic friends',
+    targetId: 'fox',
+    name: 'Ember the Fox',
+    description: 'A wandering fox looking for a warm home',
   },
 
-  // Second unlock tier
+  // 2. Build the Kitchen above
+  {
+    id: 'unlock_kitchen',
+    type: 'room',
+    cost: 30,
+    isUnlocked: false,
+    order: 2,
+    targetId: 'kitchen',
+    name: 'Rustic Kitchen',
+    description: 'A cozy space for culinary adventures',
+  },
+
+  // 3. Invite Panko the Pangolin
   {
     id: 'unlock_pangolin',
     type: 'character',
-    cost: 50,
+    cost: 25,
     isUnlocked: false,
     order: 3,
     targetId: 'pangolin',
     name: 'Panko the Pangolin',
     description: 'A chef who curls into philosophical balls',
   },
+
+  // 4. Build the Study
   {
-    id: 'unlock_kitchen',
+    id: 'unlock_study',
     type: 'room',
-    cost: 65,
+    cost: 50,
     isUnlocked: false,
     order: 4,
-    targetId: 'kitchen',
-    name: 'Rustic Kitchen',
-    description: 'Where comfort food meets existential recipes',
+    targetId: 'study',
+    name: 'Scholar\'s Study',
+    description: 'A quiet place for deep thoughts',
   },
 
-  // Third unlock tier
+  // 5. Invite Archimedes the Owl
   {
-    id: 'unlock_sloth',
+    id: 'unlock_owl',
     type: 'character',
-    cost: 75,
+    cost: 40,
     isUnlocked: false,
     order: 5,
-    targetId: 'sloth',
-    name: 'Sloane the Sloth',
-    description: 'Moves slowly, thinks deeply',
+    targetId: 'owl',
+    name: 'Archimedes the Owl',
+    description: 'Read every book, still searching for answers',
   },
+
+  // 6. Build the Aquarium
+  {
+    id: 'unlock_aquarium',
+    type: 'room',
+    cost: 75,
+    isUnlocked: false,
+    order: 6,
+    targetId: 'aquarium',
+    name: 'Aquarium Room',
+    description: 'A watery haven full of wonder',
+  },
+
+  // 7. Invite Axel the Axolotl
+  {
+    id: 'unlock_axolotl',
+    type: 'character',
+    cost: 50,
+    isUnlocked: false,
+    order: 7,
+    targetId: 'axolotl',
+    name: 'Axel the Axolotl',
+    description: 'A dreamy creature who never grew up',
+  },
+
+  // 8. Build the Jungle Room
   {
     id: 'unlock_jungle',
     type: 'room',
-    cost: 90,
+    cost: 100,
     isUnlocked: false,
-    order: 6,
+    order: 8,
     targetId: 'jungle_room',
     name: 'Jungle Hammock',
     description: 'A verdant retreat for slow contemplation',
   },
 
-  // Fourth unlock tier
+  // 9. Invite Sloane the Sloth
   {
-    id: 'unlock_fennec',
+    id: 'unlock_sloth',
     type: 'character',
-    cost: 100,
+    cost: 75,
     isUnlocked: false,
-    order: 7,
-    targetId: 'fennec_fox',
-    name: 'Fennick the Fennec Fox',
-    description: 'Hears everything, understands too much',
+    order: 9,
+    targetId: 'sloth',
+    name: 'Sloane the Sloth',
+    description: 'Moves slowly, thinks deeply',
   },
+
+  // 10. Build the Desert Room
   {
     id: 'unlock_desert',
     type: 'room',
-    cost: 120,
+    cost: 125,
     isUnlocked: false,
-    order: 8,
+    order: 10,
     targetId: 'desert_room',
     name: 'Desert Camp',
     description: 'Sandy silence under watchful stars',
   },
 
-  // Fifth unlock tier
+  // 11. Invite Fennick the Fennec Fox
   {
-    id: 'unlock_fox',
+    id: 'unlock_fennec',
     type: 'character',
-    cost: 140,
-    isUnlocked: false,
-    order: 9,
-    targetId: 'fox',
-    name: 'Ember the Fox',
-    description: 'Keeper of flames and fading hopes',
-  },
-  {
-    id: 'unlock_den',
-    type: 'room',
-    cost: 160,
-    isUnlocked: false,
-    order: 10,
-    targetId: 'cozy_den',
-    name: 'Cozy Den',
-    description: 'Warm on the outside, cold within',
-  },
-
-  // Sixth unlock tier
-  {
-    id: 'unlock_owl',
-    type: 'character',
-    cost: 180,
+    cost: 100,
     isUnlocked: false,
     order: 11,
-    targetId: 'owl',
-    name: 'Archimedes the Owl',
-    description: 'Read every book, found no answers',
-  },
-  {
-    id: 'unlock_study',
-    type: 'room',
-    cost: 200,
-    isUnlocked: false,
-    order: 12,
-    targetId: 'study',
-    name: 'Scholar\'s Study',
-    description: 'Knowledge weighs heavy here',
+    targetId: 'fennec_fox',
+    name: 'Fennick the Fennec Fox',
+    description: 'Hears everything, understands too much',
   },
 
-  // Seventh unlock tier
+  // 12. Build the Office
+  {
+    id: 'unlock_office',
+    type: 'room',
+    cost: 150,
+    isUnlocked: false,
+    order: 12,
+    targetId: 'office',
+    name: 'Chill Office',
+    description: 'Where productivity meets existential doubt',
+  },
+
+  // 13. Invite Chill the Capybara
   {
     id: 'unlock_capybara',
     type: 'character',
-    cost: 225,
+    cost: 125,
     isUnlocked: false,
     order: 13,
     targetId: 'capybara',
     name: 'Chill the Capybara',
     description: 'Appears calm, screaming internally',
   },
+
+  // 14. Build the Burrow
   {
-    id: 'unlock_office',
+    id: 'unlock_burrow',
     type: 'room',
-    cost: 250,
+    cost: 175,
     isUnlocked: false,
     order: 14,
-    targetId: 'office',
-    name: 'Chill Office',
-    description: 'Productivity is a myth we all believe',
+    targetId: 'burrow',
+    name: 'Underground Burrow',
+    description: 'Below everything, something stirs',
   },
 
-  // Eighth unlock tier
+  // 15. Invite Warren the Wombat
   {
     id: 'unlock_wombat',
     type: 'character',
-    cost: 275,
+    cost: 150,
     isUnlocked: false,
     order: 15,
     targetId: 'wombat',
     name: 'Warren the Wombat',
     description: 'Digs deep, finds what shouldn\'t be found',
   },
+
+  // 16. Build the Garden
   {
-    id: 'unlock_burrow',
+    id: 'unlock_garden',
     type: 'room',
-    cost: 300,
+    cost: 200,
     isUnlocked: false,
     order: 16,
-    targetId: 'burrow',
-    name: 'Underground Burrow',
-    description: 'Below everything, something stirs',
+    targetId: 'garden',
+    name: 'Garden Patio',
+    description: 'Where endings bloom like flowers',
   },
 
-  // Final unlock tier
+  // 17. Invite Thyme the Rabbit
   {
     id: 'unlock_rabbit',
     type: 'character',
-    cost: 350,
+    cost: 175,
     isUnlocked: false,
     order: 17,
     targetId: 'rabbit',
     name: 'Thyme the Rabbit',
     description: 'Running from what cannot be outrun',
   },
+
+  // 18. Build the Bamboo Attic (Top)
   {
-    id: 'unlock_garden',
+    id: 'unlock_bamboo_attic',
     type: 'room',
-    cost: 400,
+    cost: 250,
     isUnlocked: false,
     order: 18,
-    targetId: 'garden',
-    name: 'Garden Patio',
-    description: 'Where endings bloom like flowers',
+    targetId: 'bamboo_attic',
+    name: 'Bamboo Attic',
+    description: 'The highest place, closest to the sky',
+  },
+
+  // 19. Invite Bamboo the Red Panda
+  {
+    id: 'unlock_red_panda',
+    type: 'character',
+    cost: 200,
+    isUnlocked: false,
+    order: 19,
+    targetId: 'red_panda',
+    name: 'Bamboo the Red Panda',
+    description: 'Zen master seeking inner peace at the top',
   },
 ];
 
@@ -520,7 +569,9 @@ function getAnimalForRoom(roomId: string): string | null {
 }
 
 /**
- * Check if an unlock is available (previous unlocks done, animal unlocked for room)
+ * Check if an unlock is available
+ * Flow: invite animal → build room → invite animal → build room
+ * For the first animal, the room already exists
  */
 export async function isUnlockAvailable(unlockId: string): Promise<{
   available: boolean;
@@ -557,14 +608,14 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
     }
   }
 
-  // For room unlocks, check if the animal for that room is unlocked
-  if (unlock.type === 'room') {
-    const animalId = getAnimalForRoom(unlock.targetId);
-    if (animalId && !progress.unlockedAnimals.includes(animalId)) {
-      const animal = ANIMALS.find(a => a.id === animalId);
+  // For character unlocks, check if the room exists
+  if (unlock.type === 'character') {
+    const animal = ANIMALS.find(a => a.id === unlock.targetId);
+    if (animal && !progress.unlockedRooms.includes(animal.roomId)) {
+      const room = ROOMS.find(r => r.id === animal.roomId);
       return {
         available: false,
-        reason: `Must unlock ${animal?.name || 'the animal'} first`,
+        reason: `Must build ${room?.name || 'the room'} first`,
       };
     }
   }

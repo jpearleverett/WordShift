@@ -271,14 +271,18 @@ export const RoomView: React.FC<RoomViewProps> = ({
         />
       )}
 
-      {/* Locked animal indicator */}
+      {/* Empty room waiting for animal - show invite indicator */}
       {animal && !animal.isUnlocked && (
-        <View style={styles.lockedAnimalContainer}>
-          <View style={styles.lockedAnimalBadge}>
-            <Text style={styles.lockedAnimalIcon}>🔒</Text>
-            <Text style={styles.lockedAnimalText}>???</Text>
+        <TouchableOpacity
+          style={styles.lockedAnimalContainer}
+          onPress={() => onRoomPress(room)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.inviteAnimalBadge}>
+            <Text style={styles.inviteAnimalIcon}>✨</Text>
+            <Text style={styles.inviteAnimalText}>Tap to Invite!</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -422,7 +426,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -30 }, { translateY: -30 }],
+    transform: [{ translateX: -40 }, { translateY: -35 }],
   },
   lockedAnimalBadge: {
     width: 60,
@@ -442,6 +446,31 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[300],
     fontSize: 10,
     fontWeight: '700',
+  },
+  inviteAnimalBadge: {
+    width: 80,
+    height: 70,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: CandyColors.yellow.main,
+    shadowColor: CandyColors.yellow.main,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  inviteAnimalIcon: {
+    fontSize: 24,
+    marginBottom: 2,
+  },
+  inviteAnimalText: {
+    color: CandyColors.purple.main,
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 });
 

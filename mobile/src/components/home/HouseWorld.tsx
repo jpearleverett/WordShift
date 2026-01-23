@@ -14,16 +14,14 @@ import { CandyColors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// House dimensions
-const ROOM_WIDTH = 160;
+// House dimensions - single column of rooms stacked vertically
+const ROOM_WIDTH = 280; // Wider single room
 const ROOM_HEIGHT = 140;
 const ROOM_GAP = 4;
 const HOUSE_PADDING = 20;
 
-// Full house dimensions based on layout
-// 6 rows: top (full), 4 rows of 2, bottom (garden)
-const HOUSE_WIDTH = ROOM_WIDTH * 2 + ROOM_GAP + HOUSE_PADDING * 2;
-const HOUSE_HEIGHT = ROOM_HEIGHT * 6 + ROOM_GAP * 5 + HOUSE_PADDING * 2 + 120; // Extra for roof
+// Full house dimensions - grows with unlocked rooms
+const HOUSE_WIDTH = ROOM_WIDTH + HOUSE_PADDING * 2;
 
 interface HouseWorldProps {
   rooms: Room[];
@@ -70,26 +68,21 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     animateClouds();
   }, []);
 
-  // Group rooms by row for layout
-  const roomsByRow = rooms.reduce((acc, room) => {
-    const row = room.layoutPosition.row;
-    if (!acc[row]) acc[row] = [];
-    acc[row].push(room);
-    return acc;
-  }, {} as Record<number, Room[]>);
+  // Get only unlocked rooms, sorted by floor (bottom to top for display)
+  const unlockedRooms = rooms
+    .filter(room => room.isUnlocked)
+    .sort((a, b) => a.floor - b.floor); // Lower floor numbers at bottom
 
   // Get animal for a room
   const getAnimalForRoom = (roomId: string): Animal | null => {
     return animals.find(a => a.roomId === roomId) || null;
   };
 
-  // Calculate room width based on whether it's full width or half
-  const getRoomWidth = (row: number, roomsInRow: Room[]): number => {
-    // Row 0 (top/attic) and row 5 (garden) are full width
-    if (row === 0 || row === 5) {
-      return ROOM_WIDTH * 2 + ROOM_GAP;
-    }
-    return ROOM_WIDTH;
+  // Calculate house height based on number of unlocked rooms
+  const calculateHouseHeight = (): number => {
+    return Math.max(1, unlockedRooms.length) * ROOM_HEIGHT +
+           Math.max(0, unlockedRooms.length - 1) * ROOM_GAP +
+           HOUSE_PADDING * 2;
   };
 
   const panResponder = useRef(
@@ -218,35 +211,37 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             </View>
           </View>
 
-          {/* House body with rooms */}
-          <View style={styles.houseBody}>
+          {/* House body with rooms - stacked vertically, bottom to top */}
+          <View style={[styles.houseBody, { minHeight: calculateHouseHeight() - HOUSE_PADDING }]}>
             {/* Decorative trim at top */}
             <View style={styles.topTrim} />
 
-            {Object.entries(roomsByRow)
-              .sort(([a], [b]) => Number(a) - Number(b))
-              .map(([row, rowRooms]) => (
-                <View
-                  key={`row-${row}`}
-                  style={[
-                    styles.roomRow,
-                    Number(row) === 5 && styles.gardenRow,
-                  ]}
-                >
-                  {rowRooms.map((room, index) => (
-                    <RoomView
-                      key={room.id}
-                      room={room}
-                      animal={getAnimalForRoom(room.id)}
-                      width={getRoomWidth(Number(row), rowRooms)}
-                      height={ROOM_HEIGHT}
-                      onAnimalPress={onAnimalPress}
-                      onRoomPress={onRoomPress}
-                      currentPhase={currentPhase}
-                    />
-                  ))}
-                </View>
-              ))}
+            {/* Rooms displayed in reverse order (highest floor at top visually) */}
+            {[...unlockedRooms].reverse().map((room, index) => (
+              <View
+                key={room.id}
+                style={styles.roomRow}
+              >
+                <RoomView
+                  key={room.id}
+                  room={room}
+                  animal={getAnimalForRoom(room.id)}
+                  width={ROOM_WIDTH}
+                  height={ROOM_HEIGHT}
+                  onAnimalPress={onAnimalPress}
+                  onRoomPress={onRoomPress}
+                  currentPhase={currentPhase}
+                />
+              </View>
+            ))}
+
+            {/* Show empty state if no rooms */}
+            {unlockedRooms.length === 0 && (
+              <View style={styles.emptyHouse}>
+                <Text style={styles.emptyHouseText}>🏠</Text>
+                <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>
+              </View>
+            )}
           </View>
 
           {/* Foundation */}
@@ -389,7 +384,7 @@ const styles = StyleSheet.create({
     marginTop: -10,
   },
   house: {
-    width: HOUSE_WIDTH,
+    width: HOUSE_WIDTH + 40, // Accommodate house frame
     alignItems: 'center',
   },
   roof: {
@@ -494,6 +489,7 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: '#5D4037',
     borderTopWidth: 0,
+    alignItems: 'center',
   },
   topTrim: {
     position: 'absolute',
@@ -506,12 +502,21 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 3,
   },
   roomRow: {
-    flexDirection: 'row',
-    gap: ROOM_GAP,
     marginBottom: ROOM_GAP,
   },
-  gardenRow: {
-    marginTop: 10,
+  emptyHouse: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHouseText: {
+    fontSize: 60,
+    marginBottom: 10,
+  },
+  emptyHouseSubtext: {
+    fontSize: 16,
+    color: CandyColors.white,
+    fontWeight: '700',
   },
   foundation: {
     width: HOUSE_WIDTH,

@@ -16,13 +16,14 @@ let progressCache: HomeWorldProgress | null = null;
 
 /**
  * Get default initial progress
+ * Starts with just one empty room - player must invite first animal
  */
 function getDefaultProgress(): HomeWorldProgress {
   return {
     amber: 0,
     totalAmberEarned: 0,
-    unlockedAnimals: ['red_panda'], // Starter animal
-    unlockedRooms: ['bamboo_attic'], // Starter room
+    unlockedAnimals: [], // No animals - must invite first one!
+    unlockedRooms: ['cozy_den'], // Starter room (empty)
     currentPhase: 0,
     puzzlesSolved: 0,
     phasePuzzleThresholds: [...PHASE_THRESHOLDS],
