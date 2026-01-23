@@ -48,7 +48,8 @@ mobile/
 │       ├── wordHistory.ts       # Word history tracking for diversity
 │       ├── starRating.ts        # Star rating system and cumulative stats
 │       ├── amberCurrency.ts     # Amber currency system with persistence
-│       ├── animalDialogue.ts    # Animal dialogue content by phase (0-4)
+│       ├── animalDialogue.ts    # Animal dialogue content by phase (0-4), 52 per animal
+│       ├── dialogueSession.ts   # Dialogue session system with cooldowns
 │       └── homeWorldData.ts     # Room/animal definitions and unlock progression
 ```
 
@@ -96,6 +97,33 @@ Animal dialogue evolves as players complete puzzles:
 
 Each animal has unique dialogue fitting their personality (owl becomes intellectual crisis, sloth has slow-motion dread, etc.)
 
+**Dialogue Count**: 52 dialogues per animal (520 total)
+- Phase 0: 12 dialogues (happy, friendly)
+- Phases 1-4: 10 dialogues each (progressively darker)
+
+### Dialogue Session System
+
+Animals have conversation sessions with cooldown periods to pace interactions:
+
+**Session Parameters** (in `dialogueSession.ts`):
+- Session duration: 2.5 minutes
+- Max dialogues per session: 10
+- Cooldown after session: 5 minutes
+- Min interval between dialogues: 3 seconds
+
+**Session Flow**:
+1. Player taps animal → starts session if available
+2. Session timer begins (2.5 min)
+3. Player can have up to 10 dialogues during session
+4. Session ends when: time expires, max dialogues reached, or player leaves
+5. Cooldown begins → animal unavailable for 5 minutes
+6. After cooldown → animal available again
+
+**UI Indicators**:
+- Session status bar shows time/dialogues remaining
+- Cooldown toast appears when animal is unavailable
+- Session persists via AsyncStorage (survives app restart)
+
 ### Unlock Progression
 
 Alternates between characters and rooms:
@@ -103,6 +131,29 @@ Alternates between characters and rooms:
 2. Axolotl (25 amber) → Aquarium (40 amber)
 3. Pangolin (50 amber) → Kitchen (65 amber)
 4. ...continues with increasing costs
+
+**Unlock Sequence Validation**:
+- Animals must be unlocked before their corresponding rooms
+- Previous unlock in sequence must be completed first
+- `isUnlockAvailable()` function validates prerequisites
+- UI shows reason if unlock is blocked (e.g., "Unlock Axel first")
+
+### House & Room Visuals
+
+**House Structure** (`HouseWorld.tsx`):
+- Multi-story house with roof shingles, chimney with smoke
+- Attic window, foundation with stone pattern
+- Animated clouds in sky, sun, birds
+- Ground decorations: flowers, mushrooms, path, fence
+- Trees flanking the house
+- Pinch-to-zoom support via PanResponder
+
+**Room Decorations** (`RoomView.tsx`):
+- Each room theme has 6-7 furniture/decoration items
+- Items positioned at: wall-left/center/right, floor-left/center/right, corners
+- Sizes: small (14px), medium (20px), large (28px)
+- Some rooms have windows (study, kitchen, cozy_den)
+- Wall and floor patterns for themed textures
 
 ### Word Theme Evolution
 
@@ -209,6 +260,39 @@ Key functions:
 - `getCumulativeStats()` - Load lifetime stats
 - `clearStats()` - Reset all stats (for testing)
 
+### Dialogue Session System (`dialogueSession.ts`)
+
+Manages timed dialogue sessions with cooldown periods:
+
+**Configuration Constants**:
+```typescript
+DIALOGUE_SESSION_CONFIG = {
+  SESSION_DURATION_MS: 2.5 * 60 * 1000,   // 2.5 minutes
+  COOLDOWN_DURATION_MS: 5 * 60 * 1000,    // 5 minutes
+  MIN_DIALOGUE_INTERVAL_MS: 3000,          // 3 seconds
+  DIALOGUES_PER_SESSION: 10,               // Max per session
+}
+```
+
+**Key Types**:
+```typescript
+interface DialogueSession {
+  animalId: string;
+  sessionStartTime: number;
+  lastDialogueTime: number;
+  dialoguesInSession: number;
+  cooldownEndTime: number | null;
+}
+```
+
+**Key Functions**:
+- `checkDialogueAvailability(animalId)` - Returns availability status and time remaining
+- `recordDialogue(animalId)` - Record a dialogue, start/continue session
+- `endSession(animalId)` - End session and start cooldown
+- `getSessionStatus(animalId)` - Get 'available' | 'in_session' | 'cooldown' status
+- `formatTimeRemaining(seconds)` - Format time for display (e.g., "2m 30s")
+- `loadDialogueSessions()` - Load sessions from AsyncStorage on app start
+
 ### Word Dictionaries (`constants.ts`)
 
 Words organized by length in arrays:
@@ -292,6 +376,13 @@ Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
 Edit `DREAD_WORDS` set in `localGenerator.ts` to add/remove words
 that appear more frequently at higher phases
 
+### Home Screen - Adjusting dialogue sessions
+Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
+- `SESSION_DURATION_MS` - How long a session lasts (default: 2.5 min)
+- `COOLDOWN_DURATION_MS` - Rest period after session (default: 5 min)
+- `MIN_DIALOGUE_INTERVAL_MS` - Time between dialogues (default: 3s)
+- `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 10)
+
 ## Testing
 
 Test on physical device via Expo Go app:
@@ -300,6 +391,12 @@ Test on physical device via Expo Go app:
 3. Test all three difficulty modes
 4. Verify puzzle generation doesn't hang (should complete in <3s)
 5. Test DROP row arc layout with different word lengths
+6. Test home screen features:
+   - Tap animals to start dialogue sessions
+   - Verify session timer and dialogue count display
+   - Verify cooldown appears after session ends
+   - Test unlock sequence (can't unlock room before animal)
+   - Test pinch-to-zoom on house view
 
 ## Known Constraints
 
@@ -307,3 +404,5 @@ Test on physical device via Expo Go app:
 - 4s wrapper timeout in App.tsx as fallback
 - Dictionary limited to common English words (no proper nouns, abbreviations)
 - Arc layout uses `overflow: visible` - elements can extend beyond row container
+- Dialogue sessions persist across app restarts (cooldowns continue)
+- House view supports pinch-to-zoom via PanResponder (basic implementation)
