@@ -487,9 +487,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: '#7C3AED',
     textShadowColor: 'rgba(0,0,0,0.1)',
-    textShadowOffset: { width: 2, height: 2 },
+    textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 0,
   },
   titleAccent: {
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
   // Game area
   gameArea: {
     flex: 1,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
     justifyContent: 'flex-start',
     paddingTop: 20,
   },
