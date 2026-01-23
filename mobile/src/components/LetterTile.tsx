@@ -80,12 +80,12 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
 const styles = StyleSheet.create({
   tileBase: {
-    width: 52,
-    height: 64,
-    borderRadius: 16,
+    width: 48,
+    height: 58,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 3,
+    marginHorizontal: 2,
   },
 
   // Tile variants
