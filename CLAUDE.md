@@ -1,6 +1,6 @@
 # WordShift - Claude Code Context
 
-A word puzzle game where players shift letters between words to form valid English words. Features a vibrant Candy Crush-inspired visual style.
+A word puzzle game where players shift letters between words to form valid English words. Features a vibrant Candy Crush-inspired visual style and a home screen with unlockable animal characters whose dialogue evolves from cheerful to existential dread.
 
 ## Quick Commands
 
@@ -15,7 +15,7 @@ npx expo start --clear  # Clear cache and start
 
 - **Framework**: React Native with Expo SDK 54
 - **Language**: TypeScript
-- **Navigation**: Single-screen game (no router)
+- **Navigation**: Home screen ↔ Puzzle screen (state-based)
 - **State**: React useState/useEffect (no external state library)
 - **Target**: iOS and Android via Expo Go
 
@@ -23,22 +23,33 @@ npx expo start --clear  # Clear cache and start
 
 ```
 mobile/
-├── App.tsx                      # Main game component, all game logic
+├── App.tsx                      # Main app with screen navigation (home/puzzle)
 ├── src/
-│   ├── types.ts                 # TypeScript interfaces
+│   ├── types.ts                 # TypeScript interfaces for puzzle game
+│   ├── types/
+│   │   └── homeWorld.ts         # Types for home screen (animals, rooms, currency)
 │   ├── constants.ts             # Word lists by length (3-6 letters)
 │   ├── dictionary.ts            # 8000+ word dictionary for validation
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout for slots
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling
 │   │   ├── AnimatedBackground.tsx  # Floating particles/decorations background
-│   │   └── Confetti.tsx         # Win celebration confetti effect
+│   │   ├── Confetti.tsx         # Win celebration confetti effect
+│   │   └── home/
+│   │       ├── HomeScreen.tsx   # Main home screen with animal house
+│   │       ├── HouseWorld.tsx   # Zoomable/pannable house view
+│   │       ├── RoomView.tsx     # Individual room with decorations
+│   │       ├── AnimalSprite.tsx # Animated animal characters
+│   │       └── index.ts         # Home component exports
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette and tile color system
 │   └── services/
-│       ├── localGenerator.ts    # Puzzle generation algorithm
+│       ├── localGenerator.ts    # Puzzle generation with dread word progression
 │       ├── wordHistory.ts       # Word history tracking for diversity
-│       └── starRating.ts        # Star rating system and cumulative stats
+│       ├── starRating.ts        # Star rating system and cumulative stats
+│       ├── amberCurrency.ts     # Amber currency system with persistence
+│       ├── animalDialogue.ts    # Animal dialogue content by phase (0-4)
+│       └── homeWorldData.ts     # Room/animal definitions and unlock progression
 ```
 
 ## Game Mechanics
@@ -48,6 +59,56 @@ mobile/
 3. Drop letter into next word → word grows by 1 letter
 4. Both resulting words must be valid English words
 5. Progress through all rows to win
+
+## Home Screen & Animal House
+
+The home screen features a multi-story house with unlockable rooms and animal characters.
+
+### Currency System (Amber)
+
+- Players earn **Amber** (💎) by completing puzzles
+- Rewards scale by difficulty: EASY=5, MEDIUM=10, HARD=20
+- Bonus amber for 3-star performances (+50%) or 2-star (+25%)
+- Amber is spent to unlock new characters and rooms
+
+### Animal Characters
+
+10 unique animals, each with their own room and personality:
+- **Red Panda (Bamboo)** - Zen/contemplative, bamboo attic
+- **Axolotl (Axel)** - Dreamy, aquarium room
+- **Pangolin (Panko)** - Practical chef, rustic kitchen
+- **Sloth (Sloane)** - Slow observer, jungle hammock
+- **Fennec Fox (Fennick)** - Alert listener, desert camp
+- **Fox (Ember)** - Introspective, cozy den with fireplace
+- **Owl (Archimedes)** - Scholar, study full of books
+- **Capybara (Chill)** - Seemingly calm, office
+- **Wombat (Warren)** - Grounded digger, underground burrow
+- **Rabbit (Thyme)** - Anxious, garden patio
+
+### Dialogue Progression (Phases 0-4)
+
+Animal dialogue evolves as players complete puzzles:
+- **Phase 0 (0+ puzzles)**: Happy, friendly, light
+- **Phase 1 (10+ puzzles)**: Curious, slightly philosophical
+- **Phase 2 (25+ puzzles)**: Questioning existence
+- **Phase 3 (50+ puzzles)**: Existential dread
+- **Phase 4 (100+ puzzles)**: Complete philosophical crisis
+
+Each animal has unique dialogue fitting their personality (owl becomes intellectual crisis, sloth has slow-motion dread, etc.)
+
+### Unlock Progression
+
+Alternates between characters and rooms:
+1. Red Panda + Bamboo Attic (starter, free)
+2. Axolotl (25 amber) → Aquarium (40 amber)
+3. Pangolin (50 amber) → Kitchen (65 amber)
+4. ...continues with increasing costs
+
+### Word Theme Evolution
+
+Puzzle words gradually shift to match the existential theme:
+- Phase 0: Fun words (SPARK, FLAME, TIGER)
+- Higher phases: Dread words preferred (VOID, FADE, DOOM, ABYSS)
 
 ## Key Architecture
 
@@ -157,6 +218,7 @@ Words organized by length in arrays:
 ### Game State (`App.tsx`)
 
 Key state variables:
+- `currentScreen` - 'home' | 'puzzle' (navigation state)
 - `rows` - Current puzzle words with letter states
 - `selectedTile` - Currently picked letter
 - `currentRowIndex` - Active row being solved
@@ -166,6 +228,9 @@ Key state variables:
 - `hintsUsed` - Count of hints used this puzzle (for star rating)
 - `earnedStars` - Stars earned on current puzzle (1-3)
 - `cumulativeStats` - Lifetime stats loaded from storage
+- `amberEarned` - Amber earned from current puzzle
+- `amberBalance` - Total amber balance
+- `phaseChanged` - Whether completing puzzle triggered phase transition
 
 ## Coding Conventions
 
@@ -204,6 +269,28 @@ Edit `calculateStars()` function in `starRating.ts`:
 
 ### Adding new tile colors
 Add to `tileColors` array in `theme/colors.ts`
+
+### Home Screen - Adding new animals
+1. Add animal type to `AnimalType` in `types/homeWorld.ts`
+2. Add dialogue entries in `animalDialogue.ts` (all 5 phases)
+3. Add animal definition in `ANIMALS` array in `homeWorldData.ts`
+4. Add room definition in `ROOMS` array
+5. Add unlock entries in `UNLOCK_PROGRESSION`
+
+### Home Screen - Adjusting amber rewards
+Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
+- EASY: 5 → change for easier/harder progression
+- MEDIUM: 10
+- HARD: 20
+
+### Home Screen - Adjusting dialogue phases
+Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
+- Default: [0, 10, 25, 50, 100] puzzles for phases 0-4
+- Lower values = faster descent into existential dread
+
+### Home Screen - Adding dread words
+Edit `DREAD_WORDS` set in `localGenerator.ts` to add/remove words
+that appear more frequently at higher phases
 
 ## Testing
 

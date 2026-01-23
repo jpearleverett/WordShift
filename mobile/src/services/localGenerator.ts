@@ -7,6 +7,8 @@ import {
   isInHardCooldown,
   recordPuzzleWords,
 } from './wordHistory';
+import { getCurrentPhase } from './amberCurrency';
+import { DialoguePhase } from '../types/homeWorld';
 
 // Organize sets for dynamic access
 const WORD_SETS: Record<number, Set<string>> = {
@@ -187,10 +189,36 @@ const FUN_WORDS = new Set([
   'CRYPT', 'TOMB', 'HAUNT', 'CURSE', 'DOOM', 'FATE', 'OMEN'
 ]);
 
+// Existential dread words - gradually introduced at higher phases
+const DREAD_WORDS = new Set([
+  // Phase 1 - Curious/wondering
+  'THINK', 'PONDER', 'WONDER', 'DOUBT', 'MAYBE', 'COULD', 'MIGHT', 'SEEM',
+  'DRIFT', 'WANDER', 'LOST', 'SEEK', 'FIND', 'QUESTION', 'ASK', 'WHY',
+  // Phase 2 - Questioning existence
+  'VOID', 'EMPTY', 'HOLLOW', 'SHELL', 'FADE', 'WANE', 'DECAY', 'WILT',
+  'ALONE', 'APART', 'DETACH', 'FLOAT', 'DRIFT', 'SINK', 'FALL', 'DROP',
+  'TIME', 'PASS', 'FLEETING', 'BRIEF', 'SHORT', 'GONE', 'PAST', 'WAS',
+  // Phase 3 - Existential dread
+  'DREAD', 'FEAR', 'DARK', 'COLD', 'NUMB', 'BLANK', 'STILL', 'QUIET',
+  'END', 'FINAL', 'LAST', 'CEASE', 'STOP', 'HALT', 'DONE', 'OVER',
+  'DUST', 'ASH', 'SHADOW', 'SHADE', 'GHOST', 'ECHO', 'TRACE', 'REMAIN',
+  'VAST', 'INFINITE', 'ETERNAL', 'FOREVER', 'NEVER', 'ALWAYS', 'ENDLESS',
+  // Phase 4 - Complete crisis
+  'DOOM', 'OBLIVION', 'ABYSS', 'CHASM', 'RIFT', 'TEAR', 'REND', 'BREAK',
+  'NOTHING', 'ZERO', 'NULL', 'BLANK', 'VOID', 'ABSENCE', 'LACK', 'WANT',
+  'TRUTH', 'REAL', 'FAKE', 'FALSE', 'LIE', 'MASK', 'VEIL', 'HIDE',
+  'WAKE', 'SLEEP', 'DREAM', 'NIGHTMARE', 'VISION', 'ILLUSION', 'MIRAGE',
+  'HORIZON', 'EDGE', 'BRINK', 'VERGE', 'THRESHOLD', 'GATE', 'DOOR', 'PORTAL'
+]);
+
+// Current phase for word selection (cached, updated during generation)
+let currentDreadPhase: DialoguePhase = 0;
+
 /**
  * Score how "interesting" a word is (0-100)
  * Higher = more interesting/fun to play with
  * Now includes freshness penalty based on word history
+ * And dread word bonus based on current phase
  */
 function scoreWordInterestingness(
   word: string,
@@ -213,6 +241,14 @@ function scoreWordInterestingness(
   // Bonus for fun/evocative words
   if (FUN_WORDS.has(word)) {
     score += 30;
+  }
+
+  // Bonus for dread words based on current phase
+  // Higher phases = stronger preference for existential words
+  if (DREAD_WORDS.has(word) && currentDreadPhase > 0) {
+    // Phase 1: +5, Phase 2: +15, Phase 3: +25, Phase 4: +40
+    const dreadBonus = currentDreadPhase * currentDreadPhase * 2.5;
+    score += dreadBonus;
   }
 
   // Score based on letter composition
@@ -375,7 +411,10 @@ const SEMANTIC_CLUSTERS: Record<string, Set<string>> = {
 
   home: new Set(['BED', 'CUP', 'JAR', 'JUG', 'KEY', 'LID', 'MAT', 'MOP', 'MUG', 'PAN', 'PIN', 'POT', 'RUG', 'TUB', 'URN', 'BATH', 'BELL', 'BOLT', 'BOWL', 'BULB', 'DESK', 'DOOR', 'FORK', 'GATE', 'HALL', 'HOME', 'HOOK', 'IRON', 'KNOB', 'LAMP', 'LOCK', 'NAIL', 'OVEN', 'PAIL', 'PIPE', 'PLUG', 'RACK', 'ROOF', 'ROOM', 'ROPE', 'SHELF', 'SINK', 'SOFA', 'TILE', 'VASE', 'WALL', 'YARD', 'BASIN', 'BENCH', 'BLIND', 'BROOM', 'BRUSH', 'CHAIR', 'CHEST', 'CLOCK', 'COUCH', 'CRATE', 'DRAPE', 'FENCE', 'FLOOR', 'FRAME', 'GLASS', 'HOUSE', 'KNIFE', 'LATCH', 'LIGHT', 'LINEN', 'PIANO', 'PLATE', 'PORCH', 'SHEET', 'SPOON', 'STAIR', 'STOOL', 'STOVE', 'TABLE', 'TORCH', 'TOWEL']),
 
-  action: new Set(['RUN', 'HIT', 'CUT', 'DIG', 'FLY', 'RIP', 'SIT', 'WIN', 'BANG', 'BASH', 'BEAT', 'BLOW', 'BURN', 'CALL', 'DASH', 'DIVE', 'DRAG', 'DRAW', 'DROP', 'DUMP', 'FALL', 'FLEE', 'FLIP', 'GRAB', 'GRIP', 'HACK', 'HAUL', 'HIDE', 'HOLD', 'HUNT', 'HURT', 'JUMP', 'KICK', 'KILL', 'LEAD', 'LEAP', 'LIFT', 'LOST', 'MOVE', 'OPEN', 'PASS', 'PICK', 'PLAY', 'PULL', 'PUSH', 'READ', 'REST', 'RIDE', 'RISE', 'ROLL', 'RUSH', 'SAVE', 'SEEK', 'SHOW', 'SHUT', 'SINK', 'SKIP', 'SLAM', 'SLIP', 'SNAP', 'SPIN', 'STAY', 'STEP', 'STOP', 'SWIM', 'TAKE', 'TALK', 'TEAR', 'TELL', 'TOSS', 'TRAP', 'TRIP', 'TURN', 'WALK', 'WARN', 'WASH', 'WORK', 'WRAP', 'CLASH', 'CLIMB', 'CRAWL', 'DANCE', 'DRIVE', 'FIGHT', 'FLOAT', 'MARCH', 'REACH', 'SHAKE', 'SHOOT', 'SHOUT', 'SLIDE', 'SPEAK', 'STAND', 'STEAL', 'SWING', 'THROW', 'TOUCH', 'WATCH', 'WRITE'])
+  action: new Set(['RUN', 'HIT', 'CUT', 'DIG', 'FLY', 'RIP', 'SIT', 'WIN', 'BANG', 'BASH', 'BEAT', 'BLOW', 'BURN', 'CALL', 'DASH', 'DIVE', 'DRAG', 'DRAW', 'DROP', 'DUMP', 'FALL', 'FLEE', 'FLIP', 'GRAB', 'GRIP', 'HACK', 'HAUL', 'HIDE', 'HOLD', 'HUNT', 'HURT', 'JUMP', 'KICK', 'KILL', 'LEAD', 'LEAP', 'LIFT', 'LOST', 'MOVE', 'OPEN', 'PASS', 'PICK', 'PLAY', 'PULL', 'PUSH', 'READ', 'REST', 'RIDE', 'RISE', 'ROLL', 'RUSH', 'SAVE', 'SEEK', 'SHOW', 'SHUT', 'SINK', 'SKIP', 'SLAM', 'SLIP', 'SNAP', 'SPIN', 'STAY', 'STEP', 'STOP', 'SWIM', 'TAKE', 'TALK', 'TEAR', 'TELL', 'TOSS', 'TRAP', 'TRIP', 'TURN', 'WALK', 'WARN', 'WASH', 'WORK', 'WRAP', 'CLASH', 'CLIMB', 'CRAWL', 'DANCE', 'DRIVE', 'FIGHT', 'FLOAT', 'MARCH', 'REACH', 'SHAKE', 'SHOOT', 'SHOUT', 'SLIDE', 'SPEAK', 'STAND', 'STEAL', 'SWING', 'THROW', 'TOUCH', 'WATCH', 'WRITE']),
+
+  // Existential/philosophical words - for darker phases
+  existential: new Set(['VOID', 'EMPTY', 'HOLLOW', 'FADE', 'WANE', 'DECAY', 'ALONE', 'LOST', 'DRIFT', 'SINK', 'FALL', 'TIME', 'PASS', 'GONE', 'END', 'LAST', 'CEASE', 'DUST', 'ASH', 'SHADOW', 'SHADE', 'GHOST', 'ECHO', 'VAST', 'DOOM', 'ABYSS', 'RIFT', 'BREAK', 'TRUTH', 'REAL', 'FAKE', 'WAKE', 'SLEEP', 'DREAM', 'EDGE', 'BRINK', 'DREAD', 'FEAR', 'COLD', 'NUMB', 'DARK', 'STILL', 'QUIET', 'FINAL', 'OVER', 'DONE'])
 };
 
 function getSemanticCluster(word: string): string | null {
@@ -567,6 +606,13 @@ export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Pr
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();
+
+  // Load current phase for dread word selection
+  try {
+    currentDreadPhase = await getCurrentPhase();
+  } catch {
+    currentDreadPhase = 0;
+  }
 
   const dicts = {
     min: WORD_SETS[wordLength - 1],
