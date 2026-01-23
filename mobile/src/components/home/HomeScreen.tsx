@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -49,7 +49,292 @@ import {
   isOnCooldown,
 } from '../../services/dialogueSession';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// JUICY ANIMATED BUTTON COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface JuicyButtonProps {
+  onPress: () => void;
+  style?: any;
+  children: React.ReactNode;
+  disabled?: boolean;
+  bounceScale?: number;
+}
+
+const JuicyButton: React.FC<JuicyButtonProps> = ({
+  onPress,
+  style,
+  children,
+  disabled = false,
+  bounceScale = 0.92,
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Subtle pulse glow
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    glowLoop.start();
+    return () => glowLoop.stop();
+  }, []);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: bounceScale,
+      friction: 5,
+      tension: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.6, 1],
+  });
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: disabled ? 0.5 : glowOpacity }}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+        disabled={disabled}
+        style={style}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CELEBRATION CONFETTI FOR PURCHASES
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface ConfettiPiece {
+  id: number;
+  x: Animated.Value;
+  y: Animated.Value;
+  rotation: Animated.Value;
+  scale: Animated.Value;
+  opacity: Animated.Value;
+  color: string;
+}
+
+const CelebrationConfetti: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+  const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
+
+  useEffect(() => {
+    const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3'];
+    const newPieces: ConfettiPiece[] = [];
+
+    for (let i = 0; i < 30; i++) {
+      const startX = SCREEN_WIDTH / 2 + (Math.random() - 0.5) * 100;
+      const piece: ConfettiPiece = {
+        id: i,
+        x: new Animated.Value(startX),
+        y: new Animated.Value(SCREEN_HEIGHT / 2),
+        rotation: new Animated.Value(0),
+        scale: new Animated.Value(0),
+        opacity: new Animated.Value(1),
+        color: colors[Math.floor(Math.random() * colors.length)],
+      };
+      newPieces.push(piece);
+
+      // Animate each piece
+      const targetX = startX + (Math.random() - 0.5) * 300;
+      const targetY = SCREEN_HEIGHT + 100;
+
+      Animated.parallel([
+        Animated.timing(piece.x, {
+          toValue: targetX,
+          duration: 2000 + Math.random() * 1000,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(piece.y, {
+          toValue: targetY,
+          duration: 2000 + Math.random() * 1000,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(piece.rotation, {
+          toValue: Math.random() * 720 - 360,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.spring(piece.scale, {
+            toValue: 1 + Math.random() * 0.5,
+            friction: 4,
+            useNativeDriver: true,
+          }),
+          Animated.timing(piece.opacity, {
+            toValue: 0,
+            duration: 500,
+            delay: 1500,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
+
+    setPieces(newPieces);
+
+    const timeout = setTimeout(onComplete, 2500);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  return (
+    <View style={confettiStyles.container} pointerEvents="none">
+      {pieces.map(piece => {
+        const rotate = piece.rotation.interpolate({
+          inputRange: [-360, 360],
+          outputRange: ['-360deg', '360deg'],
+        });
+        return (
+          <Animated.View
+            key={piece.id}
+            style={[
+              confettiStyles.piece,
+              {
+                backgroundColor: piece.color,
+                transform: [
+                  { translateX: piece.x },
+                  { translateY: piece.y },
+                  { rotate },
+                  { scale: piece.scale },
+                ],
+                opacity: piece.opacity,
+              },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+};
+
+const confettiStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  piece: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AMBER SPARKLE ANIMATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+const AmberSparkle: React.FC = () => {
+  const sparkles = useRef(
+    [...Array(5)].map(() => ({
+      x: new Animated.Value(0),
+      y: new Animated.Value(0),
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0),
+    }))
+  ).current;
+
+  useEffect(() => {
+    sparkles.forEach((sparkle, i) => {
+      const animate = () => {
+        sparkle.x.setValue(Math.random() * 30 - 15);
+        sparkle.y.setValue(0);
+        sparkle.opacity.setValue(0);
+        sparkle.scale.setValue(0.5);
+
+        Animated.parallel([
+          Animated.timing(sparkle.y, {
+            toValue: -20 - Math.random() * 10,
+            duration: 1000,
+            useNativeDriver: true,
+            delay: i * 200,
+          }),
+          Animated.sequence([
+            Animated.timing(sparkle.opacity, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+              delay: i * 200,
+            }),
+            Animated.timing(sparkle.opacity, {
+              toValue: 0,
+              duration: 800,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.spring(sparkle.scale, {
+            toValue: 1,
+            friction: 4,
+            useNativeDriver: true,
+            delay: i * 200,
+          }),
+        ]).start(() => animate());
+      };
+      animate();
+    });
+  }, []);
+
+  return (
+    <View style={{ position: 'absolute', top: -5, right: 0 }}>
+      {sparkles.map((sparkle, i) => (
+        <Animated.Text
+          key={i}
+          style={{
+            position: 'absolute',
+            fontSize: 8,
+            transform: [
+              { translateX: sparkle.x },
+              { translateY: sparkle.y },
+              { scale: sparkle.scale },
+            ],
+            opacity: sparkle.opacity,
+          }}
+        >
+          ✨
+        </Animated.Text>
+      ))}
+    </View>
+  );
+};
 
 interface HomeScreenProps {
   onPlayPuzzle: () => void;
@@ -90,6 +375,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
   const dialogueSlide = useRef(new Animated.Value(0)).current;
+
+  // Celebration state
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -294,6 +582,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handlePurchase = async (unlock: Unlockable) => {
     const result = await purchaseUnlock(unlock.id);
     if (result.success) {
+      // Trigger celebration confetti!
+      setShowCelebration(true);
+
       await loadAllData();
       setShowShop(false);
       setShowRoomUnlock(null);
@@ -396,16 +687,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <View style={styles.container}>
       {/* Header with amber and play button */}
       <View style={styles.header}>
-        <TouchableOpacity
+        <JuicyButton
           style={styles.amberContainer}
           onPress={() => setShowShop(true)}
+          bounceScale={0.95}
         >
-          <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-            <Text style={styles.amberEmoji}>💎</Text>
-          </Animated.View>
-          <Text style={styles.amberCount}>{progress.amber}</Text>
-          <Text style={styles.amberPlus}>+</Text>
-        </TouchableOpacity>
+          <View style={styles.amberInner}>
+            <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
+              <Text style={styles.amberEmoji}>💎</Text>
+            </Animated.View>
+            <Text style={styles.amberCount}>{progress.amber}</Text>
+            <Text style={styles.amberPlus}>+</Text>
+            <AmberSparkle />
+          </View>
+        </JuicyButton>
 
         <View style={styles.headerCenter}>
           <Text style={styles.title}>Animal House</Text>
@@ -414,14 +709,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </Text>
         </View>
 
-        <TouchableOpacity
+        <JuicyButton
           style={styles.playButton}
           onPress={onPlayPuzzle}
-          activeOpacity={0.8}
+          bounceScale={0.9}
         >
           <Text style={styles.playButtonText}>PLAY</Text>
-        </TouchableOpacity>
+        </JuicyButton>
       </View>
+
+      {/* Celebration Confetti */}
+      {showCelebration && (
+        <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
+      )}
 
       {/* House World */}
       <HouseWorld
@@ -434,9 +734,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Cooldown Message Toast */}
       {cooldownMessage && (
-        <View style={styles.cooldownToast}>
+        <Animated.View style={styles.cooldownToast}>
           <Text style={styles.cooldownToastText}>{cooldownMessage}</Text>
-        </View>
+        </Animated.View>
       )}
 
       {/* Dialogue Modal */}
@@ -811,13 +1111,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   amberContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+  },
+  amberInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
+    position: 'relative',
   },
   amberEmoji: {
     fontSize: 20,
