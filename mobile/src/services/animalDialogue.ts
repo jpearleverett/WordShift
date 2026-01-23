@@ -333,31 +333,31 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
 
 // FOX - Introspective, fireside musings
 const FOX_DIALOGUES: Dialogue[] = [
-  // Phase 0 - Warm and cozy (12 dialogues - first 4 introduce building mechanic)
+  // Phase 0 - Warm and cozy (12 dialogues forming a cohesive welcome story)
   { id: 'fx_0_1', text: "Oh my... thank you for inviting me in! This cozy den is wonderful. I've been wandering for so long.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_2', text: "You know what this place needs? More rooms! More friends! I've met so many creatures on my travels who need a warm home too.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_3', text: "If you collect enough amber from solving puzzles, we could build upward! A kitchen above, maybe? I know a pangolin who makes the BEST stew...", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_4', text: "Every puzzle you solve brings amber, and every room brings new friends. This could become quite the community!", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_5', text: "The fire tells stories if you watch long enough. Tonight it's telling a good one.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_6', text: "I collected these books over many winters. Each one is a friend I haven't met yet.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_7', text: "My tail makes the best pillow. It's basically a portable comfort device.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_8', text: "There's nothing quite like the sound of rain on a den roof. Safe and dry and home.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_9', text: "I made cider! From apples I found! Some of them were only a little bit stepped on!", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_10', text: "Being clever means knowing when to think and when to just... feel. This is a feeling moment.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_11', text: "The forest outside is beautiful at night. But so is staying in. Both are valid.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_12', text: "My grandmother told me stories by this fireplace. I like to think she'd approve of our growing house.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_2', text: "Come, sit by the fire with me! Let me tell you about this place... and what we could build together.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_3', text: "See, I've met so many creatures on my travels. A pangolin who makes incredible stew. An owl who's read every book. They all need homes.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_4', text: "And that's where the amber comes in! Every puzzle you solve earns amber. With enough, we can build new rooms above this one.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_5', text: "Imagine it - a whole house full of friends, each with their own cozy space. All because you solved puzzles!", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_6', text: "But enough about the future. Right now, just watch the fire with me. See how the flames dance?", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_7', text: "I collected these books over many winters, you know. Each spine holds a story I haven't read yet. Isn't that exciting?", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_8', text: "And my tail - feel how soft! It doubles as a pillow, a blanket, and an emergency comfort device.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_9', text: "Oh! I almost forgot - I made cider! Want some? The apples were only a little bit stepped on. Adds character.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_10', text: "Being clever taught me one thing: knowing when to think... and when to just sit and feel cozy. This is a feeling moment.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_11', text: "The forest outside is beautiful at night. But so is staying in, warm and safe. Both are valid choices.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_12', text: "My grandmother used to tell me stories by this very fireplace. I think she'd approve of us, sitting here, building something together.", phase: 0, animalType: 'fox' },
 
-  // Phase 1 - Reflective warmth (10 dialogues)
-  { id: 'fx_1_1', text: "Fire destroys to create warmth. We destroy to create comfort. Interesting, isn't it?", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_2', text: "I've lived in this den for years. It feels less like home lately. More like hiding.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_3', text: "The fire casts shadows that look like memories. Mine mostly look like regrets.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_4', text: "Being clever gets lonely. You see patterns others miss. Including the sad ones.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_5', text: "I add logs to the fire knowing they'll become ash. I do it anyway. Why?", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_6', text: "The cider tastes different this year. Same apples. Different me, I suppose.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_7', text: "Cozy is just being distracted from the cold. The cold is always outside. Waiting.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_8', text: "I've read all my books twice. The stories stay the same. Why don't I?", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_9', text: "My tail covers my face when I sleep. Protection from nightmares. It doesn't always work.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_10', text: "The fire needs constant attention or it dies. Everything does. Everything ends.", phase: 1, animalType: 'fox' },
+  // Phase 1 - Reflective warmth (10 dialogues - a contemplative evening story)
+  { id: 'fx_1_1', text: "You know what I've been thinking about lately? Fire. How it destroys to create warmth. Strange, isn't it?", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_2', text: "I've lived in this den for years now. It used to feel like home. Lately it feels more like... hiding.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_3', text: "Watch the shadows on the wall. See how they dance? They look like memories to me. Mine mostly look like regrets.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_4', text: "Being clever gets lonely, you know. You see patterns others miss. Including the sad ones nobody talks about.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_5', text: "I keep adding logs to the fire. But why? They just become ash. Everything just becomes... something else.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_6', text: "The cider tastes different this year. I used the same apples. Maybe it's me that's different.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_7', text: "This coziness we create - is it real? Or just distraction? The cold is always outside that door. Waiting.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_8', text: "I've read all my books twice now. The stories stay the same. Why don't I stay the same?", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_9', text: "When I sleep, my tail covers my face. Protection from nightmares, I think. It doesn't always work.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_10', text: "The fire needs constant attention or it dies. Everything does, I suppose. Everything eventually... ends.", phase: 1, animalType: 'fox' },
 
   // Phase 2 - Cooling hearth (10 dialogues)
   { id: 'fx_2_1', text: "Every fire dies eventually. I've watched thousands die. I've started thousands more. The cycle never asks permission.", phase: 2, animalType: 'fox' },
@@ -749,5 +749,117 @@ export const ANIMAL_INFO: Record<AnimalType, { name: string; description: string
   wombat: { name: 'Warren', description: 'A grounded wombat who digs deep', emoji: '🐻' },
   rabbit: { name: 'Thyme', description: 'An anxious rabbit in the garden', emoji: '🐰' },
 };
+
+/**
+ * Intro dialogues - Multi-part introductions shown once when each animal is unlocked
+ * These play in sequence before regular dialogues begin
+ */
+export const INTRO_DIALOGUES: Record<AnimalType, string[]> = {
+  fox: [
+    "Oh! A visitor! I've been waiting by this fire for... well, I'm not sure how long.",
+    "My name is Ember. I found this cozy den abandoned and thought... why not make it a home?",
+    "The world outside is vast and confusing. But in here, by the fire, things make sense.",
+    "You seem like someone who enjoys puzzles. Me too! Words, patterns, meanings...",
+    "Stay as long as you like. Solve puzzles, earn amber, and maybe... build something together?",
+    "The more puzzles you solve, the more friends we can invite. There's room to grow here.",
+  ],
+  pangolin: [
+    "Ah, a new face! Welcome to my kitchen! I'm Panko.",
+    "I was just preparing ant soufflé. Would you like some? No? Fair enough.",
+    "When life gets overwhelming, I curl into a ball. Very practical. Also cozy.",
+    "The amber you earn helps build more rooms. More rooms means more friends!",
+    "I find cooking meditative. Every recipe is like a puzzle, really.",
+    "Make yourself comfortable. This kitchen has seen many good conversations.",
+  ],
+  owl: [
+    "*adjusts spectacles* Ah, a visitor to my study. How... intriguing.",
+    "I am Archimedes. I've read every book in this room. Twice. Some thrice.",
+    "Knowledge is a curious thing. The more you have, the more questions arise.",
+    "I've been researching something lately. Something that defies categorization.",
+    "But let's not dwell on that now. You're here! That's what matters.",
+    "Solve puzzles, expand your mind, and perhaps... share what you discover.",
+  ],
+  axolotl: [
+    "Blub! *rises through the water* Oh hello there!",
+    "I'm Axel! I've been swimming in circles waiting for company!",
+    "Did you know I never grow up? Eternal youth! It's mostly wonderful!",
+    "The water here is perfect. Not too warm, not too cold. Just... floaty.",
+    "I regenerate everything! Limbs, organs, even parts of my brain! Neat, right?",
+    "Visit often, okay? It gets quiet under here. Just me and the bubbles.",
+  ],
+  sloth: [
+    "...",
+    "...oh...",
+    "...hello there...",
+    "...I'm Sloane... nice to... meet you...",
+    "...I was just... watching a leaf fall... it took three hours... worth it...",
+    "...no rush here... time moves... differently... when you pay attention...",
+    "...visit whenever... I'll be... right here... probably...",
+  ],
+  fennec_fox: [
+    "*ears twitch* I heard you coming from three rooms away.",
+    "I'm Fennick. My ears pick up everything. EVERYTHING.",
+    "The desert nights are quiet. Perfect for listening to the universe.",
+    "Sometimes I hear things others can't. Whispers. Patterns. Warnings.",
+    "But right now? I just hear a new friend. That's a good sound.",
+    "Come sit under the stars sometime. I'll tell you what I've heard.",
+  ],
+  capybara: [
+    "*slow blink* Oh. You're here. That's nice.",
+    "I'm Chill. That's... actually my name. Fitting, right?",
+    "Everyone says I look relaxed. I am. Mostly. From the outside.",
+    "The office work keeps me busy. Spreadsheets. Reports. Existential audits.",
+    "But right now? Right now is for meeting you. So hello. Welcome.",
+    "Stay as long as you want. I'll be here. Just... being.",
+  ],
+  wombat: [
+    "*emerges from tunnel* Oi! Fresh face up here!",
+    "Name's Warren. I dig. It's what I do. It's what I am.",
+    "You'd be surprised what you find underground. Roots. Rocks. Questions.",
+    "This burrow goes deep. Sometimes I wonder if there's a bottom.",
+    "But it's cozy! And dark! And mine! Well... ours now, I suppose.",
+    "Dig in, make yourself at home. Just watch your step. Tunnels everywhere.",
+  ],
+  rabbit: [
+    "*nose twitches nervously* Oh! Oh my! A visitor!",
+    "I'm Thyme! Like the herb! I grow it! In the garden! It's very calming!",
+    "Sorry, I get a bit... jumpy. Many predators growing up. Old habits.",
+    "But this garden is safe! Flowers everywhere! Tea parties sometimes!",
+    "I find tending plants soothing. They grow slowly. Predictably. Mostly.",
+    "Please visit often? Friends make the anxiety... smaller. A little bit.",
+  ],
+  red_panda: [
+    "*descends gracefully from a bamboo branch* Ah. You've reached the top.",
+    "I am Bamboo. Fitting name for one who lives among bamboo, no?",
+    "This attic is the highest room. Closest to the sky. Furthest from the ground.",
+    "I've spent years seeking enlightenment. I've found questions instead.",
+    "But the view from up here... the perspective... it changes everything.",
+    "You've built quite a home. Many friends. Much amber. Much growth.",
+    "Welcome to the peak. Now... let's see what lies beyond.",
+  ],
+};
+
+/**
+ * Get intro dialogue for an animal
+ */
+export function getIntroDialogue(animalType: AnimalType): string[] {
+  return INTRO_DIALOGUES[animalType] || [];
+}
+
+/**
+ * Get a specific intro dialogue line
+ */
+export function getIntroDialogueLine(animalType: AnimalType, index: number): string | null {
+  const intro = INTRO_DIALOGUES[animalType];
+  if (!intro || index < 0 || index >= intro.length) return null;
+  return intro[index];
+}
+
+/**
+ * Get total intro dialogue count
+ */
+export function getIntroDialogueCount(animalType: AnimalType): number {
+  return INTRO_DIALOGUES[animalType]?.length || 0;
+}
 
 export { ALL_DIALOGUES };
