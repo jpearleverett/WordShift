@@ -1,8 +1,23 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  Easing,
+  ScrollView,
+  Dimensions,
+  LayoutChangeEvent,
+} from 'react-native';
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
 import { CandyColors } from '../theme/colors';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const ROW_HORIZONTAL_MARGIN = 12;
+const ROW_PADDING = 8;
+const MAX_ROW_CONTENT_WIDTH = SCREEN_WIDTH - (ROW_HORIZONTAL_MARGIN * 2) - (ROW_PADDING * 2);
 
 interface RowProps {
   rowData: RowData;
@@ -150,6 +165,79 @@ const Slot: React.FC<{ onPress: () => void; index: number }> = ({ onPress, index
   );
 };
 
+// Edge fade indicator component
+const EdgeFade: React.FC<{ side: 'left' | 'right'; visible: boolean }> = ({ side, visible }) => {
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(opacityAnim, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    if (visible) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 1000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+
+    return () => pulseAnim.stopAnimation();
+  }, [visible]);
+
+  const arrowTranslate = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: side === 'left' ? [0, -4] : [0, 4],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.edgeFade,
+        side === 'left' ? styles.edgeFadeLeft : styles.edgeFadeRight,
+        { opacity: opacityAnim },
+      ]}
+      pointerEvents="none"
+    >
+      {/* Gradient simulation with multiple layers */}
+      <View style={[
+        styles.edgeFadeGradient,
+        side === 'left' ? styles.edgeFadeGradientLeft : styles.edgeFadeGradientRight,
+      ]}>
+        <View style={[styles.gradientLayer, styles.gradientLayer1, side === 'right' && styles.gradientLayerFlip]} />
+        <View style={[styles.gradientLayer, styles.gradientLayer2, side === 'right' && styles.gradientLayerFlip]} />
+        <View style={[styles.gradientLayer, styles.gradientLayer3, side === 'right' && styles.gradientLayerFlip]} />
+      </View>
+
+      {/* Animated scroll hint arrow */}
+      <Animated.View
+        style={[
+          styles.scrollHintArrow,
+          { transform: [{ translateX: arrowTranslate }] },
+        ]}
+      >
+        <Text style={styles.scrollHintArrowText}>
+          {side === 'left' ? '‹' : '›'}
+        </Text>
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
 export const Row: React.FC<RowProps> = ({
   rowData,
   rowIndex,
@@ -162,12 +250,33 @@ export const Row: React.FC<RowProps> = ({
   const isSource = rowIndex === activeRowIndex;
   const isTarget = rowIndex === activeRowIndex + 1;
   const isCompleted = rowIndex < activeRowIndex;
+  const showSlots = isTarget && selectedLetter && !isProcessing;
+
+  // Scroll state
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [contentWidth, setContentWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(MAX_ROW_CONTENT_WIDTH);
+  const [scrollPosition, setScrollPosition] = useState(0);
+
+  const canScrollLeft = scrollPosition > 5;
+  const canScrollRight = contentWidth > containerWidth && scrollPosition < (contentWidth - containerWidth - 5);
+  const needsScroll = contentWidth > containerWidth;
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(isSource ? 1 : 0.9)).current;
   const opacityAnim = useRef(new Animated.Value(isSource ? 1 : 0.3)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Auto-center when content changes (e.g., slots appear)
+  useEffect(() => {
+    if (needsScroll && scrollViewRef.current) {
+      const centerOffset = Math.max(0, (contentWidth - containerWidth) / 2);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ x: centerOffset, animated: true });
+      }, 100);
+    }
+  }, [showSlots, contentWidth, containerWidth, needsScroll]);
 
   useEffect(() => {
     // Animate row transitions
@@ -255,12 +364,24 @@ export const Row: React.FC<RowProps> = ({
     };
   }, [isSource, isTarget, isCompleted]);
 
+  const handleContentLayout = (event: LayoutChangeEvent) => {
+    setContentWidth(event.nativeEvent.layout.width);
+  };
+
+  const handleContainerLayout = (event: LayoutChangeEvent) => {
+    setContainerWidth(event.nativeEvent.layout.width);
+  };
+
+  const handleScroll = (event: any) => {
+    setScrollPosition(event.nativeEvent.contentOffset.x);
+  };
+
   const renderContent = () => {
     const elements: React.ReactNode[] = [];
     const letters = rowData.words;
 
     // Target row with slots for dropping
-    if (isTarget && selectedLetter && !isProcessing) {
+    if (showSlots) {
       elements.push(<Slot key="slot-start" onPress={() => onSlotPress(0)} index={0} />);
       letters.forEach((letter, index) => {
         elements.push(
@@ -317,6 +438,25 @@ export const Row: React.FC<RowProps> = ({
         },
       ]}
     >
+      {/* FLOATING BADGES - positioned outside row container */}
+      {isSource && (
+        <View style={[styles.floatingBadge, styles.floatingBadgePick]}>
+          <View style={styles.badgeShine} />
+          <Text style={styles.badgeText}>PICK</Text>
+        </View>
+      )}
+      {isTarget && selectedLetter && (
+        <View style={[styles.floatingBadge, styles.floatingBadgeDrop]}>
+          <View style={styles.badgeShine} />
+          <Text style={styles.badgeText}>DROP</Text>
+        </View>
+      )}
+      {isCompleted && (
+        <View style={styles.floatingCheckBadge}>
+          <Text style={styles.checkText}>✓</Text>
+        </View>
+      )}
+
       {/* Outer glow for source row */}
       {isSource && (
         <Animated.View
@@ -336,31 +476,39 @@ export const Row: React.FC<RowProps> = ({
           </>
         )}
 
-        {/* Badge label for source/target */}
-        {isSource && (
-          <View style={[styles.badge, styles.badgePick]}>
-            <View style={styles.badgeShine} />
-            <Text style={styles.badgeText}>PICK</Text>
-          </View>
-        )}
-        {isTarget && selectedLetter && (
-          <View style={[styles.badge, styles.badgeDrop]}>
-            <View style={styles.badgeShine} />
-            <Text style={styles.badgeText}>DROP</Text>
-          </View>
-        )}
+        {/* Scrollable content area */}
+        <View style={styles.scrollWrapper} onLayout={handleContainerLayout}>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            contentContainerStyle={styles.scrollContent}
+            bounces={needsScroll}
+            scrollEnabled={needsScroll}
+          >
+            <View style={styles.lettersContainer} onLayout={handleContentLayout}>
+              {renderContent()}
+            </View>
+          </ScrollView>
 
-        {/* Progress indicator for completed */}
-        {isCompleted && (
-          <View style={styles.checkBadge}>
-            <Text style={styles.checkText}>✓</Text>
-          </View>
-        )}
-
-        <View style={styles.lettersContainer}>
-          {renderContent()}
+          {/* Edge fade indicators */}
+          {showSlots && (
+            <>
+              <EdgeFade side="left" visible={canScrollLeft} />
+              <EdgeFade side="right" visible={canScrollRight} />
+            </>
+          )}
         </View>
       </View>
+
+      {/* Scroll hint text for target row */}
+      {showSlots && needsScroll && (
+        <Animated.View style={styles.scrollHintContainer}>
+          <Text style={styles.scrollHintText}>← swipe to see all slots →</Text>
+        </Animated.View>
+      )}
     </Animated.View>
   );
 };
@@ -368,11 +516,12 @@ export const Row: React.FC<RowProps> = ({
 const styles = StyleSheet.create({
   rowWrapper: {
     marginVertical: 6,
-    marginHorizontal: 12,
+    marginHorizontal: ROW_HORIZONTAL_MARGIN,
+    position: 'relative',
   },
   rowGlow: {
     position: 'absolute',
-    top: -8,
+    top: 4, // Adjusted for floating badge space
     left: -8,
     right: -8,
     bottom: -8,
@@ -380,14 +529,20 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.purple.main,
   },
   rowContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    marginTop: 16, // Space for floating badge
     borderRadius: 24,
     position: 'relative',
+  },
+
+  // Scroll wrapper
+  scrollWrapper: {
+    position: 'relative',
+    borderRadius: 24,
     overflow: 'hidden',
+  },
+  scrollContent: {
+    paddingVertical: 16,
+    paddingHorizontal: ROW_PADDING,
   },
   lettersContainer: {
     flexDirection: 'row',
@@ -450,20 +605,30 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
 
-  // Badge styles
-  badge: {
+  // FLOATING Badge styles - positioned outside row
+  floatingBadge: {
     position: 'absolute',
-    left: 8,
-    top: -12,
+    left: 12,
+    top: 4,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 12,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    elevation: 5,
-    zIndex: 10,
+    elevation: 8,
+    zIndex: 20,
     overflow: 'hidden',
+  },
+  floatingBadgePick: {
+    backgroundColor: CandyColors.purple.main,
+    shadowColor: CandyColors.purple.main,
+    transform: [{ rotate: '-3deg' }],
+  },
+  floatingBadgeDrop: {
+    backgroundColor: CandyColors.pink.main,
+    shadowColor: CandyColors.pink.main,
+    transform: [{ rotate: '2deg' }],
   },
   badgeShine: {
     position: 'absolute',
@@ -474,16 +639,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
-  },
-  badgePick: {
-    backgroundColor: CandyColors.purple.main,
-    shadowColor: CandyColors.purple.main,
-    transform: [{ rotate: '-3deg' }],
-  },
-  badgeDrop: {
-    backgroundColor: CandyColors.pink.main,
-    shadowColor: CandyColors.pink.main,
-    transform: [{ rotate: '2deg' }],
   },
   badgeText: {
     color: CandyColors.white,
@@ -496,10 +651,10 @@ const styles = StyleSheet.create({
   },
 
   // Check badge for completed
-  checkBadge: {
+  floatingCheckBadge: {
     position: 'absolute',
-    left: 8,
-    top: -8,
+    left: 12,
+    top: 8,
     width: 24,
     height: 24,
     borderRadius: 12,
@@ -510,12 +665,93 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 8,
+    zIndex: 20,
   },
   checkText: {
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '900',
+  },
+
+  // Edge fade indicators
+  edgeFade: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  edgeFadeLeft: {
+    left: 0,
+  },
+  edgeFadeRight: {
+    right: 0,
+  },
+  edgeFadeGradient: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 48,
+    flexDirection: 'row',
+  },
+  edgeFadeGradientLeft: {
+    left: 0,
+  },
+  edgeFadeGradientRight: {
+    right: 0,
+    flexDirection: 'row-reverse',
+  },
+  gradientLayer: {
+    height: '100%',
+  },
+  gradientLayer1: {
+    width: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  gradientLayer2: {
+    width: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  gradientLayer3: {
+    width: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  gradientLayerFlip: {
+    // Handled by flexDirection: row-reverse on parent
+  },
+  scrollHintArrow: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: CandyColors.pink.main,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: CandyColors.pink.main,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  scrollHintArrowText: {
+    color: CandyColors.white,
+    fontSize: 18,
+    fontWeight: '900',
+    marginTop: -2,
+  },
+
+  // Scroll hint text
+  scrollHintContainer: {
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  scrollHintText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
+    letterSpacing: 0.5,
   },
 
   // Slot styles
