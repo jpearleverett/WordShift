@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
 import { Animal, Room, DialoguePhase, HomeWorldProgress, Unlockable } from '../../types/homeWorld';
@@ -325,7 +324,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header with amber and play button */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -665,7 +664,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -690,7 +689,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 50,
+    paddingBottom: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   amberContainer: {
