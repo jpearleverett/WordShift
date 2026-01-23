@@ -333,11 +333,11 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
 
 // FOX - Introspective, fireside musings
 const FOX_DIALOGUES: Dialogue[] = [
-  // Phase 0 - Warm and cozy (12 dialogues)
-  { id: 'fx_0_1', text: "Come sit by the fire! I've got hot cocoa and warm blankets!", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_2', text: "I love autumn evenings. The crackle of fire. The smell of woodsmoke. Perfect.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_3', text: "My den is cozy, my belly is full, and you're here. What more could one want?", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_4', text: "They say we're clever. I prefer to think we're just... thoughtful.", phase: 0, animalType: 'fox' },
+  // Phase 0 - Warm and cozy (12 dialogues - first 4 introduce building mechanic)
+  { id: 'fx_0_1', text: "Oh my... thank you for inviting me in! This cozy den is wonderful. I've been wandering for so long.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_2', text: "You know what this place needs? More rooms! More friends! I've met so many creatures on my travels who need a warm home too.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_3', text: "If you collect enough amber from solving puzzles, we could build upward! A kitchen above, maybe? I know a pangolin who makes the BEST stew...", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_4', text: "Every puzzle you solve brings amber, and every room brings new friends. This could become quite the community!", phase: 0, animalType: 'fox' },
   { id: 'fx_0_5', text: "The fire tells stories if you watch long enough. Tonight it's telling a good one.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_6', text: "I collected these books over many winters. Each one is a friend I haven't met yet.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_7', text: "My tail makes the best pillow. It's basically a portable comfort device.", phase: 0, animalType: 'fox' },
@@ -345,7 +345,7 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_0_9', text: "I made cider! From apples I found! Some of them were only a little bit stepped on!", phase: 0, animalType: 'fox' },
   { id: 'fx_0_10', text: "Being clever means knowing when to think and when to just... feel. This is a feeling moment.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_11', text: "The forest outside is beautiful at night. But so is staying in. Both are valid.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_12', text: "My grandmother told me stories by this fireplace. I like to think she'd approve of my life.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_12', text: "My grandmother told me stories by this fireplace. I like to think she'd approve of our growing house.", phase: 0, animalType: 'fox' },
 
   // Phase 1 - Reflective warmth (10 dialogues)
   { id: 'fx_1_1', text: "Fire destroys to create warmth. We destroy to create comfort. Interesting, isn't it?", phase: 1, animalType: 'fox' },
