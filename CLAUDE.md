@@ -24,6 +24,11 @@ npx expo start --clear  # Clear cache and start
 ```
 mobile/
 ├── App.tsx                      # Main app with screen navigation (home/puzzle)
+├── assets/                      # Image assets (see Asset System below)
+│   ├── characters/              # Animal character sprites
+│   ├── rooms/                   # Room background images
+│   ├── house/                   # House structure elements
+│   └── environment/             # Sky, trees, ground, etc.
 ├── src/
 │   ├── types.ts                 # TypeScript interfaces for puzzle game
 │   ├── types/
@@ -52,6 +57,96 @@ mobile/
 │       ├── dialogueSession.ts   # Dialogue session system with cooldowns
 │       └── homeWorldData.ts     # Room/animal definitions and unlock progression
 ```
+
+## Asset System (Images)
+
+The home screen is transitioning from emoji-based graphics to proper image assets. Assets are added incrementally - when an asset exists, use it; otherwise fall back to the current emoji/styled implementation.
+
+### Asset Directory Structure
+
+```
+mobile/assets/
+├── characters/                  # Animal character sprites
+│   ├── fox/
+│   │   ├── idle.png            # Standing pose, facing right
+│   │   ├── walk.png            # 4-frame sprite sheet (or walk_1.png - walk_4.png)
+│   │   ├── talk.png            # Mouth open variant for dialogue
+│   │   └── robed.png           # Phase 4 dark version with cloak
+│   ├── pangolin/               # Same structure for each animal
+│   ├── owl/
+│   ├── axolotl/
+│   ├── sloth/
+│   ├── fennec_fox/
+│   ├── capybara/
+│   ├── wombat/
+│   ├── rabbit/
+│   └── red_panda/
+│
+├── rooms/                       # Room background images (280x140 recommended)
+│   ├── cozy_den.png            # Fox's room - fireplace, armchair, rug, lamp
+│   ├── kitchen.png             # Pangolin's - stove, pots, stone hearth, table
+│   ├── study.png               # Owl's - bookshelves, desk, quill, globe
+│   ├── aquarium.png            # Axolotl's - large tank, bubbles, coral, fish
+│   ├── jungle.png              # Sloth's - vines, hammock, plants, tropical
+│   ├── desert.png              # Fennec's - tent, cactus, starry window, sand
+│   ├── office.png              # Capybara's - desk, computer, lamp, papers
+│   ├── burrow.png              # Wombat's - dirt walls, roots, cozy underground
+│   ├── garden.png              # Rabbit's - flowers, table, teacups, outdoor patio
+│   └── bamboo.png              # Red Panda's - bamboo walls, lantern, zen decor
+│
+├── house/                       # House structure elements
+│   ├── roof.png                # Dark shingles roof
+│   ├── frame_left.png          # Left wall/border of house
+│   ├── frame_right.png         # Right wall/border of house
+│   ├── foundation.png          # Stone base at bottom
+│   ├── floor_divider.png       # Horizontal beam between rooms
+│   └── chimney.png             # Chimney with smoke (optional)
+│
+└── environment/                 # Background and scenery
+    ├── sky_day.png             # Blue gradient with clouds (default)
+    ├── sky_storm.png           # Dark, ominous sky (Phase 4)
+    ├── tree_left.png           # Tree on left side of house
+    ├── tree_right.png          # Tree on right side of house
+    ├── ground.png              # Grass, path, flowers at bottom
+    ├── cloud_1.png             # Animated cloud sprite
+    ├── cloud_2.png             # Second cloud variant
+    ├── shadow_figure.png       # The looming entity (Phase 4 only)
+    └── birds.png               # Optional flying birds
+```
+
+### Asset Integration Guidelines
+
+**When adding a new asset:**
+1. Drop the image file into the appropriate folder
+2. Update the corresponding component to check for and use the asset
+3. Keep emoji fallback for missing assets
+
+**Loading pattern:**
+```typescript
+// Example: Check if asset exists, fallback to emoji
+const foxIdleImage = require('../../assets/characters/fox/idle.png');
+// Use Image component when asset exists, Text with emoji otherwise
+```
+
+**Phase 4 visual changes:**
+- Use `robed.png` variants for all animals at Phase 4
+- Switch from `sky_day.png` to `sky_storm.png`
+- Show `shadow_figure.png` in background
+
+**Room backgrounds:**
+- Room images should be 280x140px (or 2x/3x for retina)
+- Include all furniture/decorations baked into the image
+- Animal sprites render on top of room background
+
+### Current State
+
+The home screen currently uses:
+- Emoji characters (🦊, 🦉, etc.) in `AnimalSprite.tsx`
+- Styled View components for rooms in `RoomView.tsx`
+- Emoji decorations for furniture
+- Animated emoji clouds, sun, birds in `HouseWorld.tsx`
+
+As image assets are added, components should be updated to prefer images over emoji.
 
 ## Game Mechanics
 
@@ -160,14 +255,18 @@ The house is built from the ground up, one room at a time:
 - Only unlocked rooms are rendered
 - Rooms sorted by floor number (ground = 0, increasing upward)
 - Dynamic height based on number of unlocked rooms
-- Pinch-to-zoom support via PanResponder
+- Pan/zoom via `react-native-gesture-handler` (PanGestureHandler + PinchGestureHandler)
+- Fixed sky background with animated clouds, sun, birds
+- Ground layer fixed at bottom of screen
+- House transforms with pan/zoom gestures
 
 **Room Decorations** (`RoomView.tsx`):
-- Each room theme has 6-7 furniture/decoration items
+- Each room theme has 6-7 furniture/decoration items (emoji-based, will be replaced by room images)
 - Items positioned at: wall-left/center/right, floor-left/center/right, corners
 - Sizes: small (14px), medium (20px), large (28px)
 - Some rooms have windows (study, kitchen, cozy_den)
 - Wall and floor patterns for themed textures
+- Will transition to single room background images from `assets/rooms/`
 
 ### Word Theme Evolution
 
@@ -422,4 +521,5 @@ Test on physical device via Expo Go app:
 - Dictionary limited to common English words (no proper nouns, abbreviations)
 - Arc layout uses `overflow: visible` - elements can extend beyond row container
 - Dialogue sessions persist across app restarts (cooldowns continue)
-- House view supports pinch-to-zoom via PanResponder (basic implementation)
+- House view uses `react-native-gesture-handler` for pan/zoom (GestureHandlerRootView wraps content)
+- TouchableOpacity in home screen components must be imported from `react-native-gesture-handler` for proper touch handling
