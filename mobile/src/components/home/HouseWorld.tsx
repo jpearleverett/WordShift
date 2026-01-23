@@ -1,27 +1,35 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
-  ScrollView,
   StyleSheet,
   Dimensions,
   Animated,
-  PanResponder,
   Text,
 } from 'react-native';
+import {
+  GestureHandlerRootView,
+  PinchGestureHandler,
+  PanGestureHandler,
+  State,
+  PinchGestureHandlerGestureEvent,
+  PanGestureHandlerGestureEvent,
+} from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// House dimensions - single column of rooms stacked vertically
-const ROOM_WIDTH = 280; // Wider single room
+// House dimensions
+const ROOM_WIDTH = 280;
 const ROOM_HEIGHT = 140;
 const ROOM_GAP = 4;
 const HOUSE_PADDING = 20;
-
-// Full house dimensions - grows with unlocked rooms
 const HOUSE_WIDTH = ROOM_WIDTH + HOUSE_PADDING * 2;
+
+// Zoom constraints
+const MIN_SCALE = 0.6;
+const MAX_SCALE = 2.0;
 
 interface HouseWorldProps {
   rooms: Room[];
@@ -38,355 +46,430 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   onAnimalPress,
   onRoomPress,
 }) => {
-  const [scale, setScale] = useState(1);
-  const scaleRef = useRef(new Animated.Value(1)).current;
-  const lastScale = useRef(1);
+  // Animated values
+  const scale = useRef(new Animated.Value(1)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
 
-  // Cloud animation
-  const cloud1X = useRef(new Animated.Value(-50)).current;
-  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH)).current;
+  // Refs for gesture tracking
+  const pinchRef = useRef<PinchGestureHandler>(null);
+  const panRef = useRef<PanGestureHandler>(null);
+
+  // State tracking for gestures
+  const baseScale = useRef(1);
+  const lastScale = useRef(1);
+  const baseTranslateX = useRef(0);
+  const baseTranslateY = useRef(0);
+
+  // Cloud animations
+  const cloud1X = useRef(new Animated.Value(-100)).current;
+  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
+  const cloud3X = useRef(new Animated.Value(SCREEN_WIDTH / 2)).current;
 
   useEffect(() => {
-    // Animate clouds
-    const animateClouds = () => {
-      Animated.loop(
-        Animated.timing(cloud1X, {
-          toValue: SCREEN_WIDTH + 100,
-          duration: 40000,
+    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
+      const animate = () => {
+        cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
+        Animated.timing(cloudAnim, {
+          toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
+          duration,
           useNativeDriver: true,
-        })
-      ).start();
-
-      Animated.loop(
-        Animated.timing(cloud2X, {
-          toValue: -150,
-          duration: 35000,
-          useNativeDriver: true,
-        })
-      ).start();
+        }).start(() => animate());
+      };
+      animate();
     };
-    animateClouds();
+
+    animateCloud(cloud1X, -100, 45000);
+    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
+    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
   }, []);
 
-  // Get only unlocked rooms, sorted by floor (bottom to top for display)
+  // Get only unlocked rooms, sorted by floor
   const unlockedRooms = rooms
     .filter(room => room.isUnlocked)
-    .sort((a, b) => a.floor - b.floor); // Lower floor numbers at bottom
+    .sort((a, b) => a.floor - b.floor);
 
-  // Get animal for a room
   const getAnimalForRoom = (roomId: string): Animal | null => {
     return animals.find(a => a.roomId === roomId) || null;
   };
 
-  // Calculate house height based on number of unlocked rooms
   const calculateHouseHeight = (): number => {
     return Math.max(1, unlockedRooms.length) * ROOM_HEIGHT +
            Math.max(0, unlockedRooms.length - 1) * ROOM_GAP +
            HOUSE_PADDING * 2;
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {},
-      onPanResponderMove: (evt, gestureState) => {
-        // Handle pinch zoom with two touches
-        if (evt.nativeEvent.touches.length === 2) {
-          const touch1 = evt.nativeEvent.touches[0];
-          const touch2 = evt.nativeEvent.touches[1];
-          const distance = Math.sqrt(
-            Math.pow(touch2.pageX - touch1.pageX, 2) +
-            Math.pow(touch2.pageY - touch1.pageY, 2)
-          );
-          // Scale based on pinch
-          const newScale = Math.max(0.5, Math.min(2, lastScale.current * (distance / 200)));
-          setScale(newScale);
-          scaleRef.setValue(newScale);
-        }
-      },
-      onPanResponderRelease: () => {
-        lastScale.current = scale;
-      },
-    })
-  ).current;
+  // Pinch gesture handler
+  const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
+    const { scale: gestureScale } = event.nativeEvent;
+    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * gestureScale));
+    scale.setValue(newScale);
+  };
+
+  const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      const currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
+      baseScale.current = currentScale;
+      lastScale.current = currentScale;
+
+      // Smooth snap if too zoomed out
+      if (currentScale < 0.7) {
+        Animated.spring(scale, {
+          toValue: 0.7,
+          friction: 5,
+          useNativeDriver: true,
+        }).start(() => {
+          baseScale.current = 0.7;
+          lastScale.current = 0.7;
+        });
+      }
+    }
+  };
+
+  // Pan gesture handler
+  const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
+    const { translationX, translationY } = event.nativeEvent;
+
+    // Scale translation by current scale for natural feeling
+    const maxTranslate = 150 * lastScale.current;
+
+    const newX = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
+    const newY = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
+
+    translateX.setValue(newX);
+    translateY.setValue(newY);
+  };
+
+  const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      const { translationX, translationY } = event.nativeEvent;
+      const maxTranslate = 150 * lastScale.current;
+
+      baseTranslateX.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
+      baseTranslateY.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
+    }
+  };
+
+  const houseHeight = calculateHouseHeight();
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-      showsHorizontalScrollIndicator={false}
-      bounces={true}
-      maximumZoomScale={2}
-      minimumZoomScale={0.5}
-      bouncesZoom={true}
-    >
-      {/* Animated clouds */}
-      <Animated.View
-        style={[
-          styles.cloud,
-          styles.cloud1,
-          { transform: [{ translateX: cloud1X }] },
-        ]}
-      >
+    <GestureHandlerRootView style={styles.container}>
+      {/* Fixed sky background */}
+      <View style={styles.skyBackground}>
+        <View style={styles.skyTop} />
+        <View style={styles.skyMiddle} />
+        <View style={styles.skyBottom} />
+      </View>
+
+      {/* Animated clouds - fixed to screen */}
+      <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
         <Text style={styles.cloudEmoji}>☁️</Text>
       </Animated.View>
-      <Animated.View
-        style={[
-          styles.cloud,
-          styles.cloud2,
-          { transform: [{ translateX: cloud2X }] },
-        ]}
-      >
+      <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
         <Text style={styles.cloudEmoji}>☁️</Text>
-        <Text style={[styles.cloudEmoji, { marginLeft: 20 }]}>☁️</Text>
+        <Text style={[styles.cloudEmoji, { marginLeft: 25 }]}>☁️</Text>
+      </Animated.View>
+      <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
+        <Text style={[styles.cloudEmoji, { fontSize: 38 }]}>☁️</Text>
       </Animated.View>
 
-      {/* Sun */}
-      <View style={styles.sun}>
+      {/* Sun - fixed position */}
+      <View style={styles.sun} pointerEvents="none">
         <Text style={styles.sunEmoji}>☀️</Text>
       </View>
 
-      {/* Birds */}
-      <View style={styles.birds}>
+      {/* Birds - fixed position */}
+      <View style={styles.birds} pointerEvents="none">
         <Text style={styles.birdEmoji}>🐦</Text>
-        <Text style={[styles.birdEmoji, { marginLeft: 10, marginTop: -5 }]}>🐦</Text>
+        <Text style={[styles.birdEmoji, { marginLeft: 12, marginTop: -6 }]}>🐦</Text>
       </View>
 
-      <Animated.View
-        style={[
-          styles.houseContainer,
-          {
-            transform: [{ scale: scaleRef }],
-          },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        {/* Sky background */}
-        <View style={styles.skyBackground} />
-
-        {/* Trees on sides */}
-        <View style={styles.leftTree}>
-          <Text style={styles.treeEmoji}>🌳</Text>
-          <Text style={styles.treeEmoji}>🌲</Text>
-          <Text style={styles.bushEmoji}>🌿</Text>
-        </View>
-        <View style={styles.rightTree}>
-          <Text style={styles.treeEmoji}>🌳</Text>
-          <Text style={styles.treeEmoji}>🌲</Text>
-          <Text style={styles.bushEmoji}>🌿</Text>
-        </View>
-
-        {/* House frame */}
-        <View style={styles.house}>
-          {/* Roof */}
-          <View style={styles.roof}>
-            {/* Chimney */}
-            <View style={styles.chimney}>
-              <View style={styles.chimneyBody} />
-              <View style={styles.chimneyTop} />
-              <Text style={styles.smokeEmoji}>💨</Text>
-            </View>
-            <View style={styles.roofMain}>
-              {/* Roof shingles pattern */}
-              <View style={styles.roofPattern}>
-                <View style={styles.shingleRow}>
-                  {[...Array(8)].map((_, i) => (
-                    <View key={i} style={styles.shingle} />
-                  ))}
-                </View>
-                <View style={[styles.shingleRow, { marginLeft: 10 }]}>
-                  {[...Array(7)].map((_, i) => (
-                    <View key={i} style={styles.shingle} />
-                  ))}
-                </View>
-              </View>
-            </View>
-            <View style={styles.roofTrim} />
-            {/* Attic window */}
-            <View style={styles.atticWindow}>
-              <View style={styles.atticWindowGlass} />
-              <View style={styles.atticWindowFrame} />
-            </View>
-          </View>
-
-          {/* House body with rooms - stacked vertically, bottom to top */}
-          <View style={[styles.houseBody, { minHeight: calculateHouseHeight() - HOUSE_PADDING }]}>
-            {/* Decorative trim at top */}
-            <View style={styles.topTrim} />
-
-            {/* Rooms displayed in reverse order (highest floor at top visually) */}
-            {[...unlockedRooms].reverse().map((room, index) => (
-              <View
-                key={room.id}
-                style={styles.roomRow}
-              >
-                <RoomView
-                  key={room.id}
-                  room={room}
-                  animal={getAnimalForRoom(room.id)}
-                  width={ROOM_WIDTH}
-                  height={ROOM_HEIGHT}
-                  onAnimalPress={onAnimalPress}
-                  onRoomPress={onRoomPress}
-                  currentPhase={currentPhase}
-                />
-              </View>
-            ))}
-
-            {/* Show empty state if no rooms */}
-            {unlockedRooms.length === 0 && (
-              <View style={styles.emptyHouse}>
-                <Text style={styles.emptyHouseText}>🏠</Text>
-                <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Foundation */}
-          <View style={styles.foundation}>
-            {/* Stone pattern */}
-            <View style={styles.stoneRow}>
-              {[...Array(6)].map((_, i) => (
-                <View key={i} style={styles.stone} />
-              ))}
-            </View>
-          </View>
-
-          {/* Front door decoration */}
-          <View style={styles.doorMat}>
-            <Text style={styles.doorMatEmoji}>🚪</Text>
-          </View>
-        </View>
-
-        {/* Ground */}
-        <View style={styles.ground}>
-          {/* Grass texture */}
-          <View style={styles.grassLayer} />
-          {/* Flowers and grass decorations */}
-          <View style={styles.groundDecorations}>
-            <Text style={styles.groundEmoji}>🌸</Text>
-            <Text style={styles.groundEmoji}>🌷</Text>
-            <Text style={styles.groundEmoji}>🌻</Text>
-            <Text style={styles.groundEmoji}>🌺</Text>
-            <Text style={styles.groundEmoji}>🌼</Text>
-          </View>
-          {/* Mushrooms */}
-          <View style={styles.mushrooms}>
-            <Text style={styles.mushroomEmoji}>🍄</Text>
-            <Text style={styles.mushroomEmoji}>🍄</Text>
-          </View>
-        </View>
-
-        {/* Stream/Path */}
-        <View style={styles.path}>
-          <View style={styles.pathStone} />
-          <View style={styles.pathStone} />
-          <View style={styles.pathStone} />
-          <View style={styles.pathStone} />
-        </View>
-
-        {/* Stream */}
-        <View style={styles.stream}>
-          <Text style={styles.streamEmoji}>💧</Text>
-          <Text style={styles.streamEmoji}>💧</Text>
-          <Text style={styles.streamEmoji}>💧</Text>
-        </View>
-
-        {/* Fence */}
-        <View style={styles.fence}>
-          {[...Array(5)].map((_, i) => (
-            <View key={i} style={styles.fencePost} />
+      {/* Ground layer - fixed at bottom */}
+      <View style={styles.groundLayer} pointerEvents="none">
+        <View style={styles.grassStrip} />
+        <View style={styles.dirtStrip} />
+        <View style={styles.groundDecorations}>
+          {['🍄', '🌸', '🌷', '🌻', '🌺', '🌼', '🌸', '🌷', '🍄'].map((emoji, i) => (
+            <Text key={i} style={styles.groundEmoji}>{emoji}</Text>
           ))}
         </View>
-      </Animated.View>
-    </ScrollView>
+      </View>
+
+      {/* Gesture handlers with simultaneous recognition */}
+      <PanGestureHandler
+        ref={panRef}
+        simultaneousHandlers={pinchRef}
+        onGestureEvent={onPanGestureEvent}
+        onHandlerStateChange={onPanHandlerStateChange}
+        minDist={10}
+        avgTouches
+      >
+        <Animated.View style={styles.gestureContainer}>
+          <PinchGestureHandler
+            ref={pinchRef}
+            simultaneousHandlers={panRef}
+            onGestureEvent={onPinchGestureEvent}
+            onHandlerStateChange={onPinchHandlerStateChange}
+          >
+            <Animated.View
+              style={[
+                styles.transformContainer,
+                {
+                  transform: [
+                    { translateX },
+                    { translateY },
+                    { scale },
+                  ],
+                },
+              ]}
+            >
+              {/* Trees on left side */}
+              <View style={[styles.treeGroup, styles.leftTrees]} pointerEvents="none">
+                <Text style={styles.treeEmoji}>🌳</Text>
+                <Text style={styles.smallTreeEmoji}>🌲</Text>
+                <Text style={styles.bushEmoji}>🌿</Text>
+              </View>
+
+              {/* Trees on right side */}
+              <View style={[styles.treeGroup, styles.rightTrees]} pointerEvents="none">
+                <Text style={styles.treeEmoji}>🌳</Text>
+                <Text style={styles.smallTreeEmoji}>🌲</Text>
+                <Text style={styles.bushEmoji}>🌿</Text>
+              </View>
+
+              {/* Fence */}
+              <View style={styles.fence} pointerEvents="none">
+                {[...Array(6)].map((_, i) => (
+                  <View key={i} style={styles.fencePost} />
+                ))}
+              </View>
+
+              {/* House */}
+              <View style={styles.houseContainer}>
+                {/* Roof */}
+                <View style={styles.roof}>
+                  <View style={styles.chimney}>
+                    <View style={styles.chimneyBody} />
+                    <View style={styles.chimneyTop} />
+                    <Text style={styles.smokeEmoji}>💨</Text>
+                  </View>
+                  <View style={styles.roofMain}>
+                    <View style={styles.roofPattern}>
+                      <View style={styles.shingleRow}>
+                        {[...Array(8)].map((_, i) => (
+                          <View key={i} style={styles.shingle} />
+                        ))}
+                      </View>
+                      <View style={[styles.shingleRow, { marginLeft: 10 }]}>
+                        {[...Array(7)].map((_, i) => (
+                          <View key={i} style={styles.shingle} />
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.roofTrim} />
+                  <View style={styles.atticWindow}>
+                    <View style={styles.atticWindowGlass} />
+                    <View style={styles.atticWindowFrame} />
+                  </View>
+                </View>
+
+                {/* House body with rooms */}
+                <View style={[styles.houseBody, { minHeight: houseHeight - HOUSE_PADDING }]}>
+                  <View style={styles.topTrim} />
+
+                  {[...unlockedRooms].reverse().map((room) => (
+                    <View key={room.id} style={styles.roomRow}>
+                      <RoomView
+                        room={room}
+                        animal={getAnimalForRoom(room.id)}
+                        width={ROOM_WIDTH}
+                        height={ROOM_HEIGHT}
+                        onAnimalPress={onAnimalPress}
+                        onRoomPress={onRoomPress}
+                        currentPhase={currentPhase}
+                      />
+                    </View>
+                  ))}
+
+                  {unlockedRooms.length === 0 && (
+                    <View style={styles.emptyHouse}>
+                      <Text style={styles.emptyHouseText}>🏠</Text>
+                      <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Foundation */}
+                <View style={styles.foundation}>
+                  <View style={styles.stoneRow}>
+                    {[...Array(6)].map((_, i) => (
+                      <View key={i} style={styles.stone} />
+                    ))}
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          </PinchGestureHandler>
+        </Animated.View>
+      </PanGestureHandler>
+    </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB', // Sky blue
   },
-  contentContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    minHeight: SCREEN_HEIGHT,
-  },
-  cloud: {
-    position: 'absolute',
-    flexDirection: 'row',
-    zIndex: 10,
-  },
-  cloud1: {
-    top: 60,
-  },
-  cloud2: {
-    top: 100,
-  },
-  cloudEmoji: {
-    fontSize: 40,
-    opacity: 0.8,
-  },
-  sun: {
-    position: 'absolute',
-    top: 50,
-    right: 30,
-    zIndex: 5,
-  },
-  sunEmoji: {
-    fontSize: 50,
-  },
-  birds: {
-    position: 'absolute',
-    top: 80,
-    left: 50,
-    flexDirection: 'row',
-    zIndex: 5,
-  },
-  birdEmoji: {
-    fontSize: 20,
-  },
-  houseContainer: {
-    position: 'relative',
-    width: HOUSE_WIDTH + 100, // Extra for trees
-    alignItems: 'center',
-    marginTop: 60,
-  },
+
+  // Fixed sky background
   skyBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 200,
-    backgroundColor: 'transparent',
+    bottom: 0,
+    zIndex: 0,
   },
-  leftTree: {
+  skyTop: {
+    flex: 2,
+    backgroundColor: '#87CEEB',
+  },
+  skyMiddle: {
+    flex: 1,
+    backgroundColor: '#9DD5ED',
+  },
+  skyBottom: {
+    flex: 1,
+    backgroundColor: '#B0E0E6',
+  },
+
+  // Clouds - fixed to screen
+  cloud: {
     position: 'absolute',
-    left: -10,
-    top: 80,
+    flexDirection: 'row',
+    zIndex: 200,
+  },
+  cloudEmoji: {
+    fontSize: 45,
+    opacity: 0.9,
+  },
+
+  // Sun - fixed
+  sun: {
+    position: 'absolute',
+    top: 15,
+    right: 20,
+    zIndex: 200,
+  },
+  sunEmoji: {
+    fontSize: 50,
+  },
+
+  // Birds - fixed
+  birds: {
+    position: 'absolute',
+    top: 50,
+    left: 35,
+    flexDirection: 'row',
+    zIndex: 200,
+  },
+  birdEmoji: {
+    fontSize: 20,
+  },
+
+  // Ground layer - fixed at bottom of screen
+  groundLayer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 150,
+    zIndex: 1,
+  },
+  grassStrip: {
+    height: 50,
+    backgroundColor: '#32CD32',
+  },
+  dirtStrip: {
+    flex: 1,
+    backgroundColor: '#8B4513',
+  },
+  groundDecorations: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+  },
+  groundEmoji: {
+    fontSize: 18,
+  },
+
+  // Gesture container
+  gestureContainer: {
+    flex: 1,
+    zIndex: 10,
+  },
+
+  // Transform container
+  transformContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 130,
+  },
+
+  // Trees
+  treeGroup: {
+    position: 'absolute',
     alignItems: 'center',
   },
-  rightTree: {
-    position: 'absolute',
-    right: -10,
-    top: 80,
-    alignItems: 'center',
+  leftTrees: {
+    left: 15,
+    bottom: 5,
+  },
+  rightTrees: {
+    right: 15,
+    bottom: 5,
   },
   treeEmoji: {
-    fontSize: 50,
-    marginVertical: 5,
+    fontSize: 55,
   },
-  bushEmoji: {
-    fontSize: 30,
+  smallTreeEmoji: {
+    fontSize: 45,
     marginTop: -10,
   },
-  house: {
-    width: HOUSE_WIDTH + 40, // Accommodate house frame
+  bushEmoji: {
+    fontSize: 32,
+    marginTop: -12,
+  },
+
+  // Fence
+  fence: {
+    position: 'absolute',
+    bottom: 20,
+    left: 25,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fencePost: {
+    width: 8,
+    height: 30,
+    backgroundColor: '#D2691E',
+    borderRadius: 2,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+
+  // House container
+  houseContainer: {
     alignItems: 'center',
   },
+
+  // Roof
   roof: {
     width: HOUSE_WIDTH + 30,
     height: 80,
@@ -444,7 +527,6 @@ const styles = StyleSheet.create({
     width: 30,
     height: 15,
     backgroundColor: '#4E342E',
-    borderRadius: 0,
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
   },
@@ -483,6 +565,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 3,
     borderBottomRightRadius: 3,
   },
+
+  // House body
   houseBody: {
     backgroundColor: '#A0522D',
     padding: HOUSE_PADDING / 2,
@@ -518,6 +602,8 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontWeight: '700',
   },
+
+  // Foundation
   foundation: {
     width: HOUSE_WIDTH,
     height: 25,
@@ -537,90 +623,6 @@ const styles = StyleSheet.create({
     height: 15,
     backgroundColor: '#5D4037',
     borderRadius: 3,
-  },
-  doorMat: {
-    position: 'absolute',
-    bottom: -30,
-    alignSelf: 'center',
-  },
-  doorMatEmoji: {
-    fontSize: 30,
-  },
-  ground: {
-    width: HOUSE_WIDTH + 120,
-    height: 70,
-    backgroundColor: '#228B22',
-    borderRadius: 100,
-    marginTop: -10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  grassLayer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: '#32CD32',
-    borderRadius: 100,
-  },
-  groundDecorations: {
-    flexDirection: 'row',
-    gap: 15,
-    marginTop: 10,
-  },
-  groundEmoji: {
-    fontSize: 22,
-  },
-  mushrooms: {
-    position: 'absolute',
-    left: 20,
-    bottom: 10,
-    flexDirection: 'row',
-    gap: 5,
-  },
-  mushroomEmoji: {
-    fontSize: 16,
-  },
-  path: {
-    position: 'absolute',
-    bottom: 20,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  pathStone: {
-    width: 25,
-    height: 12,
-    backgroundColor: '#808080',
-    borderRadius: 6,
-    opacity: 0.8,
-  },
-  stream: {
-    position: 'absolute',
-    bottom: 0,
-    right: 30,
-    flexDirection: 'row',
-    gap: 5,
-    opacity: 0.7,
-  },
-  streamEmoji: {
-    fontSize: 16,
-  },
-  fence: {
-    position: 'absolute',
-    bottom: 50,
-    left: 20,
-    flexDirection: 'row',
-    gap: 10,
-  },
-  fencePost: {
-    width: 8,
-    height: 25,
-    backgroundColor: '#D2691E',
-    borderRadius: 2,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
   },
 });
 

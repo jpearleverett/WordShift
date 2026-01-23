@@ -3,8 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
 } from 'react-native';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
