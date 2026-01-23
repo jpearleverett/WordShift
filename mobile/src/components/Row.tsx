@@ -14,10 +14,12 @@ import { CandyColors } from '../theme/colors';
 const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
 
-// Arc layout configuration
-const ARC_HEIGHT = 25; // How much the arc curves down at edges
-const COMPACT_TILE_SCALE = 0.78; // Scale down tiles in DROP row to fit
-const COMPACT_SLOT_WIDTH = 22; // Smaller slots for arc layout
+// Fan layout configuration - dramatic card-spread effect
+const FAN_ROTATION = 12; // Max rotation in degrees for edge letters
+const FAN_LIFT = 20; // How much center letters lift up
+const COMPACT_TILE_SCALE = 0.72; // Scale down tiles in DROP row
+const COMPACT_SLOT_WIDTH = 24; // Slot width
+const SLOT_VERTICAL_OFFSET = 28; // Push slots down into the gaps
 
 interface RowProps {
   rowData: RowData;
@@ -275,64 +277,58 @@ export const Row: React.FC<RowProps> = ({
     };
   }, [isSource, isTarget, isCompleted]);
 
-  // Calculate arc positions for elements
-  const calculateArcPosition = (index: number, totalElements: number) => {
-    // Position along the arc from -1 to 1 (left to right)
-    const normalizedPos = totalElements > 1
-      ? (index / (totalElements - 1)) * 2 - 1
+  // Calculate fan positions for letters (card-spread effect)
+  const calculateLetterFanPosition = (index: number, totalLetters: number) => {
+    // Position from -1 to 1 (left to right)
+    const normalizedPos = totalLetters > 1
+      ? (index / (totalLetters - 1)) * 2 - 1
       : 0;
 
-    // Parabolic curve: y = x^2 creates a U-shape (bowl)
-    const yOffset = normalizedPos * normalizedPos * ARC_HEIGHT;
+    // Fan rotation - edges rotate outward, center stays straight
+    const rotation = normalizedPos * FAN_ROTATION;
 
-    // Rotation: tilt elements to follow the arc tangent
-    const rotation = normalizedPos * 8; // degrees
+    // Inverted parabola - center lifts UP, edges stay down
+    // y = -(1 - x^2) so center is highest
+    const yOffset = (normalizedPos * normalizedPos - 1) * FAN_LIFT;
 
     return { yOffset, rotation };
   };
 
-  // Render arc layout for DROP row with slots
-  const renderArcContent = () => {
+  // Calculate slot positions (in the diagonal gaps between fanned letters)
+  const calculateSlotPosition = (slotIndex: number, totalLetters: number) => {
+    // Slots go between letters, so position them at the midpoints
+    // slotIndex 0 = before first letter, slotIndex N = after last letter
+    const totalSlots = totalLetters + 1;
+    const normalizedPos = totalSlots > 1
+      ? (slotIndex / (totalSlots - 1)) * 2 - 1
+      : 0;
+
+    // Slots rotate to match the gap angle between adjacent letters
+    const rotation = normalizedPos * (FAN_ROTATION * 0.8);
+
+    // Slots sit lower in the gaps - pushed down
+    const yOffset = SLOT_VERTICAL_OFFSET + Math.abs(normalizedPos) * 8;
+
+    return { yOffset, rotation };
+  };
+
+  // Render fan layout for DROP row - letters fan out, slots in gaps
+  const renderFanContent = () => {
     const letters = rowData.words;
-    const totalElements = letters.length * 2 + 1; // slots between and around letters
+    const totalLetters = letters.length;
 
-    const elements: React.ReactNode[] = [];
-    let elementIndex = 0;
-
-    // Start with first slot
-    const firstPos = calculateArcPosition(elementIndex, totalElements);
-    elements.push(
-      <Animated.View
-        key="slot-start"
-        style={[
-          styles.arcElement,
-          {
-            transform: [
-              { translateY: firstPos.yOffset },
-              { rotate: `${firstPos.rotation}deg` },
-            ],
-          },
-        ]}
-      >
-        <Slot onPress={() => onSlotPress(0)} index={0} compact />
-      </Animated.View>
-    );
-    elementIndex++;
-
-    // Alternate: letter, slot, letter, slot...
-    letters.forEach((letter, letterIdx) => {
-      // Letter
-      const letterPos = calculateArcPosition(elementIndex, totalElements);
-      elements.push(
+    // Render letters in a fan arrangement
+    const letterElements = letters.map((letter, idx) => {
+      const pos = calculateLetterFanPosition(idx, totalLetters);
+      return (
         <Animated.View
           key={letter.id}
           style={[
-            styles.arcElement,
-            styles.arcTileElement,
+            styles.fanLetterElement,
             {
               transform: [
-                { translateY: letterPos.yOffset },
-                { rotate: `${letterPos.rotation}deg` },
+                { translateY: pos.yOffset },
+                { rotate: `${pos.rotation}deg` },
                 { scale: COMPACT_TILE_SCALE },
               ],
             },
@@ -344,30 +340,42 @@ export const Row: React.FC<RowProps> = ({
           />
         </Animated.View>
       );
-      elementIndex++;
+    });
 
-      // Slot after letter
-      const slotPos = calculateArcPosition(elementIndex, totalElements);
-      elements.push(
+    // Render slots positioned in the gaps between letters
+    const slotElements = [];
+    for (let i = 0; i <= totalLetters; i++) {
+      const pos = calculateSlotPosition(i, totalLetters);
+      slotElements.push(
         <Animated.View
-          key={`slot-${letterIdx + 1}`}
+          key={`slot-${i}`}
           style={[
-            styles.arcElement,
+            styles.fanSlotElement,
             {
               transform: [
-                { translateY: slotPos.yOffset },
-                { rotate: `${slotPos.rotation}deg` },
+                { translateY: pos.yOffset },
+                { rotate: `${pos.rotation}deg` },
               ],
             },
           ]}
         >
-          <Slot onPress={() => onSlotPress(letterIdx + 1)} index={letterIdx + 1} compact />
+          <Slot onPress={() => onSlotPress(i)} index={i} compact />
         </Animated.View>
       );
-      elementIndex++;
-    });
+    }
 
-    return elements;
+    return (
+      <>
+        {/* Slots layer (behind letters) */}
+        <View style={styles.slotsLayer}>
+          {slotElements}
+        </View>
+        {/* Letters layer (in front) */}
+        <View style={styles.lettersLayer}>
+          {letterElements}
+        </View>
+      </>
+    );
   };
 
   const renderContent = () => {
@@ -450,11 +458,11 @@ export const Row: React.FC<RowProps> = ({
         )}
 
         {/* Content area */}
-        <View style={styles.contentWrapper}>
+        <View style={[styles.contentWrapper, showSlots && styles.contentWrapperFan]}>
           {showSlots ? (
-            // Arc layout for DROP row - shows all slots without scrolling
-            <View style={styles.arcContainer}>
-              {renderArcContent()}
+            // Fan layout for DROP row - letters pop out, slots in gaps
+            <View style={styles.fanContainer}>
+              {renderFanContent()}
             </View>
           ) : (
             // Standard centered layout for other rows
@@ -473,6 +481,8 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     marginHorizontal: ROW_HORIZONTAL_MARGIN,
     position: 'relative',
+    overflow: 'visible', // Allow fan content to pop out
+    zIndex: 1,
   },
   rowGlow: {
     position: 'absolute',
@@ -487,6 +497,7 @@ const styles = StyleSheet.create({
     marginTop: 16, // Space for floating badge
     borderRadius: 24,
     position: 'relative',
+    overflow: 'visible', // Allow content to overflow
   },
 
   // Content wrapper
@@ -497,25 +508,47 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: ROW_PADDING,
   },
+  contentWrapperFan: {
+    overflow: 'visible', // Allow letters to pop out!
+  },
   lettersContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Arc layout for DROP row
-  arcContainer: {
+  // Fan layout for DROP row - dramatic card spread
+  fanContainer: {
+    position: 'relative',
+    height: 70, // Fixed height - content overflows
+    marginHorizontal: 20, // Extra margin for edge slots
+  },
+  lettersLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  slotsLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'center',
-    paddingTop: 8,
-    paddingBottom: ARC_HEIGHT + 8,
+    zIndex: 1,
   },
-  arcElement: {
-    alignItems: 'center',
+  fanLetterElement: {
+    marginHorizontal: -6, // Overlap letters slightly at bottom
+    transformOrigin: 'center bottom', // Pivot from bottom for fan effect
   },
-  arcTileElement: {
-    marginHorizontal: -2, // Tighter spacing for scaled tiles
+  fanSlotElement: {
+    marginHorizontal: 4,
   },
 
   // Row variants
