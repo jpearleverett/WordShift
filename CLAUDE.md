@@ -58,12 +58,13 @@ The Row component handles two states:
 Arc layout for DROP row:
 - Interleaved elements: `[slot][letter][slot][letter]...[slot]`
 - Center elements lift upward, edges tilt outward creating a fan effect
-- Letters stay full-size, slots are narrow wedges that fit between fanned letters
-- Smooth 450ms glide animation when transitioning to/from arc
+- Letters stay full-size, slots are upside-down trapezoid shapes (wider top, narrower bottom)
+- Slots render on top of letters (zIndex: 10) for better tap targeting
+- Smooth 450ms glide animation on expand, 300ms on collapse; replays on each letter selection
 - Configuration constants at top of file:
   - `ARC_ROTATION` (12°) - Max rotation for edge elements (steeper = more fan spread)
   - `ARC_LIFT` (18px) - Vertical arc depth, centered in container
-  - `SLOT_WIDTH` (14px) - Narrow wedge-shaped drop slots
+  - `SLOT_WIDTH` (14px) - Base width for drop slots (rendered +4px wider for trapezoid effect)
   - `SLOT_HEIGHT` (52px) - Matches letter tile height
 
 ### Theme System (`theme/colors.ts`)
