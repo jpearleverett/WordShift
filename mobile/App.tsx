@@ -11,6 +11,7 @@ import {
   Dimensions,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
 
 // Simple ID generator (React Native compatible)
@@ -644,7 +645,7 @@ export default function App() {
   if (currentScreen === 'home') {
     return (
       <>
-        <StatusBar hidden />
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <HomeScreen
           onPlayPuzzle={handlePlayPuzzle}
           onAmberChange={setAmberBalance}
@@ -656,7 +657,7 @@ export default function App() {
   // Render puzzle screen
   return (
     <View style={styles.container}>
-      <StatusBar hidden />
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Animated Background */}
       <AnimatedBackground />
@@ -1017,7 +1018,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 8,
     zIndex: 100,
   },

@@ -8,6 +8,8 @@ import {
   Animated,
   Easing,
   Dimensions,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Animal, Room, DialoguePhase, HomeWorldProgress, Unlockable } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
@@ -1106,7 +1108,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
