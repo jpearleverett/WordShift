@@ -75,28 +75,28 @@ const JuicyButton: React.FC<JuicyButtonProps> = ({
   bounceScale = 0.92,
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Subtle pulse glow
-    const glowLoop = Animated.loop(
+    // Subtle scale pulse (not opacity - keeps button fully visible)
+    const pulseLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 1500,
+        Animated.timing(pulseAnim, {
+          toValue: 1.03,
+          duration: 1200,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 1500,
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
       ])
     );
-    glowLoop.start();
-    return () => glowLoop.stop();
+    pulseLoop.start();
+    return () => pulseLoop.stop();
   }, []);
 
   const handlePressIn = () => {
@@ -117,18 +117,16 @@ const JuicyButton: React.FC<JuicyButtonProps> = ({
     }).start();
   };
 
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 1],
-  });
+  // Combine scale animations
+  const combinedScale = Animated.multiply(scaleAnim, pulseAnim);
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: disabled ? 0.5 : glowOpacity }}>
+    <Animated.View style={{ transform: [{ scale: combinedScale }], opacity: disabled ? 0.5 : 1 }}>
       <TouchableOpacity
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        activeOpacity={1}
+        activeOpacity={0.8}
         disabled={disabled}
         style={style}
       >
@@ -761,7 +759,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Cooldown Message Toast */}
       {cooldownMessage && (
-        <Animated.View style={styles.cooldownToast}>
+        <Animated.View style={styles.cooldownToast} pointerEvents="none">
           <Text style={styles.cooldownToastText}>{cooldownMessage}</Text>
         </Animated.View>
       )}
@@ -1426,10 +1424,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Cooldown toast
+  // Cooldown toast - positioned below header, doesn't block touches
   cooldownToast: {
     position: 'absolute',
-    top: 100,
+    bottom: 120,
     left: 20,
     right: 20,
     backgroundColor: CandyColors.orange.main,

@@ -689,7 +689,7 @@ export async function getRoomsWithStatus(): Promise<Room[]> {
 }
 
 /**
- * Get animals with unlock status
+ * Get animals with unlock status and saved dialogue progress
  */
 export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const progress = await loadProgress();
@@ -697,6 +697,8 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   return ANIMALS.map(animal => ({
     ...animal,
     isUnlocked: progress.unlockedAnimals.includes(animal.id),
+    // Load saved dialogue index from progress
+    currentDialogueIndex: progress.lastDialogueRead[animal.id] ?? 0,
   }));
 }
 
