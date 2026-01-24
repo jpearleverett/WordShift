@@ -442,3 +442,15 @@ export async function canAfford(cost: number): Promise<boolean> {
   const progress = await loadProgress();
   return progress.amber >= cost;
 }
+
+/**
+ * DEV ONLY: Add amber directly (for testing)
+ */
+export async function devAddAmber(amount: number): Promise<number> {
+  const progress = await loadProgress();
+  progress.amber += amount;
+  progress.totalAmberEarned += amount;
+  progressCache = progress;
+  await saveProgress();
+  return progress.amber;
+}
