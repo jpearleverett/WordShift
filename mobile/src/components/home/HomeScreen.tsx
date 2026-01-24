@@ -1106,7 +1106,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 50,
+    paddingTop: 16,
     paddingBottom: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },

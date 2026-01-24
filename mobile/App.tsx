@@ -644,7 +644,7 @@ export default function App() {
   if (currentScreen === 'home') {
     return (
       <>
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <StatusBar hidden />
         <HomeScreen
           onPlayPuzzle={handlePlayPuzzle}
           onAmberChange={setAmberBalance}
@@ -656,7 +656,7 @@ export default function App() {
   // Render puzzle screen
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar hidden />
 
       {/* Animated Background */}
       <AnimatedBackground />
