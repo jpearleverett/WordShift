@@ -14,7 +14,8 @@ import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
 
 // Character sprite assets - add more as they become available
-const CHARACTER_SPRITES: Partial<Record<AnimalType, {
+// Exported so dialogue modals can use talk sprites
+export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   idle: ImageSourcePropType;
   talk?: ImageSourcePropType;
   robed?: ImageSourcePropType;
@@ -429,14 +430,15 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     }
   };
 
+  // Position sprite within room bounds (keep near bottom half for floor walking)
   const translateX = posX.interpolate({
     inputRange: [0, 100],
-    outputRange: [0, roomWidth - 60],
+    outputRange: [5, roomWidth - 55],
   });
 
   const translateY = posY.interpolate({
     inputRange: [0, 100],
-    outputRange: [0, roomHeight - 60],
+    outputRange: [roomHeight * 0.3, roomHeight - 50],
   });
 
   return (
@@ -478,21 +480,21 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           />
 
           {/* Animal body */}
-          <View style={[styles.body, { borderColor: getMoodColor() }]}>
-            {CHARACTER_SPRITES[animal.type] ? (
-              <Image
-                source={
-                  currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
-                    ? CHARACTER_SPRITES[animal.type]!.robed!
-                    : CHARACTER_SPRITES[animal.type]!.idle
-                }
-                style={styles.spriteImage}
-                resizeMode="contain"
-              />
-            ) : (
+          {CHARACTER_SPRITES[animal.type] ? (
+            <Image
+              source={
+                currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
+                  ? CHARACTER_SPRITES[animal.type]!.robed!
+                  : CHARACTER_SPRITES[animal.type]!.idle
+              }
+              style={styles.spriteImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>
               <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
-            )}
-          </View>
+            </View>
+          )}
 
           {/* Emotion bubble */}
           {currentEmotion && (
@@ -555,20 +557,20 @@ const styles = StyleSheet.create({
   },
   shadow: {
     position: 'absolute',
-    bottom: 5,
-    width: 40,
-    height: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    bottom: 0,
+    width: 35,
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 20,
   },
-  body: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  emojiBody: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: CandyColors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
+    borderWidth: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -576,19 +578,19 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   emoji: {
-    fontSize: 28,
+    fontSize: 22,
   },
   spriteImage: {
-    width: 44,
-    height: 44,
+    width: 50,
+    height: 50,
   },
   notificationBadge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    top: -8,
+    right: -8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: CandyColors.red.main,
     justifyContent: 'center',
     alignItems: 'center',
