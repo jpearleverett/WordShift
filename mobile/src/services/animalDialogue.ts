@@ -706,8 +706,15 @@ export function getCurrentDialogue(
   maxPhase: DialoguePhase
 ): Dialogue | null {
   const dialogues = getDialoguesForAnimal(animalType, maxPhase);
-  if (currentIndex >= dialogues.length || currentIndex < 0) {
-    return dialogues[0] || null;
+  if (dialogues.length === 0) {
+    return null;
+  }
+  // Clamp index to valid range - show last dialogue if index exceeds available
+  if (currentIndex < 0) {
+    return dialogues[0];
+  }
+  if (currentIndex >= dialogues.length) {
+    return dialogues[dialogues.length - 1];
   }
   return dialogues[currentIndex];
 }

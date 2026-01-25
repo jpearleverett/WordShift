@@ -525,16 +525,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const status = getSessionStatus(selectedAnimal.id);
       setSessionInfo(status);
 
-      // Check if session hit max dialogues
-      if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
-        handleCloseDialogue();
-        setCooldownMessage(
-          `${selectedAnimal.name} wants to rest now. Come back later for more conversation!`
-        );
-        return;
-      }
-
-      // Advance to next dialogue
+      // Advance to next dialogue FIRST (before checking session limit)
       const newIndex = selectedAnimal.currentDialogueIndex + 1;
       await markDialogueRead(selectedAnimal.id, newIndex);
 
@@ -549,6 +540,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setSelectedAnimal(prev =>
         prev ? { ...prev, currentDialogueIndex: newIndex, hasNewDialogue: false } : null
       );
+
+      // Check if session hit max dialogues AFTER advancing
+      if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
+        handleCloseDialogue();
+        setCooldownMessage(
+          `${selectedAnimal.name} wants to rest now. Come back later for more conversation!`
+        );
+        return;
+      }
     } else {
       // No more dialogues - close
       handleCloseDialogue();
