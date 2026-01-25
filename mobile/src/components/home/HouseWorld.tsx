@@ -25,6 +25,7 @@ import { isOnCooldown } from '../../services/dialogueSession';
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
 const SKY_STORM = require('../../../assets/environment/sky_storm.png');
 const SHADOW_FIGURE = require('../../../assets/environment/shadow_figure.png');
+const GROUND = require('../../../assets/environment/ground.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -725,6 +726,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
+              {/* Ground layer */}
+              <Image
+                source={GROUND}
+                style={styles.groundImage}
+                resizeMode="cover"
+              />
+
               {/* Trees on left side with sway animation */}
               <Animated.View
                 style={[
@@ -993,6 +1001,15 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
+  },
+
+  // Ground image
+  groundImage: {
+    position: 'absolute',
+    bottom: 0,
+    left: -SCREEN_WIDTH * 0.5,
+    width: SCREEN_WIDTH * 2,
+    height: 200,
   },
 
   // Trees
