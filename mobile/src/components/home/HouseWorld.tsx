@@ -6,6 +6,7 @@ import {
   Animated,
   Text,
   Easing,
+  Image,
 } from 'react-native';
 import {
   GestureHandlerRootView,
@@ -19,6 +20,11 @@ import { Room, Animal, DialoguePhase } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { isOnCooldown } from '../../services/dialogueSession';
+
+// Environment assets
+const SKY_DAY = require('../../../assets/environment/sky_day.jpg');
+const SKY_STORM = require('../../../assets/environment/sky_storm.jpg');
+const SHADOW_FIGURE = require('../../../assets/environment/shadow_figure.jpg');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -486,18 +492,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
   }, []);
 
-  // Get sky colors based on phase
-  const getSkyColors = useMemo(() => {
-    switch (currentPhase) {
-      case 0: return { top: '#87CEEB', middle: '#B0E0E6', bottom: '#E0F6FF' };
-      case 1: return { top: '#6BB3D9', middle: '#A8D4E6', bottom: '#D4E9F2' };
-      case 2: return { top: '#5A7A8A', middle: '#8BA5B5', bottom: '#B5C5CF' };
-      case 3: return { top: '#3D4F5F', middle: '#5A6B7A', bottom: '#7A8B9A' };
-      case 4: return { top: '#1A1A2E', middle: '#2D2D44', bottom: '#3D3D5C' };
-      default: return { top: '#87CEEB', middle: '#B0E0E6', bottom: '#E0F6FF' };
-    }
-  }, [currentPhase]);
-
   const treeSwayRotate = treeSway.interpolate({
     inputRange: [-1, 1],
     outputRange: ['-2deg', '2deg'],
@@ -598,12 +592,23 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Fixed sky background with phase-based colors */}
-      <View style={styles.skyBackground}>
-        <View style={[styles.skyTop, { backgroundColor: getSkyColors.top }]} />
-        <View style={[styles.skyMiddle, { backgroundColor: getSkyColors.middle }]} />
-        <View style={[styles.skyBottom, { backgroundColor: getSkyColors.bottom }]} />
-      </View>
+      {/* Fixed sky background with phase-based image */}
+      <Image
+        source={currentPhase >= 4 ? SKY_STORM : SKY_DAY}
+        style={styles.skyBackgroundImage}
+        resizeMode="cover"
+      />
+
+      {/* Shadow figure appears at phase 4 */}
+      {currentPhase >= 4 && (
+        <Animated.View style={styles.shadowFigureContainer}>
+          <Image
+            source={SHADOW_FIGURE}
+            style={styles.shadowFigure}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      )}
 
       {/* Floating particles */}
       {particles.map(particle => (
@@ -888,26 +893,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Fixed sky background
-  skyBackground: {
+  // Fixed sky background image
+  skyBackgroundImage: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+    width: '100%',
+    height: '100%',
     zIndex: 0,
   },
-  skyTop: {
-    flex: 2,
-    backgroundColor: '#87CEEB',
+  // Shadow figure for phase 4
+  shadowFigureContainer: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 5,
+    opacity: 0.7,
   },
-  skyMiddle: {
-    flex: 1,
-    backgroundColor: '#9DD5ED',
-  },
-  skyBottom: {
-    flex: 1,
-    backgroundColor: '#B0E0E6',
+  shadowFigure: {
+    width: 120,
+    height: 180,
   },
 
   // Clouds - fixed to screen
