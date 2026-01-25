@@ -1293,7 +1293,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dialogueSpriteContainer: {
-    width: 140,
+    width: 110,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1302,8 +1302,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   dialogueSpriteImage: {
-    width: 140,
-    height: 240,
+    width: 180,
+    height: 300,
   },
   dialogueSpriteEmoji: {
     fontSize: 110,
