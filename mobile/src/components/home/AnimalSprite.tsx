@@ -5,11 +5,26 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
+
+// Character sprite assets - add more as they become available
+const CHARACTER_SPRITES: Partial<Record<AnimalType, {
+  idle: ImageSourcePropType;
+  talk?: ImageSourcePropType;
+  robed?: ImageSourcePropType;
+}>> = {
+  fox: {
+    idle: require('../../../assets/characters/fox/idle.png'),
+    talk: require('../../../assets/characters/fox/talk.png'),
+    robed: require('../../../assets/characters/fox/robed.png'),
+  },
+};
 
 // Emotion bubble emojis based on phase
 const EMOTION_BUBBLES: Record<number, string[]> = {
@@ -464,7 +479,19 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
           {/* Animal body */}
           <View style={[styles.body, { borderColor: getMoodColor() }]}>
-            <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
+            {CHARACTER_SPRITES[animal.type] ? (
+              <Image
+                source={
+                  currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
+                    ? CHARACTER_SPRITES[animal.type]!.robed!
+                    : CHARACTER_SPRITES[animal.type]!.idle
+                }
+                style={styles.spriteImage}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
+            )}
           </View>
 
           {/* Emotion bubble */}
@@ -550,6 +577,10 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontSize: 28,
+  },
+  spriteImage: {
+    width: 44,
+    height: 44,
   },
   notificationBadge: {
     position: 'absolute',
