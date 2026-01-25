@@ -14,16 +14,16 @@ import { CandyColors } from '../../theme/colors';
 
 // Room background images - maps theme to image asset
 const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
-  cozy_den: require('../../../assets/rooms/cozy_den.jpg'),
-  kitchen: require('../../../assets/rooms/kitchen.jpg'),
-  study: require('../../../assets/rooms/study.jpg'),
-  aquarium: require('../../../assets/rooms/aquarium.jpg'),
-  jungle: require('../../../assets/rooms/jungle.jpg'),
-  desert: require('../../../assets/rooms/desert.jpg'),
-  office: require('../../../assets/rooms/office.jpg'),
-  burrow: require('../../../assets/rooms/burrow.jpg'),
-  garden: require('../../../assets/rooms/garden.jpg'),
-  bamboo: require('../../../assets/rooms/bamboo.jpg'),
+  cozy_den: require('../../../assets/rooms/cozy_den.png'),
+  kitchen: require('../../../assets/rooms/kitchen.png'),
+  study: require('../../../assets/rooms/study.png'),
+  aquarium: require('../../../assets/rooms/aquarium.png'),
+  jungle: require('../../../assets/rooms/jungle.png'),
+  desert: require('../../../assets/rooms/desert.png'),
+  office: require('../../../assets/rooms/office.png'),
+  burrow: require('../../../assets/rooms/burrow.png'),
+  garden: require('../../../assets/rooms/garden.png'),
+  bamboo: require('../../../assets/rooms/bamboo.png'),
 };
 
 interface RoomViewProps {
