@@ -725,47 +725,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
-              {/* Ground layer - moves with house */}
-              <View style={styles.groundLayer} pointerEvents="none">
-                <View style={styles.grassStrip} />
-                <View style={styles.groundDecorations}>
-                  {['🍄', '🌸', '🌷', '🌻', '🌺', '🌼', '🌸', '🌷', '🍄'].map((emoji, i) => (
-                    <Text key={i} style={styles.groundEmoji}>{emoji}</Text>
-                  ))}
-                </View>
-                {/* Underground layers with decorations */}
-                <View style={styles.dirtStrip}>
-                  {/* Shallow underground - roots and worms */}
-                  <View style={styles.undergroundRow}>
-                    {['🌱', '🪱', '🫘', '🥕', '🪱', '🌰', '🫛'].map((emoji, i) => (
-                      <Text key={`shallow-${i}`} style={[styles.undergroundEmoji, { opacity: 0.7 }]}>{emoji}</Text>
-                    ))}
-                  </View>
-                  {/* Mid underground - fossils and gems */}
-                  <View style={[styles.undergroundRow, { marginTop: 40 }]}>
-                    {['🦴', '💎', '🪨', '🦴', '💎', '🪨', '🦴'].map((emoji, i) => (
-                      <Text key={`mid-${i}`} style={[styles.undergroundEmoji, { fontSize: 20 }]}>{emoji}</Text>
-                    ))}
-                  </View>
-                  {/* Deep underground - fossils and crystals */}
-                  <View style={[styles.undergroundRow, { marginTop: 50 }]}>
-                    {['🦕', '💠', '🪨', '🦖', '💎', '🔮', '🦴'].map((emoji, i) => (
-                      <Text key={`deep-${i}`} style={[styles.undergroundEmoji, { fontSize: 24 }]}>{emoji}</Text>
-                    ))}
-                  </View>
-                  {/* Deepest - ancient things */}
-                  <View style={[styles.undergroundRow, { marginTop: 60 }]}>
-                    {['⚱️', '🏺', '💀', '🗿', '📿', '🏺', '⚱️'].map((emoji, i) => (
-                      <Text key={`deepest-${i}`} style={[styles.undergroundEmoji, { fontSize: 22, opacity: 0.6 }]}>{emoji}</Text>
-                    ))}
-                  </View>
-                  {/* Rock layers */}
-                  <View style={styles.rockLayer} />
-                  <View style={[styles.rockLayer, { backgroundColor: '#5D4037', marginTop: 20 }]} />
-                  <View style={[styles.rockLayer, { backgroundColor: '#4E342E', marginTop: 30 }]} />
-                </View>
-              </View>
-
               {/* Trees on left side with sway animation */}
               <Animated.View
                 style={[
@@ -1036,55 +995,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
 
-  // Ground layer - at bottom of transform container
-  groundLayer: {
-    position: 'absolute',
-    bottom: 0,
-    left: -SCREEN_WIDTH, // Extend beyond screen for pan
-    right: -SCREEN_WIDTH,
-    width: SCREEN_WIDTH * 3, // Wide enough for panning
-    height: 600, // Much taller to fill screen when panning
-  },
-  grassStrip: {
-    height: 60,
-    backgroundColor: '#32CD32',
-  },
-  dirtStrip: {
-    flex: 1,
-    backgroundColor: '#8B4513',
-    paddingTop: 20,
-  },
-  groundDecorations: {
-    position: 'absolute',
-    top: 15,
-    left: SCREEN_WIDTH, // Center the decorations
-    width: SCREEN_WIDTH,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    zIndex: 10,
-  },
-  groundEmoji: {
-    fontSize: 22,
-  },
-  undergroundRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: SCREEN_WIDTH + 20,
-    width: SCREEN_WIDTH * 3,
-  },
-  undergroundEmoji: {
-    fontSize: 18,
-  },
-  rockLayer: {
-    height: 15,
-    backgroundColor: '#6D4C41',
-    marginHorizontal: SCREEN_WIDTH * 0.5,
-    marginTop: 40,
-    borderRadius: 8,
-    opacity: 0.5,
-  },
-
   // Trees
   treeGroup: {
     position: 'absolute',
@@ -1092,11 +1002,11 @@ const styles = StyleSheet.create({
   },
   leftTrees: {
     left: 15,
-    bottom: 585,
+    bottom: 80,
   },
   rightTrees: {
     right: 15,
-    bottom: 585,
+    bottom: 80,
   },
   treeEmoji: {
     fontSize: 55,
@@ -1113,7 +1023,7 @@ const styles = StyleSheet.create({
   // Fence
   fence: {
     position: 'absolute',
-    bottom: 600,
+    bottom: 95,
     left: 25,
     flexDirection: 'row',
     gap: 8,
@@ -1130,7 +1040,7 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginBottom: 545, // Sit on top of grass (ground layer is 600px, grass is 60px at top)
+    marginBottom: 40,
   },
 
   // Roof
