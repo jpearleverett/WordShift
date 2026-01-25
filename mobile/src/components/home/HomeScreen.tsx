@@ -1293,20 +1293,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dialogueSpriteContainer: {
-    width: 120,
+    width: 140,
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    backgroundColor: CandyColors.gray[100],
-    borderRadius: 20,
-    padding: 8,
+    backgroundColor: CandyColors.white,
+    borderRadius: 12,
   },
   dialogueSpriteImage: {
-    width: 100,
-    height: 180,
+    width: 140,
+    height: 240,
   },
   dialogueSpriteEmoji: {
-    fontSize: 80,
+    fontSize: 110,
   },
   dialogueRightSide: {
     flex: 1,
