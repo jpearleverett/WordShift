@@ -184,11 +184,11 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 ### Dialogue Progression (Phases 0-4)
 
 Animal dialogue evolves as players complete puzzles:
-- **Phase 0 (0+ puzzles)**: Happy, friendly, light
-- **Phase 1 (10+ puzzles)**: Curious, slightly philosophical
-- **Phase 2 (25+ puzzles)**: Questioning existence
-- **Phase 3 (50+ puzzles)**: Existential dread
-- **Phase 4 (100+ puzzles)**: Complete philosophical crisis
+- **Phase 0 (0-24 puzzles)**: Happy, friendly, light
+- **Phase 1 (25-74 puzzles)**: Curious, slightly philosophical
+- **Phase 2 (75-149 puzzles)**: Questioning existence
+- **Phase 3 (150-249 puzzles)**: Existential dread
+- **Phase 4 (250+ puzzles)**: Complete philosophical crisis
 
 Each animal has unique dialogue fitting their personality (owl becomes intellectual crisis, sloth has slow-motion dread, etc.)
 
@@ -198,26 +198,24 @@ Each animal has unique dialogue fitting their personality (owl becomes intellect
 
 ### Dialogue Session System
 
-Animals have conversation sessions with cooldown periods to pace interactions:
+Animals have conversation sessions with puzzle-based cooldowns to pace interactions:
 
-**Session Parameters** (in `dialogueSession.ts`):
-- Session duration: 2.5 minutes
-- Max dialogues per session: 10
-- Cooldown after session: 5 minutes
-- Min interval between dialogues: 3 seconds
+**Session Parameters** (in `dialogueSession.ts` and `types/homeWorld.ts`):
+- Max dialogues per session: 6
+- Cooldown: 5 puzzles between sessions
+- Dialogue progress persists (animals remember where they left off)
 
 **Session Flow**:
 1. Player taps animal → starts session if available
-2. Session timer begins (2.5 min)
-3. Player can have up to 10 dialogues during session
-4. Session ends when: time expires, max dialogues reached, or player leaves
-5. Cooldown begins → animal unavailable for 5 minutes
-6. After cooldown → animal available again
+2. Player can have up to 6 dialogues during session
+3. Session ends when: max dialogues reached or player leaves
+4. Cooldown begins → must complete 5 puzzles to talk again
+5. After cooldown → animal continues from next dialogue (not repeat)
 
 **UI Indicators**:
-- Session status bar shows time/dialogues remaining
-- Cooldown toast appears when animal is unavailable
-- Session persists via AsyncStorage (survives app restart)
+- Session status bar shows dialogues remaining
+- Cooldown toast appears at bottom of screen when animal is unavailable
+- Session/cooldown state persists via AsyncStorage
 
 ### House Building System (Bottom-Up)
 
@@ -375,15 +373,13 @@ Key functions:
 
 ### Dialogue Session System (`dialogueSession.ts`)
 
-Manages timed dialogue sessions with cooldown periods:
+Manages puzzle-based dialogue sessions with cooldown periods:
 
-**Configuration Constants**:
+**Configuration Constants** (in `types/homeWorld.ts`):
 ```typescript
 DIALOGUE_SESSION_CONFIG = {
-  SESSION_DURATION_MS: 2.5 * 60 * 1000,   // 2.5 minutes
-  COOLDOWN_DURATION_MS: 5 * 60 * 1000,    // 5 minutes
-  MIN_DIALOGUE_INTERVAL_MS: 3000,          // 3 seconds
-  DIALOGUES_PER_SESSION: 10,               // Max per session
+  DIALOGUES_PER_SESSION: 6,        // Max dialogues before cooldown
+  PUZZLES_BETWEEN_SESSIONS: 5,     // Puzzles required to unlock next session
 }
 ```
 
@@ -391,20 +387,18 @@ DIALOGUE_SESSION_CONFIG = {
 ```typescript
 interface DialogueSession {
   animalId: string;
-  sessionStartTime: number;
-  lastDialogueTime: number;
   dialoguesInSession: number;
-  cooldownEndTime: number | null;
+  puzzlesAtSessionEnd: number | null;  // Puzzle count when cooldown started
 }
 ```
 
 **Key Functions**:
-- `checkDialogueAvailability(animalId)` - Returns availability status and time remaining
+- `checkDialogueAvailability(animalId)` - Returns availability status and puzzles remaining
 - `recordDialogue(animalId)` - Record a dialogue, start/continue session
 - `endSession(animalId)` - End session and start cooldown
 - `getSessionStatus(animalId)` - Get 'available' | 'in_session' | 'cooldown' status
-- `formatTimeRemaining(seconds)` - Format time for display (e.g., "2m 30s")
-- `loadDialogueSessions()` - Load sessions from AsyncStorage on app start
+- `updatePuzzleCount(count)` - Update current puzzle count for cooldown tracking
+- `clearAllSessions()` - Clear all sessions (for testing/dev)
 
 ### Word Dictionaries (`constants.ts`)
 
@@ -463,7 +457,8 @@ Edit `calculateStars()` function in `starRating.ts`:
 - Arc/fan effect: Constants at top of `Row.tsx` (ARC_ROTATION, ARC_LIFT, SLOT_WIDTH, SLOT_HEIGHT)
 - Color palette: `theme/colors.ts`
 - Game container: `App.tsx` styles object
-- Status bar handling: Use `paddingTop: 50` on headers (not SafeAreaView) for Android compatibility
+- Room dimensions: `ROOM_WIDTH` (165) and `ROOM_HEIGHT` (130) in `HouseWorld.tsx`
+- Status bar handling: Use `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50` for proper Android status bar padding
 
 ### Adding new tile colors
 Add to `tileColors` array in `theme/colors.ts`
@@ -483,7 +478,7 @@ Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
 
 ### Home Screen - Adjusting dialogue phases
 Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
-- Default: [0, 10, 25, 50, 100] puzzles for phases 0-4
+- Default: [0, 25, 75, 150, 250] puzzles for phases 0-4
 - Lower values = faster descent into existential dread
 
 ### Home Screen - Adding dread words
@@ -492,10 +487,15 @@ that appear more frequently at higher phases
 
 ### Home Screen - Adjusting dialogue sessions
 Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
-- `SESSION_DURATION_MS` - How long a session lasts (default: 2.5 min)
-- `COOLDOWN_DURATION_MS` - Rest period after session (default: 5 min)
-- `MIN_DIALOGUE_INTERVAL_MS` - Time between dialogues (default: 3s)
-- `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 10)
+- `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 6)
+- `PUZZLES_BETWEEN_SESSIONS` - Puzzles required to unlock next session (default: 5)
+
+### DEV Button (Testing Only)
+A red "DEV" button appears in the top-right of the home screen for testing:
+- Adds 5000 amber on each tap
+- Clears all dialogue session cooldowns so animals can talk immediately
+- Useful for testing unlock progression and dialogue content
+- Located in `HomeScreen.tsx` - remove before production
 
 ## Testing
 
