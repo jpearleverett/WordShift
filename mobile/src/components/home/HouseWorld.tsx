@@ -22,9 +22,9 @@ import { CandyColors } from '../../theme/colors';
 import { isOnCooldown } from '../../services/dialogueSession';
 
 // Environment assets
-const SKY_DAY = require('../../../assets/environment/sky_day.jpg');
-const SKY_STORM = require('../../../assets/environment/sky_storm.jpg');
-const SHADOW_FIGURE = require('../../../assets/environment/shadow_figure.jpg');
+const SKY_DAY = require('../../../assets/environment/sky_day.png');
+const SKY_STORM = require('../../../assets/environment/sky_storm.png');
+const SHADOW_FIGURE = require('../../../assets/environment/shadow_figure.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
