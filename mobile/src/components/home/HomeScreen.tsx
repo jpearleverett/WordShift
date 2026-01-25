@@ -21,6 +21,7 @@ import {
   markIntroSeen,
   hasSeenIntro,
   devAddAmber,
+  devAddPuzzles,
 } from '../../services/amberCurrency';
 import {
   ROOMS,
@@ -677,10 +678,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return `${current}/${total}`;
   };
 
-  // DEV: Add amber and reset dialogue sessions
+  // DEV: Add amber, puzzles, and reset dialogue sessions
   const handleDevButton = async () => {
     // Add 5000 amber
     const newBalance = await devAddAmber(5000);
+
+    // Add 30 puzzles to progress through phases (enough to go from phase 0 to 1)
+    await devAddPuzzles(30);
 
     // Clear all dialogue sessions so animals can talk again
     await clearAllSessions();

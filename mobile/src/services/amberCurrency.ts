@@ -454,3 +454,19 @@ export async function devAddAmber(amount: number): Promise<number> {
   await saveProgress();
   return progress.amber;
 }
+
+/**
+ * DEV ONLY: Add puzzles and update phase (for testing dialogue progression)
+ */
+export async function devAddPuzzles(amount: number): Promise<{ puzzles: number; phase: DialoguePhase }> {
+  const progress = await loadProgress();
+  progress.puzzlesSolved += amount;
+
+  // Update phase based on new puzzle count
+  const newPhase = calculatePhase(progress.puzzlesSolved);
+  progress.currentPhase = newPhase;
+
+  progressCache = progress;
+  await saveProgress();
+  return { puzzles: progress.puzzlesSolved, phase: progress.currentPhase };
+}
