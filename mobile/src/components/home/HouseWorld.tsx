@@ -1092,11 +1092,11 @@ const styles = StyleSheet.create({
   },
   leftTrees: {
     left: 15,
-    bottom: 160,
+    bottom: 585,
   },
   rightTrees: {
     right: 15,
-    bottom: 160,
+    bottom: 585,
   },
   treeEmoji: {
     fontSize: 55,
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   // Fence
   fence: {
     position: 'absolute',
-    bottom: 175,
+    bottom: 600,
     left: 25,
     flexDirection: 'row',
     gap: 8,
@@ -1130,7 +1130,7 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginBottom: 120, // Sit on top of ground
+    marginBottom: 545, // Sit on top of grass (ground layer is 600px, grass is 60px at top)
   },
 
   // Roof
