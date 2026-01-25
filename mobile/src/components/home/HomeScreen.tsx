@@ -10,9 +10,11 @@ import {
   Dimensions,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { Animal, Room, DialoguePhase, HomeWorldProgress, Unlockable } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
+import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
 import {
   loadProgress,
@@ -814,9 +816,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Animal portrait */}
                 <View style={styles.portraitContainer}>
-                  <Text style={styles.portraitEmoji}>
-                    {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
-                  </Text>
+                  {CHARACTER_SPRITES[selectedAnimal.type] ? (
+                    <Image
+                      source={
+                        progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
+                          ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
+                          : CHARACTER_SPRITES[selectedAnimal.type]?.talk || CHARACTER_SPRITES[selectedAnimal.type]!.idle
+                      }
+                      style={styles.portraitSprite}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Text style={styles.portraitEmoji}>
+                      {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
+                    </Text>
+                  )}
                   <View style={styles.nameContainer}>
                     <Text style={styles.animalName}>{selectedAnimal.name}</Text>
                     <Text style={styles.animalDescription}>
@@ -1078,9 +1092,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <>
                 {/* Animal portrait */}
                 <View style={styles.introPortraitContainer}>
-                  <Text style={styles.introPortraitEmoji}>
-                    {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
-                  </Text>
+                  {CHARACTER_SPRITES[introAnimal.type] ? (
+                    <Image
+                      source={
+                        progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed
+                          ? CHARACTER_SPRITES[introAnimal.type]!.robed!
+                          : CHARACTER_SPRITES[introAnimal.type]?.talk || CHARACTER_SPRITES[introAnimal.type]!.idle
+                      }
+                      style={styles.introPortraitSprite}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Text style={styles.introPortraitEmoji}>
+                      {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
+                    </Text>
+                  )}
                 </View>
 
                 <Text style={styles.introAnimalName}>{introAnimal.name}</Text>
@@ -1246,6 +1272,11 @@ const styles = StyleSheet.create({
   },
   portraitEmoji: {
     fontSize: 50,
+    marginRight: 16,
+  },
+  portraitSprite: {
+    width: 70,
+    height: 70,
     marginRight: 16,
   },
   nameContainer: {
@@ -1551,6 +1582,10 @@ const styles = StyleSheet.create({
   },
   introPortraitEmoji: {
     fontSize: 50,
+  },
+  introPortraitSprite: {
+    width: 80,
+    height: 80,
   },
   introAnimalName: {
     fontSize: 28,

@@ -14,7 +14,8 @@ import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
 
 // Character sprite assets - add more as they become available
-const CHARACTER_SPRITES: Partial<Record<AnimalType, {
+// Exported so dialogue modals can use talk sprites
+export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   idle: ImageSourcePropType;
   talk?: ImageSourcePropType;
   robed?: ImageSourcePropType;
