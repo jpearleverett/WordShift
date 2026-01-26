@@ -1006,10 +1006,10 @@ const styles = StyleSheet.create({
   // Ground image
   groundImage: {
     position: 'absolute',
-    bottom: -280,
+    bottom: -290,
     alignItems: 'center',
     width: SCREEN_WIDTH * 2.2,
-    height: 349,
+    height: 449,
   },
 
   // Trees
