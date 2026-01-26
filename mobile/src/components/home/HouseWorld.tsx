@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
     bottom: -240,
     alignItems: 'center',
     width: SCREEN_WIDTH * 2.2,
-    height: 400,
+    height: 440,
   },
 
   // Trees
