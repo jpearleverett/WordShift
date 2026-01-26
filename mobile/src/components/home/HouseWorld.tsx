@@ -1006,7 +1006,7 @@ const styles = StyleSheet.create({
   // Ground image
   groundImage: {
     position: 'absolute',
-    bottom: -220,
+    bottom: -240,
     alignItems: 'center',
     width: SCREEN_WIDTH * 2.2,
     height: 400,
