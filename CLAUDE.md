@@ -140,13 +140,16 @@ const foxIdleImage = require('../../assets/characters/fox/idle.png');
 
 ### Current State
 
-The home screen currently uses:
-- Emoji characters (🦊, 🦉, etc.) in `AnimalSprite.tsx`
-- Styled View components for rooms in `RoomView.tsx`
-- Emoji decorations for furniture
-- Animated emoji clouds, sun, birds in `HouseWorld.tsx`
+The home screen now uses image assets for:
+- **Fox character sprites** (`idle.png`, `talk.png`, `robed.png`) in `AnimalSprite.tsx` - other animals fall back to emoji
+- **All 10 room backgrounds** in `RoomView.tsx` - fully wired up
+- **Environment images** in `HouseWorld.tsx`:
+  - `sky_day.png` / `sky_storm.png` - sky background (storm at Phase 4)
+  - `shadow_figure.png` - appears at Phase 4
+  - `ground.png` - ground beneath the house
+- Animated emoji clouds, sun, birds, trees, fence still use emoji/styled Views
 
-As image assets are added, components should be updated to prefer images over emoji.
+As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite.tsx`.
 
 ## Game Mechanics
 
