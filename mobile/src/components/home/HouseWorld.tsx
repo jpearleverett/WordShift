@@ -594,18 +594,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Fixed sky background with phase-based image */}
-      <Image
-        source={
-          currentPhase >= 4 ? SKY_SHADOW :
-          currentPhase >= 3 ? SKY_STORM :
-          currentPhase >= 2 ? SKY_DUSK :
-          SKY_DAY
-        }
-        style={styles.skyBackgroundImage}
-        resizeMode="cover"
-      />
-
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -720,6 +708,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
+              {/* Sky background - moves with house */}
+              <Image
+                source={
+                  currentPhase >= 4 ? SKY_SHADOW :
+                  currentPhase >= 3 ? SKY_STORM :
+                  currentPhase >= 2 ? SKY_DUSK :
+                  SKY_DAY
+                }
+                style={styles.skyBackground}
+                resizeMode="cover"
+              />
+
               {/* Trees on left side with sway animation */}
               <Animated.View
                 style={[
@@ -878,16 +878,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Fixed sky background image
-  skyBackgroundImage: {
+  // Sky background - large enough for pan/zoom
+  skyBackground: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    zIndex: 0,
+    top: -SCREEN_HEIGHT,
+    left: -SCREEN_WIDTH,
+    width: SCREEN_WIDTH * 3,
+    height: SCREEN_HEIGHT * 3,
+    zIndex: -1,
   },
   // Clouds - fixed to screen
   cloud: {
