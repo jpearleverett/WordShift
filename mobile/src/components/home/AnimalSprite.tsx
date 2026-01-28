@@ -25,6 +25,21 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
     talk: require('../../../assets/characters/fox/talk.png'),
     robed: require('../../../assets/characters/fox/robed.png'),
   },
+  pangolin: {
+    idle: require('../../../assets/characters/pangolin/idle.png'),
+    talk: require('../../../assets/characters/pangolin/talk.png'),
+    robed: require('../../../assets/characters/pangolin/robed.png'),
+  },
+  owl: {
+    idle: require('../../../assets/characters/owl/idle.png'),
+    talk: require('../../../assets/characters/owl/talk.png'),
+    robed: require('../../../assets/characters/owl/robed.png'),
+  },
+  axolotl: {
+    idle: require('../../../assets/characters/axolotl/idle.png'),
+    talk: require('../../../assets/characters/axolotl/talk.png'),
+    robed: require('../../../assets/characters/axolotl/robed.png'),
+  },
 };
 
 // Emotion bubble emojis based on phase
