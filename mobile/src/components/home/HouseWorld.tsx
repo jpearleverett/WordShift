@@ -883,8 +883,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -SCREEN_HEIGHT,
     left: -SCREEN_WIDTH,
-    width: SCREEN_WIDTH * 3,
-    height: SCREEN_HEIGHT * 3,
+    width: SCREEN_WIDTH * 1.2,
+    height: SCREEN_HEIGHT * 1.2,
     zIndex: -1,
   },
   // Clouds - fixed to screen
