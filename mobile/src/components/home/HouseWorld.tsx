@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
   // Sky background - large enough for pan/zoom
   skyBackground: {
     position: 'absolute',
-    alignItems: center,
+    alignItems: 'center',
     width: SCREEN_WIDTH * 1.2,
     height: SCREEN_HEIGHT * 1.2,
     zIndex: -1,
