@@ -594,6 +594,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
+      {/* Sky background - FIXED to screen, doesn't move with zoom/pan */}
+      <Image
+        source={
+          currentPhase >= 4 ? SKY_SHADOW :
+          currentPhase >= 3 ? SKY_STORM :
+          currentPhase >= 2 ? SKY_DUSK :
+          SKY_DAY
+        }
+        style={styles.skyBackground}
+        resizeMode="cover"
+      />
+
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -708,18 +720,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
-              {/* Sky background - moves with house */}
-              <Image
-                source={
-                  currentPhase >= 4 ? SKY_SHADOW :
-                  currentPhase >= 3 ? SKY_STORM :
-                  currentPhase >= 2 ? SKY_DUSK :
-                  SKY_DAY
-                }
-                style={styles.skyBackground}
-                resizeMode="contain"
-              />
-
               {/* Trees on left side with sway animation */}
               <Animated.View
                 style={[
@@ -878,17 +878,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Sky background - sized to show full image with background color filling edges
-  // Using contain mode + smaller container = more of image visible
-  // Sky blue background fills any gaps around the contained image
+  // Sky background - FIXED to screen, fills entire view area
+  // Uses cover mode to fill edge-to-edge without gaps
+  // Positioned behind everything else (zIndex: 0)
   skyBackground: {
     position: 'absolute',
-    bottom: -SCREEN_HEIGHT * 0.3,
-    left: -SCREEN_WIDTH * 0.25,
-    width: SCREEN_WIDTH * 1.5,
-    height: SCREEN_HEIGHT * 1.5,
-    zIndex: -1,
-    backgroundColor: '#87CEEB', // Sky blue to match background edges
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
   },
   // Clouds - fixed to screen
   cloud: {
