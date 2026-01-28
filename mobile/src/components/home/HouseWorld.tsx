@@ -882,9 +882,9 @@ const styles = StyleSheet.create({
   skyBackground: {
     position: 'absolute',
     alignItems: 'center',
-    top: '20%',
-    width: SCREEN_WIDTH * 2,
-    height: SCREEN_HEIGHT * 2,
+    top: '10%',
+    width: SCREEN_WIDTH * 2.2,
+    height: SCREEN_HEIGHT * 2.2,
     zIndex: -100,
   },
   // Clouds - fixed to screen
