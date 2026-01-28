@@ -1186,6 +1186,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 100,
   },
   amberContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
