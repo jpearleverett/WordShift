@@ -717,7 +717,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   SKY_DAY
                 }
                 style={styles.skyBackground}
-                resizeMode="cover"
+                resizeMode="contain"
               />
 
               {/* Trees on left side with sway animation */}
@@ -879,16 +879,17 @@ const styles = StyleSheet.create({
   },
 
   // Sky background - sized to cover viewport at minimum zoom (0.6x) plus pan range
-  // At 0.6x zoom: sky visual size = original * 0.6, must cover full screen + pan
-  // Formula: original_size * MIN_SCALE >= SCREEN_SIZE + pan_margin
-  // Using 4x screen size ensures coverage at all zoom/pan combinations
+  // Using contain mode to show the full image rather than cropping
+  // At 0.6x zoom, need container * 0.6 >= screen + pan margin
+  // Container 3x ensures coverage; background color fills any edge gaps
   skyBackground: {
     position: 'absolute',
-    bottom: -SCREEN_HEIGHT * 1.2,
-    left: -SCREEN_WIDTH * 1.5,
-    width: SCREEN_WIDTH * 4,
-    height: SCREEN_HEIGHT * 3,
+    bottom: -SCREEN_HEIGHT * 0.8,
+    left: -SCREEN_WIDTH * 1,
+    width: SCREEN_WIDTH * 3,
+    height: SCREEN_HEIGHT * 2.5,
     zIndex: -1,
+    backgroundColor: '#87CEEB', // Sky blue to match background edges
   },
   // Clouds - fixed to screen
   cloud: {
