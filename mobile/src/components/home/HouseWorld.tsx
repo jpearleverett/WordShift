@@ -23,9 +23,9 @@ import { isOnCooldown } from '../../services/dialogueSession';
 
 // Environment assets
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
+const SKY_DUSK = require('../../../assets/environment/sky_dusk.png');
 const SKY_STORM = require('../../../assets/environment/sky_storm.png');
-const SHADOW_FIGURE = require('../../../assets/environment/shadow_figure.png');
-const GROUND = require('../../../assets/environment/ground.png');
+const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -596,21 +596,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     <GestureHandlerRootView style={styles.container}>
       {/* Fixed sky background with phase-based image */}
       <Image
-        source={currentPhase >= 4 ? SKY_STORM : SKY_DAY}
+        source={
+          currentPhase >= 4 ? SKY_SHADOW :
+          currentPhase >= 3 ? SKY_STORM :
+          currentPhase >= 2 ? SKY_DUSK :
+          SKY_DAY
+        }
         style={styles.skyBackgroundImage}
         resizeMode="cover"
       />
-
-      {/* Shadow figure appears at phase 4 */}
-      {currentPhase >= 4 && (
-        <Animated.View style={styles.shadowFigureContainer}>
-          <Image
-            source={SHADOW_FIGURE}
-            style={styles.shadowFigure}
-            resizeMode="contain"
-          />
-        </Animated.View>
-      )}
 
       {/* Floating particles */}
       {particles.map(particle => (
@@ -726,13 +720,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
-              {/* Ground layer */}
-              <Image
-                source={GROUND}
-                style={styles.groundImage}
-                resizeMode="cover"
-              />
-
               {/* Trees on left side with sway animation */}
               <Animated.View
                 style={[
@@ -902,21 +889,6 @@ const styles = StyleSheet.create({
     height: '100%',
     zIndex: 0,
   },
-  // Shadow figure for phase 4
-  shadowFigureContainer: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 5,
-    opacity: 0.7,
-  },
-  shadowFigure: {
-    width: 120,
-    height: 180,
-  },
-
   // Clouds - fixed to screen
   cloud: {
     position: 'absolute',
@@ -1001,15 +973,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-  },
-
-  // Ground image
-  groundImage: {
-    position: 'absolute',
-    bottom: -285,
-    alignItems: 'center',
-    width: SCREEN_WIDTH * 2.2,
-    height: 449,
   },
 
   // Trees
