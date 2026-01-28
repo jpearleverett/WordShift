@@ -876,6 +876,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    zIndex: 1, // Keep below header (zIndex: 100)
   },
 
   // Sky background - inside transform container, zooms with house
