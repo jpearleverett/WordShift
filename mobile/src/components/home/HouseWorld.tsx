@@ -878,13 +878,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Sky background - large enough for pan/zoom
+  // Sky background - sized to cover viewport at minimum zoom (0.6x) plus pan range
+  // At 0.6x zoom: sky visual size = original * 0.6, must cover full screen + pan
+  // Formula: original_size * MIN_SCALE >= SCREEN_SIZE + pan_margin
+  // Using 4x screen size ensures coverage at all zoom/pan combinations
   skyBackground: {
     position: 'absolute',
-    alignItems: 'center',
-    width: SCREEN_WIDTH * 2.2,
-    height: SCREEN_HEIGHT * 2.2,
-    zIndex: -100,
+    bottom: -SCREEN_HEIGHT * 1.2,
+    left: -SCREEN_WIDTH * 1.5,
+    width: SCREEN_WIDTH * 4,
+    height: SCREEN_HEIGHT * 3,
+    zIndex: -1,
   },
   // Clouds - fixed to screen
   cloud: {
