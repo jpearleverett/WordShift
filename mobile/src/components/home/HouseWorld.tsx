@@ -878,16 +878,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Sky background - sized to cover viewport at minimum zoom (0.6x) plus pan range
-  // Using contain mode to show the full image rather than cropping
-  // At 0.6x zoom, need container * 0.6 >= screen + pan margin
-  // Container 3x ensures coverage; background color fills any edge gaps
+  // Sky background - sized to show full image with background color filling edges
+  // Using contain mode + smaller container = more of image visible
+  // Sky blue background fills any gaps around the contained image
   skyBackground: {
     position: 'absolute',
-    bottom: -SCREEN_HEIGHT * 0.8,
-    left: -SCREEN_WIDTH * 1,
-    width: SCREEN_WIDTH * 3,
-    height: SCREEN_HEIGHT * 2.5,
+    bottom: -SCREEN_HEIGHT * 0.3,
+    left: -SCREEN_WIDTH * 0.25,
+    width: SCREEN_WIDTH * 1.5,
+    height: SCREEN_HEIGHT * 1.5,
     zIndex: -1,
     backgroundColor: '#87CEEB', // Sky blue to match background edges
   },
