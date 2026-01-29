@@ -10,10 +10,8 @@ import {
 } from 'react-native';
 import {
   GestureHandlerRootView,
-  PinchGestureHandler,
   PanGestureHandler,
   State,
-  PinchGestureHandlerGestureEvent,
   PanGestureHandlerGestureEvent,
 } from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase } from '../../types/homeWorld';
@@ -331,17 +329,16 @@ const ShootingStar: React.FC = () => {
   );
 };
 
-// House dimensions (2-column layout)
+// House dimensions (single-column layout, filling screen width)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
-const ROOM_WIDTH = 160;
-const ROOM_HEIGHT = 80;
-const ROOM_GAP = 6;
-const HOUSE_PADDING = 16;
-const HOUSE_WIDTH = (ROOM_WIDTH * 2) + ROOM_GAP + (HOUSE_PADDING * 2);
+const HOUSE_PADDING = 12;
+const ROOM_WIDTH = SCREEN_WIDTH - (HOUSE_PADDING * 2) - 24; // Fill screen width with some margin
+const ROOM_HEIGHT = ROOM_WIDTH * 0.5; // Maintain 2:1 aspect ratio
+const ROOM_GAP = 8;
+const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
-// Zoom constraints
-const MIN_SCALE = 0.6;
-const MAX_SCALE = 2.0;
+// No zoom - fixed scale
+const FIXED_SCALE = 1;
 
 interface HouseWorldProps {
   rooms: Room[];
@@ -358,19 +355,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   onAnimalPress,
   onRoomPress,
 }) => {
-  // Animated values
-  const scale = useRef(new Animated.Value(1)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
+  // Animated values - vertical pan only, no zoom
   const translateY = useRef(new Animated.Value(0)).current;
 
   // Refs for gesture tracking
-  const pinchRef = useRef<PinchGestureHandler>(null);
   const panRef = useRef<PanGestureHandler>(null);
 
-  // State tracking for gestures
-  const baseScale = useRef(1);
-  const lastScale = useRef(1);
-  const baseTranslateX = useRef(0);
+  // State tracking for vertical pan
   const baseTranslateY = useRef(0);
 
   // Particle system state
@@ -513,80 +504,36 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     return animals.find(a => a.roomId === roomId) || null;
   };
 
-  // Group rooms by row for 2-column layout
-  const getRoomsByRow = () => {
-    const rowMap: Map<number, Room[]> = new Map();
-    unlockedRooms.forEach(room => {
-      const row = room.layoutPosition.row;
-      if (!rowMap.has(row)) {
-        rowMap.set(row, []);
-      }
-      rowMap.get(row)!.push(room);
-    });
-    // Sort rooms within each row by column
-    rowMap.forEach(roomsInRow => {
-      roomsInRow.sort((a, b) => a.layoutPosition.col - b.layoutPosition.col);
-    });
-    return rowMap;
-  };
-
-  const roomsByRow = getRoomsByRow();
-  const numRows = Math.max(1, roomsByRow.size);
+  // Calculate house height based on number of rooms (single-column layout)
+  const numRooms = Math.max(1, unlockedRooms.length);
 
   const calculateHouseHeight = (): number => {
-    return numRows * ROOM_HEIGHT +
-           Math.max(0, numRows - 1) * ROOM_GAP +
+    return numRooms * ROOM_HEIGHT +
+           Math.max(0, numRooms - 1) * ROOM_GAP +
            HOUSE_PADDING * 2;
   };
 
-  // Pinch gesture handler
-  const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
-    const { scale: gestureScale } = event.nativeEvent;
-    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * gestureScale));
-    scale.setValue(newScale);
-  };
-
-  const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      const currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
-      baseScale.current = currentScale;
-      lastScale.current = currentScale;
-
-      // Smooth snap if too zoomed out
-      if (currentScale < 0.7) {
-        Animated.spring(scale, {
-          toValue: 0.7,
-          friction: 5,
-          useNativeDriver: true,
-        }).start(() => {
-          baseScale.current = 0.7;
-          lastScale.current = 0.7;
-        });
-      }
-    }
-  };
-
-  // Pan gesture handler
+  // Pan gesture handler - vertical only, no zoom
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
-    const { translationX, translationY } = event.nativeEvent;
+    const { translationY: gestureTranslateY } = event.nativeEvent;
 
-    // Scale translation by current scale for natural feeling
-    const maxTranslate = 150 * lastScale.current;
+    // Calculate max pan based on house height vs screen height
+    const totalContentHeight = calculateHouseHeight() + 200; // Extra for roof/foundation
+    const maxPanUp = Math.max(0, totalContentHeight - SCREEN_HEIGHT + 200);
+    const maxPanDown = 100; // Allow some pan down to see top of house
 
-    const newX = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
-    const newY = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
-
-    translateX.setValue(newX);
+    const newY = Math.max(-maxPanUp, Math.min(maxPanDown, baseTranslateY.current + gestureTranslateY));
     translateY.setValue(newY);
   };
 
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
-      const { translationX, translationY } = event.nativeEvent;
-      const maxTranslate = 150 * lastScale.current;
+      const { translationY: gestureTranslateY } = event.nativeEvent;
+      const totalContentHeight = calculateHouseHeight() + 200;
+      const maxPanUp = Math.max(0, totalContentHeight - SCREEN_HEIGHT + 200);
+      const maxPanDown = 100;
 
-      baseTranslateX.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
-      baseTranslateY.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
+      baseTranslateY.current = Math.max(-maxPanUp, Math.min(maxPanDown, baseTranslateY.current + gestureTranslateY));
     }
   };
 
@@ -594,6 +541,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
+      {/* Sky background - FIXED to screen, doesn't scroll with content */}
+      <Image
+        source={
+          currentPhase >= 4 ? SKY_SHADOW :
+          currentPhase >= 3 ? SKY_STORM :
+          currentPhase >= 2 ? SKY_DUSK :
+          SKY_DAY
+        }
+        style={styles.skyBackground}
+        resizeMode="cover"
+      />
+
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -680,46 +639,24 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         </View>
       )}
 
-      {/* Gesture handlers with simultaneous recognition */}
+      {/* Gesture handler - vertical pan only, no zoom */}
       <PanGestureHandler
         ref={panRef}
-        simultaneousHandlers={pinchRef}
         onGestureEvent={onPanGestureEvent}
         onHandlerStateChange={onPanHandlerStateChange}
         minDist={10}
         avgTouches
       >
-        <Animated.View style={styles.gestureContainer}>
-          <PinchGestureHandler
-            ref={pinchRef}
-            simultaneousHandlers={panRef}
-            onGestureEvent={onPinchGestureEvent}
-            onHandlerStateChange={onPinchHandlerStateChange}
-          >
-            <Animated.View
-              style={[
-                styles.transformContainer,
-                {
-                  transform: [
-                    { translateX },
-                    { translateY },
-                    { scale },
-                  ],
-                },
-              ]}
-            >
-              {/* Sky background - zooms with house content */}
-              <Image
-                source={
-                  currentPhase >= 4 ? SKY_SHADOW :
-                  currentPhase >= 3 ? SKY_STORM :
-                  currentPhase >= 2 ? SKY_DUSK :
-                  SKY_DAY
-                }
-                style={styles.skyBackground}
-                resizeMode="cover"
-              />
-
+        <Animated.View
+          style={[
+            styles.transformContainer,
+            {
+              transform: [
+                { translateY },
+              ],
+            },
+          ]}
+        >
               {/* Trees on left side with sway animation */}
               <Animated.View
                 style={[
@@ -790,63 +727,30 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   </View>
                 </View>
 
-                {/* House body with rooms (2-column layout) */}
+                {/* House body with rooms (single-column layout) */}
                 <View style={[styles.houseBody, { minHeight: houseHeight - HOUSE_PADDING }]}>
                   <View style={styles.topTrim} />
 
-                  {/* Render rows from top to bottom (highest row number first) */}
-                  {[...roomsByRow.entries()]
-                    .sort((a, b) => b[0] - a[0]) // Sort by row descending
-                    .map(([rowIndex, rowRooms]) => (
-                      <View key={`row-${rowIndex}`} style={styles.roomRow}>
-                        {/* Left column (col 0) */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 0).map(room => {
-                          const roomAnimal = getAnimalForRoom(room.id);
-                          return (
-                            <RoomView
-                              key={room.id}
-                              room={room}
-                              animal={roomAnimal}
-                              width={ROOM_WIDTH}
-                              height={ROOM_HEIGHT}
-                              onAnimalPress={onAnimalPress}
-                              onRoomPress={onRoomPress}
-                              currentPhase={currentPhase}
-                              isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
-                            />
-                          );
-                        })}
-                        {/* Empty placeholder if no left room */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 0).length === 0 && (
-                          <View style={{ width: ROOM_WIDTH, height: ROOM_HEIGHT }} />
-                        )}
-
-                        {/* Gap between columns */}
-                        <View style={{ width: ROOM_GAP }} />
-
-                        {/* Right column (col 1) */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 1).map(room => {
-                          const roomAnimal = getAnimalForRoom(room.id);
-                          return (
-                            <RoomView
-                              key={room.id}
-                              room={room}
-                              animal={roomAnimal}
-                              width={ROOM_WIDTH}
-                              height={ROOM_HEIGHT}
-                              onAnimalPress={onAnimalPress}
-                              onRoomPress={onRoomPress}
-                              currentPhase={currentPhase}
-                              isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
-                            />
-                          );
-                        })}
-                        {/* Empty placeholder if no right room */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 1).length === 0 && (
-                          <View style={{ width: ROOM_WIDTH, height: ROOM_HEIGHT }} />
-                        )}
-                      </View>
-                    ))}
+                  {/* Render rooms from top to bottom (highest unlock order first for vertical stacking) */}
+                  {unlockedRooms
+                    .sort((a, b) => b.unlockOrder - a.unlockOrder) // Newest rooms at top
+                    .map(room => {
+                      const roomAnimal = getAnimalForRoom(room.id);
+                      return (
+                        <View key={room.id} style={styles.roomRow}>
+                          <RoomView
+                            room={room}
+                            animal={roomAnimal}
+                            width={ROOM_WIDTH}
+                            height={ROOM_HEIGHT}
+                            onAnimalPress={onAnimalPress}
+                            onRoomPress={onRoomPress}
+                            currentPhase={currentPhase}
+                            isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
+                          />
+                        </View>
+                      );
+                    })}
 
                   {unlockedRooms.length === 0 && (
                     <View style={styles.emptyHouse}>
@@ -865,8 +769,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   </View>
                 </View>
               </View>
-            </Animated.View>
-          </PinchGestureHandler>
         </Animated.View>
       </PanGestureHandler>
     </GestureHandlerRootView>
@@ -879,16 +781,14 @@ const styles = StyleSheet.create({
     zIndex: 1, // Keep below header (zIndex: 100)
   },
 
-  // Sky background - inside transform container, zooms with house
-  // Sized to cover viewport at minimum zoom (0.6x): need size * 0.6 >= screen
-  // So we use ~2x screen size for coverage with pan margin
-  // Positioned to center the scenic view behind the house
+  // Sky background - fills the screen, shows full image
+  // Uses contain mode to show as much of the image as possible
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * 0.5,
-    left: -SCREEN_WIDTH * 0.5,
-    width: SCREEN_WIDTH * 2,
-    height: SCREEN_HEIGHT * 2,
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     zIndex: -1,
   },
   // Clouds - fixed to screen
@@ -965,11 +865,6 @@ const styles = StyleSheet.create({
   },
 
   // Gesture container
-  gestureContainer: {
-    flex: 1,
-    zIndex: 10,
-  },
-
   // Transform container
   transformContainer: {
     flex: 1,
