@@ -35,9 +35,9 @@ import {
   awardPuzzleAmber,
   getAmberBalance,
   getCurrentPhase,
-  getStreakInfo,
 } from './src/services/amberCurrency';
-import { AMBER_REWARDS, DialoguePhase, calculateStreakMultiplier } from './src/types/homeWorld';
+import { updatePuzzleCount } from './src/services/dialogueSession';
+import { DialoguePhase } from './src/types/homeWorld';
 
 // App screen type
 type AppScreen = 'home' | 'puzzle';
@@ -409,10 +409,11 @@ export default function App() {
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
     setCurrentWordLength(wordLength);
-    // Reset star rating tracking for new puzzle
+    // Reset tracking for new puzzle
     setInvalidAttempts(0);
     setHintsUsed(0);
     setEarnedStars(0);
+    setStreak(0);
   };
 
   const startNewGame = async (selectedDifficulty: Difficulty = difficulty) => {
@@ -575,6 +576,8 @@ export default function App() {
       ]).then(([_, amberResult]) => {
         // Refresh cumulative stats
         getCumulativeStats().then(setCumulativeStats);
+        // Update dialogue session puzzle count so cooldowns progress
+        updatePuzzleCount(amberResult.puzzlesSolved);
         // Update amber display
         setAmberEarned(amberResult.amount);
         setAmberBalance(amberResult.newBalance);
@@ -585,6 +588,8 @@ export default function App() {
         // Milestone bonus
         setMilestoneBonus(amberResult.milestoneBonus);
         setMilestoneMessage(amberResult.milestoneMessage);
+      }).catch(err => {
+        console.warn('Failed to record puzzle completion:', err);
       });
 
       setMessage("Sweet Victory!");
@@ -954,8 +959,8 @@ export default function App() {
 
             <View style={styles.victoryStats}>
               <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>{streak}</Text>
-                <Text style={styles.victoryStatLabel}>Streak</Text>
+                <Text style={styles.victoryStatValue}>Lv.{level}</Text>
+                <Text style={styles.victoryStatLabel}>{difficulty}</Text>
               </View>
               <View style={styles.victoryStatDivider} />
               <View style={styles.victoryStatItem}>
