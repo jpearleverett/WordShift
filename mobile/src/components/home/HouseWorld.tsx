@@ -343,6 +343,10 @@ const HOUSE_WIDTH = (ROOM_WIDTH * 2) + ROOM_GAP + (HOUSE_PADDING * 2);
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2.0;
 
+// Parallax: background moves at this fraction of the foreground
+const BG_PARALLAX_PAN = 0.3;
+const BG_PARALLAX_ZOOM = 0.4;
+
 interface HouseWorldProps {
   rooms: Room[];
   animals: Animal[];
@@ -362,6 +366,26 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const scale = useRef(new Animated.Value(1)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
+
+  // Parallax background transforms - derived from main transforms
+  // Scale: stays at 1.0 when zoomed out (fills screen), zooms in at reduced rate
+  const bgScale = scale.interpolate({
+    inputRange: [MIN_SCALE, 1, MAX_SCALE],
+    outputRange: [1, 1, 1 + (MAX_SCALE - 1) * BG_PARALLAX_ZOOM],
+    extrapolate: 'clamp',
+  });
+  // Pan: moves at a fraction of the foreground pan for parallax depth
+  const maxPan = 150 * MAX_SCALE;
+  const bgTranslateX = translateX.interpolate({
+    inputRange: [-maxPan, 0, maxPan],
+    outputRange: [-maxPan * BG_PARALLAX_PAN, 0, maxPan * BG_PARALLAX_PAN],
+    extrapolate: 'clamp',
+  });
+  const bgTranslateY = translateY.interpolate({
+    inputRange: [-maxPan, 0, maxPan],
+    outputRange: [-maxPan * BG_PARALLAX_PAN, 0, maxPan * BG_PARALLAX_PAN],
+    extrapolate: 'clamp',
+  });
 
   // Refs for gesture tracking
   const pinchRef = useRef<PinchGestureHandler>(null);
@@ -617,17 +641,31 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Sky background - fixed to screen, never zooms/pans */}
-      <Image
-        source={
-          currentPhase >= 4 ? SKY_SHADOW :
-          currentPhase >= 3 ? SKY_STORM :
-          currentPhase >= 2 ? SKY_DUSK :
-          SKY_DAY
-        }
-        style={styles.skyBackground}
-        resizeMode="cover"
-      />
+      {/* Sky background - parallax: moves with house at reduced rate, never shows edges */}
+      <Animated.View
+        style={[
+          styles.skyBackgroundContainer,
+          {
+            transform: [
+              { translateX: bgTranslateX },
+              { translateY: bgTranslateY },
+              { scale: bgScale },
+            ],
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <Image
+          source={
+            currentPhase >= 4 ? SKY_SHADOW :
+            currentPhase >= 3 ? SKY_STORM :
+            currentPhase >= 2 ? SKY_DUSK :
+            SKY_DAY
+          }
+          style={styles.skyBackground}
+          resizeMode="cover"
+        />
+      </Animated.View>
 
       {/* Floating particles */}
       {particles.map(particle => (
@@ -905,14 +943,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#4A7C59', // Fallback matching sky image edges
   },
 
-  // Sky background - fixed to screen, outside zoom transform
-  skyBackground: {
+  // Sky background container - slightly oversized to absorb parallax pan without gaps
+  // At 1.3x, margin is 0.15*screenSize per side (~58px), covering max parallax pan (45px)
+  skyBackgroundContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
+    top: -SCREEN_HEIGHT * 0.15,
+    left: -SCREEN_WIDTH * 0.15,
+    width: SCREEN_WIDTH * 1.3,
+    height: SCREEN_HEIGHT * 1.3,
+    zIndex: 0,
+  },
+  // Sky image fills its container
+  skyBackground: {
     width: '100%',
     height: '100%',
-    zIndex: 0,
   },
   // Clouds - fixed to screen
   cloud: {
