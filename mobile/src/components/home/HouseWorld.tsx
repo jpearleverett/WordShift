@@ -377,8 +377,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const nightStars = useMemo(() =>
     [...Array(12)].map((_, i) => ({
       id: i,
-      left: `${10 + (i * 7) % 80}%`,
-      top: `${5 + (i * 11) % 15}%`,
+      left: `${10 + (i * 7) % 80}%` as `${number}%`,
+      top: `${5 + (i * 11) % 15}%` as `${number}%`,
       opacity: 0.3 + (((i * 17 + 7) % 10) / 10) * 0.5,
       fontSize: 8 + (((i * 13 + 3) % 10) / 10) * 6,
     })),
