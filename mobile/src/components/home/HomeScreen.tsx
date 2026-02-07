@@ -383,6 +383,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
   const dialogueSlide = useRef(new Animated.Value(0)).current;
+  const cooldownOpacity = useRef(new Animated.Value(0)).current;
+  const cooldownSlide = useRef(new Animated.Value(20)).current;
 
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
@@ -401,12 +403,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [selectedAnimal]);
 
-  // Timer for dismissing cooldown message
+  // Timer for dismissing cooldown message with animation
   useEffect(() => {
     if (cooldownMessage) {
+      // Animate in
+      cooldownOpacity.setValue(0);
+      cooldownSlide.setValue(20);
+      Animated.parallel([
+        Animated.timing(cooldownOpacity, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cooldownSlide, {
+          toValue: 0,
+          friction: 8,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Animate out after delay
       const timeout = setTimeout(() => {
-        setCooldownMessage(null);
-      }, 3000);
+        Animated.parallel([
+          Animated.timing(cooldownOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(cooldownSlide, {
+            toValue: 20,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setCooldownMessage(null);
+        });
+      }, 2500);
       return () => clearTimeout(timeout);
     }
   }, [cooldownMessage]);
@@ -780,7 +813,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Cooldown Message Toast */}
       {cooldownMessage && (
-        <Animated.View style={styles.cooldownToast} pointerEvents="none">
+        <Animated.View
+          style={[
+            styles.cooldownToast,
+            {
+              opacity: cooldownOpacity,
+              transform: [{ translateY: cooldownSlide }],
+            },
+          ]}
+          pointerEvents="none"
+        >
           <Text style={styles.cooldownToastText}>{cooldownMessage}</Text>
         </Animated.View>
       )}
@@ -1294,7 +1336,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dialogueSpriteContainer: {
-    width: 110,
+    width: Math.min(110, SCREEN_WIDTH * 0.28),
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1303,11 +1345,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   dialogueSpriteImage: {
-    width: 180,
-    height: 300,
+    width: Math.min(160, SCREEN_WIDTH * 0.35),
+    height: Math.min(260, SCREEN_HEIGHT * 0.3),
   },
   dialogueSpriteEmoji: {
-    fontSize: 110,
+    fontSize: Math.min(90, SCREEN_WIDTH * 0.22),
   },
   dialogueRightSide: {
     flex: 1,
@@ -1479,15 +1521,17 @@ const styles = StyleSheet.create({
 
   // Session status bar
   sessionBar: {
-    backgroundColor: CandyColors.purple.light,
+    backgroundColor: CandyColors.purple.light + '30',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginBottom: 8,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: CandyColors.purple.light + '50',
   },
   sessionBarText: {
-    color: CandyColors.purple.dark,
+    color: CandyColors.gray[600],
     fontSize: 10,
     fontWeight: '700',
   },

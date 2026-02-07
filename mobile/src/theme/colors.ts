@@ -76,6 +76,8 @@ export const CandyColors = {
     { bg: '#4DE8C2', border: '#2EAF8E', glow: 'rgba(77, 232, 194, 0.5)' },  // Mint
     { bg: '#FFD84D', border: '#CCB030', glow: 'rgba(255, 216, 77, 0.5)' },  // Gold
     { bg: '#FF8C4D', border: '#CC6633', glow: 'rgba(255, 140, 77, 0.5)' },  // Orange
+    { bg: '#FF5A5A', border: '#CC3333', glow: 'rgba(255, 90, 90, 0.5)' },   // Coral red
+    { bg: '#5AC8FA', border: '#3AAFDD', glow: 'rgba(90, 200, 250, 0.5)' },  // Cyan
   ],
 
   // Status colors

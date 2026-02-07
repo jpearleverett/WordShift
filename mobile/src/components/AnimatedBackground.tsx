@@ -119,7 +119,28 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
     switch (particle.type) {
       case 'star':
         return (
-          <View style={[styles.star, { borderBottomColor: particle.color }]} />
+          <View style={styles.starContainer}>
+            <View
+              style={[
+                styles.starH,
+                {
+                  width: particle.size,
+                  height: particle.size * 0.35,
+                  backgroundColor: particle.color,
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.starV,
+                {
+                  width: particle.size * 0.35,
+                  height: particle.size,
+                  backgroundColor: particle.color,
+                },
+              ]}
+            />
+          </View>
         );
       case 'diamond':
         return (
@@ -229,10 +250,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   gradientLayer1: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    opacity: 0.8,
-    // Simulated gradient with overlapping views
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.35,
+    backgroundColor: 'rgba(76, 29, 149, 0.25)',
   },
   gradientLayer2: {
     position: 'absolute',
@@ -290,17 +313,21 @@ const styles = StyleSheet.create({
   circle: {
     // Styles applied dynamically
   },
-  star: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderBottomWidth: 16,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
+  starContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starH: {
+    position: 'absolute',
+    borderRadius: 2,
+  },
+  starV: {
+    position: 'absolute',
+    borderRadius: 2,
   },
   diamond: {
     transform: [{ rotate: '45deg' }],
+    borderRadius: 2,
   },
 });
 

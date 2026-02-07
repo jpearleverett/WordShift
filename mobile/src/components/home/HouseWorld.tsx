@@ -373,6 +373,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const baseTranslateX = useRef(0);
   const baseTranslateY = useRef(0);
 
+  // Memoize night star positions/sizes to prevent flicker on re-render
+  const nightStars = useMemo(() =>
+    [...Array(12)].map((_, i) => ({
+      id: i,
+      left: `${10 + (i * 7) % 80}%`,
+      top: `${5 + (i * 11) % 15}%`,
+      opacity: 0.3 + (((i * 17 + 7) % 10) / 10) * 0.5,
+      fontSize: 8 + (((i * 13 + 3) % 10) / 10) * 6,
+    })),
+  []);
+
   // Particle system state
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
@@ -661,16 +672,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       {/* Stars at night (phase 3-4) */}
       {currentPhase >= 3 && (
         <View style={styles.starsContainer} pointerEvents="none">
-          {[...Array(12)].map((_, i) => (
+          {nightStars.map((star) => (
             <Text
-              key={i}
+              key={star.id}
               style={[
                 styles.star,
                 {
-                  left: `${10 + (i * 7) % 80}%`,
-                  top: `${5 + (i * 11) % 15}%`,
-                  opacity: 0.3 + Math.random() * 0.5,
-                  fontSize: 8 + Math.random() * 6,
+                  left: star.left,
+                  top: star.top,
+                  opacity: star.opacity,
+                  fontSize: star.fontSize,
                 }
               ]}
             >

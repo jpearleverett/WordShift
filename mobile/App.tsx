@@ -886,6 +886,11 @@ export default function App() {
       {/* Victory Modal */}
       <Modal visible={gameState === GameState.WON} transparent animationType="fade">
         <View style={styles.modalOverlay}>
+          <ScrollView
+            contentContainerStyle={styles.victoryScrollContent}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
           <View style={styles.victoryModal}>
             {/* Decorative elements */}
             <View style={styles.victoryGlow} />
@@ -1005,6 +1010,7 @@ export default function App() {
               </TouchableOpacity>
             </View>
           </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -1500,6 +1506,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     textAlign: 'center',
     letterSpacing: 2,
+  },
+
+  victoryScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
 
   // Victory modal
