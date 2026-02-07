@@ -1207,7 +1207,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#87CEEB',
+    backgroundColor: '#2D5A27',
   },
   loadingContainer: {
     flex: 1,
