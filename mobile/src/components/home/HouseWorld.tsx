@@ -887,19 +887,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    overflow: 'hidden',
     zIndex: 1, // Keep below header (zIndex: 100)
   },
 
   // Sky background - inside transform container, zooms with house
-  // Sized to cover viewport at minimum zoom (0.6x) with max pan offset:
-  // Need image_size * 0.6 >= screen_size + 2 * max_pan (90px) → ~2.5x screen
-  // Using 3x for comfortable margin, centered on container
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT,
-    left: -SCREEN_WIDTH,
-    width: SCREEN_WIDTH * 3,
-    height: SCREEN_HEIGHT * 3,
+    top: -SCREEN_HEIGHT * 0.5,
+    left: -SCREEN_WIDTH * 0.5,
+    width: SCREEN_WIDTH * 2,
+    height: SCREEN_HEIGHT * 2,
     zIndex: -1,
   },
   // Clouds - fixed to screen
