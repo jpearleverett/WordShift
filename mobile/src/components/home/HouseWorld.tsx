@@ -343,10 +343,6 @@ const HOUSE_WIDTH = (ROOM_WIDTH * 2) + ROOM_GAP + (HOUSE_PADDING * 2);
 const MIN_SCALE = 0.6;
 const MAX_SCALE = 2.0;
 
-// Parallax: background moves at this fraction of the foreground
-const BG_PARALLAX_PAN = 0.3;
-const BG_PARALLAX_ZOOM = 0.4;
-
 interface HouseWorldProps {
   rooms: Room[];
   animals: Animal[];
@@ -366,26 +362,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const scale = useRef(new Animated.Value(1)).current;
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
-
-  // Parallax background transforms - derived from main transforms
-  // Scale: stays at 1.0 when zoomed out (fills screen), zooms in at reduced rate
-  const bgScale = scale.interpolate({
-    inputRange: [MIN_SCALE, 1, MAX_SCALE],
-    outputRange: [1, 1, 1 + (MAX_SCALE - 1) * BG_PARALLAX_ZOOM],
-    extrapolate: 'clamp',
-  });
-  // Pan: moves at a fraction of the foreground pan for parallax depth
-  const maxPan = 150 * MAX_SCALE;
-  const bgTranslateX = translateX.interpolate({
-    inputRange: [-maxPan, 0, maxPan],
-    outputRange: [-maxPan * BG_PARALLAX_PAN, 0, maxPan * BG_PARALLAX_PAN],
-    extrapolate: 'clamp',
-  });
-  const bgTranslateY = translateY.interpolate({
-    inputRange: [-maxPan, 0, maxPan],
-    outputRange: [-maxPan * BG_PARALLAX_PAN, 0, maxPan * BG_PARALLAX_PAN],
-    extrapolate: 'clamp',
-  });
 
   // Refs for gesture tracking
   const pinchRef = useRef<PinchGestureHandler>(null);
@@ -583,32 +559,20 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
-      let currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
+      const currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
+      baseScale.current = currentScale;
+      lastScale.current = currentScale;
 
       // Smooth snap if too zoomed out
       if (currentScale < 0.7) {
-        currentScale = 0.7;
         Animated.spring(scale, {
           toValue: 0.7,
           friction: 5,
           useNativeDriver: true,
-        }).start();
-      }
-
-      baseScale.current = currentScale;
-      lastScale.current = currentScale;
-
-      // Clamp pan to new bounds after zoom change
-      const maxTranslateX = 150 * currentScale;
-      const maxTranslateY = 150 * currentScale;
-      const clampedX = Math.max(-maxTranslateX, Math.min(maxTranslateX, baseTranslateX.current));
-      const clampedY = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current));
-
-      if (clampedX !== baseTranslateX.current || clampedY !== baseTranslateY.current) {
-        baseTranslateX.current = clampedX;
-        baseTranslateY.current = clampedY;
-        Animated.spring(translateX, { toValue: clampedX, friction: 5, useNativeDriver: true }).start();
-        Animated.spring(translateY, { toValue: clampedY, friction: 5, useNativeDriver: true }).start();
+        }).start(() => {
+          baseScale.current = 0.7;
+          lastScale.current = 0.7;
+        });
       }
     }
   };
@@ -641,32 +605,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Sky background - parallax: moves with house at reduced rate, never shows edges */}
-      <Animated.View
-        style={[
-          styles.skyBackgroundContainer,
-          {
-            transform: [
-              { translateX: bgTranslateX },
-              { translateY: bgTranslateY },
-              { scale: bgScale },
-            ],
-          },
-        ]}
-        pointerEvents="none"
-      >
-        <Image
-          source={
-            currentPhase >= 4 ? SKY_SHADOW :
-            currentPhase >= 3 ? SKY_STORM :
-            currentPhase >= 2 ? SKY_DUSK :
-            SKY_DAY
-          }
-          style={styles.skyBackground}
-          resizeMode="cover"
-        />
-      </Animated.View>
-
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -781,6 +719,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
+              {/* Sky background - zooms with house content */}
+              <Image
+                source={
+                  currentPhase >= 4 ? SKY_SHADOW :
+                  currentPhase >= 3 ? SKY_STORM :
+                  currentPhase >= 2 ? SKY_DUSK :
+                  SKY_DAY
+                }
+                style={styles.skyBackground}
+                resizeMode="cover"
+              />
 
               {/* Trees on left side with sway animation */}
               <Animated.View
@@ -940,23 +889,16 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     zIndex: 1, // Keep below header (zIndex: 100)
-    backgroundColor: '#4A7C59', // Fallback matching sky image edges
   },
 
-  // Sky background container - slightly oversized to absorb parallax pan without gaps
-  // At 1.3x, margin is 0.15*screenSize per side (~58px), covering max parallax pan (45px)
-  skyBackgroundContainer: {
-    position: 'absolute',
-    top: -SCREEN_HEIGHT * 0.15,
-    left: -SCREEN_WIDTH * 0.15,
-    width: SCREEN_WIDTH * 1.3,
-    height: SCREEN_HEIGHT * 1.3,
-    zIndex: 0,
-  },
-  // Sky image fills its container
+  // Sky background - inside transform container, zooms with house
   skyBackground: {
-    width: '100%',
-    height: '100%',
+    position: 'absolute',
+    top: -SCREEN_HEIGHT * 0.5,
+    left: -SCREEN_WIDTH * 0.5,
+    width: SCREEN_WIDTH * 2,
+    height: SCREEN_HEIGHT * 2,
+    zIndex: -1,
   },
   // Clouds - fixed to screen
   cloud: {
