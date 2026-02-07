@@ -299,6 +299,23 @@ const Toast: React.FC<{ message: string; isError: boolean }> = ({ message, isErr
         Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
       ]).start();
+
+      // Fade out error toast before it disappears
+      const fadeTimeout = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(opacityAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: -10,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }, 1700);
+      return () => clearTimeout(fadeTimeout);
     }
   }, [message, isError]);
 
@@ -460,6 +477,7 @@ export default function App() {
 
     if (selectedLetter?.id === letter.id) {
       setSelectedLetter(null);
+      setMessage("Tap a letter to pick it up");
     } else {
       setSelectedLetter(letter);
       setError(null);
@@ -531,7 +549,7 @@ export default function App() {
     const isSourceValid = checkValidation(sourceWordStr);
     if (!isSourceValid) {
       shakeError(`"${sourceWordStr}" isn't a word!`);
-      setStreak(0);
+      setStreak(prev => Math.max(0, prev - 1));
       setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return;
@@ -540,7 +558,7 @@ export default function App() {
     const isTargetValid = checkValidation(targetWordStr);
     if (!isTargetValid) {
       shakeError(`"${targetWordStr}" isn't a word!`);
-      setStreak(0);
+      setStreak(prev => Math.max(0, prev - 1));
       setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return;
@@ -710,33 +728,40 @@ export default function App() {
         </TouchableOpacity>
 
         {showDifficultyMenu && (
-          <View style={styles.difficultyMenu}>
-            {(['EASY', 'MEDIUM', 'HARD'] as Difficulty[]).map(d => (
-              <TouchableOpacity
-                key={d}
-                style={[
-                  styles.difficultyMenuItem,
-                  difficulty === d && styles.difficultyMenuItemActive,
-                ]}
-                onPress={() => startNewGame(d)}
-              >
-                <View style={[
-                  styles.difficultyMenuDot,
-                  d === 'EASY' && styles.difficultyDotEasy,
-                  d === 'MEDIUM' && styles.difficultyDotMedium,
-                  d === 'HARD' && styles.difficultyDotHard,
-                ]} />
-                <Text
+          <>
+            <TouchableOpacity
+              style={styles.difficultyBackdrop}
+              activeOpacity={1}
+              onPress={() => setShowDifficultyMenu(false)}
+            />
+            <View style={styles.difficultyMenu}>
+              {(['EASY', 'MEDIUM', 'HARD'] as Difficulty[]).map(d => (
+                <TouchableOpacity
+                  key={d}
                   style={[
-                    styles.difficultyMenuText,
-                    difficulty === d && styles.difficultyMenuTextActive,
+                    styles.difficultyMenuItem,
+                    difficulty === d && styles.difficultyMenuItemActive,
                   ]}
+                  onPress={() => startNewGame(d)}
                 >
-                  {d}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                  <View style={[
+                    styles.difficultyMenuDot,
+                    d === 'EASY' && styles.difficultyDotEasy,
+                    d === 'MEDIUM' && styles.difficultyDotMedium,
+                    d === 'HARD' && styles.difficultyDotHard,
+                  ]} />
+                  <Text
+                    style={[
+                      styles.difficultyMenuText,
+                      difficulty === d && styles.difficultyMenuTextActive,
+                    ]}
+                  >
+                    {d}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
         )}
       </View>
 
@@ -747,7 +772,7 @@ export default function App() {
 
       {/* Game Area */}
       <View style={styles.gameArea}>
-        {(gameState === GameState.LOADING || isProcessing) && (
+        {gameState === GameState.LOADING && (
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={CandyColors.pink.main} />
@@ -1201,6 +1226,14 @@ const styles = StyleSheet.create({
   difficultyArrow: {
     fontSize: 8,
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  difficultyBackdrop: {
+    position: 'absolute',
+    top: -100,
+    left: -100,
+    right: -100,
+    bottom: -500,
+    zIndex: 199,
   },
   difficultyMenu: {
     position: 'absolute',

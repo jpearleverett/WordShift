@@ -274,6 +274,9 @@ export const Row: React.FC<RowProps> = ({
 
     return () => {
       glowAnim.stopAnimation();
+      scaleAnim.stopAnimation();
+      opacityAnim.stopAnimation();
+      slideAnim.stopAnimation();
     };
   }, [isSource, isTarget, isCompleted]);
 
@@ -552,9 +555,9 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   rowCompleted: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(200, 255, 220, 0.35)',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(16, 185, 129, 0.25)',
   },
   rowFuture: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',

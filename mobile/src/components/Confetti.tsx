@@ -49,7 +49,7 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
     const wobbleAmount = 30 + Math.random() * 50;
     const fallDuration = 2000 + Math.random() * 1500;
 
-    Animated.sequence([
+    const animation = Animated.sequence([
       Animated.delay(piece.delay),
       Animated.parallel([
         // Pop in
@@ -94,7 +94,10 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
           }),
         ]),
       ]),
-    ]).start();
+    ]);
+    animation.start();
+
+    return () => animation.stop();
   }, []);
 
   const spin = rotate.interpolate({
