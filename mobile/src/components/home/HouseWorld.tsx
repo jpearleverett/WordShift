@@ -550,27 +550,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
            HOUSE_PADDING * 2;
   };
 
-  // Calculate max pan translation to keep sky background covering the viewport.
-  // Sky covers -0.5*screen to 1.5*screen in container coords (2x size, centered).
-  // With transform order [translate, scale(about center)], the constraint is:
-  //   |translateX| <= screenWidth * (1 - 1/(2*scale))
-  const getMaxTranslate = (s: number) => ({
-    maxX: Math.max(0, SCREEN_WIDTH * (1 - 1 / (2 * s))),
-    maxY: Math.max(0, SCREEN_HEIGHT * (1 - 1 / (2 * s))),
-  });
-
   // Pinch gesture handler
   const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
     const { scale: gestureScale } = event.nativeEvent;
     const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * gestureScale));
     scale.setValue(newScale);
-
-    // Clamp translate to stay within sky bounds at new scale
-    const { maxX, maxY } = getMaxTranslate(newScale);
-    const clampedX = Math.max(-maxX, Math.min(maxX, baseTranslateX.current));
-    const clampedY = Math.max(-maxY, Math.min(maxY, baseTranslateY.current));
-    translateX.setValue(clampedX);
-    translateY.setValue(clampedY);
   };
 
   const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
@@ -578,8 +562,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       const currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
       baseScale.current = currentScale;
       lastScale.current = currentScale;
-
-      const targetScale = currentScale < 0.7 ? 0.7 : currentScale;
 
       // Smooth snap if too zoomed out
       if (currentScale < 0.7) {
@@ -592,31 +574,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
           lastScale.current = 0.7;
         });
       }
-
-      // Clamp translate to sky bounds at the target scale
-      const { maxX, maxY } = getMaxTranslate(targetScale);
-      baseTranslateX.current = Math.max(-maxX, Math.min(maxX, baseTranslateX.current));
-      baseTranslateY.current = Math.max(-maxY, Math.min(maxY, baseTranslateY.current));
-      Animated.spring(translateX, {
-        toValue: baseTranslateX.current,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
-      Animated.spring(translateY, {
-        toValue: baseTranslateY.current,
-        friction: 5,
-        useNativeDriver: true,
-      }).start();
     }
   };
 
   // Pan gesture handler
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
     const { translationX, translationY } = event.nativeEvent;
-    const { maxX, maxY } = getMaxTranslate(lastScale.current);
 
-    const newX = Math.max(-maxX, Math.min(maxX, baseTranslateX.current + translationX));
-    const newY = Math.max(-maxY, Math.min(maxY, baseTranslateY.current + translationY));
+    // Scale translation by current scale for natural feeling
+    const maxTranslate = 150 * lastScale.current;
+
+    const newX = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
+    const newY = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
 
     translateX.setValue(newX);
     translateY.setValue(newY);
@@ -625,10 +594,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
       const { translationX, translationY } = event.nativeEvent;
-      const { maxX, maxY } = getMaxTranslate(lastScale.current);
+      const maxTranslate = 150 * lastScale.current;
 
-      baseTranslateX.current = Math.max(-maxX, Math.min(maxX, baseTranslateX.current + translationX));
-      baseTranslateY.current = Math.max(-maxY, Math.min(maxY, baseTranslateY.current + translationY));
+      baseTranslateX.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
+      baseTranslateY.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
     }
   };
 
