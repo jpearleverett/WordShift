@@ -559,20 +559,32 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
-      const currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
-      baseScale.current = currentScale;
-      lastScale.current = currentScale;
+      let currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
 
       // Smooth snap if too zoomed out
       if (currentScale < 0.7) {
+        currentScale = 0.7;
         Animated.spring(scale, {
           toValue: 0.7,
           friction: 5,
           useNativeDriver: true,
-        }).start(() => {
-          baseScale.current = 0.7;
-          lastScale.current = 0.7;
-        });
+        }).start();
+      }
+
+      baseScale.current = currentScale;
+      lastScale.current = currentScale;
+
+      // Clamp pan to new bounds after zoom change
+      const maxTranslateX = 150 * currentScale;
+      const maxTranslateY = 150 * currentScale;
+      const clampedX = Math.max(-maxTranslateX, Math.min(maxTranslateX, baseTranslateX.current));
+      const clampedY = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current));
+
+      if (clampedX !== baseTranslateX.current || clampedY !== baseTranslateY.current) {
+        baseTranslateX.current = clampedX;
+        baseTranslateY.current = clampedY;
+        Animated.spring(translateX, { toValue: clampedX, friction: 5, useNativeDriver: true }).start();
+        Animated.spring(translateY, { toValue: clampedY, friction: 5, useNativeDriver: true }).start();
       }
     }
   };
@@ -605,6 +617,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
+      {/* Sky background - fixed to screen, never zooms/pans */}
+      <Image
+        source={
+          currentPhase >= 4 ? SKY_SHADOW :
+          currentPhase >= 3 ? SKY_STORM :
+          currentPhase >= 2 ? SKY_DUSK :
+          SKY_DAY
+        }
+        style={styles.skyBackground}
+        resizeMode="cover"
+      />
+
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -719,17 +743,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
-              {/* Sky background - zooms with house content */}
-              <Image
-                source={
-                  currentPhase >= 4 ? SKY_SHADOW :
-                  currentPhase >= 3 ? SKY_STORM :
-                  currentPhase >= 2 ? SKY_DUSK :
-                  SKY_DAY
-                }
-                style={styles.skyBackground}
-                resizeMode="cover"
-              />
 
               {/* Trees on left side with sway animation */}
               <Animated.View
@@ -889,16 +902,17 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     zIndex: 1, // Keep below header (zIndex: 100)
+    backgroundColor: '#4A7C59', // Fallback matching sky image edges
   },
 
-  // Sky background - inside transform container, zooms with house
+  // Sky background - fixed to screen, outside zoom transform
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * 0.5,
-    left: -SCREEN_WIDTH * 0.5,
-    width: SCREEN_WIDTH * 2,
-    height: SCREEN_HEIGHT * 2,
-    zIndex: -1,
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 0,
   },
   // Clouds - fixed to screen
   cloud: {
