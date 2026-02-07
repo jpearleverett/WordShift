@@ -9,19 +9,15 @@ import {
   ActivityIndicator,
   StatusBar,
   Dimensions,
-  Animated,
-  Easing,
   Platform,
 } from 'react-native';
-
-// Simple ID generator (React Native compatible)
-let idCounter = 0;
-const generateId = () => `id_${Date.now()}_${idCounter++}`;
 import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti } from './src/components/Confetti';
+import { ActionButton, AnimatedLogo, Toast, LevelDisplay } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { CandyColors } from './src/theme/colors';
 import { generateLocalPuzzle } from './src/services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from './src/constants';
@@ -39,290 +35,14 @@ import {
 import { updatePuzzleCount } from './src/services/dialogueSession';
 import { DialoguePhase } from './src/types/homeWorld';
 
+// Simple ID generator (React Native compatible)
+let idCounter = 0;
+const generateId = () => `id_${Date.now()}_${idCounter++}`;
+
 // App screen type
 type AppScreen = 'home' | 'puzzle';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-// Animated Action Button Component
-const ActionButton: React.FC<{
-  icon: string;
-  label: string;
-  colors: { bg: string; border: string; glow: string };
-  onPress: () => void;
-  disabled: boolean;
-}> = ({ icon, label, colors, onPress, disabled }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!disabled) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
-    }
-    return () => glowAnim.stopAnimation();
-  }, [disabled]);
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.9,
-      friction: 5,
-      tension: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 3,
-      tension: 150,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.6],
-  });
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled}
-      activeOpacity={1}
-    >
-      <Animated.View
-        style={[
-          styles.actionButton,
-          disabled && styles.actionButtonDisabled,
-          { transform: [{ scale: scaleAnim }] },
-        ]}
-      >
-        {/* Glow effect */}
-        {!disabled && (
-          <Animated.View
-            style={[
-              styles.actionButtonGlow,
-              { backgroundColor: colors.glow, opacity: glowOpacity },
-            ]}
-          />
-        )}
-
-        {/* Button body */}
-        <View
-          style={[
-            styles.actionButtonIcon,
-            { backgroundColor: colors.bg },
-          ]}
-        >
-          {/* Top bevel */}
-          <View style={styles.actionButtonBevel} />
-
-          {/* Icon */}
-          <Text style={styles.actionButtonIconText}>{icon}</Text>
-        </View>
-
-        {/* 3D edge */}
-        <View
-          style={[
-            styles.actionButtonEdge,
-            { backgroundColor: colors.border },
-          ]}
-        />
-
-        {/* Label */}
-        <Text style={styles.actionButtonLabel}>{label}</Text>
-      </Animated.View>
-    </TouchableOpacity>
-  );
-};
-
-// Animated Logo Component
-const AnimatedLogo: React.FC = () => {
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    // Subtle bounce
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounceAnim, {
-          toValue: -3,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounceAnim, {
-          toValue: 0,
-          duration: 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    // Very subtle rotation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 3000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotateAnim, {
-          toValue: -1,
-          duration: 3000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
-
-  const rotate = rotateAnim.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-1deg', '1deg'],
-  });
-
-  return (
-    <Animated.View
-      style={[
-        styles.logoContainer,
-        {
-          transform: [
-            { translateY: bounceAnim },
-            { rotate },
-          ],
-        },
-      ]}
-    >
-      <View style={styles.logoInner}>
-        <Text style={styles.logoWord}>WORD</Text>
-        <Text style={styles.logoShift}>SHIFT</Text>
-      </View>
-      {/* Sparkle decorations */}
-      <View style={[styles.logoSparkle, styles.logoSparkle1]} />
-      <View style={[styles.logoSparkle, styles.logoSparkle2]} />
-      <View style={[styles.logoSparkle, styles.logoSparkle3]} />
-    </Animated.View>
-  );
-};
-
-// Streak Counter Component
-const StreakCounter: React.FC<{ streak: number; level: number }> = ({ streak, level }) => {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (streak > 0) {
-      Animated.sequence([
-        Animated.spring(scaleAnim, {
-          toValue: 1.3,
-          friction: 3,
-          tension: 200,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          friction: 4,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-  }, [streak]);
-
-  return (
-    <View style={styles.statsContainer}>
-      <View style={styles.statBox}>
-        <Text style={styles.statLabel}>LEVEL</Text>
-        <View style={styles.statValueContainer}>
-          <Text style={styles.statValue}>{level}</Text>
-        </View>
-      </View>
-      <Animated.View style={[styles.statBox, { transform: [{ scale: scaleAnim }] }]}>
-        <Text style={styles.statLabel}>STREAK</Text>
-        <View style={[styles.statValueContainer, styles.streakContainer]}>
-          <Text style={styles.statValue}>{streak}</Text>
-          {streak >= 3 && <Text style={styles.fireEmoji}>🔥</Text>}
-        </View>
-      </Animated.View>
-    </View>
-  );
-};
-
-// Toast Message Component
-const Toast: React.FC<{ message: string; isError: boolean }> = ({ message, isError }) => {
-  const slideAnim = useRef(new Animated.Value(-20)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    slideAnim.setValue(-20);
-    opacityAnim.setValue(0);
-
-    Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    if (isError) {
-      Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [message, isError]);
-
-  return (
-    <Animated.View
-      style={[
-        styles.toast,
-        isError ? styles.toastError : styles.toastNormal,
-        {
-          transform: [
-            { translateY: slideAnim },
-            { translateX: shakeAnim },
-          ],
-          opacity: opacityAnim,
-        },
-      ]}
-    >
-      <View style={styles.toastShine} />
-      <Text style={[styles.toastText, isError && styles.toastTextError]}>
-        {message}
-      </Text>
-    </Animated.View>
-  );
-};
 
 export default function App() {
   // Screen navigation
@@ -343,7 +63,6 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
   const [showDifficultyMenu, setShowDifficultyMenu] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [streak, setStreak] = useState(0);
   const [level, setLevel] = useState(1);
 
   // Star rating tracking
@@ -413,7 +132,6 @@ export default function App() {
     setInvalidAttempts(0);
     setHintsUsed(0);
     setEarnedStars(0);
-    setStreak(0);
   };
 
   const startNewGame = async (selectedDifficulty: Difficulty = difficulty) => {
@@ -426,8 +144,6 @@ export default function App() {
     }
 
     try {
-      await new Promise(r => setTimeout(r, 300));
-
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Generation timeout')), 4000)
       );
@@ -531,7 +247,6 @@ export default function App() {
     const isSourceValid = checkValidation(sourceWordStr);
     if (!isSourceValid) {
       shakeError(`"${sourceWordStr}" isn't a word!`);
-      setStreak(0);
       setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return;
@@ -540,7 +255,6 @@ export default function App() {
     const isTargetValid = checkValidation(targetWordStr);
     if (!isTargetValid) {
       shakeError(`"${targetWordStr}" isn't a word!`);
-      setStreak(0);
       setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return;
@@ -561,7 +275,6 @@ export default function App() {
     setRows(newRows);
     setSelectedLetter(null);
     setError(null);
-    setStreak(prev => prev + 1);
 
     const maxMoves = rows.length - 1;
     if (activeRowIndex === maxMoves - 1) {
@@ -569,13 +282,14 @@ export default function App() {
       const stars = calculateStars(hintsUsed, invalidAttempts);
       setEarnedStars(stars);
 
-      // Record completion and award amber
+      // Record completion and award amber, then show victory
       Promise.all([
         recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts),
         awardPuzzleAmber(difficulty, stars),
-      ]).then(([_, amberResult]) => {
+      ]).then(async ([_, amberResult]) => {
         // Refresh cumulative stats
-        getCumulativeStats().then(setCumulativeStats);
+        const stats = await getCumulativeStats();
+        setCumulativeStats(stats);
         // Update dialogue session puzzle count so cooldowns progress
         updatePuzzleCount(amberResult.puzzlesSolved);
         // Update amber display
@@ -588,13 +302,17 @@ export default function App() {
         // Milestone bonus
         setMilestoneBonus(amberResult.milestoneBonus);
         setMilestoneMessage(amberResult.milestoneMessage);
+        // Show victory AFTER persistence completes
+        setMessage("Sweet Victory!");
+        setGameState(GameState.WON);
+        setShowConfetti(true);
       }).catch(err => {
         console.warn('Failed to record puzzle completion:', err);
+        // Still show victory even if persistence fails, but with stale data
+        setMessage("Sweet Victory!");
+        setGameState(GameState.WON);
+        setShowConfetti(true);
       });
-
-      setMessage("Sweet Victory!");
-      setGameState(GameState.WON);
-      setShowConfetti(true);
     } else {
       setActiveRowIndex(prev => prev + 1);
       const messages = [
@@ -621,7 +339,6 @@ export default function App() {
     setSelectedLetter(null);
     setError(null);
     setMessage("Let's try again!");
-    setStreak(prev => Math.max(0, prev - 1));
   };
 
   const handleNextLevel = () => {
@@ -649,18 +366,25 @@ export default function App() {
   // Render home screen
   if (currentScreen === 'home') {
     return (
-      <>
+      <ErrorBoundary
+        fallbackMessage="Something went wrong with the home screen. Tap to try again."
+        onReset={() => setCurrentScreen('home')}
+      >
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <HomeScreen
           onPlayPuzzle={handlePlayPuzzle}
           onAmberChange={setAmberBalance}
         />
-      </>
+      </ErrorBoundary>
     );
   }
 
   // Render puzzle screen
   return (
+    <ErrorBoundary
+      fallbackMessage="Something went wrong with the puzzle. Tap to return home."
+      onReset={() => { setCurrentScreen('home'); setGameState(GameState.IDLE); }}
+    >
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
@@ -675,6 +399,8 @@ export default function App() {
         <TouchableOpacity
           style={styles.headerHomeButton}
           onPress={handleGoHome}
+          accessibilityLabel="Go home"
+          accessibilityRole="button"
         >
           <Text style={styles.headerHomeText}>🏠</Text>
         </TouchableOpacity>
@@ -684,6 +410,8 @@ export default function App() {
         <TouchableOpacity
           style={styles.helpButton}
           onPress={() => setShowRules(true)}
+          accessibilityLabel="How to play"
+          accessibilityRole="button"
         >
           <View style={styles.helpButtonShine} />
           <Text style={styles.helpButtonText}>?</Text>
@@ -692,11 +420,13 @@ export default function App() {
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
-        <StreakCounter streak={streak} level={level} />
+        <LevelDisplay level={level} />
 
         <TouchableOpacity
           style={styles.difficultyButton}
           onPress={() => setShowDifficultyMenu(!showDifficultyMenu)}
+          accessibilityLabel={`Difficulty: ${difficulty}. Tap to change`}
+          accessibilityRole="button"
         >
           <View style={styles.difficultyButtonShine} />
           <View style={[
@@ -945,8 +675,20 @@ export default function App() {
             {/* Phase change notification */}
             {phaseChanged && (
               <View style={styles.phaseChangeContainer}>
+                <Text style={styles.phaseChangeEmoji}>
+                  {newPhase >= 4 ? '🌑' : newPhase >= 3 ? '👁️' : newPhase >= 2 ? '🌙' : '💭'}
+                </Text>
+                <Text style={styles.phaseChangeTitle}>
+                  {newPhase >= 4 ? 'Something has changed...'
+                    : newPhase >= 3 ? 'A shadow falls...'
+                    : newPhase >= 2 ? 'The mood shifts...'
+                    : 'New conversations await'}
+                </Text>
                 <Text style={styles.phaseChangeText}>
-                  Your friends have new things to say...
+                  {newPhase >= 4 ? 'Your friends seem... different. Visit them at home.'
+                    : newPhase >= 3 ? 'Your friends have grown restless. Check on them.'
+                    : newPhase >= 2 ? 'Your friends are asking deeper questions...'
+                    : 'Your friends have new things to say!'}
                 </Text>
               </View>
             )}
@@ -997,6 +739,8 @@ export default function App() {
               <TouchableOpacity
                 style={styles.homeButton}
                 onPress={handleReturnHome}
+                accessibilityLabel="Return home"
+                accessibilityRole="button"
               >
                 <Text style={styles.homeButtonText}>🏠 HOME</Text>
               </TouchableOpacity>
@@ -1004,6 +748,8 @@ export default function App() {
               <TouchableOpacity
                 style={styles.nextLevelButton}
                 onPress={handleNextLevel}
+                accessibilityLabel="Next level"
+                accessibilityRole="button"
               >
                 <View style={styles.buttonShine} />
                 <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
@@ -1014,6 +760,7 @@ export default function App() {
         </View>
       </Modal>
     </View>
+    </ErrorBoundary>
   );
 }
 
@@ -1032,48 +779,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 8,
     zIndex: 100,
-  },
-  logoContainer: {
-    position: 'relative',
-  },
-  logoInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoWord: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: CandyColors.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-  logoShift: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: CandyColors.yellow.main,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-  logoSparkle: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    backgroundColor: CandyColors.white,
-    borderRadius: 4,
-  },
-  logoSparkle1: {
-    top: -5,
-    left: 20,
-  },
-  logoSparkle2: {
-    top: 5,
-    right: -10,
-  },
-  logoSparkle3: {
-    bottom: -3,
-    left: 60,
   },
   headerHomeButton: {
     width: 40,
@@ -1121,42 +826,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     zIndex: 100,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  statBox: {
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.7)',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  statValueContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    minWidth: 50,
-    alignItems: 'center',
-  },
-  streakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: CandyColors.white,
-  },
-  fireEmoji: {
-    fontSize: 14,
-    marginLeft: 4,
-  },
-
   // Difficulty selector
   difficultyButton: {
     flexDirection: 'row',
@@ -1249,42 +918,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     zIndex: 50,
   },
-  toast: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  toastShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  toastNormal: {
-    backgroundColor: CandyColors.white,
-    shadowColor: CandyColors.purple.main,
-  },
-  toastError: {
-    backgroundColor: CandyColors.red.main,
-    shadowColor: CandyColors.red.dark,
-  },
-  toastText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: CandyColors.purple.main,
-  },
-  toastTextError: {
-    color: CandyColors.white,
-  },
 
   // Game area
   gameArea: {
@@ -1333,64 +966,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     gap: 20,
   },
-  actionButton: {
-    alignItems: 'center',
-    position: 'relative',
-  },
-  actionButtonDisabled: {
-    opacity: 0.5,
-  },
-  actionButtonGlow: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: 20,
-    borderRadius: 20,
-  },
-  actionButtonIcon: {
-    width: 64,
-    height: 56,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  actionButtonBevel: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '45%',
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-  },
-  actionButtonEdge: {
-    position: 'absolute',
-    bottom: 16,
-    left: 4,
-    right: 4,
-    height: 8,
-    borderBottomLeftRadius: 14,
-    borderBottomRightRadius: 14,
-    zIndex: -1,
-  },
-  actionButtonIconText: {
-    fontSize: 28,
-  },
-  actionButtonLabel: {
-    marginTop: 12,
-    fontSize: 10,
-    fontWeight: '900',
-    color: 'rgba(255, 255, 255, 0.8)',
-    letterSpacing: 1.5,
-  },
-
   // Modals
   modalOverlay: {
     flex: 1,
@@ -1725,17 +1300,32 @@ const styles = StyleSheet.create({
 
   // Phase change notification
   phaseChangeContainer: {
-    backgroundColor: CandyColors.purple.light + '30',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
+    backgroundColor: CandyColors.purple.dark,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: CandyColors.purple.main,
+  },
+  phaseChangeEmoji: {
+    fontSize: 32,
     marginBottom: 8,
+  },
+  phaseChangeTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: CandyColors.white,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   phaseChangeText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: CandyColors.purple.main,
-    fontStyle: 'italic',
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 
   // Victory button row
