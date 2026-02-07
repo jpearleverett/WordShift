@@ -298,14 +298,9 @@ export const LetterTile: React.FC<LetterTileProps> = ({
           />
         )}
 
-        {/* Lock overlay for locked tiles */}
+        {/* Subtle lock overlay for locked tiles */}
         {highlight === 'locked' && (
-          <View style={styles.lockOverlay}>
-            <View style={styles.lockIcon}>
-              <View style={styles.lockBody} />
-              <View style={styles.lockShackle} />
-            </View>
-          </View>
+          <View style={styles.lockOverlay} />
         )}
       </View>
 
@@ -439,36 +434,7 @@ const styles = StyleSheet.create({
   },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  lockIcon: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 14,
-    height: 16,
-    alignItems: 'center',
-  },
-  lockBody: {
-    width: 12,
-    height: 8,
-    backgroundColor: CandyColors.gray[500],
-    borderRadius: 2,
-    position: 'absolute',
-    bottom: 0,
-  },
-  lockShackle: {
-    width: 8,
-    height: 8,
-    borderWidth: 2,
-    borderColor: CandyColors.gray[500],
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-    position: 'absolute',
-    top: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
 });
 
