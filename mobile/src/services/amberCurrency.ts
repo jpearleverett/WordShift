@@ -155,6 +155,7 @@ export async function awardPuzzleAmber(
   phaseChanged: boolean;
   newPhase: DialoguePhase;
   currentStreak: number;
+  puzzlesSolved: number;
 }> {
   const progress = await loadProgress();
 
@@ -233,6 +234,7 @@ export async function awardPuzzleAmber(
     phaseChanged,
     newPhase,
     currentStreak,
+    puzzlesSolved: progress.puzzlesSolved,
   };
 }
 

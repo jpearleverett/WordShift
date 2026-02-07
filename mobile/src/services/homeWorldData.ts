@@ -712,7 +712,7 @@ export async function getUnlockProgress(): Promise<{
 }> {
   const progress = await loadProgress();
   const totalCount = UNLOCK_PROGRESSION.length;
-  const unlockedCount = progress.unlockedAnimals.length + progress.unlockedRooms.length - 2; // Subtract starter room/animal
+  const unlockedCount = progress.unlockedAnimals.length + progress.unlockedRooms.length - 1; // Subtract starter room (cozy_den is pre-unlocked)
 
   return {
     unlockedCount: Math.max(0, unlockedCount),
