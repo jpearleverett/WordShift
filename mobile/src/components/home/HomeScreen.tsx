@@ -615,33 +615,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {selectedAnimal && (
               <>
-                {/* Character sprite - floats above the white panel */}
+                {/* Character sprite - floats above the white panel with backdrop */}
                 <View style={styles.dialogueSpriteArea}>
-                  {CHARACTER_SPRITES[selectedAnimal.type] ? (
-                    <Image
-                      source={
-                        progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
-                          : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[selectedAnimal.type]!.idle
-                      }
-                      style={styles.dialogueSpriteImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <Text style={styles.dialogueSpriteEmoji}>
-                      {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
-                    </Text>
-                  )}
+                  <View style={styles.dialogueSpriteBackdrop}>
+                    {CHARACTER_SPRITES[selectedAnimal.type] ? (
+                      <Image
+                        source={
+                          progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
+                            ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
+                            : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
+                              ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
+                              : CHARACTER_SPRITES[selectedAnimal.type]!.idle
+                        }
+                        style={styles.dialogueSpriteImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.dialogueSpriteEmoji}>
+                        {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
+                      </Text>
+                    )}
+                  </View>
                 </View>
 
                 {/* White dialogue panel - overlaps under the sprite */}
                 <View style={styles.dialoguePanel}>
-                  {/* Name row - sits beside sprite overlap zone */}
-                  <View style={styles.dialogueNameRow}>
-                    <Text style={styles.dialogueAnimalName}>{selectedAnimal.name}</Text>
-                  </View>
+                  <Text style={styles.dialogueAnimalName}>{selectedAnimal.name}</Text>
 
                   {/* Full-width speech bubble */}
                   <View style={styles.dialogueBubble}>
@@ -1199,6 +1198,13 @@ const styles = StyleSheet.create({
     paddingLeft: 22,
     alignItems: 'flex-start',
   },
+  dialogueSpriteBackdrop: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderRadius: 28,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dialogueSpriteImage: {
     width: Math.min(170, SCREEN_WIDTH * 0.43),
     height: Math.min(240, SCREEN_HEIGHT * 0.28),
@@ -1210,7 +1216,8 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -50,
+    marginTop: -40,
+    paddingTop: 50,
     paddingHorizontal: 22,
     paddingBottom: 34,
     shadowColor: '#000',
@@ -1219,16 +1226,12 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 10,
   },
-  dialogueNameRow: {
-    minHeight: 54,
-    paddingLeft: Math.min(160, SCREEN_WIDTH * 0.43 + 4),
-    justifyContent: 'center',
-  },
   dialogueAnimalName: {
     fontSize: 24,
     fontWeight: '900',
     color: CandyColors.purple.dark,
     letterSpacing: 0.3,
+    marginBottom: 12,
   },
   dialogueBubble: {
     backgroundColor: CandyColors.gray[100],
