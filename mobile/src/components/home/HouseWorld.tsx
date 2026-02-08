@@ -841,9 +841,9 @@ const styles = StyleSheet.create({
   // Vertical pan adds up to ±150px in content coords. 3x height covers all cases.
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * 0.4,
-    left: -SCREEN_WIDTH * 0.25,
-    width: SCREEN_WIDTH * 1.5,
+    top: -SCREEN_HEIGHT * 0.8,
+    left: -SCREEN_WIDTH * 0.35,
+    width: SCREEN_WIDTH * 1.7,
     height: SCREEN_HEIGHT * 2.2,
     zIndex: -1,
   },
