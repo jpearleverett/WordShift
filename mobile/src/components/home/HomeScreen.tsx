@@ -615,25 +615,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {selectedAnimal && (
               <>
-                {/* Character sprite - floats above the white panel */}
+                {/* Character sprite - floats above the white panel with backdrop */}
                 <View style={styles.dialogueSpriteArea}>
-                  {CHARACTER_SPRITES[selectedAnimal.type] ? (
-                    <Image
-                      source={
-                        progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
-                          : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[selectedAnimal.type]!.idle
-                      }
-                      style={styles.dialogueSpriteImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <Text style={styles.dialogueSpriteEmoji}>
-                      {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
-                    </Text>
-                  )}
+                  <View style={styles.dialogueSpriteBackdrop}>
+                    {CHARACTER_SPRITES[selectedAnimal.type] ? (
+                      <Image
+                        source={
+                          progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
+                            ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
+                            : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
+                              ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
+                              : CHARACTER_SPRITES[selectedAnimal.type]!.idle
+                        }
+                        style={styles.dialogueSpriteImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.dialogueSpriteEmoji}>
+                        {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
+                      </Text>
+                    )}
+                  </View>
                 </View>
 
                 {/* White dialogue panel - overlaps under the sprite */}
@@ -1195,6 +1197,13 @@ const styles = StyleSheet.create({
   dialogueSpriteArea: {
     paddingLeft: 22,
     alignItems: 'flex-start',
+  },
+  dialogueSpriteBackdrop: {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderRadius: 28,
+    padding: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dialogueSpriteImage: {
     width: Math.min(170, SCREEN_WIDTH * 0.43),
