@@ -90,7 +90,7 @@ mobile/
 │   │   ├── DailyChallengeCard.tsx # Daily challenge status card with pulse animation
 │   │   └── home/
 │   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
-│   │       ├── HouseWorld.tsx   # Zoomable/pannable house view
+│   │       ├── HouseWorld.tsx   # Zoomable house view (vertical pan only, pinch zoom)
 │   │       ├── RoomView.tsx     # Individual room with decorations
 │   │       ├── AnimalSprite.tsx # Animated animal characters
 │   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
@@ -172,8 +172,10 @@ mobile/assets/
 │   └── chimney.png             # Chimney with smoke (optional)
 │
 └── environment/                 # Background and scenery
-    ├── sky_day.png             # Blue gradient with clouds (default)
-    ├── sky_storm.png           # Dark, ominous sky (Phase 4)
+    ├── sky_day.png             # Blue gradient with clouds (Phase 0-1)
+    ├── sky_dusk.png            # Muted dusk sky (Phase 2)
+    ├── sky_storm.png           # Dark, ominous sky (Phase 3)
+    ├── sky_shadow.png          # Near-black with entity silhouette (Phase 4)
     ├── tree_left.png           # Tree on left side of house
     ├── tree_right.png          # Tree on right side of house
     ├── ground.png              # Grass, path, flowers at bottom
@@ -199,7 +201,7 @@ const foxIdleImage = require('../../assets/characters/fox/idle.png');
 
 **Phase 4 visual changes (the cult is revealed):**
 - Use `robed.png` variants for all animals at Phase 4 — cult robes/cloaks
-- Switch from `sky_day.png` to `sky_storm.png` — ominous, oppressive sky
+- Sky progresses: `sky_day.png` → `sky_dusk.png` → `sky_storm.png` → `sky_shadow.png`
 - Show `shadow_figure.png` in background — the entity being summoned
 - Puzzle screen background shifts to near-black (#1A1A2E) with crimson particle embers
 - Victory confetti uses dark muted colors instead of rainbow
@@ -216,7 +218,7 @@ The home screen now uses image assets for:
 - **Fox character sprites** (`idle.png`, `talk.png`, `robed.png`) in `AnimalSprite.tsx` - other animals fall back to emoji
 - **All 10 room backgrounds** in `RoomView.tsx` - fully wired up
 - **Environment images** in `HouseWorld.tsx`:
-  - `sky_day.png` / `sky_storm.png` - sky background (storm at Phase 4)
+  - `sky_day.png` / `sky_dusk.png` / `sky_storm.png` / `sky_shadow.png` - phase-aware sky background (day → dusk → storm → shadow)
   - `shadow_figure.png` - appears at Phase 4
   - `ground.png` - ground beneath the house
 - Animated emoji clouds, sun, birds, trees, fence still use emoji/styled Views
@@ -408,11 +410,14 @@ Managed via `purchaseDecoration()`, `hasDecoration()`, `getAllDecorations()` in 
 ### House & Room Visuals
 
 **House Structure** (`HouseWorld.tsx`):
-- Single column of rooms stacked vertically (bottom-up)
+- 2-column layout of rooms stacked vertically (bottom-up)
 - Only unlocked rooms are rendered
-- Pan/zoom via `react-native-gesture-handler` (PanGestureHandler + PinchGestureHandler)
-- Fixed sky background with animated clouds, sun, birds
-- Room dimensions: `ROOM_WIDTH` (165) and `ROOM_HEIGHT` (130)
+- Vertical-only pan + pinch zoom via `react-native-gesture-handler` (horizontal pan disabled to prevent side gaps)
+- Sky background is inside the transform container (moves with scene) but oversized (2x width, 3x height) to prevent gaps at any zoom/pan combo
+- Phase-aware sky: `sky_day.png` → `sky_dusk.png` → `sky_storm.png` → `sky_shadow.png`
+- Animated emoji clouds, sun, birds, trees rendered on top
+- Room dimensions: `ROOM_WIDTH` (160) and `ROOM_HEIGHT` (80)
+- Zoom: MIN_SCALE (0.6) to MAX_SCALE (2.0), snaps back to 0.7 if zoomed below
 
 ### Word Theme Evolution
 
@@ -614,7 +619,7 @@ Edit `calculateStars()` function in `starRating.ts`:
 - Arc/fan effect: Constants at top of `Row.tsx` (ARC_ROTATION, ARC_LIFT, SLOT_WIDTH, SLOT_HEIGHT)
 - Color palette: `theme/colors.ts`
 - Game container: `App.tsx` styles object
-- Room dimensions: `ROOM_WIDTH` (165) and `ROOM_HEIGHT` (130) in `HouseWorld.tsx`
+- Room dimensions: `ROOM_WIDTH` (160) and `ROOM_HEIGHT` (80) in `HouseWorld.tsx`
 - Status bar: `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50`
 
 ### Adding new tile colors
@@ -663,7 +668,7 @@ Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
 - Dictionary limited to common English words (no proper nouns, abbreviations)
 - Arc layout uses `overflow: visible` - elements can extend beyond row container
 - Dialogue sessions persist across app restarts (cooldowns continue)
-- House view uses `react-native-gesture-handler` for pan/zoom (GestureHandlerRootView wraps content)
+- House view uses `react-native-gesture-handler` for vertical pan + pinch zoom (horizontal pan disabled; GestureHandlerRootView wraps content)
 - TouchableOpacity in home screen components must be imported from `react-native-gesture-handler` for proper touch handling
 - HomeScreen.tsx uses react-native TouchableOpacity (not RNGH) for modal content
 - Daily challenge uses Math.random override for seeded generation (guarded against concurrency)
