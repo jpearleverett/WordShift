@@ -598,7 +598,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <Animated.View
             style={[
-              styles.dialogueWrapper,
+              styles.dialogueModal,
               {
                 transform: [
                   {
@@ -614,40 +614,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             onStartShouldSetResponder={() => true}
           >
             {selectedAnimal && (
-              <>
-                {/* Character sprite - floats above the white panel with backdrop */}
-                <View style={styles.dialogueSpriteArea}>
-                  <View style={styles.dialogueSpriteBackdrop}>
-                    {CHARACTER_SPRITES[selectedAnimal.type] ? (
-                      <Image
-                        source={
-                          progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
-                            ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
-                            : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
-                              ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
-                              : CHARACTER_SPRITES[selectedAnimal.type]!.idle
-                        }
-                        style={styles.dialogueSpriteImage}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      <Text style={styles.dialogueSpriteEmoji}>
-                        {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
-                      </Text>
-                    )}
-                  </View>
+              <View style={styles.dialogueRow}>
+                {/* Sprite column - 30% width, zoomed in to fill */}
+                <View style={styles.dialogueSpriteCol}>
+                  {CHARACTER_SPRITES[selectedAnimal.type] ? (
+                    <Image
+                      source={
+                        progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
+                          ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
+                          : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
+                            ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
+                            : CHARACTER_SPRITES[selectedAnimal.type]!.idle
+                      }
+                      style={styles.dialogueSpriteImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={styles.dialogueSpriteEmoji}>
+                      {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
+                    </Text>
+                  )}
                 </View>
 
-                {/* White dialogue panel - overlaps under the sprite */}
-                <View style={styles.dialoguePanel}>
+                {/* Text column - 70% width */}
+                <View style={styles.dialogueTextCol}>
                   <Text style={styles.dialogueAnimalName}>{selectedAnimal.name}</Text>
 
-                  {/* Full-width speech bubble */}
                   <View style={styles.dialogueBubble}>
                     <Text style={styles.dialogueText}>{getCurrentDialogueText()}</Text>
                   </View>
 
-                  {/* Footer with button */}
                   <View style={styles.dialogueFooter}>
                     <TouchableOpacity
                       style={styles.continueButton}
@@ -667,7 +663,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </TouchableOpacity>
                   </View>
                 </View>
-              </>
+              </View>
             )}
           </Animated.View>
         </TouchableOpacity>
@@ -1190,60 +1186,62 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Dialogue modal - RPG-style with sprite floating above the panel
-  dialogueWrapper: {
-    // Transparent container so sprite shows against the dark overlay
-  },
-  dialogueSpriteArea: {
-    paddingLeft: 22,
-    alignItems: 'flex-start',
-  },
-  dialogueSpriteBackdrop: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderRadius: 28,
-    padding: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dialogueSpriteImage: {
-    width: Math.min(170, SCREEN_WIDTH * 0.43),
-    height: Math.min(240, SCREEN_HEIGHT * 0.28),
-  },
-  dialogueSpriteEmoji: {
-    fontSize: Math.min(100, SCREEN_WIDTH * 0.25),
-  },
-  dialoguePanel: {
+  // Dialogue modal - side-by-side: 30% sprite, 70% text
+  dialogueModal: {
     backgroundColor: CandyColors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -40,
-    paddingTop: 50,
-    paddingHorizontal: 22,
-    paddingBottom: 34,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 10,
+    overflow: 'hidden',
+  },
+  dialogueRow: {
+    flexDirection: 'row',
+    minHeight: 260,
+  },
+  dialogueSpriteCol: {
+    width: '30%',
+    backgroundColor: CandyColors.gray[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  dialogueSpriteImage: {
+    width: '120%',
+    height: '90%',
+  },
+  dialogueSpriteEmoji: {
+    fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
+  },
+  dialogueTextCol: {
+    flex: 1,
+    paddingTop: 20,
+    paddingBottom: 34,
+    paddingHorizontal: 18,
+    justifyContent: 'space-between',
   },
   dialogueAnimalName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
     color: CandyColors.purple.dark,
     letterSpacing: 0.3,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   dialogueBubble: {
     backgroundColor: CandyColors.gray[100],
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    marginBottom: 16,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+    flex: 1,
   },
   dialogueText: {
-    fontSize: 16,
+    fontSize: 15,
     color: CandyColors.gray[700],
-    lineHeight: 24,
+    lineHeight: 22,
   },
   dialogueFooter: {
     flexDirection: 'row',
@@ -1251,9 +1249,9 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     backgroundColor: CandyColors.purple.main,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 22,
     shadowColor: CandyColors.purple.shadow,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
@@ -1262,7 +1260,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     color: CandyColors.white,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
   },
 
