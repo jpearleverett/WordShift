@@ -1071,10 +1071,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 4,
     marginBottom: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: 'rgba(30, 60, 30, 0.85)',
     borderRadius: 12,
     padding: 10,
     zIndex: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   unlockProgressInner: {
     flexDirection: 'row',

@@ -889,6 +889,7 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     zIndex: 1, // Keep below header (zIndex: 100)
+    backgroundColor: '#5B8C3E', // Matches sky_day bottom edge so no gaps when zoomed out
   },
 
   // Sky background - inside transform container, zooms with house
