@@ -696,9 +696,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
               ]}
             >
               {/* Sky background - inside transform so it moves with the scene.
-                  Oversized to prevent gaps at any zoom/pan combination.
-                  Width: 2x screen covers horizontal at min zoom (no horizontal pan).
-                  Height: 3x screen covers vertical pan range at all zoom levels. */}
+                  Sized to prevent gaps at any zoom/pan combination while keeping
+                  the image close to its natural size so it doesn't appear overly zoomed. */}
               <Image
                 source={
                   currentPhase >= 4 ? SKY_SHADOW :
@@ -837,14 +836,14 @@ const styles = StyleSheet.create({
   },
 
   // Sky background - moves with scene, oversized to prevent gaps.
-  // At MIN_SCALE (0.6) the visible area is ~1.67x screen in each dimension.
-  // Vertical pan adds up to ±150px in content coords. 3x height covers all cases.
+  // At MIN_SCALE (0.6) visible area is ~1.67x screen; pan adds ±150 content-px.
+  // 2x width and 2.2x height cover all zoom/pan combos without over-zooming the image.
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT,
+    top: -SCREEN_HEIGHT * 0.6,
     left: -SCREEN_WIDTH * 0.5,
     width: SCREEN_WIDTH * 2,
-    height: SCREEN_HEIGHT * 3,
+    height: SCREEN_HEIGHT * 2.2,
     zIndex: -1,
   },
   // Clouds - fixed to screen
