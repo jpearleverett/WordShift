@@ -453,12 +453,12 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Position sprite within room bounds (keep near bottom half for floor walking)
   const translateX = posX.interpolate({
     inputRange: [0, 100],
-    outputRange: [5, roomWidth - 55],
+    outputRange: [10, roomWidth - 100],
   });
 
   const translateY = posY.interpolate({
     inputRange: [0, 100],
-    outputRange: [roomHeight * 0.3, roomHeight - 50],
+    outputRange: [roomHeight * 0.3, roomHeight - 95],
   });
 
   return (
@@ -582,19 +582,19 @@ const styles = StyleSheet.create({
   shadow: {
     position: 'absolute',
     bottom: 0,
-    width: 35,
-    height: 8,
+    width: 60,
+    height: 12,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 20,
   },
   emojiBody: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: CandyColors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -602,11 +602,11 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   emoji: {
-    fontSize: 22,
+    fontSize: 38,
   },
   spriteImage: {
-    width: 50,
-    height: 50,
+    width: 90,
+    height: 90,
   },
   notificationBadge: {
     position: 'absolute',
