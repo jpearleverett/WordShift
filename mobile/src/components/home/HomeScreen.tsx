@@ -58,17 +58,25 @@ import {
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
 import { AmberSparkle } from './AmberSparkle';
+import { DailyChallengeCard } from '../DailyChallengeCard';
+import { Difficulty } from '../../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface HomeScreenProps {
-  onPlayPuzzle: () => void;
+  onPlayPuzzle: (difficulty?: Difficulty) => void;
   onAmberChange?: (newBalance: number) => void;
+  onOpenSettings?: () => void;
+  onOpenStats?: () => void;
+  onStartDaily?: (difficulty: Difficulty) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onAmberChange,
+  onOpenSettings,
+  onOpenStats,
+  onStartDaily,
 }) => {
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -482,14 +490,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </Text>
         </View>
 
-        <JuicyButton
-          style={styles.playButton}
-          onPress={onPlayPuzzle}
-          bounceScale={0.9}
-        >
-          <Text style={styles.playButtonText}>PLAY</Text>
-        </JuicyButton>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.headerIconBtn} onPress={onOpenStats}>
+            <Text style={styles.headerIconText}>📊</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerIconBtn} onPress={onOpenSettings}>
+            <Text style={styles.headerIconText}>⚙️</Text>
+          </TouchableOpacity>
+          <JuicyButton
+            style={styles.playButton}
+            onPress={() => onPlayPuzzle()}
+            bounceScale={0.9}
+          >
+            <Text style={styles.playButtonText}>PLAY</Text>
+          </JuicyButton>
+        </View>
       </View>
+
+      {/* Daily Challenge Card */}
+      {onStartDaily && (
+        <DailyChallengeCard onStartDaily={onStartDaily} />
+      )}
 
       {/* Celebration Confetti */}
       {showCelebration && (
@@ -951,6 +972,23 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     alignItems: 'center',
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerIconText: {
+    fontSize: 16,
   },
   title: {
     color: CandyColors.white,

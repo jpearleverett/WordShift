@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   StatusBar,
   Dimensions,
   Platform,
+  Animated,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -22,9 +23,27 @@ import { CandyColors } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence, VictoryData } from './src/hooks/useGamePersistence';
 import { logEvent } from './src/services/eventLogger';
+// New feature imports
+import { Tutorial, hasTutorialCompleted } from './src/components/Tutorial';
+import { SettingsScreen } from './src/components/SettingsScreen';
+import { StatsScreen } from './src/components/StatsScreen';
+import { AchievementToast } from './src/components/AchievementToast';
+import { DailyChallengeCard } from './src/components/DailyChallengeCard';
+import {
+  checkAchievements,
+  Achievement,
+  AchievementCheckState,
+  getShareCount,
+} from './src/services/achievements';
+import { getDailyStatus, recordDailyCompletion, getTodayString } from './src/services/dailyChallenge';
+import { sharePuzzleResult, generateShareText } from './src/services/shareResults';
+import { getSettings } from './src/services/settings';
+import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
+import { hapticLight, hapticMedium, hapticSuccess, hapticError, hapticHeavy, hapticSelection } from './src/services/haptics';
+import { getFullProgress } from './src/services/amberCurrency';
 
-// App screen type
-type AppScreen = 'home' | 'puzzle';
+// App screen type — expanded with settings and stats
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -39,52 +58,266 @@ export default function App() {
   // Victory display state
   const [victoryData, setVictoryData] = useState<VictoryData | null>(null);
 
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // Achievement toast queue
+  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
+
+  // Daily challenge state
+  const [isPlayingDaily, setIsPlayingDaily] = useState(false);
+
+  // Screen transition animation
+  const screenFade = useRef(new Animated.Value(1)).current;
+
+  // Initialize on mount
+  useEffect(() => {
+    initAudio();
+    // Check if tutorial needed
+    hasTutorialCompleted().then(completed => {
+      if (!completed) {
+        setShowTutorial(true);
+      }
+    });
+  }, []);
+
+  // Process achievement toast queue
+  useEffect(() => {
+    if (!currentAchievement && achievementQueue.length > 0) {
+      const [next, ...rest] = achievementQueue;
+      setCurrentAchievement(next);
+      setAchievementQueue(rest);
+    }
+  }, [currentAchievement, achievementQueue]);
+
+  // Check for achievements after victory
+  const checkForAchievements = useCallback(async (victory: VictoryData) => {
+    try {
+      const progress = await getFullProgress();
+      const shareCount = await getShareCount();
+      const dailyStatus = await getDailyStatus();
+
+      const state: AchievementCheckState = {
+        stats: victory.cumulativeStats || {
+          totalPuzzlesCompleted: 0,
+          totalStars: 0,
+          threeStarCount: 0,
+          twoStarCount: 0,
+          oneStarCount: 0,
+          totalInvalidAttempts: 0,
+          totalHintsUsed: 0,
+          byDifficulty: {
+            EASY: { completed: 0, stars: 0 },
+            MEDIUM: { completed: 0, stars: 0 },
+            HARD: { completed: 0, stars: 0 },
+          },
+          lastUpdated: 0,
+        },
+        puzzlesSolved: progress.puzzlesSolved,
+        currentPhase: progress.currentPhase,
+        currentStreak: victory.currentStreak,
+        unlockedAnimals: progress.unlockedAnimals.length,
+        unlockedRooms: progress.unlockedRooms.length,
+        amberEarned: progress.totalAmberEarned,
+        dailyChallengesCompleted: dailyStatus.totalCompleted,
+        shareCount,
+      };
+
+      const newAchievements = await checkAchievements(state);
+      if (newAchievements.length > 0) {
+        hapticHeavy();
+        setAchievementQueue(prev => [...prev, ...newAchievements]);
+      }
+    } catch (err) {
+      console.warn('Achievement check failed:', err);
+    }
+  }, []);
+
+  // Animated screen transition
+  const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
+    Animated.timing(screenFade, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentScreen(screen);
+      callback?.();
+      Animated.timing(screenFade, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [screenFade]);
+
   // Start puzzle when navigating to puzzle screen
-  const handlePlayPuzzle = () => {
-    setCurrentScreen('puzzle');
-    puzzleActions.startNewGame(puzzle.difficulty);
-    logEvent({ type: 'puzzle_started', data: { difficulty: puzzle.difficulty } });
-  };
+  const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
+    hapticLight();
+    soundTap();
+    const diff = difficulty || puzzle.difficulty;
+    transitionTo('puzzle', () => {
+      puzzleActions.startNewGame(diff);
+      setIsPlayingDaily(false);
+      logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
+    });
+  }, [puzzle.difficulty, puzzleActions, transitionTo]);
+
+  // Start daily challenge
+  const handleStartDaily = useCallback((difficulty: Difficulty) => {
+    hapticMedium();
+    soundTap();
+    transitionTo('puzzle', () => {
+      puzzleActions.startNewGame(difficulty);
+      setIsPlayingDaily(true);
+      logEvent({ type: 'puzzle_started', data: { difficulty, isDaily: true } });
+    });
+  }, [puzzleActions, transitionTo]);
 
   // Return to home screen
-  const handleGoHome = () => {
-    setCurrentScreen('home');
-    puzzleActions.setGameState(GameState.IDLE);
-    puzzleActions.setShowConfetti(false);
-  };
+  const handleGoHome = useCallback(() => {
+    hapticLight();
+    transitionTo('home', () => {
+      puzzleActions.setGameState(GameState.IDLE);
+      puzzleActions.setShowConfetti(false);
+    });
+  }, [puzzleActions, transitionTo]);
 
-  const handleSlotPress = async (targetIndex: number) => {
+  const handleSlotPress = useCallback(async (targetIndex: number) => {
     const result = await puzzleActions.handleSlotPress(targetIndex);
 
     if (result?.completed) {
       // Puzzle completed — record persistence and show victory
+      hapticSuccess();
+
       const victory = await persistenceActions.recordVictory(
         puzzle.difficulty,
         result.hintsUsed,
         result.invalidAttempts
       );
 
+      // Record daily challenge completion if applicable
+      if (isPlayingDaily) {
+        await recordDailyCompletion(
+          victory.earnedStars,
+          result.hintsUsed,
+          result.invalidAttempts
+        );
+      }
+
       puzzleActions.setEarnedStars(victory.earnedStars);
       setVictoryData(victory);
+
+      if (victory.earnedStars === 3) {
+        soundPerfect();
+      } else {
+        soundVictory();
+      }
 
       puzzleActions.setMessage("Sweet Victory!");
       puzzleActions.setGameState(GameState.WON);
       puzzleActions.setShowConfetti(true);
+
+      // Check achievements after brief delay to not block victory display
+      setTimeout(() => checkForAchievements(victory), 500);
+    } else if (result === null && puzzle.selectedLetter) {
+      // Slot press happened but was invalid
+      hapticError();
+      soundInvalidMove();
+    } else {
+      // Valid intermediate move
+      hapticMedium();
+      soundValidMove();
     }
-  };
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, checkForAchievements]);
 
-  const handleNextLevel = () => {
+  const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
+    hapticLight();
+    soundTap();
+    puzzleActions.handleLetterPress(letter, rowIndex);
+  }, [puzzleActions]);
+
+  const handleUndo = useCallback(() => {
+    hapticLight();
+    soundUndo();
+    puzzleActions.handleUndo();
+  }, [puzzleActions]);
+
+  const handleHintPress = useCallback(() => {
+    hapticSelection();
+    soundHint();
+    puzzleActions.handleHint();
+  }, [puzzleActions]);
+
+  const handleNextLevel = useCallback(() => {
+    hapticLight();
     puzzleActions.setShowConfetti(false);
     setVictoryData(null);
+    setIsPlayingDaily(false);
     puzzleActions.handleNextLevel();
-  };
+  }, [puzzleActions]);
 
-  const handleReturnHome = () => {
+  const handleReturnHome = useCallback(() => {
+    hapticLight();
     puzzleActions.setShowConfetti(false);
     setVictoryData(null);
-    setCurrentScreen('home');
-    puzzleActions.setGameState(GameState.IDLE);
-  };
+    setIsPlayingDaily(false);
+    transitionTo('home', () => {
+      puzzleActions.setGameState(GameState.IDLE);
+    });
+  }, [puzzleActions, transitionTo]);
+
+  const handleShare = useCallback(async () => {
+    if (!victoryData) return;
+    hapticLight();
+    const moveCount = puzzle.rows.length - 1;
+    await sharePuzzleResult({
+      stars: victoryData.earnedStars,
+      difficulty: puzzle.difficulty,
+      level: puzzle.level,
+      hintsUsed: puzzle.hintsUsed,
+      invalidAttempts: puzzle.invalidAttempts,
+      isDaily: isPlayingDaily,
+      dailyDate: isPlayingDaily ? getTodayString() : undefined,
+      moveCount,
+    });
+  }, [victoryData, puzzle, isPlayingDaily]);
+
+  // Tutorial overlay
+  if (showTutorial) {
+    return (
+      <View style={{ flex: 1 }}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <Tutorial onComplete={() => setShowTutorial(false)} />
+      </View>
+    );
+  }
+
+  // Settings screen
+  if (currentScreen === 'settings') {
+    return (
+      <Animated.View style={{ flex: 1, opacity: screenFade }}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <SettingsScreen onClose={() => transitionTo('home')} />
+      </Animated.View>
+    );
+  }
+
+  // Stats screen
+  if (currentScreen === 'stats') {
+    return (
+      <Animated.View style={{ flex: 1, opacity: screenFade }}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <StatsScreen
+          onClose={() => transitionTo('home')}
+          puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
+          currentPhase={persistence.currentPhase}
+          currentStreak={victoryData?.currentStreak || 0}
+          amberBalance={persistence.amberBalance}
+        />
+      </Animated.View>
+    );
+  }
 
   // Render home screen
   if (currentScreen === 'home') {
@@ -93,11 +326,21 @@ export default function App() {
         fallbackMessage="Something went wrong with the home screen. Tap to try again."
         onReset={() => setCurrentScreen('home')}
       >
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <HomeScreen
-          onPlayPuzzle={handlePlayPuzzle}
-          onAmberChange={persistenceActions.setAmberBalance}
-        />
+        <Animated.View style={{ flex: 1, opacity: screenFade }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <HomeScreen
+            onPlayPuzzle={handlePlayPuzzle}
+            onAmberChange={persistenceActions.setAmberBalance}
+            onOpenSettings={() => transitionTo('settings')}
+            onOpenStats={() => transitionTo('stats')}
+            onStartDaily={handleStartDaily}
+          />
+          {/* Achievement toast overlay */}
+          <AchievementToast
+            achievement={currentAchievement}
+            onDismiss={() => setCurrentAchievement(null)}
+          />
+        </Animated.View>
       </ErrorBoundary>
     );
   }
@@ -108,7 +351,7 @@ export default function App() {
       fallbackMessage="Something went wrong with the puzzle. Tap to return home."
       onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
     >
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: screenFade }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Animated Background */}
@@ -116,6 +359,12 @@ export default function App() {
 
       {/* Confetti celebration */}
       <Confetti active={puzzle.showConfetti} />
+
+      {/* Achievement toast overlay */}
+      <AchievementToast
+        achievement={currentAchievement}
+        onDismiss={() => setCurrentAchievement(null)}
+      />
 
       {/* Header */}
       <View style={styles.header}>
@@ -128,7 +377,15 @@ export default function App() {
           <Text style={styles.headerHomeText}>🏠</Text>
         </TouchableOpacity>
 
-        <AnimatedLogo />
+        <View style={styles.headerTitleArea}>
+          {isPlayingDaily ? (
+            <View style={styles.dailyBadge}>
+              <Text style={styles.dailyBadgeText}>DAILY</Text>
+            </View>
+          ) : (
+            <AnimatedLogo />
+          )}
+        </View>
 
         <TouchableOpacity
           style={styles.helpButton}
@@ -171,7 +428,10 @@ export default function App() {
                   styles.difficultyMenuItem,
                   puzzle.difficulty === d && styles.difficultyMenuItemActive,
                 ]}
-                onPress={() => puzzleActions.startNewGame(d)}
+                onPress={() => {
+                  hapticLight();
+                  puzzleActions.startNewGame(d);
+                }}
               >
                 <View style={[
                   styles.difficultyMenuDot,
@@ -220,7 +480,7 @@ export default function App() {
               rowIndex={idx}
               activeRowIndex={puzzle.activeRowIndex}
               selectedLetter={puzzle.selectedLetter}
-              onLetterPress={puzzleActions.handleLetterPress}
+              onLetterPress={handleLetterPress}
               onSlotPress={handleSlotPress}
               isProcessing={puzzle.isProcessing}
             />
@@ -238,7 +498,7 @@ export default function App() {
             border: CandyColors.yellow.shadow,
             glow: CandyColors.yellow.glow,
           }}
-          onPress={puzzleActions.handleUndo}
+          onPress={handleUndo}
           disabled={puzzle.history.length === 0 || puzzle.gameState === GameState.WON}
         />
         <ActionButton
@@ -249,7 +509,7 @@ export default function App() {
             border: CandyColors.blue.shadow,
             glow: CandyColors.blue.glow,
           }}
-          onPress={puzzleActions.handleHint}
+          onPress={handleHintPress}
           disabled={puzzle.gameState !== GameState.PLAYING}
         />
         <ActionButton
@@ -260,7 +520,10 @@ export default function App() {
             border: CandyColors.green.shadow,
             glow: CandyColors.green.glow,
           }}
-          onPress={() => puzzleActions.startNewGame()}
+          onPress={() => {
+            hapticLight();
+            puzzleActions.startNewGame();
+          }}
           disabled={false}
         />
       </View>
@@ -363,7 +626,9 @@ export default function App() {
             <Text style={styles.victoryTitle}>
               {puzzle.earnedStars === 3 ? 'PERFECT!' : puzzle.earnedStars === 2 ? 'SWEET!' : 'NICE!'}
             </Text>
-            <Text style={styles.victorySubtitle}>Level {puzzle.level} Complete</Text>
+            <Text style={styles.victorySubtitle}>
+              {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${puzzle.level} Complete`}
+            </Text>
 
             {/* Amber earned */}
             {victoryData && (
@@ -460,6 +725,15 @@ export default function App() {
             {/* Action buttons */}
             <View style={styles.victoryButtonRow}>
               <TouchableOpacity
+                style={styles.shareButton}
+                onPress={handleShare}
+                accessibilityLabel="Share result"
+                accessibilityRole="button"
+              >
+                <Text style={styles.shareButtonText}>📤</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 style={styles.homeButton}
                 onPress={handleReturnHome}
                 accessibilityLabel="Return home"
@@ -482,7 +756,7 @@ export default function App() {
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </Animated.View>
     </ErrorBoundary>
   );
 }
@@ -514,6 +788,22 @@ const styles = StyleSheet.create({
   },
   headerHomeText: {
     fontSize: 20,
+  },
+  headerTitleArea: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  dailyBadge: {
+    backgroundColor: CandyColors.yellow.main,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  dailyBadgeText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: CandyColors.gray[800],
+    letterSpacing: 2,
   },
   helpButton: {
     width: 40,
@@ -1055,6 +1345,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareButton: {
+    backgroundColor: CandyColors.blue.light,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  shareButtonText: {
+    fontSize: 20,
   },
   homeButton: {
     backgroundColor: CandyColors.gray[200],
