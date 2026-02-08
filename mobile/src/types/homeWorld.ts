@@ -119,6 +119,12 @@ export interface HomeWorldProgress {
   // Streak tracking for bonus amber
   currentStreak: number;
   lastPlayDate: string | null; // ISO date string (YYYY-MM-DD)
+  // Weighted phase progress (performance-based acceleration)
+  phaseProgress?: number;
+  // Challenge mode tracking
+  challengeCompletions?: number;
+  // Room decorations purchased
+  decorations?: { [roomId: string]: string[] };
 }
 
 /**
@@ -284,4 +290,111 @@ export function calculateStreakMultiplier(streak: number): number {
     STREAK_BONUSES.MAX_BONUS_PERCENTAGE
   );
   return 1 + bonusPercentage;
+}
+
+/**
+ * Narrative acceleration configuration
+ * Engaged players progress through phases faster based on performance
+ * An engaged player can reach Phase 4 in ~120-150 puzzles instead of 250
+ */
+export const NARRATIVE_ACCELERATION = {
+  // Three-star rate threshold: above this, puzzles count more toward phase progress
+  THREE_STAR_RATE_THRESHOLD: 0.5,
+  THREE_STAR_MULTIPLIER: 1.5,
+  // Streak threshold: long streaks accelerate phase progression
+  STREAK_THRESHOLD: 7,
+  STREAK_MULTIPLIER: 1.25,
+  // Difficulty-based: harder puzzles accelerate, easy stays neutral
+  HARD_MULTIPLIER: 1.5,
+  MEDIUM_MULTIPLIER: 1.0,
+  EASY_MULTIPLIER: 1.0,
+  // Challenge mode: completing in challenge mode counts double
+  CHALLENGE_MULTIPLIER: 2.0,
+};
+
+/**
+ * Challenge mode configuration
+ * Optional harder mode for experienced players with better rewards
+ */
+export const CHALLENGE_MODE_CONFIG = {
+  // Maximum undos allowed in challenge mode (0 = no undos)
+  MAX_UNDOS: 1,
+  // Amber reward multiplier for challenge completions
+  AMBER_MULTIPLIER: 1.5,
+  // No hints allowed in challenge mode
+  HINTS_ALLOWED: false,
+};
+
+/**
+ * Room decoration definitions
+ * Cosmetic items purchasable after all base unlocks are done
+ */
+export interface Decoration {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  cost: number;
+  roomTheme: RoomTheme; // Which room this decoration belongs to
+}
+
+/**
+ * Available decorations for each room
+ * Each room gets 3 decorations to purchase
+ */
+export const ROOM_DECORATIONS: Decoration[] = [
+  // Cozy den (Fox)
+  { id: 'cozy_den_rug', name: 'Velvet Rug', description: 'A luxurious crimson rug by the fire', icon: '🟥', cost: 75, roomTheme: 'cozy_den' },
+  { id: 'cozy_den_lamp', name: 'Crystal Lamp', description: 'Casts warm amber light across the room', icon: '🪔', cost: 100, roomTheme: 'cozy_den' },
+  { id: 'cozy_den_painting', name: 'Forest Painting', description: 'A misty woodland scene in a gold frame', icon: '🖼️', cost: 150, roomTheme: 'cozy_den' },
+  // Kitchen (Pangolin)
+  { id: 'kitchen_pots', name: 'Copper Pot Set', description: 'Gleaming copper pots hanging from hooks', icon: '🫕', cost: 75, roomTheme: 'kitchen' },
+  { id: 'kitchen_herbs', name: 'Herb Garden', description: 'Fresh herbs growing on the windowsill', icon: '🌿', cost: 100, roomTheme: 'kitchen' },
+  { id: 'kitchen_chandelier', name: 'Iron Chandelier', description: 'Rustic wrought iron with candles', icon: '🕯️', cost: 150, roomTheme: 'kitchen' },
+  // Study (Owl)
+  { id: 'study_globe', name: 'Antique Globe', description: 'A spinning globe with golden meridians', icon: '🌍', cost: 75, roomTheme: 'study' },
+  { id: 'study_telescope', name: 'Brass Telescope', description: 'Points toward the night sky through the window', icon: '🔭', cost: 100, roomTheme: 'study' },
+  { id: 'study_clock', name: 'Grandfather Clock', description: 'Ticks with measured, philosophical patience', icon: '🕰️', cost: 150, roomTheme: 'study' },
+  // Aquarium (Axolotl)
+  { id: 'aquarium_coral', name: 'Living Coral', description: 'Bioluminescent coral that softly glows', icon: '🪸', cost: 75, roomTheme: 'aquarium' },
+  { id: 'aquarium_treasure', name: 'Sunken Treasure', description: 'A tiny treasure chest with golden coins', icon: '💰', cost: 100, roomTheme: 'aquarium' },
+  { id: 'aquarium_jellyfish', name: 'Jellyfish Mobile', description: 'Glass jellyfish that catch the light', icon: '🪼', cost: 150, roomTheme: 'aquarium' },
+  // Jungle (Sloth)
+  { id: 'jungle_flowers', name: 'Tropical Flowers', description: 'Exotic blooms in vibrant colors', icon: '🌺', cost: 75, roomTheme: 'jungle' },
+  { id: 'jungle_butterfly', name: 'Butterfly Garden', description: 'Butterflies drift lazily through the vines', icon: '🦋', cost: 100, roomTheme: 'jungle' },
+  { id: 'jungle_waterfall', name: 'Mini Waterfall', description: 'A gentle cascade into a mossy pool', icon: '💧', cost: 150, roomTheme: 'jungle' },
+  // Desert (Fennec Fox)
+  { id: 'desert_lantern', name: 'Star Lantern', description: 'A brass lantern that projects star patterns', icon: '🏮', cost: 75, roomTheme: 'desert' },
+  { id: 'desert_cactus', name: 'Blooming Cactus', description: 'A rare cactus with a single pink flower', icon: '🌵', cost: 100, roomTheme: 'desert' },
+  { id: 'desert_orrery', name: 'Desert Orrery', description: 'A model of the solar system in brass and stone', icon: '🪐', cost: 150, roomTheme: 'desert' },
+  // Office (Capybara)
+  { id: 'office_plant', name: 'Office Fern', description: 'A calming fern that purifies the air', icon: '🪴', cost: 75, roomTheme: 'office' },
+  { id: 'office_fish', name: 'Desktop Aquarium', description: 'A tiny fish tank with a single goldfish', icon: '🐠', cost: 100, roomTheme: 'office' },
+  { id: 'office_art', name: 'Abstract Art', description: 'A soothing abstract canvas in cool tones', icon: '🎨', cost: 150, roomTheme: 'office' },
+  // Burrow (Wombat)
+  { id: 'burrow_crystals', name: 'Crystal Cluster', description: 'Amethyst crystals embedded in the wall', icon: '💎', cost: 75, roomTheme: 'burrow' },
+  { id: 'burrow_mushrooms', name: 'Glow Mushrooms', description: 'Bioluminescent mushrooms in the corner', icon: '🍄', cost: 100, roomTheme: 'burrow' },
+  { id: 'burrow_fossils', name: 'Fossil Collection', description: 'Ancient fossils carefully mounted on the wall', icon: '🦴', cost: 150, roomTheme: 'burrow' },
+  // Garden (Rabbit)
+  { id: 'garden_fountain', name: 'Stone Fountain', description: 'A bubbling fountain with mossy stones', icon: '⛲', cost: 75, roomTheme: 'garden' },
+  { id: 'garden_birdhouse', name: 'Birdhouse', description: 'A charming painted birdhouse on a pole', icon: '🏡', cost: 100, roomTheme: 'garden' },
+  { id: 'garden_gazebo', name: 'Garden Gazebo', description: 'A vine-covered gazebo for afternoon tea', icon: '🛖', cost: 150, roomTheme: 'garden' },
+  // Bamboo (Red Panda)
+  { id: 'bamboo_incense', name: 'Incense Burner', description: 'Fragrant smoke curls upward in spirals', icon: '🧘', cost: 75, roomTheme: 'bamboo' },
+  { id: 'bamboo_bonsai', name: 'Bonsai Tree', description: 'A centuries-old bonsai in a jade pot', icon: '🌳', cost: 100, roomTheme: 'bamboo' },
+  { id: 'bamboo_windchime', name: 'Wind Chimes', description: 'Bamboo chimes that sing in the breeze', icon: '🎐', cost: 150, roomTheme: 'bamboo' },
+];
+
+/**
+ * Get decorations available for a specific room
+ */
+export function getDecorationsForRoom(roomTheme: RoomTheme): Decoration[] {
+  return ROOM_DECORATIONS.filter(d => d.roomTheme === roomTheme);
+}
+
+/**
+ * Get total cost of all decorations (for post-completion amber sink)
+ */
+export function getTotalDecorationCost(): number {
+  return ROOM_DECORATIONS.reduce((sum, d) => sum + d.cost, 0);
 }

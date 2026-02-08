@@ -18,6 +18,7 @@ interface ShareableResult {
   isDaily?: boolean;
   dailyDate?: string;
   moveCount: number;
+  isChallenge?: boolean;
 }
 
 /**
@@ -78,10 +79,13 @@ export function generateShareText(result: ShareableResult): string {
     lines.push(`WordShift Lv.${result.level}`);
   }
 
-  lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${result.difficulty}`);
+  const challengeTag = result.isChallenge ? ' 🔒' : '';
+  lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${result.difficulty}${challengeTag}`);
   lines.push(performanceGrid(result.moveCount, result.hintsUsed, result.invalidAttempts));
 
-  if (result.hintsUsed === 0 && result.invalidAttempts <= 1) {
+  if (result.isChallenge && result.hintsUsed === 0 && result.invalidAttempts <= 1) {
+    lines.push('Challenge Mode — flawless!');
+  } else if (result.hintsUsed === 0 && result.invalidAttempts <= 1) {
     lines.push('No hints, no mistakes!');
   }
 

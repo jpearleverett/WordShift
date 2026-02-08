@@ -43,6 +43,8 @@ export interface AchievementCheckState {
   amberEarned: number;
   dailyChallengesCompleted: number;
   shareCount: number;
+  challengeCompletions: number;
+  decorationCount: number;
 }
 
 // ===== Achievement Definitions =====
@@ -283,6 +285,78 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '📤',
     category: 'journey',
     check: (s) => s.shareCount >= 1,
+  },
+
+  // Challenge mode achievements
+  {
+    id: 'challenge_first',
+    title: 'Challenger',
+    description: 'Complete your first puzzle in Challenge Mode',
+    icon: '🔒',
+    category: 'mastery',
+    check: (s) => s.challengeCompletions >= 1,
+  },
+  {
+    id: 'challenge_10',
+    title: 'Fearless Champion',
+    description: 'Complete 10 puzzles in Challenge Mode',
+    icon: '🛡️',
+    category: 'mastery',
+    check: (s) => s.challengeCompletions >= 10,
+  },
+  {
+    id: 'challenge_25',
+    title: 'Iron Will',
+    description: 'Complete 25 puzzles in Challenge Mode',
+    icon: '⚔️',
+    category: 'mastery',
+    check: (s) => s.challengeCompletions >= 25,
+  },
+
+  // Decoration achievements
+  {
+    id: 'first_decoration',
+    title: 'Interior Designer',
+    description: 'Purchase your first room decoration',
+    icon: '🎨',
+    category: 'collection',
+    check: (s) => s.decorationCount >= 1,
+  },
+  {
+    id: 'decorations_10',
+    title: 'Home Stylist',
+    description: 'Purchase 10 decorations',
+    icon: '🏡',
+    category: 'collection',
+    check: (s) => s.decorationCount >= 10,
+  },
+  {
+    id: 'decorations_all',
+    title: 'Grand Designer',
+    description: 'Purchase all 30 decorations',
+    icon: '👑',
+    category: 'collection',
+    check: (s) => s.decorationCount >= 30,
+  },
+
+  // Extended streak achievements
+  {
+    id: 'streak_60',
+    title: 'Unbreakable',
+    description: 'Maintain a 60-day play streak',
+    icon: '💫',
+    category: 'streak',
+    check: (s) => s.currentStreak >= 60,
+  },
+
+  // Extended puzzle count
+  {
+    id: 'puzzle_500',
+    title: 'Word Legend',
+    description: 'Complete 500 puzzles',
+    icon: '🌟',
+    category: 'puzzle',
+    check: (s) => s.stats.totalPuzzlesCompleted >= 500,
   },
 ];
 

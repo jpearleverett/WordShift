@@ -35,6 +35,7 @@ import {
   getShareCount,
 } from './src/services/achievements';
 import { getDailyStatus, recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
+import { getDecorationCount } from './src/services/amberCurrency';
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettings, getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
@@ -96,6 +97,7 @@ export default function App() {
       const progress = await getFullProgress();
       const shareCount = await getShareCount();
       const dailyStatus = await getDailyStatus();
+      const decorationCount = await getDecorationCount();
 
       const state: AchievementCheckState = {
         stats: victory.cumulativeStats || {
@@ -122,6 +124,8 @@ export default function App() {
         amberEarned: progress.totalAmberEarned,
         dailyChallengesCompleted: dailyStatus.totalCompleted,
         shareCount,
+        challengeCompletions: progress.challengeCompletions || 0,
+        decorationCount,
       };
 
       const newAchievements = await checkAchievements(state);
@@ -206,7 +210,8 @@ export default function App() {
       const victory = await persistenceActions.recordVictory(
         puzzle.difficulty,
         result.hintsUsed,
-        result.invalidAttempts
+        result.invalidAttempts,
+        result.gameMode
       );
 
       // Record daily challenge completion if applicable
@@ -412,7 +417,20 @@ export default function App() {
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
-        <LevelDisplay level={puzzle.level} />
+        <View style={styles.leftStatsGroup}>
+          <LevelDisplay level={puzzle.level} />
+          {/* Challenge Mode Badge */}
+          {puzzle.gameMode === 'challenge' && (
+            <View style={styles.challengeBadge}>
+              <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
+              {puzzle.undosRemaining < Infinity && (
+                <Text style={styles.challengeUndoText}>
+                  {puzzle.undosRemaining} undo{puzzle.undosRemaining !== 1 ? 's' : ''}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
 
         <TouchableOpacity
           style={styles.difficultyButton}
@@ -442,7 +460,7 @@ export default function App() {
                 ]}
                 onPress={() => {
                   hapticLight();
-                  puzzleActions.startNewGame(d);
+                  puzzleActions.startNewGame(d, puzzle.gameMode);
                 }}
               >
                 <View style={[
@@ -461,6 +479,34 @@ export default function App() {
                 </Text>
               </TouchableOpacity>
             ))}
+            {/* Challenge mode toggle */}
+            <View style={styles.challengeMenuDivider} />
+            <TouchableOpacity
+              style={[
+                styles.difficultyMenuItem,
+                puzzle.gameMode === 'challenge' && styles.challengeMenuItemActive,
+              ]}
+              onPress={() => {
+                hapticMedium();
+                const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
+                puzzleActions.startNewGame(puzzle.difficulty, newMode);
+              }}
+            >
+              <Text style={styles.challengeMenuIcon}>
+                {puzzle.gameMode === 'challenge' ? '🔓' : '🔒'}
+              </Text>
+              <View style={styles.challengeMenuContent}>
+                <Text style={[
+                  styles.difficultyMenuText,
+                  puzzle.gameMode === 'challenge' && styles.challengeMenuTextActive,
+                ]}>
+                  CHALLENGE
+                </Text>
+                <Text style={styles.challengeMenuDesc}>
+                  {puzzle.gameMode === 'challenge' ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -649,7 +695,12 @@ export default function App() {
                 <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} Amber</Text>
                 {victoryData.streakBonus > 0 && (
                   <Text style={styles.streakBonusText}>
-                    (+{victoryData.streakBonus} streak bonus!)
+                    (+{victoryData.streakBonus} streak!)
+                  </Text>
+                )}
+                {victoryData.challengeBonus > 0 && (
+                  <Text style={styles.challengeBonusText}>
+                    (+{victoryData.challengeBonus} challenge!)
                   </Text>
                 )}
               </View>
@@ -1272,6 +1323,12 @@ const styles = StyleSheet.create({
     color: CandyColors.orange.main,
     marginLeft: 8,
   },
+  challengeBonusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: CandyColors.pink.main,
+    marginLeft: 8,
+  },
 
   // Win screen streak display
   winStreakContainer: {
@@ -1376,5 +1433,56 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[600],
     fontSize: 16,
     fontWeight: '800',
+  },
+
+  // Challenge mode styles
+  leftStatsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  challengeBadge: {
+    backgroundColor: CandyColors.red.main,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  challengeBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: CandyColors.white,
+    letterSpacing: 1,
+  },
+  challengeUndoText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  challengeMenuDivider: {
+    height: 1,
+    backgroundColor: CandyColors.gray[200],
+    marginVertical: 6,
+    marginHorizontal: 8,
+  },
+  challengeMenuItemActive: {
+    backgroundColor: CandyColors.red.main + '15',
+  },
+  challengeMenuIcon: {
+    fontSize: 16,
+    marginRight: 10,
+  },
+  challengeMenuContent: {
+    flex: 1,
+  },
+  challengeMenuTextActive: {
+    color: CandyColors.red.main,
+  },
+  challengeMenuDesc: {
+    fontSize: 10,
+    color: CandyColors.gray[400],
+    marginTop: 1,
   },
 });

@@ -21,6 +21,8 @@ export enum GameState {
 
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
+export type GameMode = 'standard' | 'challenge';
+
 export interface PuzzleSolutionStep {
   stepIndex: number;
   sourceWord: string;
