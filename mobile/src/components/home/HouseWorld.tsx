@@ -978,7 +978,7 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 0,
     marginTop: 50,
   },
 
