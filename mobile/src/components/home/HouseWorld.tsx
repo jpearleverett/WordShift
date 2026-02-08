@@ -546,14 +546,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       lastScale.current = currentScale;
 
       // Smooth snap if too zoomed out
-      if (currentScale < 0.7) {
+      if (currentScale < 0.8) {
         Animated.spring(scale, {
-          toValue: 0.7,
+          toValue: 0.8,
           friction: 5,
           useNativeDriver: true,
         }).start(() => {
-          baseScale.current = 0.7;
-          lastScale.current = 0.7;
+          baseScale.current = 0.8;
+          lastScale.current = 0.8;
         });
       }
     }
