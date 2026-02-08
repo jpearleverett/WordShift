@@ -62,7 +62,7 @@ export interface Room {
   theme: RoomTheme;
   animalId: string | null;
   // Visual positioning
-  layoutPosition: { row: number; col: number }; // For 2-column layouts
+  layoutPosition: { row: number; col: number }; // Single-column layout (col always 0)
   backgroundColor: string;
   accentColor: string;
 }

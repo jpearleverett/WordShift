@@ -331,13 +331,13 @@ const ShootingStar: React.FC = () => {
   );
 };
 
-// House dimensions (2-column layout)
+// House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
-const ROOM_WIDTH = 160;
+const ROOM_WIDTH = 326;
 const ROOM_HEIGHT = 80;
 const ROOM_GAP = 6;
 const HOUSE_PADDING = 16;
-const HOUSE_WIDTH = (ROOM_WIDTH * 2) + ROOM_GAP + (HOUSE_PADDING * 2);
+const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
 // Zoom constraints
 const MIN_SCALE = 0.6;
@@ -522,25 +522,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     return animals.find(a => a.roomId === roomId) || null;
   };
 
-  // Group rooms by row for 2-column layout
-  const getRoomsByRow = () => {
-    const rowMap: Map<number, Room[]> = new Map();
-    unlockedRooms.forEach(room => {
-      const row = room.layoutPosition.row;
-      if (!rowMap.has(row)) {
-        rowMap.set(row, []);
-      }
-      rowMap.get(row)!.push(room);
-    });
-    // Sort rooms within each row by column
-    rowMap.forEach(roomsInRow => {
-      roomsInRow.sort((a, b) => a.layoutPosition.col - b.layoutPosition.col);
-    });
-    return rowMap;
-  };
-
-  const roomsByRow = getRoomsByRow();
-  const numRows = Math.max(1, roomsByRow.size);
+  // Single-column layout: each room is its own row, sorted by row index descending (top to bottom)
+  const sortedRooms = [...unlockedRooms].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
+  const numRows = Math.max(1, unlockedRooms.length);
 
   const calculateHouseHeight = (): number => {
     return numRows * ROOM_HEIGHT +
@@ -796,63 +780,28 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   </View>
                 </View>
 
-                {/* House body with rooms (2-column layout) */}
+                {/* House body with rooms (single-column layout) */}
                 <View style={[styles.houseBody, { minHeight: houseHeight - HOUSE_PADDING }]}>
                   <View style={styles.topTrim} />
 
-                  {/* Render rows from top to bottom (highest row number first) */}
-                  {[...roomsByRow.entries()]
-                    .sort((a, b) => b[0] - a[0]) // Sort by row descending
-                    .map(([rowIndex, rowRooms]) => (
-                      <View key={`row-${rowIndex}`} style={styles.roomRow}>
-                        {/* Left column (col 0) */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 0).map(room => {
-                          const roomAnimal = getAnimalForRoom(room.id);
-                          return (
-                            <RoomView
-                              key={room.id}
-                              room={room}
-                              animal={roomAnimal}
-                              width={ROOM_WIDTH}
-                              height={ROOM_HEIGHT}
-                              onAnimalPress={onAnimalPress}
-                              onRoomPress={onRoomPress}
-                              currentPhase={currentPhase}
-                              isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
-                            />
-                          );
-                        })}
-                        {/* Empty placeholder if no left room */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 0).length === 0 && (
-                          <View style={{ width: ROOM_WIDTH, height: ROOM_HEIGHT }} />
-                        )}
-
-                        {/* Gap between columns */}
-                        <View style={{ width: ROOM_GAP }} />
-
-                        {/* Right column (col 1) */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 1).map(room => {
-                          const roomAnimal = getAnimalForRoom(room.id);
-                          return (
-                            <RoomView
-                              key={room.id}
-                              room={room}
-                              animal={roomAnimal}
-                              width={ROOM_WIDTH}
-                              height={ROOM_HEIGHT}
-                              onAnimalPress={onAnimalPress}
-                              onRoomPress={onRoomPress}
-                              currentPhase={currentPhase}
-                              isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
-                            />
-                          );
-                        })}
-                        {/* Empty placeholder if no right room */}
-                        {rowRooms.filter(r => r.layoutPosition.col === 1).length === 0 && (
-                          <View style={{ width: ROOM_WIDTH, height: ROOM_HEIGHT }} />
-                        )}
+                  {/* Render rooms from top to bottom (highest row number first) */}
+                  {sortedRooms.map(room => {
+                    const roomAnimal = getAnimalForRoom(room.id);
+                    return (
+                      <View key={room.id} style={styles.roomRow}>
+                        <RoomView
+                          room={room}
+                          animal={roomAnimal}
+                          width={ROOM_WIDTH}
+                          height={ROOM_HEIGHT}
+                          onAnimalPress={onAnimalPress}
+                          onRoomPress={onRoomPress}
+                          currentPhase={currentPhase}
+                          isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
+                        />
                       </View>
-                    ))}
+                    );
+                  })}
 
                   {unlockedRooms.length === 0 && (
                     <View style={styles.emptyHouse}>
@@ -1029,7 +978,8 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
+    marginTop: 30,
   },
 
   // Roof
@@ -1149,9 +1099,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 3,
   },
   roomRow: {
-    flexDirection: 'row',
     marginBottom: ROOM_GAP,
-    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyHouse: {
     padding: 40,

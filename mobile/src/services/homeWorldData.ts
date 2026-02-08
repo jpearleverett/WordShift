@@ -3,8 +3,8 @@ import { loadProgress, unlockAnimal, unlockRoom, canAfford } from './amberCurren
 
 /**
  * Default room definitions
- * Layout: 2-column building that grows upward
- * Each row has 2 rooms side by side before going to next floor
+ * Layout: single-column building that grows upward
+ * Each room occupies its own row, stacked vertically
  */
 export const ROOMS: Room[] = [
   // Row 0 (Ground Floor)
@@ -19,6 +19,8 @@ export const ROOMS: Room[] = [
     backgroundColor: '#CD853F',
     accentColor: '#8B4513',
   },
+
+  // Row 1
   {
     id: 'kitchen',
     name: 'Rustic Kitchen',
@@ -26,12 +28,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'kitchen',
     animalId: 'pangolin',
-    layoutPosition: { row: 0, col: 1 },
+    layoutPosition: { row: 1, col: 0 },
     backgroundColor: '#D2691E',
     accentColor: '#8B4513',
   },
 
-  // Row 1
+  // Row 2
   {
     id: 'study',
     name: 'Scholar\'s Study',
@@ -39,10 +41,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'study',
     animalId: 'owl',
-    layoutPosition: { row: 1, col: 0 },
+    layoutPosition: { row: 2, col: 0 },
     backgroundColor: '#4A4A6A',
     accentColor: '#2F2F4F',
   },
+
+  // Row 3
   {
     id: 'aquarium',
     name: 'Aquarium Room',
@@ -50,12 +54,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'aquarium',
     animalId: 'axolotl',
-    layoutPosition: { row: 1, col: 1 },
+    layoutPosition: { row: 3, col: 0 },
     backgroundColor: '#87CEEB',
     accentColor: '#4682B4',
   },
 
-  // Row 2
+  // Row 4
   {
     id: 'jungle_room',
     name: 'Jungle Hammock',
@@ -63,10 +67,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'jungle',
     animalId: 'sloth',
-    layoutPosition: { row: 2, col: 0 },
+    layoutPosition: { row: 4, col: 0 },
     backgroundColor: '#32CD32',
     accentColor: '#006400',
   },
+
+  // Row 5
   {
     id: 'desert_room',
     name: 'Desert Camp',
@@ -74,12 +80,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'desert',
     animalId: 'fennec_fox',
-    layoutPosition: { row: 2, col: 1 },
+    layoutPosition: { row: 5, col: 0 },
     backgroundColor: '#F4A460',
     accentColor: '#DAA520',
   },
 
-  // Row 3
+  // Row 6
   {
     id: 'office',
     name: 'Chill Office',
@@ -87,10 +93,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'office',
     animalId: 'capybara',
-    layoutPosition: { row: 3, col: 0 },
+    layoutPosition: { row: 6, col: 0 },
     backgroundColor: '#708090',
     accentColor: '#2F4F4F',
   },
+
+  // Row 7
   {
     id: 'burrow',
     name: 'Underground Burrow',
@@ -98,12 +106,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'burrow',
     animalId: 'wombat',
-    layoutPosition: { row: 3, col: 1 },
+    layoutPosition: { row: 7, col: 0 },
     backgroundColor: '#8B7355',
     accentColor: '#5C4033',
   },
 
-  // Row 4 (Top Floor)
+  // Row 8
   {
     id: 'garden',
     name: 'Garden Patio',
@@ -111,10 +119,12 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'garden',
     animalId: 'rabbit',
-    layoutPosition: { row: 4, col: 0 },
+    layoutPosition: { row: 8, col: 0 },
     backgroundColor: '#98FB98',
     accentColor: '#228B22',
   },
+
+  // Row 9 (Top Floor)
   {
     id: 'bamboo_attic',
     name: 'Bamboo Attic',
@@ -122,7 +132,7 @@ export const ROOMS: Room[] = [
     isUnlocked: false,
     theme: 'bamboo',
     animalId: 'red_panda',
-    layoutPosition: { row: 4, col: 1 },
+    layoutPosition: { row: 9, col: 0 },
     backgroundColor: '#90EE90',
     accentColor: '#228B22',
   },
