@@ -638,10 +638,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* White dialogue panel - overlaps under the sprite */}
                 <View style={styles.dialoguePanel}>
-                  {/* Name row - sits beside sprite overlap zone */}
-                  <View style={styles.dialogueNameRow}>
-                    <Text style={styles.dialogueAnimalName}>{selectedAnimal.name}</Text>
-                  </View>
+                  <Text style={styles.dialogueAnimalName}>{selectedAnimal.name}</Text>
 
                   {/* Full-width speech bubble */}
                   <View style={styles.dialogueBubble}>
@@ -1210,7 +1207,8 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -50,
+    marginTop: -40,
+    paddingTop: 50,
     paddingHorizontal: 22,
     paddingBottom: 34,
     shadowColor: '#000',
@@ -1219,16 +1217,12 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 10,
   },
-  dialogueNameRow: {
-    minHeight: 54,
-    paddingLeft: Math.min(160, SCREEN_WIDTH * 0.43 + 4),
-    justifyContent: 'center',
-  },
   dialogueAnimalName: {
     fontSize: 24,
     fontWeight: '900',
     color: CandyColors.purple.dark,
     letterSpacing: 0.3,
+    marginBottom: 12,
   },
   dialogueBubble: {
     backgroundColor: CandyColors.gray[100],
