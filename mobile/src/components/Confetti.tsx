@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
+import { getSettingsSync } from '../services/settings';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -139,6 +140,11 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete }) => {
 
   useEffect(() => {
     if (active) {
+      // Skip confetti animation if reduced motion is enabled
+      if (getSettingsSync().reducedMotion) {
+        onComplete?.();
+        return;
+      }
       setPieces(generateConfetti(50));
       const timeout = setTimeout(() => {
         onComplete?.();

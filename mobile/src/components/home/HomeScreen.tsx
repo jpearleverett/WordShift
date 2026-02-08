@@ -24,8 +24,6 @@ import {
   markDialogueRead,
   markIntroSeen,
   hasSeenIntro,
-  devAddAmber,
-  devAddPuzzles,
 } from '../../services/amberCurrency';
 import {
   ROOMS,
@@ -52,26 +50,31 @@ import {
   recordDialogue,
   endSession,
   getSessionStatus,
-  formatTimeRemaining,
   updatePuzzleCount,
-  isOnCooldown,
-  clearAllSessions,
 } from '../../services/dialogueSession';
 
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
 import { AmberSparkle } from './AmberSparkle';
+import { DailyChallengeCard } from '../DailyChallengeCard';
+import { Difficulty } from '../../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface HomeScreenProps {
-  onPlayPuzzle: () => void;
+  onPlayPuzzle: (difficulty?: Difficulty) => void;
   onAmberChange?: (newBalance: number) => void;
+  onOpenSettings?: () => void;
+  onOpenStats?: () => void;
+  onStartDaily?: (difficulty: Difficulty) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onAmberChange,
+  onOpenSettings,
+  onOpenStats,
+  onStartDaily,
 }) => {
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -81,7 +84,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showShop, setShowShop] = useState(false);
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
-  const [showBuildPrompt, setShowBuildPrompt] = useState(false);
   const [nextUnlock, setNextUnlock] = useState<Unlockable | null>(null);
   const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
   const [sessionInfo, setSessionInfo] = useState<{
@@ -451,24 +453,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return `${current}/${total}`;
   };
 
-  // DEV: Add amber, puzzles, and reset dialogue sessions
-  const handleDevButton = async () => {
-    // Add 5000 amber
-    const newBalance = await devAddAmber(5000);
-
-    // Add 30 puzzles to progress through phases (enough to go from phase 0 to 1)
-    await devAddPuzzles(30);
-
-    // Clear all dialogue sessions so animals can talk again
-    await clearAllSessions();
-
-    // Reload data
-    await loadAllData();
-
-    // Notify parent of amber change
-    onAmberChange?.(newBalance);
-  };
-
   if (!progress || rooms.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -503,23 +487,72 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </Text>
         </View>
 
-        <JuicyButton
-          style={styles.playButton}
-          onPress={onPlayPuzzle}
-          bounceScale={0.9}
-        >
-          <Text style={styles.playButtonText}>PLAY</Text>
-        </JuicyButton>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={onOpenStats}
+            accessibilityLabel="View stats"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerIconText}>📊</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={onOpenSettings}
+            accessibilityLabel="Settings"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerIconText}>⚙️</Text>
+          </TouchableOpacity>
+          <JuicyButton
+            style={styles.playButton}
+            onPress={() => onPlayPuzzle()}
+            bounceScale={0.9}
+            accessibilityLabel="Play puzzle"
+            accessibilityRole="button"
+          >
+            <Text style={styles.playButtonText}>PLAY</Text>
+          </JuicyButton>
+        </View>
       </View>
 
-      {/* DEV Button - gives amber and resets dialogue sessions */}
-      {__DEV__ && (
+      {/* Next Unlock Progress Bar */}
+      {nextUnlock && (
         <TouchableOpacity
-          style={styles.devButton}
-          onPress={handleDevButton}
+          style={styles.unlockProgressContainer}
+          onPress={() => setShowShop(true)}
+          activeOpacity={0.8}
+          accessibilityLabel={`Next unlock: ${nextUnlock.name}. ${nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${nextUnlock.cost} amber`}`}
+          accessibilityRole="button"
         >
-          <Text style={styles.devButtonText}>DEV</Text>
+          <View style={styles.unlockProgressInner}>
+            <Text style={styles.unlockProgressLabel}>
+              {nextUnlock.type === 'character' ? '🐾' : '🏠'} {nextUnlock.name}
+            </Text>
+            <View style={styles.unlockProgressBarBg}>
+              <View
+                style={[
+                  styles.unlockProgressBarFill,
+                  {
+                    width: `${Math.min(100, nextUnlock.cost > 0
+                      ? (progress.amber / nextUnlock.cost) * 100
+                      : 100)}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.unlockProgressText}>
+              {nextUnlock.cost === 0
+                ? 'FREE — Tap to invite!'
+                : `💎 ${progress.amber} / ${nextUnlock.cost}`}
+            </Text>
+          </View>
         </TouchableOpacity>
+      )}
+
+      {/* Daily Challenge Card */}
+      {onStartDaily && (
+        <DailyChallengeCard onStartDaily={onStartDaily} />
       )}
 
       {/* Celebration Confetti */}
@@ -638,6 +671,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <TouchableOpacity
                       style={styles.continueButton}
                       onPress={handleAdvanceDialogue}
+                      accessibilityLabel="Continue dialogue"
+                      accessibilityRole="button"
                     >
                       <Text style={styles.continueButtonText}>
                         {hasMoreDialogues(
@@ -982,6 +1017,23 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     alignItems: 'center',
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerIconText: {
+    fontSize: 16,
   },
   title: {
     color: CandyColors.white,
@@ -1014,21 +1066,43 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // DEV button
-  devButton: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 70 : 110,
-    right: 10,
-    backgroundColor: 'rgba(255, 0, 0, 0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    zIndex: 1000,
+  // Unlock progress bar
+  unlockProgressContainer: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    padding: 10,
   },
-  devButtonText: {
+  unlockProgressInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  unlockProgressLabel: {
     color: CandyColors.white,
-    fontSize: 10,
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  unlockProgressText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  unlockProgressBarBg: {
+    flex: 2,
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  unlockProgressBarFill: {
+    height: '100%',
+    backgroundColor: CandyColors.yellow.main,
+    borderRadius: 4,
   },
 
   // Modal styles

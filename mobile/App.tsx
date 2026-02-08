@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,9 @@ import {
   StatusBar,
   Dimensions,
   Platform,
+  Animated,
 } from 'react-native';
-import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty } from './src/types';
+import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti } from './src/components/Confetti';
@@ -19,28 +20,29 @@ import { ActionButton, AnimatedLogo, Toast, LevelDisplay } from './src/component
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { CandyColors } from './src/theme/colors';
-import { generateLocalPuzzle } from './src/services/localGenerator';
-import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from './src/constants';
+import { usePuzzleGame } from './src/hooks/usePuzzleGame';
+import { useGamePersistence, VictoryData } from './src/hooks/useGamePersistence';
+import { logEvent } from './src/services/eventLogger';
+// New feature imports
+import { Tutorial, hasTutorialCompleted } from './src/components/Tutorial';
+import { SettingsScreen } from './src/components/SettingsScreen';
+import { StatsScreen } from './src/components/StatsScreen';
+import { AchievementToast } from './src/components/AchievementToast';
 import {
-  calculateStars,
-  recordPuzzleCompletion,
-  getCumulativeStats,
-  CumulativeStats,
-} from './src/services/starRating';
-import {
-  awardPuzzleAmber,
-  getAmberBalance,
-  getCurrentPhase,
-} from './src/services/amberCurrency';
-import { updatePuzzleCount } from './src/services/dialogueSession';
-import { DialoguePhase } from './src/types/homeWorld';
+  checkAchievements,
+  Achievement,
+  AchievementCheckState,
+  getShareCount,
+} from './src/services/achievements';
+import { getDailyStatus, recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
+import { sharePuzzleResult } from './src/services/shareResults';
+import { getSettings, getSettingsSync } from './src/services/settings';
+import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
+import { hapticLight, hapticMedium, hapticSuccess, hapticError, hapticHeavy, hapticSelection } from './src/services/haptics';
+import { getFullProgress } from './src/services/amberCurrency';
 
-// Simple ID generator (React Native compatible)
-let idCounter = 0;
-const generateId = () => `id_${Date.now()}_${idCounter++}`;
-
-// App screen type
-type AppScreen = 'home' | 'puzzle';
+// App screen type — expanded with settings and stats
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -48,320 +50,286 @@ export default function App() {
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
 
-  const [rows, setRows] = useState<RowData[]>([]);
-  const [activeRowIndex, setActiveRowIndex] = useState(0);
-  const [selectedLetter, setSelectedLetter] = useState<Letter | null>(null);
-  const [gameState, setGameState] = useState<GameState>(GameState.IDLE);
-  const [message, setMessage] = useState<string>("Loading puzzle...");
-  const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<MoveHistory[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [hint, setHint] = useState<string>("");
-  const [solution, setSolution] = useState<PuzzleSolutionStep[] | undefined>(undefined);
-  const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
-  const [currentWordLength, setCurrentWordLength] = useState(4);
-  const [showRules, setShowRules] = useState(false);
-  const [showDifficultyMenu, setShowDifficultyMenu] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [level, setLevel] = useState(1);
+  // Custom hooks - game logic & persistence separated from UI
+  const [puzzle, puzzleActions] = usePuzzleGame();
+  const [persistence, persistenceActions] = useGamePersistence();
 
-  // Star rating tracking
-  const [invalidAttempts, setInvalidAttempts] = useState(0);
-  const [hintsUsed, setHintsUsed] = useState(0);
-  const [earnedStars, setEarnedStars] = useState(0);
-  const [cumulativeStats, setCumulativeStats] = useState<CumulativeStats | null>(null);
+  // Victory display state
+  const [victoryData, setVictoryData] = useState<VictoryData | null>(null);
 
-  // Amber currency tracking
-  const [amberEarned, setAmberEarned] = useState(0);
-  const [amberBalance, setAmberBalance] = useState(0);
-  const [phaseChanged, setPhaseChanged] = useState(false);
-  const [newPhase, setNewPhase] = useState<DialoguePhase>(0);
-  const [streakBonus, setStreakBonus] = useState(0);
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [milestoneBonus, setMilestoneBonus] = useState(0);
-  const [milestoneMessage, setMilestoneMessage] = useState<string | null>(null);
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
 
-  const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
+  // Achievement toast queue
+  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+  const [currentAchievement, setCurrentAchievement] = useState<Achievement | null>(null);
 
+  // Daily challenge state
+  const [isPlayingDaily, setIsPlayingDaily] = useState(false);
+
+  // Screen transition animation
+  const screenFade = useRef(new Animated.Value(1)).current;
+
+  // Initialize on mount
   useEffect(() => {
-    // Load cumulative stats and amber balance
-    getCumulativeStats().then(setCumulativeStats);
-    getAmberBalance().then(setAmberBalance);
-    getCurrentPhase().then(setNewPhase);
+    initAudio();
+    // Check if tutorial needed
+    hasTutorialCompleted().then(completed => {
+      if (!completed) {
+        setShowTutorial(true);
+      }
+    });
   }, []);
 
+  // Process achievement toast queue
+  useEffect(() => {
+    if (!currentAchievement && achievementQueue.length > 0) {
+      const [next, ...rest] = achievementQueue;
+      setCurrentAchievement(next);
+      setAchievementQueue(rest);
+    }
+  }, [currentAchievement, achievementQueue]);
+
+  // Check for achievements after victory
+  const checkForAchievements = useCallback(async (victory: VictoryData) => {
+    try {
+      const progress = await getFullProgress();
+      const shareCount = await getShareCount();
+      const dailyStatus = await getDailyStatus();
+
+      const state: AchievementCheckState = {
+        stats: victory.cumulativeStats || {
+          totalPuzzlesCompleted: 0,
+          totalStars: 0,
+          threeStarCount: 0,
+          twoStarCount: 0,
+          oneStarCount: 0,
+          totalInvalidAttempts: 0,
+          totalHintsUsed: 0,
+          noHintPuzzleCount: 0,
+          byDifficulty: {
+            EASY: { completed: 0, stars: 0 },
+            MEDIUM: { completed: 0, stars: 0 },
+            HARD: { completed: 0, stars: 0 },
+          },
+          lastUpdated: 0,
+        },
+        puzzlesSolved: progress.puzzlesSolved,
+        currentPhase: progress.currentPhase,
+        currentStreak: victory.currentStreak,
+        unlockedAnimals: progress.unlockedAnimals.length,
+        unlockedRooms: progress.unlockedRooms.length,
+        amberEarned: progress.totalAmberEarned,
+        dailyChallengesCompleted: dailyStatus.totalCompleted,
+        shareCount,
+      };
+
+      const newAchievements = await checkAchievements(state);
+      if (newAchievements.length > 0) {
+        hapticHeavy();
+        setAchievementQueue(prev => [...prev, ...newAchievements]);
+      }
+    } catch (err) {
+      console.warn('Achievement check failed:', err);
+    }
+  }, []);
+
+  // Animated screen transition (instant if reducedMotion)
+  const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
+    const reducedMotion = getSettingsSync().reducedMotion;
+    if (reducedMotion) {
+      setCurrentScreen(screen);
+      callback?.();
+      return;
+    }
+    Animated.timing(screenFade, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start(() => {
+      setCurrentScreen(screen);
+      callback?.();
+      Animated.timing(screenFade, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [screenFade]);
+
   // Start puzzle when navigating to puzzle screen
-  const handlePlayPuzzle = () => {
-    setCurrentScreen('puzzle');
-    startNewGame(difficulty);
-  };
+  const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
+    hapticLight();
+    soundTap();
+    const diff = difficulty || puzzle.difficulty;
+    transitionTo('puzzle', () => {
+      puzzleActions.startNewGame(diff);
+      setIsPlayingDaily(false);
+      logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
+    });
+  }, [puzzle.difficulty, puzzleActions, transitionTo]);
+
+  // Start daily challenge — uses seeded generation for deterministic puzzles
+  const handleStartDaily = useCallback(async (difficulty: Difficulty) => {
+    hapticMedium();
+    soundTap();
+    transitionTo('puzzle', async () => {
+      setIsPlayingDaily(true);
+      puzzleActions.setGameState(GameState.LOADING);
+      try {
+        const daily = await generateDailyPuzzle();
+        puzzleActions.initGame(daily.words, daily.hint);
+      } catch (err) {
+        console.warn('Daily puzzle generation failed, using random:', err);
+        puzzleActions.startNewGame(difficulty);
+      }
+      logEvent({ type: 'puzzle_started', data: { difficulty, isDaily: true } });
+    });
+  }, [puzzleActions, transitionTo]);
 
   // Return to home screen
-  const handleGoHome = () => {
-    setCurrentScreen('home');
-    setGameState(GameState.IDLE);
-    setShowConfetti(false);
-  };
+  const handleGoHome = useCallback(() => {
+    hapticLight();
+    transitionTo('home', () => {
+      puzzleActions.setGameState(GameState.IDLE);
+      puzzleActions.setShowConfetti(false);
+    });
+  }, [puzzleActions, transitionTo]);
 
-  const initGame = (
-    words: string[],
-    puzzleHint?: string,
-    puzzleSolution?: PuzzleSolutionStep[],
-    wordLength: number = 4
-  ) => {
-    const newRows: RowData[] = words.map(word => ({
-      id: generateId(),
-      originalWord: word,
-      words: word.split('').map(char => ({
-        id: generateId(),
-        char: char,
-        isLocked: false,
-      })),
-    }));
-    setRows(newRows);
-    setActiveRowIndex(0);
-    setSelectedLetter(null);
-    setHistory([]);
-    setGameState(GameState.PLAYING);
-    setMessage("Tap a tile to begin!");
-    setError(null);
-    setHint(puzzleHint || "");
-    setSolution(puzzleSolution);
-    setCurrentWordLength(wordLength);
-    // Reset tracking for new puzzle
-    setInvalidAttempts(0);
-    setHintsUsed(0);
-    setEarnedStars(0);
-  };
+  const handleSlotPress = useCallback(async (targetIndex: number) => {
+    const result = await puzzleActions.handleSlotPress(targetIndex);
 
-  const startNewGame = async (selectedDifficulty: Difficulty = difficulty) => {
-    setGameState(GameState.LOADING);
-    setMessage("Mixing up words...");
-    setError(null);
-    setShowDifficultyMenu(false);
-    if (selectedDifficulty !== difficulty) {
-      setDifficulty(selectedDifficulty);
-    }
+    if (result?.completed) {
+      // Puzzle completed — record persistence and show victory
+      hapticSuccess();
 
-    try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Generation timeout')), 4000)
+      const victory = await persistenceActions.recordVictory(
+        puzzle.difficulty,
+        result.hintsUsed,
+        result.invalidAttempts
       );
 
-      const puzzle = await Promise.race([
-        generateLocalPuzzle(selectedDifficulty),
-        timeoutPromise
-      ]);
-
-      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength);
-    } catch (localErr) {
-      console.log("Local generation failed, using fallback:", localErr);
-      if (selectedDifficulty === 'HARD') {
-        initGame(FALLBACK_PUZZLE_HARD, "Challenge Mode", undefined, 5);
-      } else if (selectedDifficulty === 'EASY') {
-        initGame(FALLBACK_PUZZLE.slice(0, 3), "Simple Start", undefined, 4);
-      } else {
-        initGame(FALLBACK_PUZZLE, "Classic Setup", undefined, 4);
+      // Record daily challenge completion if applicable
+      if (isPlayingDaily) {
+        await recordDailyCompletion(
+          victory.earnedStars,
+          result.hintsUsed,
+          result.invalidAttempts
+        );
       }
-    }
-  };
 
-  const handleLetterPress = (letter: Letter, rowIndex: number) => {
-    if (gameState !== GameState.PLAYING) return;
-    if (rowIndex !== activeRowIndex) return;
-    if (letter.isLocked) {
-      shakeError("That letter is locked!");
-      return;
-    }
+      puzzleActions.setEarnedStars(victory.earnedStars);
+      setVictoryData(victory);
 
-    if (selectedLetter?.id === letter.id) {
-      setSelectedLetter(null);
+      if (victory.earnedStars === 3) {
+        soundPerfect();
+      } else {
+        soundVictory();
+      }
+
+      puzzleActions.setMessage("Sweet Victory!");
+      puzzleActions.setGameState(GameState.WON);
+      puzzleActions.setShowConfetti(true);
+
+      // Check achievements after brief delay to not block victory display
+      setTimeout(() => checkForAchievements(victory), 500);
+    } else if (result === null && puzzle.selectedLetter) {
+      // Slot press happened but was invalid
+      hapticError();
+      soundInvalidMove();
     } else {
-      setSelectedLetter(letter);
-      setError(null);
+      // Valid intermediate move
+      hapticMedium();
+      soundValidMove();
     }
-  };
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, checkForAchievements]);
 
-  const shakeError = (msg: string) => {
-    setError(msg);
-    setTimeout(() => setError(null), 2000);
-  };
+  const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
+    hapticLight();
+    soundTap();
+    puzzleActions.handleLetterPress(letter, rowIndex);
+  }, [puzzleActions]);
 
-  const checkValidation = (word: string): boolean => {
-    return validWordsCache.current.has(word.toUpperCase());
-  };
+  const handleUndo = useCallback(() => {
+    hapticLight();
+    soundUndo();
+    puzzleActions.handleUndo();
+  }, [puzzleActions]);
 
-  const handleHint = () => {
-    if (gameState !== GameState.PLAYING || isProcessing) return;
+  const handleHintPress = useCallback(() => {
+    hapticSelection();
+    soundHint();
+    puzzleActions.handleHint();
+  }, [puzzleActions]);
 
-    const currentSourceWord = rows[activeRowIndex].words.map(l => l.char).join("");
-    const currentTargetWord = rows[activeRowIndex + 1].words.map(l => l.char).join("");
+  const handleNextLevel = useCallback(() => {
+    hapticLight();
+    puzzleActions.setShowConfetti(false);
+    setVictoryData(null);
+    setIsPlayingDaily(false);
+    puzzleActions.handleNextLevel();
+  }, [puzzleActions]);
 
-    const relevantStep = solution?.find(s =>
-      s.stepIndex === activeRowIndex &&
-      s.sourceWord === currentSourceWord &&
-      s.targetWord === currentTargetWord
+  const handleReturnHome = useCallback(() => {
+    hapticLight();
+    puzzleActions.setShowConfetti(false);
+    setVictoryData(null);
+    setIsPlayingDaily(false);
+    transitionTo('home', () => {
+      puzzleActions.setGameState(GameState.IDLE);
+    });
+  }, [puzzleActions, transitionTo]);
+
+  const handleShare = useCallback(async () => {
+    if (!victoryData) return;
+    hapticLight();
+    const moveCount = puzzle.rows.length - 1;
+    await sharePuzzleResult({
+      stars: victoryData.earnedStars,
+      difficulty: puzzle.difficulty,
+      level: puzzle.level,
+      hintsUsed: puzzle.hintsUsed,
+      invalidAttempts: puzzle.invalidAttempts,
+      isDaily: isPlayingDaily,
+      dailyDate: isPlayingDaily ? getTodayString() : undefined,
+      moveCount,
+    });
+  }, [victoryData, puzzle, isPlayingDaily]);
+
+  // Tutorial overlay
+  if (showTutorial) {
+    return (
+      <View style={{ flex: 1 }}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <Tutorial onComplete={() => setShowTutorial(false)} />
+      </View>
     );
+  }
 
-    if (relevantStep) {
-      setHintsUsed(prev => prev + 1);
-      setMessage(`Try the letter: ${relevantStep.letterToMove}`);
-    } else {
-      setMessage("Hmm, try undoing a move!");
-    }
-  };
+  // Settings screen
+  if (currentScreen === 'settings') {
+    return (
+      <Animated.View style={{ flex: 1, opacity: screenFade }}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <SettingsScreen onClose={() => transitionTo('home')} />
+      </Animated.View>
+    );
+  }
 
-  const handleSlotPress = async (targetIndex: number) => {
-    if (!selectedLetter || gameState !== GameState.PLAYING) return;
-
-    const sourceRow = rows[activeRowIndex];
-    const targetRow = rows[activeRowIndex + 1];
-
-    const newSourceLetters = sourceRow.words.filter(l => l.id !== selectedLetter.id);
-    const newTargetLetters = [...targetRow.words];
-
-    const movedLetter: Letter = { ...selectedLetter, isLocked: true };
-    newTargetLetters.splice(targetIndex, 0, movedLetter);
-
-    const sourceWordStr = newSourceLetters.map(l => l.char).join("");
-    const targetWordStr = newTargetLetters.map(l => l.char).join("");
-
-    setIsProcessing(true);
-
-    const isStartRow = activeRowIndex === 0;
-    const expectedSourceLength = isStartRow ? currentWordLength - 1 : currentWordLength;
-    const expectedTargetLength = currentWordLength + 1;
-
-    if (sourceWordStr.length !== expectedSourceLength) {
-      shakeError(`Need ${expectedSourceLength} letters!`);
-      setIsProcessing(false);
-      return;
-    }
-
-    if (targetWordStr.length !== expectedTargetLength) {
-      shakeError(`Need ${expectedTargetLength} letters!`);
-      setIsProcessing(false);
-      return;
-    }
-
-    const isSourceValid = checkValidation(sourceWordStr);
-    if (!isSourceValid) {
-      shakeError(`"${sourceWordStr}" isn't a word!`);
-      setInvalidAttempts(prev => prev + 1);
-      setIsProcessing(false);
-      return;
-    }
-
-    const isTargetValid = checkValidation(targetWordStr);
-    if (!isTargetValid) {
-      shakeError(`"${targetWordStr}" isn't a word!`);
-      setInvalidAttempts(prev => prev + 1);
-      setIsProcessing(false);
-      return;
-    }
-
-    setHistory(prev => [...prev, { rows: JSON.parse(JSON.stringify(rows)), activeRowIndex }]);
-
-    const newRows = [...rows];
-    newRows[activeRowIndex] = { ...sourceRow, words: newSourceLetters };
-    newRows[activeRowIndex + 1] = {
-      ...targetRow,
-      words: newTargetLetters.map(l => ({
-        ...l,
-        isLocked: l.id === selectedLetter.id,
-      })),
-    };
-
-    setRows(newRows);
-    setSelectedLetter(null);
-    setError(null);
-
-    const maxMoves = rows.length - 1;
-    if (activeRowIndex === maxMoves - 1) {
-      // Calculate stars and record completion
-      const stars = calculateStars(hintsUsed, invalidAttempts);
-      setEarnedStars(stars);
-
-      // Record completion and award amber, then show victory
-      Promise.all([
-        recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts),
-        awardPuzzleAmber(difficulty, stars),
-      ]).then(async ([_, amberResult]) => {
-        // Refresh cumulative stats
-        const stats = await getCumulativeStats();
-        setCumulativeStats(stats);
-        // Update dialogue session puzzle count so cooldowns progress
-        updatePuzzleCount(amberResult.puzzlesSolved);
-        // Update amber display
-        setAmberEarned(amberResult.amount);
-        setAmberBalance(amberResult.newBalance);
-        setPhaseChanged(amberResult.phaseChanged);
-        setNewPhase(amberResult.newPhase);
-        setStreakBonus(amberResult.streakBonus);
-        setCurrentStreak(amberResult.currentStreak);
-        // Milestone bonus
-        setMilestoneBonus(amberResult.milestoneBonus);
-        setMilestoneMessage(amberResult.milestoneMessage);
-        // Show victory AFTER persistence completes
-        setMessage("Sweet Victory!");
-        setGameState(GameState.WON);
-        setShowConfetti(true);
-      }).catch(err => {
-        console.warn('Failed to record puzzle completion:', err);
-        // Still show victory even if persistence fails, but with stale data
-        setMessage("Sweet Victory!");
-        setGameState(GameState.WON);
-        setShowConfetti(true);
-      });
-    } else {
-      setActiveRowIndex(prev => prev + 1);
-      const messages = [
-        "Delicious!",
-        "Tasty move!",
-        "Sweet!",
-        "Yummy!",
-        "Perfect!",
-        "Brilliant!",
-      ];
-      setMessage(messages[Math.floor(Math.random() * messages.length)]);
-    }
-
-    setIsProcessing(false);
-  };
-
-  const handleUndo = () => {
-    if (history.length === 0) return;
-    const lastState = history[history.length - 1];
-    setRows(lastState.rows);
-    setActiveRowIndex(lastState.activeRowIndex);
-    setHistory(prev => prev.slice(0, -1));
-    setGameState(GameState.PLAYING);
-    setSelectedLetter(null);
-    setError(null);
-    setMessage("Let's try again!");
-  };
-
-  const handleNextLevel = () => {
-    setShowConfetti(false);
-    setLevel(prev => prev + 1);
-    setAmberEarned(0);
-    setPhaseChanged(false);
-    setStreakBonus(0);
-    setMilestoneBonus(0);
-    setMilestoneMessage(null);
-    startNewGame();
-  };
-
-  const handleReturnHome = () => {
-    setShowConfetti(false);
-    setAmberEarned(0);
-    setPhaseChanged(false);
-    setStreakBonus(0);
-    setMilestoneBonus(0);
-    setMilestoneMessage(null);
-    setCurrentScreen('home');
-    setGameState(GameState.IDLE);
-  };
+  // Stats screen
+  if (currentScreen === 'stats') {
+    return (
+      <Animated.View style={{ flex: 1, opacity: screenFade }}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <StatsScreen
+          onClose={() => transitionTo('home')}
+          puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
+          currentPhase={persistence.currentPhase}
+          amberBalance={persistence.amberBalance}
+        />
+      </Animated.View>
+    );
+  }
 
   // Render home screen
   if (currentScreen === 'home') {
@@ -370,11 +338,21 @@ export default function App() {
         fallbackMessage="Something went wrong with the home screen. Tap to try again."
         onReset={() => setCurrentScreen('home')}
       >
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <HomeScreen
-          onPlayPuzzle={handlePlayPuzzle}
-          onAmberChange={setAmberBalance}
-        />
+        <Animated.View style={{ flex: 1, opacity: screenFade }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <HomeScreen
+            onPlayPuzzle={handlePlayPuzzle}
+            onAmberChange={persistenceActions.setAmberBalance}
+            onOpenSettings={() => transitionTo('settings')}
+            onOpenStats={() => transitionTo('stats')}
+            onStartDaily={handleStartDaily}
+          />
+          {/* Achievement toast overlay */}
+          <AchievementToast
+            achievement={currentAchievement}
+            onDismiss={() => setCurrentAchievement(null)}
+          />
+        </Animated.View>
       </ErrorBoundary>
     );
   }
@@ -383,16 +361,22 @@ export default function App() {
   return (
     <ErrorBoundary
       fallbackMessage="Something went wrong with the puzzle. Tap to return home."
-      onReset={() => { setCurrentScreen('home'); setGameState(GameState.IDLE); }}
+      onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
     >
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: screenFade }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Animated Background */}
       <AnimatedBackground />
 
       {/* Confetti celebration */}
-      <Confetti active={showConfetti} />
+      <Confetti active={puzzle.showConfetti} />
+
+      {/* Achievement toast overlay */}
+      <AchievementToast
+        achievement={currentAchievement}
+        onDismiss={() => setCurrentAchievement(null)}
+      />
 
       {/* Header */}
       <View style={styles.header}>
@@ -405,11 +389,19 @@ export default function App() {
           <Text style={styles.headerHomeText}>🏠</Text>
         </TouchableOpacity>
 
-        <AnimatedLogo />
+        <View style={styles.headerTitleArea}>
+          {isPlayingDaily ? (
+            <View style={styles.dailyBadge}>
+              <Text style={styles.dailyBadgeText}>DAILY</Text>
+            </View>
+          ) : (
+            <AnimatedLogo />
+          )}
+        </View>
 
         <TouchableOpacity
           style={styles.helpButton}
-          onPress={() => setShowRules(true)}
+          onPress={() => puzzleActions.setShowRules(true)}
           accessibilityLabel="How to play"
           accessibilityRole="button"
         >
@@ -420,35 +412,38 @@ export default function App() {
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
-        <LevelDisplay level={level} />
+        <LevelDisplay level={puzzle.level} />
 
         <TouchableOpacity
           style={styles.difficultyButton}
-          onPress={() => setShowDifficultyMenu(!showDifficultyMenu)}
-          accessibilityLabel={`Difficulty: ${difficulty}. Tap to change`}
+          onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
+          accessibilityLabel={`Difficulty: ${puzzle.difficulty}. Tap to change`}
           accessibilityRole="button"
         >
           <View style={styles.difficultyButtonShine} />
           <View style={[
             styles.difficultyDot,
-            difficulty === 'EASY' && styles.difficultyDotEasy,
-            difficulty === 'MEDIUM' && styles.difficultyDotMedium,
-            difficulty === 'HARD' && styles.difficultyDotHard,
+            puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
+            puzzle.difficulty === 'MEDIUM' && styles.difficultyDotMedium,
+            puzzle.difficulty === 'HARD' && styles.difficultyDotHard,
           ]} />
-          <Text style={styles.difficultyText}>{difficulty}</Text>
+          <Text style={styles.difficultyText}>{puzzle.difficulty}</Text>
           <Text style={styles.difficultyArrow}>▼</Text>
         </TouchableOpacity>
 
-        {showDifficultyMenu && (
+        {puzzle.showDifficultyMenu && (
           <View style={styles.difficultyMenu}>
             {(['EASY', 'MEDIUM', 'HARD'] as Difficulty[]).map(d => (
               <TouchableOpacity
                 key={d}
                 style={[
                   styles.difficultyMenuItem,
-                  difficulty === d && styles.difficultyMenuItemActive,
+                  puzzle.difficulty === d && styles.difficultyMenuItemActive,
                 ]}
-                onPress={() => startNewGame(d)}
+                onPress={() => {
+                  hapticLight();
+                  puzzleActions.startNewGame(d);
+                }}
               >
                 <View style={[
                   styles.difficultyMenuDot,
@@ -459,7 +454,7 @@ export default function App() {
                 <Text
                   style={[
                     styles.difficultyMenuText,
-                    difficulty === d && styles.difficultyMenuTextActive,
+                    puzzle.difficulty === d && styles.difficultyMenuTextActive,
                   ]}
                 >
                   {d}
@@ -472,12 +467,12 @@ export default function App() {
 
       {/* Toast Message */}
       <View style={styles.toastContainer}>
-        <Toast message={error || message} isError={!!error} />
+        <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} />
       </View>
 
       {/* Game Area */}
       <View style={styles.gameArea}>
-        {(gameState === GameState.LOADING || isProcessing) && (
+        {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing) && (
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={CandyColors.pink.main} />
@@ -490,16 +485,16 @@ export default function App() {
           contentContainerStyle={styles.rowsContainer}
           showsVerticalScrollIndicator={false}
         >
-          {rows.map((row, idx) => (
+          {puzzle.rows.map((row, idx) => (
             <Row
               key={row.id}
               rowData={row}
               rowIndex={idx}
-              activeRowIndex={activeRowIndex}
-              selectedLetter={selectedLetter}
+              activeRowIndex={puzzle.activeRowIndex}
+              selectedLetter={puzzle.selectedLetter}
               onLetterPress={handleLetterPress}
               onSlotPress={handleSlotPress}
-              isProcessing={isProcessing}
+              isProcessing={puzzle.isProcessing}
             />
           ))}
         </ScrollView>
@@ -516,7 +511,7 @@ export default function App() {
             glow: CandyColors.yellow.glow,
           }}
           onPress={handleUndo}
-          disabled={history.length === 0 || gameState === GameState.WON}
+          disabled={puzzle.history.length === 0 || puzzle.gameState === GameState.WON}
         />
         <ActionButton
           icon="💡"
@@ -526,8 +521,8 @@ export default function App() {
             border: CandyColors.blue.shadow,
             glow: CandyColors.blue.glow,
           }}
-          onPress={handleHint}
-          disabled={gameState !== GameState.PLAYING}
+          onPress={handleHintPress}
+          disabled={puzzle.gameState !== GameState.PLAYING}
         />
         <ActionButton
           icon="🔄"
@@ -537,25 +532,27 @@ export default function App() {
             border: CandyColors.green.shadow,
             glow: CandyColors.green.glow,
           }}
-          onPress={() => startNewGame()}
+          onPress={() => {
+            hapticLight();
+            puzzleActions.startNewGame();
+          }}
           disabled={false}
         />
       </View>
 
       {/* Rules Modal */}
-      <Modal visible={showRules} transparent animationType="fade">
+      <Modal visible={puzzle.showRules} transparent animationType="fade">
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowRules(false)}
+          onPress={() => puzzleActions.setShowRules(false)}
         >
           <View style={styles.rulesModal} onStartShouldSetResponder={() => true}>
-            {/* Modal shine */}
             <View style={styles.modalShine} />
 
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowRules(false)}
+              onPress={() => puzzleActions.setShowRules(false)}
             >
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
@@ -604,7 +601,7 @@ export default function App() {
 
             <TouchableOpacity
               style={styles.gotItButton}
-              onPress={() => setShowRules(false)}
+              onPress={() => puzzleActions.setShowRules(false)}
             >
               <View style={styles.buttonShine} />
               <Text style={styles.gotItButtonText}>LET'S PLAY!</Text>
@@ -614,7 +611,7 @@ export default function App() {
       </Modal>
 
       {/* Victory Modal */}
-      <Modal visible={gameState === GameState.WON} transparent animationType="fade">
+      <Modal visible={puzzle.gameState === GameState.WON} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <ScrollView
             contentContainerStyle={styles.victoryScrollContent}
@@ -622,113 +619,114 @@ export default function App() {
             bounces={false}
           >
           <View style={styles.victoryModal}>
-            {/* Decorative elements */}
             <View style={styles.victoryGlow} />
             <View style={styles.modalShine} />
 
-            {/* Stars - show earned vs empty */}
+            {/* Stars */}
             <View style={styles.starsContainer}>
-              <Text style={[styles.victoryStar, earnedStars < 1 && styles.victoryStarEmpty]}>
-                {earnedStars >= 1 ? '⭐' : '☆'}
+              <Text style={[styles.victoryStar, puzzle.earnedStars < 1 && styles.victoryStarEmpty]}>
+                {puzzle.earnedStars >= 1 ? '⭐' : '☆'}
               </Text>
-              <Text style={[styles.victoryStar, styles.victoryStarBig, earnedStars < 2 && styles.victoryStarEmpty]}>
-                {earnedStars >= 2 ? '⭐' : '☆'}
+              <Text style={[styles.victoryStar, styles.victoryStarBig, puzzle.earnedStars < 2 && styles.victoryStarEmpty]}>
+                {puzzle.earnedStars >= 2 ? '⭐' : '☆'}
               </Text>
-              <Text style={[styles.victoryStar, earnedStars < 3 && styles.victoryStarEmpty]}>
-                {earnedStars >= 3 ? '⭐' : '☆'}
+              <Text style={[styles.victoryStar, puzzle.earnedStars < 3 && styles.victoryStarEmpty]}>
+                {puzzle.earnedStars >= 3 ? '⭐' : '☆'}
               </Text>
             </View>
 
             <Text style={styles.victoryTitle}>
-              {earnedStars === 3 ? 'PERFECT!' : earnedStars === 2 ? 'SWEET!' : 'NICE!'}
+              {puzzle.earnedStars === 3 ? 'PERFECT!' : puzzle.earnedStars === 2 ? 'GREAT!' : 'WELL DONE!'}
             </Text>
-            <Text style={styles.victorySubtitle}>Level {level} Complete</Text>
+            <Text style={styles.victorySubtitle}>
+              {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${puzzle.level} Complete`}
+            </Text>
 
             {/* Amber earned */}
-            <View style={styles.amberEarnedContainer}>
-              <Text style={styles.amberEarnedIcon}>💎</Text>
-              <Text style={styles.amberEarnedText}>+{amberEarned} Amber</Text>
-              {streakBonus > 0 && (
-                <Text style={styles.streakBonusText}>
-                  (+{streakBonus} streak bonus!)
-                </Text>
-              )}
-            </View>
+            {victoryData && (
+              <View style={styles.amberEarnedContainer}>
+                <Text style={styles.amberEarnedIcon}>💎</Text>
+                <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} Amber</Text>
+                {victoryData.streakBonus > 0 && (
+                  <Text style={styles.streakBonusText}>
+                    (+{victoryData.streakBonus} streak bonus!)
+                  </Text>
+                )}
+              </View>
+            )}
 
             {/* Streak display */}
-            {currentStreak > 1 && (
+            {victoryData && victoryData.currentStreak > 1 && (
               <View style={styles.winStreakContainer}>
                 <Text style={styles.winStreakEmoji}>🔥</Text>
-                <Text style={styles.winStreakText}>{currentStreak} Day Streak!</Text>
+                <Text style={styles.winStreakText}>{victoryData.currentStreak} Day Streak!</Text>
               </View>
             )}
 
             {/* Milestone bonus */}
-            {milestoneBonus > 0 && milestoneMessage && (
+            {victoryData && victoryData.milestoneBonus > 0 && victoryData.milestoneMessage && (
               <View style={styles.milestoneContainer}>
                 <Text style={styles.milestoneEmoji}>🏆</Text>
-                <Text style={styles.milestoneMessage}>{milestoneMessage}</Text>
-                <Text style={styles.milestoneBonus}>+{milestoneBonus} Bonus Amber!</Text>
+                <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
+                <Text style={styles.milestoneBonus}>+{victoryData.milestoneBonus} Bonus Amber!</Text>
               </View>
             )}
 
             {/* Phase change notification */}
-            {phaseChanged && (
+            {victoryData?.phaseChanged && (
               <View style={styles.phaseChangeContainer}>
                 <Text style={styles.phaseChangeEmoji}>
-                  {newPhase >= 4 ? '🌑' : newPhase >= 3 ? '👁️' : newPhase >= 2 ? '🌙' : '💭'}
+                  {victoryData.newPhase >= 4 ? '🌑' : victoryData.newPhase >= 3 ? '👁️' : victoryData.newPhase >= 2 ? '🌙' : '💭'}
                 </Text>
                 <Text style={styles.phaseChangeTitle}>
-                  {newPhase >= 4 ? 'Something has changed...'
-                    : newPhase >= 3 ? 'A shadow falls...'
-                    : newPhase >= 2 ? 'The mood shifts...'
+                  {victoryData.newPhase >= 4 ? 'Something has changed...'
+                    : victoryData.newPhase >= 3 ? 'A shadow falls...'
+                    : victoryData.newPhase >= 2 ? 'The mood shifts...'
                     : 'New conversations await'}
                 </Text>
                 <Text style={styles.phaseChangeText}>
-                  {newPhase >= 4 ? 'Your friends seem... different. Visit them at home.'
-                    : newPhase >= 3 ? 'Your friends have grown restless. Check on them.'
-                    : newPhase >= 2 ? 'Your friends are asking deeper questions...'
+                  {victoryData.newPhase >= 4 ? 'Your friends seem... different. Visit them at home.'
+                    : victoryData.newPhase >= 3 ? 'Your friends have grown restless. Check on them.'
+                    : victoryData.newPhase >= 2 ? 'Your friends are asking deeper questions...'
                     : 'Your friends have new things to say!'}
                 </Text>
               </View>
             )}
 
-            {/* Performance feedback */}
+            {/* Performance feedback — always positive framing */}
             <Text style={styles.victoryFeedback}>
-              {earnedStars === 3
-                ? 'No hints, minimal mistakes!'
-                : earnedStars === 2
-                ? hintsUsed > 0
-                  ? `Used ${hintsUsed} hint${hintsUsed > 1 ? 's' : ''}`
-                  : `${invalidAttempts} wrong attempt${invalidAttempts > 1 ? 's' : ''}`
-                : `${hintsUsed} hint${hintsUsed !== 1 ? 's' : ''}, ${invalidAttempts} mistake${invalidAttempts !== 1 ? 's' : ''}`}
+              {puzzle.earnedStars === 3
+                ? 'Flawless solve — you nailed it!'
+                : puzzle.earnedStars === 2
+                ? 'Solid performance — almost perfect!'
+                : 'Puzzle conquered — keep improving!'}
             </Text>
 
             <View style={styles.victoryStats}>
               <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>Lv.{level}</Text>
-                <Text style={styles.victoryStatLabel}>{difficulty}</Text>
+                <Text style={styles.victoryStatValue}>Lv.{puzzle.level}</Text>
+                <Text style={styles.victoryStatLabel}>{puzzle.difficulty}</Text>
               </View>
               <View style={styles.victoryStatDivider} />
               <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>💎 {amberBalance}</Text>
+                <Text style={styles.victoryStatValue}>💎 {persistence.amberBalance}</Text>
                 <Text style={styles.victoryStatLabel}>Total Amber</Text>
               </View>
             </View>
 
             {/* Cumulative stats */}
-            {cumulativeStats && (
+            {persistence.cumulativeStats && (
               <View style={styles.cumulativeStats}>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalStars}</Text>
+                  <Text style={styles.cumulativeStatValue}>{persistence.cumulativeStats.totalStars}</Text>
                   <Text style={styles.cumulativeStatLabel}>Total Stars</Text>
                 </View>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.threeStarCount}</Text>
+                  <Text style={styles.cumulativeStatValue}>{persistence.cumulativeStats.threeStarCount}</Text>
                   <Text style={styles.cumulativeStatLabel}>Perfect</Text>
                 </View>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalPuzzlesCompleted}</Text>
+                  <Text style={styles.cumulativeStatValue}>{persistence.cumulativeStats.totalPuzzlesCompleted}</Text>
                   <Text style={styles.cumulativeStatLabel}>Puzzles</Text>
                 </View>
               </View>
@@ -736,6 +734,15 @@ export default function App() {
 
             {/* Action buttons */}
             <View style={styles.victoryButtonRow}>
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={handleShare}
+                accessibilityLabel="Share result"
+                accessibilityRole="button"
+              >
+                <Text style={styles.shareButtonText}>📤</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={styles.homeButton}
                 onPress={handleReturnHome}
@@ -759,7 +766,7 @@ export default function App() {
           </ScrollView>
         </View>
       </Modal>
-    </View>
+    </Animated.View>
     </ErrorBoundary>
   );
 }
@@ -791,6 +798,22 @@ const styles = StyleSheet.create({
   },
   headerHomeText: {
     fontSize: 20,
+  },
+  headerTitleArea: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  dailyBadge: {
+    backgroundColor: CandyColors.yellow.main,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  dailyBadgeText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: CandyColors.gray[800],
+    letterSpacing: 2,
   },
   helpButton: {
     width: 40,
@@ -826,7 +849,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     zIndex: 100,
   },
-  // Difficulty selector
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1333,6 +1355,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareButton: {
+    backgroundColor: CandyColors.blue.light,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  shareButtonText: {
+    fontSize: 20,
   },
   homeButton: {
     backgroundColor: CandyColors.gray[200],

@@ -56,6 +56,18 @@ function isYesterday(dateString: string): boolean {
 }
 
 /**
+ * Check if a date string is within the streak grace period (STREAK_RESET_DAYS)
+ * Returns true if the date is 1 to STREAK_RESET_DAYS days ago
+ */
+function isWithinStreakGracePeriod(dateString: string): boolean {
+  const date = new Date(dateString);
+  const today = new Date();
+  const diffMs = today.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return diffDays >= 1 && diffDays <= STREAK_BONUSES.STREAK_RESET_DAYS;
+}
+
+/**
  * Check if a date string is today
  */
 function isToday(dateString: string): boolean {
@@ -82,12 +94,12 @@ async function updateStreak(): Promise<number> {
   } else if (isToday(progress.lastPlayDate)) {
     // Already played today - streak unchanged
     // Just return current streak
-  } else if (isYesterday(progress.lastPlayDate)) {
-    // Played yesterday - continue streak
+  } else if (isWithinStreakGracePeriod(progress.lastPlayDate)) {
+    // Played within grace period (STREAK_RESET_DAYS) - continue streak
     progress.currentStreak += 1;
     progress.lastPlayDate = today;
   } else {
-    // Missed a day - reset streak
+    // Missed too many days - reset streak
     progress.currentStreak = 1;
     progress.lastPlayDate = today;
   }

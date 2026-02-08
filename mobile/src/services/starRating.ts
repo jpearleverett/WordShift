@@ -25,6 +25,8 @@ export interface CumulativeStats {
   oneStarCount: number;
   totalInvalidAttempts: number;
   totalHintsUsed: number;
+  /** Number of puzzles completed without using any hints */
+  noHintPuzzleCount: number;
   // Per-difficulty breakdowns
   byDifficulty: {
     [K in Difficulty]: {
@@ -41,9 +43,9 @@ let statsCache: CumulativeStats | null = null;
 /**
  * Calculate star rating based on hints used and invalid attempts
  *
- * 3 stars: 0 hints, 0-1 invalid attempts
- * 2 stars: 1 hint OR 2-3 invalid attempts
- * 1 star: 2+ hints OR 4+ invalid attempts
+ * 3 stars: 0 hints, 0-2 invalid attempts (generous — reward exploration)
+ * 2 stars: 1 hint OR 3-4 invalid attempts
+ * 1 star: 2+ hints OR 5+ invalid attempts
  */
 export function calculateStars(hintsUsed: number, invalidAttempts: number): number {
   // 2+ hints = 1 star max
@@ -51,17 +53,17 @@ export function calculateStars(hintsUsed: number, invalidAttempts: number): numb
     return 1;
   }
 
-  // 4+ invalid attempts = 1 star max
-  if (invalidAttempts >= 4) {
+  // 5+ invalid attempts = 1 star max
+  if (invalidAttempts >= 5) {
     return 1;
   }
 
-  // 1 hint OR 2-3 invalid attempts = 2 stars max
-  if (hintsUsed === 1 || invalidAttempts >= 2) {
+  // 1 hint OR 3-4 invalid attempts = 2 stars max
+  if (hintsUsed === 1 || invalidAttempts >= 3) {
     return 2;
   }
 
-  // 0 hints, 0-1 invalid attempts = 3 stars
+  // 0 hints, 0-2 invalid attempts = 3 stars
   return 3;
 }
 
@@ -77,6 +79,7 @@ function getDefaultStats(): CumulativeStats {
     oneStarCount: 0,
     totalInvalidAttempts: 0,
     totalHintsUsed: 0,
+    noHintPuzzleCount: 0,
     byDifficulty: {
       EASY: { completed: 0, stars: 0 },
       MEDIUM: { completed: 0, stars: 0 },
@@ -97,7 +100,12 @@ export async function loadStats(): Promise<CumulativeStats> {
 
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
-      statsCache = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      // Backward compat: add noHintPuzzleCount if missing from old data
+      if (parsed.noHintPuzzleCount === undefined) {
+        parsed.noHintPuzzleCount = 0;
+      }
+      statsCache = parsed;
       return statsCache!;
     }
   } catch (error) {
@@ -128,6 +136,9 @@ export async function recordPuzzleCompletion(
     statsCache!.totalStars += starsEarned;
     statsCache!.totalInvalidAttempts += invalidAttempts;
     statsCache!.totalHintsUsed += hintsUsed;
+    if (hintsUsed === 0) {
+      statsCache!.noHintPuzzleCount = (statsCache!.noHintPuzzleCount || 0) + 1;
+    }
 
     // Update star count breakdown
     if (starsEarned === 3) {
