@@ -189,10 +189,10 @@ export interface DialogueSession {
  * Pacing designed for 10-15 hour total gameplay
  */
 export const DIALOGUE_SESSION_CONFIG = {
-  // Number of dialogues allowed per session before cooldown
-  DIALOGUES_PER_SESSION: 6,
-  // Number of puzzles required before next session is available
-  PUZZLES_BETWEEN_SESSIONS: 5,
+  // Number of dialogues allowed per session before cooldown (generous for exploration)
+  DIALOGUES_PER_SESSION: 8,
+  // Number of puzzles required before next session is available (reduced for less friction)
+  PUZZLES_BETWEEN_SESSIONS: 3,
 };
 
 /**

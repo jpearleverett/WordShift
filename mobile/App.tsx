@@ -107,6 +107,7 @@ export default function App() {
           oneStarCount: 0,
           totalInvalidAttempts: 0,
           totalHintsUsed: 0,
+          noHintPuzzleCount: 0,
           byDifficulty: {
             EASY: { completed: 0, stars: 0 },
             MEDIUM: { completed: 0, stars: 0 },
@@ -624,7 +625,7 @@ export default function App() {
             </View>
 
             <Text style={styles.victoryTitle}>
-              {puzzle.earnedStars === 3 ? 'PERFECT!' : puzzle.earnedStars === 2 ? 'SWEET!' : 'NICE!'}
+              {puzzle.earnedStars === 3 ? 'PERFECT!' : puzzle.earnedStars === 2 ? 'GREAT!' : 'WELL DONE!'}
             </Text>
             <Text style={styles.victorySubtitle}>
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${puzzle.level} Complete`}
@@ -681,15 +682,13 @@ export default function App() {
               </View>
             )}
 
-            {/* Performance feedback */}
+            {/* Performance feedback — always positive framing */}
             <Text style={styles.victoryFeedback}>
               {puzzle.earnedStars === 3
-                ? 'No hints, minimal mistakes!'
+                ? 'Flawless solve — you nailed it!'
                 : puzzle.earnedStars === 2
-                ? puzzle.hintsUsed > 0
-                  ? `Used ${puzzle.hintsUsed} hint${puzzle.hintsUsed > 1 ? 's' : ''}`
-                  : `${puzzle.invalidAttempts} wrong attempt${puzzle.invalidAttempts > 1 ? 's' : ''}`
-                : `${puzzle.hintsUsed} hint${puzzle.hintsUsed !== 1 ? 's' : ''}, ${puzzle.invalidAttempts} mistake${puzzle.invalidAttempts !== 1 ? 's' : ''}`}
+                ? 'Solid performance — almost perfect!'
+                : 'Puzzle conquered — keep improving!'}
             </Text>
 
             <View style={styles.victoryStats}>

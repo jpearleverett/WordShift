@@ -145,10 +145,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'no_hints_10',
     title: 'Independent Thinker',
-    description: 'Complete 10 puzzles without hints',
+    description: 'Complete 10 puzzles without using hints',
     icon: '🧠',
     category: 'mastery',
-    check: (s) => s.stats.threeStarCount + s.stats.twoStarCount >= 10 && s.stats.totalHintsUsed === 0,
+    check: (s) => (s.stats.noHintPuzzleCount || 0) >= 10,
   },
 
   // Streak achievements

@@ -173,9 +173,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
-      setMessage(`Try the letter: ${relevantStep.letterToMove}`);
+      // Educational hint: show which letter and what word it helps form
+      setMessage(
+        `Move '${relevantStep.letterToMove}' — think "${relevantStep.targetWord}"!`
+      );
     } else {
-      setMessage("Hmm, try undoing a move!");
+      setMessage("Not quite right — try undoing your last move!");
     }
   }, [gameState, isProcessing, rows, activeRowIndex, solution]);
 

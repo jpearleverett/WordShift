@@ -119,8 +119,8 @@ export async function isDailyCompleted(): Promise<boolean> {
 
 /**
  * Generate the daily challenge puzzle
- * Uses the date as a seed to ensure consistency (but actual puzzle
- * generation uses the existing generator with the right difficulty)
+ * Uses the date as a seed so all players get the same puzzle.
+ * Temporarily replaces Math.random with a seeded PRNG during generation.
  */
 export async function generateDailyPuzzle(): Promise<{
   words: string[];
@@ -130,18 +130,23 @@ export async function generateDailyPuzzle(): Promise<{
 }> {
   const today = getTodayString();
   const difficulty = getDailyDifficulty(today);
+  const rng = seededRandom(`wordshift-daily-${today}`);
 
-  // Generate a puzzle with the daily difficulty
-  // The puzzle won't be identical across devices (generator has randomness),
-  // but it will be the same difficulty and themed consistently
-  const puzzle = await generateLocalPuzzle(difficulty);
+  // Temporarily override Math.random for deterministic generation
+  const originalRandom = Math.random;
+  Math.random = rng;
 
-  return {
-    words: puzzle.words,
-    hint: puzzle.hint,
-    difficulty,
-    date: today,
-  };
+  try {
+    const puzzle = await generateLocalPuzzle(difficulty);
+    return {
+      words: puzzle.words,
+      hint: puzzle.hint,
+      difficulty,
+      date: today,
+    };
+  } finally {
+    Math.random = originalRandom;
+  }
 }
 
 /**

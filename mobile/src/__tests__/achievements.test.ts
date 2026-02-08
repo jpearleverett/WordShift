@@ -41,6 +41,7 @@ const defaultState: AchievementCheckState = {
     oneStarCount: 0,
     totalInvalidAttempts: 0,
     totalHintsUsed: 0,
+    noHintPuzzleCount: 0,
     byDifficulty: {
       EASY: { completed: 0, stars: 0 },
       MEDIUM: { completed: 0, stars: 0 },

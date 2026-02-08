@@ -491,21 +491,67 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIconBtn} onPress={onOpenStats}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={onOpenStats}
+            accessibilityLabel="View stats"
+            accessibilityRole="button"
+          >
             <Text style={styles.headerIconText}>📊</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconBtn} onPress={onOpenSettings}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={onOpenSettings}
+            accessibilityLabel="Settings"
+            accessibilityRole="button"
+          >
             <Text style={styles.headerIconText}>⚙️</Text>
           </TouchableOpacity>
           <JuicyButton
             style={styles.playButton}
             onPress={() => onPlayPuzzle()}
             bounceScale={0.9}
+            accessibilityLabel="Play puzzle"
+            accessibilityRole="button"
           >
             <Text style={styles.playButtonText}>PLAY</Text>
           </JuicyButton>
         </View>
       </View>
+
+      {/* Next Unlock Progress Bar */}
+      {nextUnlock && (
+        <TouchableOpacity
+          style={styles.unlockProgressContainer}
+          onPress={() => setShowShop(true)}
+          activeOpacity={0.8}
+          accessibilityLabel={`Next unlock: ${nextUnlock.name}. ${nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${nextUnlock.cost} amber`}`}
+          accessibilityRole="button"
+        >
+          <View style={styles.unlockProgressInner}>
+            <Text style={styles.unlockProgressLabel}>
+              {nextUnlock.type === 'character' ? '🐾' : '🏠'} {nextUnlock.name}
+            </Text>
+            <View style={styles.unlockProgressBarBg}>
+              <View
+                style={[
+                  styles.unlockProgressBarFill,
+                  {
+                    width: `${Math.min(100, nextUnlock.cost > 0
+                      ? (progress.amber / nextUnlock.cost) * 100
+                      : 100)}%`,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={styles.unlockProgressText}>
+              {nextUnlock.cost === 0
+                ? 'FREE — Tap to invite!'
+                : `💎 ${progress.amber} / ${nextUnlock.cost}`}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Daily Challenge Card */}
       {onStartDaily && (
@@ -628,6 +674,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <TouchableOpacity
                       style={styles.continueButton}
                       onPress={handleAdvanceDialogue}
+                      accessibilityLabel="Continue dialogue"
+                      accessibilityRole="button"
                     >
                       <Text style={styles.continueButtonText}>
                         {hasMoreDialogues(
@@ -1019,6 +1067,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+
+  // Unlock progress bar
+  unlockProgressContainer: {
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    padding: 10,
+  },
+  unlockProgressInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  unlockProgressLabel: {
+    color: CandyColors.white,
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  unlockProgressText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  unlockProgressBarBg: {
+    flex: 2,
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  unlockProgressBarFill: {
+    height: '100%',
+    backgroundColor: CandyColors.yellow.main,
+    borderRadius: 4,
   },
 
   // Modal styles
