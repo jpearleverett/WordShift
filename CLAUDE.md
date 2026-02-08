@@ -83,7 +83,7 @@ mobile/
 │   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + gradient pulse
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
 │   │   ├── ErrorBoundary.tsx    # React error boundary wrapper
-│   │   ├── Tutorial.tsx         # 5-step animated onboarding
+│   │   ├── Tutorial.tsx         # Fox-guided interactive onboarding with mini-puzzle
 │   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
@@ -529,14 +529,24 @@ Educational hints show the target word with phase-aware tone:
 
 ## Tutorial System (`components/Tutorial.tsx`)
 
-5-step animated onboarding:
-1. Welcome
-2. Pick Letter
-3. Drop Down
-4. Complete Chain
-5. Build House
+Fox-guided interactive onboarding with a real mini-puzzle. Ember (Fox) greets the player and walks them through a single puzzle move: HEAT → ATE (pick H from HEAT → EAT, drop H into ATE → HATE).
 
-Checks `AsyncStorage` for `wordshift_tutorial_completed`. Spring animations between steps.
+**7 tutorial phases**: `welcome` → `show_puzzle` → `pick_letter` → `letter_picked` → `drop_letter` → `move_complete` → `house_intro`
+
+**Components**:
+- `FoxCharacter` — Fox talk sprite with emoji fallback, bounce animation when speaking
+- `MiniTile` — Smaller LetterTile (44x54) with 3D candy styling, pulse animation for guided hints
+- `MiniSlot` — Pulsing dashed-border drop zones
+- `SpeechBubble` — Fade-in dialogue with emphasis variant
+
+**Narrative seeds** (innocent now, ominous in retrospect):
+- "We've been waiting for someone like you."
+- "Every puzzle you solve helps us build the house."
+- "The others are going to love you. There's so much more to discover... together."
+
+**Features**: Interactive mini-puzzle (not just text slides), progress dots (5 stages), skip button, content fade transitions, spring animations for celebration.
+
+Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialCompleted()`, `markTutorialCompleted()`, `resetTutorial()`, `Tutorial`.
 
 ## Coding Conventions
 
