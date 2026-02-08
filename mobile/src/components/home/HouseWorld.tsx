@@ -340,7 +340,7 @@ const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
 // Zoom constraints
-const MIN_SCALE = 0.6;
+const MIN_SCALE = 0.7;
 const MAX_SCALE = 2.0;
 
 interface HouseWorldProps {
