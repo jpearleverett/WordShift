@@ -360,7 +360,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 }) => {
   // Animated values
   const scale = useRef(new Animated.Value(1)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
 
   // Refs for gesture tracking
@@ -370,7 +369,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // State tracking for gestures
   const baseScale = useRef(1);
   const lastScale = useRef(1);
-  const baseTranslateX = useRef(0);
   const baseTranslateY = useRef(0);
 
   // Memoize night star positions/sizes to prevent flicker on re-render
@@ -577,27 +575,22 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     }
   };
 
-  // Pan gesture handler
+  // Pan gesture handler - vertical only to prevent horizontal gaps
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
-    const { translationX, translationY } = event.nativeEvent;
+    const { translationY } = event.nativeEvent;
 
-    // Scale translation by current scale for natural feeling
-    const maxTranslate = 150 * lastScale.current;
+    const maxTranslateY = 150 * lastScale.current;
+    const newY = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
 
-    const newX = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
-    const newY = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
-
-    translateX.setValue(newX);
     translateY.setValue(newY);
   };
 
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
-      const { translationX, translationY } = event.nativeEvent;
-      const maxTranslate = 150 * lastScale.current;
+      const { translationY } = event.nativeEvent;
+      const maxTranslateY = 150 * lastScale.current;
 
-      baseTranslateX.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateX.current + translationX));
-      baseTranslateY.current = Math.max(-maxTranslate, Math.min(maxTranslate, baseTranslateY.current + translationY));
+      baseTranslateY.current = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
     }
   };
 
@@ -712,14 +705,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 styles.transformContainer,
                 {
                   transform: [
-                    { translateX },
                     { translateY },
                     { scale },
                   ],
                 },
               ]}
             >
-              {/* Sky background - zooms with house content */}
+              {/* Sky background - inside transform so it moves with the scene.
+                  Oversized to prevent gaps at any zoom/pan combination.
+                  Width: 2x screen covers horizontal at min zoom (no horizontal pan).
+                  Height: 3x screen covers vertical pan range at all zoom levels. */}
               <Image
                 source={
                   currentPhase >= 4 ? SKY_SHADOW :
@@ -892,13 +887,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#5B8C3E', // Matches sky_day bottom edge so no gaps when zoomed out
   },
 
-  // Sky background - inside transform container, zooms with house
+  // Sky background - moves with scene, oversized to prevent gaps.
+  // At MIN_SCALE (0.6) the visible area is ~1.67x screen in each dimension.
+  // Vertical pan adds up to ±150px in content coords. 3x height covers all cases.
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * 0.5,
+    top: -SCREEN_HEIGHT,
     left: -SCREEN_WIDTH * 0.5,
     width: SCREEN_WIDTH * 2,
-    height: SCREEN_HEIGHT * 2,
+    height: SCREEN_HEIGHT * 3,
     zIndex: -1,
   },
   // Clouds - fixed to screen
