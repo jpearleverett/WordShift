@@ -978,7 +978,8 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
+    marginTop: 30,
   },
 
   // Roof
