@@ -28,16 +28,15 @@ import { Tutorial, hasTutorialCompleted } from './src/components/Tutorial';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
-import { DailyChallengeCard } from './src/components/DailyChallengeCard';
 import {
   checkAchievements,
   Achievement,
   AchievementCheckState,
   getShareCount,
 } from './src/services/achievements';
-import { getDailyStatus, recordDailyCompletion, getTodayString } from './src/services/dailyChallenge';
-import { sharePuzzleResult, generateShareText } from './src/services/shareResults';
-import { getSettings } from './src/services/settings';
+import { getDailyStatus, recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
+import { sharePuzzleResult } from './src/services/shareResults';
+import { getSettings, getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticSuccess, hapticError, hapticHeavy, hapticSelection } from './src/services/haptics';
 import { getFullProgress } from './src/services/amberCurrency';
@@ -135,8 +134,14 @@ export default function App() {
     }
   }, []);
 
-  // Animated screen transition
+  // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
+    const reducedMotion = getSettingsSync().reducedMotion;
+    if (reducedMotion) {
+      setCurrentScreen(screen);
+      callback?.();
+      return;
+    }
     Animated.timing(screenFade, {
       toValue: 0,
       duration: 150,
@@ -164,13 +169,20 @@ export default function App() {
     });
   }, [puzzle.difficulty, puzzleActions, transitionTo]);
 
-  // Start daily challenge
-  const handleStartDaily = useCallback((difficulty: Difficulty) => {
+  // Start daily challenge — uses seeded generation for deterministic puzzles
+  const handleStartDaily = useCallback(async (difficulty: Difficulty) => {
     hapticMedium();
     soundTap();
-    transitionTo('puzzle', () => {
-      puzzleActions.startNewGame(difficulty);
+    transitionTo('puzzle', async () => {
       setIsPlayingDaily(true);
+      puzzleActions.setGameState(GameState.LOADING);
+      try {
+        const daily = await generateDailyPuzzle();
+        puzzleActions.initGame(daily.words, daily.hint);
+      } catch (err) {
+        console.warn('Daily puzzle generation failed, using random:', err);
+        puzzleActions.startNewGame(difficulty);
+      }
       logEvent({ type: 'puzzle_started', data: { difficulty, isDaily: true } });
     });
   }, [puzzleActions, transitionTo]);
@@ -313,7 +325,6 @@ export default function App() {
           onClose={() => transitionTo('home')}
           puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
           currentPhase={persistence.currentPhase}
-          currentStreak={victoryData?.currentStreak || 0}
           amberBalance={persistence.amberBalance}
         />
       </Animated.View>

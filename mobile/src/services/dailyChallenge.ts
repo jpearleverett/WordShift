@@ -117,10 +117,14 @@ export async function isDailyCompleted(): Promise<boolean> {
   return progress.lastCompletedDate === getTodayString();
 }
 
+// Guard against concurrent daily puzzle generation
+let dailyGenerationInProgress = false;
+
 /**
  * Generate the daily challenge puzzle
  * Uses the date as a seed so all players get the same puzzle.
  * Temporarily replaces Math.random with a seeded PRNG during generation.
+ * Guarded against concurrent calls to prevent race conditions.
  */
 export async function generateDailyPuzzle(): Promise<{
   words: string[];
@@ -128,6 +132,16 @@ export async function generateDailyPuzzle(): Promise<{
   difficulty: Difficulty;
   date: string;
 }> {
+  // Prevent concurrent calls from interfering with Math.random override
+  if (dailyGenerationInProgress) {
+    // Fall back to non-seeded generation if already running
+    const today = getTodayString();
+    const difficulty = getDailyDifficulty(today);
+    const puzzle = await generateLocalPuzzle(difficulty);
+    return { words: puzzle.words, hint: puzzle.hint, difficulty, date: today };
+  }
+
+  dailyGenerationInProgress = true;
   const today = getTodayString();
   const difficulty = getDailyDifficulty(today);
   const rng = seededRandom(`wordshift-daily-${today}`);
@@ -146,6 +160,7 @@ export async function generateDailyPuzzle(): Promise<{
     };
   } finally {
     Math.random = originalRandom;
+    dailyGenerationInProgress = false;
   }
 }
 

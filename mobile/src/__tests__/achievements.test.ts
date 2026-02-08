@@ -163,6 +163,15 @@ describe('achievements', () => {
     expect(weeklyWarrior).toBeTruthy();
   });
 
+  test('no_hints_10 achievement unlocks at 10 no-hint puzzles', async () => {
+    const state = {
+      ...defaultState,
+      stats: { ...defaultState.stats, totalPuzzlesCompleted: 10, noHintPuzzleCount: 10 },
+    };
+    const unlocked = await checkAchievements(state);
+    expect(unlocked.find(a => a.id === 'no_hints_10')).toBeTruthy();
+  });
+
   test('clearAchievements resets all progress', async () => {
     const state = {
       ...defaultState,

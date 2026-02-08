@@ -15,6 +15,11 @@ import { GameSettings, getSettings, updateSetting, resetSettings } from '../serv
 import { clearStats } from '../services/starRating';
 import { clearAchievements } from '../services/achievements';
 import { clearDailyProgress } from '../services/dailyChallenge';
+import { clearProgress } from '../services/amberCurrency';
+import { clearWordHistory } from '../services/wordHistory';
+import { clearAllSessions } from '../services/dialogueSession';
+import { clearEvents } from '../services/eventLogger';
+import { resetTutorial } from './Tutorial';
 import { hapticLight } from '../services/haptics';
 
 interface SettingsScreenProps {
@@ -48,6 +53,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               clearStats(),
               clearAchievements(),
               clearDailyProgress(),
+              clearProgress(),
+              clearWordHistory(),
+              clearAllSessions(),
+              clearEvents(),
+              resetTutorial(),
               resetSettings(),
             ]);
             const fresh = await getSettings();

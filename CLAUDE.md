@@ -9,53 +9,87 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
+npx jest --no-coverage   # Run all tests (144 tests, 11 suites)
 ```
 
 ## Tech Stack
 
 - **Framework**: React Native with Expo SDK 54
-- **Language**: TypeScript
-- **Navigation**: Home screen ↔ Puzzle screen (state-based)
+- **Language**: TypeScript (strict)
+- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats'`)
 - **State**: React useState/useEffect (no external state library)
+- **Persistence**: AsyncStorage with in-memory cache pattern
+- **Haptics**: expo-haptics (settings-gated)
+- **Audio**: expo-av (placeholder infrastructure, awaiting real audio assets)
+- **Testing**: Jest with ts-jest preset
 - **Target**: iOS and Android via Expo Go
 
 ## Project Structure
 
 ```
 mobile/
-├── App.tsx                      # Main app with screen navigation (home/puzzle)
+├── App.tsx                      # Main app: screen routing, victory flow, achievement queue
 ├── assets/                      # Image assets (see Asset System below)
 │   ├── characters/              # Animal character sprites
 │   ├── rooms/                   # Room background images
 │   ├── house/                   # House structure elements
 │   └── environment/             # Sky, trees, ground, etc.
 ├── src/
-│   ├── types.ts                 # TypeScript interfaces for puzzle game
+│   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
 │   ├── types/
-│   │   └── homeWorld.ts         # Types for home screen (animals, rooms, currency)
-│   ├── constants.ts             # Word lists by length (3-6 letters)
+│   │   └── homeWorld.ts         # Home screen types, config constants, streak/amber types
+│   ├── constants.ts             # Word lists by length (3-6 letters), COMMON_WORDS set
 │   ├── dictionary.ts            # 8000+ word dictionary for validation
+│   ├── hooks/
+│   │   ├── usePuzzleGame.ts     # All puzzle game state and actions (extracted from App.tsx)
+│   │   └── useGamePersistence.ts # Persistence: amber, stats, phases (extracted from App.tsx)
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout for slots
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling
-│   │   ├── AnimatedBackground.tsx  # Floating particles/decorations background
-│   │   ├── Confetti.tsx         # Win celebration confetti effect
+│   │   ├── AnimatedBackground.tsx  # Floating particles (respects reducedMotion)
+│   │   ├── Confetti.tsx         # Win celebration confetti (respects reducedMotion)
+│   │   ├── ErrorBoundary.tsx    # React error boundary wrapper
+│   │   ├── Tutorial.tsx         # 5-step animated onboarding
+│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
+│   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
+│   │   ├── AchievementToast.tsx # Slide-in achievement notification
+│   │   ├── DailyChallengeCard.tsx # Daily challenge status card with pulse animation
 │   │   └── home/
-│   │       ├── HomeScreen.tsx   # Main home screen with animal house
+│   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
 │   │       ├── HouseWorld.tsx   # Zoomable/pannable house view
 │   │       ├── RoomView.tsx     # Individual room with decorations
 │   │       ├── AnimalSprite.tsx # Animated animal characters
+│   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
 │   │       └── index.ts         # Home component exports
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette and tile color system
 │   └── services/
-│       ├── localGenerator.ts    # Puzzle generation with dread word progression
-│       ├── wordHistory.ts       # Word history tracking for diversity
-│       ├── starRating.ts        # Star rating system and cumulative stats
-│       ├── amberCurrency.ts     # Amber currency system with persistence
-│       ├── animalDialogue.ts    # Animal dialogue content by phase (0-4), 52 per animal
-│       ├── dialogueSession.ts   # Dialogue session system with cooldowns
-│       └── homeWorldData.ts     # Room/animal definitions and unlock progression
+│       ├── localGenerator.ts    # Puzzle generation with DFS, quality scoring, dread words
+│       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
+│       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
+│       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
+│       ├── animalDialogue.ts    # 520 dialogue lines (52 per animal, 5 phases)
+│       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
+│       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
+│       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
+│       ├── achievements.ts      # 28 achievements across 5 categories
+│       ├── shareResults.ts      # Wordle-style emoji grid sharing
+│       ├── settings.ts          # User preferences (sound, haptics, reducedMotion)
+│       ├── haptics.ts           # Haptic feedback (settings-gated)
+│       ├── audio.ts             # Sound effects (placeholder, awaiting assets)
+│       └── eventLogger.ts       # Analytics event logging
+├── src/__tests__/               # Test suites (144 tests, 11 suites)
+│   ├── achievements.test.ts
+│   ├── amberCurrency.test.ts
+│   ├── dailyChallenge.test.ts
+│   ├── dialogueSession.test.ts
+│   ├── eventLogger.test.ts
+│   ├── homeWorldData.test.ts
+│   ├── localGenerator.test.ts
+│   ├── settings.test.ts
+│   ├── shareResults.test.ts
+│   ├── starRating.test.ts
+│   └── wordHistory.test.ts
 ```
 
 ## Asset System (Images)
@@ -138,7 +172,7 @@ const foxIdleImage = require('../../assets/characters/fox/idle.png');
 - Include all furniture/decorations baked into the image
 - Animal sprites render on top of room background
 
-### Current State
+### Current Asset State
 
 The home screen now uses image assets for:
 - **Fox character sprites** (`idle.png`, `talk.png`, `robed.png`) in `AnimalSprite.tsx` - other animals fall back to emoji
@@ -154,10 +188,81 @@ As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite
 ## Game Mechanics
 
 1. Player sees a chain of words (3-5 rows depending on difficulty)
-2. Pick a letter from current word → word shrinks by 1 letter
-3. Drop letter into next word → word grows by 1 letter
+2. Pick a letter from current word - word shrinks by 1 letter
+3. Drop letter into next word - word grows by 1 letter
 4. Both resulting words must be valid English words
 5. Progress through all rows to win
+
+## App Architecture
+
+### Custom Hooks
+
+Game logic is extracted into two custom hooks:
+
+**`usePuzzleGame()`** (`src/hooks/usePuzzleGame.ts`):
+- All puzzle state: rows, selected letter, game state, hints, validation
+- `initGame(words, hint?, solution?, wordLength?)` - Load pre-generated puzzle
+- `startNewGame(difficulty?)` - Generate and start a random puzzle
+- `handleLetterPress(letter, rowIndex)` - Pick a letter
+- `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data
+- `handleHint()` - Show educational hint ("Move 'R' - think "WARM"!")
+- `handleUndo()` - Undo last move
+
+**`useGamePersistence()`** (`src/hooks/useGamePersistence.ts`):
+- All persistence: amber balance, cumulative stats, phase, streak
+- `handleVictory(difficulty, hintsUsed, invalidAttempts)` - Record win, update stats
+- `refreshProgress()` - Reload from storage
+
+### Screen Navigation
+
+State-based routing in `App.tsx`:
+- `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats'`
+- Screen transitions use `Animated.timing` fade (150ms out, 200ms in)
+- Transitions instant when `reducedMotion` setting is enabled
+- `transitionTo(screen, callback?)` handles all navigation
+
+### Victory Flow
+
+When puzzle completes (`handleSlotPress` returns `{completed: true}`):
+1. Record stars via `calculateStars(hintsUsed, invalidAttempts)`
+2. Record puzzle completion via `amberCurrency.awardPuzzleCompletion()`
+3. Check for newly unlocked achievements
+4. Queue achievement toasts for display
+5. Show victory modal with positive feedback
+
+### Achievement System (`services/achievements.ts`)
+
+28 achievements across 5 categories (puzzle, mastery, streak, collection, journey):
+- Each has `check: (state: AchievementCheckState) => boolean`
+- State includes: stats, puzzlesSolved, currentPhase, currentStreak, unlockedAnimals, etc.
+- Persisted via AsyncStorage (`wordshift_unlocked_achievements`)
+- `checkAchievements(state)` returns newly unlocked achievements
+- `AchievementToast` component shows slide-in notification
+
+### Daily Challenge System (`services/dailyChallenge.ts`)
+
+- **Deterministic**: Uses seeded PRNG (`seededRandom()`) with date as seed
+- **`generateDailyPuzzle()`** temporarily overrides `Math.random` for deterministic generation
+- Concurrency guard prevents race conditions during async generation
+- Difficulty cycles: Easy (day%3===0), Medium (day%3===1), Hard (day%3===2)
+- Streak tracking: consecutive days of daily completion
+- DailyChallengeCard shows status on home screen
+
+### Settings System (`services/settings.ts`)
+
+User preferences persisted via AsyncStorage:
+- `soundEnabled` - Controls audio playback
+- `hapticsEnabled` - Controls haptic feedback
+- `reducedMotion` - Controls animations (confetti, particles, screen transitions)
+
+Pattern: `getSettingsSync()` for synchronous reads (after initial `getSettings()` populates cache)
+
+### Share Results (`services/shareResults.ts`)
+
+Wordle-style emoji grid sharing:
+- Performance grid: green/yellow/orange/red squares
+- Star display and difficulty badge
+- Uses React Native `Share` API
 
 ## Home Screen & Animal House
 
@@ -165,10 +270,11 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 
 ### Currency System (Amber)
 
-- Players earn **Amber** (💎) by completing puzzles
-- Rewards scale by difficulty: EASY=5, MEDIUM=10, HARD=20
-- Bonus amber for 3-star performances (+50%) or 2-star (+25%)
-- Amber is spent to unlock new characters and rooms
+- Players earn **Amber** by completing puzzles
+- Rewards: EASY=5, MEDIUM=10, HARD=20 base
+- Star bonuses: 3-star +50%, 2-star +25%
+- Streak multiplier: 5% per day (max 50%, requires MIN_STREAK_FOR_BONUS=3)
+- **Streak grace period**: Players can miss up to STREAK_RESET_DAYS (2) days
 
 ### Animal Characters
 
@@ -204,16 +310,16 @@ Each animal has unique dialogue fitting their personality (owl becomes intellect
 Animals have conversation sessions with puzzle-based cooldowns to pace interactions:
 
 **Session Parameters** (in `dialogueSession.ts` and `types/homeWorld.ts`):
-- Max dialogues per session: 6
-- Cooldown: 5 puzzles between sessions
+- Max dialogues per session: 8
+- Cooldown: 3 puzzles between sessions
 - Dialogue progress persists (animals remember where they left off)
 
 **Session Flow**:
-1. Player taps animal → starts session if available
-2. Player can have up to 6 dialogues during session
+1. Player taps animal -> starts session if available
+2. Player can have up to 8 dialogues during session
 3. Session ends when: max dialogues reached or player leaves
-4. Cooldown begins → must complete 5 puzzles to talk again
-5. After cooldown → animal continues from next dialogue (not repeat)
+4. Cooldown begins -> must complete 3 puzzles to talk again
+5. After cooldown -> animal continues from next dialogue (not repeat)
 
 **UI Indicators**:
 - Session status bar shows dialogues remaining
@@ -229,7 +335,7 @@ The house is built from the ground up, one room at a time:
 - No animals unlocked - must invite the first one
 - House only shows unlocked rooms (single vertical stack)
 
-**Unlock Flow**: Invite animal → Build room → Invite animal → Build room...
+**Unlock Flow**: Invite animal -> Build room -> Invite animal -> Build room...
 1. **Fox (Ember)** - FREE to invite into Cozy Den (starter)
 2. **Kitchen** - 30 amber to build above Cozy Den
 3. **Pangolin (Panko)** - 25 amber to invite into Kitchen
@@ -237,37 +343,16 @@ The house is built from the ground up, one room at a time:
 5. **Owl (Archimedes)** - 40 amber to invite
 6. ...continues alternating rooms and animals
 
-**Invite System**:
-- Empty rooms show "Tap to Invite!" indicator
-- Tapping opens invite modal with animal info and cost
-- First animal (Fox) is free to introduce house-building lore
-- Fox's opening dialogue explains the amber/building mechanic
-
-**Unlock Sequence Validation**:
-- Can only invite an animal if their room exists
-- Can only build a room if previous animal is invited
-- `isUnlockAvailable()` function validates prerequisites
-- UI shows reason if unlock is blocked (e.g., "Invite Panko first")
+**Unlock Progress Bar**: Home screen shows amber progress toward next unlock with a visual bar.
 
 ### House & Room Visuals
 
 **House Structure** (`HouseWorld.tsx`):
 - Single column of rooms stacked vertically (bottom-up)
 - Only unlocked rooms are rendered
-- Rooms sorted by floor number (ground = 0, increasing upward)
-- Dynamic height based on number of unlocked rooms
 - Pan/zoom via `react-native-gesture-handler` (PanGestureHandler + PinchGestureHandler)
 - Fixed sky background with animated clouds, sun, birds
-- Ground layer fixed at bottom of screen
-- House transforms with pan/zoom gestures
-
-**Room Decorations** (`RoomView.tsx`):
-- Each room theme has 6-7 furniture/decoration items (emoji-based, will be replaced by room images)
-- Items positioned at: wall-left/center/right, floor-left/center/right, corners
-- Sizes: small (14px), medium (20px), large (28px)
-- Some rooms have windows (study, kitchen, cozy_den)
-- Wall and floor patterns for themed textures
-- Will transition to single room background images from `assets/rooms/`
+- Room dimensions: `ROOM_WIDTH` (165) and `ROOM_HEIGHT` (130)
 
 ### Word Theme Evolution
 
@@ -275,165 +360,116 @@ Puzzle words gradually shift to match the existential theme:
 - Phase 0: Fun words (SPARK, FLAME, TIGER)
 - Higher phases: Dread words preferred (VOID, FADE, DOOM, ABYSS)
 
-## Key Architecture
-
-### Row Component (`Row.tsx`)
-
-The Row component handles two states:
-- **PICK row**: Active row where player selects a letter (purple border, PICK badge)
-- **DROP row**: Target row showing insertion slots (pink dashed border, DROP badge)
-
-Arc layout for DROP row:
-- Interleaved elements: `[slot][letter][slot][letter]...[slot]`
-- Center elements lift upward, edges tilt outward creating a fan effect
-- Letters stay full-size, slots are upside-down trapezoid shapes (wider top, narrower bottom)
-- Slots render on top of letters (zIndex: 10) for better tap targeting
-- Smooth 450ms glide animation on expand, 300ms on collapse; replays on each letter selection
-- Configuration constants at top of file:
-  - `ARC_ROTATION` (12°) - Max rotation for edge elements (steeper = more fan spread)
-  - `ARC_LIFT` (18px) - Vertical arc depth, centered in container
-  - `SLOT_WIDTH` (14px) - Base width for drop slots (rendered +4px wider for trapezoid effect)
-  - `SLOT_HEIGHT` (52px) - Matches letter tile height
-
-### Theme System (`theme/colors.ts`)
-
-`CandyColors` object provides:
-- Named color groups: `purple`, `pink`, `blue`, `green`, `yellow`, `orange`, `red`, `cyan`
-- Each has: `light`, `main`, `dark`, `glow`, `shadow` variants
-- `tileColors` array for letter variety (6 colors, assigned by char code)
-- `getTileColor(char)` - Returns consistent color for a letter
+## Key Services
 
 ### Puzzle Generation (`localGenerator.ts`)
 
-The generator creates word chains using DFS with quality scoring:
+DFS-based word chain generator with quality scoring:
 
-- **Anti-boring detection**: Penalizes obvious transforms (S→plural, ED→past tense, ING, LY)
+- **Anti-boring detection**: Penalizes obvious transforms (S->plural, ED->past tense, ING, LY)
 - **Position scoring**: Prefers middle-position letter moves over edge moves
-- **Semantic journey**: Bonus for traversing different word categories (animals→food→nature)
+- **Semantic journey**: Bonus for traversing different word categories
 - **Quality threshold**: Rejects puzzles scoring below 45/100
 - **Multi-candidate**: Generates 3 puzzles, selects highest scoring
-- **Word history integration**: Penalizes/excludes recently used words for diversity
+- **Word history integration**: Penalizes/excludes recently used words
 
 Key functions:
-- `generateLocalPuzzle(difficulty)` - Main entry point
+- `generateLocalPuzzle(difficulty)` - Main entry point (2.5s timeout)
 - `findPath()` - Recursive DFS to find valid word chains
 - `scorePuzzleChain()` - Evaluates puzzle quality (includes freshness scoring)
-- `getBoringTransformPenalty()` - Penalizes obvious suffix/prefix moves
-- `scoreWordInterestingness()` - Scores words by interest + freshness
-
-### Word History (`wordHistory.ts`)
-
-Tracks recently used words to ensure puzzle diversity across sessions:
-
-- **AsyncStorage persistence**: History survives app restarts
-- **Tracks ~100 puzzles**: Stores last ~500 words (5 words/puzzle average)
-- **Hard cooldown (15 puzzles)**: Words completely excluded from generation
-- **Soft cooldown (15-40 puzzles)**: Decaying penalty (50→10 points)
-- **Freshness bonus**: Never-seen words get +5 score boost
-
-Key functions:
-- `getWordHistoryWithRecency()` - Returns Map<word, puzzlesAgo>
-- `calculateFreshnessPenalty(word, recencyMap)` - Returns 0-100 penalty
-- `isInHardCooldown(word, recencyMap)` - Check if word should be excluded
-- `recordPuzzleWords(words)` - Save words after puzzle generation
-- `clearWordHistory()` - Reset history (for testing)
-
-Cooldown constants (at top of file):
-- `HARD_COOLDOWN = 15` - Puzzles before word can reappear
-- `SOFT_COOLDOWN = 40` - Puzzles before penalty fully decays
-- `MAX_HISTORY_SIZE = 100` - Max puzzles tracked
 
 ### Star Rating System (`starRating.ts`)
 
-Grades puzzle performance without time pressure. Stars are awarded based on hints and mistakes:
+Grades puzzle performance without time pressure:
 
-**Star Thresholds:**
-- **3 stars (PERFECT)**: 0 hints, 0-1 invalid attempts
-- **2 stars (SWEET)**: 1 hint OR 2-3 invalid attempts
-- **1 star (NICE)**: 2+ hints OR 4+ invalid attempts
+**Star Thresholds (generous, reward exploration):**
+- **3 stars (PERFECT!)**: 0 hints, 0-2 invalid attempts
+- **2 stars (GREAT!)**: 1 hint OR 3-4 invalid attempts
+- **1 star (WELL DONE!)**: 2+ hints OR 5+ invalid attempts
 
-**Design Philosophy:**
-- Stars are a "grade" on performance, not a replay target
-- Each puzzle is one-shot (like Wordle) - no replaying for better stars
-- Forward momentum: "Try to do better on the next one"
-- Non-stressful: no timer, always completable
-
-**Tracked Metrics:**
-- `invalidAttempts` - Incremented when player tries invalid word combinations
-- `hintsUsed` - Incremented when player uses hint button (only counts helpful hints)
+**Victory feedback is always positive** - no negative framing.
 
 **Cumulative Stats (persisted via AsyncStorage):**
-- `totalPuzzlesCompleted` - Total games finished
-- `totalStars` - Sum of all stars earned
-- `threeStarCount` / `twoStarCount` / `oneStarCount` - Breakdown by rating
+- `totalPuzzlesCompleted`, `totalStars`, star count breakdowns
+- `noHintPuzzleCount` - Number of puzzles completed without hints
+- `totalInvalidAttempts`, `totalHintsUsed`
 - `byDifficulty` - Per-difficulty stats (EASY/MEDIUM/HARD)
 
-Key functions:
-- `calculateStars(hintsUsed, invalidAttempts)` - Returns 1-3 stars
-- `recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts)` - Save after win
-- `getCumulativeStats()` - Load lifetime stats
-- `clearStats()` - Reset all stats (for testing)
+### Word History (`wordHistory.ts`)
 
-### Dialogue Session System (`dialogueSession.ts`)
+Tracks recently used words to ensure puzzle diversity:
 
-Manages puzzle-based dialogue sessions with cooldown periods:
+- **Hard cooldown (15 puzzles)**: Words completely excluded from generation
+- **Soft cooldown (15-40 puzzles)**: Decaying penalty (50->10 points)
+- **Freshness bonus**: Never-seen words get +5 score boost
+- **Max history**: 100 puzzles tracked (~500 words)
 
-**Configuration Constants** (in `types/homeWorld.ts`):
-```typescript
-DIALOGUE_SESSION_CONFIG = {
-  DIALOGUES_PER_SESSION: 6,        // Max dialogues before cooldown
-  PUZZLES_BETWEEN_SESSIONS: 5,     // Puzzles required to unlock next session
-}
-```
+### Amber Currency (`amberCurrency.ts`)
 
-**Key Types**:
-```typescript
-interface DialogueSession {
-  animalId: string;
-  dialoguesInSession: number;
-  puzzlesAtSessionEnd: number | null;  // Puzzle count when cooldown started
-}
-```
+Manages amber balance, streak, and phase progression:
 
-**Key Functions**:
-- `checkDialogueAvailability(animalId)` - Returns availability status and puzzles remaining
-- `recordDialogue(animalId)` - Record a dialogue, start/continue session
-- `endSession(animalId)` - End session and start cooldown
-- `getSessionStatus(animalId)` - Get 'available' | 'in_session' | 'cooldown' status
-- `updatePuzzleCount(count)` - Update current puzzle count for cooldown tracking
-- `clearAllSessions()` - Clear all sessions (for testing/dev)
+- `awardPuzzleCompletion(difficulty)` - Main entry, returns balance/phase/streak
+- `updateStreak()` - Grace period of STREAK_RESET_DAYS (2 days)
+- `getStreakInfo()` - Current streak, multiplier, bonus percentage
+- `getFullProgress()` - All progress data (amber, puzzles, phase, unlocks)
+- `clearProgress()` - Full reset
 
-### Word Dictionaries (`constants.ts`)
+### Hint System
 
-Words organized by length in arrays:
-- `WORDS_3`, `WORDS_4`, `WORDS_5`, `WORDS_6` - Word lists
-- `COMMON_WORDS` - Set of all valid words for validation
+Educational hints show the target word:
+- "Move 'R' - think "WARM"!" instead of just "Try the letter: R"
+- Falls back to undo suggestion if player is off the solution path
 
-### Game State (`App.tsx`)
+## Tutorial System (`components/Tutorial.tsx`)
 
-Key state variables:
-- `currentScreen` - 'home' | 'puzzle' (navigation state)
-- `rows` - Current puzzle words with letter states
-- `selectedTile` - Currently picked letter
-- `currentRowIndex` - Active row being solved
-- `gamePhase` - 'playing' | 'won'
-- `difficulty` - 'EASY' (3 rows) | 'MEDIUM' (4 rows) | 'HARD' (5 rows, 5-letter words)
-- `invalidAttempts` - Count of wrong moves this puzzle (for star rating)
-- `hintsUsed` - Count of hints used this puzzle (for star rating)
-- `earnedStars` - Stars earned on current puzzle (1-3)
-- `cumulativeStats` - Lifetime stats loaded from storage
-- `amberEarned` - Amber earned from current puzzle
-- `amberBalance` - Total amber balance
-- `phaseChanged` - Whether completing puzzle triggered phase transition
+5-step animated onboarding:
+1. Welcome
+2. Pick Letter
+3. Drop Down
+4. Complete Chain
+5. Build House
+
+Checks `AsyncStorage` for `wordshift_tutorial_completed`. Spring animations between steps.
 
 ## Coding Conventions
 
 - Use TypeScript with explicit types for props and state
 - React Native StyleSheet for styling (not inline styles)
 - Functional components with hooks
-- Keep components focused - game logic stays in App.tsx
+- Custom hooks extract game logic from App.tsx (`usePuzzleGame`, `useGamePersistence`)
 - Import colors from `CandyColors` in `src/theme/colors.ts`
 - Use `Animated` API for smooth animations
+- Services use AsyncStorage with in-memory cache pattern (load -> cache -> return cached)
+- TS strict: module-level nullable caches need local variable assignment before return to avoid TS2322
+- Accessibility: interactive elements should have `accessibilityLabel` and `accessibilityRole`
+
+## Testing
+
+### Automated Tests
+
+```bash
+cd mobile && npx jest --no-coverage  # 144 tests, 11 suites
+```
+
+**Test patterns:**
+- Tests mock `@react-native-async-storage/async-storage` with inline factory per file
+- Tests that import react-native modules need `jest.mock('react-native', ...)` at top
+- `beforeEach` must call both `AsyncStorage.clear()` AND service-specific clear functions
+- Puzzle generator tests mock `amberCurrency.getCurrentPhase` + all `wordHistory` functions
+
+### Manual Testing
+
+Test on physical device via Expo Go app:
+1. Run `npx expo start` in mobile/
+2. Scan QR code with Expo Go
+3. Test all three difficulty modes
+4. Verify puzzle generation doesn't hang (should complete in <3s)
+5. Test tutorial on fresh install
+6. Test daily challenge (should give same puzzle if opened twice same day)
+7. Test home screen unlock flow (Fox free -> build Kitchen -> invite Panko)
+8. Test settings (toggle reduced motion -> verify no confetti/particles)
+9. Test Reset All Data -> verify complete reset including tutorial/amber/unlocks
+10. Test stats screen shows correct streak
 
 ## Common Tasks
 
@@ -451,8 +487,7 @@ Edit constants at top of `wordHistory.ts`:
 
 ### Adjusting star rating thresholds
 Edit `calculateStars()` function in `starRating.ts`:
-- Current: 3 stars = 0 hints + ≤1 mistake, 2 stars = 1 hint OR 2-3 mistakes, 1 star = rest
-- Modify the conditionals to adjust difficulty of earning stars
+- Current: 3 stars = 0 hints + 0-2 mistakes, 2 stars = 1 hint OR 3-4 mistakes, 1 star = rest
 
 ### UI adjustments
 - Tile sizes/styling: `LetterTile.tsx` styles
@@ -461,10 +496,16 @@ Edit `calculateStars()` function in `starRating.ts`:
 - Color palette: `theme/colors.ts`
 - Game container: `App.tsx` styles object
 - Room dimensions: `ROOM_WIDTH` (165) and `ROOM_HEIGHT` (130) in `HouseWorld.tsx`
-- Status bar handling: Use `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50` for proper Android status bar padding
+- Status bar: `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50`
 
 ### Adding new tile colors
 Add to `tileColors` array in `theme/colors.ts`
+
+### Adding new achievements
+1. Add achievement definition to `ACHIEVEMENTS` array in `achievements.ts`
+2. Include `id`, `title`, `description`, `icon`, `category`, and `check` function
+3. `check` receives `AchievementCheckState` with stats, streak, phase, etc.
+4. Add test case in `achievements.test.ts`
 
 ### Home Screen - Adding new animals
 1. Add animal type to `AnimalType` in `types/homeWorld.ts`
@@ -475,47 +516,26 @@ Add to `tileColors` array in `theme/colors.ts`
 
 ### Home Screen - Adjusting amber rewards
 Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
-- EASY: 5 → change for easier/harder progression
-- MEDIUM: 10
-- HARD: 20
+- EASY: 5, MEDIUM: 10, HARD: 20
 
 ### Home Screen - Adjusting dialogue phases
 Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
 - Default: [0, 25, 75, 150, 250] puzzles for phases 0-4
-- Lower values = faster descent into existential dread
-
-### Home Screen - Adding dread words
-Edit `DREAD_WORDS` set in `localGenerator.ts` to add/remove words
-that appear more frequently at higher phases
 
 ### Home Screen - Adjusting dialogue sessions
 Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
-- `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 6)
-- `PUZZLES_BETWEEN_SESSIONS` - Puzzles required to unlock next session (default: 5)
+- `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 8)
+- `PUZZLES_BETWEEN_SESSIONS` - Puzzles required to unlock next session (default: 3)
 
-### DEV Button (Testing Only)
-A red "DEV" button appears in the top-right of the home screen for testing:
-- Adds 5000 amber on each tap
-- Clears all dialogue session cooldowns so animals can talk immediately
-- Useful for testing unlock progression and dialogue content
-- Located in `HomeScreen.tsx` - remove before production
+### Home Screen - Adjusting streak grace period
+Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
+- Default: 2 (can miss 2 days before streak resets)
 
-## Testing
-
-Test on physical device via Expo Go app:
-1. Run `npx expo start` in mobile/
-2. Scan QR code with Expo Go
-3. Test all three difficulty modes
-4. Verify puzzle generation doesn't hang (should complete in <3s)
-5. Test DROP row arc layout with different word lengths
-6. Test home screen features:
-   - New game: starts with empty Cozy Den, invite prompt appears
-   - Invite Fox for free, verify intro dialogue about building
-   - Tap animals to start dialogue sessions
-   - Verify session timer and dialogue count display
-   - Verify cooldown appears after session ends
-   - Test unlock sequence (invite animal → build room → invite animal)
-   - Test pinch-to-zoom on house view
+### Adding sound effects
+1. Add audio file to `assets/sounds/`
+2. Register in `audio.ts` sound map
+3. Call the corresponding `sound*()` function from App.tsx or relevant component
+4. Audio functions already check `settings.soundEnabled` before playing
 
 ## Known Constraints
 
@@ -526,3 +546,6 @@ Test on physical device via Expo Go app:
 - Dialogue sessions persist across app restarts (cooldowns continue)
 - House view uses `react-native-gesture-handler` for pan/zoom (GestureHandlerRootView wraps content)
 - TouchableOpacity in home screen components must be imported from `react-native-gesture-handler` for proper touch handling
+- HomeScreen.tsx uses react-native TouchableOpacity (not RNGH) for modal content
+- Daily challenge uses Math.random override for seeded generation (guarded against concurrency)
+- Sound system is placeholder infrastructure (API wired up, awaiting real audio asset files)

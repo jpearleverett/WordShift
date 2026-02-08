@@ -50,9 +50,7 @@ import {
   recordDialogue,
   endSession,
   getSessionStatus,
-  formatTimeRemaining,
   updatePuzzleCount,
-  isOnCooldown,
 } from '../../services/dialogueSession';
 
 import { JuicyButton } from './JuicyButton';
@@ -86,7 +84,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showShop, setShowShop] = useState(false);
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
-  const [showBuildPrompt, setShowBuildPrompt] = useState(false);
   const [nextUnlock, setNextUnlock] = useState<Unlockable | null>(null);
   const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
   const [sessionInfo, setSessionInfo] = useState<{

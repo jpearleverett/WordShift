@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { getSettingsSync } from '../services/settings';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -193,10 +194,12 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
 };
 
 export const AnimatedBackground: React.FC = () => {
-  const particles = useRef(generateParticles(15)).current;
+  const reducedMotion = getSettingsSync().reducedMotion;
+  const particles = useRef(reducedMotion ? [] : generateParticles(15)).current;
   const gradientPulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (reducedMotion) return;
     // Subtle gradient pulse animation
     Animated.loop(
       Animated.sequence([

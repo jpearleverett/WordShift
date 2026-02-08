@@ -8,6 +8,7 @@ interface JuicyButtonProps {
   disabled?: boolean;
   bounceScale?: number;
   accessibilityLabel?: string;
+  accessibilityRole?: 'button' | 'link' | 'none';
 }
 
 export const JuicyButton: React.FC<JuicyButtonProps> = ({
@@ -17,6 +18,7 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
   disabled = false,
   bounceScale = 0.92,
   accessibilityLabel,
+  accessibilityRole = 'button',
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -74,7 +76,7 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
         disabled={disabled}
         style={style}
         accessibilityLabel={accessibilityLabel}
-        accessibilityRole="button"
+        accessibilityRole={accessibilityRole}
         accessibilityState={{ disabled }}
       >
         {children}

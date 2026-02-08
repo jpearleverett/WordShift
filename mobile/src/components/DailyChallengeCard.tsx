@@ -7,7 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
-import { getDailyStatus, getDailyDifficulty, getTodayString } from '../services/dailyChallenge';
+import { getDailyStatus } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
 
 interface DailyChallengeCardProps {

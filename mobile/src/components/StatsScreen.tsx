@@ -12,13 +12,13 @@ import { CandyColors } from '../theme/colors';
 import { CumulativeStats, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
 import { getDailyStatus } from '../services/dailyChallenge';
+import { getStreakInfo } from '../services/amberCurrency';
 import { Difficulty } from '../types';
 
 interface StatsScreenProps {
   onClose: () => void;
   puzzlesSolved: number;
   currentPhase: number;
-  currentStreak: number;
   amberBalance: number;
 }
 
@@ -26,18 +26,19 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   onClose,
   puzzlesSolved,
   currentPhase,
-  currentStreak,
   amberBalance,
 }) => {
   const [stats, setStats] = useState<CumulativeStats | null>(null);
   const [achievements, setAchievements] = useState<(Achievement & { isUnlocked: boolean; unlockedAt: number | null })[]>([]);
   const [dailyStatus, setDailyStatus] = useState<{ totalCompleted: number; bestStreak: number } | null>(null);
+  const [currentStreak, setCurrentStreak] = useState(0);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'achievements'>('overview');
 
   useEffect(() => {
     getCumulativeStats().then(setStats);
     getAchievementsWithStatus().then(setAchievements);
     getDailyStatus().then(s => setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak }));
+    getStreakInfo().then(info => setCurrentStreak(info.currentStreak));
   }, []);
 
   if (!stats) return null;
