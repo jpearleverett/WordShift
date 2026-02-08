@@ -2,7 +2,8 @@ import { useState, useRef, useCallback } from 'react';
 import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { generateLocalPuzzle } from '../services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
-import { CHALLENGE_MODE_CONFIG } from '../types/homeWorld';
+import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
+import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage } from '../services/phaseNarrative';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -30,6 +31,7 @@ export interface PuzzleGameState {
   earnedStars: number;
   gameMode: GameMode;
   undosRemaining: number;
+  currentPhase: DialoguePhase;
 }
 
 export interface PuzzleGameActions {
@@ -52,6 +54,7 @@ export interface PuzzleGameActions {
   setEarnedStars: (stars: number) => void;
   setMessage: (message: string) => void;
   setGameMode: (mode: GameMode) => void;
+  setCurrentPhase: (phase: DialoguePhase) => void;
 }
 
 export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
@@ -76,6 +79,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [earnedStars, setEarnedStars] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('standard');
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
+  const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
 
@@ -108,7 +112,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedLetter(null);
     setHistory([]);
     setGameState(GameState.PLAYING);
-    setMessage("Tap a tile to begin!");
+    setMessage(getStartMessage(currentPhase));
     setError(null);
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
@@ -118,11 +122,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setEarnedStars(0);
     // Reset undos for challenge mode
     setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
-  }, [gameMode]);
+  }, [gameMode, currentPhase]);
 
   const startNewGame = useCallback(async (selectedDifficulty: Difficulty = difficulty, mode?: GameMode) => {
     setGameState(GameState.LOADING);
-    setMessage("Mixing up words...");
+    setMessage(getLoadingMessage(currentPhase));
     setError(null);
     setShowDifficultyMenu(false);
     if (selectedDifficulty !== difficulty) {
@@ -192,14 +196,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
-      // Educational hint: show which letter and what word it helps form
       setMessage(
-        `Move '${relevantStep.letterToMove}' — think "${relevantStep.targetWord}"!`
+        getHintMessage(relevantStep.letterToMove, relevantStep.targetWord, currentPhase)
       );
     } else {
-      setMessage("Not quite right — try undoing your last move!");
+      setMessage(getHintFallback(currentPhase));
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, currentPhase]);
 
   const handleSlotPress = useCallback(async (targetIndex: number): Promise<{
     completed: boolean;
@@ -278,15 +281,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return { completed: true, hintsUsed, invalidAttempts, gameMode };
     } else {
       setActiveRowIndex(prev => prev + 1);
-      const messages = [
-        "Delicious!",
-        "Tasty move!",
-        "Sweet!",
-        "Yummy!",
-        "Perfect!",
-        "Brilliant!",
-      ];
-      setMessage(messages[Math.floor(Math.random() * messages.length)]);
+      setMessage(getMoveMessage(currentPhase));
     }
 
     setIsProcessing(false);
@@ -344,6 +339,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     earnedStars,
     gameMode,
     undosRemaining,
+    currentPhase,
   };
 
   const actions: PuzzleGameActions = {
@@ -361,6 +357,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setEarnedStars,
     setMessage,
     setGameMode,
+    setCurrentPhase,
   };
 
   return [state, actions];
