@@ -1200,7 +1200,6 @@ const styles = StyleSheet.create({
   },
   dialogueRow: {
     flexDirection: 'row',
-    minHeight: 260,
   },
   dialogueSpriteCol: {
     width: '30%',
@@ -1210,8 +1209,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dialogueSpriteImage: {
-    width: '120%',
-    height: '90%',
+    width: SCREEN_WIDTH * 0.36,
+    height: SCREEN_WIDTH * 0.48,
   },
   dialogueSpriteEmoji: {
     fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
@@ -1221,7 +1220,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 34,
     paddingHorizontal: 18,
-    justifyContent: 'space-between',
   },
   dialogueAnimalName: {
     fontSize: 22,
@@ -1236,7 +1234,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
-    flex: 1,
   },
   dialogueText: {
     fontSize: 15,
