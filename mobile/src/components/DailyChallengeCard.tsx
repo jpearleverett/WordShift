@@ -110,6 +110,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
     marginBottom: 8,
+    zIndex: 10,
   },
   card: {
     flexDirection: 'row',
