@@ -334,7 +334,7 @@ const ShootingStar: React.FC = () => {
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
 const ROOM_WIDTH = 326;
-const ROOM_HEIGHT = 80;
+const ROOM_HEIGHT = 161; // Maintains ~2:1 aspect ratio of room PNGs (1456x720)
 const ROOM_GAP = 6;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
@@ -979,7 +979,7 @@ const styles = StyleSheet.create({
   houseContainer: {
     alignItems: 'center',
     marginBottom: 20,
-    marginTop: 30,
+    marginTop: 50,
   },
 
   // Roof
