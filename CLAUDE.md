@@ -1,6 +1,40 @@
 # WordShift - Claude Code Context
 
-A word puzzle game where players shift letters between words to form valid English words. Features a vibrant Candy Crush-inspired visual style and a home screen with unlockable animal characters whose dialogue evolves from cheerful to existential dread.
+A word puzzle game where players shift letters between words to form valid English words. What begins as a bright, candy-colored experience with adorable animal companions gradually descends into cosmic horror — the animals are revealed to be members of a cult, and every puzzle the player solves brings them closer to summoning a dark entity.
+
+## Narrative Vision
+
+**The core conceit**: The player is unknowingly participating in a ritual. Every puzzle solved is an incantation. The animal "friends" aren't just getting philosophical — they're preparing for something. The house isn't just a home — it's a temple being constructed, room by room, to house something ancient.
+
+**The tone shift must be gradual and earned.** The game should feel genuinely delightful for the first 25+ puzzles. Players should *like* these animals. The betrayal of that warmth is the entire point. When Fox says "The fire grows cold... but something else burns," it should land because the player remembers when Fox just wanted to tell them about cozy blankets.
+
+**Everything reflects the transition:**
+- **Puzzle words**: Shift from FUN/SPARK/TIGER → VOID/DOOM/ABYSS/RITUAL
+- **Background visuals**: Bright candy purple → near-black with crimson accents
+- **Floating particles**: Sparkles and stars → dim, dying embers
+- **Victory text**: "PERFECT!" → "WHY DOES IT MATTER?"
+- **Move messages**: "Delicious!" → "The void accepts."
+- **Confetti**: Vibrant rainbow → muted, dark colors
+- **Hints**: "Move 'R' — think WARM!" → "If it matters, 'R' — see VOID."
+- **Home screen**: Sunny day, happy clouds → storm sky, shadow figure looming
+- **Animal sprites**: Cute idle poses → robed cult figures
+- **Room decorations**: Cozy furnishings → ritual objects, sigils, altars
+- **Music/sound** (future): Cheerful chimes → droning, dissonant ambience
+
+**Key narrative rules:**
+1. Never break the fourth wall. The animals don't know they're in a game.
+2. The darkness should feel *earned*, not sudden. Each phase is a gradual shift.
+3. Phase 4 animals aren't "evil" — they're reverent, serene, certain. That's what makes it unsettling.
+4. The player should feel complicit. "You solved the puzzle. You brought us closer."
+5. Visual changes should slightly precede dialogue revelations — the player should *feel* something is off before they're told.
+6. The shadow_figure.png entity is never named, never explained. It just *is*.
+
+**Phase narrative arc:**
+- **Phase 0 (Bright Days)**: Pure joy. Cute animals, candy colors, fun words. The trap is set.
+- **Phase 1 (Curious Thoughts)**: Animals start wondering about the nature of things. Subtle philosophical undertones. "Have you ever noticed how letters can become anything?"
+- **Phase 2 (Deeper Questions)**: Isolation creeps in. Animals question reality, impermanence. Words shift toward emptiness. The background noticeably darkens.
+- **Phase 3 (Growing Shadows)**: Overt dread. Animals speak of endings, purpose, something approaching. The puzzle screen feels cold. Victory feels hollow.
+- **Phase 4 (The Horizon)**: The cult is revealed. Animals speak of "the arrangement," "the pattern," "what comes through." Robed sprites. Storm sky. The shadow figure appears. Every puzzle solved is explicitly framed as part of the summoning. Victory text questions why the player continues.
 
 ## Quick Commands
 
@@ -46,10 +80,10 @@ mobile/
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout for slots
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling
-│   │   ├── AnimatedBackground.tsx  # Floating particles (respects reducedMotion)
-│   │   ├── Confetti.tsx         # Win celebration confetti (respects reducedMotion)
+│   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + gradient pulse
+│   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
 │   │   ├── ErrorBoundary.tsx    # React error boundary wrapper
-│   │   ├── Tutorial.tsx         # 5-step animated onboarding
+│   │   ├── Tutorial.tsx         # Fox-guided interactive onboarding with mini-puzzle
 │   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
@@ -62,7 +96,7 @@ mobile/
 │   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
 │   │       └── index.ts         # Home component exports
 │   ├── theme/
-│   │   └── colors.ts            # CandyColors palette and tile color system
+│   │   └── colors.ts            # CandyColors palette, tile colors, PhaseTheme system
 │   └── services/
 │       ├── localGenerator.ts    # Puzzle generation with DFS, quality scoring, dread words
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
@@ -72,7 +106,8 @@ mobile/
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
-│       ├── achievements.ts      # 28 achievements across 5 categories
+│       ├── phaseNarrative.ts     # Phase-aware text: victory, moves, hints, loading
+│       ├── achievements.ts      # 36 achievements across 6 categories
 │       ├── shareResults.ts      # Wordle-style emoji grid sharing
 │       ├── settings.ts          # User preferences (sound, haptics, reducedMotion)
 │       ├── haptics.ts           # Haptic feedback (settings-gated)
@@ -162,10 +197,13 @@ const foxIdleImage = require('../../assets/characters/fox/idle.png');
 // Use Image component when asset exists, Text with emoji otherwise
 ```
 
-**Phase 4 visual changes:**
-- Use `robed.png` variants for all animals at Phase 4
-- Switch from `sky_day.png` to `sky_storm.png`
-- Show `shadow_figure.png` in background
+**Phase 4 visual changes (the cult is revealed):**
+- Use `robed.png` variants for all animals at Phase 4 — cult robes/cloaks
+- Switch from `sky_day.png` to `sky_storm.png` — ominous, oppressive sky
+- Show `shadow_figure.png` in background — the entity being summoned
+- Puzzle screen background shifts to near-black (#1A1A2E) with crimson particle embers
+- Victory confetti uses dark muted colors instead of rainbow
+- All text (victory, hints, move messages) takes on nihilistic/ritual tone
 
 **Room backgrounds:**
 - Room images should be 280x140px (or 2x/3x for retina)
@@ -200,13 +238,15 @@ As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite
 Game logic is extracted into two custom hooks:
 
 **`usePuzzleGame()`** (`src/hooks/usePuzzleGame.ts`):
-- All puzzle state: rows, selected letter, game state, hints, validation
+- All puzzle state: rows, selected letter, game state, hints, validation, gameMode, currentPhase
 - `initGame(words, hint?, solution?, wordLength?)` - Load pre-generated puzzle
-- `startNewGame(difficulty?)` - Generate and start a random puzzle
+- `startNewGame(difficulty?, mode?)` - Generate and start a random puzzle (standard or challenge)
 - `handleLetterPress(letter, rowIndex)` - Pick a letter
-- `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data
-- `handleHint()` - Show educational hint ("Move 'R' - think "WARM"!")
-- `handleUndo()` - Undo last move
+- `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode
+- `handleHint()` - Show phase-aware hint (blocked in challenge mode)
+- `handleUndo()` - Undo last move (limited to 1 in challenge mode)
+- `setCurrentPhase(phase)` - Sync narrative phase from persistence layer
+- All messages (start, loading, move success, hints) use `phaseNarrative.ts` for phase-aware tone
 
 **`useGamePersistence()`** (`src/hooks/useGamePersistence.ts`):
 - All persistence: amber balance, cumulative stats, phase, streak
@@ -225,16 +265,22 @@ State-based routing in `App.tsx`:
 
 When puzzle completes (`handleSlotPress` returns `{completed: true}`):
 1. Record stars via `calculateStars(hintsUsed, invalidAttempts)`
-2. Record puzzle completion via `amberCurrency.awardPuzzleCompletion()`
+2. Record puzzle completion via `amberCurrency.awardPuzzleAmber()`
 3. Check for newly unlocked achievements
 4. Queue achievement toasts for display
-5. Show victory modal with positive feedback
+5. Choreographed victory sequence:
+   - Stars pop in one-by-one with 200ms stagger (spring animation)
+   - Victory modal scales + fades in after stars complete
+   - Phase-aware title: "PERFECT!" (Phase 0) → "WHY DOES IT MATTER?" (Phase 4)
+   - Phase-aware feedback text shifts tone with narrative phase
+6. If phase changed: dramatic screen flash (double flicker to black)
+7. StarBurst particle effect plays on each valid intermediate move
 
 ### Achievement System (`services/achievements.ts`)
 
-28 achievements across 5 categories (puzzle, mastery, streak, collection, journey):
+36 achievements across 6 categories (puzzle, mastery, streak, collection, journey, challenge):
 - Each has `check: (state: AchievementCheckState) => boolean`
-- State includes: stats, puzzlesSolved, currentPhase, currentStreak, unlockedAnimals, etc.
+- State includes: stats, puzzlesSolved, currentPhase, currentStreak, unlockedAnimals, challengeCompletions, decorationCount, etc.
 - Persisted via AsyncStorage (`wordshift_unlocked_achievements`)
 - `checkAchievements(state)` returns newly unlocked achievements
 - `AchievementToast` component shows slide-in notification
@@ -273,37 +319,45 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 - Players earn **Amber** by completing puzzles
 - Rewards: EASY=5, MEDIUM=10, HARD=20 base
 - Star bonuses: 3-star +50%, 2-star +25%
-- Streak multiplier: 5% per day (max 50%, requires MIN_STREAK_FOR_BONUS=3)
+- Challenge mode: 1.5x amber multiplier
+- Streak multiplier: 10% per day (max 100%, requires MIN_STREAK_FOR_BONUS=2)
 - **Streak grace period**: Players can miss up to STREAK_RESET_DAYS (2) days
+- Milestone bonuses at key puzzle counts (10, 25, 50... up to 350)
 
 ### Animal Characters
 
-10 unique animals, each with their own room and personality (listed in unlock order):
-- **Fox (Ember)** - Introspective, cozy den with fireplace (STARTER - free to invite)
-- **Pangolin (Panko)** - Practical chef, rustic kitchen
-- **Owl (Archimedes)** - Scholar, study full of books
-- **Axolotl (Axel)** - Dreamy, aquarium room
-- **Capybara (Chill)** - Seemingly calm, office
-- **Fennec Fox (Fennick)** - Alert listener, desert camp
-- **Sloth (Sloane)** - Slow observer, jungle hammock
-- **Wombat (Warren)** - Grounded digger, underground burrow
-- **Rabbit (Thyme)** - Anxious, garden patio
-- **Red Panda (Bamboo)** - Zen/contemplative, bamboo attic (final unlock)
+10 unique animals, each with their own room and personality (listed in unlock order). Each has a surface persona and a deeper cult role that emerges at higher phases:
+
+- **Fox (Ember)** - Surface: introspective, cozy den with fireplace. Depth: the cult's oracle, reads meaning in flames. (STARTER - free to invite)
+- **Pangolin (Panko)** - Surface: practical chef, rustic kitchen. Depth: prepares ritual offerings, "the recipe was always leading here."
+- **Owl (Archimedes)** - Surface: scholar, study full of books. Depth: the cult's lorekeeper, found the summoning text in ancient words.
+- **Axolotl (Axel)** - Surface: dreamy, aquarium room. Depth: the medium, "I can see it in the water... it's close."
+- **Capybara (Chill)** - Surface: seemingly calm, office. Depth: the cult's administrator, has been coordinating everything. Unshakably serene about the end.
+- **Fennec Fox (Fennick)** - Surface: alert listener, desert camp. Depth: the sentinel, hears the entity approaching.
+- **Sloth (Sloane)** - Surface: slow observer, jungle hammock. Depth: has always known, moves slowly because time doesn't matter anymore.
+- **Wombat (Warren)** - Surface: grounded digger, underground burrow. Depth: built the foundation — literally. The burrow connects to something beneath.
+- **Rabbit (Thyme)** - Surface: anxious, garden patio. Depth: anxious because they understand what's coming, but committed anyway.
+- **Red Panda (Bamboo)** - Surface: zen/contemplative, bamboo attic. Depth: the cult's spiritual leader, at perfect peace with the summoning. (final unlock)
 
 ### Dialogue Progression (Phases 0-4)
 
-Animal dialogue evolves as players complete puzzles:
-- **Phase 0 (0-24 puzzles)**: Happy, friendly, light
-- **Phase 1 (25-74 puzzles)**: Curious, slightly philosophical
-- **Phase 2 (75-149 puzzles)**: Questioning existence
-- **Phase 3 (150-249 puzzles)**: Existential dread
-- **Phase 4 (250+ puzzles)**: Complete philosophical crisis
+Animal dialogue evolves as players complete puzzles, gradually revealing the cult:
+- **Phase 0 (0-24 puzzles)**: Happy, friendly, light. The animals are your friends. No hint of anything dark.
+- **Phase 1 (25-74 puzzles)**: Curious, slightly philosophical. "Have you ever wondered why the letters move?" Subtle signs they know more than they let on.
+- **Phase 2 (75-149 puzzles)**: Questioning existence, isolation. "The words are changing, aren't they? Or are we?" First hints of shared purpose among the animals.
+- **Phase 3 (150-249 puzzles)**: Existential dread, references to "the arrangement," "what's coming." Animals start speaking in unison-like themes. Something is being prepared.
+- **Phase 4 (250+ puzzles)**: The cult revealed. Animals speak reverently of the summoning, the player's role, the entity approaching. Robed sprites. They're grateful — terrifyingly so.
 
-Each animal has unique dialogue fitting their personality (owl becomes intellectual crisis, sloth has slow-motion dread, etc.)
+Each animal filters the cult narrative through their personality:
+- **Fox (Ember)**: Fireside prophet. "The embers whisper of what's to come."
+- **Owl (Archimedes)**: Has read the texts. "I found the passage. It was always in the letters."
+- **Sloth (Sloane)**: Slow, inevitable acceptance. "It approaches... at the speed... it was always... going to."
+- **Rabbit (Thyme)**: Anxious but devoted. "I'm scared, but... this is what we prepared for, right?"
+- **Red Panda (Bamboo)**: Zen certainty. "The pattern completes. Breathe. Accept."
 
 **Dialogue Count**: 52 dialogues per animal (520 total)
 - Phase 0: 12 dialogues (happy, friendly)
-- Phases 1-4: 10 dialogues each (progressively darker)
+- Phases 1-4: 10 dialogues each (progressively darker, culminating in cult revelation)
 
 ### Dialogue Session System
 
@@ -328,7 +382,7 @@ Animals have conversation sessions with puzzle-based cooldowns to pace interacti
 
 ### House Building System (Bottom-Up)
 
-The house is built from the ground up, one room at a time:
+The house is built from the ground up, one room at a time. What begins as "building a cozy home for your animal friends" is gradually revealed to be constructing a temple — each room a chamber, each animal a cultist taking their position:
 
 **Starting State**:
 - Player starts with one empty room (Cozy Den) on the ground floor
@@ -345,6 +399,12 @@ The house is built from the ground up, one room at a time:
 
 **Unlock Progress Bar**: Home screen shows amber progress toward next unlock with a visual bar.
 
+### Room Decorations (Post-Completion Content)
+
+After all rooms and animals are unlocked, players can purchase cosmetic decorations (30 total, 3 per room, 75-150 amber each). At higher phases, these decorations take on a darker significance — what starts as "a velvet rug" or "copper pots" eventually feels like "ritual furnishings."
+
+Managed via `purchaseDecoration()`, `hasDecoration()`, `getAllDecorations()` in `amberCurrency.ts`.
+
 ### House & Room Visuals
 
 **House Structure** (`HouseWorld.tsx`):
@@ -356,9 +416,50 @@ The house is built from the ground up, one room at a time:
 
 ### Word Theme Evolution
 
-Puzzle words gradually shift to match the existential theme:
-- Phase 0: Fun words (SPARK, FLAME, TIGER)
-- Higher phases: Dread words preferred (VOID, FADE, DOOM, ABYSS)
+Puzzle words gradually shift to match the ritual narrative:
+- Phase 0: Fun words (SPARK, FLAME, TIGER) — innocent, playful
+- Phase 1: Questioning words (THINK, WONDER, DRIFT, SHIFT) — curiosity
+- Phase 2: Isolation words (VOID, EMPTY, ALONE, FADE, FLOAT) — impermanence
+- Phase 3: Dread words (DOOM, DARK, COLD, NUMB, GRAVE, ECHO) — something approaching
+- Phase 4: Cosmic/ritual words (ABYSS, RIFT, SUMMON, PORTAL, GATE, ETERNAL) — the summoning
+
+The `DREAD_WORDS` set in `localGenerator.ts` contains 200+ words organized by phase. The dread bonus formula is `phase * phase * 2.5` (Phase 4 = +40 score), making ritual-themed words strongly preferred at higher phases.
+
+## Phase-Aware Visual Theming
+
+The entire puzzle screen transforms across narrative phases via the `PhaseTheme` system in `theme/colors.ts` and narrative text in `services/phaseNarrative.ts`.
+
+### Visual Theme (`getPhaseTheme(phase)`)
+Returns phase-specific colors for backgrounds, particles, confetti, victory modal, and vignettes:
+- **Phase 0**: Bright candy purple (#667EEA), white/pink particles, vibrant confetti
+- **Phase 1**: Muted lavender (#5B6DB0), amber-toned particles
+- **Phase 2**: Cool blue-purple (#4A5580), desaturated particles
+- **Phase 3**: Dark indigo (#2E3355), dim muted particles
+- **Phase 4**: Near-black (#1A1A2E), crimson/purple accents, dying embers
+
+### Narrative Text (`phaseNarrative.ts`)
+All player-facing text shifts tone with phase:
+- `getVictoryTitle(stars, phase)` — "PERFECT!" → "WHY DOES IT MATTER?"
+- `getVictoryFeedback(stars, phase)` — "Flawless solve!" → "Perfection in an imperfect void."
+- `getMoveMessage(phase)` — "Delicious!" → "The void accepts."
+- `getHintMessage(letter, word, phase)` — "Move 'R'" → "If it matters, 'R'"
+- `getLoadingMessage(phase)` — "Mixing words..." → "The void speaks..."
+- `getStartMessage(phase)` — "Tap a tile to begin!" → "The words are waiting. They always are."
+- `getPhaseChangeNarrative(phase)` — Dramatic text for phase transitions
+- `getPhaseIndicator(phase)` — Icon + label for puzzle header badge
+
+### Challenge Mode
+Optional harder mode for experienced players (`GameMode = 'standard' | 'challenge'`):
+- Max 1 undo, no hints allowed
+- 1.5x amber reward multiplier
+- Challenge completions count 2x toward phase progression (accelerating the narrative)
+
+### Narrative Acceleration
+Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250 via `NARRATIVE_ACCELERATION` config:
+- High three-star rate: 1.5x phase progress
+- Long streaks (7+ days): 1.25x phase progress
+- Hard difficulty: 1.5x phase progress
+- Challenge mode: 2.0x phase progress
 
 ## Key Services
 
@@ -387,7 +488,7 @@ Grades puzzle performance without time pressure:
 - **2 stars (GREAT!)**: 1 hint OR 3-4 invalid attempts
 - **1 star (WELL DONE!)**: 2+ hints OR 5+ invalid attempts
 
-**Victory feedback is always positive** - no negative framing.
+**Victory feedback shifts with narrative phase** — always positive at Phase 0, increasingly hollow/questioning at higher phases. See `phaseNarrative.ts` for the full text progression.
 
 **Cumulative Stats (persisted via AsyncStorage):**
 - `totalPuzzlesCompleted`, `totalStars`, star count breakdowns
@@ -406,30 +507,46 @@ Tracks recently used words to ensure puzzle diversity:
 
 ### Amber Currency (`amberCurrency.ts`)
 
-Manages amber balance, streak, and phase progression:
+Manages amber balance, streak, phase progression, and decorations:
 
-- `awardPuzzleCompletion(difficulty)` - Main entry, returns balance/phase/streak
+- `awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate)` - Main entry, returns balance/phase/streak/challenge bonus
+- `calculatePhaseAcceleration(threeStarRate, streak, difficulty, gameMode)` - Weighted phase progress multiplier
 - `updateStreak()` - Grace period of STREAK_RESET_DAYS (2 days)
 - `getStreakInfo()` - Current streak, multiplier, bonus percentage
 - `getFullProgress()` - All progress data (amber, puzzles, phase, unlocks)
+- `purchaseDecoration(roomId, decorationId, cost)` - Buy room decoration
+- `hasDecoration(roomId, decorationId)` / `getAllDecorations()` / `getDecorationCount()` - Decoration queries
 - `clearProgress()` - Full reset
 
 ### Hint System
 
-Educational hints show the target word:
-- "Move 'R' - think "WARM"!" instead of just "Try the letter: R"
-- Falls back to undo suggestion if player is off the solution path
+Educational hints show the target word with phase-aware tone:
+- Phase 0: "Move 'R' — think "WARM"!" (encouraging)
+- Phase 2: "Consider 'R' — notice "COLD"." (distant)
+- Phase 4: "If it matters, 'R' — see "VOID"." (nihilistic)
+- Falls back to phase-aware undo suggestion if player is off the solution path
+- Challenge mode blocks hints entirely
 
 ## Tutorial System (`components/Tutorial.tsx`)
 
-5-step animated onboarding:
-1. Welcome
-2. Pick Letter
-3. Drop Down
-4. Complete Chain
-5. Build House
+Fox-guided interactive onboarding with a real mini-puzzle. Ember (Fox) greets the player and walks them through a single puzzle move: HEAT → ATE (pick H from HEAT → EAT, drop H into ATE → HATE).
 
-Checks `AsyncStorage` for `wordshift_tutorial_completed`. Spring animations between steps.
+**7 tutorial phases**: `welcome` → `show_puzzle` → `pick_letter` → `letter_picked` → `drop_letter` → `move_complete` → `house_intro`
+
+**Components**:
+- `FoxCharacter` — Fox talk sprite with emoji fallback, bounce animation when speaking
+- `MiniTile` — Smaller LetterTile (44x54) with 3D candy styling, pulse animation for guided hints
+- `MiniSlot` — Pulsing dashed-border drop zones
+- `SpeechBubble` — Fade-in dialogue with emphasis variant
+
+**Narrative seeds** (innocent now, ominous in retrospect):
+- "We've been waiting for someone like you."
+- "Every puzzle you solve helps us build the house."
+- "The others are going to love you. There's so much more to discover... together."
+
+**Features**: Interactive mini-puzzle (not just text slides), progress dots (5 stages), skip button, content fade transitions, spring animations for celebration.
+
+Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialCompleted()`, `markTutorialCompleted()`, `resetTutorial()`, `Tutorial`.
 
 ## Coding Conventions
 
@@ -437,11 +554,13 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Spring animations betw
 - React Native StyleSheet for styling (not inline styles)
 - Functional components with hooks
 - Custom hooks extract game logic from App.tsx (`usePuzzleGame`, `useGamePersistence`)
-- Import colors from `CandyColors` in `src/theme/colors.ts`
-- Use `Animated` API for smooth animations
+- Import colors from `CandyColors` in `src/theme/colors.ts`; use `getPhaseTheme(phase)` for phase-aware colors
+- All player-facing text must go through `phaseNarrative.ts` — never hardcode victory/move/hint strings
+- Use `Animated` API for smooth animations; choreograph multi-step animations with `Animated.sequence` + `Animated.stagger`
 - Services use AsyncStorage with in-memory cache pattern (load -> cache -> return cached)
 - TS strict: module-level nullable caches need local variable assignment before return to avoid TS2322
 - Accessibility: interactive elements should have `accessibilityLabel` and `accessibilityRole`
+- **Narrative consistency**: Any new feature, UI text, or visual element must respect the current phase. If it looks cheerful, it should only be cheerful at Phase 0. If it's always cheerful regardless of phase, it breaks the narrative.
 
 ## Testing
 

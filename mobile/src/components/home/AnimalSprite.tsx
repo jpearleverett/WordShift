@@ -546,17 +546,21 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             </Animated.View>
           )}
 
-          {/* Name tag with phase-based style */}
+          {/* Name tag with phase-based mood indicator */}
           <View style={[
             styles.nameTag,
             currentPhase >= 3 && styles.nameTagDark,
           ]}>
+            <View style={[styles.moodDot, { backgroundColor: getMoodColor() }]} />
             <Text style={[
               styles.nameText,
               currentPhase >= 3 && styles.nameTextDark,
             ]}>
               {animal.name}
             </Text>
+            {isOnCooldown && (
+              <Text style={styles.cooldownIndicator}>💤</Text>
+            )}
           </View>
         </Animated.View>
       </TouchableOpacity>
@@ -633,11 +637,23 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   nameText: {
     color: CandyColors.white,
     fontSize: 10,
     fontWeight: '700',
+  },
+  moodDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  cooldownIndicator: {
+    fontSize: 8,
+    marginLeft: 2,
   },
   nameTagDark: {
     backgroundColor: CandyColors.purple.dark,

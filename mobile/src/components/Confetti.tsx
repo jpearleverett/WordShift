@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
+import { getPhaseTheme } from '../theme/colors';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -13,24 +14,14 @@ interface ConfettiPiece {
   delay: number;
 }
 
-const CONFETTI_COLORS = [
-  '#FF6B9D', // Hot pink
-  '#C44DFF', // Purple
-  '#4DAFFF', // Blue
-  '#4DE8C2', // Mint
-  '#FFD84D', // Gold
-  '#FF8C4D', // Orange
-  '#FF4D6A', // Red
-  '#9D4DFF', // Violet
-];
-
-const generateConfetti = (count: number): ConfettiPiece[] => {
+const generateConfetti = (count: number, colors?: string[]): ConfettiPiece[] => {
+  const confettiColors = colors || getPhaseTheme(0).confettiColors;
   const pieces: ConfettiPiece[] = [];
   for (let i = 0; i < count; i++) {
     pieces.push({
       id: i,
       x: Math.random() * SCREEN_WIDTH,
-      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
       size: 8 + Math.random() * 12,
       rotation: Math.random() * 360,
       delay: Math.random() * 300,
@@ -133,9 +124,10 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
 interface ConfettiProps {
   active: boolean;
   onComplete?: () => void;
+  phase?: number;
 }
 
-export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete }) => {
+export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 0 }) => {
   const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
 
   useEffect(() => {
@@ -145,7 +137,8 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete }) => {
         onComplete?.();
         return;
       }
-      setPieces(generateConfetti(50));
+      const theme = getPhaseTheme(phase);
+      setPieces(generateConfetti(50, theme.confettiColors));
       const timeout = setTimeout(() => {
         onComplete?.();
       }, 3500);

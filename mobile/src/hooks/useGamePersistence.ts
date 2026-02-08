@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Difficulty } from '../types';
+import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   calculateStars,
   recordPuzzleCompletion,
   getCumulativeStats,
   CumulativeStats,
+  getThreeStarRate,
 } from '../services/starRating';
 import {
   awardPuzzleAmber,
@@ -22,10 +23,12 @@ export interface VictoryData {
   phaseChanged: boolean;
   newPhase: DialoguePhase;
   streakBonus: number;
+  challengeBonus: number;
   currentStreak: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
   cumulativeStats: CumulativeStats | null;
+  phaseAcceleration: number;
 }
 
 export interface PersistenceState {
@@ -35,7 +38,7 @@ export interface PersistenceState {
 }
 
 export interface PersistenceActions {
-  recordVictory: (difficulty: Difficulty, hintsUsed: number, invalidAttempts: number) => Promise<VictoryData>;
+  recordVictory: (difficulty: Difficulty, hintsUsed: number, invalidAttempts: number, gameMode?: GameMode) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
 }
@@ -61,17 +64,19 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   const recordVictory = useCallback(async (
     difficulty: Difficulty,
     hintsUsed: number,
-    invalidAttempts: number
+    invalidAttempts: number,
+    gameMode: GameMode = 'standard'
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
 
     try {
-      const [_, amberResult] = await Promise.all([
-        recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts),
-        awardPuzzleAmber(difficulty, stars),
-      ]);
-
+      // Record star stats first so we can get the three-star rate
+      await recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts);
       const stats = await getCumulativeStats();
+      const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
+
+      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate);
+
       setCumulativeStats(stats);
       updatePuzzleCount(amberResult.puzzlesSolved);
       setAmberBalance(amberResult.newBalance);
@@ -84,10 +89,13 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           stars,
           hintsUsed,
           invalidAttempts,
+          gameMode,
           amberEarned: amberResult.amount,
+          challengeBonus: amberResult.challengeBonus,
           puzzlesSolved: amberResult.puzzlesSolved,
           phase: amberResult.newPhase,
           phaseChanged: amberResult.phaseChanged,
+          phaseAcceleration: amberResult.phaseAcceleration,
         },
       });
 
@@ -98,10 +106,12 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseChanged: amberResult.phaseChanged,
         newPhase: amberResult.newPhase,
         streakBonus: amberResult.streakBonus,
+        challengeBonus: amberResult.challengeBonus,
         currentStreak: amberResult.currentStreak,
         milestoneBonus: amberResult.milestoneBonus,
         milestoneMessage: amberResult.milestoneMessage,
         cumulativeStats: stats,
+        phaseAcceleration: amberResult.phaseAcceleration,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -112,10 +122,12 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseChanged: false,
         newPhase: currentPhase,
         streakBonus: 0,
+        challengeBonus: 0,
         currentStreak: 0,
         milestoneBonus: 0,
         milestoneMessage: null,
         cumulativeStats,
+        phaseAcceleration: 1.0,
       };
     }
   }, [amberBalance, currentPhase, cumulativeStats]);

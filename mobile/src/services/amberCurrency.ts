@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Difficulty } from '../types';
+import { Difficulty, GameMode } from '../types';
 import {
   HomeWorldProgress,
   AmberTransaction,
@@ -9,6 +9,8 @@ import {
   STREAK_BONUSES,
   calculateStreakMultiplier,
   checkMilestone,
+  NARRATIVE_ACCELERATION,
+  CHALLENGE_MODE_CONFIG,
 } from '../types/homeWorld';
 
 const PROGRESS_STORAGE_KEY = 'wordshift_home_progress';
@@ -152,15 +154,55 @@ export async function getAmberBalance(): Promise<number> {
 }
 
 /**
+ * Calculate narrative acceleration multiplier for phase progression
+ * Based on player performance (three-star rate, streak, difficulty)
+ */
+export function calculatePhaseAcceleration(
+  threeStarRate: number,
+  currentStreak: number,
+  difficulty: Difficulty,
+  gameMode: GameMode = 'standard'
+): number {
+  let multiplier = 1.0;
+
+  // Three-star performance bonus
+  if (threeStarRate >= NARRATIVE_ACCELERATION.THREE_STAR_RATE_THRESHOLD) {
+    multiplier *= NARRATIVE_ACCELERATION.THREE_STAR_MULTIPLIER;
+  }
+
+  // Streak bonus
+  if (currentStreak >= NARRATIVE_ACCELERATION.STREAK_THRESHOLD) {
+    multiplier *= NARRATIVE_ACCELERATION.STREAK_MULTIPLIER;
+  }
+
+  // Difficulty bonus
+  if (difficulty === 'HARD') {
+    multiplier *= NARRATIVE_ACCELERATION.HARD_MULTIPLIER;
+  } else if (difficulty === 'EASY') {
+    multiplier *= NARRATIVE_ACCELERATION.EASY_MULTIPLIER;
+  }
+
+  // Challenge mode bonus
+  if (gameMode === 'challenge') {
+    multiplier *= NARRATIVE_ACCELERATION.CHALLENGE_MULTIPLIER;
+  }
+
+  return multiplier;
+}
+
+/**
  * Award amber for completing a puzzle
  */
 export async function awardPuzzleAmber(
   difficulty: Difficulty,
-  starsEarned: number
+  starsEarned: number,
+  gameMode: GameMode = 'standard',
+  threeStarRate: number = 0
 ): Promise<{
   amount: number;
   baseAmount: number;
   streakBonus: number;
+  challengeBonus: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
   newBalance: number;
@@ -168,6 +210,7 @@ export async function awardPuzzleAmber(
   newPhase: DialoguePhase;
   currentStreak: number;
   puzzlesSolved: number;
+  phaseAcceleration: number;
 }> {
   const progress = await loadProgress();
 
@@ -188,12 +231,29 @@ export async function awardPuzzleAmber(
 
   // Apply streak bonus
   const streakMultiplier = calculateStreakMultiplier(currentStreak);
-  const totalAmount = Math.floor(baseAmount * streakMultiplier);
+  let totalAmount = Math.floor(baseAmount * streakMultiplier);
   const streakBonus = totalAmount - baseAmount;
+
+  // Apply challenge mode bonus
+  let challengeBonus = 0;
+  if (gameMode === 'challenge') {
+    challengeBonus = Math.floor(totalAmount * (CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER - 1));
+    totalAmount += challengeBonus;
+
+    // Track challenge completions
+    progress.challengeCompletions = (progress.challengeCompletions || 0) + 1;
+  }
 
   progress.amber += totalAmount;
   progress.totalAmberEarned += totalAmount;
   progress.puzzlesSolved += 1;
+
+  // Calculate phase acceleration and update phase progress
+  const phaseAcceleration = calculatePhaseAcceleration(
+    threeStarRate, currentStreak, difficulty, gameMode
+  );
+  const phaseProgressIncrement = phaseAcceleration;
+  progress.phaseProgress = (progress.phaseProgress || progress.puzzlesSolved - 1) + phaseProgressIncrement;
 
   // Check for milestone bonus
   const milestone = checkMilestone(progress.puzzlesSolved);
@@ -214,9 +274,10 @@ export async function awardPuzzleAmber(
     });
   }
 
-  // Check for phase transition
+  // Check for phase transition using weighted phase progress
   const previousPhase = progress.currentPhase;
-  const newPhase = calculatePhase(progress.puzzlesSolved);
+  const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
+  const newPhase = calculatePhase(effectiveProgress);
   const phaseChanged = newPhase > previousPhase;
   progress.currentPhase = newPhase;
 
@@ -232,7 +293,7 @@ export async function awardPuzzleAmber(
   await recordTransaction({
     amount: totalAmount,
     type: 'earn',
-    source: `puzzle_${difficulty.toLowerCase()}${streakBonus > 0 ? `_streak${currentStreak}` : ''}`,
+    source: `puzzle_${difficulty.toLowerCase()}${gameMode === 'challenge' ? '_challenge' : ''}${streakBonus > 0 ? `_streak${currentStreak}` : ''}`,
     timestamp: Date.now(),
   });
 
@@ -240,6 +301,7 @@ export async function awardPuzzleAmber(
     amount: totalAmount,
     baseAmount,
     streakBonus,
+    challengeBonus,
     milestoneBonus,
     milestoneMessage,
     newBalance: progress.amber,
@@ -247,6 +309,7 @@ export async function awardPuzzleAmber(
     newPhase,
     currentStreak,
     puzzlesSolved: progress.puzzlesSolved,
+    phaseAcceleration,
   };
 }
 
@@ -319,13 +382,14 @@ export async function unlockRoom(roomId: string, cost: number): Promise<boolean>
 }
 
 /**
- * Calculate current dialogue phase based on puzzles solved
+ * Calculate current dialogue phase based on effective progress
+ * Uses phaseProgress (weighted) when available, falls back to puzzlesSolved
  */
-function calculatePhase(puzzlesSolved: number): DialoguePhase {
-  if (puzzlesSolved >= PHASE_THRESHOLDS[4]) return 4;
-  if (puzzlesSolved >= PHASE_THRESHOLDS[3]) return 3;
-  if (puzzlesSolved >= PHASE_THRESHOLDS[2]) return 2;
-  if (puzzlesSolved >= PHASE_THRESHOLDS[1]) return 1;
+function calculatePhase(effectiveProgress: number): DialoguePhase {
+  if (effectiveProgress >= PHASE_THRESHOLDS[4]) return 4;
+  if (effectiveProgress >= PHASE_THRESHOLDS[3]) return 3;
+  if (effectiveProgress >= PHASE_THRESHOLDS[2]) return 2;
+  if (effectiveProgress >= PHASE_THRESHOLDS[1]) return 1;
   return 0;
 }
 
@@ -458,6 +522,58 @@ export async function canAfford(cost: number): Promise<boolean> {
 }
 
 /**
+ * Purchase a room decoration
+ */
+export async function purchaseDecoration(
+  roomId: string,
+  decorationId: string,
+  cost: number
+): Promise<{ success: boolean; newBalance: number }> {
+  const result = await spendAmber(cost, `decoration_${decorationId}`);
+  if (!result.success) return result;
+
+  const progress = await loadProgress();
+  if (!progress.decorations) {
+    progress.decorations = {};
+  }
+  if (!progress.decorations[roomId]) {
+    progress.decorations[roomId] = [];
+  }
+  if (!progress.decorations[roomId].includes(decorationId)) {
+    progress.decorations[roomId].push(decorationId);
+  }
+  progressCache = progress;
+  await saveProgress();
+
+  return { success: true, newBalance: result.newBalance };
+}
+
+/**
+ * Check if a decoration has been purchased
+ */
+export async function hasDecoration(roomId: string, decorationId: string): Promise<boolean> {
+  const progress = await loadProgress();
+  return !!(progress.decorations?.[roomId]?.includes(decorationId));
+}
+
+/**
+ * Get all purchased decorations
+ */
+export async function getAllDecorations(): Promise<{ [roomId: string]: string[] }> {
+  const progress = await loadProgress();
+  return progress.decorations || {};
+}
+
+/**
+ * Get total number of decorations purchased
+ */
+export async function getDecorationCount(): Promise<number> {
+  const progress = await loadProgress();
+  if (!progress.decorations) return 0;
+  return Object.values(progress.decorations).reduce((sum, ids) => sum + ids.length, 0);
+}
+
+/**
  * DEV ONLY: Add amber directly (for testing)
  */
 export async function devAddAmber(amount: number): Promise<number> {
@@ -475,9 +591,12 @@ export async function devAddAmber(amount: number): Promise<number> {
 export async function devAddPuzzles(amount: number): Promise<{ puzzles: number; phase: DialoguePhase }> {
   const progress = await loadProgress();
   progress.puzzlesSolved += amount;
+  // Keep phaseProgress in sync for tests
+  progress.phaseProgress = (progress.phaseProgress || 0) + amount;
 
-  // Update phase based on new puzzle count
-  const newPhase = calculatePhase(progress.puzzlesSolved);
+  // Update phase based on effective progress
+  const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
+  const newPhase = calculatePhase(effectiveProgress);
   progress.currentPhase = newPhase;
 
   progressCache = progress;

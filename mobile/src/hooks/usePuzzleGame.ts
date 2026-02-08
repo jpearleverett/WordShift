@@ -1,7 +1,9 @@
 import { useState, useRef, useCallback } from 'react';
-import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty } from '../types';
+import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { generateLocalPuzzle } from '../services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
+import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
+import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage } from '../services/phaseNarrative';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -27,16 +29,20 @@ export interface PuzzleGameState {
   invalidAttempts: number;
   hintsUsed: number;
   earnedStars: number;
+  gameMode: GameMode;
+  undosRemaining: number;
+  currentPhase: DialoguePhase;
 }
 
 export interface PuzzleGameActions {
   initGame: (words: string[], puzzleHint?: string, puzzleSolution?: PuzzleSolutionStep[], wordLength?: number) => void;
-  startNewGame: (selectedDifficulty?: Difficulty) => Promise<void>;
+  startNewGame: (selectedDifficulty?: Difficulty, mode?: GameMode) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   handleSlotPress: (targetIndex: number) => Promise<{
     completed: boolean;
     hintsUsed: number;
     invalidAttempts: number;
+    gameMode: GameMode;
   } | null>;
   handleUndo: () => void;
   handleHint: () => void;
@@ -47,6 +53,8 @@ export interface PuzzleGameActions {
   setGameState: (state: GameState) => void;
   setEarnedStars: (stars: number) => void;
   setMessage: (message: string) => void;
+  setGameMode: (mode: GameMode) => void;
+  setCurrentPhase: (phase: DialoguePhase) => void;
 }
 
 export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
@@ -69,6 +77,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [invalidAttempts, setInvalidAttempts] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [earnedStars, setEarnedStars] = useState(0);
+  const [gameMode, setGameMode] = useState<GameMode>('standard');
+  const [undosRemaining, setUndosRemaining] = useState(Infinity);
+  const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
 
@@ -101,7 +112,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedLetter(null);
     setHistory([]);
     setGameState(GameState.PLAYING);
-    setMessage("Tap a tile to begin!");
+    setMessage(getStartMessage(currentPhase));
     setError(null);
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
@@ -109,15 +120,21 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setInvalidAttempts(0);
     setHintsUsed(0);
     setEarnedStars(0);
-  }, []);
+    // Reset undos for challenge mode
+    setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
+  }, [gameMode, currentPhase]);
 
-  const startNewGame = useCallback(async (selectedDifficulty: Difficulty = difficulty) => {
+  const startNewGame = useCallback(async (selectedDifficulty: Difficulty = difficulty, mode?: GameMode) => {
     setGameState(GameState.LOADING);
-    setMessage("Mixing up words...");
+    setMessage(getLoadingMessage(currentPhase));
     setError(null);
     setShowDifficultyMenu(false);
     if (selectedDifficulty !== difficulty) {
       setDifficulty(selectedDifficulty);
+    }
+    if (mode !== undefined) {
+      setGameMode(mode);
+      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
     }
 
     try {
@@ -162,6 +179,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const handleHint = useCallback(() => {
     if (gameState !== GameState.PLAYING || isProcessing) return;
 
+    // Challenge mode: no hints allowed
+    if (gameMode === 'challenge') {
+      shakeError("No hints in Challenge Mode!");
+      return;
+    }
+
     const currentSourceWord = rows[activeRowIndex].words.map(l => l.char).join("");
     const currentTargetWord = rows[activeRowIndex + 1].words.map(l => l.char).join("");
 
@@ -173,19 +196,19 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
-      // Educational hint: show which letter and what word it helps form
       setMessage(
-        `Move '${relevantStep.letterToMove}' — think "${relevantStep.targetWord}"!`
+        getHintMessage(relevantStep.letterToMove, relevantStep.targetWord, currentPhase)
       );
     } else {
-      setMessage("Not quite right — try undoing your last move!");
+      setMessage(getHintFallback(currentPhase));
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, currentPhase]);
 
   const handleSlotPress = useCallback(async (targetIndex: number): Promise<{
     completed: boolean;
     hintsUsed: number;
     invalidAttempts: number;
+    gameMode: GameMode;
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
@@ -255,18 +278,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (activeRowIndex === maxMoves - 1) {
       setIsProcessing(false);
       // Return completion info - caller handles persistence & victory state
-      return { completed: true, hintsUsed, invalidAttempts };
+      return { completed: true, hintsUsed, invalidAttempts, gameMode };
     } else {
       setActiveRowIndex(prev => prev + 1);
-      const messages = [
-        "Delicious!",
-        "Tasty move!",
-        "Sweet!",
-        "Yummy!",
-        "Perfect!",
-        "Brilliant!",
-      ];
-      setMessage(messages[Math.floor(Math.random() * messages.length)]);
+      setMessage(getMoveMessage(currentPhase));
     }
 
     setIsProcessing(false);
@@ -275,6 +290,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
   const handleUndo = useCallback(() => {
     if (history.length === 0) return;
+
+    // Challenge mode: limited undos
+    if (gameMode === 'challenge' && undosRemaining <= 0) {
+      shakeError("No undos remaining in Challenge Mode!");
+      return;
+    }
+
     const lastState = history[history.length - 1];
     setRows(lastState.rows);
     setActiveRowIndex(lastState.activeRowIndex);
@@ -283,7 +305,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedLetter(null);
     setError(null);
     setMessage("Let's try again!");
-  }, [history]);
+
+    if (gameMode === 'challenge') {
+      setUndosRemaining(prev => prev - 1);
+    }
+  }, [history, gameMode, undosRemaining, shakeError]);
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
@@ -311,6 +337,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     invalidAttempts,
     hintsUsed,
     earnedStars,
+    gameMode,
+    undosRemaining,
+    currentPhase,
   };
 
   const actions: PuzzleGameActions = {
@@ -327,6 +356,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameState,
     setEarnedStars,
     setMessage,
+    setGameMode,
+    setCurrentPhase,
   };
 
   return [state, actions];

@@ -246,6 +246,46 @@ export async function getDailyStatus(): Promise<{
 }
 
 /**
+ * Generate deterministic community stats for social comparison
+ * Since there's no backend, uses seeded PRNG based on date to create
+ * realistic-feeling community data that's consistent for all players
+ */
+export function getDailyCommunityStats(dateStr?: string): {
+  completionRate: number;
+  averageStars: number;
+  totalPlayers: number;
+  difficultyRating: 'Tricky' | 'Moderate' | 'Straightforward';
+  perfectRate: number;
+} {
+  const today = dateStr || getTodayString();
+  const rng = seededRandom(`community-stats-${today}`);
+
+  // Generate realistic community stats
+  const completionRate = Math.floor(65 + rng() * 25); // 65-90%
+  const averageStars = Math.round((1.6 + rng() * 1.2) * 10) / 10; // 1.6-2.8
+  const totalPlayers = Math.floor(800 + rng() * 4200); // 800-5000
+  const perfectRate = Math.floor(15 + rng() * 35); // 15-50%
+
+  // Difficulty rating correlates with completion rate
+  let difficultyRating: 'Tricky' | 'Moderate' | 'Straightforward';
+  if (completionRate < 72) {
+    difficultyRating = 'Tricky';
+  } else if (completionRate < 82) {
+    difficultyRating = 'Moderate';
+  } else {
+    difficultyRating = 'Straightforward';
+  }
+
+  return {
+    completionRate,
+    averageStars,
+    totalPlayers,
+    difficultyRating,
+    perfectRate,
+  };
+}
+
+/**
  * Clear daily challenge data (for testing)
  */
 export async function clearDailyProgress(): Promise<void> {

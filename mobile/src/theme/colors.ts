@@ -118,4 +118,165 @@ export const SparkleColors = [
   '#FCE4EC',
 ];
 
+// ============================================================================
+// PHASE-AWARE THEMING
+// The puzzle screen visually evolves as the player's narrative phase deepens
+// ============================================================================
+
+export interface PhaseTheme {
+  // Background gradient pulse colors
+  bgPrimary: string;
+  bgSecondary: string;
+  bgTertiary: string;
+  // Gradient overlay layers
+  overlayTop: string;
+  overlayMid: string;
+  overlayBottom: string;
+  // Center glow
+  centerGlow: string;
+  // Particle colors (floating background particles)
+  particleColors: string[];
+  // Confetti colors (victory celebration)
+  confettiColors: string[];
+  // Victory modal accent
+  victoryTitleColor: string;
+  victoryGlowColor: string;
+  // Vignette
+  vignetteColor: string;
+}
+
+/**
+ * Get the visual theme for the current narrative phase.
+ * Phase 0: Bright candy colors (default)
+ * Phase 1: Slightly muted, amber tones creeping in
+ * Phase 2: Cooler, more blue/purple, hints of isolation
+ * Phase 3: Dark, cold, shadowy
+ * Phase 4: Near-black with deep crimson/purple accents
+ */
+export function getPhaseTheme(phase: number): PhaseTheme {
+  switch (phase) {
+    case 0:
+      return {
+        bgPrimary: '#667EEA',
+        bgSecondary: '#764BA2',
+        bgTertiary: '#667EEA',
+        overlayTop: 'rgba(76, 29, 149, 0.25)',
+        overlayMid: 'rgba(102, 126, 234, 0.3)',
+        overlayBottom: 'rgba(240, 147, 251, 0.2)',
+        centerGlow: 'rgba(255, 255, 255, 0.1)',
+        particleColors: [
+          'rgba(255, 255, 255, 0.3)',
+          'rgba(255, 182, 193, 0.4)',
+          'rgba(221, 160, 221, 0.3)',
+          'rgba(173, 216, 230, 0.3)',
+          'rgba(255, 218, 185, 0.3)',
+        ],
+        confettiColors: [
+          '#FF6B9D', '#C44DFF', '#4DAFFF', '#4DE8C2',
+          '#FFD84D', '#FF8C4D', '#FF4D6A', '#9D4DFF',
+        ],
+        victoryTitleColor: CandyColors.pink.main,
+        victoryGlowColor: CandyColors.yellow.light,
+        vignetteColor: '#4C1D95',
+      };
+    case 1:
+      return {
+        bgPrimary: '#5B6DB0',
+        bgSecondary: '#6B4592',
+        bgTertiary: '#5B6DB0',
+        overlayTop: 'rgba(60, 25, 120, 0.3)',
+        overlayMid: 'rgba(80, 100, 180, 0.3)',
+        overlayBottom: 'rgba(180, 120, 200, 0.2)',
+        centerGlow: 'rgba(255, 220, 150, 0.08)',
+        particleColors: [
+          'rgba(255, 240, 200, 0.3)',
+          'rgba(200, 160, 180, 0.3)',
+          'rgba(180, 150, 200, 0.3)',
+          'rgba(150, 180, 210, 0.25)',
+          'rgba(220, 200, 170, 0.3)',
+        ],
+        confettiColors: [
+          '#E06090', '#A040DD', '#4090DD', '#40C8A0',
+          '#E0C040', '#E08040', '#E04060', '#8040DD',
+        ],
+        victoryTitleColor: '#D06090',
+        victoryGlowColor: '#E8D080',
+        vignetteColor: '#3D1870',
+      };
+    case 2:
+      return {
+        bgPrimary: '#4A5580',
+        bgSecondary: '#5A3878',
+        bgTertiary: '#4A5580',
+        overlayTop: 'rgba(40, 20, 80, 0.35)',
+        overlayMid: 'rgba(60, 70, 130, 0.35)',
+        overlayBottom: 'rgba(100, 80, 140, 0.25)',
+        centerGlow: 'rgba(180, 180, 255, 0.06)',
+        particleColors: [
+          'rgba(180, 180, 220, 0.25)',
+          'rgba(160, 130, 180, 0.25)',
+          'rgba(140, 140, 190, 0.25)',
+          'rgba(120, 150, 190, 0.2)',
+          'rgba(170, 160, 200, 0.2)',
+        ],
+        confettiColors: [
+          '#B05080', '#8838B8', '#3878B8', '#38A888',
+          '#B8A038', '#B86838', '#B83858', '#6838B8',
+        ],
+        victoryTitleColor: '#9868A8',
+        victoryGlowColor: '#A8A0C0',
+        vignetteColor: '#2A1050',
+      };
+    case 3:
+      return {
+        bgPrimary: '#2E3355',
+        bgSecondary: '#3D2250',
+        bgTertiary: '#2E3355',
+        overlayTop: 'rgba(20, 10, 50, 0.45)',
+        overlayMid: 'rgba(35, 40, 80, 0.4)',
+        overlayBottom: 'rgba(60, 40, 80, 0.35)',
+        centerGlow: 'rgba(120, 100, 180, 0.04)',
+        particleColors: [
+          'rgba(120, 110, 160, 0.2)',
+          'rgba(100, 80, 130, 0.2)',
+          'rgba(90, 90, 140, 0.2)',
+          'rgba(80, 100, 140, 0.15)',
+          'rgba(110, 100, 150, 0.15)',
+        ],
+        confettiColors: [
+          '#803860', '#602890', '#285890', '#287868',
+          '#907028', '#904828', '#902838', '#502890',
+        ],
+        victoryTitleColor: '#7858A0',
+        victoryGlowColor: '#605880',
+        vignetteColor: '#180830',
+      };
+    case 4:
+    default:
+      return {
+        bgPrimary: '#1A1A2E',
+        bgSecondary: '#2D1530',
+        bgTertiary: '#1A1A2E',
+        overlayTop: 'rgba(10, 5, 25, 0.55)',
+        overlayMid: 'rgba(20, 15, 45, 0.5)',
+        overlayBottom: 'rgba(30, 15, 40, 0.45)',
+        centerGlow: 'rgba(80, 40, 120, 0.03)',
+        particleColors: [
+          'rgba(80, 60, 100, 0.15)',
+          'rgba(120, 40, 60, 0.15)',
+          'rgba(60, 50, 90, 0.15)',
+          'rgba(50, 60, 90, 0.12)',
+          'rgba(100, 40, 80, 0.12)',
+        ],
+        confettiColors: [
+          '#602040', '#401860', '#184060', '#185040',
+          '#604018', '#603018', '#601828', '#381860',
+        ],
+        victoryTitleColor: '#6040A0',
+        victoryGlowColor: '#302840',
+        vignetteColor: '#0A0418',
+      };
+  }
+}
+
 export default CandyColors;

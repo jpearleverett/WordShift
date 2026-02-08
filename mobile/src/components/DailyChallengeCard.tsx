@@ -7,7 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
-import { getDailyStatus } from '../services/dailyChallenge';
+import { getDailyStatus, getDailyCommunityStats } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
 
 interface DailyChallengeCardProps {
@@ -21,6 +21,12 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
   const [stars, setStars] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [communityStats, setCommunityStats] = useState<{
+    completionRate: number;
+    averageStars: number;
+    difficultyRating: string;
+    perfectRate: number;
+  } | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -57,6 +63,9 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     if (status.todayResult) {
       setStars(status.todayResult.stars);
     }
+    // Load community stats (always available, deterministic)
+    const community = getDailyCommunityStats();
+    setCommunityStats(community);
   };
 
   const difficultyColor = {
@@ -102,6 +111,37 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
           )}
         </View>
       </TouchableOpacity>
+
+      {/* Community stats shown after completion */}
+      {isCompleted && communityStats && (
+        <View style={styles.communityStatsRow}>
+          <View style={styles.communityStatItem}>
+            <Text style={styles.communityStatValue}>{communityStats.completionRate}%</Text>
+            <Text style={styles.communityStatLabel}>solved</Text>
+          </View>
+          <View style={styles.communityStatDivider} />
+          <View style={styles.communityStatItem}>
+            <Text style={styles.communityStatValue}>{communityStats.averageStars}</Text>
+            <Text style={styles.communityStatLabel}>avg stars</Text>
+          </View>
+          <View style={styles.communityStatDivider} />
+          <View style={styles.communityStatItem}>
+            <Text style={styles.communityStatValue}>{communityStats.perfectRate}%</Text>
+            <Text style={styles.communityStatLabel}>perfect</Text>
+          </View>
+          <View style={styles.communityStatDivider} />
+          <View style={styles.communityStatItem}>
+            <Text style={[
+              styles.communityStatValue,
+              styles.communityDifficultyText,
+              communityStats.difficultyRating === 'Tricky' && styles.communityDifficultyTricky,
+            ]}>
+              {communityStats.difficultyRating}
+            </Text>
+            <Text style={styles.communityStatLabel}>rating</Text>
+          </View>
+        </View>
+      )}
     </Animated.View>
   );
 };
@@ -190,5 +230,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: CandyColors.orange.light,
     marginTop: 4,
+  },
+  communityStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    marginTop: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  communityStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  communityStatValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: CandyColors.white,
+  },
+  communityStatLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginTop: 1,
+  },
+  communityStatDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  communityDifficultyText: {
+    color: CandyColors.green.main,
+    fontSize: 11,
+  },
+  communityDifficultyTricky: {
+    color: CandyColors.orange.main,
   },
 });

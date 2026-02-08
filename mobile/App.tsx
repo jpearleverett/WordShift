@@ -15,11 +15,11 @@ import {
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
-import { Confetti } from './src/components/Confetti';
+import { Confetti, StarBurst } from './src/components/Confetti';
 import { ActionButton, AnimatedLogo, Toast, LevelDisplay } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { CandyColors } from './src/theme/colors';
+import { CandyColors, getPhaseTheme } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence, VictoryData } from './src/hooks/useGamePersistence';
 import { logEvent } from './src/services/eventLogger';
@@ -35,11 +35,18 @@ import {
   getShareCount,
 } from './src/services/achievements';
 import { getDailyStatus, recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
+import { getDecorationCount } from './src/services/amberCurrency';
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettings, getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticSuccess, hapticError, hapticHeavy, hapticSelection } from './src/services/haptics';
 import { getFullProgress } from './src/services/amberCurrency';
+import {
+  getVictoryTitle,
+  getVictoryFeedback,
+  getPhaseIndicator,
+  getPhaseChangeNarrative,
+} from './src/services/phaseNarrative';
 
 // App screen type — expanded with settings and stats
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats';
@@ -53,6 +60,26 @@ export default function App() {
   // Custom hooks - game logic & persistence separated from UI
   const [puzzle, puzzleActions] = usePuzzleGame();
   const [persistence, persistenceActions] = useGamePersistence();
+
+  // Sync narrative phase from persistence into puzzle hook
+  useEffect(() => {
+    puzzleActions.setCurrentPhase(persistence.currentPhase);
+  }, [persistence.currentPhase]);
+
+  // StarBurst effect state for valid moves
+  const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
+    active: false, x: 0, y: 0,
+  });
+
+  // Choreographed victory animation state
+  const victoryStar1 = useRef(new Animated.Value(0)).current;
+  const victoryStar2 = useRef(new Animated.Value(0)).current;
+  const victoryStar3 = useRef(new Animated.Value(0)).current;
+  const victoryModalScale = useRef(new Animated.Value(0.8)).current;
+  const victoryModalOpacity = useRef(new Animated.Value(0)).current;
+
+  // Phase change dramatic overlay
+  const phaseFlashOpacity = useRef(new Animated.Value(0)).current;
 
   // Victory display state
   const [victoryData, setVictoryData] = useState<VictoryData | null>(null);
@@ -96,6 +123,7 @@ export default function App() {
       const progress = await getFullProgress();
       const shareCount = await getShareCount();
       const dailyStatus = await getDailyStatus();
+      const decorationCount = await getDecorationCount();
 
       const state: AchievementCheckState = {
         stats: victory.cumulativeStats || {
@@ -122,6 +150,8 @@ export default function App() {
         amberEarned: progress.totalAmberEarned,
         dailyChallengesCompleted: dailyStatus.totalCompleted,
         shareCount,
+        challengeCompletions: progress.challengeCompletions || 0,
+        decorationCount,
       };
 
       const newAchievements = await checkAchievements(state);
@@ -156,6 +186,67 @@ export default function App() {
       }).start();
     });
   }, [screenFade]);
+
+  // Choreographed victory sequence: stars pop in one by one, then modal slides up
+  const playVictorySequence = useCallback((stars: number) => {
+    const reducedMotion = getSettingsSync().reducedMotion;
+    if (reducedMotion) {
+      victoryStar1.setValue(stars >= 1 ? 1 : 0);
+      victoryStar2.setValue(stars >= 2 ? 1 : 0);
+      victoryStar3.setValue(stars >= 3 ? 1 : 0);
+      victoryModalScale.setValue(1);
+      victoryModalOpacity.setValue(1);
+      return;
+    }
+
+    // Reset
+    victoryStar1.setValue(0);
+    victoryStar2.setValue(0);
+    victoryStar3.setValue(0);
+    victoryModalScale.setValue(0.8);
+    victoryModalOpacity.setValue(0);
+
+    const starAnims: Animated.CompositeAnimation[] = [];
+    if (stars >= 1) {
+      starAnims.push(
+        Animated.spring(victoryStar1, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
+      );
+    }
+    if (stars >= 2) {
+      starAnims.push(
+        Animated.spring(victoryStar2, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
+      );
+    }
+    if (stars >= 3) {
+      starAnims.push(
+        Animated.spring(victoryStar3, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
+      );
+    }
+
+    // Stagger stars 200ms apart, then slide in modal
+    Animated.sequence([
+      Animated.stagger(200, starAnims),
+      Animated.parallel([
+        Animated.spring(victoryModalScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+        Animated.timing(victoryModalOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
+
+  // Dramatic phase change flash
+  const playPhaseChangeFlash = useCallback(() => {
+    const reducedMotion = getSettingsSync().reducedMotion;
+    if (reducedMotion) return;
+
+    phaseFlashOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(phaseFlashOpacity, { toValue: 0.7, duration: 150, useNativeDriver: true }),
+      Animated.timing(phaseFlashOpacity, { toValue: 0, duration: 100, useNativeDriver: true }),
+      Animated.delay(100),
+      Animated.timing(phaseFlashOpacity, { toValue: 0.5, duration: 100, useNativeDriver: true }),
+      Animated.timing(phaseFlashOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, [phaseFlashOpacity]);
 
   // Start puzzle when navigating to puzzle screen
   const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
@@ -206,7 +297,8 @@ export default function App() {
       const victory = await persistenceActions.recordVictory(
         puzzle.difficulty,
         result.hintsUsed,
-        result.invalidAttempts
+        result.invalidAttempts,
+        result.gameMode
       );
 
       // Record daily challenge completion if applicable
@@ -227,9 +319,16 @@ export default function App() {
         soundVictory();
       }
 
-      puzzleActions.setMessage("Sweet Victory!");
       puzzleActions.setGameState(GameState.WON);
       puzzleActions.setShowConfetti(true);
+
+      // Play choreographed victory sequence
+      playVictorySequence(victory.earnedStars);
+
+      // If phase changed, play dramatic flash
+      if (victory.phaseChanged) {
+        setTimeout(() => playPhaseChangeFlash(), 800);
+      }
 
       // Check achievements after brief delay to not block victory display
       setTimeout(() => checkForAchievements(victory), 500);
@@ -237,10 +336,14 @@ export default function App() {
       // Slot press happened but was invalid
       hapticError();
       soundInvalidMove();
+    } else if (result === null) {
+      // No action
     } else {
-      // Valid intermediate move
+      // Valid intermediate move — trigger star burst celebration
       hapticMedium();
       soundValidMove();
+      setStarBurst({ active: true, x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT * 0.4 });
+      setTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
     }
   }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, checkForAchievements]);
 
@@ -366,11 +469,20 @@ export default function App() {
     <Animated.View style={[styles.container, { opacity: screenFade }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Animated Background */}
-      <AnimatedBackground />
+      {/* Animated Background — darkens with narrative phase */}
+      <AnimatedBackground phase={persistence.currentPhase} />
 
-      {/* Confetti celebration */}
-      <Confetti active={puzzle.showConfetti} />
+      {/* Confetti celebration — colors shift with phase */}
+      <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} />
+
+      {/* Star burst effect on valid moves */}
+      <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} />
+
+      {/* Phase change dramatic flash overlay */}
+      <Animated.View
+        style={[styles.phaseFlashOverlay, { opacity: phaseFlashOpacity }]}
+        pointerEvents="none"
+      />
 
       {/* Achievement toast overlay */}
       <AchievementToast
@@ -397,6 +509,20 @@ export default function App() {
           ) : (
             <AnimatedLogo />
           )}
+          {/* Phase indicator badge */}
+          {persistence.currentPhase > 0 && (
+            <View style={[
+              styles.phaseBadge,
+              persistence.currentPhase >= 3 && styles.phaseBadgeDark,
+              persistence.currentPhase >= 4 && styles.phaseBadgeVoid,
+            ]}>
+              <Text style={styles.phaseBadgeIcon}>{getPhaseIndicator(persistence.currentPhase).icon}</Text>
+              <Text style={[
+                styles.phaseBadgeText,
+                persistence.currentPhase >= 3 && styles.phaseBadgeTextDark,
+              ]}>{getPhaseIndicator(persistence.currentPhase).label}</Text>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity
@@ -412,7 +538,20 @@ export default function App() {
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
-        <LevelDisplay level={puzzle.level} />
+        <View style={styles.leftStatsGroup}>
+          <LevelDisplay level={puzzle.level} />
+          {/* Challenge Mode Badge */}
+          {puzzle.gameMode === 'challenge' && (
+            <View style={styles.challengeBadge}>
+              <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
+              {puzzle.undosRemaining < Infinity && (
+                <Text style={styles.challengeUndoText}>
+                  {puzzle.undosRemaining} undo{puzzle.undosRemaining !== 1 ? 's' : ''}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
 
         <TouchableOpacity
           style={styles.difficultyButton}
@@ -442,7 +581,7 @@ export default function App() {
                 ]}
                 onPress={() => {
                   hapticLight();
-                  puzzleActions.startNewGame(d);
+                  puzzleActions.startNewGame(d, puzzle.gameMode);
                 }}
               >
                 <View style={[
@@ -461,6 +600,34 @@ export default function App() {
                 </Text>
               </TouchableOpacity>
             ))}
+            {/* Challenge mode toggle */}
+            <View style={styles.challengeMenuDivider} />
+            <TouchableOpacity
+              style={[
+                styles.difficultyMenuItem,
+                puzzle.gameMode === 'challenge' && styles.challengeMenuItemActive,
+              ]}
+              onPress={() => {
+                hapticMedium();
+                const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
+                puzzleActions.startNewGame(puzzle.difficulty, newMode);
+              }}
+            >
+              <Text style={styles.challengeMenuIcon}>
+                {puzzle.gameMode === 'challenge' ? '🔓' : '🔒'}
+              </Text>
+              <View style={styles.challengeMenuContent}>
+                <Text style={[
+                  styles.difficultyMenuText,
+                  puzzle.gameMode === 'challenge' && styles.challengeMenuTextActive,
+                ]}>
+                  CHALLENGE
+                </Text>
+                <Text style={styles.challengeMenuDesc}>
+                  {puzzle.gameMode === 'challenge' ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -611,32 +778,52 @@ export default function App() {
       </Modal>
 
       {/* Victory Modal */}
-      <Modal visible={puzzle.gameState === GameState.WON} transparent animationType="fade">
+      <Modal visible={puzzle.gameState === GameState.WON} transparent animationType="none">
         <View style={styles.modalOverlay}>
           <ScrollView
             contentContainerStyle={styles.victoryScrollContent}
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-          <View style={styles.victoryModal}>
-            <View style={styles.victoryGlow} />
+          <Animated.View style={[styles.victoryModal, {
+            transform: [{ scale: victoryModalScale }],
+            opacity: victoryModalOpacity,
+          }]}>
+            <View style={[styles.victoryGlow, {
+              backgroundColor: getPhaseTheme(persistence.currentPhase).victoryGlowColor,
+            }]} />
             <View style={styles.modalShine} />
 
-            {/* Stars */}
+            {/* Stars — choreographed pop-in */}
             <View style={styles.starsContainer}>
-              <Text style={[styles.victoryStar, puzzle.earnedStars < 1 && styles.victoryStarEmpty]}>
+              <Animated.Text style={[
+                styles.victoryStar,
+                puzzle.earnedStars < 1 && styles.victoryStarEmpty,
+                { transform: [{ scale: victoryStar1 }] },
+              ]}>
                 {puzzle.earnedStars >= 1 ? '⭐' : '☆'}
-              </Text>
-              <Text style={[styles.victoryStar, styles.victoryStarBig, puzzle.earnedStars < 2 && styles.victoryStarEmpty]}>
+              </Animated.Text>
+              <Animated.Text style={[
+                styles.victoryStar,
+                styles.victoryStarBig,
+                puzzle.earnedStars < 2 && styles.victoryStarEmpty,
+                { transform: [{ scale: victoryStar2 }] },
+              ]}>
                 {puzzle.earnedStars >= 2 ? '⭐' : '☆'}
-              </Text>
-              <Text style={[styles.victoryStar, puzzle.earnedStars < 3 && styles.victoryStarEmpty]}>
+              </Animated.Text>
+              <Animated.Text style={[
+                styles.victoryStar,
+                puzzle.earnedStars < 3 && styles.victoryStarEmpty,
+                { transform: [{ scale: victoryStar3 }] },
+              ]}>
                 {puzzle.earnedStars >= 3 ? '⭐' : '☆'}
-              </Text>
+              </Animated.Text>
             </View>
 
-            <Text style={styles.victoryTitle}>
-              {puzzle.earnedStars === 3 ? 'PERFECT!' : puzzle.earnedStars === 2 ? 'GREAT!' : 'WELL DONE!'}
+            <Text style={[styles.victoryTitle, {
+              color: getPhaseTheme(persistence.currentPhase).victoryTitleColor,
+            }]}>
+              {getVictoryTitle(puzzle.earnedStars, persistence.currentPhase)}
             </Text>
             <Text style={styles.victorySubtitle}>
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${puzzle.level} Complete`}
@@ -649,7 +836,12 @@ export default function App() {
                 <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} Amber</Text>
                 {victoryData.streakBonus > 0 && (
                   <Text style={styles.streakBonusText}>
-                    (+{victoryData.streakBonus} streak bonus!)
+                    (+{victoryData.streakBonus} streak!)
+                  </Text>
+                )}
+                {victoryData.challengeBonus > 0 && (
+                  <Text style={styles.challengeBonusText}>
+                    (+{victoryData.challengeBonus} challenge!)
                   </Text>
                 )}
               </View>
@@ -673,33 +865,22 @@ export default function App() {
             )}
 
             {/* Phase change notification */}
-            {victoryData?.phaseChanged && (
-              <View style={styles.phaseChangeContainer}>
-                <Text style={styles.phaseChangeEmoji}>
-                  {victoryData.newPhase >= 4 ? '🌑' : victoryData.newPhase >= 3 ? '👁️' : victoryData.newPhase >= 2 ? '🌙' : '💭'}
-                </Text>
-                <Text style={styles.phaseChangeTitle}>
-                  {victoryData.newPhase >= 4 ? 'Something has changed...'
-                    : victoryData.newPhase >= 3 ? 'A shadow falls...'
-                    : victoryData.newPhase >= 2 ? 'The mood shifts...'
-                    : 'New conversations await'}
-                </Text>
-                <Text style={styles.phaseChangeText}>
-                  {victoryData.newPhase >= 4 ? 'Your friends seem... different. Visit them at home.'
-                    : victoryData.newPhase >= 3 ? 'Your friends have grown restless. Check on them.'
-                    : victoryData.newPhase >= 2 ? 'Your friends are asking deeper questions...'
-                    : 'Your friends have new things to say!'}
-                </Text>
-              </View>
-            )}
+            {victoryData?.phaseChanged && (() => {
+              const phaseNarrative = getPhaseChangeNarrative(victoryData.newPhase as any);
+              return (
+                <View style={[styles.phaseChangeContainer,
+                  victoryData.newPhase >= 3 && styles.phaseChangeContainerDark,
+                ]}>
+                  <Text style={styles.phaseChangeEmoji}>{phaseNarrative.emoji}</Text>
+                  <Text style={styles.phaseChangeTitle}>{phaseNarrative.title}</Text>
+                  <Text style={styles.phaseChangeText}>{phaseNarrative.body}</Text>
+                </View>
+              );
+            })()}
 
-            {/* Performance feedback — always positive framing */}
+            {/* Performance feedback — phase-aware tone */}
             <Text style={styles.victoryFeedback}>
-              {puzzle.earnedStars === 3
-                ? 'Flawless solve — you nailed it!'
-                : puzzle.earnedStars === 2
-                ? 'Solid performance — almost perfect!'
-                : 'Puzzle conquered — keep improving!'}
+              {getVictoryFeedback(puzzle.earnedStars, persistence.currentPhase)}
             </Text>
 
             <View style={styles.victoryStats}>
@@ -762,7 +943,7 @@ export default function App() {
                 <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
           </ScrollView>
         </View>
       </Modal>
@@ -1272,6 +1453,12 @@ const styles = StyleSheet.create({
     color: CandyColors.orange.main,
     marginLeft: 8,
   },
+  challengeBonusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: CandyColors.pink.main,
+    marginLeft: 8,
+  },
 
   // Win screen streak display
   winStreakContainer: {
@@ -1376,5 +1563,101 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[600],
     fontSize: 16,
     fontWeight: '800',
+  },
+
+  // Challenge mode styles
+  leftStatsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  challengeBadge: {
+    backgroundColor: CandyColors.red.main,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  challengeBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: CandyColors.white,
+    letterSpacing: 1,
+  },
+  challengeUndoText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  challengeMenuDivider: {
+    height: 1,
+    backgroundColor: CandyColors.gray[200],
+    marginVertical: 6,
+    marginHorizontal: 8,
+  },
+  challengeMenuItemActive: {
+    backgroundColor: CandyColors.red.main + '15',
+  },
+  challengeMenuIcon: {
+    fontSize: 16,
+    marginRight: 10,
+  },
+  challengeMenuContent: {
+    flex: 1,
+  },
+  challengeMenuTextActive: {
+    color: CandyColors.red.main,
+  },
+  challengeMenuDesc: {
+    fontSize: 10,
+    color: CandyColors.gray[400],
+    marginTop: 1,
+  },
+
+  // Phase indicator badge
+  phaseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginTop: 4,
+    gap: 4,
+  },
+  phaseBadgeDark: {
+    backgroundColor: 'rgba(60, 30, 80, 0.4)',
+  },
+  phaseBadgeVoid: {
+    backgroundColor: 'rgba(20, 10, 30, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(120, 40, 80, 0.4)',
+  },
+  phaseBadgeIcon: {
+    fontSize: 12,
+  },
+  phaseBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.8)',
+    letterSpacing: 1,
+  },
+  phaseBadgeTextDark: {
+    color: 'rgba(200, 180, 220, 0.9)',
+  },
+
+  // Phase change dramatic flash overlay
+  phaseFlashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+    zIndex: 999,
+  },
+
+  // Phase change container dark variant
+  phaseChangeContainerDark: {
+    backgroundColor: '#0F0818',
+    borderColor: '#3D1560',
   },
 });

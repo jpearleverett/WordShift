@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
-import { CandyColors } from '../theme/colors';
+import { getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -15,16 +15,9 @@ interface FloatingParticle {
   type: 'circle' | 'star' | 'diamond';
 }
 
-// Generate random particles for the background
-const generateParticles = (count: number): FloatingParticle[] => {
+// Generate random particles for the background using phase-specific colors
+const generateParticles = (count: number, colors: string[]): FloatingParticle[] => {
   const particles: FloatingParticle[] = [];
-  const colors = [
-    'rgba(255, 255, 255, 0.3)',
-    'rgba(255, 182, 193, 0.4)',
-    'rgba(221, 160, 221, 0.3)',
-    'rgba(173, 216, 230, 0.3)',
-    'rgba(255, 218, 185, 0.3)',
-  ];
   const types: Array<'circle' | 'star' | 'diamond'> = ['circle', 'star', 'diamond'];
 
   for (let i = 0; i < count; i++) {
@@ -193,9 +186,16 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
   );
 };
 
-export const AnimatedBackground: React.FC = () => {
+interface AnimatedBackgroundProps {
+  phase?: number;
+}
+
+export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
-  const particles = useRef(reducedMotion ? [] : generateParticles(15)).current;
+  const theme = useMemo(() => getPhaseTheme(phase), [phase]);
+  const particles = useRef(
+    reducedMotion ? [] : generateParticles(15, theme.particleColors)
+  ).current;
   const gradientPulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -221,18 +221,18 @@ export const AnimatedBackground: React.FC = () => {
 
   const backgroundColor = gradientPulse.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: ['#667EEA', '#764BA2', '#667EEA'],
+    outputRange: [theme.bgPrimary, theme.bgSecondary, theme.bgTertiary],
   });
 
   return (
     <Animated.View style={[styles.container, { backgroundColor }]}>
       {/* Gradient overlay layers */}
-      <View style={styles.gradientLayer1} />
-      <View style={styles.gradientLayer2} />
-      <View style={styles.gradientLayer3} />
+      <View style={[styles.gradientLayer1, { backgroundColor: theme.overlayTop }]} />
+      <View style={[styles.gradientLayer2, { backgroundColor: theme.overlayMid }]} />
+      <View style={[styles.gradientLayer3, { backgroundColor: theme.overlayBottom }]} />
 
       {/* Radial glow in center */}
-      <View style={styles.centerGlow} />
+      <View style={[styles.centerGlow, { backgroundColor: theme.centerGlow }]} />
 
       {/* Floating particles */}
       {particles.map((particle) => (
@@ -240,9 +240,9 @@ export const AnimatedBackground: React.FC = () => {
       ))}
 
       {/* Top vignette */}
-      <View style={styles.vignetteTop} />
+      <View style={[styles.vignetteTop, { shadowColor: theme.vignetteColor }]} />
       {/* Bottom vignette */}
-      <View style={styles.vignetteBottom} />
+      <View style={[styles.vignetteBottom, { backgroundColor: theme.vignetteColor + '4D' }]} />
     </Animated.View>
   );
 };
@@ -258,7 +258,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.35,
-    backgroundColor: 'rgba(76, 29, 149, 0.25)',
   },
   gradientLayer2: {
     position: 'absolute',
@@ -266,7 +265,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.5,
-    backgroundColor: 'rgba(102, 126, 234, 0.3)',
   },
   gradientLayer3: {
     position: 'absolute',
@@ -274,7 +272,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.5,
-    backgroundColor: 'rgba(240, 147, 251, 0.2)',
   },
   centerGlow: {
     position: 'absolute',
@@ -283,7 +280,6 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.6,
     height: SCREEN_WIDTH * 0.6,
     borderRadius: SCREEN_WIDTH * 0.3,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: '#FFFFFF',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
@@ -297,7 +293,6 @@ const styles = StyleSheet.create({
     height: 120,
     backgroundColor: 'transparent',
     // Top shadow effect
-    shadowColor: '#4C1D95',
     shadowOffset: { width: 0, height: 40 },
     shadowOpacity: 0.3,
     shadowRadius: 40,
@@ -308,7 +303,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 100,
-    backgroundColor: 'rgba(76, 29, 149, 0.3)',
   },
   particle: {
     position: 'absolute',
