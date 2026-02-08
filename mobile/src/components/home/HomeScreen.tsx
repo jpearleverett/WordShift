@@ -624,75 +624,57 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {selectedAnimal && (
               <View style={styles.dialogueContent}>
-                {/* Large sprite on the left */}
-                <View style={styles.dialogueSpriteContainer}>
-                  {CHARACTER_SPRITES[selectedAnimal.type] ? (
-                    <Image
-                      source={
-                        progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
-                          : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[selectedAnimal.type]!.idle
-                      }
-                      style={styles.dialogueSpriteImage}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <Text style={styles.dialogueSpriteEmoji}>
-                      {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
-                    </Text>
-                  )}
+                {/* Portrait row: circular avatar + name */}
+                <View style={styles.dialoguePortraitRow}>
+                  <View style={styles.dialoguePortraitCircle}>
+                    {CHARACTER_SPRITES[selectedAnimal.type] ? (
+                      <Image
+                        source={
+                          progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
+                            ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
+                            : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
+                              ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
+                              : CHARACTER_SPRITES[selectedAnimal.type]!.idle
+                        }
+                        style={styles.dialoguePortraitImage}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.dialoguePortraitEmoji}>
+                        {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={styles.dialogueAnimalName}>{selectedAnimal.name}</Text>
                 </View>
 
-                {/* Right side content */}
-                <View style={styles.dialogueRightSide}>
-                  {/* Name and description */}
-                  <View style={styles.dialogueHeader}>
-                    <Text style={styles.animalName}>{selectedAnimal.name}</Text>
-                    <Text style={styles.animalDescription}>
-                      {ANIMAL_INFO[selectedAnimal.type]?.description}
-                    </Text>
-                  </View>
-
-                  {/* Session status */}
-                  {sessionInfo && sessionInfo.status === 'in_session' && sessionInfo.dialoguesRemaining !== undefined && (
-                    <View style={styles.sessionBar}>
-                      <Text style={styles.sessionBarText}>
-                        {sessionInfo.dialoguesRemaining > 3
-                          ? 'Chatty mood!'
-                          : sessionInfo.dialoguesRemaining > 0
-                            ? 'Getting tired...'
-                            : 'Needs rest soon'}
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Dialogue text */}
+                {/* Speech bubble with tail */}
+                <View style={styles.dialogueBubbleWrapper}>
+                  <View style={styles.dialogueBubbleTail} />
                   <View style={styles.dialogueBubble}>
                     <Text style={styles.dialogueText}>{getCurrentDialogueText()}</Text>
                   </View>
+                </View>
 
-                  {/* Progress and continue */}
-                  <View style={styles.dialogueFooter}>
-                    <Text style={styles.dialogueProgress}>{getDialogueProgress()}</Text>
-                    <TouchableOpacity
-                      style={styles.continueButton}
-                      onPress={handleAdvanceDialogue}
-                      accessibilityLabel="Continue dialogue"
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.continueButtonText}>
-                        {hasMoreDialogues(
-                          selectedAnimal.type,
-                          selectedAnimal.currentDialogueIndex,
-                          progress.currentPhase
-                        )
-                          ? 'Next'
-                          : 'Close'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                {/* Footer: progress + button */}
+                <View style={styles.dialogueFooter}>
+                  <Text style={styles.dialogueProgress}>{getDialogueProgress()}</Text>
+                  <TouchableOpacity
+                    style={styles.continueButton}
+                    onPress={handleAdvanceDialogue}
+                    accessibilityLabel="Continue dialogue"
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.continueButtonText}>
+                      {hasMoreDialogues(
+                        selectedAnimal.type,
+                        selectedAnimal.currentDialogueIndex,
+                        progress.currentPhase
+                      )
+                        ? 'Next'
+                        : 'Close'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -1219,65 +1201,75 @@ const styles = StyleSheet.create({
   },
   dialogueModal: {
     backgroundColor: CandyColors.white,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 16,
-    paddingBottom: 40,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 36,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     elevation: 10,
-    minHeight: 280,
   },
   dialogueContent: {
-    flexDirection: 'row',
-    flex: 1,
+    flexDirection: 'column',
   },
-  dialogueSpriteContainer: {
-    width: Math.min(110, SCREEN_WIDTH * 0.28),
-    height: '100%',
+  dialoguePortraitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  dialoguePortraitCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: CandyColors.purple.light + '18',
+    borderWidth: 3,
+    borderColor: CandyColors.purple.light,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-    backgroundColor: CandyColors.white,
-    borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 14,
   },
-  dialogueSpriteImage: {
-    width: Math.min(160, SCREEN_WIDTH * 0.35),
-    height: Math.min(260, SCREEN_HEIGHT * 0.3),
+  dialoguePortraitImage: {
+    width: 56,
+    height: 56,
   },
-  dialogueSpriteEmoji: {
-    fontSize: Math.min(90, SCREEN_WIDTH * 0.22),
+  dialoguePortraitEmoji: {
+    fontSize: 34,
   },
-  dialogueRightSide: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  dialogueHeader: {
-    marginBottom: 8,
-  },
-  animalName: {
-    fontSize: 20,
+  dialogueAnimalName: {
+    fontSize: 22,
     fontWeight: '900',
-    color: CandyColors.purple.main,
+    color: CandyColors.purple.dark,
+    letterSpacing: 0.3,
   },
-  animalDescription: {
-    fontSize: 11,
-    color: CandyColors.gray[500],
-    fontStyle: 'italic',
+  dialogueBubbleWrapper: {
+    marginBottom: 16,
+  },
+  dialogueBubbleTail: {
+    width: 14,
+    height: 14,
+    backgroundColor: CandyColors.gray[100],
+    transform: [{ rotate: '45deg' }],
+    position: 'absolute',
+    top: -7,
+    left: 42,
+    zIndex: 0,
   },
   dialogueBubble: {
     backgroundColor: CandyColors.gray[100],
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    flex: 1,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    zIndex: 1,
+    minHeight: 80,
   },
   dialogueText: {
-    fontSize: 14,
+    fontSize: 15,
     color: CandyColors.gray[700],
-    lineHeight: 20,
+    lineHeight: 23,
   },
   dialogueFooter: {
     flexDirection: 'row',
@@ -1285,15 +1277,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dialogueProgress: {
-    fontSize: 14,
+    fontSize: 13,
     color: CandyColors.gray[400],
     fontWeight: '600',
   },
   continueButton: {
     backgroundColor: CandyColors.purple.main,
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
     paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 22,
+    shadowColor: CandyColors.purple.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   continueButtonText: {
     color: CandyColors.white,
@@ -1418,22 +1415,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
-  // Session status bar
-  sessionBar: {
-    backgroundColor: CandyColors.purple.light + '30',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginBottom: 8,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: CandyColors.purple.light + '50',
-  },
-  sessionBarText: {
-    color: CandyColors.gray[600],
-    fontSize: 10,
-    fontWeight: '700',
-  },
 
   // Cooldown toast - positioned below header, doesn't block touches
   cooldownToast: {
