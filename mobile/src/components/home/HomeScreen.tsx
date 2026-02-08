@@ -24,8 +24,6 @@ import {
   markDialogueRead,
   markIntroSeen,
   hasSeenIntro,
-  devAddAmber,
-  devAddPuzzles,
 } from '../../services/amberCurrency';
 import {
   ROOMS,
@@ -55,7 +53,6 @@ import {
   formatTimeRemaining,
   updatePuzzleCount,
   isOnCooldown,
-  clearAllSessions,
 } from '../../services/dialogueSession';
 
 import { JuicyButton } from './JuicyButton';
@@ -451,24 +448,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return `${current}/${total}`;
   };
 
-  // DEV: Add amber, puzzles, and reset dialogue sessions
-  const handleDevButton = async () => {
-    // Add 5000 amber
-    const newBalance = await devAddAmber(5000);
-
-    // Add 30 puzzles to progress through phases (enough to go from phase 0 to 1)
-    await devAddPuzzles(30);
-
-    // Clear all dialogue sessions so animals can talk again
-    await clearAllSessions();
-
-    // Reload data
-    await loadAllData();
-
-    // Notify parent of amber change
-    onAmberChange?.(newBalance);
-  };
-
   if (!progress || rooms.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -511,16 +490,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={styles.playButtonText}>PLAY</Text>
         </JuicyButton>
       </View>
-
-      {/* DEV Button - gives amber and resets dialogue sessions */}
-      {__DEV__ && (
-        <TouchableOpacity
-          style={styles.devButton}
-          onPress={handleDevButton}
-        >
-          <Text style={styles.devButtonText}>DEV</Text>
-        </TouchableOpacity>
-      )}
 
       {/* Celebration Confetti */}
       {showCelebration && (
@@ -1012,23 +981,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
-  },
-
-  // DEV button
-  devButton: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 70 : 110,
-    right: 10,
-    backgroundColor: 'rgba(255, 0, 0, 0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    zIndex: 1000,
-  },
-  devButtonText: {
-    color: CandyColors.white,
-    fontSize: 10,
-    fontWeight: '900',
   },
 
   // Modal styles
