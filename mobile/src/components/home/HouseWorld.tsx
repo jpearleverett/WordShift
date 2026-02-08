@@ -598,18 +598,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Sky background - fixed, does not pan/zoom, prevents gaps */}
-      <Image
-        source={
-          currentPhase >= 4 ? SKY_SHADOW :
-          currentPhase >= 3 ? SKY_STORM :
-          currentPhase >= 2 ? SKY_DUSK :
-          SKY_DAY
-        }
-        style={styles.fixedSkyBackground}
-        resizeMode="cover"
-      />
-
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -723,6 +711,21 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 },
               ]}
             >
+              {/* Sky background - inside transform so it moves with the scene.
+                  Oversized to prevent gaps at any zoom/pan combination.
+                  Width: 2x screen covers horizontal at min zoom (no horizontal pan).
+                  Height: 3x screen covers vertical pan range at all zoom levels. */}
+              <Image
+                source={
+                  currentPhase >= 4 ? SKY_SHADOW :
+                  currentPhase >= 3 ? SKY_STORM :
+                  currentPhase >= 2 ? SKY_DUSK :
+                  SKY_DAY
+                }
+                style={styles.skyBackground}
+                resizeMode="cover"
+              />
+
               {/* Trees on left side with sway animation */}
               <Animated.View
                 style={[
@@ -884,14 +887,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#5B8C3E', // Matches sky_day bottom edge so no gaps when zoomed out
   },
 
-  // Sky background - fixed behind everything, never moves or zooms
-  fixedSkyBackground: {
+  // Sky background - moves with scene, oversized to prevent gaps.
+  // At MIN_SCALE (0.6) the visible area is ~1.67x screen in each dimension.
+  // Vertical pan adds up to ±150px in content coords. 3x height covers all cases.
+  skyBackground: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    zIndex: 0,
+    top: -SCREEN_HEIGHT,
+    left: -SCREEN_WIDTH * 0.5,
+    width: SCREEN_WIDTH * 2,
+    height: SCREEN_HEIGHT * 3,
+    zIndex: -1,
   },
   // Clouds - fixed to screen
   cloud: {
