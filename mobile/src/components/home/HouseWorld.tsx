@@ -602,11 +602,25 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     }
   };
 
+  // Calculate pan bounds based on content size and zoom level
+  const getPanBounds = () => {
+    const currentScale = lastScale.current;
+    // Total content height: roof (~80) + house body + foundation (~25) + margins
+    const contentHeight = houseHeight + 80 + 25 + 50;
+    // How much of the scene is visible at current zoom
+    const visibleHeight = SCREEN_HEIGHT / currentScale;
+    // Allow enough range to see all content when zoomed in
+    const overflow = Math.max(0, contentHeight - visibleHeight);
+    // Pan range: at least 150 * scale, or enough to reveal all content
+    const maxPan = Math.max(200, overflow * 0.8) * currentScale;
+    return maxPan;
+  };
+
   // Pan gesture handler - vertical only to prevent horizontal gaps
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
     const { translationY } = event.nativeEvent;
 
-    const maxTranslateY = 150 * lastScale.current;
+    const maxTranslateY = getPanBounds();
     const newY = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
 
     translateY.setValue(newY);
@@ -615,7 +629,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
       const { translationY } = event.nativeEvent;
-      const maxTranslateY = 150 * lastScale.current;
+      const maxTranslateY = getPanBounds();
 
       baseTranslateY.current = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
     }
@@ -659,8 +673,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             >
               {/* Sky background - inside transform so it moves with the scene.
                   Oversized to prevent gaps at any zoom/pan combination.
-                  Width: 2x screen covers horizontal at min zoom (no horizontal pan).
-                  Height: 3x screen covers vertical pan range at all zoom levels. */}
+                  Height scales with house size so sky expands as rooms are added. */}
               <Image
                 source={
                   currentPhase >= 4 ? SKY_SHADOW :
@@ -668,7 +681,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   currentPhase >= 2 ? SKY_DUSK :
                   SKY_DAY
                 }
-                style={styles.skyBackground}
+                style={[styles.skyBackground, {
+                  height: Math.max(SCREEN_HEIGHT * 1.4, houseHeight + SCREEN_HEIGHT),
+                  top: -Math.max(SCREEN_HEIGHT * 0.2, houseHeight * 0.5),
+                }]}
                 resizeMode="cover"
               />
 
