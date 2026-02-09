@@ -10,6 +10,7 @@ import {
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
 import { CandyColors } from '../theme/colors';
+import { getSettingsSync } from '../services/settings';
 
 const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
@@ -32,11 +33,17 @@ interface RowProps {
 
 // Animated drop slot component
 const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> = ({ onPress, index, compact = false }) => {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const settings = getSettingsSync();
+  const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (settings.reducedMotion) {
+      scaleAnim.setValue(1);
+      return;
+    }
+
     // Pop in animation with stagger
     Animated.sequence([
       Animated.delay(index * 50),
@@ -102,6 +109,7 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
   });
 
   const handlePressIn = () => {
+    if (settings.reducedMotion) return;
     Animated.spring(scaleAnim, {
       toValue: 0.9,
       friction: 5,
@@ -111,6 +119,7 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
   };
 
   const handlePressOut = () => {
+    if (settings.reducedMotion) return;
     Animated.spring(scaleAnim, {
       toValue: 1,
       friction: 3,
@@ -125,6 +134,8 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
+      accessibilityLabel={`Drop zone ${index + 1}`}
+      accessibilityRole="button"
     >
       <Animated.View
         style={[
@@ -418,13 +429,13 @@ export const Row: React.FC<RowProps> = ({
     >
       {/* FLOATING BADGES - positioned outside row container */}
       {isSource && (
-        <View style={[styles.floatingBadge, styles.floatingBadgePick]}>
+        <View style={[styles.floatingBadge, styles.floatingBadgePick]} accessibilityLabel="Pick a letter from this row">
           <View style={styles.badgeShine} />
           <Text style={styles.badgeText}>PICK</Text>
         </View>
       )}
       {isTarget && selectedLetter && (
-        <View style={[styles.floatingBadge, styles.floatingBadgeDrop]}>
+        <View style={[styles.floatingBadge, styles.floatingBadgeDrop]} accessibilityLabel="Drop the letter into this row">
           <View style={styles.badgeShine} />
           <Text style={styles.badgeText}>DROP</Text>
         </View>

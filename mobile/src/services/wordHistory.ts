@@ -1,17 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'wordshift_word_history';
-const MAX_HISTORY_SIZE = 100; // Track last 100 puzzles worth of words
-const WORDS_PER_PUZZLE = 5; // Approximate words per puzzle
-const MAX_WORDS_TRACKED = MAX_HISTORY_SIZE * WORDS_PER_PUZZLE;
+const MAX_HISTORY_SIZE = 100; // Track last 100 puzzles
+const MAX_WORDS_TRACKED = 500; // Upper bound on total words tracked
 
 // Cooldown periods (in puzzle count)
 const HARD_COOLDOWN = 15; // Word can't appear at all in next 15 puzzles
 const SOFT_COOLDOWN = 40; // Word gets penalty between 15-40 puzzles ago
 
 interface WordHistoryData {
-  // Array of words, most recent first. Index = how many puzzles ago
-  recentWords: string[];
+  // Array of puzzle word groups, most recent first. Each entry = one puzzle's words.
+  puzzleGroups: string[][];
+  // Legacy flat array for migration (optional)
+  recentWords?: string[];
   // Timestamp of last update
   lastUpdated: number;
 }
@@ -20,29 +21,49 @@ interface WordHistoryData {
 let historyCache: WordHistoryData | null = null;
 
 /**
+ * Migrate legacy flat array format to grouped format
+ */
+function migrateLegacyHistory(data: { recentWords?: string[]; puzzleGroups?: string[][]; lastUpdated: number }): WordHistoryData {
+  if (data.puzzleGroups && data.puzzleGroups.length > 0) {
+    return { puzzleGroups: data.puzzleGroups, lastUpdated: data.lastUpdated };
+  }
+  // Legacy: flat array with ~5 words per puzzle
+  const words = data.recentWords || [];
+  const groups: string[][] = [];
+  const approxWordsPerPuzzle = 5;
+  for (let i = 0; i < words.length; i += approxWordsPerPuzzle) {
+    groups.push(words.slice(i, i + approxWordsPerPuzzle));
+  }
+  return { puzzleGroups: groups, lastUpdated: data.lastUpdated };
+}
+
+/**
  * Load word history from AsyncStorage
  */
 export async function loadWordHistory(): Promise<Set<string>> {
   try {
     if (historyCache) {
-      return new Set(historyCache.recentWords);
+      const allWords = historyCache.puzzleGroups.flat();
+      return new Set(allWords);
     }
 
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
-      historyCache = JSON.parse(stored);
-      return new Set(historyCache!.recentWords);
+      const raw = JSON.parse(stored);
+      historyCache = migrateLegacyHistory(raw);
+      return new Set(historyCache.puzzleGroups.flat());
     }
   } catch (error) {
     console.warn('Failed to load word history:', error);
   }
 
-  historyCache = { recentWords: [], lastUpdated: Date.now() };
+  historyCache = { puzzleGroups: [], lastUpdated: Date.now() };
   return new Set();
 }
 
 /**
  * Get the full history data with recency information
+ * Returns Map of word -> puzzles ago (accurate per-puzzle grouping)
  */
 export async function getWordHistoryWithRecency(): Promise<Map<string, number>> {
   try {
@@ -50,17 +71,16 @@ export async function getWordHistoryWithRecency(): Promise<Map<string, number>> 
       await loadWordHistory();
     }
 
-    // Map of word -> puzzles ago (lower = more recent)
     const recencyMap = new Map<string, number>();
-    const words = historyCache?.recentWords || [];
+    const groups = historyCache?.puzzleGroups || [];
 
-    // Group words by puzzle (approximately WORDS_PER_PUZZLE words per puzzle)
-    for (let i = 0; i < words.length; i++) {
-      const puzzlesAgo = Math.floor(i / WORDS_PER_PUZZLE);
-      const word = words[i];
-      // Only track the most recent occurrence
-      if (!recencyMap.has(word)) {
-        recencyMap.set(word, puzzlesAgo);
+    // Each group index = puzzles ago (0 = most recent)
+    for (let puzzlesAgo = 0; puzzlesAgo < groups.length; puzzlesAgo++) {
+      for (const word of groups[puzzlesAgo]) {
+        // Only track the most recent occurrence
+        if (!recencyMap.has(word)) {
+          recencyMap.set(word, puzzlesAgo);
+        }
       }
     }
 
@@ -122,19 +142,32 @@ export async function recordPuzzleWords(words: string[]): Promise<void> {
       await loadWordHistory();
     }
 
-    // Add new words at the beginning (most recent)
-    const newRecentWords = [
-      ...words.map(w => w.toUpperCase()),
-      ...(historyCache?.recentWords || [])
-    ];
+    const puzzleGroup = words.map(w => w.toUpperCase());
 
-    // Trim to max size
-    if (newRecentWords.length > MAX_WORDS_TRACKED) {
-      newRecentWords.length = MAX_WORDS_TRACKED;
+    // Add new puzzle group at the beginning (most recent)
+    const newGroups = [puzzleGroup, ...(historyCache?.puzzleGroups || [])];
+
+    // Trim to max puzzles
+    if (newGroups.length > MAX_HISTORY_SIZE) {
+      newGroups.length = MAX_HISTORY_SIZE;
+    }
+
+    // Also trim if total words exceed max
+    let totalWords = 0;
+    let trimIndex = newGroups.length;
+    for (let i = 0; i < newGroups.length; i++) {
+      totalWords += newGroups[i].length;
+      if (totalWords > MAX_WORDS_TRACKED) {
+        trimIndex = i + 1;
+        break;
+      }
+    }
+    if (trimIndex < newGroups.length) {
+      newGroups.length = trimIndex;
     }
 
     historyCache = {
-      recentWords: newRecentWords,
+      puzzleGroups: newGroups,
       lastUpdated: Date.now()
     };
 
@@ -149,7 +182,7 @@ export async function recordPuzzleWords(words: string[]): Promise<void> {
  */
 export async function clearWordHistory(): Promise<void> {
   try {
-    historyCache = { recentWords: [], lastUpdated: Date.now() };
+    historyCache = { puzzleGroups: [], lastUpdated: Date.now() };
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch (error) {
     console.warn('Failed to clear word history:', error);
@@ -168,12 +201,13 @@ export async function getHistoryStats(): Promise<{
     await loadWordHistory();
   }
 
-  const words = historyCache?.recentWords || [];
-  const uniqueWords = new Set(words).size;
+  const groups = historyCache?.puzzleGroups || [];
+  const allWords = groups.flat();
+  const uniqueWords = new Set(allWords).size;
 
   return {
-    totalWordsTracked: words.length,
+    totalWordsTracked: allWords.length,
     uniqueWords,
-    oldestPuzzlesAgo: Math.floor(words.length / WORDS_PER_PUZZLE)
+    oldestPuzzlesAgo: groups.length
   };
 }

@@ -64,14 +64,24 @@ export function getSession(animalId: string): DialogueSession | null {
 }
 
 /**
+ * Check if a session's cooldown has expired
+ * Returns puzzles remaining (0 or negative means cooldown complete)
+ */
+function getCooldownRemaining(session: DialogueSession): number {
+  if (session.puzzlesAtSessionEnd === null) return 0;
+  const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
+  return DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS - puzzlesSinceEnd;
+}
+
+/**
  * Check if an animal is available for dialogue
  * Returns: { available: boolean, reason?: string, puzzlesRemaining?: number }
  */
-export function checkDialogueAvailability(animalId: string): {
+export async function checkDialogueAvailability(animalId: string): Promise<{
   available: boolean;
   reason?: string;
   puzzlesRemaining?: number;
-} {
+}> {
   const session = sessionsCache.get(animalId);
 
   if (!session) {
@@ -81,29 +91,27 @@ export function checkDialogueAvailability(animalId: string): {
 
   // Check if on cooldown (waiting for puzzles)
   if (session.puzzlesAtSessionEnd !== null) {
-    const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
-    const puzzlesRequired = DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS;
+    const remaining = getCooldownRemaining(session);
 
-    if (puzzlesSinceEnd >= puzzlesRequired) {
+    if (remaining <= 0) {
       // Cooldown complete - clear session and make available
       sessionsCache.delete(animalId);
-      saveSessions();
+      await saveSessions();
       return { available: true };
     }
 
     // Still in cooldown
-    const puzzlesRemaining = puzzlesRequired - puzzlesSinceEnd;
     return {
       available: false,
       reason: 'cooldown',
-      puzzlesRemaining,
+      puzzlesRemaining: remaining,
     };
   }
 
   // Session is active - check if max dialogues reached
   if (session.dialoguesInSession >= DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION) {
     // Too many dialogues - enter cooldown
-    startCooldown(animalId);
+    await startCooldown(animalId);
     return {
       available: false,
       reason: 'max_dialogues',
@@ -120,18 +128,8 @@ export function checkDialogueAvailability(animalId: string): {
  */
 export function isOnCooldown(animalId: string): boolean {
   const session = sessionsCache.get(animalId);
-
-  if (!session) {
-    return false;
-  }
-
-  // On cooldown if puzzlesAtSessionEnd is set
-  if (session.puzzlesAtSessionEnd !== null) {
-    const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
-    return puzzlesSinceEnd < DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS;
-  }
-
-  return false;
+  if (!session || session.puzzlesAtSessionEnd === null) return false;
+  return getCooldownRemaining(session) > 0;
 }
 
 /**
@@ -215,17 +213,11 @@ export function getSessionStatus(animalId: string): {
 
   // Check if on cooldown
   if (session.puzzlesAtSessionEnd !== null) {
-    const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
-    const puzzlesRequired = DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS;
-
-    if (puzzlesSinceEnd >= puzzlesRequired) {
+    const remaining = getCooldownRemaining(session);
+    if (remaining <= 0) {
       return { status: 'available' };
     }
-
-    return {
-      status: 'cooldown',
-      puzzlesRemaining: puzzlesRequired - puzzlesSinceEnd,
-    };
+    return { status: 'cooldown', puzzlesRemaining: remaining };
   }
 
   // In active session

@@ -59,6 +59,24 @@ function getYesterdayString(): string {
 }
 
 /**
+ * Grace period for daily challenge streaks (in days)
+ * Consistent with main game streak grace period (STREAK_BONUSES.STREAK_RESET_DAYS)
+ */
+const DAILY_STREAK_GRACE_DAYS = 2;
+
+/**
+ * Check if a date string is within the daily streak grace period
+ * Returns true if the date is 1 to DAILY_STREAK_GRACE_DAYS days ago
+ */
+function isWithinDailyGracePeriod(dateString: string): boolean {
+  const date = new Date(dateString);
+  const today = new Date();
+  const diffMs = today.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return diffDays >= 1 && diffDays <= DAILY_STREAK_GRACE_DAYS;
+}
+
+/**
  * Seeded random number generator (deterministic based on date string)
  * Uses a simple hash to generate a seed from the date string
  */
@@ -180,9 +198,8 @@ export async function recordDailyCompletion(
     return progress;
   }
 
-  // Calculate streak
-  const yesterday = getYesterdayString();
-  if (progress.lastCompletedDate === yesterday) {
+  // Calculate streak (with grace period matching main game)
+  if (progress.lastCompletedDate && isWithinDailyGracePeriod(progress.lastCompletedDate)) {
     progress.currentStreak += 1;
   } else if (progress.lastCompletedDate !== today) {
     progress.currentStreak = 1;

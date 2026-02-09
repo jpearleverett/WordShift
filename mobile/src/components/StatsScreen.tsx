@@ -64,6 +64,8 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'overview' && styles.tabActive]}
           onPress={() => setSelectedTab('overview')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: selectedTab === 'overview' }}
         >
           <Text style={[styles.tabText, selectedTab === 'overview' && styles.tabTextActive]}>
             Overview
@@ -72,6 +74,8 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'achievements' && styles.tabActive]}
           onPress={() => setSelectedTab('achievements')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: selectedTab === 'achievements' }}
         >
           <Text style={[styles.tabText, selectedTab === 'achievements' && styles.tabTextActive]}>
             Achievements ({unlockedAchievements.length}/{totalAchievements})

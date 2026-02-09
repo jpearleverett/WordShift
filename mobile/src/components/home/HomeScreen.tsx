@@ -250,9 +250,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [progress?.amber]);
 
   // Handle animal tap
-  const handleAnimalPress = useCallback((animal: Animal) => {
+  const handleAnimalPress = useCallback(async (animal: Animal) => {
     // Check if dialogue is available
-    const availability = checkDialogueAvailability(animal.id);
+    const availability = await checkDialogueAvailability(animal.id);
 
     if (!availability.available) {
       // Show cooldown message (vague, doesn't reveal puzzle count)
@@ -284,7 +284,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (!selectedAnimal || !progress) return;
 
     // Check session availability before continuing
-    const availability = checkDialogueAvailability(selectedAnimal.id);
+    const availability = await checkDialogueAvailability(selectedAnimal.id);
     if (!availability.available && availability.reason !== 'max_dialogues') {
       // Session ended, close dialogue
       handleCloseDialogue();
@@ -472,6 +472,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={styles.amberContainer}
           onPress={() => setShowShop(true)}
           bounceScale={0.95}
+          accessibilityLabel={`Shop. ${progress.amber} amber`}
+          accessibilityRole="button"
         >
           <View style={styles.amberInner}>
             <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
@@ -583,6 +585,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             },
           ]}
           pointerEvents="none"
+          accessibilityLiveRegion="polite"
+          accessibilityLabel={cooldownMessage}
         >
           <Text style={styles.cooldownToastText}>{cooldownMessage}</Text>
         </Animated.View>

@@ -31,11 +31,13 @@ function getDefaultProgress(): HomeWorldProgress {
     unlockedRooms: ['cozy_den'], // Starter room (empty)
     currentPhase: 0,
     puzzlesSolved: 0,
+    phaseProgress: 0, // Weighted phase progress (may differ from puzzlesSolved due to acceleration)
     phasePuzzleThresholds: [...PHASE_THRESHOLDS],
     lastDialogueRead: {},
     introsSeen: [], // Track which animals have had their intro shown
     currentStreak: 0,
     lastPlayDate: null,
+    challengeCompletions: 0,
   };
 }
 
@@ -253,10 +255,14 @@ export async function awardPuzzleAmber(
     threeStarRate, currentStreak, difficulty, gameMode
   );
   const phaseProgressIncrement = phaseAcceleration;
-  progress.phaseProgress = (progress.phaseProgress || progress.puzzlesSolved - 1) + phaseProgressIncrement;
+  // Initialize phaseProgress from puzzlesSolved for migrated players missing the field
+  if (progress.phaseProgress === undefined || progress.phaseProgress === null) {
+    progress.phaseProgress = progress.puzzlesSolved - 1; // -1 because we already incremented puzzlesSolved above
+  }
+  progress.phaseProgress += phaseProgressIncrement;
 
-  // Check for milestone bonus
-  const milestone = checkMilestone(progress.puzzlesSolved);
+  // Check for milestone bonus (uses >= with last-claimed tracking to prevent skips/doubles)
+  const milestone = checkMilestone(progress.puzzlesSolved, progress.lastClaimedMilestone ?? 0);
   let milestoneBonus = 0;
   let milestoneMessage: string | null = null;
   if (milestone) {
@@ -264,12 +270,13 @@ export async function awardPuzzleAmber(
     milestoneMessage = milestone.message;
     progress.amber += milestoneBonus;
     progress.totalAmberEarned += milestoneBonus;
+    progress.lastClaimedMilestone = milestone.puzzles;
 
     // Record milestone transaction separately
     await recordTransaction({
       amount: milestoneBonus,
       type: 'earn',
-      source: `milestone_${progress.puzzlesSolved}`,
+      source: `milestone_${milestone.puzzles}`,
       timestamp: Date.now(),
     });
   }
@@ -313,38 +320,55 @@ export async function awardPuzzleAmber(
   };
 }
 
+// Guard against concurrent spend operations
+let spendInProgress = false;
+
 /**
  * Spend amber on an unlock
+ * Protected against concurrent calls with a guard flag
  */
 export async function spendAmber(
   amount: number,
   targetId: string
 ): Promise<{ success: boolean; newBalance: number; error?: string }> {
-  const progress = await loadProgress();
-
-  if (progress.amber < amount) {
+  if (spendInProgress) {
     return {
       success: false,
-      newBalance: progress.amber,
-      error: 'Not enough amber',
+      newBalance: progressCache?.amber ?? 0,
+      error: 'Transaction in progress',
     };
   }
 
-  progress.amber -= amount;
-  progressCache = progress;
-  await saveProgress();
+  spendInProgress = true;
+  try {
+    const progress = await loadProgress();
 
-  await recordTransaction({
-    amount,
-    type: 'spend',
-    source: targetId,
-    timestamp: Date.now(),
-  });
+    if (progress.amber < amount) {
+      return {
+        success: false,
+        newBalance: progress.amber,
+        error: 'Not enough amber',
+      };
+    }
 
-  return {
-    success: true,
-    newBalance: progress.amber,
-  };
+    progress.amber -= amount;
+    progressCache = progress;
+    await saveProgress();
+
+    await recordTransaction({
+      amount,
+      type: 'spend',
+      source: targetId,
+      timestamp: Date.now(),
+    });
+
+    return {
+      success: true,
+      newBalance: progress.amber,
+    };
+  } finally {
+    spendInProgress = false;
+  }
 }
 
 /**

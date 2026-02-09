@@ -125,6 +125,8 @@ export interface HomeWorldProgress {
   challengeCompletions?: number;
   // Room decorations purchased
   decorations?: { [roomId: string]: string[] };
+  // Last milestone puzzle count that was claimed (prevents double-claiming)
+  lastClaimedMilestone?: number;
 }
 
 /**
@@ -247,10 +249,16 @@ export const MILESTONE_BONUSES: { puzzles: number; amber: number; message: strin
 
 /**
  * Check if a milestone was just reached
+ * Uses >= to catch milestones even if puzzleCount skips exact values (e.g., due to race conditions)
+ * Takes lastClaimedMilestone to prevent double-claiming
  */
-export function checkMilestone(puzzleCount: number): { amber: number; message: string } | null {
-  const milestone = MILESTONE_BONUSES.find(m => m.puzzles === puzzleCount);
-  return milestone ? { amber: milestone.amber, message: milestone.message } : null;
+export function checkMilestone(
+  puzzleCount: number,
+  lastClaimedMilestone?: number
+): { amber: number; message: string; puzzles: number } | null {
+  const claimed = lastClaimedMilestone ?? 0;
+  const milestone = MILESTONE_BONUSES.find(m => m.puzzles <= puzzleCount && m.puzzles > claimed);
+  return milestone ? { amber: milestone.amber, message: milestone.message, puzzles: milestone.puzzles } : null;
 }
 
 /**

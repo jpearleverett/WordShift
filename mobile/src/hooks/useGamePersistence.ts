@@ -49,9 +49,18 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
 
   useEffect(() => {
-    getCumulativeStats().then(setCumulativeStats);
-    getAmberBalance().then(setAmberBalance);
-    getCurrentPhase().then(setCurrentPhase);
+    // Initialize all services concurrently with proper error handling
+    Promise.all([
+      getCumulativeStats(),
+      getAmberBalance(),
+      getCurrentPhase(),
+    ]).then(([stats, balance, phase]) => {
+      setCumulativeStats(stats);
+      setAmberBalance(balance);
+      setCurrentPhase(phase);
+    }).catch(err => {
+      console.warn('Failed to initialize persistence:', err);
+    });
   }, []);
 
   const refreshStats = useCallback(async () => {

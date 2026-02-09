@@ -12,6 +12,7 @@ import {
 import { CandyColors } from '../theme/colors';
 import { getDailyStatus, getDailyCommunityStats } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
+import { getSettingsSync } from '../services/settings';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -43,6 +44,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   }, []);
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) return;
     if (!isCompleted) {
       const pulse = Animated.loop(
         Animated.sequence([

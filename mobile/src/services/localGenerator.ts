@@ -34,6 +34,25 @@ export const validateWord = (word: string): boolean => {
 // ANTI-BORING PATTERNS - Block obvious/cheap transformations
 // ============================================================================
 
+// Penalty values for boring transforms (higher = more penalty)
+const PENALTY = {
+  // Source removal penalties
+  REMOVE_S_FROM_END: 60,      // Removing S from end (un-pluralizing)
+  REMOVE_ED_FROM_END: 50,     // Removing D from -ED (un-past-tensing)
+  REMOVE_ER_FROM_END: 40,     // Removing R from -ER (un-comparative)
+  REMOVE_ING_G: 45,           // Removing G from -ING
+  REMOVE_ING_N: 35,           // Removing N from -IN (partial -ING)
+  REMOVE_LY_Y: 40,            // Removing Y from -LY (un-adverbing)
+  REMOVE_PREFIX_VOWEL: 25,    // Removing a leading vowel
+
+  // Target insertion penalties
+  INSERT_S_AT_END: 70,        // Adding S at end (pluralizing) — most boring move
+  INSERT_AT_START: 20,        // Adding at position 0 (prefix)
+  INSERT_SUFFIX_AT_END: 35,   // Adding boring suffix letter at end
+  INSERT_G_FOR_ING: 50,       // Adding G to form -ING
+  INSERT_Y_FOR_LY: 45,        // Adding Y to form -LY
+} as const;
+
 // Letters that are BORING when moved to/from word edges
 const BORING_SUFFIX_LETTERS = new Set(['S', 'D', 'R', 'Y', 'E']);
 const BORING_PREFIX_LETTERS = new Set(['A', 'I', 'U', 'E', 'O']);
@@ -61,69 +80,69 @@ function getBoringTransformPenalty(
 
   // HEAVILY penalize removing S from end (pluralization)
   if (char === 'S' && charIndex === sourceLen - 1) {
-    penalty += 60; // Was 20, now much stronger
+    penalty += PENALTY.REMOVE_S_FROM_END;
   }
 
   // Penalize removing D from end (past tense -ED)
   if (char === 'D' && charIndex === sourceLen - 1 && sourceWord[sourceLen - 2] === 'E') {
-    penalty += 50;
+    penalty += PENALTY.REMOVE_ED_FROM_END;
   }
 
   // Penalize removing R from end (comparative -ER)
   if (char === 'R' && charIndex === sourceLen - 1 && sourceWord[sourceLen - 2] === 'E') {
-    penalty += 40;
+    penalty += PENALTY.REMOVE_ER_FROM_END;
   }
 
   // Penalize removing G from end when it's part of -ING
   if (char === 'G' && charIndex === sourceLen - 1 &&
       sourceLen >= 3 && sourceWord.slice(-3) === 'ING') {
-    penalty += 45;
+    penalty += PENALTY.REMOVE_ING_G;
   }
 
   // Penalize removing N from end when followed by G (part of -ING removal sequence)
   if (char === 'N' && charIndex === sourceLen - 1 &&
       sourceLen >= 2 && sourceWord[sourceLen - 2] === 'I') {
-    penalty += 35;
+    penalty += PENALTY.REMOVE_ING_N;
   }
 
   // Penalize removing Y from end (adverb -LY suffix)
   if (char === 'Y' && charIndex === sourceLen - 1 &&
       sourceLen >= 2 && sourceWord[sourceLen - 2] === 'L') {
-    penalty += 40;
+    penalty += PENALTY.REMOVE_LY_Y;
   }
 
   // Penalize removing from position 0 (prefix removal)
   if (charIndex === 0 && BORING_PREFIX_LETTERS.has(char)) {
-    penalty += 25;
+    penalty += PENALTY.REMOVE_PREFIX_VOWEL;
   }
 
   // === INSERTING INTO TARGET ===
 
   // HEAVILY penalize inserting S at end (making plural)
   if (char === 'S' && insertionIndex === targetLen) {
-    penalty += 70; // This is the most boring move possible
+    penalty += PENALTY.INSERT_S_AT_END;
   }
 
   // Penalize inserting at position 0 (adding prefix)
   if (insertionIndex === 0) {
-    penalty += 20;
+    penalty += PENALTY.INSERT_AT_START;
   }
 
   // Penalize inserting at end (adding suffix)
   if (insertionIndex === targetLen && BORING_SUFFIX_LETTERS.has(char)) {
-    penalty += 35;
+    penalty += PENALTY.INSERT_SUFFIX_AT_END;
   }
 
   // Penalize inserting G at end to form -ING
   if (char === 'G' && insertionIndex === targetLen &&
       targetLen >= 2 && targetWord.slice(-2) === 'IN') {
-    penalty += 50;
+    penalty += PENALTY.INSERT_G_FOR_ING;
   }
 
   // Penalize inserting Y at end to form -LY (adverb)
   if (char === 'Y' && insertionIndex === targetLen &&
       targetLen >= 1 && targetWord[targetLen - 1] === 'L') {
-    penalty += 45;
+    penalty += PENALTY.INSERT_Y_FOR_LY;
   }
 
   return penalty;
@@ -134,11 +153,20 @@ function getBoringTransformPenalty(
  * This is boring because it doesn't feel like a real transformation
  */
 function isAnagramLike(word1: string, word2: string): boolean {
-  const sorted1 = word1.split('').sort().join('');
-  const sorted2 = word2.split('').sort().join('');
+  // Count letter frequencies for each word
+  const freq1: Record<string, number> = {};
+  const freq2: Record<string, number> = {};
+  for (const c of word1) freq1[c] = (freq1[c] || 0) + 1;
+  for (const c of word2) freq2[c] = (freq2[c] || 0) + 1;
+
+  // Count shared letters (min frequency of each letter)
+  let shared = 0;
+  for (const c of Object.keys(freq1)) {
+    if (freq2[c]) shared += Math.min(freq1[c], freq2[c]);
+  }
+
   // If more than 80% of letters are shared, it's anagram-like
-  const shared = [...sorted1].filter((c, i) => sorted2[i] === c).length;
-  return shared >= Math.min(sorted1.length, sorted2.length) * 0.8;
+  return shared >= Math.min(word1.length, word2.length) * 0.8;
 }
 
 // ============================================================================

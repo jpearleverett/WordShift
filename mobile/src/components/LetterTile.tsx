@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Letter } from '../types';
 import { getTileColor, CandyColors } from '../theme/colors';
+import { getSettingsSync } from '../services/settings';
 
 interface LetterTileProps {
   letter: Letter;
@@ -18,6 +19,8 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   isInteractable,
   highlight = 'default',
 }) => {
+  const settings = getSettingsSync();
+
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -30,6 +33,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   // Idle animation for interactable tiles
   useEffect(() => {
+    if (settings.reducedMotion) return;
     if (isInteractable && !isSelected) {
       // Subtle pulse glow
       Animated.loop(
@@ -79,6 +83,12 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   // Selected bounce animation
   useEffect(() => {
+    if (settings.reducedMotion) {
+      scaleAnim.setValue(isSelected ? 1.08 : 1);
+      bounceAnim.setValue(0);
+      wobbleAnim.setValue(0);
+      return;
+    }
     if (isSelected) {
       // Initial pop
       Animated.sequence([
@@ -150,6 +160,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   }, [isSelected]);
 
   const handlePressIn = () => {
+    if (settings.reducedMotion) return;
     if (isInteractable || isSelected) {
       Animated.spring(scaleAnim, {
         toValue: 0.92,
@@ -161,6 +172,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   };
 
   const handlePressOut = () => {
+    if (settings.reducedMotion) return;
     if (isInteractable || isSelected) {
       Animated.spring(scaleAnim, {
         toValue: isSelected ? 1.08 : 1,
@@ -322,6 +334,8 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         activeOpacity={1}
+        accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
+        accessibilityRole="button"
       >
         {content}
       </TouchableOpacity>

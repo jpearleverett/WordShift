@@ -478,6 +478,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         onPress={handlePress}
         activeOpacity={1}
         style={styles.touchable}
+        accessibilityLabel={`${animal.name} the ${animal.type}`}
+        accessibilityRole="button"
       >
         <Animated.View
           style={[
