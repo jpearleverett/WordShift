@@ -328,6 +328,15 @@ const ShootingStar: React.FC = () => {
   );
 };
 
+// Phase-aware background colors (blends with each sky image's edges)
+const PHASE_BG_COLORS: Record<number, string> = {
+  0: '#6fb7df',
+  1: '#6fb7df',
+  2: '#514378',
+  3: '#060612',
+  4: '#1a122a',
+};
+
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
 const ROOM_WIDTH = 250;
@@ -549,7 +558,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const houseHeight = calculateHouseHeight();
 
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
