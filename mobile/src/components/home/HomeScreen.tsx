@@ -26,7 +26,10 @@ import {
   hasSeenIntro,
   purchaseDecoration,
   getAllDecorations,
+  markHouseCompleted,
+  isHouseCompleted,
 } from '../../services/amberCurrency';
+import { getHouseCompletionText } from '../../services/phaseNarrative';
 import {
   ROOMS,
   ANIMALS,
@@ -41,6 +44,8 @@ import {
   ANIMAL_INFO,
   getIntroDialogueLine,
   getIntroDialogueCount,
+  getCatchupIntroDialogue,
+  getCatchupIntroDialogueCount,
 } from '../../services/animalDialogue';
 import {
   loadDialogueSessions,
@@ -92,6 +97,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
 
+  // House completion ceremony state
+  const [showHouseCompletion, setShowHouseCompletion] = useState(false);
+  const [houseCompletionTextIndex, setHouseCompletionTextIndex] = useState(0);
+
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
     progress,
@@ -129,6 +138,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setProgress(progressData);
     setRooms(roomsData);
     setAnimals(animalsData);
+
+    // Check for house completion (all 10 rooms + all 10 animals unlocked)
+    if (!progressData.houseCompleted) {
+      const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= 10;
+      const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= 10;
+      if (allRoomsUnlocked && allAnimalsUnlocked) {
+        await markHouseCompleted();
+        setShowHouseCompletion(true);
+        setHouseCompletionTextIndex(0);
+      }
+    }
 
     // Refresh unlock data with fresh arrays (avoids stale state)
     await unlockFlow.refreshUnlockData(roomsData, animalsData);
@@ -176,9 +196,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
-    if (!introAnimal) return;
+    if (!introAnimal || !progress) return;
 
-    const totalIntro = getIntroDialogueCount(introAnimal.type);
+    const totalIntro = shouldUseCatchup()
+      ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
+      : getIntroDialogueCount(introAnimal.type);
     const nextIndex = introDialogueIndex + 1;
 
     if (nextIndex < totalIntro) {
@@ -204,24 +226,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroDialogueIndex(0);
   };
 
-  // Get current intro dialogue text
+  // Determine if catch-up dialogues should be used (animal unlocked at Phase 2+)
+  const shouldUseCatchup = (): boolean => {
+    if (!introAnimal || !progress) return false;
+    return getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase) > 0;
+  };
+
+  // Get current intro dialogue text (uses catch-up dialogues at Phase 2+)
   const getCurrentIntroText = (): string => {
-    if (!introAnimal) return '';
+    if (!introAnimal || !progress) return '';
+    if (shouldUseCatchup()) {
+      return getCatchupIntroDialogue(introAnimal.type, progress.currentPhase, introDialogueIndex) || '';
+    }
     return getIntroDialogueLine(introAnimal.type, introDialogueIndex) || '';
   };
 
   // Get intro dialogue progress text
   const getIntroProgress = (): string => {
-    if (!introAnimal) return '';
+    if (!introAnimal || !progress) return '';
     const current = introDialogueIndex + 1;
-    const total = getIntroDialogueCount(introAnimal.type);
+    const total = shouldUseCatchup()
+      ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
+      : getIntroDialogueCount(introAnimal.type);
     return `${current}/${total}`;
   };
 
   // Check if there are more intro dialogues
   const hasMoreIntroDialogues = (): boolean => {
-    if (!introAnimal) return false;
-    return introDialogueIndex + 1 < getIntroDialogueCount(introAnimal.type);
+    if (!introAnimal || !progress) return false;
+    const total = shouldUseCatchup()
+      ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
+      : getIntroDialogueCount(introAnimal.type);
+    return introDialogueIndex + 1 < total;
   };
 
   if (!progress || rooms.length === 0) {
@@ -423,7 +459,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <View style={styles.dialogueTextCol}>
                   <Text style={styles.dialogueAnimalName}>{dialogueFlow.selectedAnimal.name}</Text>
 
-                  {/* Trigger word reaction — animal noticed a word from recent puzzles */}
+                  {/* Trigger word reaction / tutorial callback — animal noticed a word or Fox recalls tutorial */}
                   {dialogueFlow.triggerReaction && progress.currentPhase >= 2 && (
                     <View style={[
                       styles.triggerReactionBubble,
@@ -434,6 +470,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         progress.currentPhase >= 3 && styles.triggerReactionTextDark,
                       ]}>
                         {dialogueFlow.triggerReaction}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Cross-animal reference — one-off line mentioning another animal */}
+                  {dialogueFlow.crossAnimalRef && (
+                    <View style={[
+                      styles.triggerReactionBubble,
+                      progress.currentPhase >= 3 && styles.triggerReactionBubbleDark,
+                    ]}>
+                      <Text style={[
+                        styles.triggerReactionText,
+                        progress.currentPhase >= 3 && styles.triggerReactionTextDark,
+                      ]}>
+                        {dialogueFlow.crossAnimalRef}
                       </Text>
                     </View>
                   )}
@@ -498,7 +549,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <View style={styles.unlockInfo}>
                     <Text style={styles.unlockName}>{unlockFlow.nextUnlock.name}</Text>
                     <Text style={styles.unlockDescription}>
-                      {unlockFlow.nextUnlock.description}
+                      {unlockFlow.nextUnlock.type === 'room'
+                        ? getRoomDescription(unlockFlow.nextUnlock.targetId, progress.currentPhase)
+                        : unlockFlow.nextUnlock.description}
                     </Text>
                     <Text style={styles.unlockCost}>
                       💎 {unlockFlow.nextUnlock.cost} amber
@@ -852,6 +905,70 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* House Completion Ceremony Modal */}
+      <Modal
+        visible={showHouseCompletion}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowHouseCompletion(false)}
+      >
+        <View style={styles.centeredOverlay}>
+          <View
+            style={[styles.houseCompletionModal, progress.currentPhase >= 3 && styles.houseCompletionModalDark]}
+            onStartShouldSetResponder={() => true}
+          >
+            {(() => {
+              const lines = getHouseCompletionText();
+              return (
+                <>
+                  <Text style={styles.houseCompletionEmoji}>
+                    {progress.currentPhase >= 4 ? '🌑' : '🏠'}
+                  </Text>
+                  <Text style={[
+                    styles.houseCompletionTitle,
+                    progress.currentPhase >= 3 && styles.houseCompletionTitleDark,
+                  ]}>
+                    {progress.currentPhase >= 4 ? 'The Temple' : 'The House is Complete'}
+                  </Text>
+                  <Text style={[
+                    styles.houseCompletionText,
+                    progress.currentPhase >= 3 && styles.houseCompletionTextDark,
+                  ]}>
+                    {lines[houseCompletionTextIndex]}
+                  </Text>
+                  <View style={styles.introDialogueFooter}>
+                    <Text style={styles.introDialogueProgress}>
+                      {houseCompletionTextIndex + 1}/{lines.length}
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.introContinueButton,
+                        progress.currentPhase >= 3 && styles.houseCompletionButton,
+                      ]}
+                      onPress={() => {
+                        if (houseCompletionTextIndex + 1 < lines.length) {
+                          setHouseCompletionTextIndex(houseCompletionTextIndex + 1);
+                        } else {
+                          setShowHouseCompletion(false);
+                        }
+                      }}
+                      accessibilityLabel={
+                        houseCompletionTextIndex + 1 < lines.length ? 'Continue' : 'Close'
+                      }
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.introContinueButtonText}>
+                        {houseCompletionTextIndex + 1 < lines.length ? 'Continue' : 'Close'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1498,6 +1615,55 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[500],
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  // House completion ceremony styles
+  houseCompletionModal: {
+    backgroundColor: CandyColors.white,
+    borderRadius: 30,
+    padding: 30,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+    maxWidth: 380,
+    width: '90%',
+  },
+  houseCompletionModalDark: {
+    backgroundColor: '#0A0510',
+    borderWidth: 1,
+    borderColor: 'rgba(140, 100, 60, 0.3)',
+  },
+  houseCompletionEmoji: {
+    fontSize: 60,
+    marginBottom: 16,
+  },
+  houseCompletionTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: CandyColors.purple.main,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  houseCompletionTitleDark: {
+    color: '#C4A882',
+  },
+  houseCompletionText: {
+    fontSize: 16,
+    color: CandyColors.gray[600],
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+    paddingHorizontal: 10,
+  },
+  houseCompletionTextDark: {
+    color: '#8A7A9A',
+  },
+  houseCompletionButton: {
+    backgroundColor: '#3D1560',
   },
 });
 

@@ -12,7 +12,8 @@ A word puzzle game where players shift letters between words to form valid Engli
 - **Puzzle words**: Shift from FUN/SPARK/TIGER → VOID/DOOM/ABYSS/RITUAL
 - **Background visuals**: Bright candy purple → near-black with crimson accents
 - **Floating particles**: Sparkles and stars → dim, dying embers
-- **Victory text**: "PERFECT!" → "WHY DOES IT MATTER?"
+- **Victory text**: "PERFECT!" → "WHY DOES IT MATTER?" (plus ritual echo showing completed word chain)
+- **Words offered counter**: Simple stat → "N words offered to the arrangement"
 - **Move messages**: "Delicious!" → "The void accepts."
 - **Confetti**: Vibrant rainbow → muted, dark colors
 - **Hints**: "Move 'R' — think WARM!" → "If it matters, 'R' — see VOID."
@@ -35,6 +36,7 @@ A word puzzle game where players shift letters between words to form valid Engli
 - **Phase 2 (Deeper Questions)**: Isolation creeps in. Animals question reality, impermanence. Words shift toward emptiness. The background noticeably darkens.
 - **Phase 3 (Growing Shadows)**: Overt dread. Animals speak of endings, purpose, something approaching. The puzzle screen feels cold. Victory feels hollow.
 - **Phase 4 (The Horizon)**: The cult is revealed. Animals speak of "the arrangement," "the pattern," "what comes through." Robed sprites. Storm sky. The shadow figure appears. Every puzzle solved is explicitly framed as part of the summoning. Victory text questions why the player continues.
+- **Phase 5 (Post-Revelation)**: After the final puzzle + house completion. Terrible peace. Animals are serene, not dreadful. The shadow has settled. The pattern continues. Victory text: "The pattern continues." / "Another thread in the weave."
 
 ## Quick Commands
 
@@ -43,7 +45,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (381 tests, 18 suites)
+npx jest --no-coverage   # Run all tests (384 tests, 18 suites)
 ```
 
 ## Tech Stack
@@ -118,7 +120,7 @@ mobile/
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
-│       ├── animalDialogue.ts    # 520 dialogue lines (52 per animal, 5 phases)
+│       ├── animalDialogue.ts    # 520+ dialogue lines, cross-animal refs, catch-up, tutorial callbacks
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
@@ -298,10 +300,10 @@ Game logic is extracted into six custom hooks:
 
 **`useDialogueFlow()`** (`src/hooks/useDialogueFlow.ts`):
 - Animal dialogue session state, animations, and cooldown messaging for home screen
-- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message
+- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words, checks for tutorial callbacks (Fox Phase 4), and rolls for cross-animal references
 - `handleNextDialogue()` - Advance dialogue, record progress, check session limits
 - `handleCloseDialogue()` - End session, clean up state
-- Returns: `selectedAnimal`, `showDialogue`, `dialogueText`, `sessionInfo`, `cooldownMessage`, `isTalking`
+- Returns: `selectedAnimal`, `showDialogue`, `dialogueText`, `sessionInfo`, `cooldownMessage`, `isTalking`, `triggerReaction`, `crossAnimalRef`
 - Animations: cooldown toast slide-in/out, dialogue modal spring, talking sprite alternation (idle/talk every 300ms)
 
 **`useUnlockFlow()`** (`src/hooks/useUnlockFlow.ts`):
@@ -324,15 +326,21 @@ State-based routing in `App.tsx`:
 Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` returns `{completed: true}`):
 1. `isProcessingVictory` lock prevents double-tap during async chain
 2. Record stars via `calculateStars(hintsUsed, invalidAttempts)`
-3. Record puzzle completion via `amberCurrency.awardPuzzleAmber()`
+3. Record puzzle completion via `amberCurrency.awardPuzzleAmber()` + `recordRitualWords()`
 4. Check for newly unlocked achievements via `useAchievementQueue()`
 5. Choreographed victory sequence (`playVictorySequence`):
    - Stars pop in one-by-one with 200ms stagger (spring animation)
    - Victory modal scales + fades in after stars complete
    - Phase-aware title: "PERFECT!" (Phase 0) → "WHY DOES IT MATTER?" (Phase 4)
+   - **Ritual Echo** (Phase 2+): Completed word chain displayed below title
+   - **Named Incantation** (Phase 3+): Puzzle chain name shown in ritual echo
+   - **Words Offered** (Phase 1+): Running total of words formed across all puzzles
    - Phase-aware feedback text shifts tone with narrative phase
 6. If phase changed: `PhaseTransitionOverlay` plays cinematic multi-scene interstitial, then `playPhaseChangeFlash()` does dramatic double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
+8. **Endgame triggers** (Phase 4+ after house completion, in App.tsx):
+   - First puzzle after house completion → `FINAL_PUZZLE_EVENT` cinematic overlay
+   - First puzzle after final puzzle → `POST_REVELATION_EVENT` cinematic overlay + `markPostRevelation()`
 
 ### Achievement System (`services/achievements.ts`)
 
@@ -397,7 +405,7 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 - **Rabbit (Thyme)** - Surface: anxious, garden patio. Depth: anxious because they understand what's coming, but committed anyway.
 - **Red Panda (Bamboo)** - Surface: zen/contemplative, bamboo attic. Depth: the cult's spiritual leader, at perfect peace with the summoning. (final unlock)
 
-### Dialogue Progression (Phases 0-4)
+### Dialogue Progression (Phases 0-5)
 
 Animal dialogue evolves as players complete puzzles, gradually revealing the cult:
 - **Phase 0 (0-24 puzzles)**: Happy, friendly, light. The animals are your friends. No hint of anything dark.
@@ -405,6 +413,7 @@ Animal dialogue evolves as players complete puzzles, gradually revealing the cul
 - **Phase 2 (75-149 puzzles)**: Questioning existence, isolation. "The words are changing, aren't they? Or are we?" First hints of shared purpose among the animals.
 - **Phase 3 (150-249 puzzles)**: Existential dread, references to "the arrangement," "what's coming." Animals start speaking in unison-like themes. Something is being prepared.
 - **Phase 4 (250+ puzzles)**: The cult revealed. Animals speak reverently of the summoning, the player's role, the entity approaching. Robed sprites. They're grateful — terrifyingly so.
+- **Phase 5 (Post-Revelation)**: After house completion + final puzzle. Terrible peace. Animals are serene, not dreadful. The shadow has settled. Triggered via `markPostRevelation()` in `amberCurrency.ts`, content in `POST_REVELATION_DIALOGUES` in `animalDialogue.ts`.
 
 Each animal filters the cult narrative through their personality:
 - **Fox (Ember)**: Fireside prophet. "The embers whisper of what's to come."
@@ -413,9 +422,34 @@ Each animal filters the cult narrative through their personality:
 - **Rabbit (Thyme)**: Anxious but devoted. "I'm scared, but... this is what we prepared for, right?"
 - **Red Panda (Bamboo)**: Zen certainty. "The pattern completes. Breathe. Accept."
 
-**Dialogue Count**: 52 dialogues per animal (520 total)
+**Dialogue Count**: 52 dialogues per animal (520 total) + 5 post-revelation per animal (50 total)
 - Phase 0: 12 dialogues (happy, friendly)
 - Phases 1-4: 10 dialogues each (progressively darker, culminating in cult revelation)
+- Phase 5: 5 dialogues each (terrible peace — the aftermath)
+
+### Per-Animal Phase Awareness (Cult Hierarchy)
+
+Not all animals realize the truth at the same time. Defined in `ANIMAL_AWARENESS_TIERS` in `types/homeWorld.ts`:
+
+| Tier | Animals | Phase Offset | Narrative Role |
+|------|---------|-------------|----------------|
+| **Vanguard** (+1 ahead) | Fox, Owl | `globalPhase + 1` | The oracle and lorekeeper — they figured it out first |
+| **Middle** (matches player) | Pangolin, Axolotl, Fennec, Capybara | `globalPhase + 0` | Discover the truth in real-time with the player |
+| **Lagging** (-1 behind) | Sloth, Wombat, Rabbit, Red Panda | `globalPhase - 1` | Most impactful — when they finally catch up, it hits harder |
+
+`getAnimalPhase(globalPhase, animalType)` applies the offset (clamped 0-4). Used in `useDialogueFlow.ts` and `HomeScreen.tsx` for dialogue selection and sprite display.
+
+### Cross-Animal References
+
+Animals occasionally reference other animals in dialogue (~25% chance per visit), creating the feeling of a connected community and later a coordinated cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a styled bubble before regular dialogue in `HomeScreen.tsx`.
+
+### Catch-Up Dialogue for Late Unlocks
+
+When an animal is unlocked at Phase 2+, they get special catch-up intro dialogue that acknowledges the player's progress and compresses the emotional arc. Defined in `CATCHUP_INTRO_DIALOGUES` in `animalDialogue.ts` (4 lines per animal per phase 2/3/4). `getCatchupIntroDialogue()` / `getCatchupIntroDialogueCount()` are used in `HomeScreen.tsx` intro dialogue flow when `currentPhase >= 2`.
+
+### Tutorial Callback (Fox at Phase 4)
+
+When Fox is first tapped at Phase 4, a one-time tutorial callback dialogue is shown — recontextualizing innocent tutorial lines as cult recruitment. E.g., "Remember when I said we'd been waiting for someone like you? I wasn't being friendly. I was being honest." Defined in `TUTORIAL_CALLBACK_DIALOGUES` in `animalDialogue.ts`. Tracked via `tutorialSeedsPlanted` flag in progress, checked in `useDialogueFlow.ts`.
 
 ### Dialogue Session System
 
@@ -424,13 +458,14 @@ Animals have conversation sessions with puzzle-based cooldowns to pace interacti
 **Session Parameters** (in `dialogueSession.ts` and `types/homeWorld.ts`):
 - Max dialogues per session: 8
 - Cooldown: 3 puzzles between sessions
+- **Grace period**: First 3 sessions after unlock have no cooldown (`GRACE_PERIOD_SESSIONS`)
 - Dialogue progress persists (animals remember where they left off)
 
 **Session Flow**:
 1. Player taps animal -> starts session if available
 2. Player can have up to 8 dialogues during session
 3. Session ends when: max dialogues reached or player leaves
-4. Cooldown begins -> must complete 3 puzzles to talk again
+4. Cooldown begins -> must complete 3 puzzles to talk again (skipped during grace period)
 5. After cooldown -> animal continues from next dialogue (not repeat)
 
 **UI Indicators**:
@@ -461,7 +496,39 @@ The house is built from the ground up, one room at a time. What begins as "build
 
 After all rooms and animals are unlocked, players can purchase cosmetic decorations (30 total, 3 per room, 75-150 amber each). At higher phases, these decorations take on a darker significance — what starts as "a velvet rug" or "copper pots" eventually feels like "ritual furnishings."
 
-Managed via `purchaseDecoration()`, `hasDecoration()`, `getAllDecorations()` in `amberCurrency.ts`.
+Managed via `purchaseDecoration()`, `hasDecoration()`, `getAllDecorations()` in `amberCurrency.ts`. Phase-aware descriptions via `getDecorationDescription(decoration, phase)` in `types/homeWorld.ts` — supports `darkDescription` (Phase 3+) and `ritualDescription` (Phase 4+).
+
+### Phase-Aware Room Descriptions
+
+Room descriptions evolve with the narrative phase. `getRoomDescription(roomId, phase)` in `homeWorldData.ts` returns different descriptions per phase (e.g., Kitchen at Phase 0: "A cozy space where friends gather around good food" → Phase 4: "The ovens have been repurposed. Something else is being prepared."). Used in the shop modal for room-type unlocks.
+
+### Incantation System (Puzzle-Narrative Connection)
+
+The core system that makes puzzles feel like rituals, not just gates:
+
+**Ritual Word Memory / Ledger**: Every word formed across all puzzles is recorded in `ritualWords` array (capped at 500). Tracked via `recordRitualWords()` in `amberCurrency.ts`, called from `useGamePersistence.ts` after each victory.
+
+**Post-Puzzle Ritual Echo**: After Phase 2+, the VictoryModal shows the completed word chain (e.g., FLAME → LAME → BLAME → LAMB). At Phase 3+ arrows become vertical. Styled containers darken with phase. Header/footer text from `getRitualEchoHeader()`/`getRitualEchoFooter()` in `phaseNarrative.ts`.
+
+**Named Incantations**: At Phase 3+, each puzzle chain gets a name (e.g., "The FLAME's Shadow", "Offering: VOID to DOOM"). Generated by `getIncantationName()` in `phaseNarrative.ts` using deterministic hashing. Displayed in VictoryModal below the ritual echo chain.
+
+**Words Offered Counter**: VictoryModal shows a running count of total words formed. Phase-aware text from `getWordsOfferedText()` — Phase 0: "Words shifted: 847" → Phase 4: "847 words offered to the arrangement".
+
+**Ritual Energy**: Puzzles with darker words contribute more to phase progression. `calculateRitualEnergy()` in `localGenerator.ts` scores dread word presence (0-10 scale). Each ritual energy point adds 0.1 to `phaseProgress`. Accumulated in `ritualEnergy` field on progress.
+
+**Animals React to Specific Words**: Trigger words from puzzles (FLAME, VOID, GATE, etc.) are queued and consumed when visiting animals. At Phase 2+, animals show reactions tied to their theme. Defined in `ANIMAL_TRIGGER_WORDS` / `TRIGGER_WORD_REACTIONS` in `animalDialogue.ts`. Wired via `extractTriggerWords()`, `consumeTriggerWords()`, and displayed in `useDialogueFlow.ts`.
+
+### Endgame: House Completion + Final Puzzle + Post-Revelation
+
+**House Completion Ceremony**: When all 10 rooms + 10 animals are unlocked, `markHouseCompleted()` is called and a ceremony modal displays in `HomeScreen.tsx` with text from `getHouseCompletionText()` in `phaseNarrative.ts`. Also available as a cinematic event `HOUSE_COMPLETION_EVENT` in `phaseEvents.ts`.
+
+**The Final Puzzle**: After house completion + Phase 4, the next puzzle completed triggers `FINAL_PUZZLE_EVENT` (cinematic overlay in App.tsx). Marks `finalPuzzleCompleted` on progress via `markFinalPuzzleCompleted()`.
+
+**Post-Revelation (Phase 5)**: After the final puzzle, the next puzzle triggers `POST_REVELATION_EVENT` and marks `postRevelation` on progress via `markPostRevelation()`. Post-revelation content: special victory text (`getPostRevelationVictoryTitle`, `getPostRevelationMoveMessage` in `phaseNarrative.ts`), 5 new dialogues per animal (`POST_REVELATION_DIALOGUES` / `getPostRevelationDialogue()` in `animalDialogue.ts`).
+
+### Phase-Aware Milestone Messages
+
+Milestone bonuses at key puzzle counts use phase-aware messages. Each `MILESTONE_BONUSES` entry has `message` (default), `darkMessage` (Phase 2+), and `dreadMessage` (Phase 3+). `getMilestoneMessage(milestone, phase)` in `types/homeWorld.ts` selects the appropriate tone.
 
 ### House & Room Visuals
 
@@ -520,6 +587,11 @@ All player-facing text shifts tone with phase:
 - `getRulesText(phase)` — Phase-aware "How to Play" modal: "HOW TO PLAY" → "THE ARRANGEMENT"
 - `getPhaseChangeNarrative(phase)` — Dramatic text for phase transitions
 - `getPhaseIndicator(phase)` — Icon + label for puzzle header badge
+- `getRitualEchoHeader(phase)` / `getRitualEchoFooter(phase, wordCount)` — Ritual echo framing in VictoryModal
+- `getIncantationName(words, phase)` — Named puzzle chains at Phase 3+ (deterministic)
+- `getWordsOfferedText(totalWords, phase)` — Running word count: "Words shifted: N" → "N words offered to the arrangement"
+- `getHouseCompletionText()` — Text lines for house completion ceremony modal
+- `getPostRevelationVictoryTitle(stars)` / `getPostRevelationMoveMessage()` — Phase 5 victory/move text
 
 ### Challenge Mode
 Optional harder mode for experienced players (`GameMode = 'standard' | 'challenge'`):
@@ -590,6 +662,12 @@ Manages amber balance, streak, phase progression, and decorations:
 - `getPuzzlesUntilNextPhase()` - Uses `phaseProgress` (accelerated) not raw `puzzlesSolved`
 - `purchaseDecoration(roomId, decorationId, cost)` - Buy room decoration
 - `hasDecoration(roomId, decorationId)` / `getAllDecorations()` / `getDecorationCount()` - Decoration queries
+- `recordRitualWords(words, triggerWords, ritualEnergy)` - Record words to ledger, queue triggers, accumulate ritual energy
+- `consumeTriggerWords(animalType)` - Dequeue trigger words for an animal
+- `markHouseCompleted()` / `isHouseCompleted()` - House completion ceremony tracking
+- `markFinalPuzzleCompleted()` / `isFinalPuzzleCompleted()` - Final puzzle endgame tracking
+- `markPostRevelation()` / `isPostRevelation()` - Phase 5 post-revelation state
+- `markTutorialSeedsPlanted()` / `wereTutorialSeedsPlanted()` - Tutorial callback tracking for Fox at Phase 4
 - `clearProgress()` - Full reset
 
 ### Phase Transition Events (`phaseEvents.ts`)
@@ -601,6 +679,7 @@ Cinematic interstitial scenes that play at phase boundaries:
 - Tone darkens: Phase 1 "The words seem to want something" → Phase 4 "Go home. See what you've built."
 - `getPhaseTransitionEvent(phase)` returns event or null (no event for Phase 0)
 - `getEventDuration(event)` calculates total playback time
+- **Endgame events**: `HOUSE_COMPLETION_EVENT` (all 10 rooms + animals), `FINAL_PUZZLE_EVENT` (Phase 4 endgame), `POST_REVELATION_EVENT` (Phase 5 transition)
 - Rendered by `PhaseTransitionOverlay` component with animated fade-in/out, progress dots
 
 ### Device Tier Detection (`deviceTier.ts`)
