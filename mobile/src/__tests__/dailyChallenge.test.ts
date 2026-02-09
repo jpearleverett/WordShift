@@ -64,19 +64,15 @@ describe('dailyChallenge', () => {
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  test('getDailyDifficulty returns valid difficulty', () => {
+  test('getDailyDifficulty always returns HARD', () => {
     const diff = getDailyDifficulty();
-    expect(['EASY', 'MEDIUM', 'HARD']).toContain(diff);
+    expect(diff).toBe('HARD');
   });
 
-  test('getDailyDifficulty cycles by day of week', () => {
-    // Monday should be EASY
-    const monday = getDailyDifficulty('2026-02-09'); // Monday
-    expect(monday).toBe('EASY');
-
-    // Wednesday should be HARD
-    const wednesday = getDailyDifficulty('2026-02-11');
-    expect(wednesday).toBe('HARD');
+  test('getDailyDifficulty returns HARD regardless of date', () => {
+    expect(getDailyDifficulty('2026-02-09')).toBe('HARD');
+    expect(getDailyDifficulty('2026-02-10')).toBe('HARD');
+    expect(getDailyDifficulty('2026-02-11')).toBe('HARD');
   });
 
   test('isDailyCompleted returns false initially', async () => {

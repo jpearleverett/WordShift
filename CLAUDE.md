@@ -74,8 +74,8 @@ mobile/
 │   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
 │   ├── types/
 │   │   └── homeWorld.ts         # Home screen types, config constants, streak/amber types
-│   ├── constants.ts             # Word lists by length (3-6 letters), COMMON_WORDS set, fallback puzzle pools
-│   ├── dictionary.ts            # 8000+ word dictionary for validation
+│   ├── constants.ts             # Word lists by length (3-7 letters), COMMON_WORDS set, fallback puzzle pools
+│   ├── dictionary.ts            # 11500+ word dictionary for validation (3-7 letter words)
 │   ├── hooks/
 │   │   ├── usePuzzleGame.ts     # All puzzle game state and actions (extracted from App.tsx)
 │   │   ├── useGamePersistence.ts # Persistence: amber, stats, phases (extracted from App.tsx)
@@ -94,7 +94,7 @@ mobile/
 │   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
-│   │   ├── DailyChallengeCard.tsx # Compact collapsible daily challenge pill bar
+│   │   ├── DailyChallengeCard.tsx # Compact circular daily challenge button (in header row)
 │   │   ├── puzzle/              # Extracted puzzle screen UI components
 │   │   │   ├── ActionButton.tsx # 3D-styled button with glow animation + spring press
 │   │   │   ├── AnimatedLogo.tsx # Animated WORDSHIFT logo with bounce + subtle rotation
@@ -136,7 +136,7 @@ mobile/
 │       ├── performanceMonitor.ts # Frame rate, render timing, puzzle gen metrics
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (381 tests, 18 suites)
+├── src/__tests__/               # Test suites (384 tests, 18 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -257,7 +257,7 @@ As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite
 
 ## Game Mechanics
 
-1. Player sees a chain of words (3-5 rows depending on difficulty)
+1. Player sees a chain of words (3-5 rows depending on difficulty; daily challenge is always 5 rows of 6-letter words)
 2. Pick a letter from current word - word shrinks by 1 letter
 3. Drop letter into next word - word grows by 1 letter
 4. Both resulting words must be valid English words
@@ -356,9 +356,10 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
 - **Deterministic**: Uses seeded PRNG (`seededRandom()`) with date as seed
 - **`generateDailyPuzzle()`** temporarily overrides `Math.random` for deterministic generation
 - Concurrency guard prevents race conditions during async generation
-- Difficulty cycles: Easy (day%3===0), Medium (day%3===1), Hard (day%3===2)
-- Streak tracking: consecutive days of daily completion
-- DailyChallengeCard: compact inline pill bar on home screen (not completed → PLAY button starts challenge; completed → tap toggles community stats with LayoutAnimation)
+- **Always HARD**: 6-letter base words, 5 rows (uses `generateLocalPuzzle('HARD', { wordLength: 6, targetRows: 5 })`)
+- Requires 5-letter, 6-letter, and 7-letter words in dictionary for the pick/drop chain mechanic
+- Streak tracking: consecutive days of daily completion (2-day grace period)
+- DailyChallengeCard: compact 42px circular button in the home screen header row (not completed → pulsing glow, tap starts challenge; completed → checkmark with stars; streak badge when streak > 1)
 
 ### Settings System (`services/settings.ts`)
 
@@ -620,7 +621,7 @@ DFS-based word chain generator with quality scoring:
 - **Word history integration**: Penalizes/excludes recently used words
 
 Key functions:
-- `generateLocalPuzzle(difficulty)` - Main entry point (2.5s timeout)
+- `generateLocalPuzzle(difficulty, overrides?)` - Main entry point (2.5s timeout); optional `overrides` for custom `wordLength` and `targetRows` (used by daily challenge)
 - `findPath()` - Recursive DFS to find valid word chains
 - `scorePuzzleChain()` - Evaluates puzzle quality (includes freshness scoring)
 
@@ -780,7 +781,7 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialC
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 381 tests, 18 suites
+cd mobile && npx jest --no-coverage  # 384 tests, 18 suites
 ```
 
 **Test patterns:**
@@ -802,7 +803,7 @@ Test on physical device via Expo Go app:
 3. Test all three difficulty modes
 4. Verify puzzle generation doesn't hang (should complete in <3s)
 5. Test tutorial on fresh install
-6. Test daily challenge (should give same puzzle if opened twice same day)
+6. Test daily challenge (always 6-letter words / 5 rows; same puzzle if opened twice same day)
 7. Test home screen unlock flow (Fox free -> build Kitchen -> invite Panko)
 8. Test settings (toggle reduced motion -> verify no confetti/particles)
 9. Test Reset All Data -> verify complete reset including tutorial/amber/unlocks

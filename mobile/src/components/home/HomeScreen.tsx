@@ -313,6 +313,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         <View style={styles.headerRight}>
+          {onStartDaily && (
+            <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
+          )}
           <TouchableOpacity
             style={styles.headerIconBtn}
             onPress={onOpenStats}
@@ -383,11 +386,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
           </View>
         </TouchableOpacity>
-      )}
-
-      {/* Daily Challenge Card */}
-      {onStartDaily && (
-        <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
       )}
 
       {/* Celebration Confetti */}
