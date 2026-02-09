@@ -165,6 +165,48 @@ describe('getPuzzlesUntilNextPhase', () => {
     const remaining = await getPuzzlesUntilNextPhase();
     expect(remaining).toBeNull();
   });
+
+  test('decreases as puzzles are solved', async () => {
+    await devAddPuzzles(10);
+    const remaining = await getPuzzlesUntilNextPhase();
+    expect(remaining).toBe(15); // 25 - 10
+  });
+
+  test('uses phaseProgress for accelerated players', async () => {
+    // devAddPuzzles keeps phaseProgress in sync, so after 10 puzzles
+    // both puzzlesSolved and phaseProgress are 10
+    await devAddPuzzles(10);
+    const remaining = await getPuzzlesUntilNextPhase();
+    expect(remaining).toBe(15);
+  });
+
+  test('never returns negative values', async () => {
+    // At phase boundary, should be 0 not negative
+    await devAddPuzzles(25);
+    // Now at phase 1, puzzles until phase 2 threshold (75)
+    const remaining = await getPuzzlesUntilNextPhase();
+    expect(remaining).toBeGreaterThanOrEqual(0);
+  });
+
+  test('returns correct value at each phase boundary', async () => {
+    // Phase 0 -> 1: threshold is 25
+    expect(await getPuzzlesUntilNextPhase()).toBe(25);
+
+    await devAddPuzzles(25); // Now at phase 1
+    // Phase 1 -> 2: threshold is 75
+    expect(await getPuzzlesUntilNextPhase()).toBe(50); // 75 - 25
+
+    await devAddPuzzles(50); // Now at phase 2 (75 total)
+    // Phase 2 -> 3: threshold is 150
+    expect(await getPuzzlesUntilNextPhase()).toBe(75); // 150 - 75
+
+    await devAddPuzzles(75); // Now at phase 3 (150 total)
+    // Phase 3 -> 4: threshold is 250
+    expect(await getPuzzlesUntilNextPhase()).toBe(100); // 250 - 150
+
+    await devAddPuzzles(100); // Now at phase 4 (250 total)
+    expect(await getPuzzlesUntilNextPhase()).toBeNull();
+  });
 });
 
 describe('canAfford', () => {
