@@ -1033,7 +1033,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2D5A27',
+    backgroundColor: '#6fb7df',
   },
   loadingContainer: {
     flex: 1,

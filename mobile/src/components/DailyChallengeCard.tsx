@@ -5,10 +5,18 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
 import { getDailyStatus, getDailyCommunityStats } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
@@ -21,6 +29,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
   const [stars, setStars] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const [communityStats, setCommunityStats] = useState<{
     completionRate: number;
     averageStars: number;
@@ -35,7 +44,6 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
 
   useEffect(() => {
     if (!isCompleted) {
-      // Gentle pulse to draw attention
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -63,7 +71,6 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     if (status.todayResult) {
       setStars(status.todayResult.stars);
     }
-    // Load community stats (always available, deterministic)
     const community = getDailyCommunityStats();
     setCommunityStats(community);
   };
@@ -74,46 +81,49 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     HARD: CandyColors.red.main,
   }[difficulty];
 
+  const handlePress = () => {
+    if (!isCompleted) {
+      onStartDaily(difficulty);
+    } else {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setExpanded(prev => !prev);
+    }
+  };
+
   return (
     <Animated.View style={[styles.container, { transform: [{ scale: pulseAnim }] }]}>
       <TouchableOpacity
-        style={[styles.card, isCompleted && styles.cardCompleted]}
-        onPress={() => !isCompleted && onStartDaily(difficulty)}
-        disabled={isCompleted}
+        style={[styles.bar, isCompleted && styles.barCompleted]}
+        onPress={handlePress}
         activeOpacity={0.8}
       >
-        <View style={styles.leftSection}>
-          <View style={styles.dateRow}>
-            <Text style={styles.calendarIcon}>{isCompleted ? '✅' : '📅'}</Text>
-            <Text style={styles.dateText}>Daily Challenge</Text>
-          </View>
-          <View style={styles.difficultyBadge}>
-            <View style={[styles.difficultyDot, { backgroundColor: difficultyColor }]} />
-            <Text style={styles.difficultyText}>{difficulty}</Text>
-          </View>
-        </View>
+        <Text style={styles.icon}>{isCompleted ? '✅' : '📅'}</Text>
+        <Text style={styles.label}>Daily</Text>
+        <View style={[styles.difficultyDot, { backgroundColor: difficultyColor }]} />
+        <Text style={styles.difficultyText}>{difficulty}</Text>
 
-        <View style={styles.rightSection}>
-          {isCompleted ? (
-            <View style={styles.completedInfo}>
-              <Text style={styles.starsText}>
-                {'⭐'.repeat(stars)}{'☆'.repeat(3 - stars)}
-              </Text>
-              <Text style={styles.completedText}>Done!</Text>
-            </View>
-          ) : (
-            <View style={styles.playBadge}>
-              <Text style={styles.playText}>PLAY</Text>
-            </View>
-          )}
-          {streak > 1 && (
-            <Text style={styles.streakText}>🔥 {streak}</Text>
-          )}
-        </View>
+        {streak > 1 && (
+          <Text style={styles.streakText}>🔥{streak}</Text>
+        )}
+
+        <View style={styles.spacer} />
+
+        {isCompleted ? (
+          <View style={styles.completedSection}>
+            <Text style={styles.starsText}>
+              {'⭐'.repeat(stars)}{'☆'.repeat(3 - stars)}
+            </Text>
+            <Text style={styles.expandHint}>{expanded ? '▲' : '▼'}</Text>
+          </View>
+        ) : (
+          <View style={styles.playBadge}>
+            <Text style={styles.playText}>PLAY</Text>
+          </View>
+        )}
       </TouchableOpacity>
 
-      {/* Community stats shown after completion */}
-      {isCompleted && communityStats && (
+      {/* Expanded community stats */}
+      {expanded && isCompleted && communityStats && (
         <View style={styles.communityStatsRow}>
           <View style={styles.communityStatItem}>
             <Text style={styles.communityStatValue}>{communityStats.completionRate}%</Text>
@@ -149,87 +159,73 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 4,
     zIndex: 10,
   },
-  card: {
+  bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: 'rgba(30, 60, 30, 0.85)',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+    gap: 6,
   },
-  cardCompleted: {
+  barCompleted: {
     backgroundColor: 'rgba(20, 70, 40, 0.9)',
     borderColor: 'rgba(34, 197, 94, 0.3)',
   },
-  leftSection: {
-    flex: 1,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  calendarIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  dateText: {
+  icon: {
     fontSize: 14,
+  },
+  label: {
+    fontSize: 13,
     fontWeight: '800',
     color: CandyColors.white,
   },
-  difficultyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   difficultyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   difficultyText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.7)',
   },
-  rightSection: {
-    alignItems: 'flex-end',
+  streakText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: CandyColors.orange.light,
+  },
+  spacer: {
+    flex: 1,
+  },
+  completedSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  starsText: {
+    fontSize: 13,
+  },
+  expandHint: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   playBadge: {
     backgroundColor: CandyColors.yellow.main,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   playText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '900',
     color: CandyColors.gray[800],
     letterSpacing: 1,
-  },
-  completedInfo: {
-    alignItems: 'flex-end',
-  },
-  starsText: {
-    fontSize: 16,
-  },
-  completedText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: CandyColors.green.main,
-    marginTop: 2,
-  },
-  streakText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: CandyColors.orange.light,
-    marginTop: 4,
   },
   communityStatsRow: {
     flexDirection: 'row',
@@ -237,8 +233,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 12,
-    marginTop: 6,
-    paddingVertical: 8,
+    marginTop: 4,
+    paddingVertical: 6,
     paddingHorizontal: 12,
   },
   communityStatItem: {
@@ -246,24 +242,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   communityStatValue: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: CandyColors.white,
   },
   communityStatLabel: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.5)',
     marginTop: 1,
   },
   communityStatDivider: {
     width: 1,
-    height: 20,
+    height: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   communityDifficultyText: {
     color: CandyColors.green.main,
-    fontSize: 11,
+    fontSize: 10,
   },
   communityDifficultyTricky: {
     color: CandyColors.orange.main,

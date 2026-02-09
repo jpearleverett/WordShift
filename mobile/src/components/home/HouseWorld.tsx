@@ -215,7 +215,6 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
       x.setValue(goingRight ? -50 : SCREEN_WIDTH + 50);
       y.setValue(yPosition + (Math.random() - 0.5) * 40);
 
-      // Wing flapping
       const flapAnimation = Animated.loop(
         Animated.sequence([
           Animated.timing(flapRotation, {
@@ -308,12 +307,10 @@ const ShootingStar: React.FC = () => {
           }),
         ]),
       ]).start(() => {
-        // Random delay before next shooting star
         setTimeout(animate, 10000 + Math.random() * 20000);
       });
     };
 
-    // Start after random delay
     setTimeout(animate, 5000 + Math.random() * 10000);
   }, []);
 
@@ -390,9 +387,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const sunPulse = useRef(new Animated.Value(1)).current;
   const sunRotation = useRef(new Animated.Value(0)).current;
 
-  // Tree sway animation
-  const treeSway = useRef(new Animated.Value(0)).current;
-
   // Cloud animations
   const cloud1X = useRef(new Animated.Value(-100)).current;
   const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
@@ -463,28 +457,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     };
   }, [currentPhase]);
 
-  // Tree sway animation
-  useEffect(() => {
-    const swayAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(treeSway, {
-          toValue: 1,
-          duration: 3000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(treeSway, {
-          toValue: -1,
-          duration: 3000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    swayAnimation.start();
-    return () => swayAnimation.stop();
-  }, []);
-
+  // Cloud animations
   useEffect(() => {
     const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
       const animate = () => {
@@ -502,11 +475,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
     animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
   }, []);
-
-  const treeSwayRotate = treeSway.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-2deg', '2deg'],
-  });
 
   const sunRotate = sunRotation.interpolate({
     inputRange: [0, 360],
@@ -587,87 +555,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         <FloatingParticle key={particle.id} particle={particle} />
       ))}
 
-      {/* Shooting stars (only at higher phases) */}
-      {currentPhase >= 2 && <ShootingStar />}
-      {currentPhase >= 3 && <ShootingStar />}
-      {currentPhase >= 4 && <ShootingStar />}
-
-      {/* Flying birds */}
-      <FlyingBird startDelay={0} yPosition={80} />
-      <FlyingBird startDelay={3000} yPosition={50} />
-      {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
-
-      {/* Animated clouds - fixed to screen, darker at higher phases */}
-      <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
-        <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-      </Animated.View>
-      <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
-        <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-        <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-      </Animated.View>
-      <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
-        <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-      </Animated.View>
-
-      {/* Sun with animated rays - hidden at phase 4 */}
-      {currentPhase < 4 && (
-        <Animated.View
-          style={[
-            styles.sun,
-            {
-              transform: [
-                { scale: sunPulse },
-                { rotate: sunRotate },
-              ],
-              opacity: currentPhase >= 3 ? 0.4 : 1,
-            }
-          ]}
-          pointerEvents="none"
-        >
-          <View style={styles.sunRays}>
-            {[...Array(8)].map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.sunRay,
-                  { transform: [{ rotate: `${i * 45}deg` }] }
-                ]}
-              />
-            ))}
-          </View>
-          <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
-        </Animated.View>
-      )}
-
-      {/* Moon for phase 4 */}
-      {currentPhase >= 4 && (
-        <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
-          <Text style={styles.sunEmoji}>🌑</Text>
-        </View>
-      )}
-
-      {/* Stars at night (phase 3-4) */}
-      {currentPhase >= 3 && (
-        <View style={styles.starsContainer} pointerEvents="none">
-          {nightStars.map((star) => (
-            <Text
-              key={star.id}
-              style={[
-                styles.star,
-                {
-                  left: star.left,
-                  top: star.top,
-                  opacity: star.opacity,
-                  fontSize: star.fontSize,
-                }
-              ]}
-            >
-              ✦
-            </Text>
-          ))}
-        </View>
-      )}
-
       {/* Gesture handlers with simultaneous recognition */}
       <PanGestureHandler
         ref={panRef}
@@ -710,40 +597,86 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 resizeMode="cover"
               />
 
-              {/* Trees on left side with sway animation */}
-              <Animated.View
-                style={[
-                  styles.treeGroup,
-                  styles.leftTrees,
-                  { transform: [{ rotate: treeSwayRotate }] }
-                ]}
-                pointerEvents="none"
-              >
-                <Text style={styles.treeEmoji}>🌳</Text>
-                <Text style={styles.smallTreeEmoji}>🌲</Text>
-                <Text style={styles.bushEmoji}>🌿</Text>
+              {/* Animated clouds - inside transform so they move with the scene */}
+              <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+              <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+                <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+              <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
               </Animated.View>
 
-              {/* Trees on right side with sway animation */}
-              <Animated.View
-                style={[
-                  styles.treeGroup,
-                  styles.rightTrees,
-                  { transform: [{ rotate: treeSwayRotate }] }
-                ]}
-                pointerEvents="none"
-              >
-                <Text style={styles.treeEmoji}>🌳</Text>
-                <Text style={styles.smallTreeEmoji}>🌲</Text>
-                <Text style={styles.bushEmoji}>🌿</Text>
-              </Animated.View>
+              {/* Sun with animated rays - hidden at phase 4 */}
+              {currentPhase < 4 && (
+                <Animated.View
+                  style={[
+                    styles.sun,
+                    {
+                      transform: [
+                        { scale: sunPulse },
+                        { rotate: sunRotate },
+                      ],
+                      opacity: currentPhase >= 3 ? 0.4 : 1,
+                    }
+                  ]}
+                  pointerEvents="none"
+                >
+                  <View style={styles.sunRays}>
+                    {[...Array(8)].map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.sunRay,
+                          { transform: [{ rotate: `${i * 45}deg` }] }
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
+                </Animated.View>
+              )}
 
-              {/* Fence */}
-              <View style={styles.fence} pointerEvents="none">
-                {[...Array(6)].map((_, i) => (
-                  <View key={i} style={styles.fencePost} />
-                ))}
-              </View>
+              {/* Moon for phase 4 */}
+              {currentPhase >= 4 && (
+                <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
+                  <Text style={styles.sunEmoji}>🌑</Text>
+                </View>
+              )}
+
+              {/* Stars at night (phase 3-4) */}
+              {currentPhase >= 3 && (
+                <View style={styles.starsContainer} pointerEvents="none">
+                  {nightStars.map((star) => (
+                    <Text
+                      key={star.id}
+                      style={[
+                        styles.star,
+                        {
+                          left: star.left,
+                          top: star.top,
+                          opacity: star.opacity,
+                          fontSize: star.fontSize,
+                        }
+                      ]}
+                    >
+                      ✦
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Shooting stars (only at higher phases) */}
+              {currentPhase >= 2 && <ShootingStar />}
+              {currentPhase >= 3 && <ShootingStar />}
+              {currentPhase >= 4 && <ShootingStar />}
+
+              {/* Flying birds */}
+              <FlyingBird startDelay={0} yPosition={80} />
+              <FlyingBird startDelay={3000} yPosition={50} />
+              {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
 
               {/* House */}
               <View style={styles.houseContainer}>
@@ -847,7 +780,7 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 1.4,
     zIndex: -1,
   },
-  // Clouds - fixed to screen
+  // Clouds - inside transform container
   cloud: {
     position: 'absolute',
     flexDirection: 'row',
@@ -858,7 +791,7 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 
-  // Sun - fixed
+  // Sun - inside transform container
   sun: {
     position: 'absolute',
     top: 15,
@@ -893,7 +826,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    height: SCREEN_HEIGHT * 0.3,
     zIndex: 150,
   },
   star: {
@@ -908,18 +841,6 @@ const styles = StyleSheet.create({
     left: 5,
   },
 
-  // Birds - removed static, now using FlyingBird component
-  birds: {
-    position: 'absolute',
-    top: 50,
-    left: 35,
-    flexDirection: 'row',
-    zIndex: 200,
-  },
-  birdEmoji: {
-    fontSize: 20,
-  },
-
   // Gesture container
   gestureContainer: {
     flex: 1,
@@ -931,48 +852,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-end',
-  },
-
-  // Trees
-  treeGroup: {
-    position: 'absolute',
-    alignItems: 'center',
-  },
-  leftTrees: {
-    left: 15,
-    bottom: 80,
-  },
-  rightTrees: {
-    right: 15,
-    bottom: 80,
-  },
-  treeEmoji: {
-    fontSize: 55,
-  },
-  smallTreeEmoji: {
-    fontSize: 45,
-    marginTop: -10,
-  },
-  bushEmoji: {
-    fontSize: 32,
-    marginTop: -12,
-  },
-
-  // Fence
-  fence: {
-    position: 'absolute',
-    bottom: 95,
-    left: 25,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  fencePost: {
-    width: 8,
-    height: 30,
-    backgroundColor: '#D2691E',
-    borderRadius: 2,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
   },
 
   // House container
