@@ -43,7 +43,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (295 tests, 15 suites)
+npx jest --no-coverage   # Run all tests (316 tests, 16 suites)
 ```
 
 ## Tech Stack
@@ -78,7 +78,9 @@ mobile/
 │   │   ├── usePuzzleGame.ts     # All puzzle game state and actions (extracted from App.tsx)
 │   │   ├── useGamePersistence.ts # Persistence: amber, stats, phases (extracted from App.tsx)
 │   │   ├── useVictoryFlow.ts    # Victory animation choreography (stars, modal, phase flash)
-│   │   └── useAchievementQueue.ts # Achievement checking + toast queue processing
+│   │   ├── useAchievementQueue.ts # Achievement checking + toast queue processing
+│   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging
+│   │   └── useUnlockFlow.ts     # Unlock/shop logic: rooms, animals, decorations, purchases
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling
@@ -91,12 +93,20 @@ mobile/
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
 │   │   ├── DailyChallengeCard.tsx # Compact collapsible daily challenge pill bar
+│   │   ├── puzzle/              # Extracted puzzle screen UI components
+│   │   │   ├── ActionButton.tsx # 3D-styled button with glow animation + spring press
+│   │   │   ├── AnimatedLogo.tsx # Animated WORDSHIFT logo with bounce + subtle rotation
+│   │   │   ├── LevelDisplay.tsx # Level/stat badge display
+│   │   │   ├── Toast.tsx        # Animated toast notification (slide-in + error shake)
+│   │   │   └── index.ts         # Puzzle component exports
 │   │   └── home/
 │   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
 │   │       ├── HouseWorld.tsx   # Zoomable house view (vertical pan only, pinch zoom)
 │   │       ├── RoomView.tsx     # Individual room with decorations
-│   │       ├── AnimalSprite.tsx # Animated animal characters
+│   │       ├── AnimalSprite.tsx # Animated animal characters with movement + emotions
 │   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
+│   │       ├── AmberSparkle.tsx # Animated sparkle particles floating upward
+│   │       ├── CelebrationConfetti.tsx # 30-piece confetti burst on unlock celebration
 │   │       └── index.ts         # Home component exports
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette, tile colors, PhaseTheme system
@@ -120,7 +130,7 @@ mobile/
 │       ├── deviceTier.ts        # Device capability detection for animation scaling
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (295 tests, 15 suites)
+├── src/__tests__/               # Test suites (316 tests, 16 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -130,6 +140,7 @@ mobile/
 │   ├── dialogueSession.test.ts
 │   ├── eventLogger.test.ts
 │   ├── homeWorldData.test.ts
+│   ├── integration.test.ts      # End-to-end: victory flow, phase transitions, economy, achievements
 │   ├── localGenerator.test.ts
 │   ├── phaseNarrative.test.ts
 │   ├── settings.test.ts
@@ -148,21 +159,17 @@ The home screen is transitioning from emoji-based graphics to proper image asset
 
 ```
 mobile/assets/
-├── characters/                  # Animal character sprites
-│   ├── fox/
-│   │   ├── idle.png            # Standing pose, facing right
-│   │   ├── walk.png            # 4-frame sprite sheet (or walk_1.png - walk_4.png)
-│   │   ├── talk.png            # Mouth open variant for dialogue
-│   │   └── robed.png           # Phase 4 dark version with cloak
-│   ├── pangolin/               # Same structure for each animal
-│   ├── owl/
-│   ├── axolotl/
-│   ├── sloth/
-│   ├── fennec_fox/
-│   ├── capybara/
-│   ├── wombat/
-│   ├── rabbit/
-│   └── red_panda/
+├── characters/                  # Animal character sprites (idle.png, talk.png, robed.png each)
+│   ├── fox/                    # ✓ Complete (idle, talk, robed)
+│   ├── pangolin/               # ✓ Complete
+│   ├── owl/                    # ✓ Complete
+│   ├── axolotl/                # ✓ Complete
+│   ├── capybara/               # ✓ Complete
+│   ├── sloth/                  # Placeholder only (needs sprites)
+│   ├── fennec_fox/             # Placeholder only (needs sprites)
+│   ├── wombat/                 # Placeholder only (needs sprites)
+│   ├── rabbit/                 # Placeholder only (needs sprites)
+│   └── red_panda/              # Placeholder only (needs sprites)
 │
 ├── rooms/                       # Room background images (280x140 recommended)
 │   ├── cozy_den.png            # Fox's room - fireplace, armchair, rug, lamp
@@ -176,7 +183,7 @@ mobile/assets/
 │   ├── garden.png              # Rabbit's - flowers, table, teacups, outdoor patio
 │   └── bamboo.png              # Red Panda's - bamboo walls, lantern, zen decor
 │
-├── house/                       # House structure elements
+├── house/                       # House structure elements (planned, not yet created)
 │   ├── roof.png                # Dark shingles roof
 │   ├── frame_left.png          # Left wall/border of house
 │   ├── frame_right.png         # Right wall/border of house
@@ -185,17 +192,17 @@ mobile/assets/
 │   └── chimney.png             # Chimney with smoke (optional)
 │
 └── environment/                 # Background and scenery
-    ├── sky_day.png             # Blue gradient with clouds (Phase 0-1)
-    ├── sky_dusk.png            # Muted dusk sky (Phase 2)
-    ├── sky_storm.png           # Dark, ominous sky (Phase 3)
-    ├── sky_shadow.png          # Near-black with entity silhouette (Phase 4)
-    ├── tree_left.png           # Tree on left side of house
-    ├── tree_right.png          # Tree on right side of house
-    ├── ground.png              # Grass, path, flowers at bottom
-    ├── cloud_1.png             # Animated cloud sprite
-    ├── cloud_2.png             # Second cloud variant
-    ├── shadow_figure.png       # The looming entity (Phase 4 only)
-    └── birds.png               # Optional flying birds
+    ├── sky_day.png             # ✓ Blue gradient with clouds (Phase 0-1)
+    ├── sky_dusk.png            # ✓ Muted dusk sky (Phase 2)
+    ├── sky_storm.png           # ✓ Dark, ominous sky (Phase 3)
+    ├── sky_shadow.png          # ✓ Near-black with entity silhouette (Phase 4)
+    ├── tree_left.png           # Planned: tree on left side of house
+    ├── tree_right.png          # Planned: tree on right side of house
+    ├── ground.png              # Planned: grass, path, flowers at bottom
+    ├── cloud_1.png             # Planned: animated cloud sprite
+    ├── cloud_2.png             # Planned: second cloud variant
+    ├── shadow_figure.png       # Planned: the looming entity (Phase 4 only)
+    └── birds.png               # Planned: optional flying birds
 ```
 
 ### Asset Integration Guidelines
@@ -228,13 +235,15 @@ const foxIdleImage = require('../../assets/characters/fox/idle.png');
 ### Current Asset State
 
 The home screen now uses image assets for:
-- **Fox character sprites** (`idle.png`, `talk.png`, `robed.png`) in `AnimalSprite.tsx` - other animals fall back to emoji
+- **Character sprites** (`idle.png`, `talk.png`, `robed.png`) in `AnimalSprite.tsx`:
+  - **Have sprites**: Fox, Pangolin, Owl, Axolotl, Capybara (all 3 variants each)
+  - **Emoji fallback**: Fennec Fox, Sloth, Wombat, Rabbit, Red Panda (no sprites yet)
 - **All 10 room backgrounds** in `RoomView.tsx` - fully wired up
 - **Environment images** in `HouseWorld.tsx`:
   - `sky_day.png` / `sky_dusk.png` / `sky_storm.png` / `sky_shadow.png` - phase-aware sky background (day → dusk → storm → shadow)
 - **Animated emoji sky elements** (clouds, sun/moon, birds, shooting stars, night stars) rendered inside the transform container so they zoom/pan with the scene
 - Trees, fence, and ground emoji have been removed for a cleaner look
-- `shadow_figure.png` and `ground.png` assets exist but are not currently wired up in code
+- **Not yet created**: `shadow_figure.png`, `ground.png`, all house structure elements (`house/` folder empty), tree/cloud/bird sprites
 
 As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite.tsx`.
 
@@ -250,7 +259,7 @@ As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite
 
 ### Custom Hooks
 
-Game logic is extracted into four custom hooks:
+Game logic is extracted into six custom hooks:
 
 **`usePuzzleGame()`** (`src/hooks/usePuzzleGame.ts`):
 - All puzzle state: rows, selected letter, game state, hints, validation, gameMode, currentPhase
@@ -280,6 +289,21 @@ Game logic is extracted into four custom hooks:
 - `checkForAchievements()` - Fetches progress and checks for newly unlocked achievements
 - Auto-processes queue via useEffect (shows next when current dismissed)
 - Haptic feedback on achievement notification
+
+**`useDialogueFlow()`** (`src/hooks/useDialogueFlow.ts`):
+- Animal dialogue session state, animations, and cooldown messaging for home screen
+- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message
+- `handleNextDialogue()` - Advance dialogue, record progress, check session limits
+- `handleCloseDialogue()` - End session, clean up state
+- Returns: `selectedAnimal`, `showDialogue`, `dialogueText`, `sessionInfo`, `cooldownMessage`, `isTalking`
+- Animations: cooldown toast slide-in/out, dialogue modal spring, talking sprite alternation (idle/talk every 300ms)
+
+**`useUnlockFlow()`** (`src/hooks/useUnlockFlow.ts`):
+- Unlock/shop logic for home screen: rooms, animals, decorations, purchases
+- `handlePurchase(unlock)` - Execute purchase, trigger celebration, show intro dialogue for new characters
+- `handleRoomPress(room)` - Handle locked room tap or room needing an animal
+- `refreshUnlockData(freshRooms, freshAnimals)` - Refresh state from storage (avoids stale closures)
+- Returns: `showShop`, `showRoomUnlock`, `showInvitePrompt`, `nextUnlock`, `allUnlocks`
 
 ### Screen Navigation
 
@@ -634,7 +658,7 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialC
 - Use TypeScript with explicit types for props and state
 - React Native StyleSheet for styling (not inline styles)
 - Functional components with hooks
-- Custom hooks extract game logic from App.tsx (`usePuzzleGame`, `useGamePersistence`, `useVictoryFlow`, `useAchievementQueue`)
+- Custom hooks extract game logic from App.tsx (`usePuzzleGame`, `useGamePersistence`, `useVictoryFlow`, `useAchievementQueue`) and home screen logic (`useDialogueFlow`, `useUnlockFlow`)
 - Import colors from `CandyColors` in `src/theme/colors.ts`; use `getPhaseTheme(phase)` for phase-aware colors
 - All player-facing text must go through `phaseNarrative.ts` — never hardcode victory/move/hint strings
 - Use `Animated` API for smooth animations; choreograph multi-step animations with `Animated.sequence` + `Animated.stagger`
@@ -656,7 +680,7 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialC
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 295 tests, 15 suites
+cd mobile && npx jest --no-coverage  # 316 tests, 16 suites
 ```
 
 **Test patterns:**
