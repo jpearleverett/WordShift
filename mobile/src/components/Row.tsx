@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
-import { CandyColors } from '../theme/colors';
+import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 
@@ -30,11 +30,81 @@ interface RowProps {
   onLetterPress: (letter: Letter, rowIndex: number) => void;
   onSlotPress: (targetIndex: number) => void;
   isProcessing: boolean;
+  phase?: number;
+}
+
+// Phase-aware row color helper
+function getPhaseRowColors(phase: number) {
+  if (phase <= 1) {
+    return {
+      glowColor: CandyColors.purple.main,
+      sourceBorderColor: CandyColors.purple.light,
+      sourceShadowColor: CandyColors.purple.main,
+      targetBorderColor: CandyColors.pink.light,
+      targetShadowColor: CandyColors.pink.main,
+      pickBadgeColor: CandyColors.purple.main,
+      dropBadgeColor: CandyColors.pink.main,
+      slotGlowColor: CandyColors.pink.main,
+      slotBorderColor: CandyColors.pink.light,
+      plusColor: CandyColors.pink.main,
+      cornerDotColor: CandyColors.pink.light,
+    };
+  }
+
+  const theme = getPhaseTheme(phase);
+
+  if (phase === 2) {
+    return {
+      glowColor: theme.bgPrimary,
+      sourceBorderColor: theme.bgPrimary,
+      sourceShadowColor: theme.bgPrimary,
+      targetBorderColor: theme.bgPrimary,
+      targetShadowColor: theme.bgPrimary,
+      pickBadgeColor: theme.bgPrimary,
+      dropBadgeColor: theme.bgPrimary,
+      slotGlowColor: theme.bgPrimary,
+      slotBorderColor: theme.bgPrimary,
+      plusColor: theme.bgPrimary,
+      cornerDotColor: theme.bgPrimary,
+    };
+  }
+
+  if (phase === 3) {
+    return {
+      glowColor: '#4A3875',
+      sourceBorderColor: '#5B4890',
+      sourceShadowColor: '#4A3875',
+      targetBorderColor: '#5B4890',
+      targetShadowColor: '#4A3875',
+      pickBadgeColor: '#7A5A8E',
+      dropBadgeColor: '#7A5A8E',
+      slotGlowColor: '#4A3875',
+      slotBorderColor: '#5B4890',
+      plusColor: '#7A5A8E',
+      cornerDotColor: '#5B4890',
+    };
+  }
+
+  // Phase 4+
+  return {
+    glowColor: '#2A1845',
+    sourceBorderColor: '#3A2255',
+    sourceShadowColor: '#2A1845',
+    targetBorderColor: '#3A2255',
+    targetShadowColor: '#2A1845',
+    pickBadgeColor: '#4A3065',
+    dropBadgeColor: '#4A3065',
+    slotGlowColor: '#2A1845',
+    slotBorderColor: '#5A4075',
+    plusColor: '#4A3065',
+    cornerDotColor: '#5A4075',
+  };
 }
 
 // Animated drop slot component
-const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> = ({ onPress, index, compact = false }) => {
+const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; phase?: number }> = ({ onPress, index, compact = false, phase = 0 }) => {
   const settings = getSettingsSync();
+  const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -161,28 +231,28 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
         <Animated.View
           style={[
             styles.slotGlow,
-            { opacity: glowOpacity },
+            { opacity: glowOpacity, backgroundColor: phaseColors.slotGlowColor },
           ]}
         />
 
         {/* Main slot */}
-        <View style={[styles.slot, compact && styles.slotCompact]}>
+        <View style={[styles.slot, compact && styles.slotCompact, { borderColor: phaseColors.slotBorderColor }]}>
           {/* Inner shimmer */}
           <View style={styles.slotShimmer} />
 
           {/* Plus icon */}
           <View style={[styles.plusContainer, compact && styles.plusContainerCompact]}>
-            <View style={[styles.plusHorizontal, compact && styles.plusHorizontalCompact]} />
-            <View style={[styles.plusVertical, compact && styles.plusVerticalCompact]} />
+            <View style={[styles.plusHorizontal, compact && styles.plusHorizontalCompact, { backgroundColor: phaseColors.plusColor }]} />
+            <View style={[styles.plusVertical, compact && styles.plusVerticalCompact, { backgroundColor: phaseColors.plusColor }]} />
           </View>
 
           {/* Corner decorations - hide in compact mode */}
           {!compact && (
             <>
-              <View style={[styles.cornerDot, styles.cornerTopLeft]} />
-              <View style={[styles.cornerDot, styles.cornerTopRight]} />
-              <View style={[styles.cornerDot, styles.cornerBottomLeft]} />
-              <View style={[styles.cornerDot, styles.cornerBottomRight]} />
+              <View style={[styles.cornerDot, styles.cornerTopLeft, { backgroundColor: phaseColors.cornerDotColor }]} />
+              <View style={[styles.cornerDot, styles.cornerTopRight, { backgroundColor: phaseColors.cornerDotColor }]} />
+              <View style={[styles.cornerDot, styles.cornerBottomLeft, { backgroundColor: phaseColors.cornerDotColor }]} />
+              <View style={[styles.cornerDot, styles.cornerBottomRight, { backgroundColor: phaseColors.cornerDotColor }]} />
             </>
           )}
         </View>
@@ -199,7 +269,9 @@ export const Row: React.FC<RowProps> = memo(({
   onLetterPress,
   onSlotPress,
   isProcessing,
+  phase = 0,
 }) => {
+  const phaseColors = getPhaseRowColors(phase);
   const isSource = rowIndex === activeRowIndex;
   const isTarget = rowIndex === activeRowIndex + 1;
   const isCompleted = rowIndex < activeRowIndex;
@@ -372,7 +444,7 @@ export const Row: React.FC<RowProps> = memo(({
               { transform: [{ translateY }, { rotate }] },
             ]}
           >
-            <Slot onPress={() => onSlotPress(slotIndex)} index={slotIndex} compact />
+            <Slot onPress={() => onSlotPress(slotIndex)} index={slotIndex} compact phase={phase} />
           </Animated.View>
         );
       } else {
@@ -390,6 +462,7 @@ export const Row: React.FC<RowProps> = memo(({
             <LetterTile
               letter={letter}
               highlight={letter.isLocked ? 'locked' : 'default'}
+              phase={phase}
             />
           </Animated.View>
         );
@@ -411,6 +484,7 @@ export const Row: React.FC<RowProps> = memo(({
         isInteractable={isSource && !isProcessing && !letter.isLocked}
         highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
         onPress={() => onLetterPress(letter, rowIndex)}
+        phase={phase}
       />
     ));
   };
@@ -421,8 +495,8 @@ export const Row: React.FC<RowProps> = memo(({
   });
 
   const getRowStyle = () => {
-    if (isSource) return styles.rowSource;
-    if (isTarget && selectedLetter) return styles.rowTarget;
+    if (isSource) return [styles.rowSource, { borderColor: phaseColors.sourceBorderColor, shadowColor: phaseColors.sourceShadowColor }];
+    if (isTarget && selectedLetter) return [styles.rowTarget, { borderColor: phaseColors.targetBorderColor, shadowColor: phaseColors.targetShadowColor }];
     if (isCompleted) return styles.rowCompleted;
     return styles.rowFuture;
   };
@@ -442,13 +516,13 @@ export const Row: React.FC<RowProps> = memo(({
     >
       {/* FLOATING BADGES - positioned outside row container */}
       {isSource && (
-        <View style={[styles.floatingBadge, styles.floatingBadgePick]} accessibilityLabel="Pick a letter from this row">
+        <View style={[styles.floatingBadge, styles.floatingBadgePick, { backgroundColor: phaseColors.pickBadgeColor, shadowColor: phaseColors.pickBadgeColor }]} accessibilityLabel="Pick a letter from this row">
           <View style={styles.badgeShine} />
           <Text style={styles.badgeText}>PICK</Text>
         </View>
       )}
       {isTarget && selectedLetter && (
-        <View style={[styles.floatingBadge, styles.floatingBadgeDrop]} accessibilityLabel="Drop the letter into this row">
+        <View style={[styles.floatingBadge, styles.floatingBadgeDrop, { backgroundColor: phaseColors.dropBadgeColor, shadowColor: phaseColors.dropBadgeColor }]} accessibilityLabel="Drop the letter into this row">
           <View style={styles.badgeShine} />
           <Text style={styles.badgeText}>DROP</Text>
         </View>
@@ -464,7 +538,7 @@ export const Row: React.FC<RowProps> = memo(({
         <Animated.View
           style={[
             styles.rowGlow,
-            { opacity: glowOpacity },
+            { opacity: glowOpacity, backgroundColor: phaseColors.glowColor },
           ]}
         />
       )}

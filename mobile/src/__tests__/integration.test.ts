@@ -1,0 +1,365 @@
+/**
+ * Integration tests for critical gameplay paths.
+ *
+ * These tests exercise the real service functions together
+ * (starRating, amberCurrency, achievements) to verify that
+ * the full victory flow, phase progression, challenge mode,
+ * and economy balance work correctly end-to-end.
+ */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { calculateStars, recordPuzzleCompletion, clearStats, loadStats, getThreeStarRate } from '../services/starRating';
+import {
+  awardPuzzleAmber,
+  clearProgress,
+  loadProgress,
+  devAddPuzzles,
+  calculatePhaseAcceleration,
+  getCurrentPhase,
+} from '../services/amberCurrency';
+import { checkAchievements, clearAchievements, AchievementCheckState } from '../services/achievements';
+import {
+  PHASE_THRESHOLDS,
+  AMBER_REWARDS,
+  CHALLENGE_MODE_CONFIG,
+  NARRATIVE_ACCELERATION,
+  STREAK_BONUSES,
+  calculateStreakMultiplier,
+} from '../types/homeWorld';
+
+beforeEach(async () => {
+  (AsyncStorage.clear as jest.Mock)();
+  await clearProgress();
+  await clearStats();
+  await clearAchievements();
+});
+
+// ---------------------------------------------------------------------------
+// 1. Victory Flow Integration
+// ---------------------------------------------------------------------------
+describe('Victory Flow Integration', () => {
+  test('completing a puzzle awards correct stars and amber', async () => {
+    // Step 1: Calculate stars from performance
+    const hintsUsed = 0;
+    const invalidAttempts = 1;
+    const stars = calculateStars(hintsUsed, invalidAttempts);
+    expect(stars).toBe(3); // 0 hints, <=2 mistakes => 3 stars
+
+    // Step 2: Record stats
+    const statsResult = await recordPuzzleCompletion('MEDIUM', hintsUsed, invalidAttempts);
+    expect(statsResult.starsEarned).toBe(3);
+
+    // Step 3: Award amber
+    const amberResult = await awardPuzzleAmber('MEDIUM', stars);
+    // MEDIUM base=10, 3-star => floor(10*1.5)=15, no streak bonus (streak=1 < 2)
+    expect(amberResult.baseAmount).toBe(15);
+    expect(amberResult.amount).toBe(15);
+    expect(amberResult.newBalance).toBe(15);
+    expect(amberResult.puzzlesSolved).toBe(1);
+
+    // Step 4: Verify cumulative stats
+    const stats = await loadStats();
+    expect(stats.totalPuzzlesCompleted).toBe(1);
+    expect(stats.threeStarCount).toBe(1);
+    expect(stats.totalStars).toBe(3);
+    expect(stats.noHintPuzzleCount).toBe(1);
+
+    // Step 5: Check achievements
+    const achievementState: AchievementCheckState = {
+      stats,
+      puzzlesSolved: amberResult.puzzlesSolved,
+      currentPhase: amberResult.newPhase,
+      currentStreak: amberResult.currentStreak,
+      unlockedAnimals: 0,
+      unlockedRooms: 1,
+      amberEarned: amberResult.newBalance,
+      dailyChallengesCompleted: 0,
+      shareCount: 0,
+      challengeCompletions: 0,
+      decorationCount: 0,
+    };
+    const newAchievements = await checkAchievements(achievementState);
+    const ids = newAchievements.map(a => a.id);
+    // Should unlock first_puzzle and first_perfect (3 stars)
+    expect(ids).toContain('first_puzzle');
+    expect(ids).toContain('first_perfect');
+  });
+
+  test('completing enough puzzles triggers phase transition', async () => {
+    // Bring player to 24 puzzles (still phase 0)
+    await devAddPuzzles(24);
+    const phaseBefore = await getCurrentPhase();
+    expect(phaseBefore).toBe(0);
+
+    // The 25th puzzle should trigger phase 0 -> 1
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.puzzlesSolved).toBe(25);
+    expect(result.phaseChanged).toBe(true);
+    expect(result.newPhase).toBe(1);
+  });
+
+  test('phase transitions happen sequentially across all boundaries', async () => {
+    // Phase 0 -> 1 at 25 puzzles
+    await devAddPuzzles(24);
+    let result = await awardPuzzleAmber('EASY', 1);
+    expect(result.phaseChanged).toBe(true);
+    expect(result.newPhase).toBe(1);
+
+    // Phase 1 -> 2 at 75 puzzles
+    await devAddPuzzles(49); // 25 + 49 = 74
+    result = await awardPuzzleAmber('EASY', 1);
+    expect(result.phaseChanged).toBe(true);
+    expect(result.newPhase).toBe(2);
+
+    // Phase 2 -> 3 at 150 puzzles
+    await devAddPuzzles(74); // 75 + 74 = 149
+    result = await awardPuzzleAmber('EASY', 1);
+    expect(result.phaseChanged).toBe(true);
+    expect(result.newPhase).toBe(3);
+
+    // Phase 3 -> 4 at 250 puzzles
+    await devAddPuzzles(99); // 150 + 99 = 249
+    result = await awardPuzzleAmber('EASY', 1);
+    expect(result.phaseChanged).toBe(true);
+    expect(result.newPhase).toBe(4);
+
+    // Phase 4 is max — no further change
+    result = await awardPuzzleAmber('EASY', 1);
+    expect(result.phaseChanged).toBe(false);
+    expect(result.newPhase).toBe(4);
+  });
+
+  test('concurrent awardPuzzleAmber calls do not corrupt state', async () => {
+    // Fire two awards at the same time
+    const [resultA, resultB] = await Promise.all([
+      awardPuzzleAmber('EASY', 1),
+      awardPuzzleAmber('EASY', 1),
+    ]);
+
+    // Both should complete without error
+    expect(resultA).toBeDefined();
+    expect(resultB).toBeDefined();
+
+    // Final persisted state should reflect both puzzles
+    const progress = await loadProgress();
+    expect(progress.puzzlesSolved).toBe(2);
+    // Each EASY 1-star = 5 amber (no streak bonus on day 1)
+    expect(progress.amber).toBe(10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2. Phase Boundary Tests
+// ---------------------------------------------------------------------------
+describe('Phase Boundaries', () => {
+  test('at exactly 25 puzzles, phase transitions from 0 to 1', async () => {
+    await devAddPuzzles(24);
+    expect(await getCurrentPhase()).toBe(0);
+
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.puzzlesSolved).toBe(25);
+    expect(result.newPhase).toBe(1);
+    expect(result.phaseChanged).toBe(true);
+  });
+
+  test('at exactly 75 puzzles, phase transitions from 1 to 2', async () => {
+    await devAddPuzzles(74);
+    expect(await getCurrentPhase()).toBe(1);
+
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.puzzlesSolved).toBe(75);
+    expect(result.newPhase).toBe(2);
+    expect(result.phaseChanged).toBe(true);
+  });
+
+  test('at exactly 150 puzzles, phase transitions from 2 to 3', async () => {
+    await devAddPuzzles(149);
+    expect(await getCurrentPhase()).toBe(2);
+
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.puzzlesSolved).toBe(150);
+    expect(result.newPhase).toBe(3);
+    expect(result.phaseChanged).toBe(true);
+  });
+
+  test('at exactly 250 puzzles, phase transitions from 3 to 4', async () => {
+    await devAddPuzzles(249);
+    expect(await getCurrentPhase()).toBe(3);
+
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.puzzlesSolved).toBe(250);
+    expect(result.newPhase).toBe(4);
+    expect(result.phaseChanged).toBe(true);
+  });
+
+  test('narrative acceleration caps at 3.0x', () => {
+    // All multipliers active: high three-star rate, long streak, HARD, challenge
+    const multiplier = calculatePhaseAcceleration(0.8, 10, 'HARD', 'challenge');
+    // Uncapped: 1.5 * 1.25 * 1.5 * 2.0 = 5.625
+    // Capped at 3.0
+    expect(multiplier).toBe(3.0);
+  });
+
+  test('phase advances at most +1 per puzzle even with maximum acceleration', async () => {
+    // Get close to the phase 1 boundary with phase still 0
+    await devAddPuzzles(24);
+    expect(await getCurrentPhase()).toBe(0);
+
+    // With max acceleration (3.0), phaseProgress goes 24 -> 27
+    // calculatePhase(27) = 1 (>= 25). Previous was 0, so +1 is fine.
+    const result = await awardPuzzleAmber('HARD', 3, 'challenge', 0.8);
+    expect(result.newPhase).toBe(1);
+    expect(result.phaseAcceleration).toBe(3.0);
+
+    // Verify phase progress advanced by the acceleration amount
+    const progress = await loadProgress();
+    // devAddPuzzles set phaseProgress to 24, then awardPuzzleAmber added 3.0
+    expect(progress.phaseProgress).toBe(27);
+  });
+
+  test('phase threshold gaps are larger than max acceleration, preventing skips', () => {
+    // This structural test ensures the 3.0x cap makes phase skipping mathematically impossible
+    const maxAcceleration = 3.0;
+    for (let i = 0; i < PHASE_THRESHOLDS.length - 1; i++) {
+      const gap = PHASE_THRESHOLDS[i + 1] - PHASE_THRESHOLDS[i];
+      expect(gap).toBeGreaterThan(maxAcceleration);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 3. Challenge Mode Constraints
+// ---------------------------------------------------------------------------
+describe('Challenge Mode', () => {
+  test('challenge mode awards 1.5x amber compared to standard', async () => {
+    // Standard mode: MEDIUM 3-star
+    const standardResult = await awardPuzzleAmber('MEDIUM', 3, 'standard');
+    const standardAmount = standardResult.amount;
+
+    await clearProgress();
+
+    // Challenge mode: MEDIUM 3-star
+    const challengeResult = await awardPuzzleAmber('MEDIUM', 3, 'challenge');
+
+    // Standard: base=floor(10*1.5)=15, amount=15
+    // Challenge: base=15, challengeBonus=floor(15*0.5)=7, amount=22
+    expect(standardResult.baseAmount).toBe(15);
+    expect(standardResult.challengeBonus).toBe(0);
+    expect(standardResult.amount).toBe(15);
+
+    expect(challengeResult.baseAmount).toBe(15);
+    expect(challengeResult.challengeBonus).toBe(7);
+    expect(challengeResult.amount).toBe(22);
+
+    // Challenge total should be more than standard
+    expect(challengeResult.amount).toBeGreaterThan(standardAmount);
+  });
+
+  test('challenge mode counts 2x toward phase progression', async () => {
+    // Standard mode acceleration with default params
+    const standardAccel = calculatePhaseAcceleration(0, 1, 'EASY', 'standard');
+    // Challenge mode acceleration with same params
+    const challengeAccel = calculatePhaseAcceleration(0, 1, 'EASY', 'challenge');
+
+    expect(standardAccel).toBe(1.0);
+    expect(challengeAccel).toBe(NARRATIVE_ACCELERATION.CHALLENGE_MULTIPLIER);
+    expect(challengeAccel).toBe(2.0);
+
+    // Verify via actual awardPuzzleAmber calls
+    const standardResult = await awardPuzzleAmber('EASY', 1, 'standard');
+    expect(standardResult.phaseAcceleration).toBe(1.0);
+
+    await clearProgress();
+
+    const challengeResult = await awardPuzzleAmber('EASY', 1, 'challenge');
+    expect(challengeResult.phaseAcceleration).toBe(2.0);
+  });
+
+  test('challenge completions are tracked in progress', async () => {
+    await awardPuzzleAmber('MEDIUM', 3, 'challenge');
+    await awardPuzzleAmber('EASY', 2, 'challenge');
+
+    const progress = await loadProgress();
+    expect(progress.challengeCompletions).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Economy Balance
+// ---------------------------------------------------------------------------
+describe('Economy Balance', () => {
+  test('amber awards match expected base rates for each difficulty', async () => {
+    // EASY
+    const easyResult = await awardPuzzleAmber('EASY', 1);
+    expect(easyResult.baseAmount).toBe(AMBER_REWARDS.EASY); // 5
+    await clearProgress();
+
+    // MEDIUM
+    const mediumResult = await awardPuzzleAmber('MEDIUM', 1);
+    expect(mediumResult.baseAmount).toBe(AMBER_REWARDS.MEDIUM); // 10
+    await clearProgress();
+
+    // HARD
+    const hardResult = await awardPuzzleAmber('HARD', 1);
+    expect(hardResult.baseAmount).toBe(AMBER_REWARDS.HARD); // 20
+  });
+
+  test('3-star bonus gives 50% more base amber', async () => {
+    const result = await awardPuzzleAmber('MEDIUM', 3);
+    expect(result.baseAmount).toBe(Math.floor(AMBER_REWARDS.MEDIUM * 1.5)); // floor(10*1.5)=15
+  });
+
+  test('2-star bonus gives 25% more base amber', async () => {
+    const result = await awardPuzzleAmber('MEDIUM', 2);
+    expect(result.baseAmount).toBe(Math.floor(AMBER_REWARDS.MEDIUM * 1.25)); // floor(10*1.25)=12
+  });
+
+  test('1-star gets no bonus', async () => {
+    const result = await awardPuzzleAmber('MEDIUM', 1);
+    expect(result.baseAmount).toBe(AMBER_REWARDS.MEDIUM); // 10
+  });
+
+  test('streak multiplier caps at 2.0x (100% bonus)', () => {
+    // Below minimum: no bonus
+    expect(calculateStreakMultiplier(0)).toBe(1.0);
+    expect(calculateStreakMultiplier(1)).toBe(1.0);
+
+    // At minimum (2): small bonus
+    expect(calculateStreakMultiplier(2)).toBe(1 + 0.10); // 1.10
+
+    // Streak = 11: (11-1)*0.10 = 1.0 => multiplier = 2.0 (capped)
+    expect(calculateStreakMultiplier(11)).toBe(2.0);
+
+    // Very high streak: still capped at 2.0
+    expect(calculateStreakMultiplier(50)).toBe(2.0);
+    expect(calculateStreakMultiplier(100)).toBe(2.0);
+  });
+
+  test('maximum repeatable amber per puzzle is bounded', () => {
+    // Theoretical maximum: HARD 3-star, max streak, challenge mode
+    const hardBase = AMBER_REWARDS.HARD; // 20
+    const threeStarBase = Math.floor(hardBase * 1.5); // 30
+    const maxStreakMultiplier = 1 + STREAK_BONUSES.MAX_BONUS_PERCENTAGE; // 2.0
+    const afterStreak = Math.floor(threeStarBase * maxStreakMultiplier); // 60
+    const challengeBonus = Math.floor(afterStreak * (CHALLENGE_MODE_CONFIG.AMBER_MULTIPLIER - 1)); // 30
+    const maxPerPuzzle = afterStreak + challengeBonus; // 90
+
+    // Verify the max is reasonable — enough to buy a mid-tier decoration (75-150 amber)
+    // but not so much that progression trivializes the economy
+    expect(maxPerPuzzle).toBe(90);
+    expect(maxPerPuzzle).toBeLessThanOrEqual(100);
+    expect(maxPerPuzzle).toBeGreaterThan(0);
+  });
+
+  test('amber accumulates correctly over multiple puzzles', async () => {
+    // Solve 3 EASY puzzles with varying star ratings
+    await awardPuzzleAmber('EASY', 3); // floor(5*1.5)=7
+    await awardPuzzleAmber('EASY', 2); // floor(5*1.25)=6
+    await awardPuzzleAmber('EASY', 1); // 5
+
+    const progress = await loadProgress();
+    expect(progress.puzzlesSolved).toBe(3);
+    expect(progress.amber).toBe(7 + 6 + 5); // 18
+  });
+});

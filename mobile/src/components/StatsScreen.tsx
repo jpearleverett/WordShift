@@ -20,6 +20,7 @@ interface StatsScreenProps {
   puzzlesSolved: number;
   currentPhase: number;
   amberBalance: number;
+  phase?: number;
 }
 
 export const StatsScreen: React.FC<StatsScreenProps> = ({
@@ -27,7 +28,9 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   puzzlesSolved,
   currentPhase,
   amberBalance,
+  phase = 0,
 }) => {
+  const effectivePhase = phase || currentPhase;
   const [stats, setStats] = useState<CumulativeStats | null>(null);
   const [achievements, setAchievements] = useState<(Achievement & { isUnlocked: boolean; unlockedAt: number | null })[]>([]);
   const [dailyStatus, setDailyStatus] = useState<{ totalCompleted: number; bestStreak: number } | null>(null);
@@ -48,10 +51,19 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const unlockedAchievements = achievements.filter(a => a.isUnlocked);
   const totalAchievements = getTotalCount();
 
+  const phaseCardStyle = effectivePhase >= 4
+    ? { backgroundColor: '#D0C0E0' }
+    : effectivePhase >= 3
+      ? { backgroundColor: '#E8E0F0' }
+      : undefined;
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[
+        styles.header,
+        effectivePhase >= 4 && { backgroundColor: '#4A3570' },
+      ]}>
         <TouchableOpacity style={styles.backButton} onPress={onClose}>
           <Text style={styles.backButtonText}>{'<'} Back</Text>
         </TouchableOpacity>
@@ -87,7 +99,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         {selectedTab === 'overview' ? (
           <>
             {/* Hero stats */}
-            <View style={styles.heroRow}>
+            <View style={[
+              styles.heroRow,
+              effectivePhase >= 3 && effectivePhase < 4 && { backgroundColor: '#E8E0F0' },
+              effectivePhase >= 4 && { backgroundColor: '#D0C0E0' },
+            ]}>
               <View style={styles.heroStat}>
                 <Text style={styles.heroValue}>{stats.totalPuzzlesCompleted}</Text>
                 <Text style={styles.heroLabel}>Puzzles</Text>
@@ -106,7 +122,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
             {/* Star breakdown */}
             <Text style={styles.sectionTitle}>STAR BREAKDOWN</Text>
-            <View style={styles.card}>
+            <View style={[styles.card, phaseCardStyle]}>
               <StarBar label="3 Stars" count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} />
               <StarBar label="2 Stars" count={stats.twoStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.orange.main} />
               <StarBar label="1 Star" count={stats.oneStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.gray[400]} />
@@ -119,7 +135,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
             {/* Difficulty breakdown */}
             <Text style={styles.sectionTitle}>BY DIFFICULTY</Text>
-            <View style={styles.card}>
+            <View style={[styles.card, phaseCardStyle]}>
               <DifficultyRow
                 difficulty="EASY"
                 completed={stats.byDifficulty.EASY.completed}
@@ -144,7 +160,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
             {/* Journey progress */}
             <Text style={styles.sectionTitle}>YOUR JOURNEY</Text>
-            <View style={styles.card}>
+            <View style={[styles.card, phaseCardStyle]}>
               <View style={styles.journeyRow}>
                 <Text style={styles.journeyLabel}>Phase</Text>
                 <Text style={styles.journeyValue}>{currentPhase + 1}/5</Text>
@@ -192,7 +208,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               return (
                 <View key={category}>
                   <Text style={styles.sectionTitle}>{categoryName}</Text>
-                  <View style={styles.card}>
+                  <View style={[styles.card, phaseCardStyle]}>
                     {categoryAchievements.map((achievement, i) => (
                       <View key={achievement.id}>
                         {i > 0 && <View style={styles.rowDivider} />}

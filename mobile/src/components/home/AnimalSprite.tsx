@@ -12,6 +12,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
+import { getSettingsSync } from '../../services/settings';
 
 // Character sprite assets - add more as they become available
 // Exported so dialogue modals can use talk sprites
@@ -66,6 +67,13 @@ const SleepingZs: React.FC = () => {
   const z3Opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      z1Opacity.setValue(1);
+      z2Opacity.setValue(1);
+      z3Opacity.setValue(1);
+      return;
+    }
+
     const animateZ = (y: Animated.Value, opacity: Animated.Value, delay: number) => {
       const animate = () => {
         y.setValue(0);
@@ -182,11 +190,17 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const emotionY = useRef(new Animated.Value(0)).current;
   const wiggleRotation = useRef(new Animated.Value(0)).current;
 
+  const currentXRef = useRef(animal.position.x);
+
   const [isMoving, setIsMoving] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
 
   // Breathing animation (subtle scale pulse)
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      breatheScale.setValue(1);
+      return;
+    }
     const breatheAnimation = Animated.loop(
       Animated.sequence([
         Animated.timing(breatheScale, {
@@ -210,6 +224,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   // Random emotion bubble popup
   useEffect(() => {
     if (isOnCooldown) return; // No emotions while sleeping
+    if (getSettingsSync().reducedMotion) return; // Skip decorative animations
 
     const showEmotion = () => {
       const emojis = EMOTION_BUBBLES[currentPhase] || EMOTION_BUBBLES[0];
@@ -250,72 +265,74 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
   // Tap reaction animation
   const handlePress = useCallback(() => {
-    // Squish and bounce
-    Animated.sequence([
-      Animated.timing(tapScale, {
-        toValue: 0.85,
-        duration: 80,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-      Animated.spring(tapScale, {
-        toValue: 1,
-        friction: 3,
-        tension: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Wiggle
-    Animated.sequence([
-      Animated.timing(wiggleRotation, {
-        toValue: 1,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(wiggleRotation, {
-        toValue: -1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(wiggleRotation, {
-        toValue: 0.5,
-        duration: 75,
-        useNativeDriver: true,
-      }),
-      Animated.timing(wiggleRotation, {
-        toValue: 0,
-        duration: 75,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Show a happy emotion on tap
-    const emojis = currentPhase >= 3 ? ['😰', '💧'] : ['💕', '✨', '💖'];
-    setCurrentEmotion(emojis[Math.floor(Math.random() * emojis.length)]);
-    emotionY.setValue(0);
-    emotionOpacity.setValue(0);
-    Animated.parallel([
-      Animated.timing(emotionY, {
-        toValue: -35,
-        duration: 1500,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
+    if (!getSettingsSync().reducedMotion) {
+      // Squish and bounce
       Animated.sequence([
-        Animated.timing(emotionOpacity, {
+        Animated.timing(tapScale, {
+          toValue: 0.85,
+          duration: 80,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.spring(tapScale, {
           toValue: 1,
-          duration: 200,
+          friction: 3,
+          tension: 200,
           useNativeDriver: true,
         }),
-        Animated.delay(800),
-        Animated.timing(emotionOpacity, {
+      ]).start();
+
+      // Wiggle
+      Animated.sequence([
+        Animated.timing(wiggleRotation, {
+          toValue: 1,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(wiggleRotation, {
+          toValue: -1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(wiggleRotation, {
+          toValue: 0.5,
+          duration: 75,
+          useNativeDriver: true,
+        }),
+        Animated.timing(wiggleRotation, {
           toValue: 0,
-          duration: 500,
+          duration: 75,
           useNativeDriver: true,
         }),
-      ]),
-    ]).start();
+      ]).start();
+
+      // Show a happy emotion on tap
+      const emojis = currentPhase >= 3 ? ['😰', '💧'] : ['💕', '✨', '💖'];
+      setCurrentEmotion(emojis[Math.floor(Math.random() * emojis.length)]);
+      emotionY.setValue(0);
+      emotionOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(emotionY, {
+          toValue: -35,
+          duration: 1500,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(emotionOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.delay(800),
+          Animated.timing(emotionOpacity, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
 
     onPress(animal);
   }, [animal, onPress, currentPhase]);
@@ -327,6 +344,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
   // Walking animation - random movement within room bounds
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      // Set to a static position, no movement
+      posX.setValue(animal.position.x);
+      posY.setValue(animal.position.y);
+      return;
+    }
+
     let movementTimeout: NodeJS.Timeout;
     let isMounted = true;
 
@@ -338,8 +362,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       const targetY = 20 + Math.random() * 60;
 
       // Determine direction for flip
-      const currentX = (posX as any)._value || animal.position.x;
+      const currentX = currentXRef.current;
       const goingRight = targetX > currentX;
+
+      // Update tracked position before animation starts
+      currentXRef.current = targetX;
 
       // Flip direction
       Animated.timing(scaleX, {
@@ -384,6 +411,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
   // Bounce animation while moving
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      bounceY.setValue(0);
+      return;
+    }
+
     let bounceAnimation: Animated.CompositeAnimation;
 
     if (isMoving) {
@@ -415,6 +447,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
   // Notification pulse for new dialogue
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      notificationPulse.setValue(1);
+      return;
+    }
     if (animal.hasNewDialogue) {
       const pulse = Animated.loop(
         Animated.sequence([

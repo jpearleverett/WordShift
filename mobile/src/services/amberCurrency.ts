@@ -189,6 +189,9 @@ export function calculatePhaseAcceleration(
     multiplier *= NARRATIVE_ACCELERATION.CHALLENGE_MULTIPLIER;
   }
 
+  // Cap acceleration to prevent extreme phase skipping
+  multiplier = Math.min(multiplier, 3.0);
+
   return multiplier;
 }
 
@@ -284,7 +287,11 @@ export async function awardPuzzleAmber(
   // Check for phase transition using weighted phase progress
   const previousPhase = progress.currentPhase;
   const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
-  const newPhase = calculatePhase(effectiveProgress);
+  let newPhase = calculatePhase(effectiveProgress);
+  // Prevent phase skipping — only advance one phase at a time
+  if (newPhase > previousPhase + 1) {
+    newPhase = (previousPhase + 1) as DialoguePhase;
+  }
   const phaseChanged = newPhase > previousPhase;
   progress.currentPhase = newPhase;
 

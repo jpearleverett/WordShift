@@ -21,10 +21,12 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
+  phase?: number;
 }
 
 export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   onStartDaily,
+  phase = 0,
 }) => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
@@ -38,15 +40,26 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     perfectRate: number;
   } | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     loadStatus();
   }, []);
 
   useEffect(() => {
-    if (getSettingsSync().reducedMotion) return;
+    // Stop any existing loop
+    if (pulseLoopRef.current) {
+      pulseLoopRef.current.stop();
+      pulseLoopRef.current = null;
+    }
+
+    if (getSettingsSync().reducedMotion) {
+      pulseAnim.setValue(1);
+      return;
+    }
+
     if (!isCompleted) {
-      const pulse = Animated.loop(
+      pulseLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.02,
@@ -60,9 +73,16 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
           }),
         ])
       );
-      pulse.start();
-      return () => pulse.stop();
+      pulseLoopRef.current.start();
     }
+
+    return () => {
+      if (pulseLoopRef.current) {
+        pulseLoopRef.current.stop();
+        pulseLoopRef.current = null;
+      }
+      pulseAnim.stopAnimation();
+    };
   }, [isCompleted]);
 
   const loadStatus = async () => {
@@ -95,7 +115,12 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   return (
     <Animated.View style={[styles.container, { transform: [{ scale: pulseAnim }] }]}>
       <TouchableOpacity
-        style={[styles.bar, isCompleted && styles.barCompleted]}
+        style={[
+          styles.bar,
+          isCompleted && styles.barCompleted,
+          phase >= 3 && phase < 4 && { backgroundColor: 'rgba(74, 90, 74, 0.85)', borderColor: 'rgba(122, 138, 122, 0.3)' },
+          phase >= 4 && { backgroundColor: 'rgba(42, 53, 42, 0.9)', borderColor: 'rgba(90, 106, 90, 0.3)' },
+        ]}
         onPress={handlePress}
         activeOpacity={0.8}
       >
@@ -118,7 +143,11 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
             <Text style={styles.expandHint}>{expanded ? '▲' : '▼'}</Text>
           </View>
         ) : (
-          <View style={styles.playBadge}>
+          <View style={[
+            styles.playBadge,
+            phase >= 3 && phase < 4 && { backgroundColor: '#7A8A7A' },
+            phase >= 4 && { backgroundColor: '#5A6A5A' },
+          ]}>
             <Text style={styles.playText}>PLAY</Text>
           </View>
         )}

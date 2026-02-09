@@ -168,7 +168,7 @@ const MiniTile: React.FC<MiniTileProps> = ({ char, onPress, isSelected, isHighli
 
   if (onPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.8} accessibilityLabel={`Letter ${char}`} accessibilityRole="button">
         {tile}
       </TouchableOpacity>
     );
@@ -202,7 +202,7 @@ const MiniSlot: React.FC<{ onPress?: () => void; isPulsing?: boolean }> = ({ onP
   const opacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} disabled={!onPress}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} disabled={!onPress} accessibilityLabel="Drop letter here" accessibilityRole="button">
       <Animated.View style={[styles.miniSlot, { transform: [{ scale }], opacity }]}>
         <Text style={styles.miniSlotText}>+</Text>
       </Animated.View>
@@ -348,7 +348,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           <View style={styles.dialogueArea}>
             <FoxCharacter size={90} speaking />
             <SpeechBubble text={`Oh! A visitor!\nI'm Ember. Welcome to our little house.\nWe've been waiting for someone like you.`} />
-            <TouchableOpacity style={styles.continueBtn} onPress={showPuzzle}>
+            <TouchableOpacity style={styles.continueBtn} onPress={showPuzzle} accessibilityLabel="Nice to meet you" accessibilityRole="button">
               <View style={styles.continueBtnShine} />
               <Text style={styles.continueBtnText}>Nice to meet you!</Text>
             </TouchableOpacity>
@@ -392,7 +392,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           <View style={styles.dialogueArea}>
             <FoxCharacter size={64} speaking />
             <SpeechBubble text={`HEAT → EAT, and ATE → HATE!\nBoth real words. You're a natural.`} />
-            <TouchableOpacity style={styles.continueBtn} onPress={() => animateContentChange('house_intro')}>
+            <TouchableOpacity style={styles.continueBtn} onPress={() => animateContentChange('house_intro')} accessibilityLabel="That was fun" accessibilityRole="button">
               <View style={styles.continueBtnShine} />
               <Text style={styles.continueBtnText}>That was fun!</Text>
             </TouchableOpacity>
@@ -404,7 +404,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
           <View style={styles.dialogueArea}>
             <FoxCharacter size={90} speaking />
             <SpeechBubble text={`Every puzzle you solve helps us build the house. The others are going to love you.\nThere's so much more to discover... together.`} />
-            <TouchableOpacity style={[styles.continueBtn, styles.continueBtnFinal]} onPress={handleComplete}>
+            <TouchableOpacity style={[styles.continueBtn, styles.continueBtnFinal]} onPress={handleComplete} accessibilityLabel="Start playing" accessibilityRole="button">
               <View style={styles.continueBtnShine} />
               <Text style={styles.continueBtnText}>Let's play!</Text>
             </TouchableOpacity>
@@ -537,7 +537,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
       {/* Skip button */}
       {phase !== 'house_intro' && (
-        <TouchableOpacity style={styles.skipBtn} onPress={handleComplete}>
+        <TouchableOpacity style={styles.skipBtn} onPress={handleComplete} accessibilityLabel="Skip tutorial" accessibilityRole="button">
           <Text style={styles.skipBtnText}>Skip</Text>
         </TouchableOpacity>
       )}

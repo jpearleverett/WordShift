@@ -305,6 +305,7 @@ export default function App() {
           puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
           currentPhase={persistence.currentPhase}
           amberBalance={persistence.amberBalance}
+          phase={persistence.currentPhase}
         />
       </Animated.View>
     );
@@ -330,6 +331,7 @@ export default function App() {
           <AchievementToast
             achievement={achievementState.currentAchievement}
             onDismiss={achievementActions.dismissAchievement}
+            phase={persistence.currentPhase}
           />
         </Animated.View>
       </ErrorBoundary>
@@ -370,6 +372,7 @@ export default function App() {
       <AchievementToast
         achievement={achievementState.currentAchievement}
         onDismiss={achievementActions.dismissAchievement}
+        phase={persistence.currentPhase}
       />
 
       {/* Header */}
@@ -546,6 +549,7 @@ export default function App() {
               onLetterPress={handleLetterPress}
               onSlotPress={handleSlotPress}
               isProcessing={puzzle.isProcessing}
+              phase={persistence.currentPhase}
             />
           ))}
         </ScrollView>

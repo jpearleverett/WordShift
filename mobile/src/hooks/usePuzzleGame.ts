@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { generateLocalPuzzle } from '../services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
@@ -82,10 +82,26 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
+  const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up shakeError timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (shakeErrorTimeout.current) {
+        clearTimeout(shakeErrorTimeout.current);
+      }
+    };
+  }, []);
 
   const shakeError = useCallback((msg: string) => {
+    if (shakeErrorTimeout.current) {
+      clearTimeout(shakeErrorTimeout.current);
+    }
     setError(msg);
-    setTimeout(() => setError(null), 2000);
+    shakeErrorTimeout.current = setTimeout(() => {
+      setError(null);
+      shakeErrorTimeout.current = null;
+    }, 2000);
   }, []);
 
   const checkValidation = useCallback((word: string): boolean => {

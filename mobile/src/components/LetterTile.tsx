@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Letter } from '../types';
-import { getTileColor, CandyColors } from '../theme/colors';
+import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 
 interface LetterTileProps {
@@ -10,6 +10,7 @@ interface LetterTileProps {
   isSelected?: boolean;
   isInteractable?: boolean;
   highlight?: 'default' | 'source' | 'locked';
+  phase?: number;
 }
 
 export const LetterTile: React.FC<LetterTileProps> = ({
@@ -18,6 +19,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   isSelected,
   isInteractable,
   highlight = 'default',
+  phase = 0,
 }) => {
   const settings = getSettingsSync();
 
@@ -28,6 +30,12 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const shineAnim = useRef(new Animated.Value(0)).current;
   const wobbleAnim = useRef(new Animated.Value(0)).current;
 
+  // Loop refs for proper cleanup (prevents memory leaks)
+  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const shineLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const wobbleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
 
@@ -36,7 +44,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     if (settings.reducedMotion) return;
     if (isInteractable && !isSelected) {
       // Subtle pulse glow
-      Animated.loop(
+      const glowLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
@@ -51,10 +59,12 @@ export const LetterTile: React.FC<LetterTileProps> = ({
             useNativeDriver: false,
           }),
         ])
-      ).start();
+      );
+      glowLoopRef.current = glowLoop;
+      glowLoop.start();
 
       // Shine sweep animation
-      Animated.loop(
+      const shineLoop = Animated.loop(
         Animated.sequence([
           Animated.delay(2000),
           Animated.timing(shineAnim, {
@@ -69,13 +79,23 @@ export const LetterTile: React.FC<LetterTileProps> = ({
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      shineLoopRef.current = shineLoop;
+      shineLoop.start();
     } else {
       glowAnim.setValue(0);
       shineAnim.setValue(0);
     }
 
     return () => {
+      if (glowLoopRef.current) {
+        glowLoopRef.current.stop();
+        glowLoopRef.current = null;
+      }
+      if (shineLoopRef.current) {
+        shineLoopRef.current.stop();
+        shineLoopRef.current = null;
+      }
       glowAnim.stopAnimation();
       shineAnim.stopAnimation();
     };
@@ -83,7 +103,8 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   // Selected bounce animation
   useEffect(() => {
-    if (settings.reducedMotion) {
+    const currentSettings = getSettingsSync();
+    if (currentSettings.reducedMotion) {
       scaleAnim.setValue(isSelected ? 1.08 : 1);
       bounceAnim.setValue(0);
       wobbleAnim.setValue(0);
@@ -106,7 +127,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       ]).start();
 
       // Continuous wobble
-      Animated.loop(
+      const wobbleLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(wobbleAnim, {
             toValue: 1,
@@ -127,10 +148,12 @@ export const LetterTile: React.FC<LetterTileProps> = ({
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      wobbleLoopRef.current = wobbleLoop;
+      wobbleLoop.start();
 
       // Floating bounce
-      Animated.loop(
+      const bounceLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(bounceAnim, {
             toValue: -4,
@@ -145,7 +168,9 @@ export const LetterTile: React.FC<LetterTileProps> = ({
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      bounceLoopRef.current = bounceLoop;
+      bounceLoop.start();
     } else {
       scaleAnim.setValue(1);
       bounceAnim.setValue(0);
@@ -153,6 +178,14 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     }
 
     return () => {
+      if (wobbleLoopRef.current) {
+        wobbleLoopRef.current.stop();
+        wobbleLoopRef.current = null;
+      }
+      if (bounceLoopRef.current) {
+        bounceLoopRef.current.stop();
+        bounceLoopRef.current = null;
+      }
       scaleAnim.stopAnimation();
       bounceAnim.stopAnimation();
       wobbleAnim.stopAnimation();
@@ -185,6 +218,22 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   const getStyles = () => {
     if (highlight === 'locked') {
+      if (phase >= 4) {
+        return {
+          bgColor: CandyColors.gray[700],
+          borderColor: CandyColors.gray[800],
+          textColor: CandyColors.gray[500],
+          shadowColor: CandyColors.gray[800],
+        };
+      }
+      if (phase >= 3) {
+        return {
+          bgColor: CandyColors.gray[500],
+          borderColor: CandyColors.gray[600],
+          textColor: CandyColors.gray[700],
+          shadowColor: CandyColors.gray[600],
+        };
+      }
       return {
         bgColor: CandyColors.gray[300],
         borderColor: CandyColors.gray[400],
@@ -193,6 +242,24 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       };
     }
     if (isSelected) {
+      if (phase >= 4) {
+        // Deep purple instead of pink at phase 4
+        return {
+          bgColor: CandyColors.purple.dark,
+          borderColor: CandyColors.purple.shadow,
+          textColor: CandyColors.gray[200],
+          shadowColor: CandyColors.purple.dark,
+        };
+      }
+      if (phase >= 3) {
+        // Darker pink/purple at phase 3
+        return {
+          bgColor: CandyColors.pink.dark,
+          borderColor: CandyColors.pink.shadow,
+          textColor: CandyColors.gray[100],
+          shadowColor: CandyColors.pink.dark,
+        };
+      }
       return {
         bgColor: CandyColors.pink.main,
         borderColor: CandyColors.pink.shadow,
@@ -206,6 +273,31 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         borderColor: tileColor.border,
         textColor: CandyColors.white,
         shadowColor: tileColor.bg,
+      };
+    }
+    // Default (non-interactable, non-selected)
+    if (phase >= 4) {
+      return {
+        bgColor: CandyColors.gray[600],
+        borderColor: CandyColors.gray[700],
+        textColor: CandyColors.gray[300],
+        shadowColor: CandyColors.gray[700],
+      };
+    }
+    if (phase >= 3) {
+      return {
+        bgColor: CandyColors.gray[200],
+        borderColor: CandyColors.gray[400],
+        textColor: CandyColors.gray[500],
+        shadowColor: CandyColors.gray[400],
+      };
+    }
+    if (phase >= 2) {
+      return {
+        bgColor: CandyColors.gray[100],
+        borderColor: CandyColors.gray[300],
+        textColor: CandyColors.gray[600],
+        shadowColor: CandyColors.gray[400],
       };
     }
     return {

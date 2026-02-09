@@ -138,15 +138,21 @@ const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
   const x = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.5)).current;
+  const mountedRef = useRef(true);
+  const animationRef = useRef<Animated.CompositeAnimation>();
 
   useEffect(() => {
+    mountedRef.current = true;
+
     const animate = () => {
+      if (!mountedRef.current) return;
+
       y.setValue(0);
       x.setValue(0);
       opacity.setValue(0);
       scale.setValue(0.5);
 
-      Animated.parallel([
+      const anim = Animated.parallel([
         Animated.timing(y, {
           toValue: -40,
           duration: 3000,
@@ -181,10 +187,19 @@ const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
           useNativeDriver: true,
           delay,
         }),
-      ]).start(() => animate());
+      ]);
+      animationRef.current = anim;
+      anim.start(() => {
+        if (mountedRef.current) animate();
+      });
     };
 
     animate();
+
+    return () => {
+      mountedRef.current = false;
+      if (animationRef.current) animationRef.current.stop();
+    };
   }, []);
 
   return (
@@ -208,9 +223,17 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
   const x = useRef(new Animated.Value(-50)).current;
   const y = useRef(new Animated.Value(yPosition)).current;
   const flapRotation = useRef(new Animated.Value(0)).current;
+  const mountedRef = useRef(true);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const flapAnimRef = useRef<Animated.CompositeAnimation>();
+  const moveAnimRef = useRef<Animated.CompositeAnimation>();
 
   useEffect(() => {
+    mountedRef.current = true;
+
     const animate = () => {
+      if (!mountedRef.current) return;
+
       const goingRight = Math.random() > 0.5;
       x.setValue(goingRight ? -50 : SCREEN_WIDTH + 50);
       y.setValue(yPosition + (Math.random() - 0.5) * 40);
@@ -229,22 +252,32 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
           }),
         ])
       );
-
+      flapAnimRef.current = flapAnimation;
       flapAnimation.start();
 
-      Animated.timing(x, {
+      const moveAnimation = Animated.timing(x, {
         toValue: goingRight ? SCREEN_WIDTH + 50 : -50,
         duration: 8000 + Math.random() * 4000,
         easing: Easing.linear,
         useNativeDriver: true,
         delay: startDelay,
-      }).start(() => {
+      });
+      moveAnimRef.current = moveAnimation;
+      moveAnimation.start(() => {
         flapAnimation.stop();
-        setTimeout(animate, 5000 + Math.random() * 10000);
+        if (!mountedRef.current) return;
+        timeoutRef.current = setTimeout(animate, 5000 + Math.random() * 10000);
       });
     };
 
     animate();
+
+    return () => {
+      mountedRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (flapAnimRef.current) flapAnimRef.current.stop();
+      if (moveAnimRef.current) moveAnimRef.current.stop();
+    };
   }, []);
 
   const scaleY = flapRotation.interpolate({
@@ -273,15 +306,22 @@ const ShootingStar: React.FC = () => {
   const x = useRef(new Animated.Value(0)).current;
   const y = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const mountedRef = useRef(true);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const animationRef = useRef<Animated.CompositeAnimation>();
 
   useEffect(() => {
+    mountedRef.current = true;
+
     const animate = () => {
+      if (!mountedRef.current) return;
+
       const startX = Math.random() * SCREEN_WIDTH;
       x.setValue(startX);
       y.setValue(20 + Math.random() * 60);
       opacity.setValue(0);
 
-      Animated.parallel([
+      const anim = Animated.parallel([
         Animated.timing(x, {
           toValue: startX + 150,
           duration: 800,
@@ -306,12 +346,21 @@ const ShootingStar: React.FC = () => {
             useNativeDriver: true,
           }),
         ]),
-      ]).start(() => {
-        setTimeout(animate, 10000 + Math.random() * 20000);
+      ]);
+      animationRef.current = anim;
+      anim.start(() => {
+        if (!mountedRef.current) return;
+        timeoutRef.current = setTimeout(animate, 10000 + Math.random() * 20000);
       });
     };
 
-    setTimeout(animate, 5000 + Math.random() * 10000);
+    timeoutRef.current = setTimeout(animate, 5000 + Math.random() * 10000);
+
+    return () => {
+      mountedRef.current = false;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (animationRef.current) animationRef.current.stop();
+    };
   }, []);
 
   return (
@@ -467,15 +516,26 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   }, [currentPhase]);
 
   // Cloud animations
+  const cloudMountedRef = useRef(true);
+  const cloudAnimRefs = useRef<Animated.CompositeAnimation[]>([]);
+
   useEffect(() => {
+    cloudMountedRef.current = true;
+    cloudAnimRefs.current = [];
+
     const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
       const animate = () => {
+        if (!cloudMountedRef.current) return;
         cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
-        Animated.timing(cloudAnim, {
+        const anim = Animated.timing(cloudAnim, {
           toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
           duration,
           useNativeDriver: true,
-        }).start(() => animate());
+        });
+        cloudAnimRefs.current.push(anim);
+        anim.start(() => {
+          if (cloudMountedRef.current) animate();
+        });
       };
       animate();
     };
@@ -483,6 +543,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     animateCloud(cloud1X, -100, 45000);
     animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
     animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
+
+    return () => {
+      cloudMountedRef.current = false;
+      cloudAnimRefs.current.forEach(anim => anim.stop());
+      cloudAnimRefs.current = [];
+    };
   }, []);
 
   const sunRotate = sunRotation.interpolate({

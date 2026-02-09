@@ -37,7 +37,7 @@ interface RoomViewProps {
   isAnimalOnCooldown?: boolean;
 }
 
-export const RoomView: React.FC<RoomViewProps> = ({
+export const RoomView: React.FC<RoomViewProps> = React.memo(({
   room,
   animal,
   width,
@@ -123,7 +123,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       )}
     </View>
   );
-};
+}) as React.FC<RoomViewProps>;
 
 const styles = StyleSheet.create({
   container: {

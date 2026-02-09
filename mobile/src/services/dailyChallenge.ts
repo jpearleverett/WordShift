@@ -136,13 +136,18 @@ export async function isDailyCompleted(): Promise<boolean> {
 }
 
 // Guard against concurrent daily puzzle generation
-let dailyGenerationInProgress = false;
+let dailyGenerationInProgress: Promise<{
+  words: string[];
+  hint?: string;
+  difficulty: Difficulty;
+  date: string;
+}> | null = null;
 
 /**
  * Generate the daily challenge puzzle
  * Uses the date as a seed so all players get the same puzzle.
  * Temporarily replaces Math.random with a seeded PRNG during generation.
- * Guarded against concurrent calls to prevent race conditions.
+ * Guarded against concurrent calls — subsequent callers await the first generation.
  */
 export async function generateDailyPuzzle(): Promise<{
   words: string[];
@@ -150,36 +155,36 @@ export async function generateDailyPuzzle(): Promise<{
   difficulty: Difficulty;
   date: string;
 }> {
-  // Prevent concurrent calls from interfering with Math.random override
+  // If generation is already in progress, await the existing result
   if (dailyGenerationInProgress) {
-    // Fall back to non-seeded generation if already running
+    return dailyGenerationInProgress;
+  }
+
+  const generationPromise = (async () => {
     const today = getTodayString();
     const difficulty = getDailyDifficulty(today);
-    const puzzle = await generateLocalPuzzle(difficulty);
-    return { words: puzzle.words, hint: puzzle.hint, difficulty, date: today };
-  }
+    const rng = seededRandom(`wordshift-daily-${today}`);
 
-  dailyGenerationInProgress = true;
-  const today = getTodayString();
-  const difficulty = getDailyDifficulty(today);
-  const rng = seededRandom(`wordshift-daily-${today}`);
+    // Temporarily override Math.random for deterministic generation
+    const originalRandom = Math.random;
+    Math.random = rng;
 
-  // Temporarily override Math.random for deterministic generation
-  const originalRandom = Math.random;
-  Math.random = rng;
+    try {
+      const puzzle = await generateLocalPuzzle(difficulty);
+      return {
+        words: puzzle.words,
+        hint: puzzle.hint,
+        difficulty,
+        date: today,
+      };
+    } finally {
+      Math.random = originalRandom;
+      dailyGenerationInProgress = null;
+    }
+  })();
 
-  try {
-    const puzzle = await generateLocalPuzzle(difficulty);
-    return {
-      words: puzzle.words,
-      hint: puzzle.hint,
-      difficulty,
-      date: today,
-    };
-  } finally {
-    Math.random = originalRandom;
-    dailyGenerationInProgress = false;
-  }
+  dailyGenerationInProgress = generationPromise;
+  return generationPromise;
 }
 
 /**
