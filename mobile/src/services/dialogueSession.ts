@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DialogueSession, DIALOGUE_SESSION_CONFIG } from '../types/homeWorld';
+import { DialogueSession, DIALOGUE_SESSION_CONFIG, DialoguePhase, getDialoguesPerSession } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_dialogue_sessions';
 
@@ -63,12 +63,40 @@ export function getSession(animalId: string): DialogueSession | null {
   return sessionsCache.get(animalId) || null;
 }
 
+// Current phase for phase-aware session limits
+let currentPhase: DialoguePhase = 0;
+
+/**
+ * Set the current narrative phase (for phase-aware session limits)
+ */
+export function updateSessionPhase(phase: DialoguePhase): void {
+  currentPhase = phase;
+}
+
+/**
+ * Get the effective max dialogues for a session (phase-aware)
+ */
+function getEffectiveMaxDialogues(): number {
+  return getDialoguesPerSession(currentPhase);
+}
+
+/**
+ * Check if an animal is in grace period (recently unlocked, no cooldowns yet)
+ */
+function isInGracePeriod(session: DialogueSession): boolean {
+  const sessionsCompleted = session.sessionsCompleted ?? 0;
+  return sessionsCompleted < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
+}
+
 /**
  * Check if a session's cooldown has expired
  * Returns puzzles remaining (0 or negative means cooldown complete)
+ * Animals in grace period skip cooldowns entirely
  */
 function getCooldownRemaining(session: DialogueSession): number {
   if (session.puzzlesAtSessionEnd === null) return 0;
+  // Grace period: newly unlocked animals skip cooldowns
+  if (isInGracePeriod(session)) return 0;
   const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
   return DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS - puzzlesSinceEnd;
 }
@@ -108,9 +136,18 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
     };
   }
 
-  // Session is active - check if max dialogues reached
-  if (session.dialoguesInSession >= DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION) {
-    // Too many dialogues - enter cooldown
+  // Session is active - check if max dialogues reached (phase-aware limit)
+  const maxDialogues = getEffectiveMaxDialogues();
+  if (session.dialoguesInSession >= maxDialogues) {
+    // Too many dialogues - enter cooldown (unless in grace period)
+    if (isInGracePeriod(session)) {
+      // Grace period: reset session instead of cooldown
+      session.dialoguesInSession = 0;
+      session.sessionsCompleted = (session.sessionsCompleted ?? 0) + 1;
+      sessionsCache.set(animalId, session);
+      await saveSessions();
+      return { available: true };
+    }
     await startCooldown(animalId);
     return {
       available: false,
@@ -144,16 +181,19 @@ export async function recordDialogue(animalId: string): Promise<DialogueSession>
       animalId,
       dialoguesInSession: 1,
       puzzlesAtSessionEnd: null,
+      sessionsCompleted: 0,
     };
   } else if (session.puzzlesAtSessionEnd === null) {
     // Continue existing active session
     session.dialoguesInSession += 1;
   } else {
     // Session was on cooldown but now available - start fresh
+    const prevSessions = session.sessionsCompleted ?? 0;
     session = {
       animalId,
       dialoguesInSession: 1,
       puzzlesAtSessionEnd: null,
+      sessionsCompleted: prevSessions,
     };
   }
 
@@ -170,6 +210,7 @@ export async function startCooldown(animalId: string): Promise<void> {
 
   if (session) {
     session.puzzlesAtSessionEnd = currentPuzzleCount;
+    session.sessionsCompleted = (session.sessionsCompleted ?? 0) + 1;
     sessionsCache.set(animalId, session);
     await saveSessions();
   } else {
@@ -178,6 +219,7 @@ export async function startCooldown(animalId: string): Promise<void> {
       animalId,
       dialoguesInSession: 0,
       puzzlesAtSessionEnd: currentPuzzleCount,
+      sessionsCompleted: 1,
     };
     sessionsCache.set(animalId, newSession);
     await saveSessions();
@@ -220,10 +262,10 @@ export function getSessionStatus(animalId: string): {
     return { status: 'cooldown', puzzlesRemaining: remaining };
   }
 
-  // In active session
+  // In active session (phase-aware limit)
   return {
     status: 'in_session',
-    dialoguesRemaining: DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION - session.dialoguesInSession,
+    dialoguesRemaining: getEffectiveMaxDialogues() - session.dialoguesInSession,
   };
 }
 

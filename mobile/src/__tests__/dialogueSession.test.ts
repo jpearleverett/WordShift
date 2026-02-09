@@ -5,17 +5,37 @@ import {
   getSessionStatus,
   formatTimeRemaining,
   updatePuzzleCount,
+  updateSessionPhase,
   isOnCooldown,
   clearAllSessions,
   loadDialogueSessions,
+  startCooldown,
 } from '../services/dialogueSession';
-import { DIALOGUE_SESSION_CONFIG } from '../types/homeWorld';
+import { DIALOGUE_SESSION_CONFIG, getDialoguesPerSession } from '../types/homeWorld';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// At phase 0, getDialoguesPerSession returns 6 (not the raw DIALOGUES_PER_SESSION of 8)
+const EFFECTIVE_MAX = getDialoguesPerSession(0);
+
+/**
+ * Helper: exhaust grace period for an animal by completing multiple sessions
+ * so cooldown tests work as expected (grace period = 3 sessions).
+ */
+async function exhaustGracePeriod(animalId: string): Promise<void> {
+  for (let s = 0; s < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS; s++) {
+    for (let d = 0; d < EFFECTIVE_MAX; d++) {
+      await recordDialogue(animalId);
+    }
+    // Grace period auto-resets session; force cooldown exit for next round
+    await checkDialogueAvailability(animalId);
+  }
+}
 
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
   await clearAllSessions();
   updatePuzzleCount(0);
+  updateSessionPhase(0);
 });
 
 describe('checkDialogueAvailability', () => {
@@ -30,13 +50,27 @@ describe('checkDialogueAvailability', () => {
     expect(result.available).toBe(true);
   });
 
-  test('animal becomes unavailable after max dialogues', async () => {
-    for (let i = 0; i < DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION; i++) {
+  test('animal becomes unavailable after max dialogues (past grace period)', async () => {
+    // Exhaust grace period first so cooldowns apply
+    await exhaustGracePeriod('fox');
+
+    // Now record max dialogues
+    for (let i = 0; i < EFFECTIVE_MAX; i++) {
       await recordDialogue('fox');
     }
     const result = await checkDialogueAvailability('fox');
     expect(result.available).toBe(false);
     expect(result.reason).toBe('max_dialogues');
+  });
+
+  test('animal resets session during grace period instead of cooldown', async () => {
+    // During grace period, hitting max dialogues resets session instead of cooldown
+    for (let i = 0; i < EFFECTIVE_MAX; i++) {
+      await recordDialogue('fox');
+    }
+    const result = await checkDialogueAvailability('fox');
+    // Grace period: session resets, animal stays available
+    expect(result.available).toBe(true);
   });
 });
 
@@ -63,10 +97,19 @@ describe('recordDialogue', () => {
 });
 
 describe('endSession', () => {
-  test('starts cooldown when ending active session', async () => {
+  test('starts cooldown when ending active session (past grace period)', async () => {
+    await exhaustGracePeriod('fox');
     await recordDialogue('fox');
     await endSession('fox');
     expect(isOnCooldown('fox')).toBe(true);
+  });
+
+  test('does not cooldown during grace period', async () => {
+    // During grace period, ending session still enters cooldown state but getCooldownRemaining returns 0
+    await recordDialogue('fox');
+    await endSession('fox');
+    // Grace period: cooldown remaining is 0 so isOnCooldown returns false
+    expect(isOnCooldown('fox')).toBe(false);
   });
 
   test('does nothing if no session exists', async () => {
@@ -80,13 +123,15 @@ describe('isOnCooldown', () => {
     expect(isOnCooldown('fox')).toBe(false);
   });
 
-  test('returns true after session ends', async () => {
+  test('returns true after session ends (past grace period)', async () => {
+    await exhaustGracePeriod('fox');
     await recordDialogue('fox');
     await endSession('fox');
     expect(isOnCooldown('fox')).toBe(true);
   });
 
   test('returns false after enough puzzles completed', async () => {
+    await exhaustGracePeriod('fox');
     updatePuzzleCount(0);
     await recordDialogue('fox');
     await endSession('fox');
@@ -108,10 +153,11 @@ describe('getSessionStatus', () => {
     await recordDialogue('fox');
     const status = getSessionStatus('fox');
     expect(status.status).toBe('in_session');
-    expect(status.dialoguesRemaining).toBe(DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION - 1);
+    expect(status.dialoguesRemaining).toBe(EFFECTIVE_MAX - 1);
   });
 
-  test('returns cooldown when on cooldown', async () => {
+  test('returns cooldown when on cooldown (past grace period)', async () => {
+    await exhaustGracePeriod('fox');
     await recordDialogue('fox');
     await endSession('fox');
     const status = getSessionStatus('fox');
@@ -120,6 +166,7 @@ describe('getSessionStatus', () => {
   });
 
   test('returns available after cooldown expires', async () => {
+    await exhaustGracePeriod('fox');
     updatePuzzleCount(0);
     await recordDialogue('fox');
     await endSession('fox');
@@ -146,14 +193,15 @@ describe('formatTimeRemaining', () => {
 });
 
 describe('cooldown lifecycle', () => {
-  test('full session → cooldown → available cycle', async () => {
+  test('full session → cooldown → available cycle (past grace period)', async () => {
+    await exhaustGracePeriod('fox');
     updatePuzzleCount(0);
 
     // Start session
     expect((await checkDialogueAvailability('fox')).available).toBe(true);
 
     // Use all dialogues
-    for (let i = 0; i < DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION; i++) {
+    for (let i = 0; i < EFFECTIVE_MAX; i++) {
       await recordDialogue('fox');
     }
 
@@ -167,5 +215,21 @@ describe('cooldown lifecycle', () => {
     // Should be available again
     const afterPuzzles = await checkDialogueAvailability('fox');
     expect(afterPuzzles.available).toBe(true);
+  });
+
+  test('grace period lifecycle: session resets without cooldown', async () => {
+    updatePuzzleCount(0);
+
+    // Start session (first session, grace period active)
+    expect((await checkDialogueAvailability('fox')).available).toBe(true);
+
+    // Use all dialogues at phase 0 limit
+    for (let i = 0; i < EFFECTIVE_MAX; i++) {
+      await recordDialogue('fox');
+    }
+
+    // Grace period: session resets, still available
+    const after = await checkDialogueAvailability('fox');
+    expect(after.available).toBe(true);
   });
 });

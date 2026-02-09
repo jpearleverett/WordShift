@@ -296,3 +296,130 @@ export function getPhaseIndicator(phase: DialoguePhase): { icon: string; label: 
     default: return { icon: '☀️', label: '' };
   }
 }
+
+// ============================================================================
+// RITUAL ECHO — Word chain display after puzzle completion
+// ============================================================================
+
+/**
+ * Get the ritual echo header text shown after puzzle completion
+ * At Phase 0 this is a fun recap. At Phase 4 it reads as an incantation.
+ */
+export function getRitualEchoHeader(phase: number): string {
+  if (phase <= 0) return 'Words Shifted:';
+  if (phase === 1) return 'Words Arranged:';
+  if (phase === 2) return 'Words Transformed:';
+  if (phase === 3) return 'The Incantation:';
+  return 'The Offering:';
+}
+
+/**
+ * Get the ritual echo footer/subtitle shown below the word chain
+ */
+export function getRitualEchoFooter(phase: number, wordCount: number): string {
+  if (phase <= 1) return '';
+  if (phase === 2) return 'The pattern takes shape...';
+  if (phase === 3) return 'The arrangement accepts.';
+  return `${wordCount} words offered to the pattern.`;
+}
+
+// ============================================================================
+// INCANTATION NAME — Named puzzle chains at Phase 3+
+// ============================================================================
+
+/**
+ * Generate a name for a puzzle chain based on its words
+ * Only returns a name at Phase 3+ (returns null at lower phases)
+ */
+export function getIncantationName(words: string[], phase: number): string | null {
+  if (phase < 3) return null;
+
+  const firstWord = words[0];
+  const lastWord = words[words.length - 1];
+
+  // Phase 3 templates
+  const phase3Templates = [
+    `The ${firstWord}'s Shadow`,
+    `${firstWord} to ${lastWord}`,
+    `The Shifting of ${firstWord}`,
+    `${lastWord} Emerges`,
+  ];
+
+  // Phase 4 templates - more ritual
+  const phase4Templates = [
+    `Offering: ${firstWord} to ${lastWord}`,
+    `The ${firstWord} Speaks`,
+    `Incantation of ${lastWord}`,
+    `${firstWord} Descends to ${lastWord}`,
+    `The ${lastWord} Opens`,
+  ];
+
+  const templates = phase >= 4 ? phase4Templates : phase3Templates;
+  // Use a deterministic pick based on word content
+  const hash = words.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return templates[hash % templates.length];
+}
+
+// ============================================================================
+// WORDS OFFERED — Victory modal word count display
+// ============================================================================
+
+/**
+ * Get the "words offered" display text for the victory modal
+ * At Phase 0-1 it's just a stat. At Phase 3+ it takes on ritual significance.
+ */
+export function getWordsOfferedText(totalWords: number, phase: number): string {
+  if (phase <= 1) return `Words shifted: ${totalWords}`;
+  if (phase === 2) return `Words transformed: ${totalWords}`;
+  if (phase === 3) return `Words offered: ${totalWords}`;
+  return `${totalWords} words offered to the arrangement`;
+}
+
+// ============================================================================
+// HOUSE COMPLETION — All rooms built, all animals unlocked
+// ============================================================================
+
+/**
+ * Get text for when all 10 rooms are built and all 10 animals unlocked
+ */
+export function getHouseCompletionText(): string[] {
+  return [
+    'The house is complete.',
+    'Ten rooms. Ten keepers. Each in their place.',
+    'You built it. Puzzle by puzzle. Word by word.',
+    'Every room is a chamber. Every animal is a keeper.',
+    'The arrangement is ready.',
+  ];
+}
+
+// ============================================================================
+// POST-REVELATION (PHASE 5) — Beyond the cult reveal
+// ============================================================================
+
+/**
+ * Get victory title for Phase 5 (post-revelation)
+ */
+export function getPostRevelationVictoryTitle(stars: number): string {
+  // Different from Phase 4 - more serene, less questioning
+  const titles = [
+    'The pattern continues.',
+    'Another thread in the weave.',
+    'The arrangement hums.',
+  ];
+  return titles[stars - 1] || titles[0];
+}
+
+/**
+ * Get move message for Phase 5
+ */
+export function getPostRevelationMoveMessage(): string {
+  const messages = [
+    'The weave tightens.',
+    'Another thread.',
+    'The pattern knows.',
+    'It remembers.',
+    'Accepted.',
+    'Woven.',
+  ];
+  return messages[Math.floor(Math.random() * messages.length)];
+}

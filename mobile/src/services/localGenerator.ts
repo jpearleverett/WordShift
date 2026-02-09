@@ -987,3 +987,97 @@ async function findPath(
 
   return null;
 }
+
+// ============================================================================
+// RITUAL MECHANICS - Connecting puzzles to the narrative
+// ============================================================================
+
+/**
+ * Calculate the "ritual energy" of a completed puzzle chain.
+ * This is based on how many dread/ritual words appear in the chain.
+ * Higher ritual energy means the puzzle contributes more to the summoning narrative.
+ * Used to accelerate phase progression when the player naturally encounters dark words.
+ *
+ * @param words The completed word chain
+ * @param phase Current narrative phase
+ * @returns Ritual energy score (0-10, where 0 = mundane words, 10 = deeply ritual)
+ */
+export function calculateRitualEnergy(words: string[], phase: number): number {
+  if (phase < 1) return 0; // No ritual energy at Phase 0
+
+  let dreadCount = 0;
+  for (const word of words) {
+    if (DREAD_WORDS.has(word.toUpperCase())) {
+      dreadCount++;
+    }
+  }
+
+  // Scale: 0 dread words = 0 energy, all dread = 10
+  const ratio = dreadCount / Math.max(words.length, 1);
+  const baseEnergy = ratio * 8;
+
+  // Phase multiplier: higher phases amplify ritual energy
+  const phaseMultiplier = 1 + (phase * 0.25);
+
+  return Math.min(10, Math.round(baseEnergy * phaseMultiplier * 10) / 10);
+}
+
+/**
+ * Extract trigger words from a completed puzzle chain.
+ * These are words that specific animals will react to when the player visits them.
+ *
+ * @param words The completed word chain (all words including intermediates)
+ * @returns Array of notable trigger words found in the chain
+ */
+export function extractTriggerWords(words: string[]): string[] {
+  const triggers: string[] = [];
+  for (const word of words) {
+    const upper = word.toUpperCase();
+    if (DREAD_WORDS.has(upper) || FUN_WORDS.has(upper)) {
+      triggers.push(upper);
+    }
+  }
+  return triggers;
+}
+
+/**
+ * Generate a name for a puzzle chain (incantation name).
+ * Only returns a name at Phase 3+ (returns null at lower phases).
+ * The name is deterministic based on the words in the chain.
+ */
+export function getIncantationName(words: string[], phase: number): string | null {
+  if (phase < 3) return null;
+  if (words.length === 0) return null;
+
+  const firstWord = words[0].toUpperCase();
+  const lastWord = words[words.length - 1].toUpperCase();
+
+  // Capitalize first letter, lowercase rest for display
+  const formatWord = (w: string) => w.charAt(0) + w.slice(1).toLowerCase();
+  const first = formatWord(firstWord);
+  const last = formatWord(lastWord);
+
+  // Phase 3 templates - shadows and shifting
+  const phase3Templates = [
+    `The ${first}'s Shadow`,
+    `${first} to ${last}`,
+    `The Shifting of ${first}`,
+    `${last} Emerges`,
+    `From ${first}, ${last}`,
+  ];
+
+  // Phase 4 templates - ritual and offering
+  const phase4Templates = [
+    `Offering: ${first} to ${last}`,
+    `The ${first} Speaks`,
+    `Incantation of ${last}`,
+    `${first} Descends to ${last}`,
+    `The ${last} Opens`,
+    `The ${first} Offering`,
+  ];
+
+  const templates = phase >= 4 ? phase4Templates : phase3Templates;
+  // Deterministic pick based on word content
+  const hash = words.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return templates[hash % templates.length];
+}

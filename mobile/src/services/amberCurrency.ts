@@ -9,6 +9,7 @@ import {
   STREAK_BONUSES,
   calculateStreakMultiplier,
   checkMilestone,
+  getMilestoneMessage,
   NARRATIVE_ACCELERATION,
   CHALLENGE_MODE_CONFIG,
 } from '../types/homeWorld';
@@ -270,7 +271,8 @@ export async function awardPuzzleAmber(
   let milestoneMessage: string | null = null;
   if (milestone) {
     milestoneBonus = milestone.amber;
-    milestoneMessage = milestone.message;
+    // Use phase-aware milestone message
+    milestoneMessage = getMilestoneMessage(milestone, progress.currentPhase);
     progress.amber += milestoneBonus;
     progress.totalAmberEarned += milestoneBonus;
     progress.lastClaimedMilestone = milestone.puzzles;
@@ -603,6 +605,180 @@ export async function getDecorationCount(): Promise<number> {
   const progress = await loadProgress();
   if (!progress.decorations) return 0;
   return Object.values(progress.decorations).reduce((sum, ids) => sum + ids.length, 0);
+}
+
+// ============================================================================
+// RITUAL TRACKING - The incantation ledger
+// ============================================================================
+
+/**
+ * Record words from a completed puzzle into the ritual ledger.
+ * Tracks all words ever formed, trigger words for animal reactions,
+ * and accumulated ritual energy.
+ *
+ * @param words All words from the completed puzzle chain
+ * @param ritualEnergy The ritual energy score of this puzzle (0-10)
+ * @param triggerWords Notable words that animals may react to
+ */
+export async function recordRitualWords(
+  words: string[],
+  ritualEnergy: number,
+  triggerWords: string[]
+): Promise<{
+  totalWordsFormed: number;
+  totalRitualEnergy: number;
+  triggerWordQueue: string[];
+}> {
+  const progress = await loadProgress();
+
+  // Initialize ritual tracking fields
+  if (!progress.ritualWords) progress.ritualWords = [];
+  if (!progress.totalWordsFormed) progress.totalWordsFormed = 0;
+  if (!progress.ritualEnergy) progress.ritualEnergy = 0;
+  if (!progress.triggerWordQueue) progress.triggerWordQueue = [];
+
+  // Add words to the ritual ledger (keep last 500 words to prevent unbounded growth)
+  const upperWords = words.map(w => w.toUpperCase());
+  progress.ritualWords.push(...upperWords);
+  if (progress.ritualWords.length > 500) {
+    progress.ritualWords = progress.ritualWords.slice(-500);
+  }
+
+  // Update total count
+  progress.totalWordsFormed += words.length;
+
+  // Accumulate ritual energy
+  progress.ritualEnergy += ritualEnergy;
+
+  // Add trigger words to queue (keep last 20 for animal reactions)
+  progress.triggerWordQueue.push(...triggerWords);
+  if (progress.triggerWordQueue.length > 20) {
+    progress.triggerWordQueue = progress.triggerWordQueue.slice(-20);
+  }
+
+  // Apply ritual energy as bonus to phase progress
+  // Each point of ritual energy adds 0.1 to phase progress
+  if (ritualEnergy > 0 && progress.phaseProgress !== undefined) {
+    progress.phaseProgress += ritualEnergy * 0.1;
+  }
+
+  progressCache = progress;
+  await saveProgress();
+
+  return {
+    totalWordsFormed: progress.totalWordsFormed,
+    totalRitualEnergy: progress.ritualEnergy,
+    triggerWordQueue: progress.triggerWordQueue,
+  };
+}
+
+/**
+ * Get the ritual ledger - all words the player has formed
+ */
+export async function getRitualWords(): Promise<string[]> {
+  const progress = await loadProgress();
+  return progress.ritualWords || [];
+}
+
+/**
+ * Get total words ever formed
+ */
+export async function getTotalWordsFormed(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.totalWordsFormed || 0;
+}
+
+/**
+ * Get and clear trigger words from the queue (consumed by animal reactions)
+ */
+export async function consumeTriggerWords(): Promise<string[]> {
+  const progress = await loadProgress();
+  const queue = progress.triggerWordQueue || [];
+  // Clear the queue after consuming
+  progress.triggerWordQueue = [];
+  progressCache = progress;
+  await saveProgress();
+  return queue;
+}
+
+/**
+ * Get total accumulated ritual energy
+ */
+export async function getTotalRitualEnergy(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.ritualEnergy || 0;
+}
+
+/**
+ * Mark house as completed (all 10 rooms + all 10 animals)
+ */
+export async function markHouseCompleted(): Promise<void> {
+  const progress = await loadProgress();
+  progress.houseCompleted = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Check if house is fully completed
+ */
+export async function isHouseCompleted(): Promise<boolean> {
+  const progress = await loadProgress();
+  return progress.houseCompleted === true;
+}
+
+/**
+ * Mark the final puzzle as completed (deep Phase 4 endgame)
+ */
+export async function markFinalPuzzleCompleted(): Promise<void> {
+  const progress = await loadProgress();
+  progress.finalPuzzleCompleted = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Check if the final puzzle has been completed
+ */
+export async function isFinalPuzzleCompleted(): Promise<boolean> {
+  const progress = await loadProgress();
+  return progress.finalPuzzleCompleted === true;
+}
+
+/**
+ * Mark post-revelation state (Phase 5)
+ */
+export async function markPostRevelation(): Promise<void> {
+  const progress = await loadProgress();
+  progress.postRevelation = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Check if post-revelation (Phase 5) is active
+ */
+export async function isPostRevelation(): Promise<boolean> {
+  const progress = await loadProgress();
+  return progress.postRevelation === true;
+}
+
+/**
+ * Mark tutorial seeds as planted (for Phase 4 callbacks)
+ */
+export async function markTutorialSeedsPlanted(): Promise<void> {
+  const progress = await loadProgress();
+  progress.tutorialSeedsPlanted = true;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Check if tutorial seeds were planted
+ */
+export async function wereTutorialSeedsPlanted(): Promise<boolean> {
+  const progress = await loadProgress();
+  return progress.tutorialSeedsPlanted === true;
 }
 
 /**

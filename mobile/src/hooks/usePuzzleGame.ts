@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
-import { generateLocalPuzzle } from '../services/localGenerator';
+import { generateLocalPuzzle, getIncantationName } from '../services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
 import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage } from '../services/phaseNarrative';
@@ -32,6 +32,10 @@ export interface PuzzleGameState {
   gameMode: GameMode;
   undosRemaining: number;
   currentPhase: DialoguePhase;
+  /** The word chain from the last completed puzzle (for ritual echo display) */
+  lastCompletedWords: string[];
+  /** Named incantation for the last puzzle (Phase 3+ only, null otherwise) */
+  lastIncantationName: string | null;
 }
 
 export interface PuzzleGameActions {
@@ -43,6 +47,7 @@ export interface PuzzleGameActions {
     hintsUsed: number;
     invalidAttempts: number;
     gameMode: GameMode;
+    completedWords: string[];
   } | null>;
   handleUndo: () => void;
   handleHint: () => void;
@@ -80,6 +85,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [gameMode, setGameMode] = useState<GameMode>('standard');
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
+  const [lastCompletedWords, setLastCompletedWords] = useState<string[]>([]);
+  const [lastIncantationName, setLastIncantationName] = useState<string | null>(null);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -225,6 +232,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     hintsUsed: number;
     invalidAttempts: number;
     gameMode: GameMode;
+    completedWords: string[];
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
@@ -303,9 +311,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const maxMoves = rows.length - 1;
     if (activeRowIndex === maxMoves - 1) {
+      // Capture the completed word chain for ritual echo
+      const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
+      setLastCompletedWords(completedWords);
+      setLastIncantationName(getIncantationName(completedWords, currentPhase));
+
       setIsProcessing(false);
       // Return completion info - caller handles persistence & victory state
-      return { completed: true, hintsUsed, invalidAttempts, gameMode };
+      return { completed: true, hintsUsed, invalidAttempts, gameMode, completedWords };
     } else {
       setActiveRowIndex(prev => prev + 1);
       setMessage(getMoveMessage(currentPhase));
@@ -393,6 +406,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameMode,
     undosRemaining,
     currentPhase,
+    lastCompletedWords,
+    lastIncantationName,
   };
 
   const actions: PuzzleGameActions = {
