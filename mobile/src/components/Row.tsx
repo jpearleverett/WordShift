@@ -31,6 +31,7 @@ interface RowProps {
   onSlotPress: (targetIndex: number) => void;
   isProcessing: boolean;
   phase?: number;
+  wordLength?: number;
 }
 
 // Phase-aware row color helper
@@ -270,7 +271,9 @@ export const Row: React.FC<RowProps> = memo(({
   onSlotPress,
   isProcessing,
   phase = 0,
+  wordLength = 4,
 }) => {
+  const compactTiles = wordLength >= 6;
   const phaseColors = getPhaseRowColors(phase);
   const isSource = rowIndex === activeRowIndex;
   const isTarget = rowIndex === activeRowIndex + 1;
@@ -463,6 +466,7 @@ export const Row: React.FC<RowProps> = memo(({
               letter={letter}
               highlight={letter.isLocked ? 'locked' : 'default'}
               phase={phase}
+              compact={compactTiles}
             />
           </Animated.View>
         );
@@ -485,6 +489,7 @@ export const Row: React.FC<RowProps> = memo(({
         highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
         onPress={() => onLetterPress(letter, rowIndex)}
         phase={phase}
+        compact={compactTiles}
       />
     ));
   };

@@ -11,7 +11,15 @@ interface LetterTileProps {
   isInteractable?: boolean;
   highlight?: 'default' | 'source' | 'locked';
   phase?: number;
+  compact?: boolean;
 }
+
+// Compact tile dimensions for 6+ letter words
+const COMPACT_OUTER_W = 42;
+const COMPACT_OUTER_H = 52;
+const COMPACT_BODY_W = 42;
+const COMPACT_BODY_H = 46;
+const COMPACT_FONT = 21;
 
 export const LetterTile: React.FC<LetterTileProps> = ({
   letter,
@@ -20,6 +28,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   isInteractable,
   highlight = 'default',
   phase = 0,
+  compact = false,
 }) => {
   const settings = getSettingsSync();
 
@@ -333,6 +342,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     <Animated.View
       style={[
         styles.tileOuter,
+        compact && { width: COMPACT_OUTER_W, height: COMPACT_OUTER_H, marginHorizontal: 2 },
         {
           transform: [
             { scale: scaleAnim },
@@ -359,6 +369,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       <View
         style={[
           styles.tileBody,
+          compact && { width: COMPACT_BODY_W, height: COMPACT_BODY_H, borderRadius: 12 },
           {
             backgroundColor: tileStyles.bgColor,
             borderBottomColor: tileStyles.borderColor,
@@ -378,6 +389,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         <Text
           style={[
             styles.letterText,
+            compact && { fontSize: COMPACT_FONT },
             { color: tileStyles.textColor },
             isSelected && styles.letterTextSelected,
           ]}

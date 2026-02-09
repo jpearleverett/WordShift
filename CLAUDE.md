@@ -85,7 +85,7 @@ mobile/
 │   │   └── useUnlockFlow.ts     # Unlock/shop logic: rooms, animals, decorations, purchases
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
-│   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling
+│   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling (compact mode for 6+ letters)
 │   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + native-driver pulse
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial for phase changes
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
@@ -828,8 +828,8 @@ Edit `calculateStars()` function in `starRating.ts`:
 - Current: 3 stars = 0 hints + 0-2 mistakes, 2 stars = 1 hint OR 3-4 mistakes, 1 star = rest
 
 ### UI adjustments
-- Tile sizes/styling: `LetterTile.tsx` styles
-- Row layout: `Row.tsx` styles
+- Tile sizes/styling: `LetterTile.tsx` styles; standard tiles 52x64, compact tiles 42x52 (activated when `wordLength >= 6`)
+- Row layout: `Row.tsx` styles; accepts `wordLength` prop to trigger compact tile mode
 - Arc/fan effect: Constants at top of `Row.tsx` (ARC_ROTATION, ARC_LIFT, SLOT_WIDTH, SLOT_HEIGHT)
 - Color palette: `theme/colors.ts`
 - Game container: `App.tsx` styles object
