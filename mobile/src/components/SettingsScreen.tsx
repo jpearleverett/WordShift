@@ -95,6 +95,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               onValueChange={(v) => handleToggle('soundEnabled', v)}
               trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
               thumbColor={settings.soundEnabled ? CandyColors.purple.main : CandyColors.gray[100]}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: settings.soundEnabled }}
             />
           </View>
 
@@ -110,6 +112,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               onValueChange={(v) => handleToggle('hapticsEnabled', v)}
               trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
               thumbColor={settings.hapticsEnabled ? CandyColors.purple.main : CandyColors.gray[100]}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: settings.hapticsEnabled }}
             />
           </View>
         </View>
@@ -127,6 +131,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               onValueChange={(v) => handleToggle('reducedMotion', v)}
               trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
               thumbColor={settings.reducedMotion ? CandyColors.purple.main : CandyColors.gray[100]}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: settings.reducedMotion }}
             />
           </View>
         </View>

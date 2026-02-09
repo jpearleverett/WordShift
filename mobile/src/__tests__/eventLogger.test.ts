@@ -12,18 +12,56 @@ afterEach(() => {
 });
 
 describe('logEvent', () => {
-  test('logs event with auto-generated timestamp', () => {
+  test('logs event with auto-generated timestamp', async () => {
     logEvent({ type: 'puzzle_completed' });
-    // Event is buffered — need to flush
     jest.advanceTimersByTime(6000);
+    await Promise.resolve();
+
+    const events = await getEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('puzzle_completed');
+    expect(events[0].timestamp).toBeGreaterThan(0);
   });
 
-  test('logs event with custom data', () => {
+  test('logs event with custom data', async () => {
     logEvent({
       type: 'puzzle_completed',
       data: { difficulty: 'HARD', stars: 3 },
     });
     jest.advanceTimersByTime(6000);
+    await Promise.resolve();
+
+    const events = await getEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].data).toEqual({ difficulty: 'HARD', stars: 3 });
+  });
+
+  test('logs event with custom timestamp', async () => {
+    const customTime = 1700000000000;
+    logEvent({ type: 'puzzle_started', timestamp: customTime });
+    jest.advanceTimersByTime(6000);
+    await Promise.resolve();
+
+    const events = await getEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0].timestamp).toBe(customTime);
+  });
+
+  test('buffers multiple events before flush', async () => {
+    logEvent({ type: 'puzzle_started' });
+    logEvent({ type: 'puzzle_completed' });
+    logEvent({ type: 'phase_changed' });
+
+    // Before flush timeout — events should not be stored yet
+    const beforeFlush = await AsyncStorage.getItem('wordshift_event_log');
+    expect(beforeFlush).toBeNull();
+
+    // After flush timeout — events should be stored
+    jest.advanceTimersByTime(6000);
+    await Promise.resolve();
+
+    const events = await getEvents();
+    expect(events).toHaveLength(3);
   });
 });
 

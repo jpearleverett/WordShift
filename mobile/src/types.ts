@@ -38,6 +38,22 @@ export interface PuzzleConfig {
   wordLength?: number;
 }
 
+/**
+ * Move delta — stores what changed instead of the entire board state.
+ * To undo: remove movedLetter from targetRow at targetInsertIndex,
+ * then insert it back into sourceRow at sourceLetterIndex.
+ */
+export interface MoveDelta {
+  movedLetterId: string;
+  movedLetterChar: string;
+  sourceRowIndex: number;
+  sourceLetterIndex: number;
+  targetRowIndex: number;
+  targetInsertIndex: number;
+  activeRowIndexBefore: number;
+}
+
+/** @deprecated Use MoveDelta for new code. Kept for type compatibility. */
 export interface MoveHistory {
   rows: RowData[];
   activeRowIndex: number;

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
 import { CandyColors } from '../theme/colors';
+import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 
 const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
@@ -32,11 +34,17 @@ interface RowProps {
 
 // Animated drop slot component
 const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> = ({ onPress, index, compact = false }) => {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const settings = getSettingsSync();
+  const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (settings.reducedMotion) {
+      scaleAnim.setValue(1);
+      return;
+    }
+
     // Pop in animation with stagger
     Animated.sequence([
       Animated.delay(index * 50),
@@ -48,8 +56,13 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
       }),
     ]).start();
 
+    // Skip decorative loops on low-end devices
+    if (shouldSimplifyAnimations()) {
+      return () => { scaleAnim.stopAnimation(); };
+    }
+
     // Continuous pulse
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
@@ -64,10 +77,11 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
     // Glow animation
-    Animated.loop(
+    const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
@@ -82,9 +96,12 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
           useNativeDriver: false,
         }),
       ])
-    ).start();
+    );
+    glowLoop.start();
 
     return () => {
+      pulseLoop.stop();
+      glowLoop.stop();
       scaleAnim.stopAnimation();
       pulseAnim.stopAnimation();
       glowAnim.stopAnimation();
@@ -102,6 +119,7 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
   });
 
   const handlePressIn = () => {
+    if (settings.reducedMotion) return;
     Animated.spring(scaleAnim, {
       toValue: 0.9,
       friction: 5,
@@ -111,6 +129,7 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
   };
 
   const handlePressOut = () => {
+    if (settings.reducedMotion) return;
     Animated.spring(scaleAnim, {
       toValue: 1,
       friction: 3,
@@ -125,6 +144,8 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
+      accessibilityLabel={`Drop zone ${index + 1}`}
+      accessibilityRole="button"
     >
       <Animated.View
         style={[
@@ -170,7 +191,7 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
   );
 };
 
-export const Row: React.FC<RowProps> = ({
+export const Row: React.FC<RowProps> = memo(({
   rowData,
   rowIndex,
   activeRowIndex,
@@ -208,23 +229,26 @@ export const Row: React.FC<RowProps> = ({
         }),
       ]).start();
 
-      // Glow pulse for active row
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
+      // Glow pulse for active row (skip on low-end devices)
+      if (!shouldSimplifyAnimations()) {
+        const rowGlowLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(glowAnim, {
+              toValue: 1,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false,
+            }),
+            Animated.timing(glowAnim, {
+              toValue: 0,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false,
+            }),
+          ])
+        );
+        rowGlowLoop.start();
+      }
     } else if (isTarget) {
       Animated.parallel([
         Animated.spring(scaleAnim, {
@@ -418,13 +442,13 @@ export const Row: React.FC<RowProps> = ({
     >
       {/* FLOATING BADGES - positioned outside row container */}
       {isSource && (
-        <View style={[styles.floatingBadge, styles.floatingBadgePick]}>
+        <View style={[styles.floatingBadge, styles.floatingBadgePick]} accessibilityLabel="Pick a letter from this row">
           <View style={styles.badgeShine} />
           <Text style={styles.badgeText}>PICK</Text>
         </View>
       )}
       {isTarget && selectedLetter && (
-        <View style={[styles.floatingBadge, styles.floatingBadgeDrop]}>
+        <View style={[styles.floatingBadge, styles.floatingBadgeDrop]} accessibilityLabel="Drop the letter into this row">
           <View style={styles.badgeShine} />
           <Text style={styles.badgeText}>DROP</Text>
         </View>
@@ -471,7 +495,7 @@ export const Row: React.FC<RowProps> = ({
       </View>
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   rowWrapper: {

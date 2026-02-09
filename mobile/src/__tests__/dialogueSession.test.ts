@@ -19,14 +19,14 @@ beforeEach(async () => {
 });
 
 describe('checkDialogueAvailability', () => {
-  test('animal is available when no session exists', () => {
-    const result = checkDialogueAvailability('fox');
+  test('animal is available when no session exists', async () => {
+    const result = await checkDialogueAvailability('fox');
     expect(result.available).toBe(true);
   });
 
   test('animal is available during active session', async () => {
     await recordDialogue('fox');
-    const result = checkDialogueAvailability('fox');
+    const result = await checkDialogueAvailability('fox');
     expect(result.available).toBe(true);
   });
 
@@ -34,7 +34,7 @@ describe('checkDialogueAvailability', () => {
     for (let i = 0; i < DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION; i++) {
       await recordDialogue('fox');
     }
-    const result = checkDialogueAvailability('fox');
+    const result = await checkDialogueAvailability('fox');
     expect(result.available).toBe(false);
     expect(result.reason).toBe('max_dialogues');
   });
@@ -150,7 +150,7 @@ describe('cooldown lifecycle', () => {
     updatePuzzleCount(0);
 
     // Start session
-    expect(checkDialogueAvailability('fox').available).toBe(true);
+    expect((await checkDialogueAvailability('fox')).available).toBe(true);
 
     // Use all dialogues
     for (let i = 0; i < DIALOGUE_SESSION_CONFIG.DIALOGUES_PER_SESSION; i++) {
@@ -158,14 +158,14 @@ describe('cooldown lifecycle', () => {
     }
 
     // Should be on cooldown
-    const after = checkDialogueAvailability('fox');
+    const after = await checkDialogueAvailability('fox');
     expect(after.available).toBe(false);
 
     // Complete required puzzles
     updatePuzzleCount(DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS);
 
     // Should be available again
-    const afterPuzzles = checkDialogueAvailability('fox');
+    const afterPuzzles = await checkDialogueAvailability('fox');
     expect(afterPuzzles.available).toBe(true);
   });
 });

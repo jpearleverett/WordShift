@@ -43,7 +43,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (144 tests, 11 suites)
+npx jest --no-coverage   # Run all tests (295 tests, 15 suites)
 ```
 
 ## Tech Stack
@@ -62,7 +62,7 @@ npx jest --no-coverage   # Run all tests (144 tests, 11 suites)
 
 ```
 mobile/
-├── App.tsx                      # Main app: screen routing, victory flow, achievement queue
+├── App.tsx                      # Main app: screen routing, wires hooks together
 ├── assets/                      # Image assets (see Asset System below)
 │   ├── characters/              # Animal character sprites
 │   ├── rooms/                   # Room background images
@@ -72,15 +72,18 @@ mobile/
 │   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
 │   ├── types/
 │   │   └── homeWorld.ts         # Home screen types, config constants, streak/amber types
-│   ├── constants.ts             # Word lists by length (3-6 letters), COMMON_WORDS set
+│   ├── constants.ts             # Word lists by length (3-6 letters), COMMON_WORDS set, fallback puzzle pools
 │   ├── dictionary.ts            # 8000+ word dictionary for validation
 │   ├── hooks/
 │   │   ├── usePuzzleGame.ts     # All puzzle game state and actions (extracted from App.tsx)
-│   │   └── useGamePersistence.ts # Persistence: amber, stats, phases (extracted from App.tsx)
+│   │   ├── useGamePersistence.ts # Persistence: amber, stats, phases (extracted from App.tsx)
+│   │   ├── useVictoryFlow.ts    # Victory animation choreography (stars, modal, phase flash)
+│   │   └── useAchievementQueue.ts # Achievement checking + toast queue processing
 │   ├── components/
-│   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout for slots
+│   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling
-│   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + gradient pulse
+│   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + native-driver pulse
+│   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial for phase changes
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
 │   │   ├── ErrorBoundary.tsx    # React error boundary wrapper
 │   │   ├── Tutorial.tsx         # Fox-guided interactive onboarding with mini-puzzle
@@ -106,24 +109,34 @@ mobile/
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
-│       ├── phaseNarrative.ts     # Phase-aware text: victory, moves, hints, loading
+│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading
+│       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials)
 │       ├── achievements.ts      # 36 achievements across 6 categories
 │       ├── shareResults.ts      # Wordle-style emoji grid sharing
 │       ├── settings.ts          # User preferences (sound, haptics, reducedMotion)
 │       ├── haptics.ts           # Haptic feedback (settings-gated)
 │       ├── audio.ts             # Sound effects (placeholder, awaiting assets)
-│       └── eventLogger.ts       # Analytics event logging
-├── src/__tests__/               # Test suites (144 tests, 11 suites)
+│       ├── eventLogger.ts       # Analytics event logging
+│       ├── deviceTier.ts        # Device capability detection for animation scaling
+│       ├── dataMigration.ts     # Schema versioning with sequential migrations
+│       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
+├── src/__tests__/               # Test suites (295 tests, 15 suites)
+│   ├── helpers/
+│   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
 │   ├── amberCurrency.test.ts
 │   ├── dailyChallenge.test.ts
+│   ├── dataMigration.test.ts
 │   ├── dialogueSession.test.ts
 │   ├── eventLogger.test.ts
 │   ├── homeWorldData.test.ts
 │   ├── localGenerator.test.ts
+│   ├── phaseNarrative.test.ts
 │   ├── settings.test.ts
 │   ├── shareResults.test.ts
 │   ├── starRating.test.ts
+│   ├── useGamePersistence.test.ts
+│   ├── usePuzzleGame.test.ts
 │   └── wordHistory.test.ts
 ```
 
@@ -237,7 +250,7 @@ As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite
 
 ### Custom Hooks
 
-Game logic is extracted into two custom hooks:
+Game logic is extracted into four custom hooks:
 
 **`usePuzzleGame()`** (`src/hooks/usePuzzleGame.ts`):
 - All puzzle state: rows, selected letter, game state, hints, validation, gameMode, currentPhase
@@ -246,7 +259,7 @@ Game logic is extracted into two custom hooks:
 - `handleLetterPress(letter, rowIndex)` - Pick a letter
 - `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode
 - `handleHint()` - Show phase-aware hint (blocked in challenge mode)
-- `handleUndo()` - Undo last move (limited to 1 in challenge mode)
+- `handleUndo()` - Undo last move (limited to 1 in challenge mode); uses MoveDelta pattern (lightweight deltas instead of deep clones)
 - `setCurrentPhase(phase)` - Sync narrative phase from persistence layer
 - All messages (start, loading, move success, hints) use `phaseNarrative.ts` for phase-aware tone
 
@@ -254,6 +267,19 @@ Game logic is extracted into two custom hooks:
 - All persistence: amber balance, cumulative stats, phase, streak
 - `handleVictory(difficulty, hintsUsed, invalidAttempts)` - Record win, update stats
 - `refreshProgress()` - Reload from storage
+
+**`useVictoryFlow()`** (`src/hooks/useVictoryFlow.ts`):
+- Victory animation state: star pop-in refs, modal scale/opacity, phase flash overlay
+- `playVictorySequence(stars)` - Choreographed star stagger + modal reveal
+- `playPhaseChangeFlash()` - Double flicker to black for phase transitions
+- `resetVictory()` - Clear animation state for next puzzle
+- `isProcessingVictory` - Lock flag to block interaction during async victory chain
+
+**`useAchievementQueue()`** (`src/hooks/useAchievementQueue.ts`):
+- Achievement checking and toast queue processing
+- `checkForAchievements()` - Fetches progress and checks for newly unlocked achievements
+- Auto-processes queue via useEffect (shows next when current dismissed)
+- Haptic feedback on achievement notification
 
 ### Screen Navigation
 
@@ -265,17 +291,17 @@ State-based routing in `App.tsx`:
 
 ### Victory Flow
 
-When puzzle completes (`handleSlotPress` returns `{completed: true}`):
-1. Record stars via `calculateStars(hintsUsed, invalidAttempts)`
-2. Record puzzle completion via `amberCurrency.awardPuzzleAmber()`
-3. Check for newly unlocked achievements
-4. Queue achievement toasts for display
-5. Choreographed victory sequence:
+Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` returns `{completed: true}`):
+1. `isProcessingVictory` lock prevents double-tap during async chain
+2. Record stars via `calculateStars(hintsUsed, invalidAttempts)`
+3. Record puzzle completion via `amberCurrency.awardPuzzleAmber()`
+4. Check for newly unlocked achievements via `useAchievementQueue()`
+5. Choreographed victory sequence (`playVictorySequence`):
    - Stars pop in one-by-one with 200ms stagger (spring animation)
    - Victory modal scales + fades in after stars complete
    - Phase-aware title: "PERFECT!" (Phase 0) → "WHY DOES IT MATTER?" (Phase 4)
    - Phase-aware feedback text shifts tone with narrative phase
-6. If phase changed: dramatic screen flash (double flicker to black)
+6. If phase changed: `PhaseTransitionOverlay` plays cinematic multi-scene interstitial, then `playPhaseChangeFlash()` does dramatic double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
 
 ### Achievement System (`services/achievements.ts`)
@@ -534,6 +560,45 @@ Manages amber balance, streak, phase progression, and decorations:
 - `hasDecoration(roomId, decorationId)` / `getAllDecorations()` / `getDecorationCount()` - Decoration queries
 - `clearProgress()` - Full reset
 
+### Phase Transition Events (`phaseEvents.ts`)
+
+Cinematic interstitial scenes that play at phase boundaries:
+
+- 4 events (one per phase transition, phases 1-4), each with 4 multi-scene sequences
+- Each scene has text, optional emoji, delay, and duration
+- Tone darkens: Phase 1 "The words seem to want something" → Phase 4 "Go home. See what you've built."
+- `getPhaseTransitionEvent(phase)` returns event or null (no event for Phase 0)
+- `getEventDuration(event)` calculates total playback time
+- Rendered by `PhaseTransitionOverlay` component with animated fade-in/out, progress dots
+
+### Device Tier Detection (`deviceTier.ts`)
+
+Heuristic device capability detection for adaptive animation quality:
+
+- Classifies devices as `low`, `medium`, or `high` using PixelRatio and screen dimensions
+- `shouldSimplifyAnimations()` - Skip decorative pulse/glow on low-end devices
+- `getMaxParticleCount()` - 6/10/15 particles by tier (used by AnimatedBackground)
+- `getMaxConfettiCount()` - 8/15/25 confetti pieces by tier
+- `getMaxAnimationCount()` - General animation count limit
+
+### Data Migration (`dataMigration.ts`)
+
+Schema versioning system for persistent storage:
+
+- Sequential migration functions keyed by version number
+- `migrateData()` runs all pending migrations in order
+- `getCurrentSchemaVersion()` / `setSchemaVersion()` for version tracking
+- Add new migrations by adding to the `MIGRATIONS` record and bumping `CURRENT_SCHEMA_VERSION`
+
+### Error Reporting (`errorReporting.ts`)
+
+Lightweight error reporting infrastructure:
+
+- `reportError(error, context?)` - Log errors with optional context
+- `addBreadcrumb(message)` - Track user actions leading up to errors
+- `getRecentBreadcrumbs()` - Retrieve breadcrumb trail for debugging
+- Designed for easy integration with external services (Sentry, etc.) later
+
 ### Hint System
 
 Educational hints show the target word with phase-aware tone:
@@ -569,13 +634,21 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialC
 - Use TypeScript with explicit types for props and state
 - React Native StyleSheet for styling (not inline styles)
 - Functional components with hooks
-- Custom hooks extract game logic from App.tsx (`usePuzzleGame`, `useGamePersistence`)
+- Custom hooks extract game logic from App.tsx (`usePuzzleGame`, `useGamePersistence`, `useVictoryFlow`, `useAchievementQueue`)
 - Import colors from `CandyColors` in `src/theme/colors.ts`; use `getPhaseTheme(phase)` for phase-aware colors
 - All player-facing text must go through `phaseNarrative.ts` — never hardcode victory/move/hint strings
 - Use `Animated` API for smooth animations; choreograph multi-step animations with `Animated.sequence` + `Animated.stagger`
+- **Animation loops**: Store `Animated.loop()` return value in a ref, call `.stop()` in useEffect cleanup to prevent accumulation
+- **Native driver preferred**: Use `useNativeDriver: true` for all animations; if you need to animate backgroundColor, use an opacity overlay on a static-colored view instead
+- **Device tier gating**: Use `shouldSimplifyAnimations()` from `deviceTier.ts` to skip decorative animations on low-end devices; use `getMaxParticleCount()`/`getMaxConfettiCount()` for particle limits
+- **React.memo**: Applied to expensive pure components (e.g., `Row`) to prevent unnecessary re-renders
+- **MoveDelta pattern**: Undo history uses lightweight deltas (`{rowIndex, letterIndex, letter, action}`) instead of deep-cloning entire game state
+- **Schema versioning**: Persistent data uses `dataMigration.ts` for schema versions + sequential migrations; always bump version when storage format changes
+- **Concurrent spend guard**: `amberCurrency.ts` uses `spendInProgress` flag to prevent double-spend race conditions
 - Services use AsyncStorage with in-memory cache pattern (load -> cache -> return cached)
 - TS strict: module-level nullable caches need local variable assignment before return to avoid TS2322
-- Accessibility: interactive elements should have `accessibilityLabel` and `accessibilityRole`
+- Accessibility: interactive elements should have `accessibilityLabel` and `accessibilityRole`; progress bars use `accessibilityValue` with `min`/`max`/`now`
+- **reducedMotion**: All animations must check `getSettingsSync().reducedMotion` and either skip or set values instantly
 - **Narrative consistency**: Any new feature, UI text, or visual element must respect the current phase. If it looks cheerful, it should only be cheerful at Phase 0. If it's always cheerful regardless of phase, it breaks the narrative.
 
 ## Testing
@@ -583,14 +656,17 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialC
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 144 tests, 11 suites
+cd mobile && npx jest --no-coverage  # 295 tests, 15 suites
 ```
 
 **Test patterns:**
-- Tests mock `@react-native-async-storage/async-storage` with inline factory per file
+- Shared AsyncStorage mock factory in `src/__tests__/helpers/mockAsyncStorage.ts` — use `createMockAsyncStorage()` instead of duplicating inline mocks
 - Tests that import react-native modules need `jest.mock('react-native', ...)` at top
 - `beforeEach` must call both `AsyncStorage.clear()` AND service-specific clear functions
 - Puzzle generator tests mock `amberCurrency.getCurrentPhase` + all `wordHistory` functions
+- Hook tests (`usePuzzleGame`, `useGamePersistence`) use manual React mock with stateStore Map + index rewind pattern
+- `jest.fn(async () => ...)` infers 0 args — add typed optional params `(_d?: any, _s?: any)` for TS
+- `DialoguePhase` is `0 | 1 | 2 | 3 | 4` literal type — mock return values need `as number` or `as any` cast
 
 ### Manual Testing
 
@@ -676,6 +752,7 @@ Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
 
 - Puzzle generation has 2.5s timeout to prevent UI blocking
 - 4s wrapper timeout in App.tsx as fallback
+- Fallback puzzle pool: 15 pre-validated puzzles across 3 difficulty tiers (5 easy/5 medium/5 hard) used when generation times out; `getRandomFallback(difficulty)` selects randomly
 - Dictionary limited to common English words (no proper nouns, abbreviations)
 - Arc layout uses `overflow: visible` - elements can extend beyond row container
 - Dialogue sessions persist across app restarts (cooldowns continue)
@@ -684,3 +761,6 @@ Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
 - HomeScreen.tsx uses react-native TouchableOpacity (not RNGH) for modal content
 - Daily challenge uses Math.random override for seeded generation (guarded against concurrency)
 - Sound system is placeholder infrastructure (API wired up, awaiting real audio asset files)
+- Victory flow uses `isProcessingVictory` lock to prevent interaction during async chain
+- AnimatedBackground uses opacity overlay instead of JS-bridge backgroundColor animation (native driver compatible)
+- Low-end device detection is heuristic (PixelRatio + screen size) — not 100% accurate but good enough

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CandyColors, getTileColor } from '../theme/colors';
+import { getSettingsSync } from '../services/settings';
 
 const TUTORIAL_KEY = 'wordshift_tutorial_completed';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -61,6 +62,7 @@ const FoxCharacter: React.FC<{ size?: number; speaking?: boolean }> = ({ size = 
   const bounceAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) return;
     if (speaking) {
       Animated.loop(
         Animated.sequence([
@@ -104,6 +106,10 @@ const MiniTile: React.FC<MiniTileProps> = ({ char, onPress, isSelected, isHighli
   const tileColor = getTileColor(char);
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      scaleAnim.setValue(isSelected ? 1.15 : 1);
+      return;
+    }
     if (isSelected) {
       Animated.spring(scaleAnim, { toValue: 1.15, friction: 3, tension: 200, useNativeDriver: true }).start();
     } else {
@@ -112,6 +118,7 @@ const MiniTile: React.FC<MiniTileProps> = ({ char, onPress, isSelected, isHighli
   }, [isSelected]);
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) return;
     if (isPulsing) {
       Animated.loop(
         Animated.sequence([
@@ -177,6 +184,7 @@ const MiniSlot: React.FC<{ onPress?: () => void; isPulsing?: boolean }> = ({ onP
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) return;
     if (isPulsing) {
       Animated.loop(
         Animated.sequence([
@@ -210,6 +218,10 @@ const SpeechBubble: React.FC<{ text: string; emphasis?: boolean }> = ({ text, em
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      fadeAnim.setValue(1);
+      return;
+    }
     fadeAnim.setValue(0);
     Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
   }, [text]);
@@ -250,6 +262,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
   const contentFade = useRef(new Animated.Value(1)).current;
   const puzzleSlide = useRef(new Animated.Value(40)).current;
   const celebrateScale = useRef(new Animated.Value(0)).current;
+  const reducedMotion = getSettingsSync().reducedMotion;
 
   // Mini puzzle state
   const [row1Letters, setRow1Letters] = useState(['H', 'E', 'A', 'T']);
@@ -259,24 +272,37 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
   // Entry animation
   useEffect(() => {
+    if (reducedMotion) {
+      overlayFade.setValue(1);
+      return;
+    }
     Animated.timing(overlayFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
   }, []);
 
   const animateContentChange = useCallback((nextPhase: TutorialPhase) => {
+    if (reducedMotion) {
+      setPhase(nextPhase);
+      return;
+    }
     Animated.timing(contentFade, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
       setPhase(nextPhase);
       Animated.timing(contentFade, { toValue: 1, duration: 250, useNativeDriver: true }).start();
     });
-  }, [contentFade]);
+  }, [contentFade, reducedMotion]);
 
   const showPuzzle = useCallback(() => {
     animateContentChange('show_puzzle');
+    if (reducedMotion) {
+      puzzleSlide.setValue(0);
+      setTimeout(() => setPhase('pick_letter'), 300);
+      return;
+    }
     puzzleSlide.setValue(40);
     setTimeout(() => {
       Animated.spring(puzzleSlide, { toValue: 0, friction: 8, tension: 60, useNativeDriver: true }).start();
       setTimeout(() => setPhase('pick_letter'), 1000);
     }, 300);
-  }, [puzzleSlide, animateContentChange]);
+  }, [puzzleSlide, animateContentChange, reducedMotion]);
 
   const handleLetterPick = useCallback((char: string) => {
     if (phase !== 'pick_letter' || char !== 'H') return;
@@ -294,12 +320,20 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
     setMoveComplete(true);
     setPhase('move_complete');
 
-    celebrateScale.setValue(0);
-    Animated.spring(celebrateScale, { toValue: 1, friction: 3, tension: 100, useNativeDriver: true }).start();
-  }, [phase, celebrateScale]);
+    if (reducedMotion) {
+      celebrateScale.setValue(1);
+    } else {
+      celebrateScale.setValue(0);
+      Animated.spring(celebrateScale, { toValue: 1, friction: 3, tension: 100, useNativeDriver: true }).start();
+    }
+  }, [phase, celebrateScale, reducedMotion]);
 
   const handleComplete = async () => {
     await markTutorialCompleted();
+    if (reducedMotion) {
+      onComplete();
+      return;
+    }
     Animated.timing(overlayFade, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => onComplete());
   };
 

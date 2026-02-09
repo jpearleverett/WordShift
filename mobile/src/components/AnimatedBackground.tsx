@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 import { getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import { getMaxParticleCount } from '../services/deviceTier';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -193,39 +194,51 @@ interface AnimatedBackgroundProps {
 export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
+  const particleCount = getMaxParticleCount();
   const particles = useRef(
-    reducedMotion ? [] : generateParticles(15, theme.particleColors)
+    reducedMotion ? [] : generateParticles(particleCount, theme.particleColors)
   ).current;
-  const gradientPulse = useRef(new Animated.Value(0)).current;
+  // Use opacity-based pulse with native driver instead of JS-bridge backgroundColor
+  const pulseOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (reducedMotion) return;
-    // Subtle gradient pulse animation
-    Animated.loop(
+    // Subtle pulse: animate opacity of a secondary color overlay (native driver)
+    const pulseLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(gradientPulse, {
+        Animated.timing(pulseOpacity, {
           toValue: 1,
           duration: 4000,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
-        Animated.timing(gradientPulse, {
+        Animated.timing(pulseOpacity, {
           toValue: 0,
           duration: 4000,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
+
+    return () => {
+      pulseLoop.stop();
+      pulseOpacity.stopAnimation();
+    };
   }, []);
 
-  const backgroundColor = gradientPulse.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [theme.bgPrimary, theme.bgSecondary, theme.bgTertiary],
-  });
-
   return (
-    <Animated.View style={[styles.container, { backgroundColor }]}>
+    <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>
+      {/* Pulsing secondary color overlay — uses native driver via opacity */}
+      <Animated.View
+        style={[
+          styles.pulseOverlay,
+          { backgroundColor: theme.bgSecondary, opacity: pulseOpacity },
+        ]}
+        pointerEvents="none"
+      />
+
       {/* Gradient overlay layers */}
       <View style={[styles.gradientLayer1, { backgroundColor: theme.overlayTop }]} />
       <View style={[styles.gradientLayer2, { backgroundColor: theme.overlayMid }]} />
@@ -243,7 +256,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
       <View style={[styles.vignetteTop, { shadowColor: theme.vignetteColor }]} />
       {/* Bottom vignette */}
       <View style={[styles.vignetteBottom, { backgroundColor: theme.vignetteColor + '4D' }]} />
-    </Animated.View>
+    </View>
   );
 };
 
@@ -251,6 +264,9 @@ const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
+  },
+  pulseOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   gradientLayer1: {
     position: 'absolute',

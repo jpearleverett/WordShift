@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { RowData, Letter, GameState, MoveHistory, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
+import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { generateLocalPuzzle } from '../services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
@@ -16,7 +16,7 @@ export interface PuzzleGameState {
   gameState: GameState;
   message: string;
   error: string | null;
-  history: MoveHistory[];
+  history: MoveDelta[];
   isProcessing: boolean;
   hint: string;
   solution: PuzzleSolutionStep[] | undefined;
@@ -64,7 +64,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [gameState, setGameState] = useState<GameState>(GameState.IDLE);
   const [message, setMessage] = useState<string>("Loading puzzle...");
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState<MoveHistory[]>([]);
+  const [history, setHistory] = useState<MoveDelta[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [hint, setHint] = useState<string>("");
   const [solution, setSolution] = useState<PuzzleSolutionStep[] | undefined>(undefined);
@@ -258,7 +258,18 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return null;
     }
 
-    setHistory(prev => [...prev, { rows: JSON.parse(JSON.stringify(rows)), activeRowIndex }]);
+    // Store a lightweight move delta instead of deep-cloning entire board state
+    const sourceLetterIndex = sourceRow.words.findIndex(l => l.id === selectedLetter.id);
+    const delta: MoveDelta = {
+      movedLetterId: selectedLetter.id,
+      movedLetterChar: selectedLetter.char,
+      sourceRowIndex: activeRowIndex,
+      sourceLetterIndex,
+      targetRowIndex: activeRowIndex + 1,
+      targetInsertIndex: targetIndex,
+      activeRowIndexBefore: activeRowIndex,
+    };
+    setHistory(prev => [...prev, delta]);
 
     const newRows = [...rows];
     newRows[activeRowIndex] = { ...sourceRow, words: newSourceLetters };
@@ -297,9 +308,35 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    const lastState = history[history.length - 1];
-    setRows(lastState.rows);
-    setActiveRowIndex(lastState.activeRowIndex);
+    const delta = history[history.length - 1];
+
+    // Reconstruct previous state from delta:
+    // 1. Remove movedLetter from target row
+    // 2. Insert it back into source row at original position (unlocked)
+    setRows(prevRows => {
+      const newRows = [...prevRows];
+      const targetRow = newRows[delta.targetRowIndex];
+      const sourceRow = newRows[delta.sourceRowIndex];
+
+      // Remove the moved letter from target
+      const newTargetLetters = targetRow.words.filter(l => l.id !== delta.movedLetterId);
+
+      // Re-insert into source at original position (unlocked)
+      const restoredLetter: Letter = {
+        id: delta.movedLetterId,
+        char: delta.movedLetterChar,
+        isLocked: false,
+      };
+      const newSourceLetters = [...sourceRow.words];
+      newSourceLetters.splice(delta.sourceLetterIndex, 0, restoredLetter);
+
+      newRows[delta.targetRowIndex] = { ...targetRow, words: newTargetLetters };
+      newRows[delta.sourceRowIndex] = { ...sourceRow, words: newSourceLetters };
+
+      return newRows;
+    });
+
+    setActiveRowIndex(delta.activeRowIndexBefore);
     setHistory(prev => prev.slice(0, -1));
     setGameState(GameState.PLAYING);
     setSelectedLetter(null);

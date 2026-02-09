@@ -68,6 +68,8 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
         },
       ]}
       pointerEvents="none"
+      accessibilityLiveRegion="polite"
+      accessibilityLabel={`Achievement unlocked: ${achievement.title}. ${achievement.description}`}
     >
       <View style={styles.inner}>
         <Text style={styles.icon}>{achievement.icon}</Text>
