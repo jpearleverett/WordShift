@@ -43,7 +43,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (316 tests, 16 suites)
+npx jest --no-coverage   # Run all tests (381 tests, 18 suites)
 ```
 
 ## Tech Stack
@@ -62,7 +62,7 @@ npx jest --no-coverage   # Run all tests (316 tests, 16 suites)
 
 ```
 mobile/
-├── App.tsx                      # Main app: screen routing, wires hooks together
+├── App.tsx                      # Main app (~830 lines): screen routing, wires hooks together
 ├── assets/                      # Image assets (see Asset System below)
 │   ├── characters/              # Animal character sprites
 │   ├── rooms/                   # Room background images
@@ -98,6 +98,9 @@ mobile/
 │   │   │   ├── AnimatedLogo.tsx # Animated WORDSHIFT logo with bounce + subtle rotation
 │   │   │   ├── LevelDisplay.tsx # Level/stat badge display
 │   │   │   ├── Toast.tsx        # Animated toast notification (slide-in + error shake)
+│   │   │   ├── VictoryModal.tsx # Victory screen modal (stars, stats, amber breakdown)
+│   │   │   ├── RulesModal.tsx   # Phase-aware "How to Play" rules modal
+│   │   │   ├── DifficultyMenu.tsx # Difficulty selector dropdown + challenge mode toggle
 │   │   │   └── index.ts         # Puzzle component exports
 │   │   └── home/
 │   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
@@ -119,7 +122,7 @@ mobile/
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
-│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading
+│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules
 │       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials)
 │       ├── achievements.ts      # 36 achievements across 6 categories
 │       ├── shareResults.ts      # Wordle-style emoji grid sharing
@@ -128,13 +131,15 @@ mobile/
 │       ├── audio.ts             # Sound effects (placeholder, awaiting assets)
 │       ├── eventLogger.ts       # Analytics event logging
 │       ├── deviceTier.ts        # Device capability detection for animation scaling
+│       ├── performanceMonitor.ts # Frame rate, render timing, puzzle gen metrics
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (316 tests, 16 suites)
+├── src/__tests__/               # Test suites (381 tests, 18 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
 │   ├── amberCurrency.test.ts
+│   ├── components.test.ts       # Component data contracts, phase theme, rules modal
 │   ├── dailyChallenge.test.ts
 │   ├── dataMigration.test.ts
 │   ├── dialogueSession.test.ts
@@ -142,6 +147,7 @@ mobile/
 │   ├── homeWorldData.test.ts
 │   ├── integration.test.ts      # End-to-end: victory flow, phase transitions, economy, achievements
 │   ├── localGenerator.test.ts
+│   ├── performanceMonitor.test.ts # Frame monitoring, render timing, generation metrics
 │   ├── phaseNarrative.test.ts
 │   ├── settings.test.ts
 │   ├── shareResults.test.ts
@@ -511,6 +517,7 @@ All player-facing text shifts tone with phase:
 - `getHintMessage(letter, word, phase)` — "Move 'R'" → "If it matters, 'R'"
 - `getLoadingMessage(phase)` — "Mixing words..." → "The void speaks..."
 - `getStartMessage(phase)` — "Tap a tile to begin!" → "The words are waiting. They always are."
+- `getRulesText(phase)` — Phase-aware "How to Play" modal: "HOW TO PLAY" → "THE ARRANGEMENT"
 - `getPhaseChangeNarrative(phase)` — Dramatic text for phase transitions
 - `getPhaseIndicator(phase)` — Icon + label for puzzle header badge
 
@@ -580,6 +587,7 @@ Manages amber balance, streak, phase progression, and decorations:
 - `updateStreak()` - Grace period of STREAK_RESET_DAYS (2 days)
 - `getStreakInfo()` - Current streak, multiplier, bonus percentage
 - `getFullProgress()` - All progress data (amber, puzzles, phase, unlocks)
+- `getPuzzlesUntilNextPhase()` - Uses `phaseProgress` (accelerated) not raw `puzzlesSolved`
 - `purchaseDecoration(roomId, decorationId, cost)` - Buy room decoration
 - `hasDecoration(roomId, decorationId)` / `getAllDecorations()` / `getDecorationCount()` - Decoration queries
 - `clearProgress()` - Full reset
@@ -623,6 +631,18 @@ Lightweight error reporting infrastructure:
 - `getRecentBreadcrumbs()` - Retrieve breadcrumb trail for debugging
 - Designed for easy integration with external services (Sentry, etc.) later
 
+### Performance Monitoring (`performanceMonitor.ts`)
+
+In-memory performance metrics for animation health and puzzle generation:
+
+- `startFrameMonitoring()` / `stopFrameMonitoring()` - Frame rate tracking via requestAnimationFrame
+- `markRenderStart(component)` - Returns end function; tracks component render duration
+- `recordGenerationMetric(metric)` - Records puzzle generation timing, scores, fallback usage
+- `getPerformanceSummary()` - Aggregated stats: FPS (avg/min/p95/dropped), render times (by component, slow renders), generation (avg duration, timeouts, fallbacks)
+- `isPerformanceDegraded()` - True if avg FPS < 45 in recent samples
+- `clearMetrics()` - Reset all collected data
+- Frame monitoring starts automatically on app mount via App.tsx
+
 ### Hint System
 
 Educational hints show the target word with phase-aware tone:
@@ -659,6 +679,7 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialC
 - React Native StyleSheet for styling (not inline styles)
 - Functional components with hooks
 - Custom hooks extract game logic from App.tsx (`usePuzzleGame`, `useGamePersistence`, `useVictoryFlow`, `useAchievementQueue`) and home screen logic (`useDialogueFlow`, `useUnlockFlow`)
+- Extracted UI components live in `components/puzzle/` (VictoryModal, RulesModal, DifficultyMenu, ActionButton, AnimatedLogo, LevelDisplay, Toast)
 - Import colors from `CandyColors` in `src/theme/colors.ts`; use `getPhaseTheme(phase)` for phase-aware colors
 - All player-facing text must go through `phaseNarrative.ts` — never hardcode victory/move/hint strings
 - Use `Animated` API for smooth animations; choreograph multi-step animations with `Animated.sequence` + `Animated.stagger`
@@ -680,7 +701,7 @@ Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialC
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 316 tests, 16 suites
+cd mobile && npx jest --no-coverage  # 381 tests, 18 suites
 ```
 
 **Test patterns:**
@@ -691,6 +712,8 @@ cd mobile && npx jest --no-coverage  # 316 tests, 16 suites
 - Hook tests (`usePuzzleGame`, `useGamePersistence`) use manual React mock with stateStore Map + index rewind pattern
 - `jest.fn(async () => ...)` infers 0 args — add typed optional params `(_d?: any, _s?: any)` for TS
 - `DialoguePhase` is `0 | 1 | 2 | 3 | 4` literal type — mock return values need `as number` or `as any` cast
+- Component tests use `jest.mock('react-native', ...)` with stub exports since test env is Node (no renderer); test data contracts and service integrations rather than rendering
+- Performance monitor tests mock `requestAnimationFrame`, `cancelAnimationFrame`, and `performance.now` globally
 
 ### Manual Testing
 
