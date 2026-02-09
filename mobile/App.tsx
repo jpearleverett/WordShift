@@ -39,7 +39,8 @@ import {
   getPhaseIndicator,
   getLoadingMessage,
 } from './src/services/phaseNarrative';
-import { getPhaseTransitionEvent, PhaseTransitionEvent } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
+import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
 
 // App screen type — expanded with settings and stats
@@ -203,6 +204,31 @@ export default function App() {
         const event = getPhaseTransitionEvent(victory.newPhase as any);
         if (event) {
           setPhaseTransitionEvent(event);
+        }
+      }
+
+      // Check for endgame triggers (final puzzle + post-revelation)
+      // Only when NOT already showing a phase transition
+      if (!victory.phaseChanged && persistence.currentPhase >= 4) {
+        try {
+          const houseComplete = await isHouseCompleted();
+          if (houseComplete) {
+            const finalDone = await isFinalPuzzleCompleted();
+            if (!finalDone) {
+              // First puzzle after house completion at Phase 4 = the "final puzzle"
+              await markFinalPuzzleCompleted();
+              setTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+            } else {
+              const postRev = await isPostRevelation();
+              if (!postRev) {
+                // First puzzle after final puzzle = post-revelation (Phase 5)
+                await markPostRevelation();
+                setTimeout(() => setPhaseTransitionEvent(POST_REVELATION_EVENT), 1500);
+              }
+            }
+          }
+        } catch {
+          // Endgame triggers are non-critical
         }
       }
 

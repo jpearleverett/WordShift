@@ -16,6 +16,7 @@ import {
   getPhaseChangeNarrative,
   getRitualEchoHeader,
   getRitualEchoFooter,
+  getWordsOfferedText,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -230,6 +231,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   </Text>
                 )}
               </View>
+            )}
+
+            {/* Words Offered — ritual word count (Phase 1+) */}
+            {victoryData && victoryData.totalWordsFormed != null && victoryData.totalWordsFormed > 0 && phase >= 1 && (
+              <Text style={[
+                styles.wordsOfferedText,
+                phase >= 3 && styles.wordsOfferedTextDark,
+              ]}>
+                {getWordsOfferedText(victoryData.totalWordsFormed, phase)}
+              </Text>
             )}
 
             <View style={styles.victoryStats}>
@@ -666,6 +677,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: CandyColors.gray[400],
     marginTop: 6,
+    fontStyle: 'italic',
+  },
+  wordsOfferedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: CandyColors.gray[400],
+    marginBottom: 12,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  wordsOfferedTextDark: {
+    color: 'rgba(180, 100, 130, 0.8)',
     fontStyle: 'italic',
   },
 });

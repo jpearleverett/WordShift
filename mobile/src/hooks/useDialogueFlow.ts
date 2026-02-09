@@ -4,6 +4,8 @@ import { Animal, HomeWorldProgress, getAnimalPhase, DialoguePhase } from '../typ
 import {
   getCurrentDialogue,
   hasMoreDialogues,
+  getCrossAnimalReference,
+  TUTORIAL_CALLBACK_DIALOGUES,
 } from '../services/animalDialogue';
 import {
   checkDialogueAvailability,
@@ -11,7 +13,7 @@ import {
   endSession,
   getSessionStatus,
 } from '../services/dialogueSession';
-import { markDialogueRead, consumeTriggerWords } from '../services/amberCurrency';
+import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 
 interface SessionInfo {
@@ -36,6 +38,7 @@ interface UseDialogueFlowReturn {
   dialogueSlide: Animated.Value;
   isTalking: boolean;
   triggerReaction: string | null;
+  crossAnimalRef: string | null;
   handleAnimalTap: (animal: Animal) => Promise<void>;
   handleNextDialogue: () => Promise<void>;
   handleCloseDialogue: () => Promise<void>;
@@ -55,6 +58,7 @@ export function useDialogueFlow({
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
   const [isTalking, setIsTalking] = useState(false);
   const [triggerReaction, setTriggerReaction] = useState<string | null>(null);
+  const [crossAnimalRef, setCrossAnimalRef] = useState<string | null>(null);
 
   // Animations
   const dialogueSlide = useRef(new Animated.Value(0)).current;
@@ -179,6 +183,7 @@ export function useDialogueFlow({
     setSelectedAnimal(animal);
     setShowDialogue(true);
     setTriggerReaction(null);
+    setCrossAnimalRef(null);
 
     // Check for trigger word reactions from recent puzzles
     try {
@@ -193,6 +198,31 @@ export function useDialogueFlow({
       }
     } catch {
       // Trigger word consumption is non-critical
+    }
+
+    // Tutorial callback for Fox at Phase 4 — one-time chilling reference to tutorial lines
+    if (animal.type === 'fox' && progress && progress.currentPhase >= 4) {
+      try {
+        const seedsPlanted = await wereTutorialSeedsPlanted();
+        if (!seedsPlanted) {
+          const callbackLine = TUTORIAL_CALLBACK_DIALOGUES[Math.floor(Math.random() * TUTORIAL_CALLBACK_DIALOGUES.length)];
+          setTriggerReaction(callbackLine);
+          await markTutorialSeedsPlanted();
+        }
+      } catch {
+        // Tutorial callback is non-critical
+      }
+    }
+
+    // Cross-animal reference — ~25% chance to show a one-off reference to another animal
+    if (progress && progress.unlockedAnimals) {
+      const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
+      if (Math.random() < 0.25) {
+        const ref = getCrossAnimalReference(animal.type, animalPhase as DialoguePhase, progress.unlockedAnimals);
+        if (ref) {
+          setCrossAnimalRef(ref);
+        }
+      }
     }
 
     const status = getSessionStatus(animal.id);
@@ -221,6 +251,7 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setTriggerReaction(null);
+    setCrossAnimalRef(null);
   }, [selectedAnimal]);
 
   // Handle dialogue advance
@@ -287,6 +318,7 @@ export function useDialogueFlow({
     dialogueSlide,
     isTalking,
     triggerReaction,
+    crossAnimalRef,
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,
