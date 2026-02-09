@@ -162,7 +162,6 @@ export async function generateDailyPuzzle(): Promise<{
 
   const generationPromise = (async () => {
     const today = getTodayString();
-    const difficulty = getDailyDifficulty(today);
     const rng = seededRandom(`wordshift-daily-${today}`);
 
     // Temporarily override Math.random for deterministic generation
@@ -170,11 +169,12 @@ export async function generateDailyPuzzle(): Promise<{
     Math.random = rng;
 
     try {
-      const puzzle = await generateLocalPuzzle(difficulty);
+      // Daily challenge is always 6-letter words, 5 rows
+      const puzzle = await generateLocalPuzzle('HARD', { wordLength: 6, chainLength: 5 });
       return {
         words: puzzle.words,
         hint: puzzle.hint,
-        difficulty,
+        difficulty: 'HARD' as Difficulty,
         date: today,
       };
     } finally {

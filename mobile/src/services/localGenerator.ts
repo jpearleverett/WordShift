@@ -704,9 +704,12 @@ function weightedShuffle(
   return [...topWords, ...restWords];
 }
 
-export const generateLocalPuzzle = async (difficulty: Difficulty = 'MEDIUM'): Promise<PuzzleConfig> => {
-  const targetRows = difficulty === 'EASY' ? 3 : difficulty === 'MEDIUM' ? 4 : 5;
-  const wordLength = difficulty === 'HARD' ? 5 : 4;
+export const generateLocalPuzzle = async (
+  difficulty: Difficulty = 'MEDIUM',
+  overrides?: { wordLength?: number; chainLength?: number }
+): Promise<PuzzleConfig> => {
+  const targetRows = overrides?.chainLength ?? (difficulty === 'EASY' ? 3 : difficulty === 'MEDIUM' ? 4 : 5);
+  const wordLength = overrides?.wordLength ?? (difficulty === 'HARD' ? 5 : 4);
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();

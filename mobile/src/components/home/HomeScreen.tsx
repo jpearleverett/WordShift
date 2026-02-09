@@ -61,7 +61,7 @@ import { useUnlockFlow } from '../../hooks/useUnlockFlow';
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
 import { AmberSparkle } from './AmberSparkle';
-import { DailyChallengeCard } from '../DailyChallengeCard';
+import { getDailyStatus } from '../../services/dailyChallenge';
 import { Difficulty } from '../../types';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -100,6 +100,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
 
+  // Daily challenge state
+  const [dailyCompleted, setDailyCompleted] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState(0);
+
   // House completion ceremony state
   const [showHouseCompletion, setShowHouseCompletion] = useState(false);
   const [houseCompletionTextIndex, setHouseCompletionTextIndex] = useState(0);
@@ -127,13 +131,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Load all data from storage
   const loadAllData = useCallback(async () => {
-    const [progressData, roomsData, animalsData, decorations] = await Promise.all([
+    const [progressData, roomsData, animalsData, decorations, dailyStatus] = await Promise.all([
       getFullProgress(),
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
       getAllDecorations(),
+      getDailyStatus(),
     ]);
     setPurchasedDecorations(decorations);
+    setDailyCompleted(dailyStatus.isCompleted);
+    setDailyStreak(dailyStatus.streak);
 
     // Update puzzle count for dialogue session system
     updatePuzzleCount(progressData.puzzlesSolved);
@@ -313,6 +320,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         <View style={styles.headerRight}>
+          {onStartDaily && (
+            <TouchableOpacity
+              style={[
+                styles.headerIconBtn,
+                !dailyCompleted && styles.dailyIconActive,
+              ]}
+              onPress={() => dailyCompleted ? undefined : onStartDaily('HARD')}
+              activeOpacity={dailyCompleted ? 1 : 0.7}
+              accessibilityLabel={dailyCompleted ? `Daily complete. Streak: ${dailyStreak}` : 'Play daily challenge'}
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerIconText}>{dailyCompleted ? '✅' : '📅'}</Text>
+              {dailyStreak > 1 && (
+                <View style={styles.dailyStreakBadge}>
+                  <Text style={styles.dailyStreakText}>{dailyStreak}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.headerIconBtn}
             onPress={onOpenStats}
@@ -383,11 +409,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
           </View>
         </TouchableOpacity>
-      )}
-
-      {/* Daily Challenge Card */}
-      {onStartDaily && (
-        <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
       )}
 
       {/* Celebration Confetti */}
@@ -1066,6 +1087,28 @@ const styles = StyleSheet.create({
   },
   headerIconText: {
     fontSize: 16,
+  },
+  dailyIconActive: {
+    backgroundColor: 'rgba(255, 200, 50, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 200, 50, 0.5)',
+  },
+  dailyStreakBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: CandyColors.orange.main,
+    borderRadius: 7,
+    minWidth: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  dailyStreakText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: CandyColors.white,
   },
   title: {
     color: CandyColors.white,

@@ -136,10 +136,10 @@ export default function App() {
       puzzleActions.setGameState(GameState.LOADING);
       try {
         const daily = await generateDailyPuzzle();
-        puzzleActions.initGame(daily.words, daily.hint);
+        puzzleActions.initGame(daily.words, daily.hint, undefined, 6);
       } catch (err) {
         console.warn('Daily puzzle generation failed, using random:', err);
-        puzzleActions.startNewGame(difficulty);
+        puzzleActions.startNewGame('HARD');
       }
       logEvent({ type: 'puzzle_started', data: { difficulty, isDaily: true } });
     });
