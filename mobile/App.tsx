@@ -536,6 +536,7 @@ export default function App() {
               onSlotPress={handleSlotPress}
               isProcessing={puzzle.isProcessing}
               phase={persistence.currentPhase}
+              currentWordLength={puzzle.currentWordLength}
             />
           ))}
         </ScrollView>

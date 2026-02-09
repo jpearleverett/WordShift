@@ -11,7 +11,11 @@ interface LetterTileProps {
   isInteractable?: boolean;
   highlight?: 'default' | 'source' | 'locked';
   phase?: number;
+  tileWidth?: number;
 }
+
+// Default tile width - used as basis for proportional scaling
+export const DEFAULT_TILE_WIDTH = 52;
 
 export const LetterTile: React.FC<LetterTileProps> = ({
   letter,
@@ -20,7 +24,11 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   isInteractable,
   highlight = 'default',
   phase = 0,
+  tileWidth,
 }) => {
+  // Scale factor for dynamic sizing
+  const tw = tileWidth ?? DEFAULT_TILE_WIDTH;
+  const scale = tw / DEFAULT_TILE_WIDTH;
   const settings = getSettingsSync();
 
   // Animation values
@@ -329,11 +337,23 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     outputRange: ['-3deg', '0deg', '3deg'],
   });
 
+  // Dynamic dimensions based on scale
+  const outerWidth = tw;
+  const outerHeight = Math.round(64 * scale);
+  const bodyWidth = tw;
+  const bodyHeight = Math.round(56 * scale);
+  const fontSize = Math.round(26 * scale);
+  const borderRadius = Math.round(14 * scale);
+  const marginH = Math.round(3 * scale);
+
   const content = (
     <Animated.View
       style={[
         styles.tileOuter,
         {
+          width: outerWidth,
+          height: outerHeight,
+          marginHorizontal: marginH,
           transform: [
             { scale: scaleAnim },
             { translateY: bounceAnim },
@@ -348,6 +368,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
           style={[
             styles.glowOuter,
             {
+              borderRadius: borderRadius + 2,
               backgroundColor: tileStyles.shadowColor,
               opacity: isSelected ? 0.6 : glowOpacity,
             },
@@ -360,6 +381,9 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         style={[
           styles.tileBody,
           {
+            width: bodyWidth,
+            height: bodyHeight,
+            borderRadius,
             backgroundColor: tileStyles.bgColor,
             borderBottomColor: tileStyles.borderColor,
             shadowColor: tileStyles.shadowColor,
@@ -369,7 +393,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         ]}
       >
         {/* Top highlight (bevel effect) */}
-        <View style={styles.bevelTop} />
+        <View style={[styles.bevelTop, { borderTopLeftRadius: borderRadius, borderTopRightRadius: borderRadius }]} />
 
         {/* Glossy shine overlay */}
         <View style={styles.glossyShine} />
@@ -378,7 +402,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         <Text
           style={[
             styles.letterText,
-            { color: tileStyles.textColor },
+            { color: tileStyles.textColor, fontSize },
             isSelected && styles.letterTextSelected,
           ]}
         >
@@ -412,8 +436,15 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       <View
         style={[
           styles.tileEdge,
-          { backgroundColor: tileStyles.borderColor },
-          highlight === 'locked' && styles.tileEdgeLocked,
+          {
+            backgroundColor: tileStyles.borderColor,
+            left: Math.round(4 * scale),
+            right: Math.round(4 * scale),
+            height: Math.round(8 * scale),
+            borderBottomLeftRadius: Math.round(12 * scale),
+            borderBottomRightRadius: Math.round(12 * scale),
+          },
+          highlight === 'locked' && { height: Math.round(6 * scale) },
         ]}
       />
     </Animated.View>
@@ -439,9 +470,6 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
 const styles = StyleSheet.create({
   tileOuter: {
-    width: 52,
-    height: 64,
-    marginHorizontal: 3,
     alignItems: 'center',
   },
   glowOuter: {
@@ -450,13 +478,9 @@ const styles = StyleSheet.create({
     left: 2,
     right: 2,
     bottom: 6,
-    borderRadius: 14,
     transform: [{ scale: 1.15 }],
   },
   tileBody: {
-    width: 52,
-    height: 56,
-    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     borderBottomWidth: 0,
@@ -479,15 +503,7 @@ const styles = StyleSheet.create({
   tileEdge: {
     position: 'absolute',
     bottom: 0,
-    left: 4,
-    right: 4,
-    height: 8,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
     zIndex: -1,
-  },
-  tileEdgeLocked: {
-    height: 6,
   },
   bevelTop: {
     position: 'absolute',
@@ -496,8 +512,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: '50%',
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
   },
   glossyShine: {
     position: 'absolute',
@@ -509,7 +523,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   letterText: {
-    fontSize: 26,
     fontWeight: '900',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 2 },

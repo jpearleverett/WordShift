@@ -1,5 +1,5 @@
 
-import { WORDS_3, WORDS_4, WORDS_5, WORDS_6, COMMON_WORDS } from '../constants';
+import { WORDS_3, WORDS_4, WORDS_5, WORDS_6, WORDS_7, COMMON_WORDS } from '../constants';
 import { PuzzleConfig, PuzzleSolutionStep, Difficulty } from '../types';
 import {
   getWordHistoryWithRecency,
@@ -16,6 +16,7 @@ const WORD_SETS: Record<number, Set<string>> = {
   4: new Set(WORDS_4),
   5: new Set(WORDS_5),
   6: new Set(WORDS_6),
+  7: new Set(WORDS_7),
 };
 
 // Word arrays for frequency-based scoring (index = relative commonness)
@@ -24,6 +25,7 @@ const WORD_ARRAYS: Record<number, string[]> = {
   4: WORDS_4,
   5: WORDS_5,
   6: WORDS_6,
+  7: WORDS_7,
 };
 
 export const validateWord = (word: string): boolean => {

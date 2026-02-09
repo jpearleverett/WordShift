@@ -6,9 +6,10 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  Dimensions,
 } from 'react-native';
 import { Letter, RowData } from '../types';
-import { LetterTile } from './LetterTile';
+import { LetterTile, DEFAULT_TILE_WIDTH } from './LetterTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
@@ -22,6 +23,23 @@ const ARC_LIFT = 18; // How much center elements lift up relative to edges
 const SLOT_WIDTH = 14; // Narrow slots to keep letters close together
 const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
 
+// Calculate tile width so the widest row (arc layout with N+1 letters + N+2 slots) fits on screen
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const AVAILABLE_ROW_WIDTH = SCREEN_WIDTH - 2 * ROW_HORIZONTAL_MARGIN - 2 * ROW_PADDING;
+
+function getTileWidth(maxLetterCount: number): number {
+  // Arc row has maxLetterCount letters + (maxLetterCount+1) slots
+  // Each tile takes tileWidth + 2*(-3) margin in arc = tileWidth - 6
+  // Each slot takes (slotWidth+4) + 2*(-1) margin in arc = slotWidth + 2
+  // Total: maxLetterCount * (tileWidth - 6) + (maxLetterCount+1) * (slotWidth + 2) <= available
+  // Solve for tileWidth:
+  // maxLetterCount * tileWidth - 6*maxLetterCount + (maxLetterCount+1)*(SLOT_WIDTH+2) <= available
+  // maxLetterCount * tileWidth <= available + 6*maxLetterCount - (maxLetterCount+1)*(SLOT_WIDTH+2)
+  const slotSpace = (maxLetterCount + 1) * (SLOT_WIDTH + 2);
+  const tileWidth = Math.floor((AVAILABLE_ROW_WIDTH + 6 * maxLetterCount - slotSpace) / maxLetterCount);
+  return Math.min(tileWidth, DEFAULT_TILE_WIDTH);
+}
+
 interface RowProps {
   rowData: RowData;
   rowIndex: number;
@@ -31,6 +49,7 @@ interface RowProps {
   onSlotPress: (targetIndex: number) => void;
   isProcessing: boolean;
   phase?: number;
+  currentWordLength?: number;
 }
 
 // Phase-aware row color helper
@@ -102,7 +121,7 @@ function getPhaseRowColors(phase: number) {
 }
 
 // Animated drop slot component
-const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; phase?: number }> = ({ onPress, index, compact = false, phase = 0 }) => {
+const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; phase?: number; sizeScale?: number }> = ({ onPress, index, compact = false, phase = 0, sizeScale = 1 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
@@ -236,7 +255,15 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; ph
         />
 
         {/* Main slot */}
-        <View style={[styles.slot, compact && styles.slotCompact, { borderColor: phaseColors.slotBorderColor }]}>
+        <View style={[
+          styles.slot,
+          compact && styles.slotCompact,
+          compact && sizeScale < 1 && {
+            width: Math.round((SLOT_WIDTH + 4) * sizeScale),
+            height: Math.round(SLOT_HEIGHT * sizeScale),
+          },
+          { borderColor: phaseColors.slotBorderColor },
+        ]}>
           {/* Inner shimmer */}
           <View style={styles.slotShimmer} />
 
@@ -270,8 +297,13 @@ export const Row: React.FC<RowProps> = memo(({
   onSlotPress,
   isProcessing,
   phase = 0,
+  currentWordLength = 4,
 }) => {
   const phaseColors = getPhaseRowColors(phase);
+  // Max letters that will appear in the arc (drop) row = currentWordLength + 1
+  const maxArcLetters = currentWordLength + 1;
+  const tileWidth = getTileWidth(maxArcLetters);
+  const sizeScale = tileWidth / DEFAULT_TILE_WIDTH;
   const isSource = rowIndex === activeRowIndex;
   const isTarget = rowIndex === activeRowIndex + 1;
   const isCompleted = rowIndex < activeRowIndex;
@@ -444,7 +476,7 @@ export const Row: React.FC<RowProps> = memo(({
               { transform: [{ translateY }, { rotate }] },
             ]}
           >
-            <Slot onPress={() => onSlotPress(slotIndex)} index={slotIndex} compact phase={phase} />
+            <Slot onPress={() => onSlotPress(slotIndex)} index={slotIndex} compact phase={phase} sizeScale={sizeScale} />
           </Animated.View>
         );
       } else {
@@ -463,6 +495,7 @@ export const Row: React.FC<RowProps> = memo(({
               letter={letter}
               highlight={letter.isLocked ? 'locked' : 'default'}
               phase={phase}
+              tileWidth={tileWidth}
             />
           </Animated.View>
         );
@@ -485,6 +518,7 @@ export const Row: React.FC<RowProps> = memo(({
         highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
         onPress={() => onLetterPress(letter, rowIndex)}
         phase={phase}
+        tileWidth={tileWidth}
       />
     ));
   };
