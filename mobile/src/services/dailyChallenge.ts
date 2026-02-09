@@ -138,6 +138,7 @@ let dailyGenerationInProgress: Promise<{
   hint?: string;
   difficulty: Difficulty;
   date: string;
+  wordLength: number;
 }> | null = null;
 
 /**
@@ -151,6 +152,7 @@ export async function generateDailyPuzzle(): Promise<{
   hint?: string;
   difficulty: Difficulty;
   date: string;
+  wordLength: number;
 }> {
   // If generation is already in progress, await the existing result
   if (dailyGenerationInProgress) {
@@ -177,6 +179,7 @@ export async function generateDailyPuzzle(): Promise<{
         hint: puzzle.hint,
         difficulty,
         date: today,
+        wordLength: puzzle.wordLength ?? 6,
       };
     } finally {
       Math.random = originalRandom;
