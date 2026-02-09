@@ -12,8 +12,10 @@ import {
   awardPuzzleAmber,
   getAmberBalance,
   getCurrentPhase,
+  recordRitualWords,
 } from '../services/amberCurrency';
-import { updatePuzzleCount } from '../services/dialogueSession';
+import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
+import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
 
 export interface VictoryData {
@@ -29,6 +31,10 @@ export interface VictoryData {
   milestoneMessage: string | null;
   cumulativeStats: CumulativeStats | null;
   phaseAcceleration: number;
+  /** Total words ever formed (for ritual tracking) */
+  totalWordsFormed: number;
+  /** Ritual energy of this puzzle */
+  ritualEnergy: number;
 }
 
 export interface PersistenceState {
@@ -38,7 +44,7 @@ export interface PersistenceState {
 }
 
 export interface PersistenceActions {
-  recordVictory: (difficulty: Difficulty, hintsUsed: number, invalidAttempts: number, gameMode?: GameMode) => Promise<VictoryData>;
+  recordVictory: (difficulty: Difficulty, hintsUsed: number, invalidAttempts: number, gameMode?: GameMode, completedWords?: string[]) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
 }
@@ -75,7 +81,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     difficulty: Difficulty,
     hintsUsed: number,
     invalidAttempts: number,
-    gameMode: GameMode = 'standard'
+    gameMode: GameMode = 'standard',
+    completedWords: string[] = []
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
 
@@ -94,6 +101,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         milestoneMessage: null,
         cumulativeStats,
         phaseAcceleration: 1.0,
+        totalWordsFormed: 0,
+        ritualEnergy: 0,
       };
     }
 
@@ -108,8 +117,19 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       setCumulativeStats(stats);
       updatePuzzleCount(amberResult.puzzlesSolved);
+      updateSessionPhase(amberResult.newPhase);
       setAmberBalance(amberResult.newBalance);
       setCurrentPhase(amberResult.newPhase);
+
+      // Record ritual words from the completed puzzle
+      let totalWordsFormed = 0;
+      let ritualEnergy = 0;
+      if (completedWords.length > 0) {
+        ritualEnergy = calculateRitualEnergy(completedWords, amberResult.newPhase);
+        const triggerWords = extractTriggerWords(completedWords);
+        const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
+        totalWordsFormed = ritualResult.totalWordsFormed;
+      }
 
       logEvent({
         type: 'puzzle_completed',
@@ -125,6 +145,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           phase: amberResult.newPhase,
           phaseChanged: amberResult.phaseChanged,
           phaseAcceleration: amberResult.phaseAcceleration,
+          ritualEnergy,
         },
       });
 
@@ -141,6 +162,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         milestoneMessage: amberResult.milestoneMessage,
         cumulativeStats: stats,
         phaseAcceleration: amberResult.phaseAcceleration,
+        totalWordsFormed,
+        ritualEnergy,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -157,6 +180,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         milestoneMessage: null,
         cumulativeStats,
         phaseAcceleration: 1.0,
+        totalWordsFormed: 0,
+        ritualEnergy: 0,
       };
     } finally {
       recordInProgress.current = false;

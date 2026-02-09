@@ -14,7 +14,7 @@ import {
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
 // (inside HouseWorld's GestureHandlerRootView) correctly use RNGH's version.
-import { Animal, Room, DialoguePhase, HomeWorldProgress, Unlockable, ROOM_DECORATIONS, Decoration, getDecorationsForRoom } from '../../types/homeWorld';
+import { Animal, Room, DialoguePhase, HomeWorldProgress, Unlockable, ROOM_DECORATIONS, Decoration, getDecorationsForRoom, getDecorationDescription, getAnimalPhase } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
@@ -33,6 +33,7 @@ import {
   ANIMAL_EMOJIS,
   getRoomsWithStatus,
   getAnimalsWithStatus,
+  getRoomDescription,
 } from '../../services/homeWorldData';
 import {
   getCurrentDialogue,
@@ -422,6 +423,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <View style={styles.dialogueTextCol}>
                   <Text style={styles.dialogueAnimalName}>{dialogueFlow.selectedAnimal.name}</Text>
 
+                  {/* Trigger word reaction — animal noticed a word from recent puzzles */}
+                  {dialogueFlow.triggerReaction && progress.currentPhase >= 2 && (
+                    <View style={[
+                      styles.triggerReactionBubble,
+                      progress.currentPhase >= 3 && styles.triggerReactionBubbleDark,
+                    ]}>
+                      <Text style={[
+                        styles.triggerReactionText,
+                        progress.currentPhase >= 3 && styles.triggerReactionTextDark,
+                      ]}>
+                        {dialogueFlow.triggerReaction}
+                      </Text>
+                    </View>
+                  )}
+
                   <View style={styles.dialogueBubble}>
                     <Text style={styles.dialogueText}>{dialogueFlow.dialogueText}</Text>
                   </View>
@@ -437,7 +453,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         {hasMoreDialogues(
                           dialogueFlow.selectedAnimal.type,
                           dialogueFlow.selectedAnimal.currentDialogueIndex,
-                          progress.currentPhase
+                          getAnimalPhase(progress.currentPhase, dialogueFlow.selectedAnimal.type)
                         )
                           ? 'Next'
                           : 'Close'}
@@ -791,7 +807,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <Text style={styles.decorationIcon}>{dec.icon}</Text>
                         <View style={styles.decorationInfo}>
                           <Text style={styles.decorationName}>{dec.name}</Text>
-                          <Text style={styles.decorationDesc}>{dec.description}</Text>
+                          <Text style={styles.decorationDesc}>
+                            {getDecorationDescription(dec, progress.currentPhase)}
+                          </Text>
                         </View>
                         {isPurchased ? (
                           <View style={styles.decorationOwnedBadge}>
@@ -1036,6 +1054,29 @@ const styles = StyleSheet.create({
     color: CandyColors.purple.dark,
     letterSpacing: 0.3,
     marginBottom: 10,
+  },
+  triggerReactionBubble: {
+    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(147, 51, 234, 0.2)',
+  },
+  triggerReactionBubbleDark: {
+    backgroundColor: 'rgba(80, 20, 40, 0.3)',
+    borderColor: 'rgba(120, 40, 60, 0.4)',
+  },
+  triggerReactionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    color: CandyColors.purple.main,
+    textAlign: 'center',
+  },
+  triggerReactionTextDark: {
+    color: '#C77DBA',
   },
   dialogueBubble: {
     backgroundColor: CandyColors.gray[100],

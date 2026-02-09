@@ -69,6 +69,7 @@ jest.mock('../services/localGenerator', () => ({
     ],
     wordLength: 4,
   })),
+  getIncantationName: jest.fn(() => null),
 }));
 
 jest.mock('../services/phaseNarrative', () => ({

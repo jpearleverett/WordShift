@@ -168,7 +168,8 @@ export default function App() {
         puzzle.difficulty,
         result.hintsUsed,
         result.invalidAttempts,
-        result.gameMode
+        result.gameMode,
+        result.completedWords
       );
 
       // Record daily challenge completion if applicable
@@ -572,6 +573,8 @@ export default function App() {
         isPlayingDaily={isPlayingDaily}
         victoryData={victoryFlow.victoryData}
         cumulativeStats={persistence.cumulativeStats}
+        completedWords={puzzle.lastCompletedWords}
+        incantationName={puzzle.lastIncantationName}
         modalScale={victoryFlow.victoryModalScale}
         modalOpacity={victoryFlow.victoryModalOpacity}
         star1Scale={victoryFlow.victoryStar1}

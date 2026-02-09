@@ -14,6 +14,8 @@ import {
   getVictoryTitle,
   getVictoryFeedback,
   getPhaseChangeNarrative,
+  getRitualEchoHeader,
+  getRitualEchoFooter,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -27,6 +29,8 @@ export interface VictoryData {
   currentStreak: number;
   phaseChanged: boolean;
   newPhase: number;
+  totalWordsFormed?: number;
+  ritualEnergy?: number;
 }
 
 interface VictoryModalProps {
@@ -39,6 +43,9 @@ interface VictoryModalProps {
   isPlayingDaily: boolean;
   victoryData: VictoryData | null;
   cumulativeStats: CumulativeStats | null;
+  // Ritual echo data
+  completedWords?: string[];
+  incantationName?: string | null;
   // Animated values from useVictoryFlow
   modalScale: Animated.Value;
   modalOpacity: Animated.Value;
@@ -61,6 +68,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   isPlayingDaily,
   victoryData,
   cumulativeStats,
+  completedWords,
+  incantationName,
   modalScale,
   modalOpacity,
   star1Scale,
@@ -177,6 +186,51 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <Text style={styles.victoryFeedback}>
               {getVictoryFeedback(earnedStars, phase)}
             </Text>
+
+            {/* Ritual Echo — word chain from completed puzzle (Phase 2+) */}
+            {phase >= 2 && completedWords && completedWords.length > 0 && (
+              <View style={[
+                styles.ritualEchoContainer,
+                phase >= 4 && styles.ritualEchoContainerDark,
+              ]}>
+                <Text style={[
+                  styles.ritualEchoHeader,
+                  phase >= 3 && styles.ritualEchoHeaderDark,
+                ]}>
+                  {getRitualEchoHeader(phase)}
+                </Text>
+                <View style={styles.ritualEchoChain}>
+                  {completedWords.map((word, i) => (
+                    <React.Fragment key={i}>
+                      <Text style={[
+                        styles.ritualEchoWord,
+                        phase >= 3 && styles.ritualEchoWordDark,
+                      ]}>
+                        {word}
+                      </Text>
+                      {i < completedWords.length - 1 && (
+                        <Text style={styles.ritualEchoArrow}>
+                          {phase >= 3 ? '\u2193' : '\u2192'}
+                        </Text>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+                {incantationName && (
+                  <Text style={[
+                    styles.ritualIncantationName,
+                    phase >= 4 && styles.ritualIncantationNameDark,
+                  ]}>
+                    {incantationName}
+                  </Text>
+                )}
+                {getRitualEchoFooter(phase, completedWords.length) !== '' && (
+                  <Text style={styles.ritualEchoFooter}>
+                    {getRitualEchoFooter(phase, completedWords.length)}
+                  </Text>
+                )}
+              </View>
+            )}
 
             <View style={styles.victoryStats}>
               <View style={styles.victoryStatItem}>
@@ -542,5 +596,76 @@ const styles = StyleSheet.create({
   phaseChangeContainerDark: {
     backgroundColor: '#0F0818',
     borderColor: '#3D1560',
+  },
+
+  // Ritual Echo styles (word chain visualization)
+  ritualEchoContainer: {
+    backgroundColor: 'rgba(147, 51, 234, 0.08)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 12,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(147, 51, 234, 0.15)',
+  },
+  ritualEchoContainerDark: {
+    backgroundColor: 'rgba(30, 10, 40, 0.9)',
+    borderColor: 'rgba(120, 30, 60, 0.4)',
+  },
+  ritualEchoHeader: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: CandyColors.gray[400],
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  ritualEchoHeaderDark: {
+    color: 'rgba(180, 100, 130, 0.8)',
+  },
+  ritualEchoChain: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ritualEchoWord: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: CandyColors.purple.main,
+    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  ritualEchoWordDark: {
+    color: '#C77DBA',
+    backgroundColor: 'rgba(100, 30, 60, 0.3)',
+  },
+  ritualEchoArrow: {
+    fontSize: 12,
+    color: CandyColors.gray[400],
+    marginHorizontal: 2,
+  },
+  ritualIncantationName: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    color: CandyColors.purple.dark,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  ritualIncantationNameDark: {
+    color: '#9B4DCA',
+  },
+  ritualEchoFooter: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: CandyColors.gray[400],
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 });

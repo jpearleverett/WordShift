@@ -13,6 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CandyColors, getTileColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import { markTutorialSeedsPlanted } from '../services/amberCurrency';
 
 const TUTORIAL_KEY = 'wordshift_tutorial_completed';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -330,6 +331,9 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
   const handleComplete = async () => {
     await markTutorialCompleted();
+    // Track that tutorial seeds were planted - Fox will reference these later at higher phases
+    // "We've been waiting for someone like you" and "Every puzzle you solve helps us build the house"
+    await markTutorialSeedsPlanted().catch(() => {});
     if (reducedMotion) {
       onComplete();
       return;

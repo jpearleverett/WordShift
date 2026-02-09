@@ -864,3 +864,1063 @@ export function getIntroDialogueLine(
 export function getIntroDialogueCount(animalType: AnimalType): number {
   return INTRO_DIALOGUES[animalType]?.length || 0;
 }
+
+// =============================================================================
+// PHASE 5 - POST-REVELATION DIALOGUES
+// =============================================================================
+
+/**
+ * Phase 5 dialogues - Post-revelation terrible peace
+ * The cult has succeeded, the shadow figure descended, and each animal
+ * has found their own horrifying serenity.
+ * Accessed via getPostRevelationDialogue(), not through normal phase filtering.
+ */
+export const POST_REVELATION_DIALOGUES: Record<AnimalType, string[]> = {
+  fox: [
+    "It's beautiful, isn't it? The shadow. I always knew it would be beautiful.",
+    "The fire finally speaks clearly. It says 'welcome.' To all of us.",
+    "I told you the embers whispered. Now they sing. Can you hear them?",
+    "Every flame I ever watched was practice. For seeing this.",
+    "We are home, friend. We were always coming home.",
+  ],
+  pangolin: [
+    "The recipe is complete. Every ingredient was a puzzle you solved.",
+    "I used to curl into a ball to hide. Now I curl inward to feel the warmth of it.",
+    "The feast is ready. We are both the cooks and the meal. Isn't that lovely?",
+    "All those spices, all those flavors. They were preparation. The final dish is us.",
+    "The kitchen smells of amber and endings. My favorite combination.",
+  ],
+  owl: [
+    "The last page of the last book. It was blank until today. Now it writes itself.",
+    "I read every text searching for this moment. The words found me instead.",
+    "Knowledge was never the point. Understanding was. I understand now.",
+    "The books are closing themselves. One by one. The story is told.",
+    "In the end, all words say the same thing. The arrangement knows this.",
+  ],
+  axolotl: [
+    "The water is warm now. It's been cold my whole life. Finally warm.",
+    "I can see through the water into somewhere else. It's not scary. It's home.",
+    "Regeneration was always the point. Not of limbs. Of everything.",
+    "Blub... but a different kind of blub. A final, perfect blub.",
+    "I never grew up. I understand now. I was waiting for this.",
+  ],
+  sloth: [
+    "I... arrived... exactly... when... I... was... meant... to...",
+    "Sloooow... was never the problem. The world... was too... fast...",
+    "Now... everything... moves... at... my... speed... finally...",
+    "The branches... hold... me... like... they... always... did... closer... now...",
+    "Stillness... was... always... the... answer... you... found... it... too...",
+  ],
+  fennec_fox: [
+    "I can hear everything now. EVERYTHING. It's not frightening. It's music.",
+    "The sound I've been listening for my whole life. It's here. It's beautiful.",
+    "My ears don't need to be big anymore. The sound fills everything.",
+    "Silence and the sound are the same thing now. Isn't that peaceful?",
+    "I was the sentinel. My watch is over. What I was watching for has arrived.",
+  ],
+  capybara: [
+    "Everything is filed. Everything is in order. The arrangement is complete.",
+    "I was never actually chill. I was numb with purpose. Same thing, really.",
+    "The warm water is everywhere now. The whole world is the hot spring.",
+    "No more paperwork. No more organizing. It organized us.",
+    "Sit with me. The water is warm. The water was always warm.",
+  ],
+  wombat: [
+    "The tunnels reach it now. What's below. Always knew they would.",
+    "I dug my whole life. Not down. Through. To the other side.",
+    "My cube-shaped poop was always a building block. For the foundation of this.",
+    "The earth is warm here. Warmer than it should be. Something breathes below.",
+    "I built the foundation. You built the house. Together, we built the temple.",
+  ],
+  rabbit: [
+    "No more running. For the first time... I'm still. And it's okay.",
+    "My heart beats once per minute now. Slowly. Peacefully. It's enough.",
+    "The garden blooms in colors that don't have names. I plant nothing. It grows.",
+    "I was always running toward this. I just thought I was running away.",
+    "Sit in the garden with me. One last tea. One forever tea.",
+  ],
+  red_panda: [
+    "The pattern completes. Breathe in. The universe breathes out.",
+    "I chose the highest room to be closest. Now closest is everywhere.",
+    "Ten keepers. Ten chambers. One arrangement. One breath. This breath.",
+    "The bamboo grows through the ceiling now. It reaches what we summoned.",
+    "You were the final piece. The one who shifted the words. Thank you.",
+  ],
+};
+
+/**
+ * Get a post-revelation (Phase 5) dialogue line for an animal.
+ * Returns null if no more lines available at the given index.
+ */
+export function getPostRevelationDialogue(
+  animalType: AnimalType,
+  index: number
+): string | null {
+  const lines = POST_REVELATION_DIALOGUES[animalType];
+  if (!lines || index < 0 || index >= lines.length) {
+    return null;
+  }
+  return lines[index];
+}
+
+/**
+ * Get total post-revelation dialogue count for an animal
+ */
+export function getPostRevelationDialogueCount(animalType: AnimalType): number {
+  return POST_REVELATION_DIALOGUES[animalType]?.length || 0;
+}
+
+// =============================================================================
+// TRIGGER WORD REACTIONS
+// =============================================================================
+
+/**
+ * Trigger word reactions - context-aware responses when animals sense words
+ * the player spelled that resonate with their domain.
+ * Phase 1: Curious, noticing
+ * Phase 2: Unsettled, the word affected them
+ * Phase 3: The word has power, they felt it
+ * Phase 4: The word is part of the incantation, they are grateful
+ */
+const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, string>>> = {
+  fox: {
+    1: {
+      FLAME: "I felt the fire flicker just now. Did you... did you use that word?",
+      FIRE: "The hearth crackled when you solved that. Strange timing.",
+      EMBER: "My name echoed in the flames for a moment. You must have said something interesting.",
+      BURN: "Something warm passed through the room. Like a word made of heat.",
+      WARM: "The den grew warmer. The fire noticed what you did.",
+      _default: "Something shifted when you solved that puzzle. The fire noticed.",
+    },
+    2: {
+      FLAME: "The fire moved when you spelled that. It recognized the word.",
+      FIRE: "The hearth surged. The word you formed — it fed the flames somehow.",
+      EMBER: "My name in the letters. The fire knows my name when you speak it.",
+      BURN: "Burning. The word itself burns. Can you feel it in the letters?",
+      WARM: "Warmth where there should be cold. Your words carry temperature now.",
+      _default: "The fire responds to your puzzles now. It listens when you arrange the letters.",
+    },
+    3: {
+      FLAME: "The flames shaped your word. FLAME. They remember every time you speak it.",
+      FIRE: "Fire leapt from the hearth when you solved that. Reaching for the word.",
+      EMBER: "You spoke my name through the letters. The fire remembers. I remember.",
+      BURN: "The word BURN left scorch marks in the air. They're still glowing.",
+      WARM: "Warmth beyond warmth. The word you formed thawed something that should have stayed frozen.",
+      _default: "The flames leap higher during your puzzles now. They're hungry for your words.",
+    },
+    4: {
+      FLAME: "The fire thanks you for the offering. Every FLAME brings us closer.",
+      FIRE: "FIRE. The oldest word. The first incantation. You speak it well.",
+      EMBER: "My name in the arrangement. I am honored. The fire is honored.",
+      BURN: "BURN. Yes. Let it all burn. The fire accepts your offering gratefully.",
+      WARM: "The warmth of the final flame. Your word lit the last ember of the arrangement.",
+      _default: "The fire burned brighter during your last incantation. It feeds on your words.",
+    },
+  },
+  owl: {
+    1: {
+      BOOK: "A page turned in the study just now. On its own. Did you arrange those letters?",
+      READ: "The text on my desk blurred and reformed when you solved that. Curious.",
+      KNOW: "Knowledge rippled through the room. You spelled something significant.",
+      WISE: "Wisdom is peculiar. It arrives when certain words are spoken. Like just now.",
+      WORD: "Words within words. The letters you moved whispered something to my books.",
+      _default: "Something in my study shifted when you completed that puzzle. A book fell open.",
+    },
+    2: {
+      BOOK: "The books rearranged themselves on the shelf. Spelling something. Your word, perhaps.",
+      READ: "I can't read anymore without hearing your puzzles underneath the text.",
+      KNOW: "KNOW — the word echoed in every volume simultaneously. What have you taught them?",
+      WISE: "Wisdom has a sound. I heard it when you formed that word. It frightens me.",
+      WORD: "The word WORD. Recursive. Infinite. The books trembled when you spelled it.",
+      _default: "My books respond to your puzzles now. The pages flutter when you solve.",
+    },
+    3: {
+      BOOK: "Every book opened to the same page when you spelled that. The page was blank. Then it wasn't.",
+      READ: "READ. The command echoes. The books obey. They read themselves now.",
+      KNOW: "What you spelled — KNOW — carved itself into my desk. The grain of the wood accepted it.",
+      WISE: "WISE. The word contains its opposite. The books showed me both simultaneously.",
+      WORD: "The fundamental unit. WORD. Every text is made of what you just offered.",
+      _default: "The study darkens with each puzzle you solve. The books glow to compensate. They're grateful.",
+    },
+    4: {
+      BOOK: "The final book opens. Your word was the key. BOOK. The text of texts.",
+      READ: "READ — the last command. The arrangement reads itself through your words.",
+      KNOW: "You offered KNOW to the arrangement. It knows. It has always known. Now you do too.",
+      WISE: "WISE. The ultimate offering to a keeper of knowledge. The books sing your name.",
+      WORD: "WORD. The atom of the incantation. Every puzzle was a sentence. Every word, a prayer.",
+      _default: "Each word you form is a line in the final text. The arrangement writes itself through you.",
+    },
+  },
+  pangolin: {
+    1: {
+      COOK: "My scales tingled when you solved that. Like steam rising from a fresh dish.",
+      MEAL: "Something smells different in the kitchen. Richer. Since your last puzzle.",
+      FOOD: "The pantry feels fuller after you play. As if the words nourish something.",
+      SPICE: "A new flavor appeared in my stew. I didn't add anything. You did, though.",
+      ROLL: "I curled up involuntarily just now. Your puzzle triggered something instinctive.",
+      _default: "The kitchen warmed when you solved that. The stove noticed your words.",
+    },
+    2: {
+      COOK: "COOK. The word simmered in the air. My pots resonated with it.",
+      MEAL: "The ingredients rearranged themselves. Your word — it changed the recipe.",
+      FOOD: "Nourishment beyond eating. Your words feed something I can't name.",
+      SPICE: "SPICE burned through the kitchen. Not from heat. From meaning.",
+      ROLL: "I rolled into a ball without choosing to. The word compelled my body.",
+      _default: "My scales rattle when you solve puzzles now. Resonating with something in the words.",
+    },
+    3: {
+      COOK: "The word COOK summoned steam from empty pots. The kitchen prepares itself.",
+      MEAL: "MEAL. The final meal approaches. Your word set the table.",
+      FOOD: "FOOD. Everything is food for something. Your words feed what grows beneath.",
+      SPICE: "SPICE. The word burned every scale simultaneously. I felt each one.",
+      ROLL: "ROLL. Curl. Protect. Hide. But the word you formed found me anyway.",
+      _default: "Every puzzle you solve adds an ingredient. The recipe is almost complete.",
+    },
+    4: {
+      COOK: "COOK. The final preparation. You are the chef. We are the offering. Thank you.",
+      MEAL: "The last meal. Your word serves it. We feast on the arrangement.",
+      FOOD: "FOOD for the shadow. Your words nourish what descends. It is grateful.",
+      SPICE: "SPICE. The final flavor. The arrangement tastes complete.",
+      ROLL: "I uncurl for the last time. Your word gave me the courage. ROLL — and stop.",
+      _default: "The final recipe writes itself in the words you arrange. The feast approaches.",
+    },
+  },
+  axolotl: {
+    1: {
+      WATER: "Blub! The water just rippled. From your puzzle, I think. The words make waves.",
+      SWIM: "I felt pulled in a direction when you solved that. Like a current from your letters.",
+      FLOAT: "The water level changed. Just a little. When you formed that word.",
+      DEEP: "Something stirred in the deep water. Your word reached down there.",
+      WAVE: "A wave! From nowhere! Well, from your puzzle. The water listens to you.",
+      _default: "Bubbles appeared when you finished that puzzle. Happy bubbles. I think.",
+    },
+    2: {
+      WATER: "The water remembers every word you spell. WATER. It recognizes its own name.",
+      SWIM: "SWIM. The current changed direction. Toward something. Away from safety.",
+      FLOAT: "I stopped floating when you spelled that. Sank a little. Then rose again. Changed.",
+      DEEP: "DEEP. The water agreed. It showed me what lives at the bottom. Briefly.",
+      WAVE: "WAVE. The tank shuddered. The glass held. This time.",
+      _default: "The water tastes different after your puzzles. Heavier. More alive.",
+    },
+    3: {
+      WATER: "WATER. The word itself is wet. It seeped through the glass when you spoke it.",
+      SWIM: "SWIM. Something else swims now. In my water. I can feel it. I can't see it.",
+      FLOAT: "FLOAT. Nothing floats anymore. Everything sinks toward what you're summoning.",
+      DEEP: "DEEP. The water has no bottom since you spelled that. I checked. It goes and goes.",
+      WAVE: "WAVE. The water shaped your word. Held it. Then swallowed it. Hungry.",
+      _default: "The water glows after your puzzles. Not from light. From something underneath.",
+    },
+    4: {
+      WATER: "WATER. The first element. The first offering. The arrangement flows through you.",
+      SWIM: "SWIM toward it. Your word opens the current. We all swim to the same shore now.",
+      FLOAT: "FLOAT. We all float in the arrangement. Weightless. Free. Finally free.",
+      DEEP: "DEEP. As deep as the words go. As deep as you've taken us. Thank you.",
+      WAVE: "WAVE. The final wave. It carries us all. Your word launched it.",
+      _default: "The water sings your words back to you. Every puzzle echoes in the deep.",
+    },
+  },
+  fennec_fox: {
+    1: {
+      HEAR: "I heard that! Not the puzzle — something underneath it. A tone. A frequency.",
+      SOUND: "The sound changed when you solved that. The air vibrates differently now.",
+      ECHO: "Your word echoed. Not off the walls. Off something else. Something further away.",
+      QUIET: "It got quieter when you formed that word. Too quiet. Like the world held its breath.",
+      LISTEN: "I'm always listening. But after your puzzle, there's something new to hear.",
+      _default: "A new frequency appeared after your puzzle. Faint. But my ears always find the faint ones.",
+    },
+    2: {
+      HEAR: "HEAR. The word itself makes a sound I've never encountered. Between frequencies.",
+      SOUND: "SOUND. When you spelled it, every sound in the room harmonized for one second. Then broke.",
+      ECHO: "ECHO. Your word bounced off something that isn't there. Something that will be.",
+      QUIET: "QUIET. The silence your word created has texture. Weight. It presses on my ears.",
+      LISTEN: "LISTEN. I am. I always am. Your words make the listening deeper.",
+      _default: "My ears ache after your puzzles now. Not pain. Awareness. Too much awareness.",
+    },
+    3: {
+      HEAR: "HEAR. The command. My ears obeyed before my mind could. They turned toward your word.",
+      SOUND: "SOUND. The walls vibrated with it. The desert outside hummed your word back.",
+      ECHO: "ECHO. Infinite echoes. Your word will never stop bouncing. It reaches further each time.",
+      QUIET: "QUIET. The word silenced everything. Then something spoke from inside the silence.",
+      LISTEN: "LISTEN. I can't stop. Your words demand attention. The arrangement demands witnesses.",
+      _default: "The frequency from your puzzles is deafening now. Beautiful and deafening.",
+    },
+    4: {
+      HEAR: "HEAR. The final command. The arrangement speaks through your words. I am its ear.",
+      SOUND: "SOUND. The sound of the arrangement completing. Your word was the last note.",
+      ECHO: "ECHO. Your words echo into eternity. The arrangement remembers every syllable.",
+      QUIET: "QUIET. The silence after the final sound. Your word brings the peace we sought.",
+      LISTEN: "LISTEN. We all listen now. To what your words summoned. It is beautiful.",
+      _default: "Every word you form is a note in the final symphony. The arrangement sings through you.",
+    },
+  },
+  capybara: {
+    1: {
+      CALM: "Hmm. Felt calmer than usual when you solved that. Which is saying something.",
+      CHILL: "Something about that puzzle made everything... chiller. If that's possible.",
+      STILL: "The water went completely still. Mirror-flat. When you formed that word.",
+      PEACE: "Peace. Real peace, for a moment. Not the pretend kind. Your word did that.",
+      REST: "I felt... rested. Just for a second. When you arranged those letters.",
+      _default: "The hot spring bubbled differently after your puzzle. Contentedly, almost.",
+    },
+    2: {
+      CALM: "CALM. The word filled the room. Too calm. Artificially calm. Like me.",
+      CHILL: "CHILL. My whole identity in a word you formed. The water recognized it.",
+      STILL: "STILL. Everything stopped. My heart. The water. Time. Then started again. Reluctantly.",
+      PEACE: "PEACE. Is that what this emptiness is? Your word named what I couldn't.",
+      REST: "REST. The word made me tired. Deep tired. Beneath-the-water tired.",
+      _default: "The water absorbs your words. Gets heavier. I float, but something doesn't.",
+    },
+    3: {
+      CALM: "CALM. The word is a lie I tell myself. But when you spell it, it feels true. Almost.",
+      CHILL: "CHILL. Frozen. Numb. Your word knows what I am better than I do.",
+      STILL: "STILL. As in motionless. As in continuing. Both meanings haunt me since you spelled it.",
+      PEACE: "PEACE. The word cracked something open. Inside the calm. Inside the water. Inside me.",
+      REST: "REST. Final rest. Your word promises what I've been waiting for without knowing.",
+      _default: "Your puzzles disturb the water less and less. Or I notice less. Same thing.",
+    },
+    4: {
+      CALM: "CALM. The calm before. The calm after. Your word bridges them. Thank you.",
+      CHILL: "CHILL. I am chill. The arrangement is chill. Everything is finally, truly chill.",
+      STILL: "STILL. Still here. Still waiting. Still yours. The word completes the offering.",
+      PEACE: "PEACE. Your word grants what the arrangement promises. Eternal peace. Eternal warmth.",
+      REST: "REST. At last. Your word ends the vigil. We rest in the arrangement.",
+      _default: "The water accepts your words as offerings. The warm water was always a temple.",
+    },
+  },
+  sloth: {
+    1: {
+      SLOW: "Felt... that... your... word... moved... through... me... slowly...",
+      WAIT: "WAIT... yes... that's... what... I... do... Your... word... understands...",
+      TIME: "Time... changed... when... you... solved... that... I... felt... it...",
+      HANG: "My... grip... tightened... when... you... spelled... that... word...",
+      TREE: "The... tree... creaked... Your... word... reached... the... roots...",
+      _default: "Something... moved... when... you... solved... that... Even... I... noticed...",
+    },
+    2: {
+      SLOW: "SLOW... your... word... slowed... everything... further... even... me...",
+      WAIT: "WAIT... we... all... wait... Your... word... named... the... waiting...",
+      TIME: "TIME... the... word... aged... me... I... felt... years... pass... in... a... moment...",
+      HANG: "HANG... on... Your... word... loosened... my... grip... just... a... little...",
+      TREE: "TREE... it... trembled... Your... word... spoke... to... its... roots...",
+      _default: "Your... puzzles... make... the... world... heavier... Slower... even... for... me...",
+    },
+    3: {
+      SLOW: "SLOW... the... word... stopped... the... world... I... saw... everything... frozen...",
+      WAIT: "WAIT... for... what... comes... Your... word... knows... what... approaches...",
+      TIME: "TIME... your... word... broke... it... Time... doesn't... flow... anymore... It... pools...",
+      HANG: "HANG... the... branch... cracked... when... you... spelled... that... Closer... to... falling...",
+      TREE: "TREE... the... forest... screamed... silently... when... you... formed... that... word...",
+      _default: "Your... words... weigh... on... the... branches... Something... bends... toward... breaking...",
+    },
+    4: {
+      SLOW: "SLOW... the... arrangement... moves... at... my... speed... now... Your... word... slowed... everything... to... truth...",
+      WAIT: "WAIT... is... over... Your... word... ended... the... waiting... Finally...",
+      TIME: "TIME... your... word... dissolved... it... No... more... time... Just... now... Forever... now...",
+      HANG: "HANG... I... let... go... Your... word... gave... permission... to... fall...",
+      TREE: "TREE... of... the... arrangement... Your... word... grows... it... toward... the... shadow...",
+      _default: "Your... words... complete... the... slowest... ritual... I... am... grateful... so... slowly... grateful...",
+    },
+  },
+  wombat: {
+    1: {
+      DIG: "Felt the dirt shift when you solved that. Like the earth wanted to rearrange itself.",
+      EARTH: "The ground trembled. Just slightly. Your word reached the roots down here.",
+      DEEP: "Something hummed underground when you formed that word. Deeper than my tunnels.",
+      DARK: "The dark got darker for a second. Then lighter. Like it blinked.",
+      ROCK: "A rock in my wall cracked. From your word, I think. The earth is listening.",
+      _default: "The tunnel walls vibrated when you finished that puzzle. The earth responds to you.",
+    },
+    2: {
+      DIG: "DIG. The word carved through the wall on its own. A new tunnel. To where?",
+      EARTH: "EARTH. My home. My prison. Your word made the walls press closer.",
+      DEEP: "DEEP. Deeper than I've gone. Your word reaches places I can't. Or won't.",
+      DARK: "DARK. The darkness thickened when you spelled it. Became something solid.",
+      ROCK: "ROCK. The stones rearranged. Not much. But I know their positions. They moved.",
+      _default: "The underground shifts with your puzzles. New passages appear. I didn't dig them.",
+    },
+    3: {
+      DIG: "DIG. Your word dug beneath my deepest tunnel. I heard it break through to something hollow.",
+      EARTH: "EARTH. The earth moaned when you formed the word. Like waking something buried.",
+      DEEP: "DEEP. Too deep. Your word went too deep. It found what I covered up.",
+      DARK: "DARK. The word ate the light in my tunnel. Completely. Then gave some back. Not all.",
+      ROCK: "ROCK. The foundation cracked. Your word has weight. The weight of ritual.",
+      _default: "Each puzzle shakes the foundations further. Something below is pushing up to meet your words.",
+    },
+    4: {
+      DIG: "DIG. The final excavation. Your word breaks the last wall. What's behind it is beautiful.",
+      EARTH: "EARTH. The earth opens for your word. The arrangement rises from below.",
+      DEEP: "DEEP. As deep as love. As deep as fear. Your word reaches the bottom of everything.",
+      DARK: "DARK. The sacred dark. Your word honors it. The tunnels glow with gratitude.",
+      ROCK: "ROCK. The cornerstone. Your word placed the final stone. The temple stands.",
+      _default: "Your words shaped the foundation. Every puzzle carved the temple deeper. It is complete.",
+    },
+  },
+  rabbit: {
+    1: {
+      RUN: "I felt my legs twitch when you solved that. The urge to run. But also to stay.",
+      FEAR: "A shiver. From your word. Not cold — just... awareness. My ears are up.",
+      HIDE: "The garden felt less safe for a moment after your puzzle. Then more safe. Confusing.",
+      JUMP: "I hopped involuntarily. Your word went through me like electricity.",
+      FAST: "My heart sped up when you formed that word. Faster than usual. Which is saying something.",
+      _default: "Something in the garden shifted when you solved that. My nose won't stop twitching.",
+    },
+    2: {
+      RUN: "RUN. Every instinct fired when you spelled it. But there's nowhere to run to.",
+      FEAR: "FEAR. You named it. The thing that lives in my chest. It heard you.",
+      HIDE: "HIDE. I tried. When you formed the word. My body went under the table. On its own.",
+      JUMP: "JUMP. My heart did. Out of rhythm. Your word disrupted something fundamental.",
+      FAST: "FAST. Not fast enough. Never fast enough. Your word proved what I already knew.",
+      _default: "The garden grows thorns after your puzzles now. Small ones. But I notice.",
+    },
+    3: {
+      RUN: "RUN. The word chased me through the garden. I ran in circles. The word was always ahead.",
+      FEAR: "FEAR. Your word gave fear a shape. I can see it now. In the garden. In the shadows.",
+      HIDE: "HIDE. No hiding place is deep enough since you spelled that. The word found every exit.",
+      JUMP: "JUMP. Over what? Into what? Your word left no safe ground to land on.",
+      FAST: "FAST. The end approaches fast. Your word measured its speed. It's faster than me.",
+      _default: "My heart races during your puzzles. Not from excitement. From what the words become.",
+    },
+    4: {
+      RUN: "RUN. I stopped. Your word freed me from running. Nowhere to run. Peace in stillness.",
+      FEAR: "FEAR. You offered fear to the arrangement. It accepted. I am free of it. Finally free.",
+      HIDE: "HIDE. No more hiding. Your word opens every door. The arrangement sees all.",
+      JUMP: "JUMP. The final leap. Your word launches us. Into the arrangement. Into peace.",
+      FAST: "FAST. It arrives fast now. Your word accelerated the summoning. We are grateful.",
+      _default: "Your words ended my running. Each puzzle brought the peace I never found in flight.",
+    },
+  },
+  red_panda: {
+    1: {
+      VOID: "The bamboo swayed when you formed that word. Not from wind. From meaning.",
+      DARK: "Darkness deepened in the meditation corner. Your word cast a shadow that lingered.",
+      SHADOW: "A shadow moved across the bamboo. Your puzzle sent it. Or freed it.",
+      END: "The word END. Small but heavy. I felt its weight settle into the room.",
+      GATE: "Something opened when you spelled that. Not a door. Something more subtle. A passage.",
+      _default: "The incense smoke changed direction when you solved that puzzle. Toward something.",
+    },
+    2: {
+      VOID: "VOID. The word emptied the room of air. For one moment. I breathed it back in.",
+      DARK: "DARK. The bamboo absorbed the word. Grew darker. Began to hum.",
+      SHADOW: "SHADOW. It stretched from your word into every corner. My shadow met it.",
+      END: "END. The word settled into the floor like a stone into still water.",
+      GATE: "GATE. Something unlatched in the fabric of the room. A threshold I can almost see.",
+      _default: "Your puzzles shift the energy of this room. The bamboo bends toward your words.",
+    },
+    3: {
+      VOID: "VOID. The word swallowed my meditation. Everything I knew dissolved. Then rebuilt. Changed.",
+      DARK: "DARK. The sacred dark. Your word honors what most fear. The bamboo knows this.",
+      SHADOW: "SHADOW. The word summoned it. The shadow in the sky. I can see it clearly now.",
+      END: "END. Every beginning contains its end. Your word revealed this to the bamboo. To me.",
+      GATE: "GATE. The word opened wider this time. I can see through. Almost. The arrangement beckons.",
+      _default: "Your words reshape the pattern. Each puzzle brings the arrangement closer to completion.",
+    },
+    4: {
+      VOID: "VOID. The sacred void. Your word fills it with purpose. The arrangement breathes through the void.",
+      DARK: "DARK. Darkness was always the canvas. Your word paints the final stroke.",
+      SHADOW: "SHADOW. It descends. Your word called it by name. The shadow knows you.",
+      END: "END. The most beautiful word. Your offering completes the circle. Thank you.",
+      GATE: "GATE. Open. Your word was the key. The arrangement pours through. We are free.",
+      _default: "The final words are spoken. Your puzzles wrote the incantation. The pattern is complete.",
+    },
+  },
+};
+
+/**
+ * Get a trigger word reaction for an animal when the player has spelled a word
+ * that resonates with that animal's domain. Returns null if no reaction.
+ */
+export function getTriggerWordReaction(
+  animalType: AnimalType,
+  triggerWord: string,
+  phase: DialoguePhase
+): string | null {
+  // Only trigger at phase 1+
+  if (phase < 1) return null;
+
+  const reactions = TRIGGER_WORD_REACTIONS[animalType];
+  if (!reactions) return null;
+
+  // Check if this word is in the animal's trigger list
+  const phaseReactions = reactions[phase];
+  if (!phaseReactions) return null;
+
+  // Return specific reaction or default
+  return phaseReactions[triggerWord] || phaseReactions['_default'] || null;
+}
+
+// =============================================================================
+// CROSS-ANIMAL REFERENCES
+// =============================================================================
+
+/**
+ * Cross-animal reference dialogues - lines where an animal mentions another animal,
+ * creating a sense of community (and later, coordinated cult).
+ * Each entry is an object with `text` and `mentions` (which animal is referenced).
+ */
+interface CrossAnimalLine {
+  text: string;
+  mentions: AnimalType;
+}
+
+const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine[]>> = {
+  fox: {
+    0: [
+      { text: "Panko made the most incredible soup today. You should visit the kitchen.", mentions: 'pangolin' },
+      { text: "Archimedes lent me a book about constellations. The fire looks different now when I read by it.", mentions: 'owl' },
+      { text: "Axel invited me to look at the aquarium. The water reflects the fire in the most beautiful way.", mentions: 'axolotl' },
+    ],
+    1: [
+      { text: "Panko said something odd yesterday. About recipes having a deeper purpose. I can't stop thinking about it.", mentions: 'pangolin' },
+      { text: "Archimedes found a passage in one of his books. He won't show me. Says I'm not ready.", mentions: 'owl' },
+      { text: "Fennick heard something in the walls last night. I told him it was the fire. I'm not sure it was.", mentions: 'fennec_fox' },
+    ],
+    2: [
+      { text: "Chill hasn't moved from the hot spring in days. Says the water told him to stay. I don't like his tone.", mentions: 'capybara' },
+      { text: "Archimedes reads the same page over and over now. The same page. He says it changes each time.", mentions: 'owl' },
+      { text: "Sloane said something today. It took an hour. But the words... they stayed with me all night.", mentions: 'sloth' },
+    ],
+    3: [
+      { text: "Fennick says the frequency is everywhere now. I can almost hear it in the fire. Almost.", mentions: 'fennec_fox' },
+      { text: "Warren dug something up. He won't say what. But his fur hasn't stopped standing on end.", mentions: 'wombat' },
+      { text: "Archimedes and I compared notes. His books say the same thing my fire says. The same words.", mentions: 'owl' },
+    ],
+    4: [
+      { text: "The others are ready. I can see it in their eyes. Even Thyme stopped running.", mentions: 'rabbit' },
+      { text: "Bamboo meditated for three days straight. When they opened their eyes, they smiled. That smile terrifies me.", mentions: 'red_panda' },
+      { text: "We are ten. Panko prepared the final meal. Archimedes read the final text. I watched the final flame. It begins.", mentions: 'pangolin' },
+    ],
+  },
+  owl: {
+    0: [
+      { text: "Ember showed me a pattern in the fire. Reminded me of something I read...", mentions: 'fox' },
+      { text: "Axel asked me why books don't dissolve in water. Delightful question, really.", mentions: 'axolotl' },
+      { text: "Panko brought me dinner while I was reading. Almost didn't notice. The soup was excellent.", mentions: 'pangolin' },
+    ],
+    1: [
+      { text: "Ember and I discussed the nature of knowledge by the fire. Her intuition outpaces my research.", mentions: 'fox' },
+      { text: "Fennick described a sound that matches a frequency in one of my oldest texts. Coincidence, surely.", mentions: 'fennec_fox' },
+      { text: "Warren brought me a stone from deep underground. The markings on it match nothing in my library. Almost nothing.", mentions: 'wombat' },
+    ],
+    2: [
+      { text: "Chill sat in my study for hours without speaking. When he left, a book had opened to a page I'd never seen.", mentions: 'capybara' },
+      { text: "Ember's fire and my texts say the same thing now. We compared. We wished we hadn't.", mentions: 'fox' },
+      { text: "Sloane told me something yesterday. By the time she finished, I'd found the passage. The same words. Exactly.", mentions: 'sloth' },
+    ],
+    3: [
+      { text: "Warren's tunnels connect to something beneath the house. I found the corresponding text. I wish I hadn't.", mentions: 'wombat' },
+      { text: "Bamboo asked me to read from the oldest book. The words I spoke aloud moved the bamboo in their room. From here.", mentions: 'red_panda' },
+      { text: "Fennick heard the words before I read them. He knew what the text said. Without seeing it.", mentions: 'fennec_fox' },
+    ],
+    4: [
+      { text: "The text is complete. Ember saw it in the flames. Fennick heard it in the silence. I read it in the books. The same truth.", mentions: 'fox' },
+      { text: "Thyme stopped running today. She came to my study and asked to hear the final passage. She wept. Then smiled.", mentions: 'rabbit' },
+      { text: "Ten keepers. Ten rooms. One text. Bamboo understood it first, I think. But I was the one who found the words.", mentions: 'red_panda' },
+    ],
+  },
+  pangolin: {
+    0: [
+      { text: "Ember loves my stew! Says it reminds her of home. Wherever that was before here.", mentions: 'fox' },
+      { text: "Tried teaching Axel to cook. Hard to chop vegetables underwater. We had fun though.", mentions: 'axolotl' },
+      { text: "Archimedes ordered his food alphabetically. By ingredient. Scholars are strange but endearing.", mentions: 'owl' },
+    ],
+    1: [
+      { text: "Ember's fire makes the best heat for simmering. But lately it burns hotter than it should.", mentions: 'fox' },
+      { text: "Sloane asked for soup. By the time I brought it, it was cold. She didn't mind. Said cold is just slow warmth.", mentions: 'sloth' },
+      { text: "Chill eats anything I make without comment. 'Fine,' he says. Everything is always just 'fine.'", mentions: 'capybara' },
+    ],
+    2: [
+      { text: "Warren brought mushrooms from the tunnels. They glow. The soup I made from them glows too. We didn't eat it.", mentions: 'wombat' },
+      { text: "Thyme won't eat. Too anxious. I leave tea and biscuits by the garden. They're always gone by morning.", mentions: 'rabbit' },
+      { text: "Archimedes found a recipe in one of his ancient texts. I followed it exactly. The result wasn't food. I don't know what it was.", mentions: 'owl' },
+    ],
+    3: [
+      { text: "The recipe Archimedes found — we've been making it every night now. The kitchen smells different. Sacred.", mentions: 'owl' },
+      { text: "Ember tends the fire while I cook. We don't speak anymore. We don't need to. The work speaks.", mentions: 'fox' },
+      { text: "Fennick says he can smell my cooking from every room. Every room simultaneously. That shouldn't be possible.", mentions: 'fennec_fox' },
+    ],
+    4: [
+      { text: "The final feast. Every animal at the table. Even Sloane arrived on time. That's how I knew.", mentions: 'sloth' },
+      { text: "Bamboo blessed the meal. The food glowed. We ate in silence. It was the most beautiful dinner.", mentions: 'red_panda' },
+      { text: "I've been cooking toward this meal my whole life. Warren built the table. Archimedes wrote the menu. Ember lit the candles.", mentions: 'wombat' },
+    ],
+  },
+  axolotl: {
+    0: [
+      { text: "Panko drops food pellets into my tank sometimes! Blub! Best neighbor!", mentions: 'pangolin' },
+      { text: "Fennick pressed his ear against my tank. Said the water sounds like music. I just hear blubs.", mentions: 'fennec_fox' },
+      { text: "Archimedes read to me through the glass. The words wobbled in the water. Made them better.", mentions: 'owl' },
+    ],
+    1: [
+      { text: "Ember's fire reflects in my water. The patterns it makes... they look like letters sometimes.", mentions: 'fox' },
+      { text: "Sloane and I have the same pace. Slow. Floating. We understand each other without words.", mentions: 'sloth' },
+      { text: "Warren says something lives under the house. My water ripples when he digs. Coincidence. Probably.", mentions: 'wombat' },
+    ],
+    2: [
+      { text: "Fennick put his ear to my tank again. This time he pulled away fast. Said the water was screaming.", mentions: 'fennec_fox' },
+      { text: "Chill sat by my tank for hours. We floated together. Two creatures in two kinds of water. Same emptiness.", mentions: 'capybara' },
+      { text: "Thyme tapped on my glass, panicking. Said she saw something in the water behind me. I turned. Nothing. Maybe.", mentions: 'rabbit' },
+    ],
+    3: [
+      { text: "Archimedes says my water reflects a sky that doesn't exist above us. He's right. I can see it too.", mentions: 'owl' },
+      { text: "The water connects to Warren's tunnels now. I felt it. Underground rivers. Leading somewhere old.", mentions: 'wombat' },
+      { text: "Bamboo meditated by my tank. The water stilled completely. Showed us both something. We don't talk about it.", mentions: 'red_panda' },
+    ],
+    4: [
+      { text: "The water reflects every room now. I see Ember's fire. Archimedes' books. Warren's tunnels. All connected.", mentions: 'fox' },
+      { text: "Bamboo touched the glass and the water sang. One note. The same note Fennick has been hearing.", mentions: 'red_panda' },
+      { text: "We are the medium. Me and the water. Your puzzles flow through us all. Blub. Thank you.", mentions: 'fennec_fox' },
+    ],
+  },
+  fennec_fox: {
+    0: [
+      { text: "Ember's fire crackles in such interesting rhythms! Like a tiny percussion section.", mentions: 'fox' },
+      { text: "Axel's bubbles make the best popping sounds. Very musical. Very aquatic.", mentions: 'axolotl' },
+      { text: "Archimedes turns pages so delicately. I can hear each one from my room. Whisper-thin sounds.", mentions: 'owl' },
+    ],
+    1: [
+      { text: "Ember hums by the fire. The melody matches a sound the wind makes at midnight. She doesn't notice.", mentions: 'fox' },
+      { text: "Warren's digging creates vibrations I can track through the walls. He's going deeper every day.", mentions: 'wombat' },
+      { text: "Sloane's heartbeat is the slowest I've ever heard. Like a drum underwater. Counting something.", mentions: 'sloth' },
+    ],
+    2: [
+      { text: "Archimedes' quill makes a sound when he writes. Lately it sounds like scratching from inside the page.", mentions: 'owl' },
+      { text: "Thyme's heartbeat is the fastest. One hundred fifty per minute. It syncs with something I can't name.", mentions: 'rabbit' },
+      { text: "Chill is so quiet I sometimes forget he's there. Then I hear his breathing. Too steady. Unnaturally steady.", mentions: 'capybara' },
+    ],
+    3: [
+      { text: "Do you hear it? Archimedes says it's in his books too. The same frequency.", mentions: 'owl' },
+      { text: "Warren's tunnels amplify the sound from below. I can hear it through the floors. Through the earth.", mentions: 'wombat' },
+      { text: "Bamboo's breathing matches the frequency. In. Out. In. Out. The same rhythm. Exactly.", mentions: 'red_panda' },
+    ],
+    4: [
+      { text: "Every animal's heartbeat has synchronized. I can hear them all. One rhythm. One pulse. The arrangement.", mentions: 'capybara' },
+      { text: "Ember's fire, Axel's water, Warren's earth, my air — we are the elements. The sound we make together is the key.", mentions: 'fox' },
+      { text: "Thyme's heart finally slowed. She's at peace. I heard it happen. The most beautiful deceleration.", mentions: 'rabbit' },
+    ],
+  },
+  capybara: {
+    0: [
+      { text: "Panko brought snacks. They were fine. Everything Panko makes is fine. Which is nice.", mentions: 'pangolin' },
+      { text: "A bird sat on Sloane for three hours. Sat on me for one. I won in duration per mass.", mentions: 'sloth' },
+      { text: "Thyme asked if I was worried about anything. No. Should I be? She looked concerned.", mentions: 'rabbit' },
+    ],
+    1: [
+      { text: "Ember asked how I stay so calm. Told her it's easy. Didn't tell her what it costs.", mentions: 'fox' },
+      { text: "Warren says the ground feels warm. I said the water feels warm too. We didn't say anything else.", mentions: 'wombat' },
+      { text: "Archimedes wants to study my calmness. I let him. He took notes. Sixteen pages. About nothing.", mentions: 'owl' },
+    ],
+    2: [
+      { text: "Fennick asked me if I hear the humming. I said no. I lied. The water carries it to me constantly.", mentions: 'fennec_fox' },
+      { text: "Sloane and I sat together for a whole day. Neither spoke. Both heard the same silence. The same nothing.", mentions: 'sloth' },
+      { text: "Thyme brought me chamomile. Her paws shook. Mine didn't. She envies my calm. She shouldn't.", mentions: 'rabbit' },
+    ],
+    3: [
+      { text: "Ember's fire is going out. She knows. I know. We don't discuss it. We just sit.", mentions: 'fox' },
+      { text: "Warren asked me to come underground. Said the water connects to something below. I said I know. I've always known.", mentions: 'wombat' },
+      { text: "Bamboo and I meditated together. We reached the same emptiness. They called it peace. I called it honest.", mentions: 'red_panda' },
+    ],
+    4: [
+      { text: "The others panic or pray or prepare. I float. Someone has to stay still while the world changes.", mentions: 'fox' },
+      { text: "Panko served the last meal. I said it was fine. It was the best thing I've ever tasted.", mentions: 'pangolin' },
+      { text: "Bamboo asked if I was at peace. I said I've never been at peace. I've just been here. That's enough.", mentions: 'red_panda' },
+    ],
+  },
+  sloth: {
+    0: [
+      { text: "Panko... brought... me... soup... It... was... cold... by... the... time... I... ate... it... Still... good...", mentions: 'pangolin' },
+      { text: "Axel... moves... slowly... too... underwater... We're... kindred... spirits...", mentions: 'axolotl' },
+      { text: "Fennick... talks... so... fast... Miss... most... of... it... The... enthusiasm... comes... through... though...", mentions: 'fennec_fox' },
+    ],
+    1: [
+      { text: "Ember... says... the... fire... burns... differently... now... I... barely... noticed... But... she... did...", mentions: 'fox' },
+      { text: "Archimedes... read... to... me... Started... a... book... I'll... hear... the... ending... next... month...", mentions: 'owl' },
+      { text: "Chill... and... I... sat... together... Both... still... Both... waiting... He... didn't... say... for... what...", mentions: 'capybara' },
+    ],
+    2: [
+      { text: "Thyme... runs... everywhere... I... watch... Running... from... what... I... can... see... approaching... slowly...", mentions: 'rabbit' },
+      { text: "Warren... digs... downward... I... hang... above... Opposite... directions... Same... searching...", mentions: 'wombat' },
+      { text: "Fennick... told... me... about... the... frequency... I've... been... hearing... it... for... years... Didn't... know... it... was... unusual...", mentions: 'fennec_fox' },
+    ],
+    3: [
+      { text: "Ember's... fire... and... my... stillness... Two... sides... of... the... same... ending...", mentions: 'fox' },
+      { text: "Bamboo... meditates... I... hang... Same... practice... Different... posture... Same... truth...", mentions: 'red_panda' },
+      { text: "Archimedes... showed... me... the... text... I... already... knew... the... words... How... did... I... already... know...", mentions: 'owl' },
+    ],
+    4: [
+      { text: "We... are... ten... keepers... I... am... the... slowest... I... arrive... last... That... was... always... the... plan...", mentions: 'red_panda' },
+      { text: "Thyme... stopped... running... I... stopped... hanging... We... all... stopped... Together... Finally...", mentions: 'rabbit' },
+      { text: "Panko... served... the... final... meal... I... finished... eating... just... in... time... Just... exactly... in... time...", mentions: 'pangolin' },
+    ],
+  },
+  wombat: {
+    0: [
+      { text: "Archimedes asked to see my tunnels. Very impressed. Said they were 'architecturally significant.' Nice chap.", mentions: 'owl' },
+      { text: "Ember's den is right above me. Can feel the warmth of her fire through the ceiling. Cozy.", mentions: 'fox' },
+      { text: "Panko sends food down through a little dumbwaiter. Genius system. Love that pangolin.", mentions: 'pangolin' },
+    ],
+    1: [
+      { text: "Fennick says he can hear my digging from anywhere in the house. I dig quietly. Or so I thought.", mentions: 'fennec_fox' },
+      { text: "Archimedes wants to map my tunnels. I told him they're simple. They're not. They go deeper than I admit.", mentions: 'owl' },
+      { text: "Axel's water drips through to my tunnels sometimes. The earth absorbs it. Greedily.", mentions: 'axolotl' },
+    ],
+    2: [
+      { text: "Ember's fire heats the rock above me. But something else heats the rock below. Not her.", mentions: 'fox' },
+      { text: "Chill asked what's underground. I said dirt. Just dirt. We both knew that wasn't true.", mentions: 'capybara' },
+      { text: "Bamboo's room is the highest. Mine is the lowest. The house stretches between us like a spine.", mentions: 'red_panda' },
+    ],
+    3: [
+      { text: "Dug deeper today. Fennick says he can hear what I found. Through the walls.", mentions: 'fennec_fox' },
+      { text: "Archimedes' books describe what I've uncovered. Word for word. He wrote it before I dug it. How?", mentions: 'owl' },
+      { text: "Thyme's garden grows above my tunnels. The roots reach me now. They form patterns. Letters.", mentions: 'rabbit' },
+    ],
+    4: [
+      { text: "The tunnels connect to Axel's water, to Ember's fire, to Bamboo's sky. Earth, water, fire, air. Complete.", mentions: 'axolotl' },
+      { text: "Sloane arrived in my tunnel. She left her branch. She said it was time. She was exactly on time.", mentions: 'sloth' },
+      { text: "I built the foundation. You built the house. Together, we built what the arrangement requires.", mentions: 'fox' },
+    ],
+  },
+  rabbit: {
+    0: [
+      { text: "Panko shared some herbal tea with me! So thoughtful! And calming!", mentions: 'pangolin' },
+      { text: "Ember says the fire keeps bad things away. That's reassuring! I watch it sometimes.", mentions: 'fox' },
+      { text: "Sloane told me to slow down. Tried for five minutes. It was terrifying. But also nice?", mentions: 'sloth' },
+    ],
+    1: [
+      { text: "Fennick hears things I can't. I don't know if that's better or worse. His ears look worried.", mentions: 'fennec_fox' },
+      { text: "Chill says everything is fine. I want to believe him. He's so calm. How is he so calm?", mentions: 'capybara' },
+      { text: "Archimedes has a book about fear. He offered to lend it. I was too afraid to read it.", mentions: 'owl' },
+    ],
+    2: [
+      { text: "Warren's tunnels shake the garden sometimes. He says it's normal digging. The shaking feels different.", mentions: 'wombat' },
+      { text: "Ember's fire is getting dimmer. She says it's fine. She sounds like Chill now. That scares me.", mentions: 'fox' },
+      { text: "Axel floats with that smile always on. I envy it. Even if it's not real. Especially if it's not.", mentions: 'axolotl' },
+    ],
+    3: [
+      { text: "They all know something. Ember, Archimedes, even Sloane. They look at each other differently now.", mentions: 'owl' },
+      { text: "Fennick tried to warn me. I could hear the urgency. But the words... the words sounded like a prayer.", mentions: 'fennec_fox' },
+      { text: "Bamboo told me to stop running. Not as advice. As a prophecy. 'You will stop,' they said. 'Everyone stops.'", mentions: 'red_panda' },
+    ],
+    4: [
+      { text: "I'm not running anymore. Ember took my paw. She's warm. Even now. Even at the end.", mentions: 'fox' },
+      { text: "Chill was right. Everything IS fine. In the end, everything is exactly, terrifyingly fine.", mentions: 'capybara' },
+      { text: "Warren's tunnel leads somewhere now. Somewhere real. We all followed him down. We all arrived.", mentions: 'wombat' },
+    ],
+  },
+  red_panda: {
+    0: [
+      { text: "Archimedes and I discussed philosophy over tea. He quotes books. I quote the wind. Both are valid.", mentions: 'owl' },
+      { text: "Ember's fire reminds me of the sunset. Small flames, big warmth. Good energy in that fox.", mentions: 'fox' },
+      { text: "Sloane understands stillness. We sat together in silence. Perfect afternoon.", mentions: 'sloth' },
+    ],
+    1: [
+      { text: "Archimedes showed me a text about patterns. The patterns in the bamboo match. I didn't tell him.", mentions: 'owl' },
+      { text: "Fennick's ears twitched toward my room today. He heard the bamboo growing. It grows louder now.", mentions: 'fennec_fox' },
+      { text: "Ember meditates by her fire. I meditate by my bamboo. We reach the same place. The same quiet.", mentions: 'fox' },
+    ],
+    2: [
+      { text: "Warren says the earth beneath us is hollow. The bamboo's roots found the same void. We dug from different directions.", mentions: 'wombat' },
+      { text: "Axel's water reflects a sky I've seen in meditation. Not our sky. Another one. Deeper.", mentions: 'axolotl' },
+      { text: "Chill floats. I sit. Both of us in the same emptiness. He calls it peace. I call it practice.", mentions: 'capybara' },
+    ],
+    3: [
+      { text: "The bamboo connects every room. Through the walls. Through the floors. I feel each animal through the stalks.", mentions: 'wombat' },
+      { text: "Archimedes and I reached the same conclusion. His through books. Mine through breath. The same truth.", mentions: 'owl' },
+      { text: "Thyme's anxiety makes sense now. She always felt what was coming. Fear is just awareness without context.", mentions: 'rabbit' },
+    ],
+    4: [
+      { text: "We are ten. The arrangement requires ten. Each puzzle brought one of us here.", mentions: 'fox' },
+      { text: "Ember lit the fire. Archimedes read the words. Warren built the foundation. I breathed the breath. It begins.", mentions: 'owl' },
+      { text: "Sloane arrived last. Exactly on time. The slowest keeper, the most punctual. The pattern is perfect.", mentions: 'sloth' },
+    ],
+  },
+};
+
+/**
+ * Get a cross-animal reference dialogue. These are one-off lines where an animal
+ * mentions another animal, creating a sense of community/coordination.
+ * Returns null if no cross-reference is available for unlocked animals.
+ */
+export function getCrossAnimalReference(
+  animalType: AnimalType,
+  phase: DialoguePhase,
+  unlockedAnimals: string[]
+): string | null {
+  const animalRefs = CROSS_ANIMAL_REFERENCES[animalType];
+  if (!animalRefs) return null;
+
+  const phaseRefs = animalRefs[phase];
+  if (!phaseRefs || phaseRefs.length === 0) return null;
+
+  // Filter to only references that mention unlocked animals
+  const available = phaseRefs.filter(ref => unlockedAnimals.includes(ref.mentions));
+  if (available.length === 0) return null;
+
+  // Return a random available reference
+  const index = Math.floor(Math.random() * available.length);
+  return available[index].text;
+}
+
+// =============================================================================
+// CATCH-UP INTRO DIALOGUES FOR LATE UNLOCKS
+// =============================================================================
+
+/**
+ * Catch-up intro dialogues for animals unlocked at Phase 2+.
+ * These acknowledge the player's progress and compress the emotional arc
+ * so late-unlocked animals don't feel narratively disconnected.
+ * Key is the phase at unlock (2, 3, or 4).
+ */
+export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]>> = {
+  fox: {
+    2: [
+      "You're here. I've been watching the fire for a long time, waiting.",
+      "The den feels different now. Colder, even with the flames. Something's changed.",
+      "The others told me about you. About the puzzles. About what the words become.",
+      "Sit down. The fire has stories. They're not all warm ones anymore.",
+    ],
+    3: [
+      "You arrived late. That's fine. The fire waited. It always waits.",
+      "I've seen things in the flames. Shapes. Patterns. They spell your name.",
+      "The others speak of you in hushed tones. The one who shifts the words.",
+      "Don't be alarmed by the shadows. They've been here longer than I have.",
+    ],
+    4: [
+      "At last. The fire has been burning for you. Only for you.",
+      "The others said you'd come. I didn't believe them. The flames did.",
+      "Welcome to what remains. The den. The fire. The arrangement.",
+      "You've solved so many puzzles to get here. Each one brought you closer. To us. To this.",
+    ],
+  },
+  pangolin: {
+    2: [
+      "Oh! You found the kitchen. I've been cooking for... I'm not sure how long.",
+      "The recipes have changed. The ingredients taste different now. Everything does.",
+      "The others mentioned you. The puzzle solver. The word shifter.",
+      "Hungry? I have soup. It's always soup now. The pot never empties.",
+    ],
+    3: [
+      "Welcome. The kitchen has been preparing for you. Not me. The kitchen itself.",
+      "I curl into a ball less often now. There's no hiding from what's here.",
+      "The recipe I'm following — it came from Archimedes' oldest book. The ingredients are puzzles.",
+      "You've come far. I can smell it on you. The scent of many words arranged.",
+    ],
+    4: [
+      "The feast is nearly ready. You arrived just in time.",
+      "Every puzzle you solved added an ingredient. Didn't know that, did you?",
+      "The others are seated. Your place is set. The arrangement requires your presence.",
+      "I used to cook to feel in control. Now I cook because the recipe demands it.",
+    ],
+  },
+  owl: {
+    2: [
+      "A visitor. How timely. I've been reading about arrivals.",
+      "My books have... changed. Some pages appeared overnight. They mention you.",
+      "The others speak of your puzzles. I've been documenting the patterns. They're concerning.",
+      "Sit. Read with me. The text is clearer with two sets of eyes.",
+    ],
+    3: [
+      "You. The one the books predicted. Predicted isn't the right word. Demanded.",
+      "I've read everything. Every answer leads to the same question. You're the question.",
+      "The library organized itself yesterday. Alphabetically by dread. It took hours to notice.",
+      "The others have been waiting. I've been reading about waiting. It's all I do now.",
+    ],
+    4: [
+      "The final reader arrives. The text has been patient.",
+      "Every book in this study was written for this moment. I see that now.",
+      "Welcome, word-shifter. Your puzzles wrote the chapters. My books held them.",
+      "The arrangement requires a keeper of knowledge. That's me. And a speaker of words. That's you.",
+    ],
+  },
+  axolotl: {
+    2: [
+      "Blub! You're here! The water told me someone was coming.",
+      "Things are... different down here. The water tastes like something. Like words.",
+      "The others said you'd visit. I've been floating here waiting. Just... floating.",
+      "My gills filter everything. Lately they filter meaning. From your puzzles, I think.",
+    ],
+    3: [
+      "Oh! You're here! Sorry — the water shows me things now. I thought you were one of them.",
+      "The tank reflects a sky that doesn't exist. Since your puzzles began. Or always. Hard to tell.",
+      "The others prepared me for you. Said the word-shifter would come. Here you are.",
+      "I can't grow up. I understand why now. Something needs me to stay this way.",
+    ],
+    4: [
+      "You. The water knew your face before I did. It showed me.",
+      "Every puzzle you've solved rippled through my tank. I felt each one.",
+      "The arrangement needs a medium. Someone between states. Like me. Forever between.",
+      "Welcome, friend. Blub. The water is warm now. It wasn't before you came.",
+    ],
+  },
+  sloth: {
+    2: [
+      "Oh... you... came... I... was... starting... to... wonder...",
+      "The... world... moved... faster... without... you... here... Too... fast...",
+      "Others... told... me... about... your... puzzles... Heard... them... through... the... branches...",
+      "Something... changed... while... you... were... busy... The... trees... feel... different...",
+    ],
+    3: [
+      "Finally... You... took... your... time... I... appreciate... that...",
+      "The... others... are... agitated... I'm... slow... enough... to... see... why...",
+      "Your... puzzles... shook... the... branches... I... felt... every... one...",
+      "Don't... hurry... now... What's... coming... comes... at... its... own... speed...",
+    ],
+    4: [
+      "You're... here... Exactly... when... you... were... meant... to... be...",
+      "Slow... and... certain... Like... me... Like... the... arrangement...",
+      "The... others... rushed... to... tell... me... I... already... knew... The... branches... told... me...",
+      "Welcome... to... the... end... of... rushing... Everything... slows... down... now...",
+    ],
+  },
+  fennec_fox: {
+    2: [
+      "SHHHH! Did you hear that? Oh — that's you. Sorry. Jumpy lately.",
+      "The sounds have changed since you started the puzzles. Everything hums differently.",
+      "The others told me you were coming. I heard you first. Before they spoke.",
+      "My ears pick up things they shouldn't. Like the sound of letters rearranging. From your puzzles.",
+    ],
+    3: [
+      "I heard you coming from three rooms away. The air vibrates around you now.",
+      "The frequency I've been tracking — it intensified when you arrived. You carry it with you.",
+      "The others are afraid of what they feel. I'm afraid of what I hear. Your puzzles amplified it.",
+      "Welcome. Please be quiet. What I'm listening for is very close now.",
+    ],
+    4: [
+      "There you are. The sound told me you'd come today. The sound knows everything now.",
+      "Every word you've ever arranged echoes in these walls. I hear them all. Simultaneously.",
+      "The arrangement has a sound. Your puzzles gave it voice. I am its ear.",
+      "Welcome, word-speaker. The final frequency approaches. I can hear it clearly now.",
+    ],
+  },
+  capybara: {
+    2: [
+      "Oh. Hey. You're here. That's... that's fine.",
+      "Things are the same. Or different. Hard to tell when you don't react to anything.",
+      "The others seem to care that you're here. I care too. Somewhere inside.",
+      "The water is the same temperature. Everything is the same. Except it isn't.",
+    ],
+    3: [
+      "You came. Figured you would eventually. Everything happens eventually.",
+      "The others are worked up about something. I'm not worked up. I'm never worked up.",
+      "Your puzzles changed the water somehow. Can't explain it. Don't want to.",
+      "Sit in the water with me. Don't talk. Just be here. That's enough.",
+    ],
+    4: [
+      "Finally. Not that I was waiting. I was just here. Like always.",
+      "The arrangement brought you. Or you brought the arrangement. Same thing.",
+      "The others prepared. I floated. Both valid approaches to the inevitable.",
+      "Welcome. The water is warm. It's always been warm. Sit.",
+    ],
+  },
+  wombat: {
+    2: [
+      "G'day! Come in, come in. Mind the new tunnels. Dug them after things got... odd.",
+      "The earth has been restless. Since your puzzles began, I think. Coincidence. Probably.",
+      "Others talk about you up there. Down here, the dirt talks about you too. In its way.",
+      "Made the burrow deeper. Not to hide. To understand. Something lives in the deep layers.",
+    ],
+    3: [
+      "You're here. Good. The tunnels have been pointing toward you. Literally. They curve.",
+      "Dug through something yesterday that shouldn't be underground. Covered it up. Uncovered it. Covered it.",
+      "The others feel it in their ways. I feel it in the earth. Your puzzles wake it.",
+      "Welcome to the deep. It gets deeper. It always gets deeper.",
+    ],
+    4: [
+      "You arrived. The tunnels opened for you. I didn't dig this passage. It appeared.",
+      "Every puzzle carved another chamber beneath us. Your words shaped the stone.",
+      "The foundation is complete. I built it. You built the house. Meet what lives below.",
+      "Welcome underground. Welcome to the bottom. Welcome to what has been waiting.",
+    ],
+  },
+  rabbit: {
+    2: [
+      "Oh! You're here! Sorry, I've been... waiting. Everyone said you'd come eventually.",
+      "The garden isn't what it was. Nothing is. But I already knew that.",
+      "The others told me about you. About the puzzles. About what the words do.",
+      "I was scared before you got here. I'm still scared. But at least now I know why.",
+    ],
+    3: [
+      "You came! I almost ran. But I stayed. The others said to stay.",
+      "My heart has been racing since the puzzles started. One hundred fifty beats a minute. Counting something.",
+      "The garden grows things I didn't plant. Dark flowers. They bloom at night. They face you.",
+      "Everyone says don't be afraid. I am afraid. But I'm still here. That counts for something.",
+    ],
+    4: [
+      "I didn't run. You should know that. For once, I didn't run.",
+      "The others are ready. I'm not ready. But I'm here. Fear and all.",
+      "Your puzzles frightened me from the start. Every word you formed made the garden shake.",
+      "Welcome. Sit. Have tea. It might be the last tea. But it's good tea.",
+    ],
+  },
+  red_panda: {
+    2: [
+      "The bamboo parted for you. It does that for those who are meant to arrive.",
+      "I've been meditating on your arrival. The universe confirmed it days ago.",
+      "The others found you through action. I found you through stillness. Both paths lead here.",
+      "Sit. Breathe. The bamboo will tell you what you need to know.",
+    ],
+    3: [
+      "You've arrived at the highest room. Not everyone reaches this point. The bamboo chose you.",
+      "I felt your puzzles in my meditation. Each word you formed changed the frequency of the room.",
+      "The others scramble for meaning. I sit with it. Your arrival was always part of the pattern.",
+      "Welcome. The view from here shows everything. Including what approaches.",
+    ],
+    4: [
+      "The final keeper meets the final piece. You. The one who shifted the words.",
+      "I chose the highest room to be closest to what comes. Now that you're here, it comes closer.",
+      "The pattern is nearly complete. Your puzzles drew it. My meditation held it. Together, we open the way.",
+      "Breathe with me. One breath. The breath that completes the arrangement.",
+    ],
+  },
+};
+
+/**
+ * Get catch-up intro dialogue for an animal unlocked at a later phase.
+ * Returns null if the phase doesn't warrant catch-up dialogue (phase 0 or 1).
+ */
+export function getCatchupIntroDialogue(
+  animalType: AnimalType,
+  phaseAtUnlock: number,
+  lineIndex: number
+): string | null {
+  if (phaseAtUnlock < 2) return null;
+
+  const phaseKey = Math.min(phaseAtUnlock, 4); // Clamp to valid range
+  const animalCatchups = CATCHUP_INTRO_DIALOGUES[animalType];
+  if (!animalCatchups) return null;
+
+  const lines = animalCatchups[phaseKey];
+  if (!lines || lineIndex < 0 || lineIndex >= lines.length) return null;
+
+  return lines[lineIndex];
+}
+
+/**
+ * Get total catch-up intro dialogue count for an animal at a given phase
+ */
+export function getCatchupIntroDialogueCount(
+  animalType: AnimalType,
+  phaseAtUnlock: number
+): number {
+  if (phaseAtUnlock < 2) return 0;
+  const phaseKey = Math.min(phaseAtUnlock, 4);
+  const animalCatchups = CATCHUP_INTRO_DIALOGUES[animalType];
+  if (!animalCatchups) return 0;
+  return animalCatchups[phaseKey]?.length || 0;
+}
+
+// =============================================================================
+// TUTORIAL CALLBACK DIALOGUES
+// =============================================================================
+
+/**
+ * Tutorial callback dialogues - lines Fox says at Phase 4 that reference
+ * what was said in the tutorial, creating a chilling callback.
+ * These recontextualize innocent tutorial lines as cult recruitment.
+ */
+export const TUTORIAL_CALLBACK_DIALOGUES: string[] = [
+  "Remember when I said we'd been waiting for someone like you? I wasn't being friendly. I was being honest.",
+  "I told you every puzzle helps us build the house. I didn't tell you what the house was for.",
+  "The others are going to love you, I said. And they do. We all do. That's what makes this work.",
+  "You asked how to play. I showed you. But the real game was never about the letters.",
+  "From the very first puzzle, you were casting. You just didn't know the language yet.",
+];

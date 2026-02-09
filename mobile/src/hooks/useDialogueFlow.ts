@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Animated } from 'react-native';
-import { Animal, HomeWorldProgress } from '../types/homeWorld';
+import { Animal, HomeWorldProgress, getAnimalPhase, DialoguePhase } from '../types/homeWorld';
 import {
   getCurrentDialogue,
   hasMoreDialogues,
@@ -11,7 +11,7 @@ import {
   endSession,
   getSessionStatus,
 } from '../services/dialogueSession';
-import { markDialogueRead } from '../services/amberCurrency';
+import { markDialogueRead, consumeTriggerWords } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 
 interface SessionInfo {
@@ -35,6 +35,7 @@ interface UseDialogueFlowReturn {
   cooldownSlide: Animated.Value;
   dialogueSlide: Animated.Value;
   isTalking: boolean;
+  triggerReaction: string | null;
   handleAnimalTap: (animal: Animal) => Promise<void>;
   handleNextDialogue: () => Promise<void>;
   handleCloseDialogue: () => Promise<void>;
@@ -53,6 +54,7 @@ export function useDialogueFlow({
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
   const [isTalking, setIsTalking] = useState(false);
+  const [triggerReaction, setTriggerReaction] = useState<string | null>(null);
 
   // Animations
   const dialogueSlide = useRef(new Animated.Value(0)).current;
@@ -138,13 +140,15 @@ export function useDialogueFlow({
     }
   }, [showDialogue]);
 
-  // Get current dialogue text
+  // Get current dialogue text (uses per-animal phase awareness)
   const getDialogueText = (): string => {
     if (!selectedAnimal || !progress) return '';
+    // Per-animal phase: vanguard animals are 1 phase ahead, lagging are 1 behind
+    const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
     const dialogue = getCurrentDialogue(
       selectedAnimal.type,
       selectedAnimal.currentDialogueIndex,
-      progress.currentPhase
+      animalPhase
     );
     return dialogue?.text || 'Hello, friend!';
   };
@@ -154,14 +158,42 @@ export function useDialogueFlow({
     const availability = await checkDialogueAvailability(animal.id);
 
     if (!availability.available) {
-      setCooldownMessage(
-        `${animal.name} needs some quiet time. Play more puzzles and come back!`
-      );
+      // Phase-aware cooldown messages
+      const phase = progress?.currentPhase ?? 0;
+      const cooldownMessages = phase >= 3
+        ? [
+            `${animal.name} is preparing. Return after more offerings.`,
+            `The ritual requires patience. ${animal.name} will speak again soon.`,
+          ]
+        : phase >= 2
+          ? [
+              `${animal.name} is lost in thought. Come back after solving some puzzles.`,
+            ]
+          : [
+              `${animal.name} needs some quiet time. Play more puzzles and come back!`,
+            ];
+      setCooldownMessage(cooldownMessages[Math.floor(Math.random() * cooldownMessages.length)]);
       return;
     }
 
     setSelectedAnimal(animal);
     setShowDialogue(true);
+    setTriggerReaction(null);
+
+    // Check for trigger word reactions from recent puzzles
+    try {
+      const consumed = await consumeTriggerWords(animal.type);
+      if (consumed.length > 0) {
+        // Animal noticed a trigger word from recent puzzles
+        const word = consumed[0]; // Show reaction to first trigger word
+        const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
+        if (animalPhase >= 2) {
+          setTriggerReaction(`You spelled "${word}"... ${animal.name} noticed.`);
+        }
+      }
+    } catch {
+      // Trigger word consumption is non-critical
+    }
 
     const status = getSessionStatus(animal.id);
     setSessionInfo(status);
@@ -178,7 +210,7 @@ export function useDialogueFlow({
         useNativeDriver: true,
       }).start();
     }
-  }, [dialogueSlide]);
+  }, [dialogueSlide, progress]);
 
   // Handle closing dialogue (and ending session)
   const handleCloseDialogue = useCallback(async () => {
@@ -188,6 +220,7 @@ export function useDialogueFlow({
     setShowDialogue(false);
     setSelectedAnimal(null);
     setSessionInfo(null);
+    setTriggerReaction(null);
   }, [selectedAnimal]);
 
   // Handle dialogue advance
@@ -203,10 +236,12 @@ export function useDialogueFlow({
       return;
     }
 
+    // Per-animal phase awareness for dialogue progression
+    const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
     const hasMore = hasMoreDialogues(
       selectedAnimal.type,
       selectedAnimal.currentDialogueIndex,
-      progress.currentPhase
+      animalPhase
     );
 
     if (hasMore) {
@@ -251,6 +286,7 @@ export function useDialogueFlow({
     cooldownSlide,
     dialogueSlide,
     isTalking,
+    triggerReaction,
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,

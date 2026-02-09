@@ -138,16 +138,31 @@ const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: a
 const mockGetAmberBalance = jest.fn(async () => 100);
 const mockGetCurrentPhase = jest.fn(async () => 0);
 
+const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
+  totalWordsFormed: 0,
+  totalRitualEnergy: 0,
+  triggerWordQueue: [] as string[],
+}));
+
 jest.mock('../services/amberCurrency', () => ({
   awardPuzzleAmber: (...args: any[]) => mockAwardPuzzleAmber(args[0], args[1], args[2], args[3]),
   getAmberBalance: () => mockGetAmberBalance(),
   getCurrentPhase: () => mockGetCurrentPhase(),
+  recordRitualWords: (...args: any[]) => mockRecordRitualWords(args[0], args[1], args[2]),
 }));
 
 // --- Mock dialogueSession ---
 const mockUpdatePuzzleCount = jest.fn();
+const mockUpdateSessionPhase = jest.fn();
 jest.mock('../services/dialogueSession', () => ({
   updatePuzzleCount: (...args: any[]) => mockUpdatePuzzleCount(args[0]),
+  updateSessionPhase: (...args: any[]) => mockUpdateSessionPhase(args[0]),
+}));
+
+// --- Mock localGenerator (for ritual energy) ---
+jest.mock('../services/localGenerator', () => ({
+  calculateRitualEnergy: jest.fn(() => 0),
+  extractTriggerWords: jest.fn(() => []),
 }));
 
 // --- Mock eventLogger ---

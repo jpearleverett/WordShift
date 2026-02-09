@@ -168,3 +168,141 @@ export function getEventDuration(event: PhaseTransitionEvent): number {
   const lastScene = event.scenes[event.scenes.length - 1];
   return lastScene.delay + lastScene.duration + 500; // 500ms fade-out buffer
 }
+
+// ============================================================================
+// HOUSE COMPLETION CEREMONY
+// ============================================================================
+
+/**
+ * Cinematic event for when all 10 rooms are built and all 10 animals are unlocked.
+ * "You didn't build a house. You built a temple."
+ */
+export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
+  phase: 4,
+  title: 'The Temple',
+  bgColor: '#050208',
+  textColor: '#C4A882',
+  accentColor: '#8B6914',
+  scenes: [
+    {
+      text: 'The house is complete.',
+      emoji: '🏠',
+      delay: 0,
+      duration: 3000,
+    },
+    {
+      text: 'Ten rooms. Ten keepers.\nEach in their place.',
+      delay: 3200,
+      duration: 3500,
+    },
+    {
+      text: 'You built it.\nPuzzle by puzzle. Word by word.',
+      delay: 6900,
+      duration: 3500,
+    },
+    {
+      text: 'Every room is a chamber.\nEvery animal is a keeper.',
+      delay: 10600,
+      duration: 3500,
+    },
+    {
+      text: 'The arrangement is ready.',
+      emoji: '🌑',
+      delay: 14300,
+      duration: 3000,
+    },
+  ],
+};
+
+// ============================================================================
+// FINAL PUZZLE EVENT
+// ============================================================================
+
+/**
+ * Cinematic event for after the "final puzzle" at deep Phase 4.
+ * The shadow figure descends. The ritual is complete.
+ */
+export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
+  phase: 4,
+  title: 'The Arrival',
+  bgColor: '#020005',
+  textColor: '#6B5A7A',
+  accentColor: '#8B2252',
+  scenes: [
+    {
+      text: 'The last word has been shifted.',
+      delay: 0,
+      duration: 3500,
+    },
+    {
+      text: 'Every word you ever formed was an incantation.\nEvery puzzle was a verse.',
+      delay: 3700,
+      duration: 4000,
+    },
+    {
+      text: 'The ten keepers stand in their chambers.\nThe temple is complete.',
+      emoji: '🏠',
+      delay: 7900,
+      duration: 4000,
+    },
+    {
+      text: 'Something descends from above the attic.\nSomething that has no name.',
+      emoji: '🌑',
+      delay: 12100,
+      duration: 4000,
+    },
+    {
+      text: 'It was always coming.\nYou just gave it the words.',
+      delay: 16300,
+      duration: 4000,
+    },
+    {
+      text: 'The arrangement is complete.',
+      delay: 20500,
+      duration: 3000,
+    },
+  ],
+};
+
+// ============================================================================
+// POST-REVELATION EVENT
+// ============================================================================
+
+/**
+ * Cinematic event marking the transition to post-revelation state (Phase 5).
+ * Terrible peace. The shadow figure is here. The animals are serene.
+ */
+export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
+  phase: 4,
+  title: 'After',
+  bgColor: '#0A0510',
+  textColor: '#8A7A9A',
+  accentColor: '#4A3060',
+  scenes: [
+    {
+      text: 'The shadow settles.',
+      delay: 0,
+      duration: 3000,
+    },
+    {
+      text: 'Your friends are at peace.\nA terrible, beautiful peace.',
+      delay: 3200,
+      duration: 3500,
+    },
+    {
+      text: 'The letters still move.\nThe words still shift.',
+      delay: 6900,
+      duration: 3000,
+    },
+    {
+      text: 'But the meaning has changed.\nEverything has changed.',
+      delay: 10100,
+      duration: 3000,
+    },
+    {
+      text: 'The pattern continues.\nIt always will.',
+      delay: 13300,
+      duration: 3000,
+    },
+  ],
+};

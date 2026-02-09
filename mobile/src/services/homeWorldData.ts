@@ -1,5 +1,100 @@
-import { Animal, Room, Unlockable, AnimalType, RoomTheme } from '../types/homeWorld';
+import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase } from '../types/homeWorld';
 import { loadProgress, unlockAnimal, unlockRoom, canAfford } from './amberCurrency';
+
+// ============================================================================
+// PHASE-AWARE ROOM DESCRIPTIONS
+// The house is a temple. Each room is a chamber. Descriptions evolve with phase.
+// ============================================================================
+
+/**
+ * Phase-aware room descriptions. At Phase 0 they're cozy and inviting.
+ * By Phase 4, the temple reveals itself.
+ */
+export const ROOM_DESCRIPTIONS: Record<string, Record<number, string>> = {
+  cozy_den: {
+    0: 'A warm den with a crackling fireplace. Home.',
+    1: 'The fire has burned here for a long time. Ember tends it carefully.',
+    2: 'The flames cast shadows that move independently. Ember watches them.',
+    3: 'The fire burns without fuel now. Ember says it feeds on something else.',
+    4: 'The first chamber. Where the oracle reads the flames. The fire never goes out.',
+  },
+  kitchen: {
+    0: 'A cozy space where friends gather around good food.',
+    1: 'Panko is always cooking something. The recipes get more complex.',
+    2: 'The hearth burns constantly now. Panko says the fire must not go out.',
+    3: 'The kitchen smells of things that have no names. Panko follows a recipe from nowhere.',
+    4: 'The preparation chamber. The ovens have been repurposed. Something else is being prepared.',
+  },
+  study: {
+    0: 'A quiet place for deep thoughts and many books.',
+    1: 'Archimedes reads all day. Some books seem to read themselves.',
+    2: 'The books have rearranged. Archimedes says they found their proper order.',
+    3: 'One book remains open at all times. Archimedes will not say which page.',
+    4: 'The chamber of knowledge. The text that summoned this was always here. In the letters.',
+  },
+  aquarium: {
+    0: 'A watery haven full of wonder and floating things.',
+    1: 'The water is deeper than it should be. Axel dives and surfaces hours later.',
+    2: 'Something moves below Axel. In the deepest part. Where light does not reach.',
+    3: 'The water has gone dark. Axel says what\'s below is friendly. That should worry you.',
+    4: 'The scrying pool. Axel sees through the water into the space between. The medium\'s chamber.',
+  },
+  jungle_room: {
+    0: 'A verdant retreat with vines, hammock, and lazy afternoons.',
+    1: 'The vines grow faster than they should. Sloane does not seem to mind.',
+    2: 'The jungle thickens. The hammock hangs lower. Time moves differently here.',
+    3: 'The vines have woven patterns. The same pattern as the one in Archimedes\' book.',
+    4: 'The chamber of patience. Sloane waited longer than anyone. The vines know the arrangement.',
+  },
+  desert_room: {
+    0: 'Sandy silence under watchful stars. A peaceful camp.',
+    1: 'Fennick hears things at night. Not animals. Not wind. Something else.',
+    2: 'The desert sand has arranged itself into circles while Fennick sleeps.',
+    3: 'The stars visible from here have shifted. They now form the same pattern.',
+    4: 'The listening chamber. Fennick heard it first. The frequency of what approaches.',
+  },
+  office: {
+    0: 'A tidy workspace where everything has its place.',
+    1: 'Chill organizes compulsively. The files have an order that feels deliberate.',
+    2: 'The filing system connects to something. Every puzzle you solved has a folder.',
+    3: 'Chill\'s spreadsheets track the arrangement. Every word. Every shift. Catalogued.',
+    4: 'The administration chamber. Chill coordinated everything. The unshakable calm of certainty.',
+  },
+  burrow: {
+    0: 'An underground home carved with care. Cozy and safe.',
+    1: 'Warren\'s tunnels are deeper than a wombat needs. He keeps digging.',
+    2: 'The tunnels connect to something below the house. Warren found it accidentally.',
+    3: 'Below everything, something stirs. Warren built the path to it.',
+    4: 'The foundation chamber. Warren built the connection to what sleeps below. The burrow reaches it.',
+  },
+  garden: {
+    0: 'A beautiful garden patio with flowers and afternoon tea.',
+    1: 'The flowers grow in patterns Thyme didn\'t plant. She pretends not to notice.',
+    2: 'The garden is arranged in concentric circles. Like a target. Or a sigil.',
+    3: 'Flowers bloom and die in minutes. The cycle accelerates. Something feeds on it.',
+    4: 'The growth chamber. Where endings bloom like flowers. Thyme watches with terrible peace.',
+  },
+  bamboo_attic: {
+    0: 'The highest room. Peaceful bamboo and sky views.',
+    1: 'The bamboo sways without wind. Bamboo meditates on this. Always.',
+    2: 'From up here, you can see the shadow in the sky. Bamboo says it has always been there.',
+    3: 'The highest room is closest to what gathers above. Bamboo breathes with it.',
+    4: 'The apex chamber. The spiritual leader\'s seat. Ten rooms below, one sky above. The arrangement complete.',
+  },
+};
+
+/**
+ * Get the phase-appropriate description for a room
+ */
+export function getRoomDescription(roomId: string, phase: DialoguePhase): string {
+  const descriptions = ROOM_DESCRIPTIONS[roomId];
+  if (!descriptions) return '';
+  // Find the highest phase description at or below the current phase
+  for (let p = phase; p >= 0; p--) {
+    if (descriptions[p]) return descriptions[p];
+  }
+  return descriptions[0] || '';
+}
 
 /**
  * Default room definitions
