@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
 import { CandyColors } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 
 const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
@@ -55,8 +56,13 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
       }),
     ]).start();
 
+    // Skip decorative loops on low-end devices
+    if (shouldSimplifyAnimations()) {
+      return () => { scaleAnim.stopAnimation(); };
+    }
+
     // Continuous pulse
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
@@ -71,10 +77,11 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
     // Glow animation
-    Animated.loop(
+    const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
@@ -89,9 +96,12 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
           useNativeDriver: false,
         }),
       ])
-    ).start();
+    );
+    glowLoop.start();
 
     return () => {
+      pulseLoop.stop();
+      glowLoop.stop();
       scaleAnim.stopAnimation();
       pulseAnim.stopAnimation();
       glowAnim.stopAnimation();
@@ -181,7 +191,7 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean }> 
   );
 };
 
-export const Row: React.FC<RowProps> = ({
+export const Row: React.FC<RowProps> = memo(({
   rowData,
   rowIndex,
   activeRowIndex,
@@ -219,23 +229,26 @@ export const Row: React.FC<RowProps> = ({
         }),
       ]).start();
 
-      // Glow pulse for active row
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
+      // Glow pulse for active row (skip on low-end devices)
+      if (!shouldSimplifyAnimations()) {
+        const rowGlowLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(glowAnim, {
+              toValue: 1,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false,
+            }),
+            Animated.timing(glowAnim, {
+              toValue: 0,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false,
+            }),
+          ])
+        );
+        rowGlowLoop.start();
+      }
     } else if (isTarget) {
       Animated.parallel([
         Animated.spring(scaleAnim, {
@@ -482,7 +495,7 @@ export const Row: React.FC<RowProps> = ({
       </View>
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   rowWrapper: {

@@ -252,7 +252,13 @@ function StarBar({
 }) {
   const pct = total > 0 ? (count / total) * 100 : 0;
   return (
-    <View style={styles.starBarContainer}>
+    <View
+      style={styles.starBarContainer}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={`${label}: ${count} of ${total}`}
+      accessibilityValue={{ min: 0, max: total, now: count }}
+    >
       <Text style={styles.starBarLabel}>{label}</Text>
       <View style={styles.starBarTrack}>
         <View style={[styles.starBarFill, { width: `${Math.max(pct, 2)}%`, backgroundColor: color }]} />
