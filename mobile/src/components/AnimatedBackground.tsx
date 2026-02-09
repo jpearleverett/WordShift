@@ -40,6 +40,8 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.5)).current;
+  const mountedRef = useRef(true);
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     const animate = () => {
@@ -49,7 +51,7 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
       rotate.setValue(0);
       scale.setValue(0.5);
 
-      Animated.sequence([
+      animRef.current = Animated.sequence([
         Animated.delay(particle.delay),
         Animated.parallel([
           // Float upward
@@ -99,10 +101,18 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
             }),
           ]),
         ]),
-      ]).start(() => animate());
+      ]);
+      animRef.current.start(() => {
+        if (mountedRef.current) animate();
+      });
     };
 
     animate();
+
+    return () => {
+      mountedRef.current = false;
+      animRef.current?.stop();
+    };
   }, []);
 
   const spin = rotate.interpolate({

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import {
@@ -47,6 +47,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   const [cumulativeStats, setCumulativeStats] = useState<CumulativeStats | null>(null);
   const [amberBalance, setAmberBalance] = useState(0);
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
+  const recordInProgress = useRef(false);
 
   useEffect(() => {
     // Initialize all services concurrently with proper error handling
@@ -78,6 +79,25 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
 
+    // Guard against concurrent recordVictory calls
+    if (recordInProgress.current) {
+      return {
+        earnedStars: stars,
+        amberEarned: 0,
+        amberBalance,
+        phaseChanged: false,
+        newPhase: currentPhase,
+        streakBonus: 0,
+        challengeBonus: 0,
+        currentStreak: 0,
+        milestoneBonus: 0,
+        milestoneMessage: null,
+        cumulativeStats,
+        phaseAcceleration: 1.0,
+      };
+    }
+
+    recordInProgress.current = true;
     try {
       // Record star stats first so we can get the three-star rate
       await recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts);
@@ -138,6 +158,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         cumulativeStats,
         phaseAcceleration: 1.0,
       };
+    } finally {
+      recordInProgress.current = false;
     }
   }, [amberBalance, currentPhase, cumulativeStats]);
 

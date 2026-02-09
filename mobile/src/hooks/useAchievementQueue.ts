@@ -71,7 +71,11 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
       const newAchievements = await checkAchievements(state);
       if (newAchievements.length > 0) {
         hapticHeavy();
-        setQueue(prev => [...prev, ...newAchievements]);
+        setQueue(prev => {
+          const existingIds = new Set(prev.map(a => a.id));
+          const uniqueNew = newAchievements.filter(a => !existingIds.has(a.id));
+          return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
+        });
       }
     } catch (err) {
       console.warn('Achievement check failed:', err);

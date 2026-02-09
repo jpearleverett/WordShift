@@ -33,10 +33,6 @@ import {
   ANIMAL_EMOJIS,
   getRoomsWithStatus,
   getAnimalsWithStatus,
-  getNextUnlock,
-  purchaseUnlock,
-  getUnlockStatus,
-  isUnlockAvailable,
 } from '../../services/homeWorldData';
 import {
   getCurrentDialogue,
@@ -47,12 +43,11 @@ import {
 } from '../../services/animalDialogue';
 import {
   loadDialogueSessions,
-  checkDialogueAvailability,
-  recordDialogue,
-  endSession,
-  getSessionStatus,
   updatePuzzleCount,
 } from '../../services/dialogueSession';
+
+import { useDialogueFlow } from '../../hooks/useDialogueFlow';
+import { useUnlockFlow } from '../../hooks/useUnlockFlow';
 
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
@@ -80,23 +75,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [animals, setAnimals] = useState<Animal[]>([]);
-  const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
-  const [showDialogue, setShowDialogue] = useState(false);
-  const [showShop, setShowShop] = useState(false);
-  const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
-  const [showInvitePrompt, setShowInvitePrompt] = useState(false);
-  const [nextUnlock, setNextUnlock] = useState<Unlockable | null>(null);
-  const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
-  const [sessionInfo, setSessionInfo] = useState<{
-    status: 'available' | 'in_session' | 'cooldown';
-    dialoguesRemaining?: number;
-    puzzlesRemaining?: number;
-  } | null>(null);
-  const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
-  const [unlockAvailability, setUnlockAvailability] = useState<{
-    available: boolean;
-    reason?: string;
-  } | null>(null);
 
   // Decoration shop state
   const [showDecorationShop, setShowDecorationShop] = useState(false);
@@ -107,92 +85,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
 
-  // Talking animation state
-  const [isTalking, setIsTalking] = useState(false);
-
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
-  const dialogueSlide = useRef(new Animated.Value(0)).current;
-  const cooldownOpacity = useRef(new Animated.Value(0)).current;
-  const cooldownSlide = useRef(new Animated.Value(20)).current;
 
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
 
-  // Load data on mount
-  useEffect(() => {
-    loadAllData();
-    loadDialogueSessions(); // Load session data
-  }, []);
+  // Dialogue flow hook
+  const dialogueFlow = useDialogueFlow({
+    progress,
+    setAnimals,
+  });
 
-  // Update session status when selected animal changes
-  useEffect(() => {
-    if (selectedAnimal) {
-      const status = getSessionStatus(selectedAnimal.id);
-      setSessionInfo(status);
-    }
-  }, [selectedAnimal]);
+  // loadAllData reference for unlock hook (defined below, stable via useCallback)
+  const loadAllDataRef = useRef<() => Promise<void>>(() => Promise.resolve());
 
-  // Timer for dismissing cooldown message with animation
-  useEffect(() => {
-    if (cooldownMessage) {
-      // Animate in
-      cooldownOpacity.setValue(0);
-      cooldownSlide.setValue(20);
-      Animated.parallel([
-        Animated.timing(cooldownOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.spring(cooldownSlide, {
-          toValue: 0,
-          friction: 8,
-          tension: 100,
-          useNativeDriver: true,
-        }),
-      ]).start();
+  // Unlock flow hook
+  const unlockFlow = useUnlockFlow({
+    progress,
+    animals,
+    onAmberChange,
+    loadAllData: () => loadAllDataRef.current(),
+    setShowCelebration,
+    setIntroAnimal,
+    setIntroDialogueIndex,
+    setShowIntroDialogue,
+  });
 
-      // Animate out after delay
-      const timeout = setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(cooldownOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(cooldownSlide, {
-            toValue: 20,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          setCooldownMessage(null);
-        });
-      }, 2500);
-      return () => clearTimeout(timeout);
-    }
-  }, [cooldownMessage]);
-
-  // Talking animation - alternate between idle and talk sprites
-  useEffect(() => {
-    if (showDialogue || showIntroDialogue) {
-      const interval = setInterval(() => {
-        setIsTalking(prev => !prev);
-      }, 300); // Toggle every 300ms for talking effect
-      return () => clearInterval(interval);
-    } else {
-      setIsTalking(false);
-    }
-  }, [showDialogue, showIntroDialogue]);
-
-  const loadAllData = async () => {
-    const [progressData, roomsData, animalsData, unlock, unlocks, decorations] = await Promise.all([
+  // Load all data from storage
+  const loadAllData = useCallback(async () => {
+    const [progressData, roomsData, animalsData, decorations] = await Promise.all([
       getFullProgress(),
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
-      getNextUnlock(),
-      getUnlockStatus(),
       getAllDecorations(),
     ]);
     setPurchasedDecorations(decorations);
@@ -203,33 +128,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setProgress(progressData);
     setRooms(roomsData);
     setAnimals(animalsData);
-    setNextUnlock(unlock);
-    setAllUnlocks(unlocks);
 
-    // Check availability of next unlock
-    if (unlock) {
-      const availability = await isUnlockAvailable(unlock.id);
-      setUnlockAvailability(availability);
+    // Refresh unlock data with fresh arrays (avoids stale state)
+    await unlockFlow.refreshUnlockData(roomsData, animalsData);
+  }, [unlockFlow.refreshUnlockData]);
+
+  // Keep the ref in sync
+  loadAllDataRef.current = loadAllData;
+
+  // Load data on mount
+  useEffect(() => {
+    loadAllData();
+    loadDialogueSessions(); // Load session data
+  }, []);
+
+  // Talking animation for intro dialogue
+  const [introIsTalking, setIntroIsTalking] = useState(false);
+  useEffect(() => {
+    if (showIntroDialogue) {
+      const interval = setInterval(() => {
+        setIntroIsTalking(prev => !prev);
+      }, 300);
+      return () => clearInterval(interval);
     } else {
-      setUnlockAvailability(null);
+      setIntroIsTalking(false);
     }
-
-    // Check if there's an empty room waiting for an animal (first-time invite prompt)
-    const unlockedRooms = roomsData.filter(r => r.isUnlocked);
-    const unlockedAnimalIds = animalsData.filter(a => a.isUnlocked).map(a => a.id);
-    const hasEmptyRoom = unlockedRooms.some(room => {
-      const roomAnimal = animalsData.find(a => a.roomId === room.id);
-      return roomAnimal && !unlockedAnimalIds.includes(roomAnimal.id);
-    });
-
-    // Show invite prompt if there's an empty room and the next unlock is a character
-    if (hasEmptyRoom && unlock && unlock.type === 'character' && unlock.cost === 0) {
-      // First-time experience: show invite prompt
-      setShowInvitePrompt(true);
-    } else {
-      setShowInvitePrompt(false);
-    }
-  };
+  }, [showIntroDialogue]);
 
   // Animate amber when it changes
   useEffect(() => {
@@ -248,148 +172,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       ]).start();
     }
   }, [progress?.amber]);
-
-  // Handle animal tap
-  const handleAnimalPress = useCallback(async (animal: Animal) => {
-    // Check if dialogue is available
-    const availability = await checkDialogueAvailability(animal.id);
-
-    if (!availability.available) {
-      // Show cooldown message (vague, doesn't reveal puzzle count)
-      setCooldownMessage(
-        `${animal.name} needs some quiet time. Play more puzzles and come back!`
-      );
-      return;
-    }
-
-    setSelectedAnimal(animal);
-    setShowDialogue(true);
-
-    // Update session info
-    const status = getSessionStatus(animal.id);
-    setSessionInfo(status);
-
-    // Animate dialogue modal in
-    dialogueSlide.setValue(0);
-    Animated.spring(dialogueSlide, {
-      toValue: 1,
-      friction: 8,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  }, [dialogueSlide]);
-
-  // Handle dialogue advance
-  const handleAdvanceDialogue = async () => {
-    if (!selectedAnimal || !progress) return;
-
-    // Check session availability before continuing
-    const availability = await checkDialogueAvailability(selectedAnimal.id);
-    if (!availability.available && availability.reason !== 'max_dialogues') {
-      // Session ended, close dialogue
-      handleCloseDialogue();
-      setCooldownMessage(
-        `${selectedAnimal.name} wants to rest now. Come back after solving some puzzles!`
-      );
-      return;
-    }
-
-    const hasMore = hasMoreDialogues(
-      selectedAnimal.type,
-      selectedAnimal.currentDialogueIndex,
-      progress.currentPhase
-    );
-
-    if (hasMore) {
-      // Record this dialogue in the session
-      await recordDialogue(selectedAnimal.id);
-
-      // Update session info
-      const status = getSessionStatus(selectedAnimal.id);
-      setSessionInfo(status);
-
-      // Advance to next dialogue FIRST (before checking session limit)
-      const newIndex = selectedAnimal.currentDialogueIndex + 1;
-      await markDialogueRead(selectedAnimal.id, newIndex);
-
-      // Update local state
-      setAnimals(prev =>
-        prev.map(a =>
-          a.id === selectedAnimal.id
-            ? { ...a, currentDialogueIndex: newIndex, hasNewDialogue: false }
-            : a
-        )
-      );
-      setSelectedAnimal(prev =>
-        prev ? { ...prev, currentDialogueIndex: newIndex, hasNewDialogue: false } : null
-      );
-
-      // Check if session hit max dialogues AFTER advancing
-      if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
-        handleCloseDialogue();
-        setCooldownMessage(
-          `${selectedAnimal.name} wants to rest now. Come back later for more conversation!`
-        );
-        return;
-      }
-    } else {
-      // No more dialogues - close
-      handleCloseDialogue();
-    }
-  };
-
-  // Handle closing dialogue (and ending session)
-  const handleCloseDialogue = async () => {
-    if (selectedAnimal) {
-      await endSession(selectedAnimal.id);
-    }
-    setShowDialogue(false);
-    setSelectedAnimal(null);
-    setSessionInfo(null);
-  };
-
-  // Handle room tap (for locked rooms or rooms needing animals)
-  const handleRoomPress = useCallback((room: Room) => {
-    if (!room.isUnlocked) {
-      setShowRoomUnlock(room);
-      return;
-    }
-
-    // Check if room needs an animal
-    const roomAnimal = animals.find(a => a.roomId === room.id);
-    if (roomAnimal && !roomAnimal.isUnlocked && nextUnlock && nextUnlock.targetId === roomAnimal.id) {
-      // Show invite prompt for this animal
-      setShowInvitePrompt(true);
-    }
-  }, [animals, nextUnlock]);
-
-  // Handle unlock purchase
-  const handlePurchase = async (unlock: Unlockable) => {
-    const result = await purchaseUnlock(unlock.id);
-    if (result.success) {
-      // Trigger celebration confetti!
-      setShowCelebration(true);
-
-      await loadAllData();
-      setShowShop(false);
-      setShowRoomUnlock(null);
-      setShowInvitePrompt(false);
-      onAmberChange?.(progress!.amber - unlock.cost);
-
-      // If we just unlocked a character, show their intro dialogue
-      if (unlock.type === 'character') {
-        const animal = ANIMALS.find(a => a.id === unlock.targetId);
-        if (animal) {
-          // Small delay to let the UI update first
-          setTimeout(() => {
-            setIntroAnimal(animal);
-            setIntroDialogueIndex(0);
-            setShowIntroDialogue(true);
-          }, 300);
-        }
-      }
-    }
-  };
 
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
@@ -441,17 +223,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return introDialogueIndex + 1 < getIntroDialogueCount(introAnimal.type);
   };
 
-  // Get current dialogue text
-  const getCurrentDialogueText = (): string => {
-    if (!selectedAnimal || !progress) return '';
-    const dialogue = getCurrentDialogue(
-      selectedAnimal.type,
-      selectedAnimal.currentDialogueIndex,
-      progress.currentPhase
-    );
-    return dialogue?.text || 'Hello, friend!';
-  };
-
   if (!progress || rooms.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -470,7 +241,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <View style={styles.header}>
         <JuicyButton
           style={styles.amberContainer}
-          onPress={() => setShowShop(true)}
+          onPress={() => unlockFlow.setShowShop(true)}
           bounceScale={0.95}
           accessibilityLabel={`Shop. ${progress.amber} amber`}
           accessibilityRole="button"
@@ -522,34 +293,34 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </View>
 
       {/* Next Unlock Progress Bar */}
-      {nextUnlock && (
+      {unlockFlow.nextUnlock && (
         <TouchableOpacity
           style={styles.unlockProgressContainer}
-          onPress={() => setShowShop(true)}
+          onPress={() => unlockFlow.setShowShop(true)}
           activeOpacity={0.8}
-          accessibilityLabel={`Next unlock: ${nextUnlock.name}. ${nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${nextUnlock.cost} amber`}`}
+          accessibilityLabel={`Next unlock: ${unlockFlow.nextUnlock.name}. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
           accessibilityRole="button"
         >
           <View style={styles.unlockProgressInner}>
             <Text style={styles.unlockProgressLabel}>
-              {nextUnlock.type === 'character' ? '🐾' : '🏠'} {nextUnlock.name}
+              {unlockFlow.nextUnlock.type === 'character' ? '🐾' : '🏠'} {unlockFlow.nextUnlock.name}
             </Text>
             <View style={styles.unlockProgressBarBg}>
               <View
                 style={[
                   styles.unlockProgressBarFill,
                   {
-                    width: `${Math.min(100, nextUnlock.cost > 0
-                      ? (progress.amber / nextUnlock.cost) * 100
+                    width: `${Math.min(100, unlockFlow.nextUnlock.cost > 0
+                      ? (progress.amber / unlockFlow.nextUnlock.cost) * 100
                       : 100)}%`,
                   },
                 ]}
               />
             </View>
             <Text style={styles.unlockProgressText}>
-              {nextUnlock.cost === 0
+              {unlockFlow.nextUnlock.cost === 0
                 ? 'FREE — Tap to invite!'
-                : `💎 ${progress.amber} / ${nextUnlock.cost}`}
+                : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
             </Text>
           </View>
         </TouchableOpacity>
@@ -557,7 +328,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Daily Challenge Card */}
       {onStartDaily && (
-        <DailyChallengeCard onStartDaily={onStartDaily} />
+        <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
       )}
 
       {/* Celebration Confetti */}
@@ -570,39 +341,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         rooms={rooms}
         animals={animals}
         currentPhase={progress.currentPhase}
-        onAnimalPress={handleAnimalPress}
-        onRoomPress={handleRoomPress}
+        onAnimalPress={dialogueFlow.handleAnimalTap}
+        onRoomPress={unlockFlow.handleRoomPress}
       />
 
       {/* Cooldown Message Toast */}
-      {cooldownMessage && (
+      {dialogueFlow.cooldownMessage && (
         <Animated.View
           style={[
             styles.cooldownToast,
             {
-              opacity: cooldownOpacity,
-              transform: [{ translateY: cooldownSlide }],
+              opacity: dialogueFlow.cooldownOpacity,
+              transform: [{ translateY: dialogueFlow.cooldownSlide }],
             },
           ]}
           pointerEvents="none"
           accessibilityLiveRegion="polite"
-          accessibilityLabel={cooldownMessage}
+          accessibilityLabel={dialogueFlow.cooldownMessage}
         >
-          <Text style={styles.cooldownToastText}>{cooldownMessage}</Text>
+          <Text style={styles.cooldownToastText}>{dialogueFlow.cooldownMessage}</Text>
         </Animated.View>
       )}
 
       {/* Dialogue Modal */}
       <Modal
-        visible={showDialogue}
+        visible={dialogueFlow.showDialogue}
         transparent
         animationType="none"
-        onRequestClose={handleCloseDialogue}
+        onRequestClose={dialogueFlow.handleCloseDialogue}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={handleCloseDialogue}
+          onPress={dialogueFlow.handleCloseDialogue}
+          accessibilityLabel="Close dialogue"
+          accessibilityRole="button"
         >
           <Animated.View
             style={[
@@ -610,59 +383,60 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {
                 transform: [
                   {
-                    translateY: dialogueSlide.interpolate({
+                    translateY: dialogueFlow.dialogueSlide.interpolate({
                       inputRange: [0, 1],
                       outputRange: [300, 0],
                     }),
                   },
                 ],
-                opacity: dialogueSlide,
+                opacity: dialogueFlow.dialogueSlide,
               },
             ]}
             onStartShouldSetResponder={() => true}
           >
-            {selectedAnimal && (
+            {dialogueFlow.selectedAnimal && (
               <View style={styles.dialogueRow}>
                 {/* Sprite column - 30% width, zoomed in to fill */}
                 <View style={styles.dialogueSpriteCol}>
-                  {CHARACTER_SPRITES[selectedAnimal.type] ? (
+                  {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
                     <Image
                       source={
-                        progress.currentPhase >= 4 && CHARACTER_SPRITES[selectedAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[selectedAnimal.type]!.robed!
-                          : isTalking && CHARACTER_SPRITES[selectedAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[selectedAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[selectedAnimal.type]!.idle
+                        progress.currentPhase >= 4 && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robed
+                          ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!
+                          : dialogueFlow.isTalking && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.talk
+                            ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.talk!
+                            : CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.idle
                       }
                       style={styles.dialogueSpriteImage}
                       resizeMode="cover"
+                      accessibilityLabel={`${dialogueFlow.selectedAnimal.name} portrait`}
                     />
                   ) : (
                     <Text style={styles.dialogueSpriteEmoji}>
-                      {ANIMAL_INFO[selectedAnimal.type]?.emoji || '🐾'}
+                      {ANIMAL_INFO[dialogueFlow.selectedAnimal.type]?.emoji || '🐾'}
                     </Text>
                   )}
                 </View>
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <Text style={styles.dialogueAnimalName}>{selectedAnimal.name}</Text>
+                  <Text style={styles.dialogueAnimalName}>{dialogueFlow.selectedAnimal.name}</Text>
 
                   <View style={styles.dialogueBubble}>
-                    <Text style={styles.dialogueText}>{getCurrentDialogueText()}</Text>
+                    <Text style={styles.dialogueText}>{dialogueFlow.dialogueText}</Text>
                   </View>
 
                   <View style={styles.dialogueFooter}>
                     <TouchableOpacity
                       style={styles.continueButton}
-                      onPress={handleAdvanceDialogue}
+                      onPress={dialogueFlow.handleNextDialogue}
                       accessibilityLabel="Continue dialogue"
                       accessibilityRole="button"
                     >
                       <Text style={styles.continueButtonText}>
                         {hasMoreDialogues(
-                          selectedAnimal.type,
-                          selectedAnimal.currentDialogueIndex,
+                          dialogueFlow.selectedAnimal.type,
+                          dialogueFlow.selectedAnimal.currentDialogueIndex,
                           progress.currentPhase
                         )
                           ? 'Next'
@@ -679,15 +453,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Shop Modal */}
       <Modal
-        visible={showShop}
+        visible={unlockFlow.showShop}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowShop(false)}
+        onRequestClose={() => unlockFlow.setShowShop(false)}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowShop(false)}
+          onPress={() => unlockFlow.setShowShop(false)}
+          accessibilityLabel="Close shop"
+          accessibilityRole="button"
         >
           <View
             style={styles.shopModal}
@@ -699,41 +475,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
 
             {/* Next unlock */}
-            {nextUnlock && (
+            {unlockFlow.nextUnlock && (
               <View style={styles.nextUnlockContainer}>
                 <Text style={styles.nextUnlockLabel}>Next Unlock:</Text>
                 <View style={styles.unlockItem}>
                   <View style={styles.unlockInfo}>
-                    <Text style={styles.unlockName}>{nextUnlock.name}</Text>
+                    <Text style={styles.unlockName}>{unlockFlow.nextUnlock.name}</Text>
                     <Text style={styles.unlockDescription}>
-                      {nextUnlock.description}
+                      {unlockFlow.nextUnlock.description}
                     </Text>
                     <Text style={styles.unlockCost}>
-                      💎 {nextUnlock.cost} amber
+                      💎 {unlockFlow.nextUnlock.cost} amber
                     </Text>
-                    {unlockAvailability && !unlockAvailability.available && (
+                    {unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available && (
                       <Text style={styles.unlockBlockedText}>
-                        {unlockAvailability.reason}
+                        {unlockFlow.unlockAvailability.reason}
                       </Text>
                     )}
                   </View>
                   <TouchableOpacity
                     style={[
                       styles.buyButton,
-                      (progress.amber < nextUnlock.cost ||
-                       (unlockAvailability && !unlockAvailability.available)) &&
+                      (progress.amber < unlockFlow.nextUnlock.cost ||
+                       (unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available)) &&
                         styles.buyButtonDisabled,
                     ]}
-                    onPress={() => handlePurchase(nextUnlock)}
+                    onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
                     disabled={
-                      progress.amber < nextUnlock.cost ||
-                      (unlockAvailability !== null && !unlockAvailability.available)
+                      progress.amber < unlockFlow.nextUnlock.cost ||
+                      (unlockFlow.unlockAvailability !== null && !unlockFlow.unlockAvailability.available)
                     }
+                    accessibilityLabel={`Unlock ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber`}
+                    accessibilityRole="button"
                   >
                     <Text style={styles.buyButtonText}>
-                      {unlockAvailability && !unlockAvailability.available
+                      {unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
                         ? 'Locked'
-                        : progress.amber >= nextUnlock.cost
+                        : progress.amber >= unlockFlow.nextUnlock.cost
                           ? 'Unlock'
                           : 'Need More'}
                     </Text>
@@ -742,7 +520,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             )}
 
-            {!nextUnlock && (
+            {!unlockFlow.nextUnlock && (
               <View>
                 <Text style={styles.allUnlockedText}>
                   All characters and rooms unlocked!
@@ -750,9 +528,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <TouchableOpacity
                   style={styles.decorationShopButton}
                   onPress={() => {
-                    setShowShop(false);
+                    unlockFlow.setShowShop(false);
                     setShowDecorationShop(true);
                   }}
+                  accessibilityLabel="Browse decorations"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.decorationShopButtonIcon}>🎨</Text>
                   <Text style={styles.decorationShopButtonText}>Browse Decorations</Text>
@@ -763,7 +543,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {/* Close button */}
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowShop(false)}
+              onPress={() => unlockFlow.setShowShop(false)}
+              accessibilityLabel="Close shop"
+              accessibilityRole="button"
             >
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
@@ -773,48 +555,54 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Room Unlock Modal */}
       <Modal
-        visible={showRoomUnlock !== null}
+        visible={unlockFlow.showRoomUnlock !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowRoomUnlock(null)}
+        onRequestClose={() => unlockFlow.setShowRoomUnlock(null)}
       >
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setShowRoomUnlock(null)}
+          onPress={() => unlockFlow.setShowRoomUnlock(null)}
+          accessibilityLabel="Close room unlock"
+          accessibilityRole="button"
         >
           <View
             style={styles.shopModal}
             onStartShouldSetResponder={() => true}
           >
-            {showRoomUnlock && (
+            {unlockFlow.showRoomUnlock && (
               <>
                 <Text style={styles.shopTitle}>🔒 Locked Room</Text>
-                <Text style={styles.lockedRoomName}>{showRoomUnlock.name}</Text>
+                <Text style={styles.lockedRoomName}>{unlockFlow.showRoomUnlock.name}</Text>
                 <Text style={styles.shopSubtitle}>
                   Play more puzzles to earn amber and unlock this room!
                 </Text>
                 <Text style={styles.amberBalance}>Your Amber: 💎 {progress.amber}</Text>
 
-                {nextUnlock && nextUnlock.targetId === showRoomUnlock.id && (
+                {unlockFlow.nextUnlock && unlockFlow.nextUnlock.targetId === unlockFlow.showRoomUnlock.id && (
                   <TouchableOpacity
                     style={[
                       styles.buyButton,
                       styles.buyButtonLarge,
-                      progress.amber < nextUnlock.cost && styles.buyButtonDisabled,
+                      progress.amber < unlockFlow.nextUnlock.cost && styles.buyButtonDisabled,
                     ]}
-                    onPress={() => handlePurchase(nextUnlock)}
-                    disabled={progress.amber < nextUnlock.cost}
+                    onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
+                    disabled={progress.amber < unlockFlow.nextUnlock.cost}
+                    accessibilityLabel={`Unlock room for ${unlockFlow.nextUnlock.cost} amber`}
+                    accessibilityRole="button"
                   >
                     <Text style={styles.buyButtonText}>
-                      Unlock for 💎 {nextUnlock.cost}
+                      Unlock for 💎 {unlockFlow.nextUnlock.cost}
                     </Text>
                   </TouchableOpacity>
                 )}
 
                 <TouchableOpacity
                   style={styles.closeButton}
-                  onPress={() => setShowRoomUnlock(null)}
+                  onPress={() => unlockFlow.setShowRoomUnlock(null)}
+                  accessibilityLabel="Close"
+                  accessibilityRole="button"
                 >
                   <Text style={styles.closeButtonText}>Close</Text>
                 </TouchableOpacity>
@@ -826,18 +614,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Animal Invite Prompt */}
       <Modal
-        visible={showInvitePrompt}
+        visible={unlockFlow.showInvitePrompt}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowInvitePrompt(false)}
+        onRequestClose={() => unlockFlow.setShowInvitePrompt(false)}
       >
         <View style={styles.centeredOverlay}>
           <View
             style={styles.inviteModal}
             onStartShouldSetResponder={() => true}
           >
-            {nextUnlock && nextUnlock.type === 'character' && (() => {
-              const animalData = ANIMALS.find(a => a.id === nextUnlock.targetId);
+            {unlockFlow.nextUnlock && unlockFlow.nextUnlock.type === 'character' && (() => {
+              const animalData = ANIMALS.find(a => a.id === unlockFlow.nextUnlock!.targetId);
               const animalEmoji = animalData ? ANIMAL_EMOJIS[animalData.type] : '🐾';
               const isFirstAnimal = progress?.unlockedAnimals.length === 0;
 
@@ -848,37 +636,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     {isFirstAnimal ? 'A Visitor Approaches!' : 'A New Friend!'}
                   </Text>
                   <Text style={styles.inviteText}>
-                    {nextUnlock.description}
+                    {unlockFlow.nextUnlock!.description}
                   </Text>
                   <Text style={styles.inviteText}>
                     {isFirstAnimal
                       ? 'Would you like to invite them into your cozy den?'
-                      : `Would you like to welcome ${nextUnlock.name.split(' ')[0]} to your growing home?`
+                      : `Would you like to welcome ${unlockFlow.nextUnlock!.name.split(' ')[0]} to your growing home?`
                     }
                   </Text>
 
-                  {nextUnlock.cost > 0 && (
+                  {unlockFlow.nextUnlock!.cost > 0 && (
                     <Text style={styles.inviteCost}>
-                      Cost: 💎 {nextUnlock.cost} amber
+                      Cost: 💎 {unlockFlow.nextUnlock!.cost} amber
                     </Text>
                   )}
 
                   <TouchableOpacity
                     style={[
                       styles.inviteButton,
-                      progress && progress.amber < nextUnlock.cost && styles.inviteButtonDisabled
+                      progress && progress.amber < unlockFlow.nextUnlock!.cost && styles.inviteButtonDisabled
                     ]}
                     onPress={async () => {
-                      await handlePurchase(nextUnlock);
-                      setShowInvitePrompt(false);
+                      await unlockFlow.handlePurchase(unlockFlow.nextUnlock!);
+                      unlockFlow.setShowInvitePrompt(false);
                     }}
-                    disabled={progress ? progress.amber < nextUnlock.cost : false}
+                    disabled={progress ? progress.amber < unlockFlow.nextUnlock!.cost : false}
+                    accessibilityLabel={unlockFlow.nextUnlock!.cost === 0 ? 'Welcome friend' : `Invite for ${unlockFlow.nextUnlock!.cost} amber`}
+                    accessibilityRole="button"
                   >
                     <Text style={styles.inviteButtonText}>
-                      {nextUnlock.cost === 0
+                      {unlockFlow.nextUnlock!.cost === 0
                         ? 'Welcome, Friend! 🏠'
-                        : progress && progress.amber >= nextUnlock.cost
-                          ? `Invite ${nextUnlock.name.split(' ')[0]}! 🏠`
+                        : progress && progress.amber >= unlockFlow.nextUnlock!.cost
+                          ? `Invite ${unlockFlow.nextUnlock!.name.split(' ')[0]}! 🏠`
                           : 'Need More Amber'
                       }
                     </Text>
@@ -886,7 +676,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                   <TouchableOpacity
                     style={styles.inviteCloseButton}
-                    onPress={() => setShowInvitePrompt(false)}
+                    onPress={() => unlockFlow.setShowInvitePrompt(false)}
+                    accessibilityLabel="Maybe later"
+                    accessibilityRole="button"
                   >
                     <Text style={styles.inviteCloseButtonText}>Maybe Later</Text>
                   </TouchableOpacity>
@@ -922,6 +714,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       }
                       style={styles.introPortraitSprite}
                       resizeMode="contain"
+                      accessibilityLabel={`${introAnimal.name} portrait`}
                     />
                   ) : (
                     <Text style={styles.introPortraitEmoji}>
@@ -946,6 +739,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <TouchableOpacity
                     style={styles.introContinueButton}
                     onPress={handleAdvanceIntroDialogue}
+                    accessibilityLabel={hasMoreIntroDialogues() ? 'Continue intro' : 'Welcome and close'}
+                    accessibilityRole="button"
                   >
                     <Text style={styles.introContinueButtonText}>
                       {hasMoreIntroDialogues() ? 'Continue' : 'Welcome!'}
@@ -969,6 +764,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={() => setShowDecorationShop(false)}
+          accessibilityLabel="Close decoration shop"
+          accessibilityRole="button"
         >
           <View
             style={styles.decorationShopModal}
@@ -1014,6 +811,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                                 onAmberChange?.(result.newBalance);
                               }
                             }}
+                            accessibilityLabel={`Buy ${dec.name} for ${dec.cost} amber`}
+                            accessibilityRole="button"
                           >
                             <Text style={styles.decorationBuyText}>💎 {dec.cost}</Text>
                           </TouchableOpacity>
@@ -1028,6 +827,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowDecorationShop(false)}
+              accessibilityLabel="Close decoration shop"
+              accessibilityRole="button"
             >
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>

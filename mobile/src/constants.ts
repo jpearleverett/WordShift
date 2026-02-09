@@ -20,6 +20,16 @@ export const FALLBACK_PUZZLES_EASY: string[][] = [
   ["HIT", "SIT", "SET"],
   ["DOG", "DIG", "BIG"],
   ["PEN", "PIN", "WIN"],
+  ["HOT", "HIT", "BIT"],
+  ["RUN", "BUN", "BAN"],
+  ["TOP", "TIP", "DIP"],
+  ["CAN", "MAN", "MAP"],
+  ["FUN", "FAN", "FAR"],
+  ["NET", "NUT", "CUT"],
+  ["GUM", "GUN", "FUN"],
+  ["LOG", "FOG", "FIG"],
+  ["POT", "ROT", "RAT"],
+  ["SAD", "SAT", "SET"],
 ];
 
 export const FALLBACK_PUZZLES_MEDIUM: string[][] = [
@@ -28,14 +38,34 @@ export const FALLBACK_PUZZLES_MEDIUM: string[][] = [
   ["HEAT", "HEAR", "NEAR", "NEAT"],
   ["LAMP", "DAMP", "DAME", "GAME"],
   ["SORT", "PORT", "PORE", "CORE"],
+  ["COLD", "BEND", "CUES", "CULT"],
+  ["SALT", "HOOD", "GEEK", "TILE"],
+  ["WARM", "HOOP", "TEEN", "SING"],
+  ["WINE", "HERS", "RAMP", "PATH"],
+  ["TALE", "HOSE", "RACK", "CARS"],
+  ["HOPE", "PROS", "LEAN", "DIPS"],
+  ["RACE", "LOVE", "FAIL", "POPS"],
+  ["DRUM", "RUGS", "CARE", "RUIN"],
+  ["GIFT", "LIPS", "HEAT", "BUFF"],
+  ["BONE", "LACK", "LEAK", "RAIN"],
 ];
 
 export const FALLBACK_PUZZLES_HARD: string[][] = [
   ["STORE", "ROUTE", "VOTER", "COVET", "VOICE"],
   ["HEART", "EARTH", "TEACH", "CHEAT", "WATCH"],
-  ["PLATE", "LEAPT", "PETAL", "PLEAT", "LEAPT"],
+  ["STEAM", "CRATE", "CRIME", "VERSE", "BOARD"],
   ["CRANE", "CANER", "DANCE", "CANED", "ACNED"],
   ["LEMON", "MELON", "MODEL", "MOULD", "MOULT"],
+  ["FLAME", "SEEPS", "DEATH", "TRADE", "WEDGE"],
+  ["SHARP", "HADES", "PURSE", "CLOUD", "THEIR"],
+  ["PROUD", "FORTH", "FORMS", "CHICK", "CLOUD"],
+  ["DRIFT", "RIVER", "RIDES", "RATIO", "RHYME"],
+  ["GRACE", "RACED", "DODGE", "RINSE", "GUIDE"],
+  ["GHOST", "RAINS", "CAMPS", "FIELD", "TICKS"],
+  ["HAVEN", "HEAVE", "GRILL", "TRUST", "CRATE"],
+  ["REALM", "EAGER", "OWING", "DUPED", "USING"],
+  ["TRACE", "MOORS", "CHANT", "BRADS", "STAIN"],
+  ["CROWD", "PRIZE", "NURSE", "BLAME", "MATTE"],
 ];
 
 /** Get a random fallback puzzle for the given difficulty */

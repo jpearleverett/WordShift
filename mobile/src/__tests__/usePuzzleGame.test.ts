@@ -18,12 +18,15 @@ function resetHookState() {
   refStore.clear();
   stateIndex = 0;
   refIndex = 0;
+  effectCallbacks = [];
 }
 
 function rewindHookIndices() {
   stateIndex = 0;
   refIndex = 0;
 }
+
+let effectCallbacks: Array<() => void> = [];
 
 jest.mock('react', () => ({
   useState: (initial: unknown) => {
@@ -40,6 +43,9 @@ jest.mock('react', () => ({
       }
     };
     return [value, setter];
+  },
+  useEffect: (fn: () => void, _deps: unknown[]) => {
+    effectCallbacks.push(fn);
   },
   useRef: (initial: unknown) => {
     const idx = refIndex++;

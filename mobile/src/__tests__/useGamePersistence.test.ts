@@ -9,15 +9,20 @@
 const stateStore: Map<number, unknown> = new Map();
 let stateIndex = 0;
 let effectCallbacks: Array<() => void> = [];
+const refStore: Map<number, { current: unknown }> = new Map();
+let refIndex = 0;
 
 function resetHookState() {
   stateStore.clear();
+  refStore.clear();
   stateIndex = 0;
+  refIndex = 0;
   effectCallbacks = [];
 }
 
 function rewindHookIndices() {
   stateIndex = 0;
+  refIndex = 0;
 }
 
 jest.mock('react', () => ({
@@ -38,6 +43,13 @@ jest.mock('react', () => ({
   },
   useEffect: (fn: () => void, _deps: unknown[]) => {
     effectCallbacks.push(fn);
+  },
+  useRef: (initial: unknown) => {
+    const idx = refIndex++;
+    if (!refStore.has(idx)) {
+      refStore.set(idx, { current: initial });
+    }
+    return refStore.get(idx)!;
   },
   useCallback: (fn: Function, _deps: unknown[]) => fn,
 }));
