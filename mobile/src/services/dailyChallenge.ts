@@ -97,14 +97,11 @@ function seededRandom(seed: string): () => number {
 }
 
 /**
- * Determine the daily challenge difficulty based on the date
- * Cycles: Mon=EASY, Tue=MEDIUM, Wed=HARD, Thu=EASY, Fri=MEDIUM, Sat=HARD, Sun=MEDIUM
+ * Daily challenge difficulty is always HARD (6-letter words, 5 rows).
+ * Kept as a function for backward compatibility with status/display code.
  */
-export function getDailyDifficulty(dateStr?: string): Difficulty {
-  const date = dateStr ? new Date(dateStr) : new Date();
-  const day = date.getDay(); // 0=Sun, 1=Mon, ...6=Sat
-  const cycle: Difficulty[] = ['MEDIUM', 'EASY', 'MEDIUM', 'HARD', 'EASY', 'MEDIUM', 'HARD'];
-  return cycle[day];
+export function getDailyDifficulty(_dateStr?: string): Difficulty {
+  return 'HARD';
 }
 
 /**
@@ -170,7 +167,11 @@ export async function generateDailyPuzzle(): Promise<{
     Math.random = rng;
 
     try {
-      const puzzle = await generateLocalPuzzle(difficulty);
+      // Daily challenge always uses 6-letter words with 5 rows
+      const puzzle = await generateLocalPuzzle(difficulty, {
+        wordLength: 6,
+        targetRows: 5,
+      });
       return {
         words: puzzle.words,
         hint: puzzle.hint,

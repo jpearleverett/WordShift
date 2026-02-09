@@ -5,56 +5,54 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  LayoutAnimation,
-  Platform,
-  UIManager,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
-import { getDailyStatus, getDailyCommunityStats } from '../services/dailyChallenge';
+import { getDailyStatus } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
 import { getSettingsSync } from '../services/settings';
-
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
   phase?: number;
 }
 
+/**
+ * Compact daily challenge button designed to sit in the header row.
+ * - Not completed: pulsing calendar icon, tap starts daily
+ * - Completed: checkmark with stars, tap does nothing extra
+ * - Streak badge shown when streak > 1
+ */
 export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   onStartDaily,
   phase = 0,
 }) => {
   const [isCompleted, setIsCompleted] = useState(false);
-  const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
+  const [difficulty, setDifficulty] = useState<Difficulty>('HARD');
   const [stars, setStars] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [expanded, setExpanded] = useState(false);
-  const [communityStats, setCommunityStats] = useState<{
-    completionRate: number;
-    averageStars: number;
-    difficultyRating: string;
-    perfectRate: number;
-  } | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.3)).current;
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     loadStatus();
   }, []);
 
   useEffect(() => {
-    // Stop any existing loop
+    // Stop any existing loops
     if (pulseLoopRef.current) {
       pulseLoopRef.current.stop();
       pulseLoopRef.current = null;
     }
+    if (glowLoopRef.current) {
+      glowLoopRef.current.stop();
+      glowLoopRef.current = null;
+    }
 
     if (getSettingsSync().reducedMotion) {
       pulseAnim.setValue(1);
+      glowAnim.setValue(isCompleted ? 0 : 0.6);
       return;
     }
 
@@ -62,18 +60,37 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
       pulseLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.02,
-            duration: 1500,
+            toValue: 1.08,
+            duration: 1200,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 1500,
+            duration: 1200,
             useNativeDriver: true,
           }),
         ])
       );
       pulseLoopRef.current.start();
+
+      glowLoopRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 0.8,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.3,
+            duration: 1200,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      glowLoopRef.current.start();
+    } else {
+      pulseAnim.setValue(1);
+      glowAnim.setValue(0);
     }
 
     return () => {
@@ -81,7 +98,12 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
         pulseLoopRef.current.stop();
         pulseLoopRef.current = null;
       }
+      if (glowLoopRef.current) {
+        glowLoopRef.current.stop();
+        glowLoopRef.current = null;
+      }
       pulseAnim.stopAnimation();
+      glowAnim.stopAnimation();
     };
   }, [isCompleted]);
 
@@ -93,206 +115,144 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     if (status.todayResult) {
       setStars(status.todayResult.stars);
     }
-    const community = getDailyCommunityStats();
-    setCommunityStats(community);
   };
-
-  const difficultyColor = {
-    EASY: CandyColors.green.main,
-    MEDIUM: CandyColors.yellow.main,
-    HARD: CandyColors.red.main,
-  }[difficulty];
 
   const handlePress = () => {
     if (!isCompleted) {
       onStartDaily(difficulty);
-    } else {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setExpanded(prev => !prev);
     }
   };
 
+  const btnBg = isCompleted
+    ? 'rgba(34, 197, 94, 0.3)'
+    : phase >= 4
+      ? 'rgba(180, 60, 60, 0.4)'
+      : phase >= 3
+        ? 'rgba(160, 140, 60, 0.4)'
+        : 'rgba(255, 200, 60, 0.35)';
+
+  const glowColor = phase >= 4
+    ? 'rgba(180, 60, 60, 0.6)'
+    : phase >= 3
+      ? 'rgba(160, 140, 60, 0.5)'
+      : 'rgba(255, 200, 60, 0.5)';
+
   return (
-    <Animated.View style={[styles.container, { transform: [{ scale: pulseAnim }] }]}>
+    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
       <TouchableOpacity
-        style={[
-          styles.bar,
-          isCompleted && styles.barCompleted,
-          phase >= 3 && phase < 4 && { backgroundColor: 'rgba(74, 90, 74, 0.85)', borderColor: 'rgba(122, 138, 122, 0.3)' },
-          phase >= 4 && { backgroundColor: 'rgba(42, 53, 42, 0.9)', borderColor: 'rgba(90, 106, 90, 0.3)' },
-        ]}
+        style={[styles.button, { backgroundColor: btnBg }]}
         onPress={handlePress}
-        activeOpacity={0.8}
+        activeOpacity={isCompleted ? 1 : 0.7}
+        accessibilityLabel={
+          isCompleted
+            ? `Daily challenge completed. ${stars} stars. ${streak > 1 ? `${streak} day streak.` : ''}`
+            : 'Start daily challenge'
+        }
+        accessibilityRole="button"
       >
-        <Text style={styles.icon}>{isCompleted ? '✅' : '📅'}</Text>
-        <Text style={styles.label}>Daily</Text>
-        <View style={[styles.difficultyDot, { backgroundColor: difficultyColor }]} />
-        <Text style={styles.difficultyText}>{difficulty}</Text>
-
-        {streak > 1 && (
-          <Text style={styles.streakText}>🔥{streak}</Text>
+        {/* Glow ring for uncompleted */}
+        {!isCompleted && (
+          <Animated.View
+            style={[
+              styles.glowRing,
+              { borderColor: glowColor, opacity: glowAnim },
+            ]}
+            pointerEvents="none"
+          />
         )}
-
-        <View style={styles.spacer} />
 
         {isCompleted ? (
-          <View style={styles.completedSection}>
-            <Text style={styles.starsText}>
-              {'⭐'.repeat(stars)}{'☆'.repeat(3 - stars)}
+          <View style={styles.completedContent}>
+            <Text style={styles.checkIcon}>✓</Text>
+            <Text style={styles.miniStars}>
+              {'★'.repeat(stars)}{'☆'.repeat(3 - stars)}
             </Text>
-            <Text style={styles.expandHint}>{expanded ? '▲' : '▼'}</Text>
           </View>
         ) : (
+          <Text style={styles.calendarIcon}>📅</Text>
+        )}
+
+        {/* Streak badge */}
+        {streak > 1 && (
           <View style={[
-            styles.playBadge,
-            phase >= 3 && phase < 4 && { backgroundColor: '#7A8A7A' },
-            phase >= 4 && { backgroundColor: '#5A6A5A' },
+            styles.streakBadge,
+            phase >= 3 && { backgroundColor: '#8B4513' },
           ]}>
-            <Text style={styles.playText}>PLAY</Text>
+            <Text style={styles.streakBadgeText}>{streak}</Text>
           </View>
         )}
-      </TouchableOpacity>
 
-      {/* Expanded community stats */}
-      {expanded && isCompleted && communityStats && (
-        <View style={styles.communityStatsRow}>
-          <View style={styles.communityStatItem}>
-            <Text style={styles.communityStatValue}>{communityStats.completionRate}%</Text>
-            <Text style={styles.communityStatLabel}>solved</Text>
-          </View>
-          <View style={styles.communityStatDivider} />
-          <View style={styles.communityStatItem}>
-            <Text style={styles.communityStatValue}>{communityStats.averageStars}</Text>
-            <Text style={styles.communityStatLabel}>avg stars</Text>
-          </View>
-          <View style={styles.communityStatDivider} />
-          <View style={styles.communityStatItem}>
-            <Text style={styles.communityStatValue}>{communityStats.perfectRate}%</Text>
-            <Text style={styles.communityStatLabel}>perfect</Text>
-          </View>
-          <View style={styles.communityStatDivider} />
-          <View style={styles.communityStatItem}>
-            <Text style={[
-              styles.communityStatValue,
-              styles.communityDifficultyText,
-              communityStats.difficultyRating === 'Tricky' && styles.communityDifficultyTricky,
-            ]}>
-              {communityStats.difficultyRating}
-            </Text>
-            <Text style={styles.communityStatLabel}>rating</Text>
-          </View>
-        </View>
-      )}
+        {/* Not-completed indicator dot */}
+        {!isCompleted && (
+          <View style={[
+            styles.notifDot,
+            phase >= 4 && { backgroundColor: '#B83C3C' },
+          ]} />
+        )}
+      </TouchableOpacity>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    marginBottom: 4,
-    zIndex: 10,
-  },
-  bar: {
-    flexDirection: 'row',
+  button: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(30, 60, 30, 0.85)',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    gap: 6,
+    position: 'relative',
   },
-  barCompleted: {
-    backgroundColor: 'rgba(20, 70, 40, 0.9)',
-    borderColor: 'rgba(34, 197, 94, 0.3)',
+  glowRing: {
+    position: 'absolute',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
   },
-  icon: {
+  calendarIcon: {
+    fontSize: 18,
+  },
+  completedContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkIcon: {
     fontSize: 14,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: CandyColors.white,
-  },
-  difficultyDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  difficultyText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  streakText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: CandyColors.orange.light,
-  },
-  spacer: {
-    flex: 1,
-  },
-  completedSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  starsText: {
-    fontSize: 13,
-  },
-  expandHint: {
-    fontSize: 9,
-    color: 'rgba(255, 255, 255, 0.5)',
-  },
-  playBadge: {
-    backgroundColor: CandyColors.yellow.main,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  playText: {
-    fontSize: 11,
     fontWeight: '900',
-    color: CandyColors.gray[800],
-    letterSpacing: 1,
+    color: CandyColors.green.main,
+    marginTop: -1,
   },
-  communityStatsRow: {
-    flexDirection: 'row',
+  miniStars: {
+    fontSize: 7,
+    color: CandyColors.yellow.main,
+    marginTop: -2,
+    letterSpacing: 0.5,
+  },
+  streakBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: CandyColors.orange.main,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    marginTop: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 3,
   },
-  communityStatItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  communityStatValue: {
-    fontSize: 12,
-    fontWeight: '800',
+  streakBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
     color: CandyColors.white,
   },
-  communityStatLabel: {
-    fontSize: 8,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.5)',
-    marginTop: 1,
-  },
-  communityStatDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  communityDifficultyText: {
-    color: CandyColors.green.main,
-    fontSize: 10,
-  },
-  communityDifficultyTricky: {
-    color: CandyColors.orange.main,
+  notifDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: CandyColors.red.main,
   },
 });

@@ -1,13 +1,14 @@
 
 import { DICTIONARY_WORDS } from './dictionary';
 
-// All unique words from dictionary (already filtered to 3-6 letters)
+// All unique words from dictionary (filtered to 3-7 letters)
 const ALL_UNIQUE_WORDS = DICTIONARY_WORDS;
 
 export const WORDS_3 = ALL_UNIQUE_WORDS.filter(w => w.length === 3);
 export const WORDS_4 = ALL_UNIQUE_WORDS.filter(w => w.length === 4);
 export const WORDS_5 = ALL_UNIQUE_WORDS.filter(w => w.length === 5);
 export const WORDS_6 = ALL_UNIQUE_WORDS.filter(w => w.length === 6);
+export const WORDS_7 = ALL_UNIQUE_WORDS.filter(w => w.length === 7);
 
 // Combined for easy lookup
 export const COMMON_WORDS = new Set(ALL_UNIQUE_WORDS);
