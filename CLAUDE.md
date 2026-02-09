@@ -87,7 +87,7 @@ mobile/
 │   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
-│   │   ├── DailyChallengeCard.tsx # Daily challenge status card with pulse animation
+│   │   ├── DailyChallengeCard.tsx # Compact collapsible daily challenge pill bar
 │   │   └── home/
 │   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
 │   │       ├── HouseWorld.tsx   # Zoomable house view (vertical pan only, pinch zoom)
@@ -219,9 +219,9 @@ The home screen now uses image assets for:
 - **All 10 room backgrounds** in `RoomView.tsx` - fully wired up
 - **Environment images** in `HouseWorld.tsx`:
   - `sky_day.png` / `sky_dusk.png` / `sky_storm.png` / `sky_shadow.png` - phase-aware sky background (day → dusk → storm → shadow)
-  - `shadow_figure.png` - appears at Phase 4
-  - `ground.png` - ground beneath the house
-- Animated emoji clouds, sun, birds, trees, fence still use emoji/styled Views
+- **Animated emoji sky elements** (clouds, sun/moon, birds, shooting stars, night stars) rendered inside the transform container so they zoom/pan with the scene
+- Trees, fence, and ground emoji have been removed for a cleaner look
+- `shadow_figure.png` and `ground.png` assets exist but are not currently wired up in code
 
 As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite.tsx`.
 
@@ -294,7 +294,7 @@ When puzzle completes (`handleSlotPress` returns `{completed: true}`):
 - Concurrency guard prevents race conditions during async generation
 - Difficulty cycles: Easy (day%3===0), Medium (day%3===1), Hard (day%3===2)
 - Streak tracking: consecutive days of daily completion
-- DailyChallengeCard shows status on home screen
+- DailyChallengeCard: compact inline pill bar on home screen (not completed → PLAY button starts challenge; completed → tap toggles community stats with LayoutAnimation)
 
 ### Settings System (`services/settings.ts`)
 
@@ -410,14 +410,16 @@ Managed via `purchaseDecoration()`, `hasDecoration()`, `getAllDecorations()` in 
 ### House & Room Visuals
 
 **House Structure** (`HouseWorld.tsx`):
-- 2-column layout of rooms stacked vertically (bottom-up)
+- Single-column layout of rooms stacked vertically (bottom-up)
 - Only unlocked rooms are rendered
 - Vertical-only pan + pinch zoom via `react-native-gesture-handler` (horizontal pan disabled to prevent side gaps)
-- Sky background is inside the transform container (moves with scene) but oversized (2x width, 3x height) to prevent gaps at any zoom/pan combo
+- Sky background is inside the transform container (moves with scene) but oversized (1.4x in each dimension) to prevent gaps at any zoom/pan combo
 - Phase-aware sky: `sky_day.png` → `sky_dusk.png` → `sky_storm.png` → `sky_shadow.png`
-- Animated emoji clouds, sun, birds, trees rendered on top
-- Room dimensions: `ROOM_WIDTH` (160) and `ROOM_HEIGHT` (80)
-- Zoom: MIN_SCALE (0.6) to MAX_SCALE (2.0), snaps back to 0.7 if zoomed below
+- Phase-aware background color behind sky image (`PHASE_BG_COLORS`): Phase 0-1 `#6fb7df`, Phase 2 `#514378`, Phase 3 `#060612`, Phase 4 `#1a122a`
+- Animated emoji sky elements (clouds, sun/moon, birds, shooting stars, night stars) inside the transform container — they zoom/pan with the scene
+- No landscape emojis (trees, fence removed for cleaner look)
+- Room dimensions: `ROOM_WIDTH` (250) and `ROOM_HEIGHT` (~123, maintains 2:1 aspect ratio of room PNGs)
+- Zoom: MIN_SCALE (0.75) to MAX_SCALE (2.0), snaps back to 0.8 if zoomed below
 
 ### Word Theme Evolution
 
@@ -441,6 +443,15 @@ Returns phase-specific colors for backgrounds, particles, confetti, victory moda
 - **Phase 2**: Cool blue-purple (#4A5580), desaturated particles
 - **Phase 3**: Dark indigo (#2E3355), dim muted particles
 - **Phase 4**: Near-black (#1A1A2E), crimson/purple accents, dying embers
+
+### Home Screen Background Colors
+The home screen container and HouseWorld use phase-aware background colors that blend with each sky image:
+- **Phase 0-1**: `#6fb7df` (matches sky_day.png)
+- **Phase 2**: `#514378` (matches sky_dusk.png)
+- **Phase 3**: `#060612` (matches sky_storm.png)
+- **Phase 4**: `#1a122a` (matches sky_shadow.png)
+
+Defined as `PHASE_BG_COLORS` in `HouseWorld.tsx` and inline map in `HomeScreen.tsx`.
 
 ### Narrative Text (`phaseNarrative.ts`)
 All player-facing text shifts tone with phase:
@@ -619,7 +630,7 @@ Edit `calculateStars()` function in `starRating.ts`:
 - Arc/fan effect: Constants at top of `Row.tsx` (ARC_ROTATION, ARC_LIFT, SLOT_WIDTH, SLOT_HEIGHT)
 - Color palette: `theme/colors.ts`
 - Game container: `App.tsx` styles object
-- Room dimensions: `ROOM_WIDTH` (160) and `ROOM_HEIGHT` (80) in `HouseWorld.tsx`
+- Room dimensions: `ROOM_WIDTH` (250) and `ROOM_HEIGHT` (~123) in `HouseWorld.tsx`
 - Status bar: `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50`
 
 ### Adding new tile colors
