@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
   ScrollView,
   Animated,
 } from 'react-native';
@@ -82,14 +81,15 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 }) => {
   const phaseTheme = getPhaseTheme(phase);
 
+  if (!visible) return null;
+
   return (
-    <Modal visible={visible} transparent animationType="none">
-      <View style={styles.modalOverlay}>
-        <ScrollView
-          contentContainerStyle={styles.victoryScrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-        >
+    <View style={styles.modalOverlay}>
+      <ScrollView
+        contentContainerStyle={styles.victoryScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
           <Animated.View style={[styles.victoryModal, {
             transform: [{ scale: modalScale }],
             opacity: modalOpacity,
@@ -306,17 +306,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
           </Animated.View>
         </ScrollView>
       </View>
-    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(76, 29, 149, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    zIndex: 500,
   },
   modalShine: {
     position: 'absolute',

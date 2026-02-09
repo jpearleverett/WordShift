@@ -716,11 +716,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {unlockFlow.nextUnlock && unlockFlow.nextUnlock.type === 'character' && (() => {
               const animalData = ANIMALS.find(a => a.id === unlockFlow.nextUnlock!.targetId);
               const animalEmoji = animalData ? ANIMAL_EMOJIS[animalData.type] : '🐾';
+              const animalSprites = animalData ? CHARACTER_SPRITES[animalData.type] : undefined;
               const isFirstAnimal = progress?.unlockedAnimals.length === 0;
 
               return (
                 <>
-                  <Text style={styles.inviteEmoji}>{animalEmoji}</Text>
+                  {animalSprites ? (
+                    <Image
+                      source={animalSprites.talk || animalSprites.idle}
+                      style={styles.inviteSpriteImage}
+                      resizeMode="contain"
+                      accessibilityLabel={`${animalData?.type || 'animal'} portrait`}
+                    />
+                  ) : (
+                    <Text style={styles.inviteEmoji}>{animalEmoji}</Text>
+                  )}
                   <Text style={styles.inviteTitle}>
                     {isFirstAnimal ? 'A Visitor Approaches!' : 'A New Friend!'}
                   </Text>
@@ -1420,6 +1430,11 @@ const styles = StyleSheet.create({
   },
   inviteEmoji: {
     fontSize: 80,
+    marginBottom: 16,
+  },
+  inviteSpriteImage: {
+    width: 120,
+    height: 120,
     marginBottom: 16,
   },
   inviteTitle: {

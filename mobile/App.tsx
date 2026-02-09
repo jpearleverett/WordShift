@@ -198,13 +198,13 @@ export default function App() {
       // Play choreographed victory sequence
       victoryActions.playVictorySequence(victory.earnedStars);
 
-      // If phase changed, play dramatic flash then show transition overlay
+      // If phase changed, immediately show transition overlay and play dramatic flash
       if (victory.phaseChanged) {
-        setTimeout(() => victoryActions.playPhaseChangeFlash(), 800);
         const event = getPhaseTransitionEvent(victory.newPhase as any);
         if (event) {
           setPhaseTransitionEvent(event);
         }
+        victoryActions.playPhaseChangeFlash();
       }
 
       // Check for endgame triggers (final puzzle + post-revelation)
@@ -322,301 +322,319 @@ export default function App() {
     );
   }
 
-  // Settings screen
-  if (currentScreen === 'settings') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: screenFade }}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <SettingsScreen onClose={() => transitionTo('home')} />
-      </Animated.View>
-    );
-  }
+  // Helper: render the active screen content
+  const renderScreen = () => {
+    if (currentScreen === 'settings') {
+      return (
+        <View style={styles.screenBackground}>
+          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <SettingsScreen onClose={() => transitionTo('home')} />
+          </Animated.View>
+        </View>
+      );
+    }
 
-  // Stats screen
-  if (currentScreen === 'stats') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: screenFade }}>
-        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <StatsScreen
-          onClose={() => transitionTo('home')}
-          puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
-          currentPhase={persistence.currentPhase}
-          amberBalance={persistence.amberBalance}
-          phase={persistence.currentPhase}
-        />
-      </Animated.View>
-    );
-  }
+    if (currentScreen === 'stats') {
+      return (
+        <View style={styles.screenBackground}>
+          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <StatsScreen
+              onClose={() => transitionTo('home')}
+              puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
+              currentPhase={persistence.currentPhase}
+              amberBalance={persistence.amberBalance}
+              phase={persistence.currentPhase}
+            />
+          </Animated.View>
+        </View>
+      );
+    }
 
-  // Render home screen
-  if (currentScreen === 'home') {
+    if (currentScreen === 'home') {
+      return (
+        <ErrorBoundary
+          fallbackMessage="Something went wrong with the home screen. Tap to try again."
+          onReset={() => setCurrentScreen('home')}
+        >
+          <View style={styles.screenBackground}>
+            <Animated.View style={{ flex: 1, opacity: screenFade }}>
+              <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+              <HomeScreen
+                onPlayPuzzle={handlePlayPuzzle}
+                onAmberChange={persistenceActions.setAmberBalance}
+                onOpenSettings={() => transitionTo('settings')}
+                onOpenStats={() => transitionTo('stats')}
+                onStartDaily={handleStartDaily}
+              />
+              {/* Achievement toast overlay */}
+              <AchievementToast
+                achievement={achievementState.currentAchievement}
+                onDismiss={achievementActions.dismissAchievement}
+                phase={persistence.currentPhase}
+              />
+            </Animated.View>
+          </View>
+        </ErrorBoundary>
+      );
+    }
+
+    // Puzzle screen
     return (
       <ErrorBoundary
-        fallbackMessage="Something went wrong with the home screen. Tap to try again."
-        onReset={() => setCurrentScreen('home')}
+        fallbackMessage="Something went wrong with the puzzle. Tap to return home."
+        onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
-        <Animated.View style={{ flex: 1, opacity: screenFade }}>
-          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-          <HomeScreen
-            onPlayPuzzle={handlePlayPuzzle}
-            onAmberChange={persistenceActions.setAmberBalance}
-            onOpenSettings={() => transitionTo('settings')}
-            onOpenStats={() => transitionTo('stats')}
-            onStartDaily={handleStartDaily}
+      <View style={styles.screenBackground}>
+      <Animated.View style={[styles.container, { opacity: screenFade }]}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+        {/* Animated Background — darkens with narrative phase */}
+        <AnimatedBackground phase={persistence.currentPhase} />
+
+        {/* Confetti celebration — colors shift with phase */}
+        <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} />
+
+        {/* Star burst effect on valid moves */}
+        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} />
+
+        {/* Phase change dramatic flash overlay */}
+        <Animated.View
+          style={[styles.phaseFlashOverlay, { opacity: victoryFlow.phaseFlashOpacity }]}
+          pointerEvents="none"
+        />
+
+        {/* Achievement toast overlay */}
+        <AchievementToast
+          achievement={achievementState.currentAchievement}
+          onDismiss={achievementActions.dismissAchievement}
+          phase={persistence.currentPhase}
+        />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.headerHomeButton}
+            onPress={handleGoHome}
+            accessibilityLabel="Go home"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
+          </TouchableOpacity>
+
+          <View style={styles.headerTitleArea}>
+            {isPlayingDaily ? (
+              <View style={styles.dailyBadge}>
+                <Text style={styles.dailyBadgeText}>DAILY</Text>
+              </View>
+            ) : (
+              <AnimatedLogo />
+            )}
+            {/* Phase indicator badge */}
+            {persistence.currentPhase > 0 && (
+              <View style={[
+                styles.phaseBadge,
+                persistence.currentPhase >= 3 && styles.phaseBadgeDark,
+                persistence.currentPhase >= 4 && styles.phaseBadgeVoid,
+              ]}>
+                <Text style={styles.phaseBadgeIcon}>{getPhaseIndicator(persistence.currentPhase).icon}</Text>
+                <Text style={[
+                  styles.phaseBadgeText,
+                  persistence.currentPhase >= 3 && styles.phaseBadgeTextDark,
+                ]}>{getPhaseIndicator(persistence.currentPhase).label}</Text>
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.helpButton}
+            onPress={() => puzzleActions.setShowRules(true)}
+            accessibilityLabel="How to play"
+            accessibilityRole="button"
+          >
+            <View style={styles.helpButtonShine} />
+            <Text style={styles.helpButtonText}>?</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.leftStatsGroup}>
+            <LevelDisplay level={puzzle.level} />
+            {/* Challenge Mode Badge */}
+            {puzzle.gameMode === 'challenge' && (
+              <View style={styles.challengeBadge}>
+                <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
+                {puzzle.undosRemaining < Infinity && (
+                  <Text style={styles.challengeUndoText}>
+                    {puzzle.undosRemaining} undo{puzzle.undosRemaining !== 1 ? 's' : ''}
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.difficultyButton}
+            onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
+            accessibilityLabel={`Difficulty: ${puzzle.difficulty}. Tap to change`}
+            accessibilityRole="button"
+          >
+            <View style={styles.difficultyButtonShine} />
+            <View style={[
+              styles.difficultyDot,
+              puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
+              puzzle.difficulty === 'MEDIUM' && styles.difficultyDotMedium,
+              puzzle.difficulty === 'HARD' && styles.difficultyDotHard,
+            ]} />
+            <Text style={styles.difficultyText}>{puzzle.difficulty}</Text>
+            <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
+          </TouchableOpacity>
+
+          <DifficultyMenu
+            visible={puzzle.showDifficultyMenu}
+            currentDifficulty={puzzle.difficulty}
+            gameMode={puzzle.gameMode}
+            onSelectDifficulty={handleSelectDifficulty}
+            onToggleChallengeMode={handleToggleChallengeMode}
           />
-          {/* Achievement toast overlay */}
-          <AchievementToast
-            achievement={achievementState.currentAchievement}
-            onDismiss={achievementActions.dismissAchievement}
-            phase={persistence.currentPhase}
+        </View>
+
+        {/* Toast Message */}
+        <View style={styles.toastContainer}>
+          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} />
+        </View>
+
+        {/* Game Area */}
+        <View style={styles.gameArea}>
+          {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing || victoryFlow.isProcessingVictory) && (
+            <View style={styles.loadingOverlay}>
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color={CandyColors.pink.main} />
+                <Text style={styles.loadingText}>
+                  {getLoadingMessage(persistence.currentPhase)}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <ScrollView
+            contentContainerStyle={styles.rowsContainer}
+            showsVerticalScrollIndicator={false}
+            accessibilityRole="list"
+            accessibilityLabel={`Puzzle with ${puzzle.rows.length} word rows`}
+          >
+            {puzzle.rows.map((row, idx) => (
+              <Row
+                key={row.id}
+                rowData={row}
+                rowIndex={idx}
+                activeRowIndex={puzzle.activeRowIndex}
+                selectedLetter={puzzle.selectedLetter}
+                onLetterPress={handleLetterPress}
+                onSlotPress={handleSlotPress}
+                isProcessing={puzzle.isProcessing}
+                phase={persistence.currentPhase}
+                wordLength={puzzle.currentWordLength}
+              />
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Bottom Controls */}
+        <View style={styles.controls}>
+          <ActionButton
+            icon="↩"
+            label="UNDO"
+            colors={{
+              bg: CandyColors.yellow.main,
+              border: CandyColors.yellow.shadow,
+              glow: CandyColors.yellow.glow,
+            }}
+            onPress={handleUndo}
+            disabled={puzzle.history.length === 0 || puzzle.gameState === GameState.WON}
           />
-        </Animated.View>
+          <ActionButton
+            icon="💡"
+            label="HINT"
+            colors={{
+              bg: CandyColors.blue.main,
+              border: CandyColors.blue.shadow,
+              glow: CandyColors.blue.glow,
+            }}
+            onPress={handleHintPress}
+            disabled={puzzle.gameState !== GameState.PLAYING}
+          />
+          <ActionButton
+            icon="🔄"
+            label="NEW"
+            colors={{
+              bg: CandyColors.green.main,
+              border: CandyColors.green.shadow,
+              glow: CandyColors.green.glow,
+            }}
+            onPress={() => {
+              hapticLight();
+              puzzleActions.startNewGame();
+            }}
+            disabled={false}
+          />
+        </View>
+
+        {/* Rules Modal — phase-aware text */}
+        <RulesModal
+          visible={puzzle.showRules}
+          phase={persistence.currentPhase}
+          onClose={() => puzzleActions.setShowRules(false)}
+        />
+
+        {/* Victory Modal — extracted component */}
+        <VictoryModal
+          visible={puzzle.gameState === GameState.WON}
+          earnedStars={puzzle.earnedStars}
+          level={puzzle.level}
+          difficulty={puzzle.difficulty}
+          amberBalance={persistence.amberBalance}
+          phase={persistence.currentPhase}
+          isPlayingDaily={isPlayingDaily}
+          victoryData={victoryFlow.victoryData}
+          cumulativeStats={persistence.cumulativeStats}
+          completedWords={puzzle.lastCompletedWords}
+          incantationName={puzzle.lastIncantationName}
+          modalScale={victoryFlow.victoryModalScale}
+          modalOpacity={victoryFlow.victoryModalOpacity}
+          star1Scale={victoryFlow.victoryStar1}
+          star2Scale={victoryFlow.victoryStar2}
+          star3Scale={victoryFlow.victoryStar3}
+          onNextLevel={handleNextLevel}
+          onReturnHome={handleReturnHome}
+          onShare={handleShare}
+        />
+      </Animated.View>
+      </View>
       </ErrorBoundary>
     );
-  }
+  };
 
-  // Render puzzle screen
+  // Render screen with global phase transition overlay on top
   return (
-    <ErrorBoundary
-      fallbackMessage="Something went wrong with the puzzle. Tap to return home."
-      onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
-    >
-    <Animated.View style={[styles.container, { opacity: screenFade }]}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
-      {/* Animated Background — darkens with narrative phase */}
-      <AnimatedBackground phase={persistence.currentPhase} />
-
-      {/* Confetti celebration — colors shift with phase */}
-      <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} />
-
-      {/* Star burst effect on valid moves */}
-      <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} />
-
-      {/* Phase change dramatic flash overlay */}
-      <Animated.View
-        style={[styles.phaseFlashOverlay, { opacity: victoryFlow.phaseFlashOpacity }]}
-        pointerEvents="none"
-      />
-
-      {/* Phase transition narrative overlay */}
+    <View style={{ flex: 1 }}>
+      {renderScreen()}
+      {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
         event={phaseTransitionEvent}
         onComplete={() => setPhaseTransitionEvent(null)}
       />
-
-      {/* Achievement toast overlay */}
-      <AchievementToast
-        achievement={achievementState.currentAchievement}
-        onDismiss={achievementActions.dismissAchievement}
-        phase={persistence.currentPhase}
-      />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerHomeButton}
-          onPress={handleGoHome}
-          accessibilityLabel="Go home"
-          accessibilityRole="button"
-        >
-          <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
-        </TouchableOpacity>
-
-        <View style={styles.headerTitleArea}>
-          {isPlayingDaily ? (
-            <View style={styles.dailyBadge}>
-              <Text style={styles.dailyBadgeText}>DAILY</Text>
-            </View>
-          ) : (
-            <AnimatedLogo />
-          )}
-          {/* Phase indicator badge */}
-          {persistence.currentPhase > 0 && (
-            <View style={[
-              styles.phaseBadge,
-              persistence.currentPhase >= 3 && styles.phaseBadgeDark,
-              persistence.currentPhase >= 4 && styles.phaseBadgeVoid,
-            ]}>
-              <Text style={styles.phaseBadgeIcon}>{getPhaseIndicator(persistence.currentPhase).icon}</Text>
-              <Text style={[
-                styles.phaseBadgeText,
-                persistence.currentPhase >= 3 && styles.phaseBadgeTextDark,
-              ]}>{getPhaseIndicator(persistence.currentPhase).label}</Text>
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity
-          style={styles.helpButton}
-          onPress={() => puzzleActions.setShowRules(true)}
-          accessibilityLabel="How to play"
-          accessibilityRole="button"
-        >
-          <View style={styles.helpButtonShine} />
-          <Text style={styles.helpButtonText}>?</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Stats Row */}
-      <View style={styles.statsRow}>
-        <View style={styles.leftStatsGroup}>
-          <LevelDisplay level={puzzle.level} />
-          {/* Challenge Mode Badge */}
-          {puzzle.gameMode === 'challenge' && (
-            <View style={styles.challengeBadge}>
-              <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
-              {puzzle.undosRemaining < Infinity && (
-                <Text style={styles.challengeUndoText}>
-                  {puzzle.undosRemaining} undo{puzzle.undosRemaining !== 1 ? 's' : ''}
-                </Text>
-              )}
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity
-          style={styles.difficultyButton}
-          onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
-          accessibilityLabel={`Difficulty: ${puzzle.difficulty}. Tap to change`}
-          accessibilityRole="button"
-        >
-          <View style={styles.difficultyButtonShine} />
-          <View style={[
-            styles.difficultyDot,
-            puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
-            puzzle.difficulty === 'MEDIUM' && styles.difficultyDotMedium,
-            puzzle.difficulty === 'HARD' && styles.difficultyDotHard,
-          ]} />
-          <Text style={styles.difficultyText}>{puzzle.difficulty}</Text>
-          <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
-        </TouchableOpacity>
-
-        <DifficultyMenu
-          visible={puzzle.showDifficultyMenu}
-          currentDifficulty={puzzle.difficulty}
-          gameMode={puzzle.gameMode}
-          onSelectDifficulty={handleSelectDifficulty}
-          onToggleChallengeMode={handleToggleChallengeMode}
-        />
-      </View>
-
-      {/* Toast Message */}
-      <View style={styles.toastContainer}>
-        <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} />
-      </View>
-
-      {/* Game Area */}
-      <View style={styles.gameArea}>
-        {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing || victoryFlow.isProcessingVictory) && (
-          <View style={styles.loadingOverlay}>
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={CandyColors.pink.main} />
-              <Text style={styles.loadingText}>
-                {getLoadingMessage(persistence.currentPhase)}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        <ScrollView
-          contentContainerStyle={styles.rowsContainer}
-          showsVerticalScrollIndicator={false}
-          accessibilityRole="list"
-          accessibilityLabel={`Puzzle with ${puzzle.rows.length} word rows`}
-        >
-          {puzzle.rows.map((row, idx) => (
-            <Row
-              key={row.id}
-              rowData={row}
-              rowIndex={idx}
-              activeRowIndex={puzzle.activeRowIndex}
-              selectedLetter={puzzle.selectedLetter}
-              onLetterPress={handleLetterPress}
-              onSlotPress={handleSlotPress}
-              isProcessing={puzzle.isProcessing}
-              phase={persistence.currentPhase}
-              wordLength={puzzle.currentWordLength}
-            />
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Bottom Controls */}
-      <View style={styles.controls}>
-        <ActionButton
-          icon="↩"
-          label="UNDO"
-          colors={{
-            bg: CandyColors.yellow.main,
-            border: CandyColors.yellow.shadow,
-            glow: CandyColors.yellow.glow,
-          }}
-          onPress={handleUndo}
-          disabled={puzzle.history.length === 0 || puzzle.gameState === GameState.WON}
-        />
-        <ActionButton
-          icon="💡"
-          label="HINT"
-          colors={{
-            bg: CandyColors.blue.main,
-            border: CandyColors.blue.shadow,
-            glow: CandyColors.blue.glow,
-          }}
-          onPress={handleHintPress}
-          disabled={puzzle.gameState !== GameState.PLAYING}
-        />
-        <ActionButton
-          icon="🔄"
-          label="NEW"
-          colors={{
-            bg: CandyColors.green.main,
-            border: CandyColors.green.shadow,
-            glow: CandyColors.green.glow,
-          }}
-          onPress={() => {
-            hapticLight();
-            puzzleActions.startNewGame();
-          }}
-          disabled={false}
-        />
-      </View>
-
-      {/* Rules Modal — phase-aware text */}
-      <RulesModal
-        visible={puzzle.showRules}
-        phase={persistence.currentPhase}
-        onClose={() => puzzleActions.setShowRules(false)}
-      />
-
-      {/* Victory Modal — extracted component */}
-      <VictoryModal
-        visible={puzzle.gameState === GameState.WON}
-        earnedStars={puzzle.earnedStars}
-        level={puzzle.level}
-        difficulty={puzzle.difficulty}
-        amberBalance={persistence.amberBalance}
-        phase={persistence.currentPhase}
-        isPlayingDaily={isPlayingDaily}
-        victoryData={victoryFlow.victoryData}
-        cumulativeStats={persistence.cumulativeStats}
-        completedWords={puzzle.lastCompletedWords}
-        incantationName={puzzle.lastIncantationName}
-        modalScale={victoryFlow.victoryModalScale}
-        modalOpacity={victoryFlow.victoryModalOpacity}
-        star1Scale={victoryFlow.victoryStar1}
-        star2Scale={victoryFlow.victoryStar2}
-        star3Scale={victoryFlow.victoryStar3}
-        onNextLevel={handleNextLevel}
-        onReturnHome={handleReturnHome}
-        onShare={handleShare}
-      />
-    </Animated.View>
-    </ErrorBoundary>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screenBackground: {
+    flex: 1,
+    backgroundColor: '#1A1A2E',
+  },
   container: {
     flex: 1,
     backgroundColor: CandyColors.purple.main,
