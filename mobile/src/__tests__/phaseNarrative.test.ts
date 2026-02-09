@@ -8,6 +8,7 @@ import {
   getStartMessage,
   getPhaseChangeNarrative,
   getPhaseIndicator,
+  getRulesText,
 } from '../services/phaseNarrative';
 import { DialoguePhase } from '../types/homeWorld';
 
@@ -260,5 +261,80 @@ describe('getPhaseIndicator', () => {
     const icons = ALL_PHASES.map(p => getPhaseIndicator(p).icon);
     const unique = new Set(icons);
     expect(unique.size).toBe(5);
+  });
+});
+
+describe('getRulesText', () => {
+  test.each(ALL_PHASES)('returns valid rules object for phase %i', (phase) => {
+    const rules = getRulesText(phase);
+    expect(rules).toHaveProperty('title');
+    expect(rules).toHaveProperty('steps');
+    expect(rules).toHaveProperty('dismissLabel');
+    expect(typeof rules.title).toBe('string');
+    expect(rules.title.length).toBeGreaterThan(0);
+    expect(typeof rules.dismissLabel).toBe('string');
+    expect(rules.dismissLabel.length).toBeGreaterThan(0);
+  });
+
+  test.each(ALL_PHASES)('has exactly 4 steps for phase %i', (phase) => {
+    const rules = getRulesText(phase);
+    expect(rules.steps).toHaveLength(4);
+  });
+
+  test.each(ALL_PHASES)('each step has heading and desc for phase %i', (phase) => {
+    const rules = getRulesText(phase);
+    for (const step of rules.steps) {
+      expect(typeof step.heading).toBe('string');
+      expect(step.heading.length).toBeGreaterThan(0);
+      expect(typeof step.desc).toBe('string');
+      expect(step.desc.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('phase 0 is cheerful and inviting', () => {
+    const rules = getRulesText(0);
+    expect(rules.title).toBe('HOW TO PLAY');
+    expect(rules.dismissLabel).toBe("LET'S PLAY!");
+    expect(rules.steps[0].heading).toContain('Pick');
+  });
+
+  test('phase 2 shifts to detached tone', () => {
+    const rules = getRulesText(2);
+    expect(rules.title).toBe('THE RULES');
+    expect(rules.dismissLabel).toBe('CONTINUE');
+  });
+
+  test('phase 3 is unsettling', () => {
+    const rules = getRulesText(3);
+    expect(rules.title).toBe('THE PATTERN');
+    expect(rules.dismissLabel).toBe('PROCEED');
+  });
+
+  test('phase 4 is existential/ritual', () => {
+    const rules = getRulesText(4);
+    expect(rules.title).toBe('THE ARRANGEMENT');
+    expect(rules.dismissLabel).toBe('...');
+    expect(rules.steps[3].heading).toContain('Ritual');
+  });
+
+  test('all phases have different titles', () => {
+    const titles = ALL_PHASES.map(p => getRulesText(p).title);
+    const unique = new Set(titles);
+    // Phase 0 and 1 share "HOW TO PLAY", so 4 unique
+    expect(unique.size).toBeGreaterThanOrEqual(4);
+  });
+
+  test('all phases have different dismiss labels', () => {
+    const labels = ALL_PHASES.map(p => getRulesText(p).dismissLabel);
+    const unique = new Set(labels);
+    expect(unique.size).toBe(5);
+  });
+
+  test('step descriptions darken across phases', () => {
+    const phase0Desc = getRulesText(0).steps[0].desc;
+    const phase4Desc = getRulesText(4).steps[0].desc;
+    // Phase 0 is "Tap any colorful tile", Phase 4 is much darker
+    expect(phase0Desc).toContain('colorful');
+    expect(phase4Desc).not.toContain('colorful');
   });
 });

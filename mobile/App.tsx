@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Modal,
   ActivityIndicator,
   StatusBar,
   Dimensions,
@@ -16,10 +15,10 @@ import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
-import { ActionButton, AnimatedLogo, Toast, LevelDisplay } from './src/components/puzzle';
+import { ActionButton, AnimatedLogo, Toast, LevelDisplay, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { CandyColors, getPhaseTheme } from './src/theme/colors';
+import { CandyColors } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
 import { useVictoryFlow } from './src/hooks/useVictoryFlow';
@@ -37,12 +36,11 @@ import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticSuccess, hapticError, hapticSelection } from './src/services/haptics';
 import {
-  getVictoryTitle,
-  getVictoryFeedback,
   getPhaseIndicator,
-  getPhaseChangeNarrative,
+  getLoadingMessage,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent } from './src/services/phaseEvents';
+import { startFrameMonitoring } from './src/services/performanceMonitor';
 
 // App screen type — expanded with settings and stats
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats';
@@ -84,6 +82,7 @@ export default function App() {
   // Initialize on mount
   useEffect(() => {
     initAudio();
+    startFrameMonitoring();
     // Check if tutorial needed
     hasTutorialCompleted().then(completed => {
       if (!completed) {
@@ -275,6 +274,17 @@ export default function App() {
     });
   }, [victoryFlow.victoryData, puzzle, isPlayingDaily]);
 
+  const handleSelectDifficulty = useCallback((d: Difficulty) => {
+    hapticLight();
+    puzzleActions.startNewGame(d, puzzle.gameMode);
+  }, [puzzleActions, puzzle.gameMode]);
+
+  const handleToggleChallengeMode = useCallback(() => {
+    hapticMedium();
+    const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
+    puzzleActions.startNewGame(puzzle.difficulty, newMode);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty]);
+
   // Tutorial overlay
   if (showTutorial) {
     return (
@@ -383,7 +393,7 @@ export default function App() {
           accessibilityLabel="Go home"
           accessibilityRole="button"
         >
-          <Text style={styles.headerHomeText}>🏠</Text>
+          <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
         </TouchableOpacity>
 
         <View style={styles.headerTitleArea}>
@@ -452,69 +462,16 @@ export default function App() {
             puzzle.difficulty === 'HARD' && styles.difficultyDotHard,
           ]} />
           <Text style={styles.difficultyText}>{puzzle.difficulty}</Text>
-          <Text style={styles.difficultyArrow}>▼</Text>
+          <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
         </TouchableOpacity>
 
-        {puzzle.showDifficultyMenu && (
-          <View style={styles.difficultyMenu}>
-            {(['EASY', 'MEDIUM', 'HARD'] as Difficulty[]).map(d => (
-              <TouchableOpacity
-                key={d}
-                style={[
-                  styles.difficultyMenuItem,
-                  puzzle.difficulty === d && styles.difficultyMenuItemActive,
-                ]}
-                onPress={() => {
-                  hapticLight();
-                  puzzleActions.startNewGame(d, puzzle.gameMode);
-                }}
-              >
-                <View style={[
-                  styles.difficultyMenuDot,
-                  d === 'EASY' && styles.difficultyDotEasy,
-                  d === 'MEDIUM' && styles.difficultyDotMedium,
-                  d === 'HARD' && styles.difficultyDotHard,
-                ]} />
-                <Text
-                  style={[
-                    styles.difficultyMenuText,
-                    puzzle.difficulty === d && styles.difficultyMenuTextActive,
-                  ]}
-                >
-                  {d}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {/* Challenge mode toggle */}
-            <View style={styles.challengeMenuDivider} />
-            <TouchableOpacity
-              style={[
-                styles.difficultyMenuItem,
-                puzzle.gameMode === 'challenge' && styles.challengeMenuItemActive,
-              ]}
-              onPress={() => {
-                hapticMedium();
-                const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
-                puzzleActions.startNewGame(puzzle.difficulty, newMode);
-              }}
-            >
-              <Text style={styles.challengeMenuIcon}>
-                {puzzle.gameMode === 'challenge' ? '🔓' : '🔒'}
-              </Text>
-              <View style={styles.challengeMenuContent}>
-                <Text style={[
-                  styles.difficultyMenuText,
-                  puzzle.gameMode === 'challenge' && styles.challengeMenuTextActive,
-                ]}>
-                  CHALLENGE
-                </Text>
-                <Text style={styles.challengeMenuDesc}>
-                  {puzzle.gameMode === 'challenge' ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
+        <DifficultyMenu
+          visible={puzzle.showDifficultyMenu}
+          currentDifficulty={puzzle.difficulty}
+          gameMode={puzzle.gameMode}
+          onSelectDifficulty={handleSelectDifficulty}
+          onToggleChallengeMode={handleToggleChallengeMode}
+        />
       </View>
 
       {/* Toast Message */}
@@ -528,7 +485,9 @@ export default function App() {
           <View style={styles.loadingOverlay}>
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={CandyColors.pink.main} />
-              <Text style={styles.loadingText}>Mixing words...</Text>
+              <Text style={styles.loadingText}>
+                {getLoadingMessage(persistence.currentPhase)}
+              </Text>
             </View>
           </View>
         )}
@@ -595,246 +554,33 @@ export default function App() {
         />
       </View>
 
-      {/* Rules Modal */}
-      <Modal visible={puzzle.showRules} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => puzzleActions.setShowRules(false)}
-        >
-          <View style={styles.rulesModal} onStartShouldSetResponder={() => true}>
-            <View style={styles.modalShine} />
+      {/* Rules Modal — phase-aware text */}
+      <RulesModal
+        visible={puzzle.showRules}
+        phase={persistence.currentPhase}
+        onClose={() => puzzleActions.setShowRules(false)}
+      />
 
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => puzzleActions.setShowRules(false)}
-            >
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.rulesTitle}>HOW TO PLAY</Text>
-
-            <View style={styles.ruleItem}>
-              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.pink.light }]}>
-                <Text style={[styles.ruleNumberText, { color: CandyColors.pink.dark }]}>1</Text>
-              </View>
-              <View style={styles.ruleContent}>
-                <Text style={styles.ruleHeading}>Pick a Letter</Text>
-                <Text style={styles.ruleDesc}>Tap any colorful tile in the active row.</Text>
-              </View>
-            </View>
-
-            <View style={styles.ruleItem}>
-              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.blue.light }]}>
-                <Text style={[styles.ruleNumberText, { color: CandyColors.blue.dark }]}>2</Text>
-              </View>
-              <View style={styles.ruleContent}>
-                <Text style={styles.ruleHeading}>Drop it Down</Text>
-                <Text style={styles.ruleDesc}>Tap a + slot to place your letter.</Text>
-              </View>
-            </View>
-
-            <View style={styles.ruleItem}>
-              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.yellow.light }]}>
-                <Text style={[styles.ruleNumberText, { color: CandyColors.yellow.shadow }]}>3</Text>
-              </View>
-              <View style={styles.ruleContent}>
-                <Text style={styles.ruleHeading}>Make Real Words</Text>
-                <Text style={styles.ruleDesc}>Both words must be valid English!</Text>
-              </View>
-            </View>
-
-            <View style={styles.ruleItem}>
-              <View style={[styles.ruleNumber, { backgroundColor: CandyColors.green.light }]}>
-                <Text style={[styles.ruleNumberText, { color: CandyColors.green.dark }]}>4</Text>
-              </View>
-              <View style={styles.ruleContent}>
-                <Text style={styles.ruleHeading}>Complete All Rows</Text>
-                <Text style={styles.ruleDesc}>Work through every row to win!</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.gotItButton}
-              onPress={() => puzzleActions.setShowRules(false)}
-            >
-              <View style={styles.buttonShine} />
-              <Text style={styles.gotItButtonText}>LET'S PLAY!</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Victory Modal */}
-      <Modal visible={puzzle.gameState === GameState.WON} transparent animationType="none">
-        <View style={styles.modalOverlay}>
-          <ScrollView
-            contentContainerStyle={styles.victoryScrollContent}
-            showsVerticalScrollIndicator={false}
-            bounces={false}
-          >
-          <Animated.View style={[styles.victoryModal, {
-            transform: [{ scale: victoryFlow.victoryModalScale }],
-            opacity: victoryFlow.victoryModalOpacity,
-          }]}>
-            <View style={[styles.victoryGlow, {
-              backgroundColor: getPhaseTheme(persistence.currentPhase).victoryGlowColor,
-            }]} />
-            <View style={styles.modalShine} />
-
-            {/* Stars — choreographed pop-in */}
-            <View style={styles.starsContainer}>
-              <Animated.Text style={[
-                styles.victoryStar,
-                puzzle.earnedStars < 1 && styles.victoryStarEmpty,
-                { transform: [{ scale: victoryFlow.victoryStar1 }] },
-              ]}>
-                {puzzle.earnedStars >= 1 ? '⭐' : '☆'}
-              </Animated.Text>
-              <Animated.Text style={[
-                styles.victoryStar,
-                styles.victoryStarBig,
-                puzzle.earnedStars < 2 && styles.victoryStarEmpty,
-                { transform: [{ scale: victoryFlow.victoryStar2 }] },
-              ]}>
-                {puzzle.earnedStars >= 2 ? '⭐' : '☆'}
-              </Animated.Text>
-              <Animated.Text style={[
-                styles.victoryStar,
-                puzzle.earnedStars < 3 && styles.victoryStarEmpty,
-                { transform: [{ scale: victoryFlow.victoryStar3 }] },
-              ]}>
-                {puzzle.earnedStars >= 3 ? '⭐' : '☆'}
-              </Animated.Text>
-            </View>
-
-            <Text style={[styles.victoryTitle, {
-              color: getPhaseTheme(persistence.currentPhase).victoryTitleColor,
-            }]}>
-              {getVictoryTitle(puzzle.earnedStars, persistence.currentPhase)}
-            </Text>
-            <Text style={styles.victorySubtitle}>
-              {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${puzzle.level} Complete`}
-            </Text>
-
-            {/* Amber earned */}
-            {victoryFlow.victoryData && (
-              <View style={styles.amberEarnedContainer}>
-                <Text style={styles.amberEarnedIcon}>💎</Text>
-                <Text style={styles.amberEarnedText}>+{victoryFlow.victoryData.amberEarned} Amber</Text>
-                {victoryFlow.victoryData.streakBonus > 0 && (
-                  <Text style={styles.streakBonusText}>
-                    (+{victoryFlow.victoryData.streakBonus} streak!)
-                  </Text>
-                )}
-                {victoryFlow.victoryData.challengeBonus > 0 && (
-                  <Text style={styles.challengeBonusText}>
-                    (+{victoryFlow.victoryData.challengeBonus} challenge!)
-                  </Text>
-                )}
-              </View>
-            )}
-
-            {/* Streak display */}
-            {victoryFlow.victoryData && victoryFlow.victoryData.currentStreak > 1 && (
-              <View style={styles.winStreakContainer}>
-                <Text style={styles.winStreakEmoji}>🔥</Text>
-                <Text style={styles.winStreakText}>{victoryFlow.victoryData.currentStreak} Day Streak!</Text>
-              </View>
-            )}
-
-            {/* Milestone bonus */}
-            {victoryFlow.victoryData && victoryFlow.victoryData.milestoneBonus > 0 && victoryFlow.victoryData.milestoneMessage && (
-              <View style={styles.milestoneContainer}>
-                <Text style={styles.milestoneEmoji}>🏆</Text>
-                <Text style={styles.milestoneMessage}>{victoryFlow.victoryData.milestoneMessage}</Text>
-                <Text style={styles.milestoneBonus}>+{victoryFlow.victoryData.milestoneBonus} Bonus Amber!</Text>
-              </View>
-            )}
-
-            {/* Phase change notification */}
-            {victoryFlow.victoryData?.phaseChanged && (() => {
-              const phaseNarrative = getPhaseChangeNarrative(victoryFlow.victoryData!.newPhase as any);
-              return (
-                <View style={[styles.phaseChangeContainer,
-                  victoryFlow.victoryData!.newPhase >= 3 && styles.phaseChangeContainerDark,
-                ]}>
-                  <Text style={styles.phaseChangeEmoji}>{phaseNarrative.emoji}</Text>
-                  <Text style={styles.phaseChangeTitle}>{phaseNarrative.title}</Text>
-                  <Text style={styles.phaseChangeText}>{phaseNarrative.body}</Text>
-                </View>
-              );
-            })()}
-
-            {/* Performance feedback — phase-aware tone */}
-            <Text style={styles.victoryFeedback}>
-              {getVictoryFeedback(puzzle.earnedStars, persistence.currentPhase)}
-            </Text>
-
-            <View style={styles.victoryStats}>
-              <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>Lv.{puzzle.level}</Text>
-                <Text style={styles.victoryStatLabel}>{puzzle.difficulty}</Text>
-              </View>
-              <View style={styles.victoryStatDivider} />
-              <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>💎 {persistence.amberBalance}</Text>
-                <Text style={styles.victoryStatLabel}>Total Amber</Text>
-              </View>
-            </View>
-
-            {/* Cumulative stats */}
-            {persistence.cumulativeStats && (
-              <View style={styles.cumulativeStats}>
-                <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{persistence.cumulativeStats.totalStars}</Text>
-                  <Text style={styles.cumulativeStatLabel}>Total Stars</Text>
-                </View>
-                <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{persistence.cumulativeStats.threeStarCount}</Text>
-                  <Text style={styles.cumulativeStatLabel}>Perfect</Text>
-                </View>
-                <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{persistence.cumulativeStats.totalPuzzlesCompleted}</Text>
-                  <Text style={styles.cumulativeStatLabel}>Puzzles</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Action buttons */}
-            <View style={styles.victoryButtonRow}>
-              <TouchableOpacity
-                style={styles.shareButton}
-                onPress={handleShare}
-                accessibilityLabel="Share result"
-                accessibilityRole="button"
-              >
-                <Text style={styles.shareButtonText}>📤</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.homeButton}
-                onPress={handleReturnHome}
-                accessibilityLabel="Return home"
-                accessibilityRole="button"
-              >
-                <Text style={styles.homeButtonText}>🏠 HOME</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.nextLevelButton}
-                onPress={handleNextLevel}
-                accessibilityLabel="Next level"
-                accessibilityRole="button"
-              >
-                <View style={styles.buttonShine} />
-                <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-          </ScrollView>
-        </View>
-      </Modal>
+      {/* Victory Modal — extracted component */}
+      <VictoryModal
+        visible={puzzle.gameState === GameState.WON}
+        earnedStars={puzzle.earnedStars}
+        level={puzzle.level}
+        difficulty={puzzle.difficulty}
+        amberBalance={persistence.amberBalance}
+        phase={persistence.currentPhase}
+        isPlayingDaily={isPlayingDaily}
+        victoryData={victoryFlow.victoryData}
+        cumulativeStats={persistence.cumulativeStats}
+        modalScale={victoryFlow.victoryModalScale}
+        modalOpacity={victoryFlow.victoryModalOpacity}
+        star1Scale={victoryFlow.victoryStar1}
+        star2Scale={victoryFlow.victoryStar2}
+        star3Scale={victoryFlow.victoryStar3}
+        onNextLevel={handleNextLevel}
+        onReturnHome={handleReturnHome}
+        onShare={handleShare}
+      />
     </Animated.View>
     </ErrorBoundary>
   );
@@ -962,45 +708,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: 'rgba(255, 255, 255, 0.7)',
   },
-  difficultyMenu: {
-    position: 'absolute',
-    right: 20,
-    top: 52,
-    backgroundColor: CandyColors.white,
-    borderRadius: 16,
-    padding: 8,
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
-    zIndex: 200,
-  },
-  difficultyMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  difficultyMenuItemActive: {
-    backgroundColor: CandyColors.purple.light + '30',
-  },
-  difficultyMenuDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  difficultyMenuText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: CandyColors.gray[600],
-  },
-  difficultyMenuTextActive: {
-    color: CandyColors.purple.main,
-  },
 
   // Toast
   toastContainer: {
@@ -1057,401 +764,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     gap: 20,
   },
-  // Modals
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(76, 29, 149, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-  },
-
-  // Rules modal
-  rulesModal: {
-    backgroundColor: CandyColors.white,
-    borderRadius: 32,
-    padding: 28,
-    width: '100%',
-    maxWidth: 340,
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 20,
-    overflow: 'hidden',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: CandyColors.gray[100],
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  closeButtonText: {
-    fontSize: 18,
-    color: CandyColors.gray[400],
-    fontWeight: '700',
-  },
-  rulesTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: CandyColors.purple.main,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  ruleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  ruleNumber: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  ruleNumberText: {
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  ruleContent: {
-    flex: 1,
-  },
-  ruleHeading: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: CandyColors.gray[700],
-    marginBottom: 2,
-  },
-  ruleDesc: {
-    fontSize: 13,
-    color: CandyColors.gray[500],
-  },
-  gotItButton: {
-    backgroundColor: CandyColors.purple.main,
-    borderRadius: 18,
-    paddingVertical: 16,
-    marginTop: 12,
-    overflow: 'hidden',
-    shadowColor: CandyColors.purple.main,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  buttonShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '45%',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-  },
-  gotItButtonText: {
-    color: CandyColors.white,
-    fontSize: 17,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: 2,
-  },
-
-  victoryScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-
-  // Victory modal
-  victoryModal: {
-    backgroundColor: CandyColors.white,
-    borderRadius: 40,
-    padding: 32,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 320,
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 20,
-    overflow: 'hidden',
-  },
-  victoryGlow: {
-    position: 'absolute',
-    top: -50,
-    left: -50,
-    right: -50,
-    height: 200,
-    backgroundColor: CandyColors.yellow.light,
-    opacity: 0.3,
-    borderRadius: 100,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: 16,
-  },
-  victoryStar: {
-    fontSize: 36,
-    marginHorizontal: 4,
-  },
-  victoryStarBig: {
-    fontSize: 52,
-    marginBottom: 4,
-  },
-  victoryStarEmpty: {
-    opacity: 0.3,
-  },
-  victoryTitle: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: CandyColors.pink.main,
-    marginBottom: 8,
-    textShadowColor: CandyColors.pink.shadow,
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 0,
-  },
-  victorySubtitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: CandyColors.gray[500],
-    marginBottom: 4,
-  },
-  victoryFeedback: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: CandyColors.gray[400],
-    marginBottom: 16,
-  },
-  victoryStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CandyColors.gray[50],
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  victoryStatItem: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  victoryStatValue: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: CandyColors.purple.main,
-  },
-  victoryStatLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: CandyColors.gray[400],
-    letterSpacing: 1,
-    marginTop: 2,
-  },
-  victoryStatDivider: {
-    width: 2,
-    height: 40,
-    backgroundColor: CandyColors.gray[200],
-    borderRadius: 1,
-  },
-  cumulativeStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginBottom: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: CandyColors.gray[200],
-  },
-  cumulativeStatItem: {
-    alignItems: 'center',
-  },
-  cumulativeStatValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: CandyColors.purple.main,
-  },
-  cumulativeStatLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: CandyColors.gray[400],
-    marginTop: 2,
-  },
-  nextLevelButton: {
-    backgroundColor: CandyColors.pink.main,
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    overflow: 'hidden',
-    shadowColor: CandyColors.pink.main,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  nextLevelButtonText: {
-    color: CandyColors.white,
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-
-  // Amber earned display
-  amberEarnedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CandyColors.yellow.light,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginBottom: 8,
-  },
-  amberEarnedIcon: {
-    fontSize: 24,
-    marginRight: 8,
-  },
-  amberEarnedText: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: CandyColors.yellow.shadow,
-  },
-  streakBonusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.orange.main,
-    marginLeft: 8,
-  },
-  challengeBonusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.pink.main,
-    marginLeft: 8,
-  },
-
-  // Win screen streak display
-  winStreakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CandyColors.orange.light,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginBottom: 8,
-  },
-  winStreakEmoji: {
-    fontSize: 20,
-    marginRight: 6,
-  },
-  winStreakText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: CandyColors.orange.dark,
-  },
-
-  // Milestone bonus
-  milestoneContainer: {
-    alignItems: 'center',
-    backgroundColor: CandyColors.yellow.light,
-    borderWidth: 2,
-    borderColor: CandyColors.yellow.main,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
-    marginBottom: 12,
-  },
-  milestoneEmoji: {
-    fontSize: 28,
-    marginBottom: 4,
-  },
-  milestoneMessage: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: CandyColors.yellow.dark,
-    marginBottom: 2,
-  },
-  milestoneBonus: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: CandyColors.green.dark,
-  },
-
-  // Phase change notification
-  phaseChangeContainer: {
-    backgroundColor: CandyColors.purple.dark,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: CandyColors.purple.main,
-  },
-  phaseChangeEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  phaseChangeTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: CandyColors.white,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  phaseChangeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-
-  // Victory button row
-  victoryButtonRow: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  shareButton: {
-    backgroundColor: CandyColors.blue.light,
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-  },
-  shareButtonText: {
-    fontSize: 20,
-  },
-  homeButton: {
-    backgroundColor: CandyColors.gray[200],
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-  },
-  homeButtonText: {
-    color: CandyColors.gray[600],
-    fontSize: 16,
-    fontWeight: '800',
-  },
 
   // Challenge mode styles
   leftStatsGroup: {
@@ -1478,30 +790,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.8)',
-  },
-  challengeMenuDivider: {
-    height: 1,
-    backgroundColor: CandyColors.gray[200],
-    marginVertical: 6,
-    marginHorizontal: 8,
-  },
-  challengeMenuItemActive: {
-    backgroundColor: CandyColors.red.main + '15',
-  },
-  challengeMenuIcon: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-  challengeMenuContent: {
-    flex: 1,
-  },
-  challengeMenuTextActive: {
-    color: CandyColors.red.main,
-  },
-  challengeMenuDesc: {
-    fontSize: 10,
-    color: CandyColors.gray[400],
-    marginTop: 1,
   },
 
   // Phase indicator badge
@@ -1541,11 +829,5 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000000',
     zIndex: 999,
-  },
-
-  // Phase change container dark variant
-  phaseChangeContainerDark: {
-    backgroundColor: '#0F0818',
-    borderColor: '#3D1560',
   },
 });

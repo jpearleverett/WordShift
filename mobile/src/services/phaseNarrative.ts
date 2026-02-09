@@ -215,6 +215,77 @@ export function getPhaseChangeNarrative(newPhase: DialoguePhase): PhaseChangeNar
 // PHASE INDICATOR — What shows in the puzzle header
 // ============================================================================
 
+// ============================================================================
+// RULES MODAL — Phase-aware "How to Play" text
+// ============================================================================
+
+interface RulesText {
+  title: string;
+  steps: { heading: string; desc: string }[];
+  dismissLabel: string;
+}
+
+const RULES_TEXT: Record<DialoguePhase, RulesText> = {
+  0: {
+    title: 'HOW TO PLAY',
+    steps: [
+      { heading: 'Pick a Letter', desc: 'Tap any colorful tile in the active row.' },
+      { heading: 'Drop it Down', desc: 'Tap a + slot to place your letter.' },
+      { heading: 'Make Real Words', desc: 'Both words must be valid English!' },
+      { heading: 'Complete All Rows', desc: 'Work through every row to win!' },
+    ],
+    dismissLabel: "LET'S PLAY!",
+  },
+  1: {
+    title: 'HOW TO PLAY',
+    steps: [
+      { heading: 'Choose a Letter', desc: 'Select a glowing tile from the current row.' },
+      { heading: 'Place it Below', desc: 'Find the right slot for your letter.' },
+      { heading: 'Form Valid Words', desc: 'Both words must exist in the dictionary.' },
+      { heading: 'Solve the Chain', desc: 'Complete each row to progress.' },
+    ],
+    dismissLabel: 'UNDERSTOOD',
+  },
+  2: {
+    title: 'THE RULES',
+    steps: [
+      { heading: 'Select a Letter', desc: 'Pick from what remains in the active row.' },
+      { heading: 'Place it Below', desc: 'Drop it where it might belong.' },
+      { heading: 'Words Must Be Valid', desc: 'The dictionary decides. Not you.' },
+      { heading: 'Finish the Chain', desc: 'Row by row. There is no shortcut.' },
+    ],
+    dismissLabel: 'CONTINUE',
+  },
+  3: {
+    title: 'THE PATTERN',
+    steps: [
+      { heading: 'Take a Letter', desc: 'Pull it from the trembling row.' },
+      { heading: 'Place it in the Dark', desc: 'The slot waits below. It always waits.' },
+      { heading: 'Valid Words Only', desc: 'Some arrangements are forbidden.' },
+      { heading: 'Complete the Sequence', desc: 'You know you will. You always do.' },
+    ],
+    dismissLabel: 'PROCEED',
+  },
+  4: {
+    title: 'THE ARRANGEMENT',
+    steps: [
+      { heading: 'Remove a Letter', desc: 'It was never truly part of the word.' },
+      { heading: 'Place it Where it Belongs', desc: 'You already know where.' },
+      { heading: 'The Words Must Be Real', desc: 'As real as anything here.' },
+      { heading: 'Complete the Ritual', desc: 'Row by row. Closer and closer.' },
+    ],
+    dismissLabel: '...',
+  },
+};
+
+export function getRulesText(phase: DialoguePhase): RulesText {
+  return RULES_TEXT[phase];
+}
+
+// ============================================================================
+// PHASE INDICATOR — What shows in the puzzle header
+// ============================================================================
+
 export function getPhaseIndicator(phase: DialoguePhase): { icon: string; label: string } {
   switch (phase) {
     case 0: return { icon: '☀️', label: 'Bright Days' };

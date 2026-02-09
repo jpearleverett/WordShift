@@ -442,7 +442,8 @@ export async function getPuzzlesUntilNextPhase(): Promise<number | null> {
   if (currentPhase >= 4) return null; // Max phase reached
 
   const nextThreshold = PHASE_THRESHOLDS[currentPhase + 1];
-  return nextThreshold - progress.puzzlesSolved;
+  const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
+  return Math.max(0, nextThreshold - effectiveProgress);
 }
 
 /**
