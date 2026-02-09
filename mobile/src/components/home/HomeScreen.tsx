@@ -460,8 +460,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
   }
 
+  const phaseBgColor = {
+    0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a',
+  }[progress.currentPhase] || '#6fb7df';
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
       {/* Header with amber and play button */}
       <View style={styles.header}>
         <JuicyButton
