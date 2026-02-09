@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -200,6 +200,134 @@ const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
   );
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// FLYING BIRD ANIMATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ startDelay, yPosition }) => {
+  const x = useRef(new Animated.Value(-50)).current;
+  const y = useRef(new Animated.Value(yPosition)).current;
+  const flapRotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = () => {
+      const goingRight = Math.random() > 0.5;
+      x.setValue(goingRight ? -50 : SCREEN_WIDTH + 50);
+      y.setValue(yPosition + (Math.random() - 0.5) * 40);
+
+      const flapAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(flapRotation, {
+            toValue: 1,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.timing(flapRotation, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      flapAnimation.start();
+
+      Animated.timing(x, {
+        toValue: goingRight ? SCREEN_WIDTH + 50 : -50,
+        duration: 8000 + Math.random() * 4000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+        delay: startDelay,
+      }).start(() => {
+        flapAnimation.stop();
+        setTimeout(animate, 5000 + Math.random() * 10000);
+      });
+    };
+
+    animate();
+  }, []);
+
+  const scaleY = flapRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.6],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        transform: [{ translateX: x }, { translateY: y }, { scaleY }],
+      }}
+      pointerEvents="none"
+    >
+      <Text style={{ fontSize: 18 }}>🐦</Text>
+    </Animated.View>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SHOOTING STAR (appears at higher phases)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ShootingStar: React.FC = () => {
+  const x = useRef(new Animated.Value(0)).current;
+  const y = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = () => {
+      const startX = Math.random() * SCREEN_WIDTH;
+      x.setValue(startX);
+      y.setValue(20 + Math.random() * 60);
+      opacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(x, {
+          toValue: startX + 150,
+          duration: 800,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(y, {
+          toValue: 100 + Math.random() * 50,
+          duration: 800,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 700,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start(() => {
+        setTimeout(animate, 10000 + Math.random() * 20000);
+      });
+    };
+
+    setTimeout(animate, 5000 + Math.random() * 10000);
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        transform: [{ translateX: x }, { translateY: y }],
+        opacity,
+      }}
+      pointerEvents="none"
+    >
+      <Text style={{ fontSize: 14 }}>⭐</Text>
+    </Animated.View>
+  );
+};
+
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
 const ROOM_WIDTH = 250;
@@ -240,9 +368,29 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const lastScale = useRef(1);
   const baseTranslateY = useRef(0);
 
+  // Memoize night star positions/sizes to prevent flicker on re-render
+  const nightStars = useMemo(() =>
+    [...Array(12)].map((_, i) => ({
+      id: i,
+      left: `${10 + (i * 7) % 80}%` as `${number}%`,
+      top: `${5 + (i * 11) % 15}%` as `${number}%`,
+      opacity: 0.3 + (((i * 17 + 7) % 10) / 10) * 0.5,
+      fontSize: 8 + (((i * 13 + 3) % 10) / 10) * 6,
+    })),
+  []);
+
   // Particle system state
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
+
+  // Sun animation
+  const sunPulse = useRef(new Animated.Value(1)).current;
+  const sunRotation = useRef(new Animated.Value(0)).current;
+
+  // Cloud animations
+  const cloud1X = useRef(new Animated.Value(-100)).current;
+  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
+  const cloud3X = useRef(new Animated.Value(SCREEN_WIDTH / 2)).current;
 
   // Spawn particles based on phase
   useEffect(() => {
@@ -269,6 +417,69 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
     return () => clearInterval(interval);
   }, [currentPhase]);
+
+  // Sun pulsing animation
+  useEffect(() => {
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(sunPulse, {
+          toValue: 1.15,
+          duration: 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(sunPulse, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    const rotateAnimation = Animated.loop(
+      Animated.timing(sunRotation, {
+        toValue: 360,
+        duration: 60000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    if (currentPhase < 3) {
+      pulseAnimation.start();
+      rotateAnimation.start();
+    }
+
+    return () => {
+      pulseAnimation.stop();
+      rotateAnimation.stop();
+    };
+  }, [currentPhase]);
+
+  // Cloud animations
+  useEffect(() => {
+    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
+      const animate = () => {
+        cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
+        Animated.timing(cloudAnim, {
+          toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
+          duration,
+          useNativeDriver: true,
+        }).start(() => animate());
+      };
+      animate();
+    };
+
+    animateCloud(cloud1X, -100, 45000);
+    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
+    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
+  }, []);
+
+  const sunRotate = sunRotation.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+  });
 
   // Get only unlocked rooms, sorted by floor
   const unlockedRooms = rooms
@@ -386,6 +597,87 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 resizeMode="cover"
               />
 
+              {/* Animated clouds - inside transform so they move with the scene */}
+              <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+              <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+                <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+              <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+
+              {/* Sun with animated rays - hidden at phase 4 */}
+              {currentPhase < 4 && (
+                <Animated.View
+                  style={[
+                    styles.sun,
+                    {
+                      transform: [
+                        { scale: sunPulse },
+                        { rotate: sunRotate },
+                      ],
+                      opacity: currentPhase >= 3 ? 0.4 : 1,
+                    }
+                  ]}
+                  pointerEvents="none"
+                >
+                  <View style={styles.sunRays}>
+                    {[...Array(8)].map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.sunRay,
+                          { transform: [{ rotate: `${i * 45}deg` }] }
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
+                </Animated.View>
+              )}
+
+              {/* Moon for phase 4 */}
+              {currentPhase >= 4 && (
+                <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
+                  <Text style={styles.sunEmoji}>🌑</Text>
+                </View>
+              )}
+
+              {/* Stars at night (phase 3-4) */}
+              {currentPhase >= 3 && (
+                <View style={styles.starsContainer} pointerEvents="none">
+                  {nightStars.map((star) => (
+                    <Text
+                      key={star.id}
+                      style={[
+                        styles.star,
+                        {
+                          left: star.left,
+                          top: star.top,
+                          opacity: star.opacity,
+                          fontSize: star.fontSize,
+                        }
+                      ]}
+                    >
+                      ✦
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Shooting stars (only at higher phases) */}
+              {currentPhase >= 2 && <ShootingStar />}
+              {currentPhase >= 3 && <ShootingStar />}
+              {currentPhase >= 4 && <ShootingStar />}
+
+              {/* Flying birds */}
+              <FlyingBird startDelay={0} yPosition={80} />
+              <FlyingBird startDelay={3000} yPosition={50} />
+              {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
+
               {/* House */}
               <View style={styles.houseContainer}>
                 {/* Roof */}
@@ -488,6 +780,60 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 1.4,
     zIndex: -1,
   },
+  // Clouds - inside transform container
+  cloud: {
+    position: 'absolute',
+    flexDirection: 'row',
+    zIndex: 200,
+  },
+  cloudEmoji: {
+    fontSize: 45,
+    opacity: 0.9,
+  },
+
+  // Sun - inside transform container
+  sun: {
+    position: 'absolute',
+    top: 15,
+    right: 20,
+    zIndex: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sunEmoji: {
+    fontSize: 50,
+    zIndex: 2,
+  },
+  sunRays: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sunRay: {
+    position: 'absolute',
+    width: 3,
+    height: 40,
+    backgroundColor: '#FFD700',
+    opacity: 0.4,
+    borderRadius: 2,
+  },
+
+  // Stars for night sky
+  starsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.3,
+    zIndex: 150,
+  },
+  star: {
+    position: 'absolute',
+    color: '#FFFFFF',
+  },
+
   // Smoke container
   smokeContainer: {
     position: 'absolute',
