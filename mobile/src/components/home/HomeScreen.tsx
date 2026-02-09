@@ -28,6 +28,8 @@ import {
   getAllDecorations,
   markHouseCompleted,
   isHouseCompleted,
+  devAddAmber,
+  devAddPuzzles,
 } from '../../services/amberCurrency';
 import { getHouseCompletionText } from '../../services/phaseNarrative';
 import {
@@ -50,6 +52,7 @@ import {
 import {
   loadDialogueSessions,
   updatePuzzleCount,
+  clearAllSessions,
 } from '../../services/dialogueSession';
 
 import { useDialogueFlow } from '../../hooks/useDialogueFlow';
@@ -194,6 +197,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [progress?.amber]);
 
+  // DEV: Add amber, advance puzzles, clear dialogue cooldowns
+  const handleDevButton = async () => {
+    const newBalance = await devAddAmber(5000);
+    await devAddPuzzles(30);
+    await clearAllSessions();
+    await loadAllData();
+    onAmberChange?.(newBalance);
+  };
+
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
     if (!introAnimal || !progress) return;
@@ -328,6 +340,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </JuicyButton>
         </View>
       </View>
+
+      {/* DEV button for testing */}
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.devButton}
+          onPress={handleDevButton}
+        >
+          <Text style={styles.devButtonText}>DEV</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Next Unlock Progress Bar */}
       {unlockFlow.nextUnlock && (
@@ -1074,6 +1096,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+
+  devButton: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 70 : 110,
+    right: 10,
+    backgroundColor: 'rgba(255, 0, 0, 0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    zIndex: 1000,
+  },
+  devButtonText: {
+    color: CandyColors.white,
+    fontSize: 10,
+    fontWeight: '900',
   },
 
   // Unlock progress bar
