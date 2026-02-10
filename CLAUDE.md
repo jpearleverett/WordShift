@@ -29,6 +29,7 @@ A word puzzle game where players shift letters between words to form valid Engli
 4. The player should feel complicit. "You solved the puzzle. You brought us closer."
 5. Visual changes should slightly precede dialogue revelations — the player should *feel* something is off before they're told.
 6. The shadow_figure.png entity is never named, never explained. It just *is*.
+7. **Never reveal the phase system to the player.** No "Phase 2/5" labels, no progress bars toward phase transitions. The player should experience the shift organically through visuals, dialogue, and tone — never through a UI label telling them what stage they're in.
 
 **Phase narrative arc:**
 - **Phase 0 (Bright Days)**: Pure joy. Cute animals, candy colors, fun words. The trap is set.
@@ -282,8 +283,9 @@ Game logic is extracted into six custom hooks:
 
 **`useGamePersistence()`** (`src/hooks/useGamePersistence.ts`):
 - All persistence: amber balance, cumulative stats, phase, streak
-- `handleVictory(difficulty, hintsUsed, invalidAttempts)` - Record win, update stats
-- `refreshProgress()` - Reload from storage
+- `recordVictory(difficulty, hintsUsed, invalidAttempts, gameMode?, completedWords?)` - Record win, update stats, returns VictoryData
+- `refreshStats()` - Reload stats, amber balance, AND current phase from storage (called on puzzle screen navigation to sync phase after DEV or external changes)
+- `setAmberBalance(balance)` - Direct setter for amber balance
 
 **`useVictoryFlow()`** (`src/hooks/useVictoryFlow.ts`):
 - Victory animation state: star pop-in refs, modal scale/opacity, phase flash overlay
@@ -320,6 +322,7 @@ State-based routing in `App.tsx`:
 - Screen transitions use `Animated.timing` fade (150ms out, 200ms in)
 - Transitions instant when `reducedMotion` setting is enabled
 - `transitionTo(screen, callback?)` handles all navigation
+- **Phase sync on puzzle entry**: `handlePlayPuzzle` and `handleStartDaily` call `persistenceActions.refreshStats()` before transitioning, ensuring the puzzle screen always has the latest phase for correct visual theming
 
 ### Victory Flow
 
@@ -537,6 +540,7 @@ Milestone bonuses at key puzzle counts use phase-aware messages. Each `MILESTONE
 - Single-column layout of rooms stacked vertically (bottom-up)
 - Only unlocked rooms are rendered
 - Vertical-only pan + pinch zoom via `react-native-gesture-handler` (horizontal pan disabled to prevent side gaps)
+- Pan bounds dynamically calculated from total house height to ensure all rooms are reachable (accounts for marginBottom offset); phase background color blends seamlessly above the sky image when panning to upper rooms
 - Sky background is inside the transform container (moves with scene) but oversized (1.4x in each dimension) to prevent gaps at any zoom/pan combo
 - Phase-aware sky: `sky_day.png` → `sky_dusk.png` → `sky_storm.png` → `sky_shadow.png`
 - Phase-aware background color behind sky image (`PHASE_BG_COLORS`): Phase 0-1 `#6fb7df`, Phase 2 `#514378`, Phase 3 `#060612`, Phase 4 `#1a122a`
