@@ -396,7 +396,7 @@ const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
 // Zoom constraints
 const MIN_SCALE = 0.75;
-const MAX_SCALE = 2.0;
+const MAX_SCALE = 1.7;
 
 interface HouseWorldProps {
   rooms: Room[];
@@ -610,9 +610,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     // How much of the scene is visible at current zoom
     const visibleHeight = SCREEN_HEIGHT / currentScale;
     // Allow enough range to see all content when zoomed in
-    const overflow = Math.max(0, contentHeight - visibleHeight);
+    const overflow = Math.max(0, contentHeight * 0.8 - visibleHeight);
     // Pan range: at least 150 * scale, or enough to reveal all content
-    const maxPan = Math.max(200, overflow * 0.8) * currentScale;
+    const maxPan = Math.max(150, overflow * 0.8) * currentScale;
     return maxPan;
   };
 
@@ -683,7 +683,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   SKY_DAY
                 }
                 style={[styles.skyBackground, {
-                  top: -Math.max(SCREEN_HEIGHT * 0.1, houseHeight * 0.2),
+                  top: -Math.max(SCREEN_HEIGHT * 0.0, houseHeight * 0.0),
                 }]}
                 resizeMode="cover"
               />
