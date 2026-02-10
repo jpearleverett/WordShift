@@ -104,7 +104,9 @@ mobile/
 │   │   │   ├── VictoryModal.tsx # Victory screen modal (stars, stats, amber breakdown)
 │   │   │   ├── RulesModal.tsx   # Phase-aware "How to Play" rules modal
 │   │   │   ├── DifficultyMenu.tsx # Difficulty selector dropdown + challenge mode toggle
+│   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper from animals (fade in/out)
 │   │   │   └── index.ts         # Puzzle component exports
+│   │   ├── WordLedger.tsx       # Scrollable ritual word history screen (phase-aware styling)
 │   │   └── home/
 │   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
 │   │       ├── HouseWorld.tsx   # Zoomable house view (vertical pan only, pinch zoom)
@@ -121,11 +123,11 @@ mobile/
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
-│       ├── animalDialogue.ts    # 520+ dialogue lines, cross-animal refs, catch-up, tutorial callbacks
+│       ├── animalDialogue.ts    # 520+ dialogue lines, cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
-│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules
+│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules, animal whispers
 │       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials)
 │       ├── achievements.ts      # 36 achievements across 6 categories
 │       ├── shareResults.ts      # Wordle-style emoji grid sharing
@@ -275,7 +277,7 @@ Game logic is extracted into six custom hooks:
 - `initGame(words, hint?, solution?, wordLength?)` - Load pre-generated puzzle
 - `startNewGame(difficulty?, mode?)` - Generate and start a random puzzle (standard or challenge)
 - `handleLetterPress(letter, rowIndex)` - Pick a letter
-- `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode
+- `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode; intermediate moves return `{ completed: false, formedWord }` for dread word detection
 - `handleHint()` - Show phase-aware hint (blocked in challenge mode)
 - `handleUndo()` - Undo last move (limited to 1 in challenge mode); uses MoveDelta pattern (lightweight deltas instead of deep clones)
 - `setCurrentPhase(phase)` - Sync narrative phase from persistence layer
@@ -302,7 +304,7 @@ Game logic is extracted into six custom hooks:
 
 **`useDialogueFlow()`** (`src/hooks/useDialogueFlow.ts`):
 - Animal dialogue session state, animations, and cooldown messaging for home screen
-- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words, checks for tutorial callbacks (Fox Phase 4), and rolls for cross-animal references
+- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words (per-animal filtering), checks for tutorial callbacks (Fox Phase 4), rolls for cross-animal references (frequency scales with phase: 10% → 60%), and checks for coordinated dialogue events at puzzle milestones
 - `handleNextDialogue()` - Advance dialogue, record progress, check session limits
 - `handleCloseDialogue()` - End session, clean up state
 - Returns: `selectedAnimal`, `showDialogue`, `dialogueText`, `sessionInfo`, `cooldownMessage`, `isTalking`, `triggerReaction`, `crossAnimalRef`
@@ -318,7 +320,7 @@ Game logic is extracted into six custom hooks:
 ### Screen Navigation
 
 State-based routing in `App.tsx`:
-- `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats'`
+- `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger'`
 - Screen transitions use `Animated.timing` fade (150ms out, 200ms in)
 - Transitions instant when `reducedMotion` setting is enabled
 - `transitionTo(screen, callback?)` handles all navigation
@@ -335,13 +337,15 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
    - Stars pop in one-by-one with 200ms stagger (spring animation)
    - Victory modal scales + fades in after stars complete
    - Phase-aware title: "PERFECT!" (Phase 0) → "WHY DOES IT MATTER?" (Phase 4)
-   - **Ritual Echo** (Phase 2+): Completed word chain displayed below title
-   - **Named Incantation** (Phase 3+): Puzzle chain name shown in ritual echo
-   - **Words Offered** (Phase 1+): Running total of words formed across all puzzles
+   - **Ritual Echo** (all phases): Completed word chain displayed below title. Phase 0-1: bright candy styling. Phase 2: muted. Phase 3+: dark, arrows become vertical (↓). Header reframes from "Your Word Journey:" → "The Offering:"
+   - **Named Incantation** (Phase 2+): Puzzle chain name shown in ritual echo. Phase 2: innocent ("The HEAT Dance"). Phase 3: shadowy ("The HEAT's Shadow"). Phase 4: ritual ("Offering: HEAT to COLD")
+   - **Words Offered** (all phases): Running total of words formed across all puzzles
    - Phase-aware feedback text shifts tone with narrative phase
 6. If phase changed: `PhaseTransitionOverlay` plays cinematic multi-scene interstitial, then `playPhaseChangeFlash()` does dramatic double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
-8. **Endgame triggers** (Phase 4+ after house completion, in App.tsx):
+8. **Dread Pulse** (Phase 2+): When a valid intermediate move forms a dread word, the screen briefly flashes with a crimson overlay. Phase-scaled opacity (0.10 → 0.18 → 0.25). Uses `isDreadWord()` from `localGenerator.ts`. `handleSlotPress` returns `{ completed: false, formedWord }` for intermediate moves.
+9. **Animal Whisper** (post-victory): 1.2s after victory, `AnimalWhisper` component shows a ghost-like message from a random unlocked animal. Prefers animals whose trigger words match the puzzle. Phase-aware styling (pink → purple → crimson). Fade in 400ms, hold 3s, fade out 600ms.
+10. **Endgame triggers** (Phase 4+ after house completion, in App.tsx):
    - First puzzle after house completion → `FINAL_PUZZLE_EVENT` cinematic overlay
    - First puzzle after final puzzle → `POST_REVELATION_EVENT` cinematic overlay + `markPostRevelation()`
 
@@ -445,7 +449,7 @@ Not all animals realize the truth at the same time. Defined in `ANIMAL_AWARENESS
 
 ### Cross-Animal References
 
-Animals occasionally reference other animals in dialogue (~25% chance per visit), creating the feeling of a connected community and later a coordinated cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a styled bubble before regular dialogue in `HomeScreen.tsx`.
+Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a styled bubble before regular dialogue in `HomeScreen.tsx`.
 
 ### Catch-Up Dialogue for Late Unlocks
 
@@ -512,15 +516,29 @@ The core system that makes puzzles feel like rituals, not just gates:
 
 **Ritual Word Memory / Ledger**: Every word formed across all puzzles is recorded in `ritualWords` array (capped at 500). Tracked via `recordRitualWords()` in `amberCurrency.ts`, called from `useGamePersistence.ts` after each victory.
 
-**Post-Puzzle Ritual Echo**: After Phase 2+, the VictoryModal shows the completed word chain (e.g., FLAME → LAME → BLAME → LAMB). At Phase 3+ arrows become vertical. Styled containers darken with phase. Header/footer text from `getRitualEchoHeader()`/`getRitualEchoFooter()` in `phaseNarrative.ts`.
+**Post-Puzzle Ritual Echo**: At ALL phases, the VictoryModal shows the completed word chain (e.g., FLAME → LAME → BLAME → LAMB). Phase 0-1: bright candy-colored styling (pink/purple). Phase 2: muted. Phase 3+: dark containers, arrows become vertical (↓ instead of →). Header reframes from "Your Word Journey:" (Phase 0) → "Words Arranged:" → "Words Transformed:" → "The Incantation:" → "The Offering:" (Phase 4). Footer text from `getRitualEchoFooter()` in `phaseNarrative.ts`.
 
-**Named Incantations**: At Phase 3+, each puzzle chain gets a name (e.g., "The FLAME's Shadow", "Offering: VOID to DOOM"). Generated by `getIncantationName()` in `phaseNarrative.ts` using deterministic hashing. Displayed in VictoryModal below the ritual echo chain.
+**Named Incantations**: At Phase 2+, each puzzle chain gets a name. Phase 2: innocent ("The HEAT Dance", "A FLAME's Journey"). Phase 3: shadowy ("The HEAT's Shadow", "COLD Emerges"). Phase 4: ritual ("Offering: VOID to DOOM", "Incantation of DARK"). Generated by `getIncantationName()` in `phaseNarrative.ts` (also in `localGenerator.ts`) using deterministic hashing. Displayed in VictoryModal below the ritual echo chain.
 
-**Words Offered Counter**: VictoryModal shows a running count of total words formed. Phase-aware text from `getWordsOfferedText()` — Phase 0: "Words shifted: 847" → Phase 4: "847 words offered to the arrangement".
+**Words Offered Counter**: VictoryModal AND home screen show a running count of total words formed. Phase-aware text from `getWordsOfferedText()` — Phase 0: "Words shifted: 847" → Phase 4: "847 words offered to the arrangement". Home screen counter is tappable, opens the Word Ledger.
 
 **Ritual Energy**: Puzzles with darker words contribute more to phase progression. `calculateRitualEnergy()` in `localGenerator.ts` scores dread word presence (0-10 scale). Each ritual energy point adds 0.1 to `phaseProgress`. Accumulated in `ritualEnergy` field on progress.
 
-**Animals React to Specific Words**: Trigger words from puzzles (FLAME, VOID, GATE, etc.) are queued and consumed when visiting animals. At Phase 2+, animals show reactions tied to their theme. Defined in `ANIMAL_TRIGGER_WORDS` / `TRIGGER_WORD_REACTIONS` in `animalDialogue.ts`. Wired via `extractTriggerWords()`, `consumeTriggerWords()`, and displayed in `useDialogueFlow.ts`.
+**Animals React to Specific Words**: Trigger words from puzzles (FLAME, VOID, GATE, etc.) are queued and consumed **per-animal** when visiting. `consumeTriggerWords(animalType)` in `amberCurrency.ts` filters the queue by the animal's specific trigger word list, leaving other words for their respective animals. This way one puzzle with FLAME, WATER, and DIG creates 3 separate animal reactions. At Phase 1+, animals show reactions tied to their theme. Defined in `ANIMAL_TRIGGER_WORDS` / `TRIGGER_WORD_REACTIONS` in `animalDialogue.ts`. Wired via `extractTriggerWords()`, `consumeTriggerWords()`, and displayed in `useDialogueFlow.ts`.
+
+**Word Ledger Screen**: Scrollable screen showing all ritual words ever formed (`WordLedger.tsx`). Phase-aware titles: "Your Word Collection" (Phase 0-1) → "The Words Remember" (Phase 2) → "The Incantation Ledger" (Phase 3) → "The Offering Record" (Phase 4). Dread words highlighted in crimson at Phase 2+. Accessible via tapping the Words Offered counter on the home screen. Navigated as `currentScreen: 'ledger'`.
+
+**Animal Whispers Post-Puzzle**: After each puzzle completion, a ghost-like whisper from a random unlocked animal appears at the bottom of the puzzle screen (`AnimalWhisper.tsx`). 150+ whisper lines across 5 phases × 10 animals (3 per animal per phase) in `ANIMAL_WHISPERS` in `phaseNarrative.ts`. `getAnimalWhisper()` selects based on phase and optionally prefers animals whose trigger words match. Phase 0: "Ember says nice work!" Phase 4: "Every word brings us closer. The fire knows."
+
+**Coordinated Dialogue Events**: At specific puzzle milestones (80, 100, 120, 160, 200, 230), ALL animals have thematically linked dialogue available — creating the sense of a coordinated cult. Defined in `COORDINATED_EVENTS` in `animalDialogue.ts`. Each event has a theme name, puzzle threshold, required phase, and per-animal lines. Consumed via `recordConsumedCoordinatedEvent()` to prevent repeats. Wired in `useDialogueFlow.ts` `handleAnimalTap()`.
+
+**Narrative Seeds (Phase 0 → Phase 4 Callbacks)**: Each animal has 2 innocent Phase 0 seed lines and 2 dark Phase 4 callback lines that recontextualize them. Defined in `NARRATIVE_SEEDS` in `animalDialogue.ts`. `getNarrativeSeed()` returns a seed line at Phase 0. `getNarrativeCallback()` returns a callback at Phase 4. Extends the tutorial callback pattern (previously Fox-only) to all 10 animals.
+
+**Dread Word Visual Feedback**: At Phase 2+, when a valid intermediate puzzle move forms a dread word, the puzzle screen briefly pulses with a crimson overlay. Phase-scaled opacity: Phase 2 = 0.10, Phase 3 = 0.18, Phase 4 = 0.25. Uses `isDreadWord()` from `localGenerator.ts`. `usePuzzleGame.handleSlotPress()` returns `{ completed: false, formedWord }` for intermediate moves to enable this.
+
+**The Arrangement (House Visual Pattern)**: At Phase 2+, visual sigil lines appear connecting rooms on the house exterior in `HouseWorld.tsx`. Phase 2: thin purple connector lines. Phase 3: thicker lines with glow nodes. Phase 4: crimson pulsing lines. Creates the visual impression that the house is becoming a ritual structure. Accepts `ritualWords` prop.
+
+**Puzzle Words Echo in Rooms**: At Phase 2+, recently formed puzzle words appear as faint text scattered across animal rooms in `RoomView.tsx`. Phase 2: barely visible (opacity 0.08). Phase 3: muted purple (0.15). Phase 4: dense crimson (0.25). Words are deterministically placed based on room dimensions. Accepts `ritualWords` prop from `HouseWorld.tsx`.
 
 ### Endgame: House Completion + Final Puzzle + Post-Revelation
 
@@ -548,6 +566,8 @@ Milestone bonuses at key puzzle counts use phase-aware messages. Each `MILESTONE
 - No landscape emojis (trees, fence removed for cleaner look)
 - Room dimensions: `ROOM_WIDTH` (250) and `ROOM_HEIGHT` (~123, maintains 2:1 aspect ratio of room PNGs)
 - Zoom: MIN_SCALE (0.75) to MAX_SCALE (2.0), snaps back to 0.8 if zoomed below
+- **Arrangement pattern** (Phase 2+): Visual sigil lines connecting rooms. Phase 2: thin purple. Phase 3: thicker with nodes. Phase 4: crimson pulsing. Accepts `ritualWords` prop for room word echoes
+- **Room word echoes** (Phase 2+): Faint text of recent puzzle words scattered across room backgrounds in `RoomView.tsx`. Opacity/density/color scales with phase
 
 ### Word Theme Evolution
 
@@ -593,10 +613,11 @@ All player-facing text shifts tone with phase:
 - `getPhaseChangeNarrative(phase)` — Dramatic text for phase transitions
 - `getPhaseIndicator(phase)` — Icon + label for puzzle header badge
 - `getRitualEchoHeader(phase)` / `getRitualEchoFooter(phase, wordCount)` — Ritual echo framing in VictoryModal
-- `getIncantationName(words, phase)` — Named puzzle chains at Phase 3+ (deterministic)
+- `getIncantationName(words, phase)` — Named puzzle chains at Phase 2+ (innocent → shadowy → ritual, deterministic)
 - `getWordsOfferedText(totalWords, phase)` — Running word count: "Words shifted: N" → "N words offered to the arrangement"
 - `getHouseCompletionText()` — Text lines for house completion ceremony modal
 - `getPostRevelationVictoryTitle(stars)` / `getPostRevelationMoveMessage()` — Phase 5 victory/move text
+- `getAnimalWhisper(phase, unlockedAnimals, triggerWords?)` — Random ambient whisper from unlocked animal after puzzle completion (150+ lines across 5 phases × 10 animals)
 
 ### Challenge Mode
 Optional harder mode for experienced players (`GameMode = 'standard' | 'challenge'`):
@@ -628,6 +649,7 @@ Key functions:
 - `generateLocalPuzzle(difficulty, overrides?)` - Main entry point (2.5s timeout); optional `overrides` for custom `wordLength` and `targetRows` (used by daily challenge)
 - `findPath()` - Recursive DFS to find valid word chains
 - `scorePuzzleChain()` - Evaluates puzzle quality (includes freshness scoring)
+- `isDreadWord(word)` - Check if a word is in the dread words set (used for dread pulse visual feedback at Phase 2+)
 
 ### Star Rating System (`starRating.ts`)
 
@@ -668,11 +690,12 @@ Manages amber balance, streak, phase progression, and decorations:
 - `purchaseDecoration(roomId, decorationId, cost)` - Buy room decoration
 - `hasDecoration(roomId, decorationId)` / `getAllDecorations()` / `getDecorationCount()` - Decoration queries
 - `recordRitualWords(words, triggerWords, ritualEnergy)` - Record words to ledger, queue triggers, accumulate ritual energy
-- `consumeTriggerWords(animalType)` - Dequeue trigger words for an animal
+- `consumeTriggerWords(animalType?)` - Dequeue trigger words for a specific animal (per-animal filtering; without arg: legacy consume-all)
 - `markHouseCompleted()` / `isHouseCompleted()` - House completion ceremony tracking
 - `markFinalPuzzleCompleted()` / `isFinalPuzzleCompleted()` - Final puzzle endgame tracking
 - `markPostRevelation()` / `isPostRevelation()` - Phase 5 post-revelation state
 - `markTutorialSeedsPlanted()` / `wereTutorialSeedsPlanted()` - Tutorial callback tracking for Fox at Phase 4
+- `recordConsumedCoordinatedEvent(theme)` / `getConsumedCoordinatedEvents()` - Track consumed coordinated dialogue events
 - `clearProgress()` - Full reset
 
 ### Phase Transition Events (`phaseEvents.ts`)
