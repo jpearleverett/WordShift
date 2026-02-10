@@ -119,18 +119,22 @@ export default function App() {
   const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
     hapticLight();
     soundTap();
+    // Refresh persistence data (phase, stats) before starting puzzle
+    persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
     transitionTo('puzzle', () => {
       puzzleActions.startNewGame(diff);
       setIsPlayingDaily(false);
       logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
     });
-  }, [puzzle.difficulty, puzzleActions, transitionTo]);
+  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions]);
 
   // Start daily challenge — uses seeded generation for deterministic puzzles
   const handleStartDaily = useCallback(async (difficulty: Difficulty) => {
     hapticMedium();
     soundTap();
+    // Refresh persistence data (phase, stats) before starting puzzle
+    persistenceActions.refreshStats();
     transitionTo('puzzle', async () => {
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);

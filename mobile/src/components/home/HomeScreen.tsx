@@ -307,9 +307,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <View style={styles.headerCenter}>
           <Text style={styles.title}>Animal House</Text>
-          <Text style={styles.subtitle}>
-            Phase {progress.currentPhase + 1}/5 - {progress.puzzlesSolved} puzzles
-          </Text>
         </View>
 
         <View style={styles.headerRight}>
@@ -1082,11 +1079,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
-  },
-  subtitle: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 11,
-    fontWeight: '600',
   },
   playButton: {
     backgroundColor: CandyColors.green.main,

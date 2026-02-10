@@ -71,10 +71,14 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   }, []);
 
   const refreshStats = useCallback(async () => {
-    const stats = await getCumulativeStats();
+    const [stats, balance, phase] = await Promise.all([
+      getCumulativeStats(),
+      getAmberBalance(),
+      getCurrentPhase(),
+    ]);
     setCumulativeStats(stats);
-    const balance = await getAmberBalance();
     setAmberBalance(balance);
+    setCurrentPhase(phase);
   }, []);
 
   const recordVictory = useCallback(async (
