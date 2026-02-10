@@ -31,7 +31,7 @@ import {
   devAddAmber,
   devAddPuzzles,
 } from '../../services/amberCurrency';
-import { getHouseCompletionText } from '../../services/phaseNarrative';
+import { getHouseCompletionText, getWordsOfferedText } from '../../services/phaseNarrative';
 import {
   ROOMS,
   ANIMALS,
@@ -71,6 +71,7 @@ interface HomeScreenProps {
   onAmberChange?: (newBalance: number) => void;
   onOpenSettings?: () => void;
   onOpenStats?: () => void;
+  onOpenLedger?: () => void;
   onStartDaily?: (difficulty: Difficulty) => void;
 }
 
@@ -79,6 +80,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onAmberChange,
   onOpenSettings,
   onOpenStats,
+  onOpenLedger,
   onStartDaily,
 }) => {
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
@@ -385,6 +387,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </TouchableOpacity>
       )}
 
+      {/* Words Offered Counter — tappable to open the Word Ledger */}
+      {(progress.totalWordsFormed || 0) > 0 && (
+        <TouchableOpacity
+          style={[
+            styles.wordsOfferedHomeContainer,
+            progress.currentPhase >= 3 && styles.wordsOfferedHomeContainerDark,
+          ]}
+          onPress={onOpenLedger}
+          activeOpacity={0.7}
+          accessibilityLabel="Open word ledger"
+          accessibilityRole="button"
+        >
+          <Text style={[
+            styles.wordsOfferedHomeText,
+            progress.currentPhase >= 3 && styles.wordsOfferedHomeTextDark,
+          ]}>
+            {getWordsOfferedText(progress.totalWordsFormed || 0, progress.currentPhase)}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Celebration Confetti */}
       {showCelebration && (
         <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
@@ -397,6 +420,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         currentPhase={progress.currentPhase}
         onAnimalPress={dialogueFlow.handleAnimalTap}
         onRoomPress={unlockFlow.handleRoomPress}
+        ritualWords={progress.ritualWords}
       />
 
       {/* Cooldown Message Toast */}
@@ -476,8 +500,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <View style={styles.dialogueTextCol}>
                   <Text style={styles.dialogueAnimalName}>{dialogueFlow.selectedAnimal.name}</Text>
 
-                  {/* Trigger word reaction / tutorial callback — animal noticed a word or Fox recalls tutorial */}
-                  {dialogueFlow.triggerReaction && progress.currentPhase >= 2 && (
+                  {/* Trigger word reaction / coordinated event / tutorial callback */}
+                  {dialogueFlow.triggerReaction && progress.currentPhase >= 1 && (
                     <View style={[
                       styles.triggerReactionBubble,
                       progress.currentPhase >= 3 && styles.triggerReactionBubbleDark,
@@ -1096,6 +1120,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+
+  // Words Offered Counter (persistent on home screen)
+  wordsOfferedHomeContainer: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  wordsOfferedHomeContainerDark: {
+    backgroundColor: 'rgba(120, 30, 60, 0.2)',
+  },
+  wordsOfferedHomeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.6)',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  wordsOfferedHomeTextDark: {
+    color: 'rgba(180, 100, 130, 0.8)',
+    fontStyle: 'italic',
   },
 
   devButton: {

@@ -40,11 +40,15 @@ import {
   getLoadingMessage,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
-import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
+import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress } from './src/services/amberCurrency';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
+import { getAnimalWhisper } from './src/services/phaseNarrative';
+import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
+import { WordLedger } from './src/components/WordLedger';
+import { isDreadWord } from './src/services/localGenerator';
 
-// App screen type — expanded with settings and stats
-type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats';
+// App screen type — expanded with settings, stats, and ledger
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -76,6 +80,13 @@ export default function App() {
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
+
+  // Animal whisper state (shown after puzzle completion)
+  const [whisper, setWhisper] = useState<{ animalName: string; text: string } | null>(null);
+  const [showWhisper, setShowWhisper] = useState(false);
+
+  // Dread pulse state (flashes on dread word formation)
+  const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
 
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
@@ -238,6 +249,24 @@ export default function App() {
 
       // Check achievements after brief delay to not block victory display
       setTimeout(() => achievementActions.checkForAchievements(victory), 500);
+
+      // Trigger animal whisper after a delay (appears below the victory modal)
+      setTimeout(async () => {
+        try {
+          const fullProgress = await getFullProgress();
+          const whisperData = getAnimalWhisper(
+            persistence.currentPhase,
+            fullProgress.unlockedAnimals || [],
+            result.completedWords
+          );
+          if (whisperData) {
+            setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
+            setShowWhisper(true);
+          }
+        } catch {
+          // Whispers are non-critical
+        }
+      }, 1200);
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -250,6 +279,11 @@ export default function App() {
       soundValidMove();
       setStarBurst({ active: true, x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT * 0.4 });
       setTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
+
+      // Dread word visual feedback — subtle dark pulse when a dread word is formed
+      if (persistence.currentPhase >= 2 && result.formedWord && isDreadWord(result.formedWord)) {
+        triggerDreadPulse(persistence.currentPhase);
+      }
     }
   }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions]);
 
@@ -310,6 +344,24 @@ export default function App() {
     puzzleActions.startNewGame(d, puzzle.gameMode);
   }, [puzzleActions, puzzle.gameMode]);
 
+  // Trigger dread pulse when a dread word is formed during a puzzle
+  const triggerDreadPulse = useCallback((phase: number) => {
+    if (getSettingsSync().reducedMotion) return;
+    const maxOpacity = phase >= 4 ? 0.25 : phase >= 3 ? 0.18 : 0.10;
+    Animated.sequence([
+      Animated.timing(dreadPulseOpacity, {
+        toValue: maxOpacity,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(dreadPulseOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [dreadPulseOpacity]);
+
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
@@ -334,6 +386,20 @@ export default function App() {
           <Animated.View style={{ flex: 1, opacity: screenFade }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <SettingsScreen onClose={() => transitionTo('home')} />
+          </Animated.View>
+        </View>
+      );
+    }
+
+    if (currentScreen === 'ledger') {
+      return (
+        <View style={styles.screenBackground}>
+          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <WordLedger
+              phase={persistence.currentPhase}
+              onClose={() => transitionTo('home')}
+            />
           </Animated.View>
         </View>
       );
@@ -370,6 +436,7 @@ export default function App() {
                 onAmberChange={persistenceActions.setAmberBalance}
                 onOpenSettings={() => transitionTo('settings')}
                 onOpenStats={() => transitionTo('stats')}
+                onOpenLedger={() => transitionTo('ledger')}
                 onStartDaily={handleStartDaily}
               />
               {/* Achievement toast overlay */}
@@ -614,6 +681,21 @@ export default function App() {
           onNextLevel={handleNextLevel}
           onReturnHome={handleReturnHome}
           onShare={handleShare}
+        />
+
+        {/* Animal Whisper — ghost-like message from an animal after puzzle completion */}
+        <AnimalWhisper
+          visible={showWhisper}
+          animalName={whisper?.animalName || ''}
+          whisperText={whisper?.text || ''}
+          phase={persistence.currentPhase}
+          onComplete={() => setShowWhisper(false)}
+        />
+
+        {/* Dread Pulse — subtle dark flash when a dread word is formed */}
+        <Animated.View
+          style={[styles.dreadPulseOverlay, { opacity: dreadPulseOpacity }]}
+          pointerEvents="none"
         />
       </Animated.View>
       </View>
@@ -881,5 +963,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#000000',
     zIndex: 999,
+  },
+  dreadPulseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(100, 0, 30, 1)',
+    zIndex: 998,
   },
 });

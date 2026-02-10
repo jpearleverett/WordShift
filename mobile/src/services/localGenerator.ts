@@ -1046,12 +1046,20 @@ export function extractTriggerWords(words: string[]): string[] {
 }
 
 /**
+ * Check if a word is in the dread words set.
+ * Used for visual feedback during puzzles (dread pulse effect at Phase 2+).
+ */
+export function isDreadWord(word: string): boolean {
+  return DREAD_WORDS.has(word.toUpperCase());
+}
+
+/**
  * Generate a name for a puzzle chain (incantation name).
- * Only returns a name at Phase 3+ (returns null at lower phases).
- * The name is deterministic based on the words in the chain.
+ * Phase 2: innocent names. Phase 3: shadowy. Phase 4: ritual.
+ * Returns null at Phase 0-1.
  */
 export function getIncantationName(words: string[], phase: number): string | null {
-  if (phase < 3) return null;
+  if (phase < 2) return null;
   if (words.length === 0) return null;
 
   const firstWord = words[0].toUpperCase();
@@ -1061,6 +1069,15 @@ export function getIncantationName(words: string[], phase: number): string | nul
   const formatWord = (w: string) => w.charAt(0) + w.slice(1).toLowerCase();
   const first = formatWord(firstWord);
   const last = formatWord(lastWord);
+
+  // Phase 2 templates - innocent, playful naming
+  const phase2Templates = [
+    `The ${first} Dance`,
+    `A ${first}'s Journey`,
+    `${first} & ${last}`,
+    `From ${first} to ${last}`,
+    `The ${last} Waltz`,
+  ];
 
   // Phase 3 templates - shadows and shifting
   const phase3Templates = [
@@ -1081,7 +1098,7 @@ export function getIncantationName(words: string[], phase: number): string | nul
     `The ${first} Offering`,
   ];
 
-  const templates = phase >= 4 ? phase4Templates : phase3Templates;
+  const templates = phase >= 4 ? phase4Templates : phase >= 3 ? phase3Templates : phase2Templates;
   // Deterministic pick based on word content
   const hash = words.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return templates[hash % templates.length];

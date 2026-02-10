@@ -26,6 +26,22 @@ const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
   bamboo: require('../../../assets/rooms/bamboo.png'),
 };
 
+// Word echo configuration by phase (ritual words inscribed in rooms)
+const WORD_ECHO_CONFIG: Record<number, { count: number; opacity: number; fontSize: number; color: string }> = {
+  2: { count: 3, opacity: 0.08, fontSize: 9, color: '#FFFFFF' },
+  3: { count: 4, opacity: 0.15, fontSize: 10, color: '#9B7FCF' },
+  4: { count: 5, opacity: 0.25, fontSize: 11, color: '#8B2252' },
+};
+
+// Predefined scattered positions for word echoes within each room
+const WORD_ECHO_POSITIONS = [
+  { top: '22%', left: '8%', rotate: '-12deg' },
+  { top: '55%', left: '62%', rotate: '8deg' },
+  { top: '38%', left: '35%', rotate: '-5deg' },
+  { top: '68%', left: '12%', rotate: '15deg' },
+  { top: '30%', left: '55%', rotate: '-8deg' },
+];
+
 interface RoomViewProps {
   room: Room;
   animal: Animal | null;
@@ -35,6 +51,7 @@ interface RoomViewProps {
   onRoomPress: (room: Room) => void;
   currentPhase: DialoguePhase;
   isAnimalOnCooldown?: boolean;
+  ritualWords?: string[];
 }
 
 export const RoomView: React.FC<RoomViewProps> = React.memo(({
@@ -46,6 +63,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   onRoomPress,
   currentPhase,
   isAnimalOnCooldown = false,
+  ritualWords = [],
 }) => {
   const themeColors = ROOM_THEME_COLORS[room.theme];
 
@@ -121,6 +139,41 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           </View>
         </TouchableOpacity>
       )}
+
+      {/* Word Echo Overlay - ritual words faintly inscribed in rooms */}
+      {currentPhase >= 2 && ritualWords.length > 0 && (() => {
+        const config = WORD_ECHO_CONFIG[currentPhase] || WORD_ECHO_CONFIG[2];
+        const offset = (room.floor * 7) % Math.max(1, ritualWords.length);
+        const words: string[] = [];
+        for (let i = 0; i < config.count && i < ritualWords.length; i++) {
+          words.push(ritualWords[(offset + i * 3) % ritualWords.length]);
+        }
+        return (
+          <View style={styles.wordEchoOverlay} pointerEvents="none">
+            {words.map((word, i) => {
+              const pos = WORD_ECHO_POSITIONS[i % WORD_ECHO_POSITIONS.length];
+              return (
+                <Text
+                  key={`echo-${i}`}
+                  style={[
+                    styles.wordEchoText,
+                    {
+                      top: pos.top as any,
+                      left: pos.left as any,
+                      transform: [{ rotate: pos.rotate }],
+                      opacity: config.opacity,
+                      fontSize: config.fontSize,
+                      color: config.color,
+                    },
+                  ]}
+                >
+                  {word}
+                </Text>
+              );
+            })}
+          </View>
+        );
+      })()}
     </View>
   );
 }) as React.FC<RoomViewProps>;
@@ -243,6 +296,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     textAlign: 'center',
+  },
+  // Word echo overlay - ritual words inscribed in rooms
+  wordEchoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  wordEchoText: {
+    position: 'absolute',
+    fontWeight: '700',
+    letterSpacing: 2,
   },
 });
 
