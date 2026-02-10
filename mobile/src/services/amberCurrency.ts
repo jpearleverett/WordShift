@@ -689,16 +689,51 @@ export async function getTotalWordsFormed(): Promise<number> {
 }
 
 /**
- * Get and clear trigger words from the queue (consumed by animal reactions)
+ * Get and clear trigger words from the queue for a specific animal.
+ * Only consumes words that match the animal's trigger word list,
+ * leaving other words in the queue for their respective animals.
+ * This way one puzzle with FLAME, WATER, and DIG creates 3 separate
+ * animal reactions instead of 1.
+ *
+ * @param animalType Optional animal type to filter by. If omitted, consumes all (legacy behavior).
  */
-export async function consumeTriggerWords(): Promise<string[]> {
+export async function consumeTriggerWords(animalType?: string): Promise<string[]> {
   const progress = await loadProgress();
   const queue = progress.triggerWordQueue || [];
-  // Clear the queue after consuming
-  progress.triggerWordQueue = [];
+
+  if (!animalType) {
+    // Legacy: consume all
+    progress.triggerWordQueue = [];
+    progressCache = progress;
+    await saveProgress();
+    return queue;
+  }
+
+  // Import the animal's trigger words dynamically to avoid circular deps
+  // We access ANIMAL_TRIGGER_WORDS from homeWorld types
+  const { ANIMAL_TRIGGER_WORDS } = require('../types/homeWorld');
+  const animalTriggers: string[] | undefined = ANIMAL_TRIGGER_WORDS[animalType];
+  if (!animalTriggers || animalTriggers.length === 0) {
+    return [];
+  }
+
+  const triggerSet = new Set(animalTriggers.map((w: string) => w.toUpperCase()));
+
+  // Partition: matching words for this animal vs remaining for others
+  const consumed: string[] = [];
+  const remaining: string[] = [];
+  for (const word of queue) {
+    if (triggerSet.has(word.toUpperCase())) {
+      consumed.push(word);
+    } else {
+      remaining.push(word);
+    }
+  }
+
+  progress.triggerWordQueue = remaining;
   progressCache = progress;
   await saveProgress();
-  return queue;
+  return consumed;
 }
 
 /**
@@ -779,6 +814,29 @@ export async function markTutorialSeedsPlanted(): Promise<void> {
 export async function wereTutorialSeedsPlanted(): Promise<boolean> {
   const progress = await loadProgress();
   return progress.tutorialSeedsPlanted === true;
+}
+
+/**
+ * Record a coordinated dialogue event as consumed so it doesn't fire again.
+ */
+export async function recordConsumedCoordinatedEvent(theme: string): Promise<void> {
+  const progress = await loadProgress();
+  if (!progress.consumedCoordinatedEvents) {
+    progress.consumedCoordinatedEvents = [];
+  }
+  if (!progress.consumedCoordinatedEvents.includes(theme)) {
+    progress.consumedCoordinatedEvents.push(theme);
+  }
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Get consumed coordinated events
+ */
+export async function getConsumedCoordinatedEvents(): Promise<string[]> {
+  const progress = await loadProgress();
+  return progress.consumedCoordinatedEvents || [];
 }
 
 /**

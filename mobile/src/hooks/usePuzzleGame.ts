@@ -36,6 +36,8 @@ export interface PuzzleGameState {
   lastCompletedWords: string[];
   /** Named incantation for the last puzzle (Phase 3+ only, null otherwise) */
   lastIncantationName: string | null;
+  /** The word most recently formed by a valid intermediate move (null if none or cleared) */
+  lastFormedWord: string | null;
 }
 
 export interface PuzzleGameActions {
@@ -48,6 +50,7 @@ export interface PuzzleGameActions {
     invalidAttempts: number;
     gameMode: GameMode;
     completedWords: string[];
+    formedWord?: string;
   } | null>;
   handleUndo: () => void;
   handleHint: () => void;
@@ -87,6 +90,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
   const [lastCompletedWords, setLastCompletedWords] = useState<string[]>([]);
   const [lastIncantationName, setLastIncantationName] = useState<string | null>(null);
+  const [lastFormedWord, setLastFormedWord] = useState<string | null>(null);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -143,6 +147,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setInvalidAttempts(0);
     setHintsUsed(0);
     setEarnedStars(0);
+    setLastFormedWord(null);
     // Reset undos for challenge mode
     setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
   }, [gameMode, currentPhase]);
@@ -233,6 +238,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     invalidAttempts: number;
     gameMode: GameMode;
     completedWords: string[];
+    formedWord?: string;
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
@@ -322,10 +328,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     } else {
       setActiveRowIndex(prev => prev + 1);
       setMessage(getMoveMessage(currentPhase));
+      setLastFormedWord(targetWordStr);
     }
 
     setIsProcessing(false);
-    return null;
+    return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
   }, [selectedLetter, gameState, rows, activeRowIndex, currentWordLength, shakeError, checkValidation, hintsUsed, invalidAttempts]);
 
   const handleUndo = useCallback(() => {
@@ -408,6 +415,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentPhase,
     lastCompletedWords,
     lastIncantationName,
+    lastFormedWord,
   };
 
   const actions: PuzzleGameActions = {

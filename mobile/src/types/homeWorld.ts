@@ -200,6 +200,8 @@ export interface HomeWorldProgress {
   postRevelation?: boolean;
   // Tutorial seeds - tracks specific tutorial lines for Phase 4 callbacks
   tutorialSeedsPlanted?: boolean;
+  // Coordinated dialogue events that have been consumed (by theme name)
+  consumedCoordinatedEvents?: string[];
 }
 
 /**

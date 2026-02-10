@@ -188,14 +188,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               {getVictoryFeedback(earnedStars, phase)}
             </Text>
 
-            {/* Ritual Echo — word chain from completed puzzle (Phase 2+) */}
-            {phase >= 2 && completedWords && completedWords.length > 0 && (
+            {/* Ritual Echo — word chain from completed puzzle (all phases) */}
+            {completedWords && completedWords.length > 0 && (
               <View style={[
                 styles.ritualEchoContainer,
+                phase <= 1 && styles.ritualEchoContainerBright,
                 phase >= 4 && styles.ritualEchoContainerDark,
               ]}>
                 <Text style={[
                   styles.ritualEchoHeader,
+                  phase <= 1 && styles.ritualEchoHeaderBright,
                   phase >= 3 && styles.ritualEchoHeaderDark,
                 ]}>
                   {getRitualEchoHeader(phase)}
@@ -205,12 +207,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     <React.Fragment key={i}>
                       <Text style={[
                         styles.ritualEchoWord,
+                        phase <= 1 && styles.ritualEchoWordBright,
                         phase >= 3 && styles.ritualEchoWordDark,
                       ]}>
                         {word}
                       </Text>
                       {i < completedWords.length - 1 && (
-                        <Text style={styles.ritualEchoArrow}>
+                        <Text style={[
+                          styles.ritualEchoArrow,
+                          phase <= 1 && styles.ritualEchoArrowBright,
+                        ]}>
                           {phase >= 3 ? '\u2193' : '\u2192'}
                         </Text>
                       )}
@@ -220,21 +226,25 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 {incantationName && (
                   <Text style={[
                     styles.ritualIncantationName,
+                    phase <= 1 && styles.ritualIncantationNameBright,
                     phase >= 4 && styles.ritualIncantationNameDark,
                   ]}>
                     {incantationName}
                   </Text>
                 )}
                 {getRitualEchoFooter(phase, completedWords.length) !== '' && (
-                  <Text style={styles.ritualEchoFooter}>
+                  <Text style={[
+                    styles.ritualEchoFooter,
+                    phase <= 1 && styles.ritualEchoFooterBright,
+                  ]}>
                     {getRitualEchoFooter(phase, completedWords.length)}
                   </Text>
                 )}
               </View>
             )}
 
-            {/* Words Offered — ritual word count (Phase 1+) */}
-            {victoryData && victoryData.totalWordsFormed != null && victoryData.totalWordsFormed > 0 && phase >= 1 && (
+            {/* Words Offered — ritual word count (all phases) */}
+            {victoryData && victoryData.totalWordsFormed != null && victoryData.totalWordsFormed > 0 && (
               <Text style={[
                 styles.wordsOfferedText,
                 phase >= 3 && styles.wordsOfferedTextDark,
@@ -621,6 +631,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(147, 51, 234, 0.15)',
   },
+  ritualEchoContainerBright: {
+    backgroundColor: 'rgba(255, 182, 255, 0.12)',
+    borderColor: 'rgba(255, 150, 220, 0.25)',
+  },
   ritualEchoContainerDark: {
     backgroundColor: 'rgba(30, 10, 40, 0.9)',
     borderColor: 'rgba(120, 30, 60, 0.4)',
@@ -632,6 +646,9 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 8,
+  },
+  ritualEchoHeaderBright: {
+    color: CandyColors.pink.main,
   },
   ritualEchoHeaderDark: {
     color: 'rgba(180, 100, 130, 0.8)',
@@ -652,6 +669,10 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
   },
+  ritualEchoWordBright: {
+    color: CandyColors.pink.dark,
+    backgroundColor: 'rgba(255, 150, 220, 0.15)',
+  },
   ritualEchoWordDark: {
     color: '#C77DBA',
     backgroundColor: 'rgba(100, 30, 60, 0.3)',
@@ -668,6 +689,10 @@ const styles = StyleSheet.create({
     color: CandyColors.purple.dark,
     marginTop: 8,
     textAlign: 'center',
+  },
+  ritualIncantationNameBright: {
+    color: CandyColors.pink.main,
+    fontStyle: 'italic',
   },
   ritualIncantationNameDark: {
     color: '#9B4DCA',
@@ -686,6 +711,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
     letterSpacing: 0.5,
+  },
+  ritualEchoArrowBright: {
+    color: CandyColors.pink.main,
+  },
+  ritualEchoFooterBright: {
+    color: CandyColors.pink.shadow,
   },
   wordsOfferedTextDark: {
     color: 'rgba(180, 100, 130, 0.8)',

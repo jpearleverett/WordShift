@@ -6,6 +6,7 @@ import {
   hasMoreDialogues,
   getCrossAnimalReference,
   TUTORIAL_CALLBACK_DIALOGUES,
+  getCoordinatedEventLine,
 } from '../services/animalDialogue';
 import {
   checkDialogueAvailability,
@@ -13,7 +14,7 @@ import {
   endSession,
   getSessionStatus,
 } from '../services/dialogueSession';
-import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted } from '../services/amberCurrency';
+import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted, recordConsumedCoordinatedEvent } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 
 interface SessionInfo {
@@ -185,14 +186,14 @@ export function useDialogueFlow({
     setTriggerReaction(null);
     setCrossAnimalRef(null);
 
-    // Check for trigger word reactions from recent puzzles
+    // Check for trigger word reactions from recent puzzles (per-animal filtering)
     try {
       const consumed = await consumeTriggerWords(animal.type);
       if (consumed.length > 0) {
         // Animal noticed a trigger word from recent puzzles
         const word = consumed[0]; // Show reaction to first trigger word
         const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
-        if (animalPhase >= 2) {
+        if (animalPhase >= 1) {
           setTriggerReaction(`You spelled "${word}"... ${animal.name} noticed.`);
         }
       }
@@ -214,14 +215,40 @@ export function useDialogueFlow({
       }
     }
 
-    // Cross-animal reference — ~25% chance to show a one-off reference to another animal
+    // Cross-animal reference — frequency scales with phase
+    // Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%
     if (progress && progress.unlockedAnimals) {
       const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
-      if (Math.random() < 0.25) {
+      const crossRefChance = animalPhase <= 1 ? 0.10
+        : animalPhase === 2 ? 0.25
+        : animalPhase === 3 ? 0.45
+        : 0.60;
+      if (Math.random() < crossRefChance) {
         const ref = getCrossAnimalReference(animal.type, animalPhase as DialoguePhase, progress.unlockedAnimals);
         if (ref) {
           setCrossAnimalRef(ref);
         }
+      }
+    }
+
+    // Coordinated event — check if a milestone event is active for this animal
+    if (progress && progress.puzzlesSolved > 0) {
+      try {
+        const consumed = progress.consumedCoordinatedEvents || [];
+        const coordEvent = getCoordinatedEventLine(
+          animal.type,
+          progress.puzzlesSolved,
+          progress.currentPhase,
+          consumed
+        );
+        if (coordEvent) {
+          // Show coordinated line as a trigger reaction (same UI bubble)
+          setTriggerReaction(coordEvent.text);
+          // Mark as consumed so it doesn't repeat
+          await recordConsumedCoordinatedEvent(coordEvent.theme);
+        }
+      } catch {
+        // Coordinated events are non-critical
       }
     }
 

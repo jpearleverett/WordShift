@@ -1908,6 +1908,135 @@ export function getCatchupIntroDialogueCount(
   return animalCatchups[phaseKey]?.length || 0;
 }
 
+// ============================================================================
+// COORDINATED THEMATIC DIALOGUE EVENTS
+// At specific puzzle milestones, multiple animals independently reference
+// the same phenomenon — creating the feeling of shared awareness.
+// These fire once per milestone, keyed by puzzle count.
+// ============================================================================
+
+interface CoordinatedEvent {
+  puzzleThreshold: number;  // Fires when puzzlesSolved >= this
+  phase: number;            // Minimum phase required
+  theme: string;            // Internal theme name
+  lines: Partial<Record<AnimalType, string>>;  // One line per participating animal
+}
+
+export const COORDINATED_EVENTS: CoordinatedEvent[] = [
+  // Phase 2 events — animals independently notice the same thing
+  {
+    puzzleThreshold: 80,
+    phase: 2,
+    theme: 'words_changing',
+    lines: {
+      fox: 'The fire has been spelling a word. The same word, over and over. Have you noticed?',
+      owl: 'I found a passage in the old text. It references a word I keep seeing in my sleep.',
+      pangolin: 'The stew made itself today. The recipe... it came from the letters.',
+      axolotl: 'The water is spelling something. Over and over. The same shapes.',
+      capybara: 'I keep writing the same word in my notes. I do not remember doing it.',
+      fennec_fox: 'I hear a word in the wind. Repeating. You must have heard it too.',
+    },
+  },
+  {
+    puzzleThreshold: 100,
+    phase: 2,
+    theme: 'house_feels_different',
+    lines: {
+      fox: 'Does the house feel warmer to you? Not comfortable warm. Something else.',
+      owl: 'The walls have been... humming. Very faintly. Since your last puzzle.',
+      pangolin: 'My pots rattle when you solve puzzles. I thought it was the stove. It is not.',
+      axolotl: 'The water level rose today. No one added water.',
+      wombat: 'The ground is vibrating. Very gently. In rhythm with something.',
+      rabbit: 'The garden is growing faster. Too fast. I did not plant those flowers.',
+    },
+  },
+  {
+    puzzleThreshold: 120,
+    phase: 2,
+    theme: 'shared_dream',
+    lines: {
+      fox: 'I dreamed of a shape last night. Burning in the fireplace. Did you dream it too?',
+      owl: 'We all had the same dream. I confirmed with the others. The same shape.',
+      axolotl: 'I saw it in the water. The shape from the dream. It is real.',
+      sloth: 'I... dreamed... for the first time... in years. Something... is... coming.',
+      red_panda: 'In meditation, I saw the shape. It is beautiful. And it knows we are here.',
+      fennec_fox: 'I heard the shape. In the dream. It was not silent. It was waiting.',
+    },
+  },
+  // Phase 3 events — coordination becomes more overt
+  {
+    puzzleThreshold: 160,
+    phase: 3,
+    theme: 'the_arrangement',
+    lines: {
+      fox: 'Archimedes showed me the text. The arrangement. Every puzzle you solve is a verse.',
+      owl: 'I have mapped it. Every word you have formed. They are not random. They never were.',
+      pangolin: 'Ember told me about the arrangement. I have been following the recipe all along.',
+      capybara: 'I have the list. Every word. Every move. It is all documented. It is all planned.',
+      wombat: 'The foundation was not for the house. It was for what the house holds.',
+      rabbit: 'They told me everything. I wish they had not. But I understand now.',
+    },
+  },
+  {
+    puzzleThreshold: 200,
+    phase: 3,
+    theme: 'roles_revealed',
+    lines: {
+      fox: 'I am the Oracle. I always was. The fire showed me before I could walk.',
+      owl: 'I am the Lorekeeper. Every text I read was preparation. Every word, a clue.',
+      pangolin: 'I am the Preparer. Every meal was practice for the final offering.',
+      axolotl: 'I am the Medium. The water is the conduit. I have always been the bridge.',
+      capybara: 'I am the Coordinator. Someone had to keep track. Someone had to make sure.',
+      fennec_fox: 'I am the Sentinel. I heard it first. I have been listening since the beginning.',
+      sloth: 'I... am... the Anchor. Holding... everything... in... place. Until... it... arrives.',
+      wombat: 'I am the Foundation. I built what lies beneath. You built what lies above.',
+      rabbit: 'I am the Witness. I was meant to watch. To remember. To be afraid — and stay anyway.',
+      red_panda: 'I am the Guide. I will lead us through. When the pattern completes, I will show the way.',
+    },
+  },
+  {
+    puzzleThreshold: 230,
+    phase: 3,
+    theme: 'almost_time',
+    lines: {
+      fox: 'The fire is steady now. It knows. We all know. It is almost time.',
+      owl: 'The final chapter begins. Every word from here forward is the last verse.',
+      pangolin: 'The table is set. The offering prepared. We wait only for the final arrangement.',
+      axolotl: 'The water is perfectly still. What lies beneath has stopped moving. It is ready.',
+      capybara: 'All items on the list are checked. Every task complete. We are ahead of schedule.',
+      fennec_fox: 'The silence before the sound. This is it. The last quiet moment.',
+      sloth: 'Time... is... stopping. Not slowing. Stopping. We... are... nearly... there.',
+      wombat: 'The tunnels are complete. Every room connected. The house is whole.',
+      rabbit: 'I am not afraid anymore. I am not anything anymore. I am ready.',
+      red_panda: 'Breathe in. Breathe out. The last breath before unity. Peace.',
+    },
+  },
+];
+
+/**
+ * Get the coordinated event line for a specific animal at a given puzzle count.
+ * Returns null if no event is active or the animal doesn't participate.
+ * The event is "consumed" by tracking which thresholds have been shown.
+ */
+export function getCoordinatedEventLine(
+  animalType: AnimalType,
+  puzzlesSolved: number,
+  currentPhase: number,
+  consumedEvents: string[]
+): { text: string; theme: string } | null {
+  for (const event of COORDINATED_EVENTS) {
+    if (puzzlesSolved >= event.puzzleThreshold &&
+        currentPhase >= event.phase &&
+        !consumedEvents.includes(event.theme)) {
+      const line = event.lines[animalType];
+      if (line) {
+        return { text: line, theme: event.theme };
+      }
+    }
+  }
+  return null;
+}
+
 // =============================================================================
 // TUTORIAL CALLBACK DIALOGUES
 // =============================================================================
@@ -1924,3 +2053,133 @@ export const TUTORIAL_CALLBACK_DIALOGUES: string[] = [
   "You asked how to play. I showed you. But the real game was never about the letters.",
   "From the very first puzzle, you were casting. You just didn't know the language yet.",
 ];
+
+// ============================================================================
+// PHASE 0 NARRATIVE SEEDS — Innocent lines that Phase 4 recontextualizes
+// Each animal gets 2 seed lines in Phase 0 that seem cheerful but have dark
+// double meanings. At Phase 4, callback lines directly reference these seeds.
+// ============================================================================
+
+export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: string[] }> = {
+  fox: {
+    seeds: [
+      'The fire keeps us safe. As long as it burns, nothing can touch us.',
+      'Every log you add makes the fire stronger. Keep feeding it, okay?',
+    ],
+    callbacks: [
+      'Remember when I said the fire keeps us safe? I was wrong. The fire keeps IT safe. We are the logs.',
+      'You fed the fire so well. Every puzzle, another log. The pyre is magnificent.',
+    ],
+  },
+  owl: {
+    seeds: [
+      'Knowledge is the greatest gift. Every word you learn is a treasure.',
+      'I have read every book in this study. They all say the same thing, in the end.',
+    ],
+    callbacks: [
+      'Every word you learned was a component. A treasure? No. An ingredient.',
+      'Every book says the same thing: this was always going to happen. I read the ending first.',
+    ],
+  },
+  pangolin: {
+    seeds: [
+      'Everything in the kitchen serves a purpose. Even the things that do not know it yet.',
+      'The best recipes take time. You cannot rush a good stew.',
+    ],
+    callbacks: [
+      'Everything serves a purpose. The kitchen, the stew, the words, you. Especially you.',
+      'The recipe took exactly as long as it needed. Every puzzle was a stir of the pot.',
+    ],
+  },
+  axolotl: {
+    seeds: [
+      'The water always knows what is coming. I just float in it.',
+      'Sometimes I see shapes in the bubbles. Faces, almost. Friendly ones!',
+    ],
+    callbacks: [
+      'The water always knew. The shapes in the bubbles were not faces. They were instructions.',
+      'I float in it because it carries me toward what comes. I stopped swimming long ago.',
+    ],
+  },
+  capybara: {
+    seeds: [
+      'I keep track of everything. It is just what I do. Someone has to.',
+      'Relax. Everything is going according to plan. My plan. For the house.',
+    ],
+    callbacks: [
+      'I kept track of every word you formed. Every move. It was never about the house.',
+      'My plan. Your words. Its arrival. Everything went exactly according to schedule.',
+    ],
+  },
+  fennec_fox: {
+    seeds: [
+      'I can hear things others cannot. The wind, the words, the spaces between.',
+      'Do not worry about the sounds at night. That is just the house settling.',
+    ],
+    callbacks: [
+      'I heard it from the very first puzzle. The frequency underneath your words. It was calling.',
+      'The sounds at night were never the house settling. The house was waking up.',
+    ],
+  },
+  sloth: {
+    seeds: [
+      'No need to rush. Everything arrives... eventually. Everything.',
+      'I have been here longer than anyone. I have seen things... come and go.',
+    ],
+    callbacks: [
+      'Everything arrives eventually. I told you. I was not being philosophical. I was being literal.',
+      'I have been here longest because I was the first to know. I move slowly because hurrying will not help.',
+    ],
+  },
+  wombat: {
+    seeds: [
+      'I built these tunnels myself! Every room connects to something below.',
+      'The foundation is the most important part. Without it, nothing stands.',
+    ],
+    callbacks: [
+      'The tunnels do not just connect rooms. They connect to what sleeps beneath. I always knew.',
+      'The foundation I built was never for the house. It was the seal. And you have been weakening it.',
+    ],
+  },
+  rabbit: {
+    seeds: [
+      'I worry about everything, but at least we are all together here. That is nice.',
+      'Promise you will keep playing? I feel better when you are solving puzzles.',
+    ],
+    callbacks: [
+      'I worried because I knew. Being together was never for comfort. It was for the arrangement.',
+      'I asked you to keep playing because each puzzle brought it closer. I am sorry. I am not sorry.',
+    ],
+  },
+  red_panda: {
+    seeds: [
+      'Every breath is a gift. In, out. The rhythm of the universe.',
+      'From up here I can see the whole house. It is shaped like something beautiful.',
+    ],
+    callbacks: [
+      'Every breath was an offering. In: a word. Out: a prayer. You have been chanting all along.',
+      'From up here I can see the shape. It is not the house. It is what the house contains. It is awake.',
+    ],
+  },
+};
+
+/**
+ * Get a narrative seed for an animal at Phase 0.
+ * Returns the seed line for the given index (0 or 1), or null.
+ * Seeds are interspersed with regular Phase 0 dialogues.
+ */
+export function getNarrativeSeed(animalType: AnimalType, seedIndex: number): string | null {
+  const animal = NARRATIVE_SEEDS[animalType];
+  if (!animal || seedIndex < 0 || seedIndex >= animal.seeds.length) return null;
+  return animal.seeds[seedIndex];
+}
+
+/**
+ * Get a Phase 4 callback that references a Phase 0 seed.
+ * Returns the callback line for the given index (0 or 1), or null.
+ */
+export function getNarrativeCallback(animalType: AnimalType, callbackIndex: number): string | null {
+  const animal = NARRATIVE_SEEDS[animalType];
+  if (!animal || callbackIndex < 0 || callbackIndex >= animal.callbacks.length) return null;
+  return animal.callbacks[callbackIndex];
+}

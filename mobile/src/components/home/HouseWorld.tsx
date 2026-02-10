@@ -386,6 +386,82 @@ const PHASE_BG_COLORS: Record<number, string> = {
   4: '#1a122a',
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
+  if (phase < 2) return null;
+
+  const lineWidth = phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
+  const lineColor = phase >= 4 ? '#8B2252' : phase >= 3 ? '#6B4C8A' : '#9B7FCF';
+  const lineOpacity = phase >= 4 ? 0.7 : phase >= 3 ? 0.4 : 0.2;
+  const showNodes = phase >= 3;
+  const showGlow = phase >= 4;
+
+  return (
+    <View style={arrangementStyles.connector}>
+      {/* Vertical line */}
+      <View
+        style={[
+          arrangementStyles.line,
+          {
+            width: lineWidth,
+            backgroundColor: lineColor,
+            opacity: lineOpacity,
+          },
+          showGlow && arrangementStyles.lineGlow,
+        ]}
+      />
+      {/* Node circle at connection point */}
+      {showNodes && (
+        <View
+          style={[
+            arrangementStyles.node,
+            { borderColor: lineColor },
+            showGlow && arrangementStyles.nodeGlow,
+          ]}
+        />
+      )}
+    </View>
+  );
+};
+
+const arrangementStyles = StyleSheet.create({
+  connector: {
+    height: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  line: {
+    height: '100%',
+  },
+  lineGlow: {
+    shadowColor: '#FF4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  node: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+  },
+  nodeGlow: {
+    backgroundColor: '#8B2252',
+    borderColor: '#FF4444',
+    shadowColor: '#FF4444',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+});
+
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
 const ROOM_WIDTH = 250;
@@ -404,6 +480,7 @@ interface HouseWorldProps {
   currentPhase: DialoguePhase;
   onAnimalPress: (animal: Animal) => void;
   onRoomPress: (room: Room) => void;
+  ritualWords?: string[];
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
@@ -412,6 +489,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   currentPhase,
   onAnimalPress,
   onRoomPress,
+  ritualWords = [],
 }) => {
   // Animated values
   const scale = useRef(new Animated.Value(1)).current;
@@ -808,21 +886,28 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   <View style={styles.topTrim} />
 
                   {/* Render rooms from top to bottom (highest row number first) */}
-                  {sortedRooms.map(room => {
+                  {sortedRooms.map((room, index) => {
                     const roomAnimal = getAnimalForRoom(room.id);
                     return (
-                      <View key={room.id} style={styles.roomRow}>
-                        <RoomView
-                          room={room}
-                          animal={roomAnimal}
-                          width={ROOM_WIDTH}
-                          height={ROOM_HEIGHT}
-                          onAnimalPress={onAnimalPress}
-                          onRoomPress={onRoomPress}
-                          currentPhase={currentPhase}
-                          isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
-                        />
-                      </View>
+                      <React.Fragment key={room.id}>
+                        <View style={styles.roomRow}>
+                          <RoomView
+                            room={room}
+                            animal={roomAnimal}
+                            width={ROOM_WIDTH}
+                            height={ROOM_HEIGHT}
+                            onAnimalPress={onAnimalPress}
+                            onRoomPress={onRoomPress}
+                            currentPhase={currentPhase}
+                            isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
+                            ritualWords={ritualWords}
+                          />
+                        </View>
+                        {/* Arrangement sigil connection between rooms */}
+                        {index < sortedRooms.length - 1 && (
+                          <ArrangementConnector phase={currentPhase} />
+                        )}
+                      </React.Fragment>
                     );
                   })}
 
