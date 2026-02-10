@@ -605,14 +605,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // Calculate pan bounds based on content size and zoom level
   const getPanBounds = () => {
     const currentScale = lastScale.current;
-    // Total content height: roof (~80) + house body + foundation (~25) + margins
-    const contentHeight = houseHeight + 80 + 25 + 50;
-    // How much of the scene is visible at current zoom
-    const visibleHeight = SCREEN_HEIGHT / currentScale;
-    // Allow enough range to see all content when zoomed in
-    const overflow = Math.max(0, contentHeight * 0.8 - visibleHeight);
-    // Pan range: at least 150 * scale, or enough to reveal all content
-    const maxPan = Math.max(150, overflow * 0.8) * currentScale;
+    // Full height of the house structure including container margins
+    const totalContentHeight = 50 + 80 + houseHeight + 25; // marginTop + roof + body + foundation
+    // The house sits 150px below the container bottom (marginBottom: -150),
+    // so the top overflows above the screen when the house is tall
+    const topOverflow = Math.max(0, totalContentHeight - SCREEN_HEIGHT - 150);
+    // Allow extra padding above the house for comfortable viewing
+    const maxPan = Math.max(200, topOverflow + 100) * currentScale;
     return maxPan;
   };
 
