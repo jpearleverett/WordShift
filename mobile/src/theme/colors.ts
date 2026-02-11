@@ -252,7 +252,6 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         vignetteColor: '#180830',
       };
     case 4:
-    default:
       return {
         bgPrimary: '#1A1A2E',
         bgSecondary: '#2D1530',
@@ -275,6 +274,33 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         victoryTitleColor: '#6040A0',
         victoryGlowColor: '#302840',
         vignetteColor: '#0A0418',
+      };
+    // Phase 5 — Post-Revelation: Terrible peace
+    // Not darker than Phase 4, but subtly different — an eerie calm
+    case 5:
+    default:
+      return {
+        bgPrimary: '#1E1E30',        // Slightly lighter than Phase 4 — dawn after the storm
+        bgSecondary: '#2A1E38',      // Muted purple, not crimson
+        bgTertiary: '#1E1E30',
+        overlayTop: 'rgba(15, 10, 30, 0.45)',
+        overlayMid: 'rgba(25, 20, 50, 0.4)',
+        overlayBottom: 'rgba(35, 25, 50, 0.35)',
+        centerGlow: 'rgba(100, 80, 150, 0.05)', // Faint purple glow — something lingers
+        particleColors: [
+          'rgba(100, 80, 140, 0.12)',   // Ghostly purple
+          'rgba(80, 80, 120, 0.12)',    // Pale slate
+          'rgba(120, 100, 160, 0.10)',  // Dim lavender
+          'rgba(90, 70, 110, 0.10)',    // Faded mauve
+          'rgba(70, 70, 100, 0.08)',    // Almost invisible
+        ],
+        confettiColors: [
+          '#504060', '#403060', '#304060', '#305040',
+          '#504030', '#503030', '#502040', '#303060',
+        ],
+        victoryTitleColor: '#8070B0',   // Muted, peaceful purple
+        victoryGlowColor: '#403860',    // Dim
+        vignetteColor: '#0C0620',       // Deep purple edge
       };
   }
 }

@@ -462,6 +462,71 @@ const arrangementStyles = StyleSheet.create({
   },
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SHADOW PRESENCE - A growing dark silhouette behind the house
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * ShadowPresence — A growing dark silhouette behind the house.
+ * Invisible at Phase 0-1. Faint at Phase 2. Prominent at Phase 4.
+ * Represents the entity being summoned, visible before any animal mentions it.
+ */
+const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
+  if (phase < 2) return null;
+
+  const opacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : 0.30;
+  const scaleVal = phase === 2 ? 0.6 : phase === 3 ? 0.8 : 1.0;
+  const height = 180 * scaleVal;
+  const width = 100 * scaleVal;
+
+  return (
+    <View style={{
+      position: 'absolute',
+      top: -height * 0.3,
+      alignSelf: 'center',
+      width: width,
+      height: height,
+      opacity: opacity,
+      zIndex: -1,
+    }}>
+      {/* Central body - tall dark oval */}
+      <View style={{
+        flex: 1,
+        backgroundColor: phase >= 4 ? 'rgba(80, 10, 30, 0.9)' : 'rgba(20, 5, 30, 0.9)',
+        borderTopLeftRadius: width * 0.4,
+        borderTopRightRadius: width * 0.4,
+        borderBottomLeftRadius: width * 0.15,
+        borderBottomRightRadius: width * 0.15,
+      }} />
+      {/* "Eyes" at Phase 4 - two faint reddish dots */}
+      {phase >= 4 && (
+        <View style={{
+          position: 'absolute',
+          top: height * 0.25,
+          left: 0,
+          right: 0,
+          flexDirection: 'row',
+          justifyContent: 'center',
+          gap: width * 0.2,
+        }}>
+          <View style={{
+            width: 6,
+            height: 4,
+            borderRadius: 3,
+            backgroundColor: 'rgba(180, 40, 60, 0.7)',
+          }} />
+          <View style={{
+            width: 6,
+            height: 4,
+            borderRadius: 3,
+            backgroundColor: 'rgba(180, 40, 60, 0.7)',
+          }} />
+        </View>
+      )}
+    </View>
+  );
+};
+
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
 const ROOM_WIDTH = 250;
@@ -848,6 +913,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
               {/* House */}
               <View style={styles.houseContainer}>
+                {/* Shadow entity silhouette - grows across phases, behind the house */}
+                <ShadowPresence phase={currentPhase} />
+
                 {/* Roof */}
                 <View style={styles.roof}>
                   <View style={styles.chimney}>

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DialogueSession, DIALOGUE_SESSION_CONFIG, DialoguePhase, getDialoguesPerSession } from '../types/homeWorld';
+import { DialogueSession, DIALOGUE_SESSION_CONFIG, DialoguePhase, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_dialogue_sessions';
 
@@ -98,7 +98,7 @@ function getCooldownRemaining(session: DialogueSession): number {
   // Grace period: newly unlocked animals skip cooldowns
   if (isInGracePeriod(session)) return 0;
   const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
-  return DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS - puzzlesSinceEnd;
+  return getPuzzlesBetweenSessions(currentPhase) - puzzlesSinceEnd;
 }
 
 /**
@@ -152,7 +152,7 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
     return {
       available: false,
       reason: 'max_dialogues',
-      puzzlesRemaining: DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS,
+      puzzlesRemaining: getPuzzlesBetweenSessions(currentPhase),
     };
   }
 

@@ -20,6 +20,8 @@ A word puzzle game where players shift letters between words to form valid Engli
 - **Home screen**: Sunny day, happy clouds → storm sky, shadow figure looming
 - **Animal sprites**: Cute idle poses → robed cult figures
 - **Room decorations**: Cozy furnishings → ritual objects, sigils, altars
+- **Letter tiles**: Bouncy, fast wobble → heavy, ponderous movement with trailing glow
+- **Shadow figure**: Invisible → faint silhouette → full presence with crimson eyes above house
 - **Music/sound** (future): Cheerful chimes → droning, dissonant ambience
 
 **Key narrative rules:**
@@ -86,7 +88,7 @@ mobile/
 │   │   └── useUnlockFlow.ts     # Unlock/shop logic: rooms, animals, decorations, purchases
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
-│   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling (compact mode for 6+ letters)
+│   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails (compact mode for 6+ letters)
 │   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + native-driver pulse
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial for phase changes
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
@@ -105,6 +107,7 @@ mobile/
 │   │   │   ├── RulesModal.tsx   # Phase-aware "How to Play" rules modal
 │   │   │   ├── DifficultyMenu.tsx # Difficulty selector dropdown + challenge mode toggle
 │   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper from animals (fade in/out)
+│   │   │   ├── RitualEchoChain.tsx # In-puzzle real-time word chain display (phase-aware styling)
 │   │   │   └── index.ts         # Puzzle component exports
 │   │   ├── WordLedger.tsx       # Scrollable ritual word history screen (phase-aware styling)
 │   │   └── home/
@@ -123,11 +126,11 @@ mobile/
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
-│       ├── animalDialogue.ts    # 520+ dialogue lines, cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds
+│       ├── animalDialogue.ts    # 560+ dialogue lines, cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds, word threshold dialogues
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
-│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules, animal whispers
+│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules, animal whispers, interjections, micro-events
 │       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials)
 │       ├── achievements.ts      # 36 achievements across 6 categories
 │       ├── shareResults.ts      # Wordle-style emoji grid sharing
@@ -304,7 +307,7 @@ Game logic is extracted into six custom hooks:
 
 **`useDialogueFlow()`** (`src/hooks/useDialogueFlow.ts`):
 - Animal dialogue session state, animations, and cooldown messaging for home screen
-- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words (per-animal filtering), checks for tutorial callbacks (Fox Phase 4), rolls for cross-animal references (frequency scales with phase: 10% → 60%), and checks for coordinated dialogue events at puzzle milestones
+- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words (per-animal filtering), checks for tutorial callbacks (Fox Phase 4), rolls for cross-animal references (frequency scales with phase: 10% → 60%, guaranteed first for Vanguard animals), checks for coordinated dialogue events at puzzle milestones, and checks for word threshold dialogues
 - `handleNextDialogue()` - Advance dialogue, record progress, check session limits
 - `handleCloseDialogue()` - End session, clean up state
 - Returns: `selectedAnimal`, `showDialogue`, `dialogueText`, `sessionInfo`, `cooldownMessage`, `isTalking`, `triggerReaction`, `crossAnimalRef`
@@ -345,7 +348,10 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
 7. StarBurst particle effect plays on each valid intermediate move
 8. **Dread Pulse** (Phase 2+): When a valid intermediate move forms a dread word, the screen briefly flashes with a crimson overlay. Phase-scaled opacity (0.10 → 0.18 → 0.25). Uses `isDreadWord()` from `localGenerator.ts`. `handleSlotPress` returns `{ completed: false, formedWord }` for intermediate moves.
 9. **Animal Whisper** (post-victory): 1.2s after victory, `AnimalWhisper` component shows a ghost-like message from a random unlocked animal. Prefers animals whose trigger words match the puzzle. Phase-aware styling (pink → purple → crimson). Fade in 400ms, hold 3s, fade out 600ms.
-10. **Endgame triggers** (Phase 4+ after house completion, in App.tsx):
+10. **Animal Interjection** (post-victory): 2.5s after victory, 30% chance of an animal interjection that pulls the player toward the home screen. Phase-aware messages: Phase 0 "Ember is excited to see you!" → Phase 4 "Ember whispers: 'The house remembers every word you've given us.'" Generated by `getAnimalInterjection()` in `phaseNarrative.ts`. Auto-dismisses after 4s. Rendered in App.tsx below AnimalWhisper.
+11. **Ritual Micro-Event** (Phase 2+): When a puzzle has high ritual energy (7+), a toast message connects specific dread words to the house: "The house trembled when you formed VOID." 60% trigger rate at qualifying energy. Generated by `getRitualMicroEvent()` in `phaseNarrative.ts`.
+12. **In-Puzzle Ritual Echo Chain**: `RitualEchoChain` component (`puzzle/RitualEchoChain.tsx`) shows the word chain building in real-time on the left side of the puzzle screen as words are formed. Phase 0-1: subtle pink, `pointerEvents="none"`. Phase 2+: prominent with vertical stacking and arrows. Phase 4: crimson incantation styling. Words animate in with fade, auto-scrolls. Cleared on new puzzle/difficulty change.
+13. **Endgame triggers** (Phase 4+ after house completion, in App.tsx):
    - First puzzle after house completion → `FINAL_PUZZLE_EVENT` cinematic overlay
    - First puzzle after final puzzle → `POST_REVELATION_EVENT` cinematic overlay + `markPostRevelation()`
 
@@ -430,9 +436,10 @@ Each animal filters the cult narrative through their personality:
 - **Rabbit (Thyme)**: Anxious but devoted. "I'm scared, but... this is what we prepared for, right?"
 - **Red Panda (Bamboo)**: Zen certainty. "The pattern completes. Breathe. Accept."
 
-**Dialogue Count**: 52 dialogues per animal (520 total) + 5 post-revelation per animal (50 total)
+**Dialogue Count**: 56 dialogues per animal (560 total) + 5 post-revelation per animal (50 total)
 - Phase 0: 12 dialogues (happy, friendly)
-- Phases 1-4: 10 dialogues each (progressively darker, culminating in cult revelation)
+- Phase 1: 14 dialogues (curious + expanded variety: letters/words, house changes, community, personality)
+- Phases 2-4: 10 dialogues each (progressively darker, culminating in cult revelation)
 - Phase 5: 5 dialogues each (terrible peace — the aftermath)
 
 ### Per-Animal Phase Awareness (Cult Hierarchy)
@@ -451,6 +458,8 @@ Not all animals realize the truth at the same time. Defined in `ANIMAL_AWARENESS
 
 Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a styled bubble before regular dialogue in `HomeScreen.tsx`.
 
+**Guaranteed First Cross-Reference**: Vanguard animals (Fox/Owl) get a forced cross-reference the first time they're tapped at each new phase (Phase 1+), ensuring players see inter-animal coordination early. Tracked via `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` in `amberCurrency.ts`. Bypasses the random roll in `useDialogueFlow.ts`.
+
 ### Catch-Up Dialogue for Late Unlocks
 
 When an animal is unlocked at Phase 2+, they get special catch-up intro dialogue that acknowledges the player's progress and compresses the emotional arc. Defined in `CATCHUP_INTRO_DIALOGUES` in `animalDialogue.ts` (4 lines per animal per phase 2/3/4). `getCatchupIntroDialogue()` / `getCatchupIntroDialogueCount()` are used in `HomeScreen.tsx` intro dialogue flow when `currentPhase >= 2`.
@@ -465,7 +474,7 @@ Animals have conversation sessions with puzzle-based cooldowns to pace interacti
 
 **Session Parameters** (in `dialogueSession.ts` and `types/homeWorld.ts`):
 - Max dialogues per session: 8
-- Cooldown: 3 puzzles between sessions
+- Cooldown: Phase-aware via `getPuzzlesBetweenSessions(phase)` — Phase 0: 1 puzzle, Phase 1: 2 puzzles, Phase 2+: 3 puzzles (encourages early-game animal bonding)
 - **Grace period**: First 3 sessions after unlock have no cooldown (`GRACE_PERIOD_SESSIONS`)
 - Dialogue progress persists (animals remember where they left off)
 
@@ -530,6 +539,8 @@ The core system that makes puzzles feel like rituals, not just gates:
 
 **Animal Whispers Post-Puzzle**: After each puzzle completion, a ghost-like whisper from a random unlocked animal appears at the bottom of the puzzle screen (`AnimalWhisper.tsx`). 150+ whisper lines across 5 phases × 10 animals (3 per animal per phase) in `ANIMAL_WHISPERS` in `phaseNarrative.ts`. `getAnimalWhisper()` selects based on phase and optionally prefers animals whose trigger words match. Phase 0: "Ember says nice work!" Phase 4: "Every word brings us closer. The fire knows."
 
+**Word Threshold Dialogues**: Animals react to word count milestones (100, 250, 500, 750 total words formed). Each animal has a unique line per milestone reflecting their personality. Defined in `WORD_THRESHOLD_DIALOGUES` in `animalDialogue.ts`. `getWordThresholdDialogue(animalType, totalWordsFormed, previousWordsFormed, currentPhase)` checks if a threshold was just crossed. Wired in `useDialogueFlow.ts` `handleAnimalTap()` as a low-priority trigger reaction (only shown if no other reaction is active).
+
 **Coordinated Dialogue Events**: At specific puzzle milestones (80, 100, 120, 160, 200, 230), ALL animals have thematically linked dialogue available — creating the sense of a coordinated cult. Defined in `COORDINATED_EVENTS` in `animalDialogue.ts`. Each event has a theme name, puzzle threshold, required phase, and per-animal lines. Consumed via `recordConsumedCoordinatedEvent()` to prevent repeats. Wired in `useDialogueFlow.ts` `handleAnimalTap()`.
 
 **Narrative Seeds (Phase 0 → Phase 4 Callbacks)**: Each animal has 2 innocent Phase 0 seed lines and 2 dark Phase 4 callback lines that recontextualize them. Defined in `NARRATIVE_SEEDS` in `animalDialogue.ts`. `getNarrativeSeed()` returns a seed line at Phase 0. `getNarrativeCallback()` returns a callback at Phase 4. Extends the tutorial callback pattern (previously Fox-only) to all 10 animals.
@@ -568,6 +579,7 @@ Milestone bonuses at key puzzle counts use phase-aware messages. Each `MILESTONE
 - Zoom: MIN_SCALE (0.75) to MAX_SCALE (2.0), snaps back to 0.8 if zoomed below
 - **Arrangement pattern** (Phase 2+): Visual sigil lines connecting rooms. Phase 2: thin purple. Phase 3: thicker with nodes. Phase 4: crimson pulsing. Accepts `ritualWords` prop for room word echoes
 - **Room word echoes** (Phase 2+): Faint text of recent puzzle words scattered across room backgrounds in `RoomView.tsx`. Opacity/density/color scales with phase
+- **Shadow Presence** (Phase 2+): `ShadowPresence` internal component in `HouseWorld.tsx` renders a dark silhouette above the house roof. Phase 2: barely visible (opacity 0.06, 60% scale). Phase 3: growing (0.15, 80%). Phase 4: full presence (0.30, 100%) with crimson "eyes". Provides a looming visual before `shadow_figure.png` asset is created
 
 ### Word Theme Evolution
 
@@ -591,6 +603,15 @@ Returns phase-specific colors for backgrounds, particles, confetti, victory moda
 - **Phase 2**: Cool blue-purple (#4A5580), desaturated particles
 - **Phase 3**: Dark indigo (#2E3355), dim muted particles
 - **Phase 4**: Near-black (#1A1A2E), crimson/purple accents, dying embers
+- **Phase 5**: Terrible peace — muted purple (#252040), ghostly mauve particles, peaceful purple victory title. Distinct from Phase 4's aggression; serene resignation
+
+### Letter Tile Animation Evolution (`LetterTile.tsx`)
+Letter tiles physically change behavior across phases to make puzzles *feel* different:
+- **Spring parameters** (`getSelectedSpringParams(phase)`): Phase 0 bouncy (friction:3/tension:200) → Phase 4 heavy (friction:9/tension:80)
+- **Wobble speed** (`getWobbleDurations(phase)`): Phase 0 fast (150/300ms) → Phase 4 ponderous (400/800ms)
+- **Bounce height** (`getBounceHeight(phase)`): Phase 0 high (-4) → Phase 4 barely lifts (-1.5)
+- **Trail glow** (Phase 3+): Selected tiles emit shadow pulses. Phase 3: purple glow. Phase 4: crimson glow. Uses `useNativeDriver: false` for shadow animation.
+- **Phase 5 tile colors**: Purple-gray tints for locked/selected/default tiles (distinct from Phase 4 crimson)
 
 ### Home Screen Background Colors
 The home screen container and HouseWorld use phase-aware background colors that blend with each sky image:
@@ -618,6 +639,8 @@ All player-facing text shifts tone with phase:
 - `getHouseCompletionText()` — Text lines for house completion ceremony modal
 - `getPostRevelationVictoryTitle(stars)` / `getPostRevelationMoveMessage()` — Phase 5 victory/move text
 - `getAnimalWhisper(phase, unlockedAnimals, triggerWords?)` — Random ambient whisper from unlocked animal after puzzle completion (150+ lines across 5 phases × 10 animals)
+- `getAnimalInterjection(phase, unlockedAnimals, puzzlesSolved)` — Post-victory animal interjection pulling player to home screen (30% trigger rate, phase-aware messages)
+- `getRitualMicroEvent(ritualEnergy, phase, completedWords)` — Toast message when high-ritual-energy puzzle connects words to the house (Phase 2+, 60% trigger)
 
 ### Challenge Mode
 Optional harder mode for experienced players (`GameMode = 'standard' | 'challenge'`):
@@ -696,7 +719,8 @@ Manages amber balance, streak, phase progression, and decorations:
 - `markPostRevelation()` / `isPostRevelation()` - Phase 5 post-revelation state
 - `markTutorialSeedsPlanted()` / `wereTutorialSeedsPlanted()` - Tutorial callback tracking for Fox at Phase 4
 - `recordConsumedCoordinatedEvent(theme)` / `getConsumedCoordinatedEvents()` - Track consumed coordinated dialogue events
-- `clearProgress()` - Full reset
+- `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` - Track guaranteed first cross-reference for Vanguard animals at each phase
+- `clearProgress()` - Full reset (includes guaranteed cross-ref keys)
 
 ### Phase Transition Events (`phaseEvents.ts`)
 
@@ -890,7 +914,7 @@ Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
 ### Home Screen - Adjusting dialogue sessions
 Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
 - `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 8)
-- `PUZZLES_BETWEEN_SESSIONS` - Puzzles required to unlock next session (default: 3)
+- `getPuzzlesBetweenSessions(phase)` - Phase-aware cooldown: Phase 0=1, Phase 1=2, Phase 2+=3 puzzles
 
 ### Home Screen - Adjusting streak grace period
 Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:

@@ -512,7 +512,7 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
 export function getAnimalWhisper(
   phase: number,
   unlockedAnimals: string[],
-  triggerWords?: string[]
+  triggerWords?: string[],
 ): { animalName: string; animalType: string; text: string } | null {
   if (unlockedAnimals.length === 0) return null;
 
@@ -554,4 +554,112 @@ export function getAnimalWhisper(
     animalType: selectedType,
     text: whispers[Math.floor(Math.random() * whispers.length)],
   };
+}
+
+// ============================================================================
+// ANIMAL INTERJECTIONS — Brief messages pulling the player to the home screen
+// ============================================================================
+
+const INTERJECTION_MESSAGES: Record<number, string[]> = {
+  0: [
+    '{name} is waiting to chat with you!',
+    '{name} has something to share. Visit the house!',
+    'Check in on {name} — they love visitors!',
+  ],
+  1: [
+    '{name} has been thinking about something...',
+    '{name} seems like they want to talk.',
+    'Something is on {name}\'s mind. Visit them?',
+  ],
+  2: [
+    '{name} is acting strangely. You should check on them.',
+    '{name} keeps looking at the walls...',
+    'Have you talked to {name} lately? They\'ve changed.',
+  ],
+  3: [
+    '{name} needs to tell you something. It\'s important.',
+    '{name} has been waiting. They know things.',
+    'The others say {name} hasn\'t been sleeping.',
+  ],
+  4: [
+    '{name} is ready. They\'ve been ready for a long time.',
+    '{name} says the arrangement is almost complete.',
+    'Visit {name}. The keepers need to speak.',
+  ],
+};
+
+/**
+ * Get a puzzle-specific micro-event message when ritual energy is high.
+ * These create direct, memorable links between specific puzzles and narrative moments.
+ * Returns null most of the time - only triggers for high-energy puzzles.
+ */
+export function getRitualMicroEvent(
+  ritualEnergy: number,
+  phase: number,
+  completedWords: string[]
+): string | null {
+  // Only trigger for high ritual energy (7+ out of 10) at Phase 2+
+  if (phase < 2 || ritualEnergy < 7) return null;
+
+  // 60% chance to show even when conditions are met
+  if (Math.random() > 0.60) return null;
+
+  // Find the most notable dread word in the chain
+  const dreadWord = completedWords.find(w =>
+    ['VOID', 'DOOM', 'DARK', 'ABYSS', 'RIFT', 'GATE', 'SHADOW', 'DREAD', 'FEAR', 'COLD', 'GRAVE', 'ECHO', 'END', 'FADE', 'GHOST', 'RITUAL', 'SUMMON'].includes(w.toUpperCase())
+  ) || completedWords[completedWords.length - 1];
+
+  const word = dreadWord.toUpperCase();
+
+  const events: Record<number, string[]> = {
+    2: [
+      `The house shivered when you formed ${word}.`,
+      `Something stirred below when ${word} was spoken.`,
+      `The walls remember ${word}.`,
+    ],
+    3: [
+      `The house trembled when you formed ${word}. The animals felt it.`,
+      `${word} echoes through every room. They all heard it.`,
+      `The foundation cracked when ${word} was spoken aloud.`,
+    ],
+    4: [
+      `${word} was the word it was waiting for. The house knows.`,
+      `The keepers felt ${word} in their bones. The arrangement accepts.`,
+      `${word} completes another verse. The shadow stirs.`,
+    ],
+  };
+
+  const phaseEvents = events[Math.min(phase, 4)] || events[4];
+  return phaseEvents[Math.floor(Math.random() * phaseEvents.length)];
+}
+
+/**
+ * Get a between-puzzle animal interjection that draws the player toward the home screen.
+ * Returns null ~70% of the time so interjections don't appear after every puzzle.
+ */
+export function getAnimalInterjection(
+  phase: number,
+  unlockedAnimals: string[],
+  puzzlesSolved: number,
+): { animalName: string; text: string } | null {
+  // Only show ~30% of the time
+  if (Math.random() > 0.30) return null;
+  if (unlockedAnimals.length === 0) return null;
+
+  const { ANIMAL_INFO } = require('./animalDialogue');
+
+  const clampedPhase = Math.min(4, Math.max(0, phase));
+  const messages = INTERJECTION_MESSAGES[clampedPhase];
+  if (!messages || messages.length === 0) return null;
+
+  // Pick a random unlocked animal
+  const animalType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
+  const info = ANIMAL_INFO[animalType];
+  const animalName = info ? info.name : animalType;
+
+  // Pick a random message and substitute the name
+  const template = messages[Math.floor(Math.random() * messages.length)];
+  const text = template.replace(/\{name\}/g, animalName);
+
+  return { animalName, text };
 }
