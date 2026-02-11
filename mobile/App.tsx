@@ -18,7 +18,7 @@ import { Confetti, StarBurst } from './src/components/Confetti';
 import { ActionButton, AnimatedLogo, Toast, LevelDisplay, VictoryModal, RulesModal, DifficultyMenu, RitualEchoChain } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { CandyColors } from './src/theme/colors';
+import { CandyColors, getPhaseSurfaceTheme, getPhaseTheme } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
 import { useVictoryFlow } from './src/hooks/useVictoryFlow';
@@ -62,6 +62,9 @@ export default function App() {
   const [persistence, persistenceActions] = useGamePersistence();
   const [victoryFlow, victoryActions] = useVictoryFlow();
   const [achievementState, achievementActions] = useAchievementQueue();
+
+  const phaseSurfaceTheme = getPhaseSurfaceTheme(persistence.currentPhase);
+  const phaseTheme = getPhaseTheme(persistence.currentPhase);
 
   // Sync narrative phase from persistence into puzzle hook
   useEffect(() => {
@@ -444,10 +447,13 @@ export default function App() {
   const renderScreen = () => {
     if (currentScreen === 'settings') {
       return (
-        <View style={styles.screenBackground}>
+        <View style={[styles.screenBackground, { backgroundColor: phaseTheme.bgPrimary }]}>
           <Animated.View style={{ flex: 1, opacity: screenFade }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-            <SettingsScreen onClose={() => transitionTo('home')} />
+            <SettingsScreen
+              onClose={() => transitionTo('home')}
+              phase={persistence.currentPhase}
+            />
           </Animated.View>
         </View>
       );
@@ -455,7 +461,7 @@ export default function App() {
 
     if (currentScreen === 'ledger') {
       return (
-        <View style={styles.screenBackground}>
+        <View style={[styles.screenBackground, { backgroundColor: phaseTheme.bgPrimary }]}>
           <Animated.View style={{ flex: 1, opacity: screenFade }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <WordLedger
@@ -469,7 +475,7 @@ export default function App() {
 
     if (currentScreen === 'stats') {
       return (
-        <View style={styles.screenBackground}>
+        <View style={[styles.screenBackground, { backgroundColor: phaseTheme.bgPrimary }]}>
           <Animated.View style={{ flex: 1, opacity: screenFade }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <StatsScreen
@@ -490,7 +496,7 @@ export default function App() {
           fallbackMessage="Something went wrong with the home screen. Tap to try again."
           onReset={() => setCurrentScreen('home')}
         >
-          <View style={styles.screenBackground}>
+          <View style={[styles.screenBackground, { backgroundColor: phaseTheme.bgPrimary }]}>
             <Animated.View style={{ flex: 1, opacity: screenFade }}>
               <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
               <HomeScreen
@@ -519,7 +525,7 @@ export default function App() {
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
-      <View style={styles.screenBackground}>
+      <View style={[styles.screenBackground, { backgroundColor: phaseTheme.bgPrimary }]}>
       <Animated.View style={[styles.container, { opacity: screenFade }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
@@ -546,9 +552,23 @@ export default function App() {
         />
 
         {/* Header */}
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: phaseSurfaceTheme.glassSoft,
+              borderBottomColor: phaseSurfaceTheme.glassBorder,
+            },
+          ]}
+        >
           <TouchableOpacity
-            style={styles.headerHomeButton}
+            style={[
+              styles.headerHomeButton,
+              {
+                backgroundColor: phaseSurfaceTheme.glassStrong,
+                borderColor: phaseSurfaceTheme.glassBorder,
+              },
+            ]}
             onPress={handleGoHome}
             accessibilityLabel="Go home"
             accessibilityRole="button"
@@ -558,11 +578,31 @@ export default function App() {
 
           <View style={styles.headerTitleArea}>
             {isPlayingDaily ? (
-              <View style={styles.dailyBadge}>
-                <Text style={styles.dailyBadgeText}>DAILY</Text>
+              <View
+                style={[
+                  styles.dailyBadge,
+                  {
+                    backgroundColor: persistence.currentPhase >= 4
+                      ? 'rgba(122, 52, 68, 0.9)'
+                      : persistence.currentPhase >= 3
+                        ? 'rgba(116, 96, 64, 0.9)'
+                        : CandyColors.yellow.main,
+                    borderColor: phaseSurfaceTheme.glassBorder,
+                  },
+                ]}
+              >
+                <View style={[styles.dailyBadgeShine, { backgroundColor: phaseSurfaceTheme.glassShine }]} />
+                <Text
+                  style={[
+                    styles.dailyBadgeText,
+                    persistence.currentPhase >= 3 && { color: phaseSurfaceTheme.textSecondary },
+                  ]}
+                >
+                  DAILY
+                </Text>
               </View>
             ) : (
-              <AnimatedLogo />
+              <AnimatedLogo phase={persistence.currentPhase} />
             )}
             {/* Phase indicator badge */}
             {persistence.currentPhase > 0 && (
@@ -581,23 +621,45 @@ export default function App() {
           </View>
 
           <TouchableOpacity
-            style={styles.helpButton}
+            style={[
+              styles.helpButton,
+              {
+                backgroundColor: phaseSurfaceTheme.glassStrong,
+                borderColor: phaseSurfaceTheme.glassBorder,
+              },
+            ]}
             onPress={() => puzzleActions.setShowRules(true)}
             accessibilityLabel="How to play"
             accessibilityRole="button"
           >
-            <View style={styles.helpButtonShine} />
-            <Text style={styles.helpButtonText}>?</Text>
+            <View style={[styles.helpButtonShine, { backgroundColor: phaseSurfaceTheme.glassShine }]} />
+            <Text style={[styles.helpButtonText, { color: phaseSurfaceTheme.textPrimary }]}>?</Text>
           </TouchableOpacity>
         </View>
 
         {/* Stats Row */}
-        <View style={styles.statsRow}>
+        <View
+          style={[
+            styles.statsRow,
+            {
+              backgroundColor: phaseSurfaceTheme.glassSoft,
+              borderColor: phaseSurfaceTheme.glassBorder,
+            },
+          ]}
+        >
           <View style={styles.leftStatsGroup}>
-            <LevelDisplay level={puzzle.level} />
+            <LevelDisplay level={puzzle.level} phase={persistence.currentPhase} />
             {/* Challenge Mode Badge */}
             {puzzle.gameMode === 'challenge' && (
-              <View style={styles.challengeBadge}>
+              <View
+                style={[
+                  styles.challengeBadge,
+                  {
+                    backgroundColor: phaseSurfaceTheme.dangerAccent,
+                    borderColor: 'rgba(255, 220, 225, 0.24)',
+                  },
+                ]}
+              >
                 <Text style={styles.challengeBadgeText}>CHALLENGE</Text>
                 {puzzle.undosRemaining < Infinity && (
                   <Text style={styles.challengeUndoText}>
@@ -609,26 +671,33 @@ export default function App() {
           </View>
 
           <TouchableOpacity
-            style={styles.difficultyButton}
+            style={[
+              styles.difficultyButton,
+              {
+                backgroundColor: phaseSurfaceTheme.glassStrong,
+                borderColor: phaseSurfaceTheme.glassBorder,
+              },
+            ]}
             onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
             accessibilityLabel={`Difficulty: ${puzzle.difficulty}. Tap to change`}
             accessibilityRole="button"
           >
-            <View style={styles.difficultyButtonShine} />
+            <View style={[styles.difficultyButtonShine, { backgroundColor: phaseSurfaceTheme.glassShine }]} />
             <View style={[
               styles.difficultyDot,
               puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
               puzzle.difficulty === 'MEDIUM' && styles.difficultyDotMedium,
               puzzle.difficulty === 'HARD' && styles.difficultyDotHard,
             ]} />
-            <Text style={styles.difficultyText}>{puzzle.difficulty}</Text>
-            <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
+            <Text style={[styles.difficultyText, { color: phaseSurfaceTheme.textPrimary }]}>{puzzle.difficulty}</Text>
+            <Text style={[styles.difficultyArrow, { color: phaseSurfaceTheme.textMuted }]}>{'\u25BC'}</Text>
           </TouchableOpacity>
 
           <DifficultyMenu
             visible={puzzle.showDifficultyMenu}
             currentDifficulty={puzzle.difficulty}
             gameMode={puzzle.gameMode}
+            phase={persistence.currentPhase}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
           />
@@ -636,16 +705,26 @@ export default function App() {
 
         {/* Toast Message */}
         <View style={styles.toastContainer}>
-          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} />
+          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} phase={persistence.currentPhase} />
         </View>
 
         {/* Game Area */}
         <View style={styles.gameArea}>
           {(puzzle.gameState === GameState.LOADING || puzzle.isProcessing || victoryFlow.isProcessingVictory) && (
-            <View style={styles.loadingOverlay}>
-              <View style={styles.loadingBox}>
-                <ActivityIndicator size="large" color={CandyColors.pink.main} />
-                <Text style={styles.loadingText}>
+            <View style={[styles.loadingOverlay, { backgroundColor: phaseSurfaceTheme.modalOverlay }]}>
+              <View
+                style={[
+                  styles.loadingBox,
+                  {
+                    backgroundColor: phaseSurfaceTheme.cardBg,
+                    borderColor: phaseSurfaceTheme.cardBorder,
+                    shadowColor: phaseSurfaceTheme.cardShadow,
+                  },
+                ]}
+              >
+                <View style={[styles.loadingShine, { backgroundColor: phaseSurfaceTheme.glassShine }]} />
+                <ActivityIndicator size="large" color={phaseTheme.victoryTitleColor} />
+                <Text style={[styles.loadingText, { color: phaseSurfaceTheme.textSecondary }]}>
                   {getLoadingMessage(persistence.currentPhase)}
                 </Text>
               </View>
@@ -683,7 +762,15 @@ export default function App() {
         </View>
 
         {/* Bottom Controls */}
-        <View style={styles.controls}>
+        <View
+          style={[
+            styles.controls,
+            {
+              backgroundColor: phaseSurfaceTheme.glassSoft,
+              borderColor: phaseSurfaceTheme.glassBorder,
+            },
+          ]}
+        >
           <ActionButton
             icon="↩"
             label="UNDO"
@@ -694,6 +781,7 @@ export default function App() {
             }}
             onPress={handleUndo}
             disabled={puzzle.history.length === 0 || puzzle.gameState === GameState.WON}
+            phase={persistence.currentPhase}
           />
           <ActionButton
             icon="💡"
@@ -705,6 +793,7 @@ export default function App() {
             }}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
+            phase={persistence.currentPhase}
           />
           <ActionButton
             icon="🔄"
@@ -720,6 +809,7 @@ export default function App() {
               puzzleActions.startNewGame();
             }}
             disabled={false}
+            phase={persistence.currentPhase}
           />
         </View>
 
@@ -767,7 +857,11 @@ export default function App() {
           <View style={styles.interjectionContainer}>
             <Text style={[
               styles.interjectionText,
-              persistence.currentPhase >= 3 && styles.interjectionTextDark,
+              {
+                color: phaseSurfaceTheme.textSecondary,
+                backgroundColor: phaseSurfaceTheme.badgeBg,
+                borderColor: phaseSurfaceTheme.badgeBorder,
+              },
             ]}>
               {interjection.text}
             </Text>
@@ -816,16 +910,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 8,
+    borderBottomWidth: 1,
     zIndex: 100,
   },
   headerHomeButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    borderWidth: 1,
   },
   headerHomeText: {
     fontSize: 20,
@@ -839,6 +934,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  dailyBadgeShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '52%',
   },
   dailyBadgeText: {
     fontSize: 14,
@@ -850,10 +954,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    borderWidth: 1,
   },
   helpButtonShine: {
     position: 'absolute',
@@ -877,17 +981,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    marginHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    elevation: 4,
     zIndex: 100,
   },
   difficultyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1,
   },
   difficultyButtonShine: {
     position: 'absolute',
@@ -962,12 +1073,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  loadingShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '48%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
     fontWeight: '700',
-    color: CandyColors.purple.main,
+    color: CandyColors.gray[600],
+    textAlign: 'center',
   },
 
   // Controls
@@ -979,6 +1102,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingBottom: 30,
     gap: 20,
+    borderTopWidth: 1,
   },
 
   // Challenge mode styles
@@ -995,6 +1119,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    borderWidth: 1,
   },
   challengeBadgeText: {
     fontSize: 10,
@@ -1069,6 +1194,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     overflow: 'hidden',
+    borderWidth: 1,
   },
   interjectionTextDark: {
     color: 'rgba(200, 160, 180, 0.9)',

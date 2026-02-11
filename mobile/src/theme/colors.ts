@@ -497,4 +497,166 @@ export function getDialogueTheme(phase: number): DialogueTheme {
   }
 }
 
+// ============================================================================
+// SHARED SURFACE TOKENS
+// Phase-aware material system for cards, glass UI, and overlays
+// ============================================================================
+
+export interface PhaseSurfaceTheme {
+  // Translucent "glass" surfaces used in headers/chips/buttons
+  glassStrong: string;
+  glassSoft: string;
+  glassBorder: string;
+  glassShine: string;
+  // Solid card-like surfaces used in modals/panels
+  cardBg: string;
+  cardBorder: string;
+  cardShadow: string;
+  // Full-screen overlay/backdrop
+  modalOverlay: string;
+  // Text hierarchy for over-background UI
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  // Accent channels
+  accent: string;
+  accentSoft: string;
+  successAccent: string;
+  dangerAccent: string;
+  // Badge treatment
+  badgeBg: string;
+  badgeBorder: string;
+}
+
+/**
+ * Shared phase-aware surface tokens.
+ * These are intentionally broader than puzzle-only theming so all screens
+ * can use consistent materials and depth treatment.
+ */
+export function getPhaseSurfaceTheme(phase: number): PhaseSurfaceTheme {
+  switch (phase) {
+    case 0:
+      return {
+        glassStrong: 'rgba(255, 255, 255, 0.24)',
+        glassSoft: 'rgba(255, 255, 255, 0.14)',
+        glassBorder: 'rgba(255, 255, 255, 0.28)',
+        glassShine: 'rgba(255, 255, 255, 0.24)',
+        cardBg: 'rgba(255, 255, 255, 0.94)',
+        cardBorder: 'rgba(168, 85, 247, 0.18)',
+        cardShadow: '#5B21B6',
+        modalOverlay: 'rgba(48, 20, 90, 0.72)',
+        textPrimary: '#FFFFFF',
+        textSecondary: 'rgba(255, 255, 255, 0.88)',
+        textMuted: 'rgba(255, 255, 255, 0.68)',
+        accent: CandyColors.pink.main,
+        accentSoft: 'rgba(236, 72, 153, 0.24)',
+        successAccent: CandyColors.green.main,
+        dangerAccent: CandyColors.red.main,
+        badgeBg: 'rgba(102, 126, 234, 0.36)',
+        badgeBorder: 'rgba(255, 255, 255, 0.22)',
+      };
+    case 1:
+      return {
+        glassStrong: 'rgba(255, 245, 225, 0.22)',
+        glassSoft: 'rgba(255, 240, 210, 0.12)',
+        glassBorder: 'rgba(230, 200, 160, 0.28)',
+        glassShine: 'rgba(255, 255, 255, 0.2)',
+        cardBg: 'rgba(252, 247, 239, 0.95)',
+        cardBorder: 'rgba(180, 140, 100, 0.2)',
+        cardShadow: '#4A2D6E',
+        modalOverlay: 'rgba(32, 20, 52, 0.75)',
+        textPrimary: '#FFFFFF',
+        textSecondary: 'rgba(250, 245, 235, 0.86)',
+        textMuted: 'rgba(240, 225, 200, 0.66)',
+        accent: '#D48A86',
+        accentSoft: 'rgba(212, 138, 134, 0.24)',
+        successAccent: '#73B668',
+        dangerAccent: '#C85A64',
+        badgeBg: 'rgba(122, 88, 146, 0.42)',
+        badgeBorder: 'rgba(230, 200, 160, 0.24)',
+      };
+    case 2:
+      return {
+        glassStrong: 'rgba(196, 186, 255, 0.14)',
+        glassSoft: 'rgba(170, 160, 235, 0.1)',
+        glassBorder: 'rgba(150, 140, 220, 0.26)',
+        glassShine: 'rgba(220, 220, 255, 0.12)',
+        cardBg: 'rgba(21, 20, 38, 0.9)',
+        cardBorder: 'rgba(94, 78, 148, 0.35)',
+        cardShadow: '#151028',
+        modalOverlay: 'rgba(8, 7, 22, 0.8)',
+        textPrimary: 'rgba(228, 224, 246, 0.95)',
+        textSecondary: 'rgba(195, 188, 223, 0.88)',
+        textMuted: 'rgba(152, 146, 184, 0.72)',
+        accent: '#9E7FC9',
+        accentSoft: 'rgba(158, 127, 201, 0.24)',
+        successAccent: '#4C9E76',
+        dangerAccent: '#8E4664',
+        badgeBg: 'rgba(74, 56, 120, 0.52)',
+        badgeBorder: 'rgba(132, 110, 190, 0.38)',
+      };
+    case 3:
+      return {
+        glassStrong: 'rgba(86, 72, 132, 0.28)',
+        glassSoft: 'rgba(56, 44, 96, 0.22)',
+        glassBorder: 'rgba(122, 102, 184, 0.26)',
+        glassShine: 'rgba(180, 160, 225, 0.1)',
+        cardBg: 'rgba(16, 12, 28, 0.9)',
+        cardBorder: 'rgba(86, 64, 128, 0.4)',
+        cardShadow: '#090612',
+        modalOverlay: 'rgba(5, 3, 14, 0.84)',
+        textPrimary: 'rgba(228, 214, 246, 0.94)',
+        textSecondary: 'rgba(186, 170, 210, 0.86)',
+        textMuted: 'rgba(138, 124, 164, 0.72)',
+        accent: '#7B5DAF',
+        accentSoft: 'rgba(123, 93, 175, 0.24)',
+        successAccent: '#4A7A66',
+        dangerAccent: '#8B3A54',
+        badgeBg: 'rgba(38, 27, 62, 0.66)',
+        badgeBorder: 'rgba(108, 84, 156, 0.35)',
+      };
+    case 4:
+      return {
+        glassStrong: 'rgba(36, 20, 30, 0.7)',
+        glassSoft: 'rgba(26, 12, 20, 0.58)',
+        glassBorder: 'rgba(132, 54, 76, 0.36)',
+        glassShine: 'rgba(170, 90, 114, 0.11)',
+        cardBg: 'rgba(10, 8, 16, 0.94)',
+        cardBorder: 'rgba(122, 44, 62, 0.46)',
+        cardShadow: '#040209',
+        modalOverlay: 'rgba(4, 2, 8, 0.88)',
+        textPrimary: 'rgba(214, 186, 202, 0.94)',
+        textSecondary: 'rgba(176, 146, 162, 0.84)',
+        textMuted: 'rgba(128, 100, 116, 0.7)',
+        accent: '#8A3D54',
+        accentSoft: 'rgba(138, 61, 84, 0.26)',
+        successAccent: '#466052',
+        dangerAccent: '#A33C4D',
+        badgeBg: 'rgba(28, 14, 24, 0.78)',
+        badgeBorder: 'rgba(118, 46, 66, 0.4)',
+      };
+    case 5:
+    default:
+      return {
+        glassStrong: 'rgba(56, 42, 80, 0.42)',
+        glassSoft: 'rgba(42, 30, 62, 0.32)',
+        glassBorder: 'rgba(118, 98, 162, 0.3)',
+        glassShine: 'rgba(186, 168, 220, 0.1)',
+        cardBg: 'rgba(14, 12, 24, 0.92)',
+        cardBorder: 'rgba(96, 76, 132, 0.36)',
+        cardShadow: '#070512',
+        modalOverlay: 'rgba(5, 3, 12, 0.84)',
+        textPrimary: 'rgba(214, 206, 232, 0.95)',
+        textSecondary: 'rgba(174, 162, 202, 0.86)',
+        textMuted: 'rgba(132, 120, 164, 0.72)',
+        accent: '#8877B6',
+        accentSoft: 'rgba(136, 119, 182, 0.24)',
+        successAccent: '#4E6C68',
+        dangerAccent: '#7A506A',
+        badgeBg: 'rgba(34, 26, 52, 0.72)',
+        badgeBorder: 'rgba(110, 92, 150, 0.34)',
+      };
+  }
+}
+
 export default CandyColors;

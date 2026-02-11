@@ -1,16 +1,18 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { CandyColors } from '../../theme/colors';
+import { CandyColors, getPhaseSurfaceTheme } from '../../theme/colors';
 
 interface ToastProps {
   message: string;
   isError: boolean;
+  phase?: number;
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
+export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => {
   const slideAnim = useRef(new Animated.Value(-20)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const surfaceTheme = getPhaseSurfaceTheme(phase);
 
   useEffect(() => {
     slideAnim.setValue(-20);
@@ -45,7 +47,23 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
     <Animated.View
       style={[
         styles.toast,
-        isError ? styles.toastError : styles.toastNormal,
+        isError
+          ? [
+            styles.toastError,
+            {
+              backgroundColor: surfaceTheme.dangerAccent,
+              borderColor: 'rgba(255, 220, 225, 0.25)',
+              shadowColor: surfaceTheme.dangerAccent,
+            },
+          ]
+          : [
+            styles.toastNormal,
+            {
+              backgroundColor: surfaceTheme.cardBg,
+              borderColor: surfaceTheme.cardBorder,
+              shadowColor: surfaceTheme.cardShadow,
+            },
+          ],
         {
           transform: [
             { translateY: slideAnim },
@@ -57,8 +75,19 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
     >
-      <View style={styles.toastShine} />
-      <Text style={[styles.toastText, isError && styles.toastTextError]}>
+      <View
+        style={[
+          styles.toastShine,
+          { backgroundColor: surfaceTheme.glassShine },
+        ]}
+      />
+      <Text
+        style={[
+          styles.toastText,
+          !isError && { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.purple.main },
+          isError && styles.toastTextError,
+        ]}
+      >
         {message}
       </Text>
     </Animated.View>
@@ -71,6 +100,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
     overflow: 'hidden',
+    borderWidth: 1,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -89,10 +119,12 @@ const styles = StyleSheet.create({
   toastNormal: {
     backgroundColor: CandyColors.white,
     shadowColor: CandyColors.purple.main,
+    borderColor: CandyColors.gray[100],
   },
   toastError: {
     backgroundColor: CandyColors.red.main,
     shadowColor: CandyColors.red.dark,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   toastText: {
     fontSize: 15,

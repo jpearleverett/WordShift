@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Text, StyleSheet, Animated } from 'react-native';
 import { DialoguePhase } from '../../types/homeWorld';
 import { getSettingsSync } from '../../services/settings';
-import { CandyColors } from '../../theme/colors';
+import { CandyColors, getPhaseSurfaceTheme } from '../../theme/colors';
 
 interface AnimalWhisperProps {
   visible: boolean;
@@ -30,6 +30,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 }) => {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const surfaceTheme = getPhaseSurfaceTheme(phase);
 
   useEffect(() => {
     if (!visible) {
@@ -99,7 +100,15 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 
   return (
     <Animated.View
-      style={[styles.container, containerStyle, { opacity: opacityAnim }]}
+      style={[
+        styles.container,
+        containerStyle,
+        {
+          borderColor: surfaceTheme.glassBorder,
+          shadowColor: surfaceTheme.cardShadow,
+          opacity: opacityAnim,
+        },
+      ]}
       pointerEvents="none"
       accessibilityRole="text"
       accessibilityLabel={`${animalName} whispers: ${whisperText}`}
@@ -120,6 +129,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     maxWidth: '85%',
     alignItems: 'center',
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 6,
   },
   containerLight: {
     backgroundColor: 'rgba(236, 72, 153, 0.15)',

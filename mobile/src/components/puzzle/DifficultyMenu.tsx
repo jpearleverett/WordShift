@@ -5,13 +5,14 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { CandyColors } from '../../theme/colors';
+import { CandyColors, getPhaseSurfaceTheme } from '../../theme/colors';
 import { Difficulty, GameMode } from '../../types';
 
 interface DifficultyMenuProps {
   visible: boolean;
   currentDifficulty: Difficulty;
   gameMode: GameMode;
+  phase?: number;
   onSelectDifficulty: (difficulty: Difficulty) => void;
   onToggleChallengeMode: () => void;
 }
@@ -20,19 +21,32 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   visible,
   currentDifficulty,
   gameMode,
+  phase = 0,
   onSelectDifficulty,
   onToggleChallengeMode,
 }) => {
   if (!visible) return null;
+  const surfaceTheme = getPhaseSurfaceTheme(phase);
 
   return (
-    <View style={styles.difficultyMenu}>
+    <View
+      style={[
+        styles.difficultyMenu,
+        {
+          backgroundColor: surfaceTheme.cardBg,
+          borderColor: surfaceTheme.cardBorder,
+          shadowColor: surfaceTheme.cardShadow,
+        },
+      ]}
+    >
       {(['EASY', 'MEDIUM', 'HARD'] as Difficulty[]).map(d => (
         <TouchableOpacity
           key={d}
           style={[
             styles.difficultyMenuItem,
-            currentDifficulty === d && styles.difficultyMenuItemActive,
+            currentDifficulty === d && {
+              backgroundColor: surfaceTheme.accentSoft,
+            },
           ]}
           onPress={() => onSelectDifficulty(d)}
         >
@@ -45,7 +59,8 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           <Text
             style={[
               styles.difficultyMenuText,
-              currentDifficulty === d && styles.difficultyMenuTextActive,
+              { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[600] },
+              currentDifficulty === d && { color: surfaceTheme.accent },
             ]}
           >
             {d}
@@ -53,11 +68,11 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         </TouchableOpacity>
       ))}
       {/* Challenge mode toggle */}
-      <View style={styles.challengeMenuDivider} />
+      <View style={[styles.challengeMenuDivider, { backgroundColor: surfaceTheme.glassBorder }]} />
       <TouchableOpacity
         style={[
           styles.difficultyMenuItem,
-          gameMode === 'challenge' && styles.challengeMenuItemActive,
+          gameMode === 'challenge' && { backgroundColor: 'rgba(200, 70, 90, 0.16)' },
         ]}
         onPress={onToggleChallengeMode}
       >
@@ -67,11 +82,12 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         <View style={styles.challengeMenuContent}>
           <Text style={[
             styles.difficultyMenuText,
-            gameMode === 'challenge' && styles.challengeMenuTextActive,
+            { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[600] },
+            gameMode === 'challenge' && { color: surfaceTheme.dangerAccent },
           ]}>
             CHALLENGE
           </Text>
-          <Text style={styles.challengeMenuDesc}>
+          <Text style={[styles.challengeMenuDesc, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>
             {gameMode === 'challenge' ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
           </Text>
         </View>
@@ -85,15 +101,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     top: 52,
-    backgroundColor: CandyColors.white,
     borderRadius: 16,
     padding: 8,
-    shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
     zIndex: 200,
+    borderWidth: 1,
   },
   difficultyMenuItem: {
     flexDirection: 'row',
@@ -124,14 +139,12 @@ const styles = StyleSheet.create({
   difficultyMenuText: {
     fontSize: 13,
     fontWeight: '700',
-    color: CandyColors.gray[600],
   },
   difficultyMenuTextActive: {
     color: CandyColors.purple.main,
   },
   challengeMenuDivider: {
     height: 1,
-    backgroundColor: CandyColors.gray[200],
     marginVertical: 6,
     marginHorizontal: 8,
   },
