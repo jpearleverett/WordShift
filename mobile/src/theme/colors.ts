@@ -305,4 +305,196 @@ export function getPhaseTheme(phase: number): PhaseTheme {
   }
 }
 
+// ============================================================================
+// DIALOGUE BOX THEMING
+// Phase-aware visual theming for all dialogue boxes, speech bubbles, and modals
+// ============================================================================
+
+export interface DialogueTheme {
+  // Modal container
+  modalBg: string;
+  modalBorder: string;
+  modalShadowColor: string;
+  // Decorative accent line at top of modals
+  accentLine: string;
+  // Sprite/portrait area
+  spriteBg: string;
+  portraitRingBg: string;
+  portraitRingBorder: string;
+  // Text bubble
+  bubbleBg: string;
+  bubbleBorder: string;
+  // Text colors
+  nameColor: string;
+  textColor: string;
+  subtitleColor: string;
+  progressColor: string;
+  // Buttons
+  primaryButtonBg: string;
+  primaryButtonShadow: string;
+  secondaryButtonBg: string;
+  secondaryButtonText: string;
+  // Cooldown toast
+  cooldownBg: string;
+  cooldownBorder: string;
+  // Overlay backdrop
+  overlayBg: string;
+}
+
+/**
+ * Get the dialogue box theme for the current narrative phase.
+ * Controls the visual presentation of all speech bubbles, dialogue modals,
+ * intro screens, cooldown toasts, and invite modals.
+ *
+ * Phase 0: Warm candy-bright — welcoming, delightful
+ * Phase 1: Amber-tinged warmth — curious, subtly philosophical
+ * Phase 2: Cool isolation — muted, questioning (dark mode begins)
+ * Phase 3: Shadowed dread — cold, dim, oppressive
+ * Phase 4: Crimson ritual — near-black with blood-red accents
+ * Phase 5: Terrible peace — muted purple calm after the storm
+ */
+export function getDialogueTheme(phase: number): DialogueTheme {
+  switch (phase) {
+    case 0:
+      return {
+        modalBg: '#FFFFFF',
+        modalBorder: 'rgba(168, 85, 247, 0.18)',
+        modalShadowColor: '#7C3AED',
+        accentLine: CandyColors.purple.light,
+        spriteBg: '#F3E8FF',
+        portraitRingBg: '#E9D5FF',
+        portraitRingBorder: 'rgba(168, 85, 247, 0.4)',
+        bubbleBg: '#F5F0FF',
+        bubbleBorder: 'rgba(168, 85, 247, 0.12)',
+        nameColor: CandyColors.purple.dark,
+        textColor: CandyColors.gray[700],
+        subtitleColor: CandyColors.gray[500],
+        progressColor: CandyColors.gray[400],
+        primaryButtonBg: CandyColors.purple.main,
+        primaryButtonShadow: CandyColors.purple.shadow,
+        secondaryButtonBg: CandyColors.green.main,
+        secondaryButtonText: '#FFFFFF',
+        cooldownBg: 'rgba(249, 115, 22, 0.95)',
+        cooldownBorder: 'rgba(255, 255, 255, 0.2)',
+        overlayBg: 'rgba(30, 15, 60, 0.6)',
+      };
+    case 1:
+      return {
+        modalBg: '#FEFCF8',
+        modalBorder: 'rgba(180, 140, 100, 0.18)',
+        modalShadowColor: '#6B4592',
+        accentLine: '#C8A050',
+        spriteBg: '#F8F0E0',
+        portraitRingBg: '#EBE0D0',
+        portraitRingBorder: 'rgba(180, 140, 80, 0.4)',
+        bubbleBg: '#F8F4EE',
+        bubbleBorder: 'rgba(180, 140, 100, 0.15)',
+        nameColor: '#6B4592',
+        textColor: '#4A4540',
+        subtitleColor: '#8A8478',
+        progressColor: '#8A8478',
+        primaryButtonBg: '#7B5EA7',
+        primaryButtonShadow: '#5B3E87',
+        secondaryButtonBg: '#5A9E40',
+        secondaryButtonText: '#FFFFFF',
+        cooldownBg: 'rgba(180, 130, 60, 0.95)',
+        cooldownBorder: 'rgba(255, 255, 255, 0.15)',
+        overlayBg: 'rgba(25, 15, 50, 0.65)',
+      };
+    case 2:
+      return {
+        modalBg: '#1A1A2E',
+        modalBorder: 'rgba(90, 70, 140, 0.25)',
+        modalShadowColor: '#2D1530',
+        accentLine: '#5A4880',
+        spriteBg: '#151525',
+        portraitRingBg: '#252540',
+        portraitRingBorder: 'rgba(90, 70, 140, 0.5)',
+        bubbleBg: '#222238',
+        bubbleBorder: 'rgba(90, 70, 140, 0.2)',
+        nameColor: '#9080B0',
+        textColor: '#9898B0',
+        subtitleColor: '#686880',
+        progressColor: '#585870',
+        primaryButtonBg: '#4A3870',
+        primaryButtonShadow: '#2A1850',
+        secondaryButtonBg: '#3A6848',
+        secondaryButtonText: '#C0C0D0',
+        cooldownBg: 'rgba(60, 40, 90, 0.95)',
+        cooldownBorder: 'rgba(90, 70, 140, 0.3)',
+        overlayBg: 'rgba(10, 8, 25, 0.75)',
+      };
+    case 3:
+      return {
+        modalBg: '#0E0E1A',
+        modalBorder: 'rgba(80, 40, 100, 0.25)',
+        modalShadowColor: '#0A0510',
+        accentLine: '#4A2860',
+        spriteBg: '#0A0A15',
+        portraitRingBg: '#1A1030',
+        portraitRingBorder: 'rgba(80, 40, 100, 0.5)',
+        bubbleBg: '#161622',
+        bubbleBorder: 'rgba(80, 40, 100, 0.2)',
+        nameColor: '#7050A0',
+        textColor: '#787890',
+        subtitleColor: '#505068',
+        progressColor: '#404058',
+        primaryButtonBg: '#3D2060',
+        primaryButtonShadow: '#1D1040',
+        secondaryButtonBg: '#2A4838',
+        secondaryButtonText: '#A0A0B0',
+        cooldownBg: 'rgba(40, 20, 60, 0.95)',
+        cooldownBorder: 'rgba(80, 40, 100, 0.3)',
+        overlayBg: 'rgba(5, 3, 15, 0.8)',
+      };
+    case 4:
+      return {
+        modalBg: '#0A0810',
+        modalBorder: 'rgba(140, 40, 50, 0.25)',
+        modalShadowColor: '#1A0510',
+        accentLine: '#8B2040',
+        spriteBg: '#08060E',
+        portraitRingBg: '#1A0E20',
+        portraitRingBorder: 'rgba(140, 40, 50, 0.5)',
+        bubbleBg: '#120E18',
+        bubbleBorder: 'rgba(140, 40, 50, 0.2)',
+        nameColor: '#A04050',
+        textColor: '#686878',
+        subtitleColor: '#484858',
+        progressColor: '#383848',
+        primaryButtonBg: '#6B1830',
+        primaryButtonShadow: '#3B0818',
+        secondaryButtonBg: '#283028',
+        secondaryButtonText: '#908898',
+        cooldownBg: 'rgba(80, 20, 30, 0.95)',
+        cooldownBorder: 'rgba(140, 40, 50, 0.3)',
+        overlayBg: 'rgba(5, 2, 8, 0.85)',
+      };
+    case 5:
+    default:
+      return {
+        modalBg: '#100E18',
+        modalBorder: 'rgba(100, 80, 140, 0.18)',
+        modalShadowColor: '#0A0818',
+        accentLine: '#5A4870',
+        spriteBg: '#0C0A14',
+        portraitRingBg: '#1E1830',
+        portraitRingBorder: 'rgba(100, 80, 140, 0.4)',
+        bubbleBg: '#181620',
+        bubbleBorder: 'rgba(100, 80, 140, 0.15)',
+        nameColor: '#8070B0',
+        textColor: '#706888',
+        subtitleColor: '#505068',
+        progressColor: '#404058',
+        primaryButtonBg: '#3D3060',
+        primaryButtonShadow: '#1D1840',
+        secondaryButtonBg: '#2A3838',
+        secondaryButtonText: '#908898',
+        cooldownBg: 'rgba(50, 30, 70, 0.95)',
+        cooldownBorder: 'rgba(100, 80, 140, 0.2)',
+        overlayBg: 'rgba(5, 3, 12, 0.82)',
+      };
+  }
+}
+
 export default CandyColors;
