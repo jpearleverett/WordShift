@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { TouchableOpacity, Animated, Easing } from 'react-native';
+import { getSettingsSync } from '../../services/settings';
 
 interface JuicyButtonProps {
   onPress: () => void;
@@ -24,6 +25,10 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      pulseAnim.setValue(1);
+      return;
+    }
     // Subtle scale pulse (not opacity - keeps button fully visible)
     const pulseLoop = Animated.loop(
       Animated.sequence([
@@ -42,7 +47,10 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
       ])
     );
     pulseLoop.start();
-    return () => pulseLoop.stop();
+    return () => {
+      pulseLoop.stop();
+      pulseAnim.stopAnimation();
+    };
   }, []);
 
   const handlePressIn = () => {

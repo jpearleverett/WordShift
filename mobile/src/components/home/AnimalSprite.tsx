@@ -11,7 +11,7 @@ import {
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
-import { CandyColors } from '../../theme/colors';
+import { CandyColors, getPhaseSurfaceTheme } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
 
 // Character sprite assets - add more as they become available
@@ -177,6 +177,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   currentPhase,
   isOnCooldown = false,
 }) => {
+  const surfaceTheme = getPhaseSurfaceTheme(currentPhase);
   const posX = useRef(new Animated.Value(animal.position.x)).current;
   const posY = useRef(new Animated.Value(animal.position.y)).current;
   const bounceY = useRef(new Animated.Value(0)).current;
@@ -486,6 +487,12 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     }
   };
 
+  const spriteRimColor = currentPhase >= 4
+    ? 'rgba(150, 70, 92, 0.55)'
+    : currentPhase >= 3
+      ? 'rgba(136, 104, 184, 0.5)'
+      : 'rgba(255, 255, 255, 0.5)';
+
   // Position sprite within room bounds (keep near bottom half for floor walking)
   const translateX = posX.interpolate({
     inputRange: [0, 100],
@@ -521,6 +528,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           style={[
             styles.spriteContainer,
             {
+              shadowColor: currentPhase >= 4 ? '#8A324A' : currentPhase >= 3 ? '#5C4A8A' : '#000000',
+            },
+            {
               transform: [
                 { scaleX },
                 { scale: Animated.multiply(tapScale, breatheScale) },
@@ -539,15 +549,17 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
           {/* Animal body */}
           {CHARACTER_SPRITES[animal.type] ? (
-            <Image
-              source={
-                currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
-                  ? CHARACTER_SPRITES[animal.type]!.robed!
-                  : CHARACTER_SPRITES[animal.type]!.idle
-              }
-              style={styles.spriteImage}
-              resizeMode="contain"
-            />
+            <View style={[styles.spriteImageFrame, { borderColor: spriteRimColor }]}>
+              <Image
+                source={
+                  currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
+                    ? CHARACTER_SPRITES[animal.type]!.robed!
+                    : CHARACTER_SPRITES[animal.type]!.idle
+                }
+                style={styles.spriteImage}
+                resizeMode="contain"
+              />
+            </View>
           ) : (
             <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>
               <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
@@ -577,7 +589,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             <Animated.View
               style={[
                 styles.notificationBadge,
-                { transform: [{ scale: notificationPulse }] },
+                {
+                  transform: [{ scale: notificationPulse }],
+                  backgroundColor: currentPhase >= 4 ? surfaceTheme.dangerAccent : CandyColors.red.main,
+                  borderColor: currentPhase >= 3 ? 'rgba(245, 220, 235, 0.9)' : CandyColors.white,
+                },
               ]}
             >
               <Text style={styles.notificationText}>!</Text>
@@ -587,12 +603,15 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           {/* Name tag with phase-based mood indicator */}
           <View style={[
             styles.nameTag,
-            currentPhase >= 3 && styles.nameTagDark,
+            {
+              backgroundColor: currentPhase >= 3 ? surfaceTheme.badgeBg : 'rgba(0, 0, 0, 0.6)',
+              borderColor: currentPhase >= 3 ? surfaceTheme.badgeBorder : 'transparent',
+            },
           ]}>
             <View style={[styles.moodDot, { backgroundColor: getMoodColor() }]} />
             <Text style={[
               styles.nameText,
-              currentPhase >= 3 && styles.nameTextDark,
+              currentPhase >= 3 && { color: surfaceTheme.textSecondary },
             ]}>
               {animal.name}
             </Text>
@@ -616,6 +635,10 @@ const styles = StyleSheet.create({
   },
   spriteContainer: {
     alignItems: 'center',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
   shadow: {
     position: 'absolute',
@@ -645,6 +668,11 @@ const styles = StyleSheet.create({
   spriteImage: {
     width: 90,
     height: 90,
+  },
+  spriteImageFrame: {
+    borderRadius: 46,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
   notificationBadge: {
     position: 'absolute',
@@ -678,6 +706,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+    borderWidth: 1,
   },
   nameText: {
     color: CandyColors.white,

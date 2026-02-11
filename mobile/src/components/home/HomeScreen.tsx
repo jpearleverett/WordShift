@@ -17,7 +17,7 @@ import {
 import { Animal, Room, HomeWorldProgress, Unlockable, ROOM_DECORATIONS, Decoration, getDecorationsForRoom, getDecorationDescription } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
-import { CandyColors, getDialogueTheme } from '../../theme/colors';
+import { CandyColors, getDialogueTheme, getPhaseSurfaceTheme } from '../../theme/colors';
 import {
   loadProgress,
   getFullProgress,
@@ -286,13 +286,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Phase-aware dialogue theme for all modals and dialogue boxes
   const dt = getDialogueTheme(progress.currentPhase);
+  const surfaceTheme = getPhaseSurfaceTheme(progress.currentPhase);
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
       {/* Header with amber and play button */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: surfaceTheme.glassSoft,
+            borderBottomColor: surfaceTheme.glassBorder,
+          },
+        ]}
+      >
         <JuicyButton
-          style={styles.amberContainer}
+          style={[
+            styles.amberContainer,
+            {
+              backgroundColor: surfaceTheme.glassStrong,
+              borderColor: surfaceTheme.glassBorder,
+            },
+          ]}
           onPress={() => unlockFlow.setShowShop(true)}
           bounceScale={0.95}
           accessibilityLabel={`Shop. ${progress.amber} amber`}
@@ -302,14 +317,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
               <Text style={styles.amberEmoji}>💎</Text>
             </Animated.View>
-            <Text style={styles.amberCount}>{progress.amber}</Text>
+            <Text style={[styles.amberCount, { color: surfaceTheme.textPrimary }]}>
+              {progress.amber}
+            </Text>
             <Text style={styles.amberPlus}>+</Text>
             <AmberSparkle />
           </View>
         </JuicyButton>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.title}>Animal House</Text>
+          <Text style={[styles.title, { color: surfaceTheme.textPrimary }]}>Animal House</Text>
         </View>
 
         <View style={styles.headerRight}>
@@ -317,7 +334,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
           )}
           <TouchableOpacity
-            style={styles.headerIconBtn}
+            style={[
+              styles.headerIconBtn,
+              {
+                backgroundColor: surfaceTheme.glassStrong,
+                borderColor: surfaceTheme.glassBorder,
+              },
+            ]}
             onPress={onOpenStats}
             accessibilityLabel="View stats"
             accessibilityRole="button"
@@ -325,7 +348,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.headerIconText}>📊</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.headerIconBtn}
+            style={[
+              styles.headerIconBtn,
+              {
+                backgroundColor: surfaceTheme.glassStrong,
+                borderColor: surfaceTheme.glassBorder,
+              },
+            ]}
             onPress={onOpenSettings}
             accessibilityLabel="Settings"
             accessibilityRole="button"
@@ -333,7 +362,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.headerIconText}>⚙️</Text>
           </TouchableOpacity>
           <JuicyButton
-            style={styles.playButton}
+            style={[
+              styles.playButton,
+              {
+                backgroundColor: surfaceTheme.successAccent,
+                shadowColor: surfaceTheme.successAccent,
+                borderColor: 'rgba(255, 255, 255, 0.2)',
+              },
+            ]}
             onPress={() => onPlayPuzzle()}
             bounceScale={0.9}
             accessibilityLabel="Play puzzle"
@@ -357,14 +393,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Next Unlock Progress Bar */}
       {unlockFlow.nextUnlock && (
         <TouchableOpacity
-          style={styles.unlockProgressContainer}
+          style={[
+            styles.unlockProgressContainer,
+            {
+              backgroundColor: surfaceTheme.badgeBg,
+              borderColor: surfaceTheme.badgeBorder,
+            },
+          ]}
           onPress={() => unlockFlow.setShowShop(true)}
           activeOpacity={0.8}
           accessibilityLabel={`Next unlock: ${unlockFlow.nextUnlock.name}. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
           accessibilityRole="button"
         >
           <View style={styles.unlockProgressInner}>
-            <Text style={styles.unlockProgressLabel}>
+            <Text style={[styles.unlockProgressLabel, { color: surfaceTheme.textSecondary }]}>
               {unlockFlow.nextUnlock.type === 'character' ? '🐾' : '🏠'} {unlockFlow.nextUnlock.name}
             </Text>
             <View style={styles.unlockProgressBarBg}>
@@ -375,11 +417,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     width: `${Math.min(100, unlockFlow.nextUnlock.cost > 0
                       ? (progress.amber / unlockFlow.nextUnlock.cost) * 100
                       : 100)}%`,
+                    backgroundColor: surfaceTheme.accent,
                   },
                 ]}
               />
             </View>
-            <Text style={styles.unlockProgressText}>
+            <Text style={[styles.unlockProgressText, { color: surfaceTheme.textMuted }]}>
               {unlockFlow.nextUnlock.cost === 0
                 ? 'FREE — Tap to invite!'
                 : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
@@ -393,6 +436,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <TouchableOpacity
           style={[
             styles.wordsOfferedHomeContainer,
+            {
+              backgroundColor: surfaceTheme.glassSoft,
+              borderColor: surfaceTheme.glassBorder,
+            },
             progress.currentPhase >= 3 && styles.wordsOfferedHomeContainerDark,
           ]}
           onPress={onOpenLedger}
@@ -402,6 +449,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <Text style={[
             styles.wordsOfferedHomeText,
+            { color: surfaceTheme.textMuted },
             progress.currentPhase >= 3 && styles.wordsOfferedHomeTextDark,
           ]}>
             {getWordsOfferedText(progress.totalWordsFormed || 0, progress.currentPhase)}
@@ -1099,14 +1147,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderBottomWidth: 1,
     zIndex: 100,
   },
   amberContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    borderWidth: 1,
   },
   amberInner: {
     flexDirection: 'row',
@@ -1140,9 +1188,9 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
   headerIconText: {
     fontSize: 16,
@@ -1156,15 +1204,14 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   playButton: {
-    backgroundColor: CandyColors.green.main,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    shadowColor: CandyColors.green.dark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 4,
+    borderWidth: 1,
   },
   playButtonText: {
     color: CandyColors.white,
@@ -1176,11 +1223,11 @@ const styles = StyleSheet.create({
   // Words Offered Counter (persistent on home screen)
   wordsOfferedHomeContainer: {
     alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 16,
     paddingVertical: 5,
     borderRadius: 12,
     marginBottom: 4,
+    borderWidth: 1,
   },
   wordsOfferedHomeContainerDark: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { CandyColors } from '../theme/colors';
+import { CandyColors, getPhaseSurfaceTheme } from '../theme/colors';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
 import { getSettingsSync } from '../services/settings';
@@ -26,6 +26,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   onStartDaily,
   phase = 0,
 }) => {
+  const surfaceTheme = getPhaseSurfaceTheme(phase);
   const [isCompleted, setIsCompleted] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('HARD');
   const [stars, setStars] = useState(0);
@@ -126,21 +127,28 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   const btnBg = isCompleted
     ? 'rgba(34, 197, 94, 0.3)'
     : phase >= 4
-      ? 'rgba(180, 60, 60, 0.4)'
+      ? surfaceTheme.glassStrong
       : phase >= 3
-        ? 'rgba(160, 140, 60, 0.4)'
+        ? surfaceTheme.glassStrong
         : 'rgba(255, 200, 60, 0.35)';
 
   const glowColor = phase >= 4
-    ? 'rgba(180, 60, 60, 0.6)'
+    ? surfaceTheme.dangerAccent
     : phase >= 3
-      ? 'rgba(160, 140, 60, 0.5)'
+      ? surfaceTheme.accent
       : 'rgba(255, 200, 60, 0.5)';
 
   return (
     <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: btnBg }]}
+        style={[
+          styles.button,
+          {
+            backgroundColor: btnBg,
+            borderColor: surfaceTheme.glassBorder,
+            shadowColor: surfaceTheme.cardShadow,
+          },
+        ]}
         onPress={handlePress}
         activeOpacity={isCompleted ? 1 : 0.7}
         accessibilityLabel={
@@ -202,6 +210,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   glowRing: {
     position: 'absolute',

@@ -386,6 +386,109 @@ const PHASE_BG_COLORS: Record<number, string> = {
   4: '#1a122a',
 };
 
+interface HousePalette {
+  roofMain: string;
+  roofShingle: string;
+  roofTrim: string;
+  chimneyBody: string;
+  chimneyTop: string;
+  houseBody: string;
+  houseBorder: string;
+  topTrim: string;
+  foundation: string;
+  stone: string;
+  windowGlow: string;
+  atmosphereTop: string;
+  atmosphereBottom: string;
+}
+
+function getHousePalette(phase: number): HousePalette {
+  if (phase <= 1) {
+    return {
+      roofMain: '#5D4037',
+      roofShingle: '#4E342E',
+      roofTrim: '#3E2723',
+      chimneyBody: '#8B4513',
+      chimneyTop: '#5D4037',
+      houseBody: '#A0522D',
+      houseBorder: '#5D4037',
+      topTrim: '#8B4513',
+      foundation: '#6D4C41',
+      stone: '#5D4037',
+      windowGlow: '#FFE4B5',
+      atmosphereTop: 'rgba(255, 255, 255, 0.0)',
+      atmosphereBottom: 'rgba(255, 255, 255, 0.0)',
+    };
+  }
+  if (phase === 2) {
+    return {
+      roofMain: '#4A3D52',
+      roofShingle: '#392E44',
+      roofTrim: '#2D2338',
+      chimneyBody: '#5B4A64',
+      chimneyTop: '#3D3150',
+      houseBody: '#5A4A6E',
+      houseBorder: '#3D3150',
+      topTrim: '#4A3D5C',
+      foundation: '#4B3F58',
+      stone: '#3F344A',
+      windowGlow: '#D7C4E4',
+      atmosphereTop: 'rgba(40, 30, 70, 0.18)',
+      atmosphereBottom: 'rgba(35, 25, 55, 0.22)',
+    };
+  }
+  if (phase === 3) {
+    return {
+      roofMain: '#2A2438',
+      roofShingle: '#1E1A2A',
+      roofTrim: '#14111E',
+      chimneyBody: '#332C44',
+      chimneyTop: '#241F34',
+      houseBody: '#2E2740',
+      houseBorder: '#1C172A',
+      topTrim: '#251E36',
+      foundation: '#221D30',
+      stone: '#171322',
+      windowGlow: '#A894C0',
+      atmosphereTop: 'rgba(15, 10, 30, 0.34)',
+      atmosphereBottom: 'rgba(12, 8, 22, 0.4)',
+    };
+  }
+  if (phase >= 4) {
+    return {
+      roofMain: '#1A1422',
+      roofShingle: '#100C16',
+      roofTrim: '#0A0711',
+      chimneyBody: '#241827',
+      chimneyTop: '#160F1A',
+      houseBody: '#1E1728',
+      houseBorder: '#110D18',
+      topTrim: '#191223',
+      foundation: '#15101C',
+      stone: '#0D0914',
+      windowGlow: '#874159',
+      atmosphereTop: 'rgba(8, 4, 14, 0.48)',
+      atmosphereBottom: 'rgba(12, 6, 16, 0.58)',
+    };
+  }
+  // Phase 5 (post-revelation): calmer than phase 4
+  return {
+    roofMain: '#221D30',
+    roofShingle: '#171325',
+    roofTrim: '#100D1C',
+    chimneyBody: '#2C2540',
+    chimneyTop: '#201A32',
+    houseBody: '#2A233A',
+    houseBorder: '#1A1628',
+    topTrim: '#241E34',
+    foundation: '#1F1A2C',
+    stone: '#131022',
+    windowGlow: '#8A73A8',
+    atmosphereTop: 'rgba(14, 10, 30, 0.4)',
+    atmosphereBottom: 'rgba(12, 8, 24, 0.48)',
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
 // ═══════════════════════════════════════════════════════════════════════════
@@ -556,6 +659,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   onRoomPress,
   ritualWords = [],
 }) => {
+  const housePalette = useMemo(() => getHousePalette(currentPhase), [currentPhase]);
+
   // Animated values
   const scale = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -829,6 +934,20 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 }]}
                 resizeMode="cover"
               />
+              <View
+                style={[
+                  styles.atmosphereTop,
+                  { backgroundColor: housePalette.atmosphereTop },
+                ]}
+                pointerEvents="none"
+              />
+              <View
+                style={[
+                  styles.atmosphereBottom,
+                  { backgroundColor: housePalette.atmosphereBottom },
+                ]}
+                pointerEvents="none"
+              />
 
               {/* Animated clouds - inside transform so they move with the scene */}
               <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
@@ -919,39 +1038,56 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {/* Roof */}
                 <View style={styles.roof}>
                   <View style={styles.chimney}>
-                    <View style={styles.chimneyBody} />
-                    <View style={styles.chimneyTop} />
+                    <View style={[styles.chimneyBody, { backgroundColor: housePalette.chimneyBody }]} />
+                    <View style={[styles.chimneyTop, { backgroundColor: housePalette.chimneyTop }]} />
                     {/* Animated smoke puffs */}
-                    <View style={styles.smokeContainer}>
+                    <View style={[styles.smokeContainer, { opacity: currentPhase >= 4 ? 0.45 : 1 }]}>
                       <SmokePuff delay={0} />
                       <SmokePuff delay={1000} />
                       <SmokePuff delay={2000} />
                     </View>
                   </View>
-                  <View style={styles.roofMain}>
+                  <View style={[styles.roofMain, { backgroundColor: housePalette.roofMain }]}>
                     <View style={styles.roofPattern}>
                       <View style={styles.shingleRow}>
                         {[...Array(8)].map((_, i) => (
-                          <View key={i} style={styles.shingle} />
+                          <View key={i} style={[styles.shingle, { backgroundColor: housePalette.roofShingle }]} />
                         ))}
                       </View>
                       <View style={[styles.shingleRow, { marginLeft: 10 }]}>
                         {[...Array(7)].map((_, i) => (
-                          <View key={i} style={styles.shingle} />
+                          <View key={i} style={[styles.shingle, { backgroundColor: housePalette.roofShingle }]} />
                         ))}
                       </View>
                     </View>
                   </View>
-                  <View style={styles.roofTrim} />
+                  <View style={[styles.roofTrim, { backgroundColor: housePalette.roofTrim }]} />
                   <View style={styles.atticWindow}>
-                    <View style={styles.atticWindowGlass} />
-                    <View style={styles.atticWindowFrame} />
+                    <View
+                      style={[
+                        styles.atticWindowGlass,
+                        {
+                          backgroundColor: housePalette.windowGlow,
+                          opacity: currentPhase >= 4 ? 0.55 : currentPhase >= 3 ? 0.7 : 0.82,
+                        },
+                      ]}
+                    />
+                    <View style={[styles.atticWindowFrame, { borderColor: housePalette.roofTrim }]} />
                   </View>
                 </View>
 
                 {/* House body with rooms (single-column layout) */}
-                <View style={[styles.houseBody, { minHeight: houseHeight - HOUSE_PADDING }]}>
-                  <View style={styles.topTrim} />
+                <View
+                  style={[
+                    styles.houseBody,
+                    {
+                      minHeight: houseHeight - HOUSE_PADDING,
+                      backgroundColor: housePalette.houseBody,
+                      borderColor: housePalette.houseBorder,
+                    },
+                  ]}
+                >
+                  <View style={[styles.topTrim, { backgroundColor: housePalette.topTrim }]} />
 
                   {/* Render rooms from top to bottom (highest row number first) */}
                   {sortedRooms.map((room, index) => {
@@ -988,10 +1124,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 </View>
 
                 {/* Foundation */}
-                <View style={styles.foundation}>
+                <View style={[styles.foundation, { backgroundColor: housePalette.foundation }]}>
                   <View style={styles.stoneRow}>
                     {[...Array(6)].map((_, i) => (
-                      <View key={i} style={styles.stone} />
+                      <View key={i} style={[styles.stone, { backgroundColor: housePalette.stone }]} />
                     ))}
                   </View>
                 </View>
@@ -1022,6 +1158,22 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 1.4,
     height: SCREEN_HEIGHT * 1.4,
     zIndex: -1,
+  },
+  atmosphereTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.28,
+    zIndex: 30,
+  },
+  atmosphereBottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: SCREEN_HEIGHT * 0.3,
+    zIndex: 30,
   },
   // Clouds - inside transform container
   cloud: {
