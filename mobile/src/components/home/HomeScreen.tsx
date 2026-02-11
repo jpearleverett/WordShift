@@ -14,7 +14,7 @@ import {
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
 // (inside HouseWorld's GestureHandlerRootView) correctly use RNGH's version.
-import { Animal, Room, DialoguePhase, HomeWorldProgress, Unlockable, ROOM_DECORATIONS, Decoration, getDecorationsForRoom, getDecorationDescription, getAnimalPhase } from '../../types/homeWorld';
+import { Animal, Room, HomeWorldProgress, Unlockable, ROOM_DECORATIONS, Decoration, getDecorationsForRoom, getDecorationDescription } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
@@ -41,8 +41,6 @@ import {
   getRoomDescription,
 } from '../../services/homeWorldData';
 import {
-  getCurrentDialogue,
-  hasMoreDialogues,
   ANIMAL_INFO,
   getIntroDialogueLine,
   getIntroDialogueCount,
@@ -501,24 +499,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <Text style={styles.dialogueAnimalName}>{dialogueFlow.selectedAnimal.name}</Text>
 
                   <View style={styles.dialogueBubble}>
-                    {/* Trigger reaction woven into dialogue bubble */}
-                    {dialogueFlow.triggerReaction && progress.currentPhase >= 1 && (
-                      <Text style={[
-                        styles.inlineReactionText,
-                        progress.currentPhase >= 3 && styles.inlineReactionTextDark,
-                      ]}>
-                        {dialogueFlow.triggerReaction}
-                      </Text>
-                    )}
-                    {/* Cross-animal reference woven into dialogue bubble */}
-                    {dialogueFlow.crossAnimalRef && (
-                      <Text style={[
-                        styles.inlineCrossRefText,
-                        progress.currentPhase >= 3 && styles.inlineCrossRefTextDark,
-                      ]}>
-                        {dialogueFlow.crossAnimalRef}
-                      </Text>
-                    )}
                     <Text style={styles.dialogueText}>{dialogueFlow.dialogueText}</Text>
                   </View>
 
@@ -530,13 +510,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       accessibilityRole="button"
                     >
                       <Text style={styles.continueButtonText}>
-                        {hasMoreDialogues(
-                          dialogueFlow.selectedAnimal.type,
-                          dialogueFlow.selectedAnimal.currentDialogueIndex,
-                          getAnimalPhase(progress.currentPhase, dialogueFlow.selectedAnimal.type)
-                        )
-                          ? 'Next'
-                          : 'Close'}
+                        {dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1245,26 +1219,6 @@ const styles = StyleSheet.create({
     color: CandyColors.purple.dark,
     letterSpacing: 0.3,
     marginBottom: 10,
-  },
-  inlineReactionText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: CandyColors.purple.main,
-    lineHeight: 21,
-    marginBottom: 8,
-  },
-  inlineReactionTextDark: {
-    color: '#C77DBA',
-  },
-  inlineCrossRefText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: CandyColors.purple.main,
-    lineHeight: 21,
-    marginBottom: 8,
-  },
-  inlineCrossRefTextDark: {
-    color: '#C77DBA',
   },
   dialogueBubble: {
     backgroundColor: CandyColors.gray[100],

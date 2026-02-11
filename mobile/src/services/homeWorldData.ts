@@ -1,5 +1,7 @@
-import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase } from '../types/homeWorld';
+import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
 import { loadProgress, unlockAnimal, unlockRoom, canAfford } from './amberCurrency';
+import { getTotalDialogueCount } from './animalDialogue';
+import { isOnCooldown } from './dialogueSession';
 
 // ============================================================================
 // PHASE-AWARE ROOM DESCRIPTIONS
@@ -246,7 +248,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'cozy_den',
     isUnlocked: false, // Must be invited first!
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 45, y: 50 },
@@ -261,7 +263,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'kitchen',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 60, y: 50 },
@@ -276,7 +278,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'study',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 60, y: 45 },
@@ -291,7 +293,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'aquarium',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 40, y: 60 },
@@ -306,7 +308,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'jungle_room',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 50, y: 40 },
@@ -321,7 +323,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'desert_room',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 55, y: 55 },
@@ -336,7 +338,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'office',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 50, y: 55 },
@@ -351,7 +353,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'burrow',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 55, y: 60 },
@@ -366,7 +368,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'garden',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 40, y: 50 },
@@ -381,7 +383,7 @@ export const ANIMALS: Animal[] = [
     roomId: 'bamboo_attic',
     isUnlocked: false,
     currentDialogueIndex: 0,
-    hasNewDialogue: true,
+    hasNewDialogue: false,
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 50, y: 50 },
@@ -799,12 +801,25 @@ export async function getRoomsWithStatus(): Promise<Room[]> {
 export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const progress = await loadProgress();
 
-  return ANIMALS.map(animal => ({
-    ...animal,
-    isUnlocked: progress.unlockedAnimals.includes(animal.id),
-    // Load saved dialogue index from progress
-    currentDialogueIndex: progress.lastDialogueRead[animal.id] ?? 0,
-  }));
+  return ANIMALS.map(animal => {
+    const unlocked = progress.unlockedAnimals.includes(animal.id);
+    const dialogueIndex = progress.lastDialogueRead[animal.id] ?? 0;
+
+    // Compute hasNewDialogue: true when animal has unread dialogue and is available
+    let hasNewDialogue = false;
+    if (unlocked && !isOnCooldown(animal.id)) {
+      const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
+      const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
+      hasNewDialogue = dialogueIndex < totalDialogues;
+    }
+
+    return {
+      ...animal,
+      isUnlocked: unlocked,
+      currentDialogueIndex: dialogueIndex,
+      hasNewDialogue,
+    };
+  });
 }
 
 /**

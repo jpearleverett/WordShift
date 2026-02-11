@@ -5,6 +5,7 @@ import {
   getCurrentDialogue,
   hasMoreDialogues,
   getCrossAnimalReference,
+  getTriggerWordReaction,
   TUTORIAL_CALLBACK_DIALOGUES,
   getCoordinatedEventLine,
   getWordThresholdDialogue,
@@ -39,8 +40,7 @@ interface UseDialogueFlowReturn {
   cooldownSlide: Animated.Value;
   dialogueSlide: Animated.Value;
   isTalking: boolean;
-  triggerReaction: string | null;
-  crossAnimalRef: string | null;
+  hasMoreToShow: boolean;
   handleAnimalTap: (animal: Animal) => Promise<void>;
   handleNextDialogue: () => Promise<void>;
   handleCloseDialogue: () => Promise<void>;
@@ -49,6 +49,12 @@ interface UseDialogueFlowReturn {
 /**
  * Custom hook encapsulating dialogue session logic for the home screen.
  * Manages animal dialogue state, cooldown animations, and session flow.
+ *
+ * Dialogue pages flow naturally as a conversation:
+ * 1. Trigger word reaction (if any) — animal reacts to a puzzle word
+ * 2. Cross-animal reference (if any) — animal mentions another animal
+ * 3. Regular dialogue — the animal's main phase dialogue
+ * Each shows as a full page in the dialogue bubble, advanced by tapping "Next".
  */
 export function useDialogueFlow({
   progress,
@@ -59,8 +65,10 @@ export function useDialogueFlow({
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
   const [isTalking, setIsTalking] = useState(false);
-  const [triggerReaction, setTriggerReaction] = useState<string | null>(null);
-  const [crossAnimalRef, setCrossAnimalRef] = useState<string | null>(null);
+
+  // Pre-dialogue pages: shown before regular dialogue, one at a time
+  // These are trigger reactions, cross-animal refs, coordinated events, etc.
+  const [preDialoguePages, setPreDialoguePages] = useState<string[]>([]);
 
   // Animations
   const dialogueSlide = useRef(new Animated.Value(0)).current;
@@ -146,10 +154,14 @@ export function useDialogueFlow({
     }
   }, [showDialogue]);
 
-  // Get current dialogue text (uses per-animal phase awareness)
+  // Get current dialogue text — shows pre-dialogue pages first, then regular dialogue
   const getDialogueText = (): string => {
+    // If there are pre-dialogue pages remaining, show the first one
+    if (preDialoguePages.length > 0) {
+      return preDialoguePages[0];
+    }
+    // Otherwise show regular dialogue
     if (!selectedAnimal || !progress) return '';
-    // Per-animal phase: vanguard animals are 1 phase ahead, lagging are 1 behind
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
     const dialogue = getCurrentDialogue(
       selectedAnimal.type,
@@ -157,6 +169,16 @@ export function useDialogueFlow({
       animalPhase
     );
     return dialogue?.text || 'Hello, friend!';
+  };
+
+  // Check if there's more content to show (pre-dialogue pages or regular dialogue)
+  const computeHasMore = (): boolean => {
+    // If pre-dialogue pages remain, there's always more (regular dialogue follows)
+    if (preDialoguePages.length > 0) return true;
+    // Otherwise check regular dialogue
+    if (!selectedAnimal || !progress) return false;
+    const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
+    return hasMoreDialogues(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase);
   };
 
   // Handle animal tap
@@ -184,36 +206,20 @@ export function useDialogueFlow({
 
     setSelectedAnimal(animal);
     setShowDialogue(true);
-    setTriggerReaction(null);
-    setCrossAnimalRef(null);
 
-    // Track whether a trigger reaction has been set (to avoid overwriting)
-    let hasReaction = false;
+    // Build pre-dialogue pages: these show as sequential conversation pages
+    // before the regular dialogue, creating natural conversational flow
+    const pages: string[] = [];
 
-    // Check for trigger word reactions from recent puzzles (per-animal filtering)
-    try {
-      const consumed = await consumeTriggerWords(animal.type);
-      if (consumed.length > 0) {
-        // Animal noticed a trigger word from recent puzzles
-        const word = consumed[0]; // Show reaction to first trigger word
-        const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
-        if (animalPhase >= 1) {
-          setTriggerReaction(`You spelled "${word}"... ${animal.name} noticed.`);
-          hasReaction = true;
-        }
-      }
-    } catch {
-      // Trigger word consumption is non-critical
-    }
+    const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
 
-    // Tutorial callback for Fox at Phase 4 — one-time chilling reference to tutorial lines
+    // 1. Tutorial callback for Fox at Phase 4 — one-time chilling reference
     if (animal.type === 'fox' && progress && progress.currentPhase >= 4) {
       try {
         const seedsPlanted = await wereTutorialSeedsPlanted();
         if (!seedsPlanted) {
           const callbackLine = TUTORIAL_CALLBACK_DIALOGUES[Math.floor(Math.random() * TUTORIAL_CALLBACK_DIALOGUES.length)];
-          setTriggerReaction(callbackLine);
-          hasReaction = true;
+          pages.push(callbackLine);
           await markTutorialSeedsPlanted();
         }
       } catch {
@@ -221,12 +227,62 @@ export function useDialogueFlow({
       }
     }
 
-    // Cross-animal reference — frequency scales with phase
-    // Vanguard animals (Fox/Owl) get a guaranteed first cross-ref at each new phase
-    if (progress && progress.unlockedAnimals) {
-      const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
+    // 2. Coordinated event — milestone events take priority over trigger words
+    let hasCoordinatedEvent = false;
+    if (progress && progress.puzzlesSolved > 0) {
+      try {
+        const consumed = progress.consumedCoordinatedEvents || [];
+        const coordEvent = getCoordinatedEventLine(
+          animal.type,
+          progress.puzzlesSolved,
+          progress.currentPhase,
+          consumed
+        );
+        if (coordEvent) {
+          pages.push(coordEvent.text);
+          hasCoordinatedEvent = true;
+          await recordConsumedCoordinatedEvent(coordEvent.theme);
+        }
+      } catch {
+        // Coordinated events are non-critical
+      }
+    }
 
-      // Check if this is a Vanguard animal that should get a guaranteed cross-ref
+    // 3. Trigger word reaction — use the actual per-animal reactions
+    if (!hasCoordinatedEvent) {
+      try {
+        const consumed = await consumeTriggerWords(animal.type);
+        if (consumed.length > 0) {
+          const word = consumed[0];
+          if (animalPhase >= 1) {
+            // Use the per-animal, per-phase, per-word reaction text
+            const reaction = getTriggerWordReaction(animal.type, word, animalPhase as DialoguePhase);
+            if (reaction) {
+              pages.push(reaction);
+            }
+          }
+        }
+      } catch {
+        // Trigger word consumption is non-critical
+      }
+    }
+
+    // 4. Word count threshold dialogue — low priority
+    if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.totalWordsFormed) {
+      const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
+      const thresholdLine = getWordThresholdDialogue(
+        animal.type,
+        progress.totalWordsFormed,
+        approxPrevious,
+        progress.currentPhase
+      );
+      if (thresholdLine) {
+        pages.push(thresholdLine);
+      }
+    }
+
+    // 5. Cross-animal reference — frequency scales with phase
+    if (progress && progress.unlockedAnimals) {
       const isVanguard = ANIMAL_AWARENESS_TIERS[animal.type] === 'vanguard';
       let forceRef = false;
 
@@ -250,47 +306,12 @@ export function useDialogueFlow({
       if (forceRef || Math.random() < crossRefChance) {
         const ref = getCrossAnimalReference(animal.type, animalPhase as DialoguePhase, progress.unlockedAnimals);
         if (ref) {
-          setCrossAnimalRef(ref);
+          pages.push(ref);
         }
       }
     }
 
-    // Coordinated event — check if a milestone event is active for this animal
-    if (progress && progress.puzzlesSolved > 0) {
-      try {
-        const consumed = progress.consumedCoordinatedEvents || [];
-        const coordEvent = getCoordinatedEventLine(
-          animal.type,
-          progress.puzzlesSolved,
-          progress.currentPhase,
-          consumed
-        );
-        if (coordEvent) {
-          // Show coordinated line as a trigger reaction (same UI bubble)
-          setTriggerReaction(coordEvent.text);
-          hasReaction = true;
-          // Mark as consumed so it doesn't repeat
-          await recordConsumedCoordinatedEvent(coordEvent.theme);
-        }
-      } catch {
-        // Coordinated events are non-critical
-      }
-    }
-
-    // Word count threshold dialogue — animals reference specific milestones
-    if (progress && progress.totalWordsFormed && !hasReaction) {
-      // Approximate previous words (current minus last puzzle's words, roughly 3-5)
-      const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
-      const thresholdLine = getWordThresholdDialogue(
-        animal.type,
-        progress.totalWordsFormed,
-        approxPrevious,
-        progress.currentPhase
-      );
-      if (thresholdLine) {
-        setTriggerReaction(thresholdLine);
-      }
-    }
+    setPreDialoguePages(pages);
 
     const status = getSessionStatus(animal.id);
     setSessionInfo(status);
@@ -317,14 +338,21 @@ export function useDialogueFlow({
     setShowDialogue(false);
     setSelectedAnimal(null);
     setSessionInfo(null);
-    setTriggerReaction(null);
-    setCrossAnimalRef(null);
+    setPreDialoguePages([]);
   }, [selectedAnimal]);
 
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
     if (!selectedAnimal || !progress) return;
 
+    // If still showing pre-dialogue pages, advance through them
+    // Pre-dialogue pages don't count toward session dialogue limits
+    if (preDialoguePages.length > 0) {
+      setPreDialoguePages(prev => prev.slice(1));
+      return;
+    }
+
+    // Regular dialogue advance
     const availability = await checkDialogueAvailability(selectedAnimal.id);
     if (!availability.available && availability.reason !== 'max_dialogues') {
       handleCloseDialogue();
@@ -354,12 +382,12 @@ export function useDialogueFlow({
       setAnimals(prev =>
         prev.map(a =>
           a.id === selectedAnimal.id
-            ? { ...a, currentDialogueIndex: newIndex, hasNewDialogue: false }
+            ? { ...a, currentDialogueIndex: newIndex }
             : a
         )
       );
       setSelectedAnimal(prev =>
-        prev ? { ...prev, currentDialogueIndex: newIndex, hasNewDialogue: false } : null
+        prev ? { ...prev, currentDialogueIndex: newIndex } : null
       );
 
       if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
@@ -372,7 +400,7 @@ export function useDialogueFlow({
     } else {
       handleCloseDialogue();
     }
-  }, [selectedAnimal, progress, handleCloseDialogue, setAnimals]);
+  }, [selectedAnimal, progress, handleCloseDialogue, setAnimals, preDialoguePages]);
 
   return {
     selectedAnimal,
@@ -384,8 +412,7 @@ export function useDialogueFlow({
     cooldownSlide,
     dialogueSlide,
     isTalking,
-    triggerReaction,
-    crossAnimalRef,
+    hasMoreToShow: computeHasMore(),
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,
