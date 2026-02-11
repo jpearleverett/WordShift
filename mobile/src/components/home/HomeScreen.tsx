@@ -500,37 +500,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <View style={styles.dialogueTextCol}>
                   <Text style={styles.dialogueAnimalName}>{dialogueFlow.selectedAnimal.name}</Text>
 
-                  {/* Trigger word reaction / coordinated event / tutorial callback */}
-                  {dialogueFlow.triggerReaction && progress.currentPhase >= 1 && (
-                    <View style={[
-                      styles.triggerReactionBubble,
-                      progress.currentPhase >= 3 && styles.triggerReactionBubbleDark,
-                    ]}>
+                  <View style={styles.dialogueBubble}>
+                    {/* Trigger reaction woven into dialogue bubble */}
+                    {dialogueFlow.triggerReaction && progress.currentPhase >= 1 && (
                       <Text style={[
-                        styles.triggerReactionText,
-                        progress.currentPhase >= 3 && styles.triggerReactionTextDark,
+                        styles.inlineReactionText,
+                        progress.currentPhase >= 3 && styles.inlineReactionTextDark,
                       ]}>
                         {dialogueFlow.triggerReaction}
                       </Text>
-                    </View>
-                  )}
-
-                  {/* Cross-animal reference — one-off line mentioning another animal */}
-                  {dialogueFlow.crossAnimalRef && (
-                    <View style={[
-                      styles.triggerReactionBubble,
-                      progress.currentPhase >= 3 && styles.triggerReactionBubbleDark,
-                    ]}>
+                    )}
+                    {/* Cross-animal reference woven into dialogue bubble */}
+                    {dialogueFlow.crossAnimalRef && (
                       <Text style={[
-                        styles.triggerReactionText,
-                        progress.currentPhase >= 3 && styles.triggerReactionTextDark,
+                        styles.inlineCrossRefText,
+                        progress.currentPhase >= 3 && styles.inlineCrossRefTextDark,
                       ]}>
                         {dialogueFlow.crossAnimalRef}
                       </Text>
-                    </View>
-                  )}
-
-                  <View style={styles.dialogueBubble}>
+                    )}
                     <Text style={styles.dialogueText}>{dialogueFlow.dialogueText}</Text>
                   </View>
 
@@ -1258,27 +1246,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginBottom: 10,
   },
-  triggerReactionBubble: {
-    backgroundColor: 'rgba(147, 51, 234, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(147, 51, 234, 0.2)',
-  },
-  triggerReactionBubbleDark: {
-    backgroundColor: 'rgba(80, 20, 40, 0.3)',
-    borderColor: 'rgba(120, 40, 60, 0.4)',
-  },
-  triggerReactionText: {
-    fontSize: 12,
-    fontWeight: '600',
+  inlineReactionText: {
+    fontSize: 14,
     fontStyle: 'italic',
     color: CandyColors.purple.main,
-    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 8,
   },
-  triggerReactionTextDark: {
+  inlineReactionTextDark: {
+    color: '#C77DBA',
+  },
+  inlineCrossRefText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: CandyColors.purple.main,
+    lineHeight: 21,
+    marginBottom: 8,
+  },
+  inlineCrossRefTextDark: {
     color: '#C77DBA',
   },
   dialogueBubble: {

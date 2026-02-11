@@ -126,7 +126,7 @@ mobile/
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
-│       ├── animalDialogue.ts    # 560+ dialogue lines, cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds, word threshold dialogues
+│       ├── animalDialogue.ts    # 560+ dialogue lines (Stephen King literary voice), cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds, word threshold dialogues
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
@@ -436,6 +436,8 @@ Each animal filters the cult narrative through their personality:
 - **Rabbit (Thyme)**: Anxious but devoted. "I'm scared, but... this is what we prepared for, right?"
 - **Red Panda (Bamboo)**: Zen certainty. "The pattern completes. Breathe. Accept."
 
+**Dialogue Style**: All 560+ dialogues written in Stephen King's literary voice — each animal has a fully distinct personality with natural pronoun usage, flowing sentences, and earned emotional weight. No clipped or robotic dialogue. Each phase transition feels organic and the descent from candy-cute warmth to cosmic horror is gradual and earned.
+
 **Dialogue Count**: 56 dialogues per animal (560 total) + 5 post-revelation per animal (50 total)
 - Phase 0: 12 dialogues (happy, friendly)
 - Phase 1: 14 dialogues (curious + expanded variety: letters/words, house changes, community, personality)
@@ -456,7 +458,7 @@ Not all animals realize the truth at the same time. Defined in `ANIMAL_AWARENESS
 
 ### Cross-Animal References
 
-Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a styled bubble before regular dialogue in `HomeScreen.tsx`.
+Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as inline italic text within the animal's single dialogue bubble in `HomeScreen.tsx` (not as a separate chat box).
 
 **Guaranteed First Cross-Reference**: Vanguard animals (Fox/Owl) get a forced cross-reference the first time they're tapped at each new phase (Phase 1+), ensuring players see inter-animal coordination early. Tracked via `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` in `amberCurrency.ts`. Bypasses the random roll in `useDialogueFlow.ts`.
 
