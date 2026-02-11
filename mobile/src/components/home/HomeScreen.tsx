@@ -17,7 +17,7 @@ import {
 import { Animal, Room, HomeWorldProgress, Unlockable, ROOM_DECORATIONS, Decoration, getDecorationsForRoom, getDecorationDescription } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
-import { CandyColors } from '../../theme/colors';
+import { CandyColors, getDialogueTheme } from '../../theme/colors';
 import {
   loadProgress,
   getFullProgress,
@@ -284,6 +284,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a',
   }[progress.currentPhase] || '#6fb7df';
 
+  // Phase-aware dialogue theme for all modals and dialogue boxes
+  const dt = getDialogueTheme(progress.currentPhase);
+
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
       {/* Header with amber and play button */}
@@ -427,6 +430,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={[
             styles.cooldownToast,
             {
+              backgroundColor: dt.cooldownBg,
+              borderColor: dt.cooldownBorder,
               opacity: dialogueFlow.cooldownOpacity,
               transform: [{ translateY: dialogueFlow.cooldownSlide }],
             },
@@ -447,7 +452,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={dialogueFlow.handleCloseDialogue}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
           activeOpacity={1}
           onPress={dialogueFlow.handleCloseDialogue}
           accessibilityLabel="Close dialogue"
@@ -457,6 +462,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={[
               styles.dialogueModal,
               {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
                 transform: [
                   {
                     translateY: dialogueFlow.dialogueSlide.interpolate({
@@ -470,10 +478,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             ]}
             onStartShouldSetResponder={() => true}
           >
+            {/* Decorative accent line at top of modal */}
+            <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
+
             {dialogueFlow.selectedAnimal && (
               <View style={styles.dialogueRow}>
                 {/* Sprite column - 30% width, zoomed in to fill */}
-                <View style={styles.dialogueSpriteCol}>
+                <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
                   {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
                     <Image
                       source={
@@ -496,19 +507,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <Text style={styles.dialogueAnimalName}>{dialogueFlow.selectedAnimal.name}</Text>
+                  <Text style={[styles.dialogueAnimalName, { color: dt.nameColor }]}>
+                    {dialogueFlow.selectedAnimal.name}
+                  </Text>
+                  {/* Decorative separator under name */}
+                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
 
-                  <View style={styles.dialogueBubble}>
-                    <Text style={styles.dialogueText}>{dialogueFlow.dialogueText}</Text>
+                  <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+                    <Text style={[styles.dialogueText, { color: dt.textColor }]}>{dialogueFlow.dialogueText}</Text>
                   </View>
 
                   <View style={styles.dialogueFooter}>
                     <TouchableOpacity
-                      style={styles.continueButton}
+                      style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
                       onPress={dialogueFlow.handleNextDialogue}
                       accessibilityLabel="Continue dialogue"
                       accessibilityRole="button"
                     >
+                      <View style={styles.dialogueButtonShine} />
                       <Text style={styles.continueButtonText}>
                         {dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
                       </Text>
@@ -529,18 +545,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => unlockFlow.setShowShop(false)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
           activeOpacity={1}
           onPress={() => unlockFlow.setShowShop(false)}
           accessibilityLabel="Close shop"
           accessibilityRole="button"
         >
           <View
-            style={styles.shopModal}
+            style={[
+              styles.shopModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
             onStartShouldSetResponder={() => true}
           >
-            <Text style={styles.shopTitle}>Unlock Progress</Text>
-            <Text style={styles.shopSubtitle}>
+            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Unlock Progress</Text>
+            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
               Your Amber: 💎 {progress.amber}
             </Text>
 
@@ -548,10 +571,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {unlockFlow.nextUnlock && (
               <View style={styles.nextUnlockContainer}>
                 <Text style={styles.nextUnlockLabel}>Next Unlock:</Text>
-                <View style={styles.unlockItem}>
+                <View style={[styles.unlockItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
                   <View style={styles.unlockInfo}>
-                    <Text style={styles.unlockName}>{unlockFlow.nextUnlock.name}</Text>
-                    <Text style={styles.unlockDescription}>
+                    <Text style={[styles.unlockName, { color: dt.textColor }]}>{unlockFlow.nextUnlock.name}</Text>
+                    <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
                       {unlockFlow.nextUnlock.type === 'room'
                         ? getRoomDescription(unlockFlow.nextUnlock.targetId, progress.currentPhase)
                         : unlockFlow.nextUnlock.description}
@@ -633,21 +656,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => unlockFlow.setShowRoomUnlock(null)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
           activeOpacity={1}
           onPress={() => unlockFlow.setShowRoomUnlock(null)}
           accessibilityLabel="Close room unlock"
           accessibilityRole="button"
         >
           <View
-            style={styles.shopModal}
+            style={[
+              styles.shopModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
             onStartShouldSetResponder={() => true}
           >
             {unlockFlow.showRoomUnlock && (
               <>
-                <Text style={styles.shopTitle}>🔒 Locked Room</Text>
-                <Text style={styles.lockedRoomName}>{unlockFlow.showRoomUnlock.name}</Text>
-                <Text style={styles.shopSubtitle}>
+                <Text style={[styles.shopTitle, { color: dt.nameColor }]}>🔒 Locked Room</Text>
+                <Text style={[styles.lockedRoomName, { color: dt.textColor }]}>{unlockFlow.showRoomUnlock.name}</Text>
+                <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
                   Play more puzzles to earn amber and unlock this room!
                 </Text>
                 <Text style={styles.amberBalance}>Your Amber: 💎 {progress.amber}</Text>
@@ -691,9 +721,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={() => unlockFlow.setShowInvitePrompt(false)}
       >
-        <View style={styles.centeredOverlay}>
+        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
           <View
-            style={styles.inviteModal}
+            style={[
+              styles.inviteModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
             onStartShouldSetResponder={() => true}
           >
             {unlockFlow.nextUnlock && unlockFlow.nextUnlock.type === 'character' && (() => {
@@ -714,13 +751,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   ) : (
                     <Text style={styles.inviteEmoji}>{animalEmoji}</Text>
                   )}
-                  <Text style={styles.inviteTitle}>
+                  <Text style={[styles.inviteTitle, { color: dt.nameColor }]}>
                     {isFirstAnimal ? 'A Visitor Approaches!' : 'A New Friend!'}
                   </Text>
-                  <Text style={styles.inviteText}>
+                  <Text style={[styles.inviteText, { color: dt.textColor }]}>
                     {unlockFlow.nextUnlock!.description}
                   </Text>
-                  <Text style={styles.inviteText}>
+                  <Text style={[styles.inviteText, { color: dt.textColor }]}>
                     {isFirstAnimal
                       ? 'Would you like to invite them into your cozy den?'
                       : `Would you like to welcome ${unlockFlow.nextUnlock!.name.split(' ')[0]} to your growing home?`
@@ -736,7 +773,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <TouchableOpacity
                     style={[
                       styles.inviteButton,
-                      progress && progress.amber < unlockFlow.nextUnlock!.cost && styles.inviteButtonDisabled
+                      { backgroundColor: dt.secondaryButtonBg, shadowColor: dt.secondaryButtonBg },
+                      progress && progress.amber < unlockFlow.nextUnlock!.cost && styles.inviteButtonDisabled,
                     ]}
                     onPress={async () => {
                       await unlockFlow.handlePurchase(unlockFlow.nextUnlock!);
@@ -778,15 +816,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={handleCloseIntroDialogue}
       >
-        <View style={styles.centeredOverlay}>
+        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
           <View
-            style={styles.introDialogueModal}
+            style={[
+              styles.introDialogueModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
             onStartShouldSetResponder={() => true}
           >
+            {/* Top accent bar */}
+            <View style={[styles.introAccentLine, { backgroundColor: dt.accentLine }]} />
+
             {introAnimal && (
               <>
                 {/* Animal portrait */}
-                <View style={styles.introPortraitContainer}>
+                <View style={[
+                  styles.introPortraitContainer,
+                  {
+                    backgroundColor: dt.portraitRingBg,
+                    borderColor: dt.portraitRingBorder,
+                    shadowColor: dt.accentLine,
+                  },
+                ]}>
                   {CHARACTER_SPRITES[introAnimal.type] ? (
                     <Image
                       source={
@@ -805,26 +860,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   )}
                 </View>
 
-                <Text style={styles.introAnimalName}>{introAnimal.name}</Text>
-                <Text style={styles.introAnimalTitle}>
+                <Text style={[styles.introAnimalName, { color: dt.nameColor }]}>
+                  {introAnimal.name}
+                </Text>
+                <Text style={[styles.introAnimalTitle, { color: dt.subtitleColor }]}>
                   {ANIMAL_INFO[introAnimal.type]?.description}
                 </Text>
 
                 {/* Dialogue text */}
-                <View style={styles.introDialogueBubble}>
-                  <Text style={styles.introDialogueText}>{getCurrentIntroText()}</Text>
+                <View style={[
+                  styles.introDialogueBubble,
+                  {
+                    backgroundColor: dt.bubbleBg,
+                    borderColor: dt.bubbleBorder,
+                  },
+                ]}>
+                  <Text style={[styles.introDialogueText, { color: dt.textColor }]}>
+                    {getCurrentIntroText()}
+                  </Text>
                 </View>
 
                 {/* Progress and continue */}
                 <View style={styles.introDialogueFooter}>
-                  <Text style={styles.introDialogueProgress}>{getIntroProgress()}</Text>
+                  <Text style={[styles.introDialogueProgress, { color: dt.progressColor }]}>
+                    {getIntroProgress()}
+                  </Text>
                   <TouchableOpacity
-                    style={styles.introContinueButton}
+                    style={[
+                      styles.introContinueButton,
+                      {
+                        backgroundColor: dt.secondaryButtonBg,
+                        shadowColor: dt.secondaryButtonBg,
+                      },
+                    ]}
                     onPress={handleAdvanceIntroDialogue}
                     accessibilityLabel={hasMoreIntroDialogues() ? 'Continue intro' : 'Welcome and close'}
                     accessibilityRole="button"
                   >
-                    <Text style={styles.introContinueButtonText}>
+                    <View style={styles.dialogueButtonShine} />
+                    <Text style={[styles.introContinueButtonText, { color: dt.secondaryButtonText }]}>
                       {hasMoreIntroDialogues() ? 'Continue' : 'Welcome!'}
                     </Text>
                   </TouchableOpacity>
@@ -843,18 +917,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => setShowDecorationShop(false)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
           activeOpacity={1}
           onPress={() => setShowDecorationShop(false)}
           accessibilityLabel="Close decoration shop"
           accessibilityRole="button"
         >
           <View
-            style={styles.decorationShopModal}
+            style={[
+              styles.decorationShopModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
             onStartShouldSetResponder={() => true}
           >
-            <Text style={styles.shopTitle}>Room Decorations</Text>
-            <Text style={styles.shopSubtitle}>
+            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Room Decorations</Text>
+            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
               Your Amber: 💎 {progress.amber}
             </Text>
 
@@ -927,9 +1008,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={() => setShowHouseCompletion(false)}
       >
-        <View style={styles.centeredOverlay}>
+        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
           <View
-            style={[styles.houseCompletionModal, progress.currentPhase >= 3 && styles.houseCompletionModalDark]}
+            style={[
+              styles.houseCompletionModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+              progress.currentPhase >= 3 && styles.houseCompletionModalDark,
+            ]}
             onStartShouldSetResponder={() => true}
           >
             {(() => {
@@ -941,24 +1030,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </Text>
                   <Text style={[
                     styles.houseCompletionTitle,
-                    progress.currentPhase >= 3 && styles.houseCompletionTitleDark,
+                    { color: dt.nameColor },
                   ]}>
                     {progress.currentPhase >= 4 ? 'The Temple' : 'The House is Complete'}
                   </Text>
                   <Text style={[
                     styles.houseCompletionText,
-                    progress.currentPhase >= 3 && styles.houseCompletionTextDark,
+                    { color: dt.textColor },
                   ]}>
                     {lines[houseCompletionTextIndex]}
                   </Text>
                   <View style={styles.introDialogueFooter}>
-                    <Text style={styles.introDialogueProgress}>
+                    <Text style={[styles.introDialogueProgress, { color: dt.progressColor }]}>
                       {houseCompletionTextIndex + 1}/{lines.length}
                     </Text>
                     <TouchableOpacity
                       style={[
                         styles.introContinueButton,
-                        progress.currentPhase >= 3 && styles.houseCompletionButton,
+                        { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
                       ]}
                       onPress={() => {
                         if (houseCompletionTextIndex + 1 < lines.length) {
@@ -1180,22 +1269,25 @@ const styles = StyleSheet.create({
   },
   // Dialogue modal - side-by-side: 30% sprite, 70% text
   dialogueModal: {
-    backgroundColor: CandyColors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+  },
+  dialogueAccentLine: {
+    height: 3,
+    width: '100%',
   },
   dialogueRow: {
     flexDirection: 'row',
   },
   dialogueSpriteCol: {
     width: '30%',
-    backgroundColor: CandyColors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -1216,36 +1308,53 @@ const styles = StyleSheet.create({
   dialogueAnimalName: {
     fontSize: 22,
     fontWeight: '900',
-    color: CandyColors.purple.dark,
-    letterSpacing: 0.3,
-    marginBottom: 10,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  dialogueNameSeparator: {
+    height: 2,
+    width: 32,
+    borderRadius: 1,
+    opacity: 0.5,
+    marginBottom: 12,
   },
   dialogueBubble: {
-    backgroundColor: CandyColors.gray[100],
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 14,
+    borderWidth: 1,
   },
   dialogueText: {
     fontSize: 15,
-    color: CandyColors.gray[700],
-    lineHeight: 22,
+    lineHeight: 23,
+    letterSpacing: 0.1,
   },
   dialogueFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
+  dialogueButtonShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+  },
   continueButton: {
-    backgroundColor: CandyColors.purple.main,
     paddingHorizontal: 28,
     paddingVertical: 12,
     borderRadius: 22,
-    shadowColor: CandyColors.purple.shadow,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   continueButtonText: {
     color: CandyColors.white,
@@ -1255,22 +1364,25 @@ const styles = StyleSheet.create({
 
   // Shop modal
   shopModal: {
-    backgroundColor: CandyColors.white,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 24,
     paddingBottom: 40,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
   },
   shopTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: CandyColors.purple.main,
     textAlign: 'center',
     marginBottom: 8,
   },
   shopSubtitle: {
     fontSize: 16,
-    color: CandyColors.gray[500],
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -1286,9 +1398,9 @@ const styles = StyleSheet.create({
   unlockItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CandyColors.gray[50],
     borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
   },
   unlockInfo: {
     flex: 1,
@@ -1296,11 +1408,9 @@ const styles = StyleSheet.create({
   unlockName: {
     fontSize: 16,
     fontWeight: '800',
-    color: CandyColors.gray[700],
   },
   unlockDescription: {
     fontSize: 12,
-    color: CandyColors.gray[500],
     marginTop: 2,
   },
   unlockCost: {
@@ -1344,13 +1454,15 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   closeButton: {
-    backgroundColor: CandyColors.gray[200],
+    backgroundColor: 'rgba(128, 128, 128, 0.12)',
     paddingVertical: 14,
     borderRadius: 16,
     marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(128, 128, 128, 0.1)',
   },
   closeButtonText: {
-    color: CandyColors.gray[600],
+    color: 'rgba(150, 150, 150, 0.8)',
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
@@ -1377,7 +1489,6 @@ const styles = StyleSheet.create({
     bottom: 120,
     left: 20,
     right: 20,
-    backgroundColor: CandyColors.orange.main,
     borderRadius: 16,
     padding: 16,
     zIndex: 1000,
@@ -1386,6 +1497,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    borderWidth: 1,
   },
   cooldownToastText: {
     color: CandyColors.white,
@@ -1396,16 +1508,17 @@ const styles = StyleSheet.create({
 
   // Invite modal styles
   inviteModal: {
-    backgroundColor: CandyColors.white,
     borderRadius: 30,
     padding: 30,
     marginHorizontal: 20,
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
+    borderWidth: 1,
+    maxWidth: 380,
+    width: '90%',
   },
   inviteEmoji: {
     fontSize: 80,
@@ -1419,29 +1532,28 @@ const styles = StyleSheet.create({
   inviteTitle: {
     fontSize: 24,
     fontWeight: '900',
-    color: CandyColors.purple.main,
     textAlign: 'center',
     marginBottom: 16,
   },
   inviteText: {
     fontSize: 16,
-    color: CandyColors.gray[600],
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 12,
     paddingHorizontal: 10,
   },
   inviteButton: {
-    backgroundColor: CandyColors.green.main,
     paddingHorizontal: 30,
     paddingVertical: 16,
     borderRadius: 25,
     marginTop: 16,
-    shadowColor: CandyColors.green.dark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 6,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   inviteButtonDisabled: {
     backgroundColor: CandyColors.gray[400],
@@ -1470,32 +1582,41 @@ const styles = StyleSheet.create({
 
   // Intro dialogue modal styles
   introDialogueModal: {
-    backgroundColor: CandyColors.white,
     borderRadius: 30,
     padding: 30,
     marginHorizontal: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
     maxWidth: 380,
     width: '90%',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  introAccentLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
   },
   introPortraitContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: CandyColors.purple.light,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: CandyColors.purple.main,
+    marginTop: 6,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 2,
   },
   introPortraitEmoji: {
     fontSize: 50,
@@ -1507,29 +1628,28 @@ const styles = StyleSheet.create({
   introAnimalName: {
     fontSize: 28,
     fontWeight: '900',
-    color: CandyColors.purple.main,
     textAlign: 'center',
     marginBottom: 4,
+    letterSpacing: 0.5,
   },
   introAnimalTitle: {
     fontSize: 14,
-    color: CandyColors.gray[500],
     fontStyle: 'italic',
     textAlign: 'center',
     marginBottom: 20,
   },
   introDialogueBubble: {
-    backgroundColor: CandyColors.gray[100],
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     width: '100%',
+    borderWidth: 1,
   },
   introDialogueText: {
     fontSize: 16,
-    color: CandyColors.gray[700],
     lineHeight: 24,
     textAlign: 'center',
+    letterSpacing: 0.1,
   },
   introDialogueFooter: {
     flexDirection: 'row',
@@ -1539,22 +1659,21 @@ const styles = StyleSheet.create({
   },
   introDialogueProgress: {
     fontSize: 14,
-    color: CandyColors.gray[400],
     fontWeight: '600',
   },
   introContinueButton: {
-    backgroundColor: CandyColors.green.main,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
-    shadowColor: CandyColors.green.dark,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   introContinueButtonText: {
-    color: CandyColors.white,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -1580,12 +1699,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   decorationShopModal: {
-    backgroundColor: CandyColors.white,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 24,
     paddingBottom: 40,
     maxHeight: SCREEN_HEIGHT * 0.8,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
   },
   decorationRoomSection: {
     marginBottom: 16,
@@ -1597,7 +1721,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingBottom: 4,
     borderBottomWidth: 1,
-    borderBottomColor: CandyColors.gray[200],
+    borderBottomColor: 'rgba(128, 128, 128, 0.15)',
   },
   decorationItem: {
     flexDirection: 'row',
@@ -1649,23 +1773,20 @@ const styles = StyleSheet.create({
 
   // House completion ceremony styles
   houseCompletionModal: {
-    backgroundColor: CandyColors.white,
     borderRadius: 30,
     padding: 30,
     marginHorizontal: 20,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
     maxWidth: 380,
     width: '90%',
+    borderWidth: 1,
   },
   houseCompletionModalDark: {
-    backgroundColor: '#0A0510',
-    borderWidth: 1,
-    borderColor: 'rgba(140, 100, 60, 0.3)',
+    // Kept for backward compat but colors now come from dt
   },
   houseCompletionEmoji: {
     fontSize: 60,
@@ -1674,26 +1795,17 @@ const styles = StyleSheet.create({
   houseCompletionTitle: {
     fontSize: 22,
     fontWeight: '900',
-    color: CandyColors.purple.main,
     textAlign: 'center',
     marginBottom: 20,
-  },
-  houseCompletionTitleDark: {
-    color: '#C4A882',
+    letterSpacing: 0.5,
   },
   houseCompletionText: {
     fontSize: 16,
-    color: CandyColors.gray[600],
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
     paddingHorizontal: 10,
-  },
-  houseCompletionTextDark: {
-    color: '#8A7A9A',
-  },
-  houseCompletionButton: {
-    backgroundColor: '#3D1560',
+    letterSpacing: 0.1,
   },
 });
 

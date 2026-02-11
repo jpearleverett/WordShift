@@ -229,8 +229,15 @@ const SpeechBubble: React.FC<{ text: string; emphasis?: boolean }> = ({ text, em
 
   return (
     <Animated.View style={[styles.speechBubble, emphasis && styles.speechBubbleEmphasis, { opacity: fadeAnim }]}>
+      {/* Accent bar at the left edge */}
+      <View style={[styles.speechAccentBar, emphasis && styles.speechAccentBarEmphasis]} />
+      {/* Shine overlay at top */}
+      <View style={styles.speechShine} />
       <Text style={[styles.speechText, emphasis && styles.speechTextEmphasis]}>{text}</Text>
-      <View style={styles.speechTail} />
+      {/* Tail pointing up toward the fox */}
+      <View style={styles.speechTailOuter}>
+        <View style={[styles.speechTail, emphasis && styles.speechTailEmphasis]} />
+      </View>
     </Animated.View>
   );
 };
@@ -589,9 +596,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.5,
     shadowRadius: 32,
     elevation: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(168, 85, 247, 0.15)',
+    overflow: 'hidden',
   },
   welcomeTitle: {
     fontSize: 22,
@@ -609,39 +619,90 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   speechBubble: {
-    backgroundColor: CandyColors.gray[50],
-    borderRadius: 16,
-    padding: 14,
-    marginTop: 8,
+    backgroundColor: '#F5F0FF',
+    borderRadius: 18,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingLeft: 20,
+    paddingRight: 16,
+    marginTop: 12,
     marginBottom: 12,
     width: '100%',
     position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.12)',
+    shadowColor: CandyColors.purple.main,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: 'hidden',
   },
   speechBubbleEmphasis: {
-    backgroundColor: '#F0E6FF',
-    borderWidth: 1,
-    borderColor: CandyColors.purple.light,
+    backgroundColor: '#EDE5FF',
+    borderColor: 'rgba(168, 85, 247, 0.25)',
+    shadowOpacity: 0.15,
+  },
+  speechAccentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 8,
+    bottom: 8,
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: CandyColors.purple.light,
+    opacity: 0.6,
+  },
+  speechAccentBarEmphasis: {
+    opacity: 1,
+    backgroundColor: CandyColors.purple.main,
+    width: 4,
+  },
+  speechShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   speechText: {
     fontSize: 15,
     color: CandyColors.gray[600],
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 23,
+    letterSpacing: 0.1,
   },
   speechTextEmphasis: {
     fontWeight: '600',
-    color: CandyColors.purple.main,
+    color: CandyColors.purple.dark,
+  },
+  speechTailOuter: {
+    position: 'absolute',
+    top: -7,
+    alignSelf: 'center',
+    left: '50%',
+    marginLeft: -8,
+    width: 16,
+    height: 8,
+    overflow: 'hidden',
   },
   speechTail: {
     position: 'absolute',
-    top: -6,
-    alignSelf: 'center',
-    left: '50%',
-    marginLeft: -6,
+    bottom: -5,
+    left: 2,
     width: 12,
     height: 12,
-    backgroundColor: CandyColors.gray[50],
+    backgroundColor: '#F5F0FF',
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.12)',
     transform: [{ rotate: '45deg' }],
+  },
+  speechTailEmphasis: {
+    backgroundColor: '#EDE5FF',
+    borderColor: 'rgba(168, 85, 247, 0.25)',
   },
 
   // Continue / action buttons
@@ -649,19 +710,22 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.purple.main,
     paddingVertical: 14,
     paddingHorizontal: 32,
-    borderRadius: 16,
+    borderRadius: 20,
     alignItems: 'center',
-    shadowColor: CandyColors.purple.main,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: CandyColors.purple.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   continueBtnFinal: {
     backgroundColor: CandyColors.green.main,
-    shadowColor: CandyColors.green.main,
+    shadowColor: CandyColors.green.shadow,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   continueBtnShine: {
     position: 'absolute',
@@ -669,9 +733,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   continueBtnText: {
     fontSize: 16,
