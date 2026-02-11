@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Animated } from 'react-native';
-import { Animal, HomeWorldProgress, getAnimalPhase, DialoguePhase } from '../types/homeWorld';
+import { Animal, HomeWorldProgress, getAnimalPhase, DialoguePhase, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
 import {
   getCurrentDialogue,
   hasMoreDialogues,
   getCrossAnimalReference,
   TUTORIAL_CALLBACK_DIALOGUES,
   getCoordinatedEventLine,
+  getWordThresholdDialogue,
 } from '../services/animalDialogue';
 import {
   checkDialogueAvailability,
@@ -14,7 +15,7 @@ import {
   endSession,
   getSessionStatus,
 } from '../services/dialogueSession';
-import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted, recordConsumedCoordinatedEvent } from '../services/amberCurrency';
+import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted, recordConsumedCoordinatedEvent, hasSeenGuaranteedCrossRef, markGuaranteedCrossRefSeen } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 
 interface SessionInfo {
@@ -186,6 +187,9 @@ export function useDialogueFlow({
     setTriggerReaction(null);
     setCrossAnimalRef(null);
 
+    // Track whether a trigger reaction has been set (to avoid overwriting)
+    let hasReaction = false;
+
     // Check for trigger word reactions from recent puzzles (per-animal filtering)
     try {
       const consumed = await consumeTriggerWords(animal.type);
@@ -195,6 +199,7 @@ export function useDialogueFlow({
         const animalPhase = progress ? getAnimalPhase(progress.currentPhase, animal.type) : 0;
         if (animalPhase >= 1) {
           setTriggerReaction(`You spelled "${word}"... ${animal.name} noticed.`);
+          hasReaction = true;
         }
       }
     } catch {
@@ -208,6 +213,7 @@ export function useDialogueFlow({
         if (!seedsPlanted) {
           const callbackLine = TUTORIAL_CALLBACK_DIALOGUES[Math.floor(Math.random() * TUTORIAL_CALLBACK_DIALOGUES.length)];
           setTriggerReaction(callbackLine);
+          hasReaction = true;
           await markTutorialSeedsPlanted();
         }
       } catch {
@@ -216,14 +222,32 @@ export function useDialogueFlow({
     }
 
     // Cross-animal reference — frequency scales with phase
-    // Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%
+    // Vanguard animals (Fox/Owl) get a guaranteed first cross-ref at each new phase
     if (progress && progress.unlockedAnimals) {
       const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
+
+      // Check if this is a Vanguard animal that should get a guaranteed cross-ref
+      const isVanguard = ANIMAL_AWARENESS_TIERS[animal.type] === 'vanguard';
+      let forceRef = false;
+
+      if (isVanguard && progress.currentPhase >= 1) {
+        try {
+          const seen = await hasSeenGuaranteedCrossRef(progress.currentPhase);
+          if (!seen) {
+            forceRef = true;
+            await markGuaranteedCrossRefSeen(progress.currentPhase);
+          }
+        } catch {
+          // Non-critical
+        }
+      }
+
       const crossRefChance = animalPhase <= 1 ? 0.10
         : animalPhase === 2 ? 0.25
         : animalPhase === 3 ? 0.45
         : 0.60;
-      if (Math.random() < crossRefChance) {
+
+      if (forceRef || Math.random() < crossRefChance) {
         const ref = getCrossAnimalReference(animal.type, animalPhase as DialoguePhase, progress.unlockedAnimals);
         if (ref) {
           setCrossAnimalRef(ref);
@@ -244,11 +268,27 @@ export function useDialogueFlow({
         if (coordEvent) {
           // Show coordinated line as a trigger reaction (same UI bubble)
           setTriggerReaction(coordEvent.text);
+          hasReaction = true;
           // Mark as consumed so it doesn't repeat
           await recordConsumedCoordinatedEvent(coordEvent.theme);
         }
       } catch {
         // Coordinated events are non-critical
+      }
+    }
+
+    // Word count threshold dialogue — animals reference specific milestones
+    if (progress && progress.totalWordsFormed && !hasReaction) {
+      // Approximate previous words (current minus last puzzle's words, roughly 3-5)
+      const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
+      const thresholdLine = getWordThresholdDialogue(
+        animal.type,
+        progress.totalWordsFormed,
+        approxPrevious,
+        progress.currentPhase
+      );
+      if (thresholdLine) {
+        setTriggerReaction(thresholdLine);
       }
     }
 

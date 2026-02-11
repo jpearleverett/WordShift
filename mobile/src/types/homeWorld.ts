@@ -300,6 +300,27 @@ export function getDialoguesPerSession(phase: DialoguePhase): number {
 }
 
 /**
+ * Phase-aware cooldown between dialogue sessions.
+ * Shorter at Phase 0-1 to encourage emotional bonding.
+ * Longer at Phase 3-4 when dialogue is heavier and pacing should be deliberate.
+ */
+export function getPuzzlesBetweenSessions(phase: DialoguePhase): number {
+  switch (phase) {
+    case 0:
+      return 1;  // Very short — let the player bond with Fox early
+    case 1:
+      return 2;  // Still short — building relationships
+    case 2:
+      return 3;  // Standard cooldown
+    case 3:
+    case 4:
+      return 3;  // Deliberate pacing — each dialogue carries more weight
+    default:
+      return 3;
+  }
+}
+
+/**
  * Phase descriptions for UI
  * Phases are spread across ~300 puzzles for extended gameplay
  */

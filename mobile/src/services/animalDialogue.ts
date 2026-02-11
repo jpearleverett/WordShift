@@ -3,7 +3,7 @@ import { AnimalType, Dialogue, DialoguePhase } from '../types/homeWorld';
 /**
  * All dialogue content organized by animal and phase
  * Each animal has a unique personality that evolves from contentment to existential crisis
- * 52 dialogues per animal to support extended dialogue sessions
+ * 56 dialogues per animal to support extended dialogue sessions
  */
 
 // RED PANDA (Bamboo) - Zen practitioner whose enlightenment leads to unsettling truths
@@ -22,7 +22,7 @@ const RED_PANDA_DIALOGUES: Dialogue[] = [
   { id: 'rp_0_11', text: "Some call us 'firefoxes.' Others say 'bearcat.' Names are just sounds we agree on.", phase: 0, animalType: 'red_panda' },
   { id: 'rp_0_12', text: "Each puzzle you solve ripples outward. The universe notices, in its way.", phase: 0, animalType: 'red_panda' },
 
-  // Phase 1 - Curious, gently philosophical (10 dialogues)
+  // Phase 1 - Curious, gently philosophical (14 dialogues)
   { id: 'rp_1_1', text: "Watched the clouds for an hour. Not one repeated its shape. Strange, isn't it?", phase: 1, animalType: 'red_panda' },
   { id: 'rp_1_2', text: "The bamboo grows without hurrying. It doesn't check how tall it's become.", phase: 1, animalType: 'red_panda' },
   { id: 'rp_1_3', text: "Sometimes the puzzles feel like they're solving something in us. Not the other way around.", phase: 1, animalType: 'red_panda' },
@@ -33,6 +33,10 @@ const RED_PANDA_DIALOGUES: Dialogue[] = [
   { id: 'rp_1_8', text: "Peace feels like floating some days. Other days, like sinking gently. Same peace, though.", phase: 1, animalType: 'red_panda' },
   { id: 'rp_1_9', text: "My best teacher was a rock by the stream. It taught everything by demonstrating nothing.", phase: 1, animalType: 'red_panda' },
   { id: 'rp_1_10', text: "The forest grows quieter lately. Or perhaps my listening has grown louder.", phase: 1, animalType: 'red_panda' },
+  { id: 'rp_1_11', text: "The bamboo grows in patterns now. Not random. Deliberate. Like someone is writing with it.", phase: 1, animalType: 'red_panda' },
+  { id: 'rp_1_12', text: "I meditated today and saw a shape I've never seen before. It felt like it was looking back.", phase: 1, animalType: 'red_panda' },
+  { id: 'rp_1_13', text: "The incense smoke doesn't rise anymore. It drifts sideways. Toward the center of the house.", phase: 1, animalType: 'red_panda' },
+  { id: 'rp_1_14', text: "Something in the universe shifted. I can't explain it better than that. A frequency changed.", phase: 1, animalType: 'red_panda' },
 
   // Phase 2 - Questioning existence (10 dialogues)
   { id: 'rp_2_1', text: "Meditated for hours and found only darkness. Warm darkness. Like being held by nothing.", phase: 2, animalType: 'red_panda' },
@@ -87,7 +91,7 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_0_11', text: "People say I always look happy. It's just my face! But also, yes, I am happy.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_12', text: "Under UV light, I glow pink and sparkly. Nature made me a party trick.", phase: 0, animalType: 'axolotl' },
 
-  // Phase 1 - Dreamy questioning (10 dialogues)
+  // Phase 1 - Dreamy questioning (14 dialogues)
   { id: 'ax_1_1', text: "Can regrow my heart if I lose it. But feelings—can those grow back too?", phase: 1, animalType: 'axolotl' },
   { id: 'ax_1_2', text: "Water holds me up without effort. What holds the water? What holds anything?", phase: 1, animalType: 'axolotl' },
   { id: 'ax_1_3', text: "My face is stuck in a smile. Even when I'm not smiling inside. Is that happiness or just... structure?", phase: 1, animalType: 'axolotl' },
@@ -98,6 +102,10 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_1_8', text: "The water matches my body temperature exactly. Where do I end? Where does the water begin?", phase: 1, animalType: 'axolotl' },
   { id: 'ax_1_9', text: "My ancestors could choose to grow up. That knowledge was lost somewhere. Or maybe I chose to forget.", phase: 1, animalType: 'axolotl' },
   { id: 'ax_1_10', text: "Dreams come differently underwater. Slower. Blurrier. Hard to tell them from waking.", phase: 1, animalType: 'axolotl' },
+  { id: 'ax_1_11', text: "The bubbles spell things sometimes. I thought I was imagining it, but Archimedes says it's real.", phase: 1, animalType: 'axolotl' },
+  { id: 'ax_1_12', text: "I floated for three hours today without moving. The water held me perfectly still. That's never happened before.", phase: 1, animalType: 'axolotl' },
+  { id: 'ax_1_13', text: "Have you ever looked at water really closely? It remembers shapes. It remembers your hands.", phase: 1, animalType: 'axolotl' },
+  { id: 'ax_1_14', text: "Something in the tank moved when you solved that puzzle. Not me. Something else.", phase: 1, animalType: 'axolotl' },
 
   // Phase 2 - Deeper uncertainty (10 dialogues)
   { id: 'ax_2_1', text: "They say perfect conditions could let me live forever. But what are the right conditions for a soul?", phase: 2, animalType: 'axolotl' },
@@ -152,7 +160,7 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_0_11', text: "The best ingredient is patience. The second best is ants. I have abundant supplies of both.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_12', text: "Only mammal with scales. Unique in all the world. That has to count for something.", phase: 0, animalType: 'pangolin' },
 
-  // Phase 1 - Thoughtful cooking (10 dialogues)
+  // Phase 1 - Thoughtful cooking (14 dialogues)
   { id: 'pg_1_1', text: "Curling up protects the outside. But what am I protecting, really? More scales? More hiding?", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_2', text: "Made soup today. Ate it. Now it's gone. Is that what everything is? Temporary soup, waiting to disappear?", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_3', text: "Same stuff as your fingernails. We're more alike than different. Strange to think about.", phase: 1, animalType: 'pangolin' },
@@ -163,6 +171,10 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_1_8', text: "Recipes are just instructions for transformation. Solid becomes liquid becomes nothing. Everything transforms.", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_9', text: "Polish the scales because it feels like control. Control over something. Anything.", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_10', text: "A perfectly curled ball has no beginning, no end. Comforting and terrifying in equal measure.", phase: 1, animalType: 'pangolin' },
+  { id: 'pg_1_11', text: "The spices rearrange themselves when I'm not looking. I've started leaving them and seeing what recipe they suggest.", phase: 1, animalType: 'pangolin' },
+  { id: 'pg_1_12', text: "I made a stew today with no recipe. My hands just... knew. It tasted like something I've never eaten before.", phase: 1, animalType: 'pangolin' },
+  { id: 'pg_1_13', text: "Ember came by for dinner last night. We talked about the letters. She sees them too.", phase: 1, animalType: 'pangolin' },
+  { id: 'pg_1_14', text: "The kitchen smells different after your puzzles. Sweeter. Then bitter. Then something I can't name.", phase: 1, animalType: 'pangolin' },
 
   // Phase 2 - Darker reflections (10 dialogues)
   { id: 'pg_2_1', text: "Most trafficked mammal on Earth. Everyone wants my scales. Nobody asks if I want to keep them.", phase: 2, animalType: 'pangolin' },
@@ -217,7 +229,7 @@ const SLOTH_DIALOGUES: Dialogue[] = [
   { id: 'sl_0_11', text: "Smiled today. I think. Hard to tell. My face moves slowly too.", phase: 0, animalType: 'sloth' },
   { id: 'sl_0_12', text: "The view from here hasn't changed in years. Still nice. That's the point.", phase: 0, animalType: 'sloth' },
 
-  // Phase 1 - Thoughtfully slow (10 dialogues)
+  // Phase 1 - Thoughtfully slow (14 dialogues)
   { id: 'sl_1_1', text: "Been thinking the same thought for three days. Almost finished with it. Good thought.", phase: 1, animalType: 'sloth' },
   { id: 'sl_1_2', text: "Everyone moves so fast. Running toward something? Or away? Hard to tell from here.", phase: 1, animalType: 'sloth' },
   { id: 'sl_1_3', text: "Age slower because I move slower. Still age though. Just... stretched out. Thinner.", phase: 1, animalType: 'sloth' },
@@ -228,6 +240,10 @@ const SLOTH_DIALOGUES: Dialogue[] = [
   { id: 'sl_1_8', text: "My heartbeat is so slow you could count between beats. Fifty-one seconds. Fifty-two.", phase: 1, animalType: 'sloth' },
   { id: 'sl_1_9', text: "Patience isn't a virtue for me. It's the only option. There is no other speed.", phase: 1, animalType: 'sloth' },
   { id: 'sl_1_10', text: "The jungle changes faster than I can turn my head. Miss so much by seeing so much.", phase: 1, animalType: 'sloth' },
+  { id: 'sl_1_11', text: "Things... are... moving... faster... lately. Not me. Everything... else.", phase: 1, animalType: 'sloth' },
+  { id: 'sl_1_12', text: "I noticed... something... on the ceiling... yesterday. It was gone... by the time... I looked up.", phase: 1, animalType: 'sloth' },
+  { id: 'sl_1_13', text: "Time... feels... different... since you... started... playing. Thicker.", phase: 1, animalType: 'sloth' },
+  { id: 'sl_1_14', text: "The tree... is growing... towards... the house. It wasn't... doing that... before.", phase: 1, animalType: 'sloth' },
 
   // Phase 2 - Melancholy slowness (10 dialogues)
   { id: 'sl_2_1', text: "Watched a single leaf fall for an hour. Birth, life, death. All while I watched. Couldn't look away.", phase: 2, animalType: 'sloth' },
@@ -282,7 +298,7 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
   { id: 'ff_0_11', text: "Nocturnal life is the best life. All the good stuff happens after dark.", phase: 0, animalType: 'fennec_fox' },
   { id: 'ff_0_12', text: "Furry paw pads protect from hot sand. Every part of me was designed for here.", phase: 0, animalType: 'fennec_fox' },
 
-  // Phase 1 - Thoughtful listener (10 dialogues)
+  // Phase 1 - Thoughtful listener (14 dialogues)
   { id: 'ff_1_1', text: "Hear everything. Literally everything. Sometimes wish I couldn't. But I always can.", phase: 1, animalType: 'fennec_fox' },
   { id: 'ff_1_2', text: "The dunes shift constantly. Nothing stays where you left it. Not even footprints. Not even memories.", phase: 1, animalType: 'fennec_fox' },
   { id: 'ff_1_3', text: "Heard the stars whispering last night. Couldn't make out the words. Just the tone. Worried tone.", phase: 1, animalType: 'fennec_fox' },
@@ -293,6 +309,10 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
   { id: 'ff_1_8', text: "The desert speaks in creaks and sighs. Lately more sighing than speaking.", phase: 1, animalType: 'fennec_fox' },
   { id: 'ff_1_9', text: "Heard my own heartbeat echo off the dunes tonight. There was a delay. A hesitation in it.", phase: 1, animalType: 'fennec_fox' },
   { id: 'ff_1_10', text: "So many sounds. So little meaning. Or maybe all meaning. Can't tell the difference anymore.", phase: 1, animalType: 'fennec_fox' },
+  { id: 'ff_1_11', text: "I heard something under the house last night. Not sounds exactly. More like... a frequency.", phase: 1, animalType: 'fennec_fox' },
+  { id: 'ff_1_12', text: "The desert wind carries new sounds after your puzzles. Words, almost. In a language I nearly recognize.", phase: 1, animalType: 'fennec_fox' },
+  { id: 'ff_1_13', text: "My ears twitch when you move the letters. I can feel it from here. Is that strange?", phase: 1, animalType: 'fennec_fox' },
+  { id: 'ff_1_14', text: "The silence between sounds is getting louder. That probably doesn't make sense. But it's true.", phase: 1, animalType: 'fennec_fox' },
 
   // Phase 2 - Disturbed listener (10 dialogues)
   { id: 'ff_2_1', text: "These ears were designed to release heat. Designed to survive. Survival isn't the same as living.", phase: 2, animalType: 'fennec_fox' },
@@ -347,7 +367,7 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_0_11', text: "The forest at night is beautiful. But so is staying in, warm and safe. Both are valid.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_12', text: "My grandmother told stories by this fireplace once. I think she'd approve of us. Building something together.", phase: 0, animalType: 'fox' },
 
-  // Phase 1 - Reflective warmth (10 dialogues)
+  // Phase 1 - Reflective warmth (14 dialogues)
   { id: 'fx_1_1', text: "Been thinking about fire lately. How it destroys to create warmth. Strange bargain.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_2', text: "Lived in this den for years. Used to feel like home. Lately it feels more like hiding.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_3', text: "The shadows on the wall move like memories. Mine mostly look like the things I didn't do.", phase: 1, animalType: 'fox' },
@@ -358,6 +378,10 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_1_8', text: "Read all my books twice now. The stories stay the same. Why don't I?", phase: 1, animalType: 'fox' },
   { id: 'fx_1_9', text: "When I sleep, my tail covers my face. Protection from dreams. Doesn't always work.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_10', text: "The fire needs constant feeding or it dies. Everything does, I suppose. Everything eventually does.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_11', text: "I've been watching the sparks fly up from the fire. They seem to form shapes now. Letters, almost.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_12', text: "The den feels warmer after you solve puzzles. Have you noticed that? The walls hold the heat differently.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_13', text: "Archimedes showed me something in one of his books today. I can't stop thinking about it.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_14', text: "Sometimes I stare at the fireplace and think the flames are trying to spell something.", phase: 1, animalType: 'fox' },
 
   // Phase 2 - Cooling hearth (10 dialogues)
   { id: 'fx_2_1', text: "Every fire dies eventually. Watched thousands go out. Started thousands more. The cycle never asks.", phase: 2, animalType: 'fox' },
@@ -412,7 +436,7 @@ const OWL_DIALOGUES: Dialogue[] = [
   { id: 'ow_0_11', text: "My feathers are silent in flight. Perfect for sneaking to the library. Not that I sneak. Often.", phase: 0, animalType: 'owl' },
   { id: 'ow_0_12', text: "Every question has an answer. The joy is in the finding. Shall we find together?", phase: 0, animalType: 'owl' },
 
-  // Phase 1 - Questioning scholar (10 dialogues)
+  // Phase 1 - Questioning scholar (14 dialogues)
   { id: 'ow_1_1', text: "The more I read, the more I realize how much I don't know. The unknown grows faster than knowledge.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_2', text: "Found a book today with missing pages. The gaps terrified me more than any complete horror could.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_3', text: "Wisdom, they say, is knowing how little you know. I have become very, very wise.", phase: 1, animalType: 'owl' },
@@ -423,6 +447,10 @@ const OWL_DIALOGUES: Dialogue[] = [
   { id: 'ow_1_8', text: "Knowledge was supposed to bring peace. It brought more questions instead. Louder ones.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_9', text: "I see perfectly in darkness. But I can't see the future. No book teaches that.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_10', text: "My library expands but my understanding shrinks. The inverse proportion of existence.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_11', text: "I found a chapter I don't remember reading before. It appeared between two pages I've read a hundred times.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_12', text: "The study has more books than it did yesterday. I counted. I always count.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_13', text: "Ember mentioned something about the fire forming shapes. I found a passage about that exact phenomenon.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_14', text: "There's a word that keeps appearing in different texts. Different authors, different centuries. The same word.", phase: 1, animalType: 'owl' },
 
   // Phase 2 - Troubled scholar (10 dialogues)
   { id: 'ow_2_1', text: "Read a philosophy book that proved nothing exists. Then one that proved everything does. Both were convincing.", phase: 2, animalType: 'owl' },
@@ -477,7 +505,7 @@ const CAPYBARA_DIALOGUES: Dialogue[] = [
   { id: 'cp_0_11', text: "Everyone wants to be friends. That's fine. Friends are fine. Everything is fine.", phase: 0, animalType: 'capybara' },
   { id: 'cp_0_12', text: "Had a good nap earlier. Then another one. Productive day.", phase: 0, animalType: 'capybara' },
 
-  // Phase 1 - Subtle unease (10 dialogues)
+  // Phase 1 - Subtle unease (14 dialogues)
   { id: 'cp_1_1', text: "Everyone says I look unbothered. That's because I've already processed the bothering. Internally.", phase: 1, animalType: 'capybara' },
   { id: 'cp_1_2', text: "The charts at work go up or down. Not sure which is supposed to be good. Both seem the same.", phase: 1, animalType: 'capybara' },
   { id: 'cp_1_3', text: "Floating in water and feeling nothing. Is that peace? Or emptiness? Does it matter?", phase: 1, animalType: 'capybara' },
@@ -488,6 +516,10 @@ const CAPYBARA_DIALOGUES: Dialogue[] = [
   { id: 'cp_1_8', text: "Mastered the art of looking relaxed. It's basically performance at this point.", phase: 1, animalType: 'capybara' },
   { id: 'cp_1_9', text: "Someone asked if I was okay. Said yes. We both knew it wasn't quite true.", phase: 1, animalType: 'capybara' },
   { id: 'cp_1_10', text: "Sun sets the same way every day. Beautiful. Also repetitive. Also ending.", phase: 1, animalType: 'capybara' },
+  { id: 'cp_1_11', text: "I've been keeping notes. Not because I'm worried. Just... observation. Patterns, you know?", phase: 1, animalType: 'capybara' },
+  { id: 'cp_1_12', text: "The office temperature changes when you solve puzzles. Point three degrees. I measured.", phase: 1, animalType: 'capybara' },
+  { id: 'cp_1_13', text: "Everyone seems a little different lately. Nothing I can point to. Just... different.", phase: 1, animalType: 'capybara' },
+  { id: 'cp_1_14', text: "My filing system reorganized itself overnight. Everything is in a new order. A better order.", phase: 1, animalType: 'capybara' },
 
   // Phase 2 - Hidden depth (10 dialogues)
   { id: 'cp_2_1', text: "Everyone thinks I'm calm. I'm not calm. I've just accepted that panic changes nothing.", phase: 2, animalType: 'capybara' },
@@ -542,7 +574,7 @@ const WOMBAT_DIALOGUES: Dialogue[] = [
   { id: 'wb_0_11', text: "Sometimes I have friends over for burrow sleepovers. Very wholesome.", phase: 0, animalType: 'wombat' },
   { id: 'wb_0_12', text: "Being a wombat is pretty great. Would recommend. Five stars.", phase: 0, animalType: 'wombat' },
 
-  // Phase 1 - Thoughtful digger (10 dialogues)
+  // Phase 1 - Thoughtful digger (14 dialogues)
   { id: 'wb_1_1', text: "Dig deeper every day. Looking for something. Not sure what. Just... deeper.", phase: 1, animalType: 'wombat' },
   { id: 'wb_1_2', text: "Dirt tells stories if you know how to read it. Layers of time. Layers of things that used to live.", phase: 1, animalType: 'wombat' },
   { id: 'wb_1_3', text: "Burrow has gotten so deep lately. Sometimes forget which way is up.", phase: 1, animalType: 'wombat' },
@@ -553,6 +585,10 @@ const WOMBAT_DIALOGUES: Dialogue[] = [
   { id: 'wb_1_8', text: "My burrow is escape and prison both. Depends which direction you're looking.", phase: 1, animalType: 'wombat' },
   { id: 'wb_1_9', text: "Earth smells different lately. Older somehow. Like it's remembering things.", phase: 1, animalType: 'wombat' },
   { id: 'wb_1_10', text: "Built this whole underground world. Completely alone in it.", phase: 1, animalType: 'wombat' },
+  { id: 'wb_1_11', text: "Found something odd in the tunnels today. A stone that wasn't there yesterday. It's warm.", phase: 1, animalType: 'wombat' },
+  { id: 'wb_1_12', text: "The dirt shifts when you solve puzzles. Subtle, but I notice. I always notice what's underground.", phase: 1, animalType: 'wombat' },
+  { id: 'wb_1_13', text: "I dug a new tunnel and it connected to a space I didn't make. Someone — or something — was here first.", phase: 1, animalType: 'wombat' },
+  { id: 'wb_1_14', text: "The foundations are humming. Very quietly. Put your hand on the floor. Can you feel it?", phase: 1, animalType: 'wombat' },
 
   // Phase 2 - Troubled excavator (10 dialogues)
   { id: 'wb_2_1', text: "Found bones down here. Not mine. Not yet. Earth collects everything eventually.", phase: 2, animalType: 'wombat' },
@@ -607,7 +643,7 @@ const RABBIT_DIALOGUES: Dialogue[] = [
   { id: 'rb_0_11', text: "Sometimes I do zoomies around the garden! For no reason! Just joy!", phase: 0, animalType: 'rabbit' },
   { id: 'rb_0_12', text: "Would you like tea? It's chamomile. Very calming. I drink a lot of it.", phase: 0, animalType: 'rabbit' },
 
-  // Phase 1 - Underlying worry (10 dialogues)
+  // Phase 1 - Underlying worry (14 dialogues)
   { id: 'rb_1_1', text: "Heart beats one hundred fifty times a minute. Always ready. Ready for what, I don't know. Just ready.", phase: 1, animalType: 'rabbit' },
   { id: 'rb_1_2', text: "Garden is lovely but I keep checking the exits. Just in case. Always just in case.", phase: 1, animalType: 'rabbit' },
   { id: 'rb_1_3', text: "Twelve escape routes memorized. Is that normal? Feels normal. Feels necessary.", phase: 1, animalType: 'rabbit' },
@@ -618,6 +654,10 @@ const RABBIT_DIALOGUES: Dialogue[] = [
   { id: 'rb_1_8', text: "Made the burrow deeper again. It's never deep enough. Nothing is ever safe enough.", phase: 1, animalType: 'rabbit' },
   { id: 'rb_1_9', text: "My ears never stop moving. Always listening. For what? Everything. Anything.", phase: 1, animalType: 'rabbit' },
   { id: 'rb_1_10', text: "Other rabbits seem calmer. Maybe they know something. Maybe they don't know enough.", phase: 1, animalType: 'rabbit' },
+  { id: 'rb_1_11', text: "The garden grew three inches overnight. That's not normal. Is that normal? It doesn't feel normal.", phase: 1, animalType: 'rabbit' },
+  { id: 'rb_1_12', text: "I keep rearranging the teacups but they end up in the same position every morning.", phase: 1, animalType: 'rabbit' },
+  { id: 'rb_1_13', text: "Does anyone else feel like the house is... watching? No? Just me? Okay. Forget I said anything.", phase: 1, animalType: 'rabbit' },
+  { id: 'rb_1_14', text: "Ember says everything is fine. Why does everyone keep saying everything is fine?", phase: 1, animalType: 'rabbit' },
 
   // Phase 2 - Growing dread (10 dialogues)
   { id: 'rb_2_1', text: "I was bred to be soft and edible. Every cell knows this. Every cell is terrified.", phase: 2, animalType: 'rabbit' },
@@ -2182,4 +2222,72 @@ export function getNarrativeCallback(animalType: AnimalType, callbackIndex: numb
   const animal = NARRATIVE_SEEDS[animalType];
   if (!animal || callbackIndex < 0 || callbackIndex >= animal.callbacks.length) return null;
   return animal.callbacks[callbackIndex];
+}
+
+// ============================================================================
+// WORD THRESHOLD DIALOGUES — Animals reference word count milestones
+// ============================================================================
+
+/**
+ * Threshold dialogue — animals reference specific word count milestones.
+ * Creates tension by making the Words Offered counter feel like a countdown.
+ */
+export const WORD_THRESHOLD_DIALOGUES: { threshold: number; phase: number; lines: Record<string, string> }[] = [
+  {
+    threshold: 100,
+    phase: 1,
+    lines: {
+      fox: 'A hundred words shifted. The fire burns a little differently now.',
+      owl: 'One hundred words arranged. That is not an insignificant number.',
+    },
+  },
+  {
+    threshold: 250,
+    phase: 2,
+    lines: {
+      fox: 'Two hundred and fifty words offered. Do you feel the weight of them?',
+      owl: 'A quarter thousand words. The text speaks of this threshold.',
+      pangolin: 'Two hundred and fifty ingredients. The recipe is taking shape.',
+    },
+  },
+  {
+    threshold: 500,
+    phase: 3,
+    lines: {
+      fox: 'Five hundred words. The fire is almost too bright to look at.',
+      owl: 'Five hundred. The ancient texts predicted this exact number.',
+      red_panda: 'Five hundred breaths offered. The pattern nears completion.',
+      capybara: 'Five hundred entries in my ledger. We are ahead of schedule.',
+    },
+  },
+  {
+    threshold: 750,
+    phase: 3,
+    lines: {
+      fox: 'Seven hundred and fifty. The arrangement trembles with anticipation.',
+      owl: 'Nearly there. The final verses are being written.',
+      wombat: 'The ground shakes with each new word. Seven hundred and fifty tremors.',
+      rabbit: 'I stopped counting at seven hundred. I could not bear it.',
+    },
+  },
+];
+
+/**
+ * Get a threshold dialogue line if the player just crossed a word count milestone.
+ * Returns null if no threshold was crossed or animal doesn't have a line.
+ */
+export function getWordThresholdDialogue(
+  animalType: string,
+  totalWordsFormed: number,
+  previousWordsFormed: number,
+  currentPhase: number
+): string | null {
+  for (const entry of WORD_THRESHOLD_DIALOGUES) {
+    if (totalWordsFormed >= entry.threshold &&
+        previousWordsFormed < entry.threshold &&
+        currentPhase >= entry.phase) {
+      return entry.lines[animalType] || null;
+    }
+  }
+  return null;
 }

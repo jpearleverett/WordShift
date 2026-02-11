@@ -15,7 +15,7 @@ import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
-import { ActionButton, AnimatedLogo, Toast, LevelDisplay, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
+import { ActionButton, AnimatedLogo, Toast, LevelDisplay, VictoryModal, RulesModal, DifficultyMenu, RitualEchoChain } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { CandyColors } from './src/theme/colors';
@@ -38,11 +38,12 @@ import { hapticLight, hapticMedium, hapticSuccess, hapticError, hapticSelection 
 import {
   getPhaseIndicator,
   getLoadingMessage,
+  getRitualMicroEvent,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress } from './src/services/amberCurrency';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
-import { getAnimalWhisper } from './src/services/phaseNarrative';
+import { getAnimalWhisper, getAnimalInterjection } from './src/services/phaseNarrative';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
 import { isDreadWord } from './src/services/localGenerator';
@@ -67,6 +68,14 @@ export default function App() {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
 
+  // Auto-dismiss interjection after 4 seconds
+  useEffect(() => {
+    if (showInterjection) {
+      const timeout = setTimeout(() => setShowInterjection(false), 4000);
+      return () => clearTimeout(timeout);
+    }
+  }, [showInterjection]);
+
   // StarBurst effect state for valid moves
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
     active: false, x: 0, y: 0,
@@ -84,6 +93,13 @@ export default function App() {
   // Animal whisper state (shown after puzzle completion)
   const [whisper, setWhisper] = useState<{ animalName: string; text: string } | null>(null);
   const [showWhisper, setShowWhisper] = useState(false);
+
+  // Animal interjection state (brief message pulling player to home screen)
+  const [interjection, setInterjection] = useState<{ animalName: string; text: string } | null>(null);
+  const [showInterjection, setShowInterjection] = useState(false);
+
+  // In-progress ritual echo chain — words formed during current puzzle
+  const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
 
   // Dread pulse state (flashes on dread word formation)
   const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
@@ -133,6 +149,7 @@ export default function App() {
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
+    setRitualEchoWords([]);
     transitionTo('puzzle', () => {
       puzzleActions.startNewGame(diff);
       setIsPlayingDaily(false);
@@ -146,6 +163,7 @@ export default function App() {
     soundTap();
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
+    setRitualEchoWords([]);
     transitionTo('puzzle', async () => {
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);
@@ -195,6 +213,18 @@ export default function App() {
           result.hintsUsed,
           result.invalidAttempts
         );
+      }
+
+      // Check for ritual micro-event on high-energy puzzles
+      if (victory.ritualEnergy && victory.ritualEnergy >= 7) {
+        const microEvent = getRitualMicroEvent(
+          victory.ritualEnergy,
+          persistence.currentPhase,
+          result.completedWords
+        );
+        if (microEvent) {
+          puzzleActions.setMessage(microEvent);
+        }
       }
 
       puzzleActions.setEarnedStars(victory.earnedStars);
@@ -267,6 +297,25 @@ export default function App() {
           // Whispers are non-critical
         }
       }, 1200);
+
+      // Trigger animal interjection after a longer delay (only if whisper isn't showing)
+      setTimeout(async () => {
+        if (showWhisper) return; // Don't stack with whisper
+        try {
+          const fullProgress = await getFullProgress();
+          const interj = getAnimalInterjection(
+            persistence.currentPhase,
+            fullProgress.unlockedAnimals || [],
+            fullProgress.puzzlesSolved || 0
+          );
+          if (interj) {
+            setInterjection(interj);
+            setShowInterjection(true);
+          }
+        } catch {
+          // Interjections are non-critical
+        }
+      }, 2500);
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -279,6 +328,11 @@ export default function App() {
       soundValidMove();
       setStarBurst({ active: true, x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT * 0.4 });
       setTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
+
+      // Track formed word for in-puzzle ritual echo chain
+      if (result.formedWord) {
+        setRitualEchoWords(prev => [...prev, result.formedWord!]);
+      }
 
       // Dread word visual feedback — subtle dark pulse when a dread word is formed
       if (persistence.currentPhase >= 2 && result.formedWord && isDreadWord(result.formedWord)) {
@@ -310,6 +364,9 @@ export default function App() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);
+    setShowInterjection(false);
+    setInterjection(null);
+    setRitualEchoWords([]);
     puzzleActions.handleNextLevel();
   }, [puzzleActions, victoryActions]);
 
@@ -318,6 +375,9 @@ export default function App() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);
+    setShowInterjection(false);
+    setInterjection(null);
+    setRitualEchoWords([]);
     transitionTo('home', () => {
       puzzleActions.setGameState(GameState.IDLE);
     });
@@ -341,6 +401,7 @@ export default function App() {
 
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
+    setRitualEchoWords([]);
     puzzleActions.startNewGame(d, puzzle.gameMode);
   }, [puzzleActions, puzzle.gameMode]);
 
@@ -364,6 +425,7 @@ export default function App() {
 
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
+    setRitualEchoWords([]);
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
     puzzleActions.startNewGame(puzzle.difficulty, newMode);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty]);
@@ -611,6 +673,13 @@ export default function App() {
               />
             ))}
           </ScrollView>
+
+          {/* In-puzzle ritual echo chain — shows word chain building in real-time */}
+          <RitualEchoChain
+            words={ritualEchoWords}
+            phase={persistence.currentPhase}
+            visible={puzzle.gameState === GameState.PLAYING && ritualEchoWords.length > 0}
+          />
         </View>
 
         {/* Bottom Controls */}
@@ -647,6 +716,7 @@ export default function App() {
             }}
             onPress={() => {
               hapticLight();
+              setRitualEchoWords([]);
               puzzleActions.startNewGame();
             }}
             disabled={false}
@@ -691,6 +761,18 @@ export default function App() {
           phase={persistence.currentPhase}
           onComplete={() => setShowWhisper(false)}
         />
+
+        {/* Animal Interjection — brief message pulling player to home screen */}
+        {showInterjection && interjection && !showWhisper && (
+          <View style={styles.interjectionContainer}>
+            <Text style={[
+              styles.interjectionText,
+              persistence.currentPhase >= 3 && styles.interjectionTextDark,
+            ]}>
+              {interjection.text}
+            </Text>
+          </View>
+        )}
 
         {/* Dread Pulse — subtle dark flash when a dread word is formed */}
         <Animated.View
@@ -968,5 +1050,28 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(100, 0, 30, 1)',
     zIndex: 998,
+  },
+  interjectionContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    zIndex: 500,
+  },
+  interjectionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    backgroundColor: 'rgba(100, 60, 140, 0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  interjectionTextDark: {
+    color: 'rgba(200, 160, 180, 0.9)',
+    backgroundColor: 'rgba(30, 15, 40, 0.7)',
   },
 });

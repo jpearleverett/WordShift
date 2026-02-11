@@ -38,12 +38,36 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const shineAnim = useRef(new Animated.Value(0)).current;
   const wobbleAnim = useRef(new Animated.Value(0)).current;
+  const trailGlowAnim = useRef(new Animated.Value(0)).current;
 
   // Loop refs for proper cleanup (prevents memory leaks)
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const shineLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const wobbleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const trailGlowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Phase-aware animation parameters for selected tiles
+  const getSelectedSpringParams = () => {
+    if (phase >= 4) return { friction: 9, tension: 80 };
+    if (phase >= 3) return { friction: 7, tension: 100 };
+    if (phase >= 2) return { friction: 5, tension: 150 };
+    return { friction: 3, tension: 200 };
+  };
+
+  const getWobbleDurations = () => {
+    if (phase >= 4) return { quarter: 400, half: 800 };
+    if (phase >= 3) return { quarter: 300, half: 600 };
+    if (phase >= 2) return { quarter: 200, half: 400 };
+    return { quarter: 150, half: 300 };
+  };
+
+  const getBounceHeight = () => {
+    if (phase >= 4) return -1.5;
+    if (phase >= 3) return -2;
+    if (phase >= 2) return -3;
+    return -4;
+  };
 
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
@@ -110,49 +134,54 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     };
   }, [isInteractable, isSelected]);
 
-  // Selected bounce animation
+  // Selected bounce animation (phase-aware: bouncy at Phase 0, heavy/ritualistic at Phase 4)
   useEffect(() => {
     const currentSettings = getSettingsSync();
     if (currentSettings.reducedMotion) {
       scaleAnim.setValue(isSelected ? 1.08 : 1);
       bounceAnim.setValue(0);
       wobbleAnim.setValue(0);
+      trailGlowAnim.setValue(0);
       return;
     }
     if (isSelected) {
-      // Initial pop
+      const springParams = getSelectedSpringParams();
+      const wobbleDurations = getWobbleDurations();
+      const bounceHeight = getBounceHeight();
+
+      // Initial pop - phase-aware spring (bouncy Phase 0 → heavy Phase 4)
       Animated.sequence([
         Animated.spring(scaleAnim, {
           toValue: 1.15,
-          friction: 3,
-          tension: 200,
+          friction: springParams.friction,
+          tension: springParams.tension,
           useNativeDriver: true,
         }),
         Animated.spring(scaleAnim, {
           toValue: 1.08,
-          friction: 4,
+          friction: springParams.friction + 1,
           useNativeDriver: true,
         }),
       ]).start();
 
-      // Continuous wobble
+      // Continuous wobble - phase-aware speed (quick Phase 0 → very slow Phase 4)
       const wobbleLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(wobbleAnim, {
             toValue: 1,
-            duration: 150,
+            duration: wobbleDurations.quarter,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
           Animated.timing(wobbleAnim, {
             toValue: -1,
-            duration: 300,
+            duration: wobbleDurations.half,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
           Animated.timing(wobbleAnim, {
             toValue: 0,
-            duration: 150,
+            duration: wobbleDurations.quarter,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
@@ -161,11 +190,11 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       wobbleLoopRef.current = wobbleLoop;
       wobbleLoop.start();
 
-      // Floating bounce
+      // Floating bounce - phase-aware height (light Phase 0 → weighed down Phase 4)
       const bounceLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(bounceAnim, {
-            toValue: -4,
+            toValue: bounceHeight,
             duration: 400,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
@@ -180,10 +209,33 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       );
       bounceLoopRef.current = bounceLoop;
       bounceLoop.start();
+
+      // Trail glow effect at Phase 3+ (energy mark pulsing shadow)
+      if (phase >= 3) {
+        const trailGlowLoop = Animated.loop(
+          Animated.sequence([
+            Animated.timing(trailGlowAnim, {
+              toValue: 1,
+              duration: phase >= 4 ? 800 : 600,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false, // shadowRadius cannot use native driver
+            }),
+            Animated.timing(trailGlowAnim, {
+              toValue: 0,
+              duration: phase >= 4 ? 800 : 600,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false,
+            }),
+          ])
+        );
+        trailGlowLoopRef.current = trailGlowLoop;
+        trailGlowLoop.start();
+      }
     } else {
       scaleAnim.setValue(1);
       bounceAnim.setValue(0);
       wobbleAnim.setValue(0);
+      trailGlowAnim.setValue(0);
     }
 
     return () => {
@@ -195,11 +247,16 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         bounceLoopRef.current.stop();
         bounceLoopRef.current = null;
       }
+      if (trailGlowLoopRef.current) {
+        trailGlowLoopRef.current.stop();
+        trailGlowLoopRef.current = null;
+      }
       scaleAnim.stopAnimation();
       bounceAnim.stopAnimation();
       wobbleAnim.stopAnimation();
+      trailGlowAnim.stopAnimation();
     };
-  }, [isSelected]);
+  }, [isSelected, phase]);
 
   const handlePressIn = () => {
     if (settings.reducedMotion) return;
@@ -227,6 +284,14 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   const getStyles = () => {
     if (highlight === 'locked') {
+      if (phase >= 5) {
+        return {
+          bgColor: '#2E2A40',        // Muted purple-gray — eerie calm
+          borderColor: '#3A3555',
+          textColor: '#706890',       // Soft ghostly purple
+          shadowColor: '#2E2A40',
+        };
+      }
       if (phase >= 4) {
         return {
           bgColor: CandyColors.gray[700],
@@ -251,6 +316,15 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       };
     }
     if (isSelected) {
+      if (phase >= 5) {
+        // Muted purple — peaceful, not aggressive
+        return {
+          bgColor: '#504580',
+          borderColor: '#3A3060',
+          textColor: '#D0C8E8',       // Soft lavender text
+          shadowColor: '#504580',
+        };
+      }
       if (phase >= 4) {
         // Deep purple instead of pink at phase 4
         return {
@@ -285,6 +359,14 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       };
     }
     // Default (non-interactable, non-selected)
+    if (phase >= 5) {
+      return {
+        bgColor: '#3A3550',      // Muted purple-gray instead of dark gray
+        borderColor: '#4A4565',
+        textColor: '#9990B0',     // Soft purple text
+        shadowColor: '#3A3550',
+      };
+    }
     if (phase >= 4) {
       return {
         bgColor: CandyColors.gray[600],
@@ -338,6 +420,17 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     outputRange: ['-3deg', '0deg', '3deg'],
   });
 
+  // Trail glow interpolations for Phase 3+ energy mark effect
+  const trailGlowRadius = trailGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [6, phase >= 4 ? 24 : 16],
+  });
+  const trailGlowOpacity = trailGlowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, phase >= 4 ? 0.7 : 0.55],
+  });
+  const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
+
   const content = (
     <Animated.View
       style={[
@@ -366,17 +459,22 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       )}
 
       {/* Main tile body */}
-      <View
+      <Animated.View
         style={[
           styles.tileBody,
           compact && { width: COMPACT_BODY_W, height: COMPACT_BODY_H, borderRadius: 12 },
           {
             backgroundColor: tileStyles.bgColor,
             borderBottomColor: tileStyles.borderColor,
-            shadowColor: tileStyles.shadowColor,
+            shadowColor: (isSelected && phase >= 3) ? trailGlowColor : tileStyles.shadowColor,
           },
           isSelected && styles.tileBodySelected,
           highlight === 'locked' && styles.tileBodyLocked,
+          // Trail glow effect: pulsing shadow at Phase 3+
+          (isSelected && phase >= 3) && {
+            shadowRadius: trailGlowRadius,
+            shadowOpacity: trailGlowOpacity,
+          },
         ]}
       >
         {/* Top highlight (bevel effect) */}
@@ -418,7 +516,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         {highlight === 'locked' && (
           <View style={styles.lockOverlay} />
         )}
-      </View>
+      </Animated.View>
 
       {/* 3D bottom edge */}
       <View

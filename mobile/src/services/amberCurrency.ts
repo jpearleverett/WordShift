@@ -542,6 +542,9 @@ export async function clearProgress(): Promise<void> {
     progressCache = getDefaultProgress();
     await AsyncStorage.removeItem(PROGRESS_STORAGE_KEY);
     await AsyncStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
+    for (let i = 1; i <= 4; i++) {
+      await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
+    }
   } catch (error) {
     console.warn('Failed to clear progress:', error);
   }
@@ -837,6 +840,29 @@ export async function recordConsumedCoordinatedEvent(theme: string): Promise<voi
 export async function getConsumedCoordinatedEvents(): Promise<string[]> {
   const progress = await loadProgress();
   return progress.consumedCoordinatedEvents || [];
+}
+
+/**
+ * Track whether a guaranteed cross-reference has been shown for a phase.
+ * Key: `wordshift_guaranteed_crossref_phase_{phase}`
+ */
+export async function hasSeenGuaranteedCrossRef(phase: number): Promise<boolean> {
+  try {
+    const key = `wordshift_guaranteed_crossref_phase_${phase}`;
+    const value = await AsyncStorage.getItem(key);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markGuaranteedCrossRefSeen(phase: number): Promise<void> {
+  try {
+    const key = `wordshift_guaranteed_crossref_phase_${phase}`;
+    await AsyncStorage.setItem(key, 'true');
+  } catch {
+    // Non-critical
+  }
 }
 
 /**

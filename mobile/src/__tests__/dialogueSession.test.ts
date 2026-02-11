@@ -11,11 +11,13 @@ import {
   loadDialogueSessions,
   startCooldown,
 } from '../services/dialogueSession';
-import { DIALOGUE_SESSION_CONFIG, getDialoguesPerSession } from '../types/homeWorld';
+import { DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // At phase 0, getDialoguesPerSession returns 6 (not the raw DIALOGUES_PER_SESSION of 8)
 const EFFECTIVE_MAX = getDialoguesPerSession(0);
+// At phase 0, getPuzzlesBetweenSessions returns 1 (not the raw PUZZLES_BETWEEN_SESSIONS of 3)
+const EFFECTIVE_COOLDOWN = getPuzzlesBetweenSessions(0);
 
 /**
  * Helper: exhaust grace period for an animal by completing multiple sessions
@@ -138,7 +140,7 @@ describe('isOnCooldown', () => {
     expect(isOnCooldown('fox')).toBe(true);
 
     // Complete enough puzzles to clear cooldown
-    updatePuzzleCount(DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS);
+    updatePuzzleCount(EFFECTIVE_COOLDOWN);
     expect(isOnCooldown('fox')).toBe(false);
   });
 });
@@ -162,7 +164,7 @@ describe('getSessionStatus', () => {
     await endSession('fox');
     const status = getSessionStatus('fox');
     expect(status.status).toBe('cooldown');
-    expect(status.puzzlesRemaining).toBe(DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS);
+    expect(status.puzzlesRemaining).toBe(EFFECTIVE_COOLDOWN);
   });
 
   test('returns available after cooldown expires', async () => {
@@ -171,7 +173,7 @@ describe('getSessionStatus', () => {
     await recordDialogue('fox');
     await endSession('fox');
 
-    updatePuzzleCount(DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS);
+    updatePuzzleCount(EFFECTIVE_COOLDOWN);
     const status = getSessionStatus('fox');
     expect(status.status).toBe('available');
   });
@@ -210,7 +212,7 @@ describe('cooldown lifecycle', () => {
     expect(after.available).toBe(false);
 
     // Complete required puzzles
-    updatePuzzleCount(DIALOGUE_SESSION_CONFIG.PUZZLES_BETWEEN_SESSIONS);
+    updatePuzzleCount(EFFECTIVE_COOLDOWN);
 
     // Should be available again
     const afterPuzzles = await checkDialogueAvailability('fox');
