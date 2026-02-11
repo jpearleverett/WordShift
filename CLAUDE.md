@@ -458,7 +458,7 @@ Not all animals realize the truth at the same time. Defined in `ANIMAL_AWARENESS
 
 ### Cross-Animal References
 
-Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as inline italic text within the animal's single dialogue bubble in `HomeScreen.tsx` (not as a separate chat box).
+Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a sequential conversation page within the animal's dialogue flow — the player taps "Next" to naturally progress from cross-animal reference to regular dialogue (no separate chat boxes or overlaid text).
 
 **Guaranteed First Cross-Reference**: Vanguard animals (Fox/Owl) get a forced cross-reference the first time they're tapped at each new phase (Phase 1+), ensuring players see inter-animal coordination early. Tracked via `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` in `amberCurrency.ts`. Bypasses the random roll in `useDialogueFlow.ts`.
 
@@ -482,14 +482,16 @@ Animals have conversation sessions with puzzle-based cooldowns to pace interacti
 
 **Session Flow**:
 1. Player taps animal -> starts session if available
-2. Player can have up to 8 dialogues during session
-3. Session ends when: max dialogues reached or player leaves
-4. Cooldown begins -> must complete 3 puzzles to talk again (skipped during grace period)
-5. After cooldown -> animal continues from next dialogue (not repeat)
+2. Pre-dialogue pages shown first (trigger reactions, cross-animal refs, coordinated events) — each as a separate conversation page, tapped through with "Next". These don't count toward session limits.
+3. Regular dialogue follows, up to 8 dialogues per session
+4. Session ends when: max dialogues reached or player leaves
+5. Cooldown begins -> must complete 1-3 puzzles to talk again (skipped during grace period)
+6. After cooldown -> animal continues from next dialogue (not repeat)
 
 **UI Indicators**:
-- Session status bar shows dialogues remaining
+- `hasNewDialogue` exclamation (`!`) badge: computed dynamically from `isUnlocked && !isOnCooldown && currentDialogueIndex < totalDialogueCount`. Shows when there's genuinely unread dialogue, disappears on cooldown, reappears when cooldown expires and more dialogue is available.
 - Cooldown toast appears at bottom of screen when animal is unavailable
+- Sleeping Z's overlay shown on animal sprite during cooldown
 - Session/cooldown state persists via AsyncStorage
 
 ### House Building System (Bottom-Up)
