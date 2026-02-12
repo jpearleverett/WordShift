@@ -61,6 +61,7 @@ import { CelebrationConfetti } from './CelebrationConfetti';
 import { AmberSparkle } from './AmberSparkle';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
+import { OnboardingStep } from '../../services/onboarding';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -71,6 +72,10 @@ interface HomeScreenProps {
   onOpenStats?: () => void;
   onOpenLedger?: () => void;
   onStartDaily?: (difficulty: Difficulty) => void;
+  /** Current onboarding step (undefined when onboarding is complete) */
+  onboardingStep?: OnboardingStep;
+  /** Advance onboarding to next step */
+  onAdvanceOnboarding?: (step: OnboardingStep) => Promise<void>;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -80,7 +85,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenStats,
   onOpenLedger,
   onStartDaily,
+  onboardingStep,
+  onAdvanceOnboarding,
 }) => {
+  const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -165,6 +173,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     loadAllData();
     loadDialogueSessions(); // Load session data
   }, []);
+
+  // Onboarding: auto-show invite prompt when data is loaded during home_empty step
+  useEffect(() => {
+    if (onboardingStep === 'home_empty' && progress && unlockFlow.nextUnlock) {
+      // Automatically show the invite prompt for Fox
+      if (unlockFlow.nextUnlock.type === 'character' && unlockFlow.nextUnlock.cost === 0) {
+        unlockFlow.setShowInvitePrompt(true);
+      }
+    }
+  }, [onboardingStep, progress, unlockFlow.nextUnlock]);
 
   // Talking animation for intro dialogue
   const [introIsTalking, setIntroIsTalking] = useState(false);
@@ -289,49 +307,63 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
-      {/* Header with amber and play button */}
+      {/* Header — simplified during onboarding */}
       <View style={styles.header}>
-        <JuicyButton
-          style={styles.amberContainer}
-          onPress={() => unlockFlow.setShowShop(true)}
-          bounceScale={0.95}
-          accessibilityLabel={`Shop. ${progress.amber} amber`}
-          accessibilityRole="button"
-        >
-          <View style={styles.amberInner}>
-            <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
+        {!isOnboarding ? (
+          <JuicyButton
+            style={styles.amberContainer}
+            onPress={() => unlockFlow.setShowShop(true)}
+            bounceScale={0.95}
+            accessibilityLabel={`Shop. ${progress.amber} amber`}
+            accessibilityRole="button"
+          >
+            <View style={styles.amberInner}>
+              <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
+                <Text style={styles.amberEmoji}>💎</Text>
+              </Animated.View>
+              <Text style={styles.amberCount}>{progress.amber}</Text>
+              <Text style={styles.amberPlus}>+</Text>
+              <AmberSparkle />
+            </View>
+          </JuicyButton>
+        ) : (
+          <View style={styles.amberContainer}>
+            <View style={styles.amberInner}>
               <Text style={styles.amberEmoji}>💎</Text>
-            </Animated.View>
-            <Text style={styles.amberCount}>{progress.amber}</Text>
-            <Text style={styles.amberPlus}>+</Text>
-            <AmberSparkle />
+              <Text style={styles.amberCount}>{progress.amber}</Text>
+            </View>
           </View>
-        </JuicyButton>
+        )}
 
         <View style={styles.headerCenter}>
           <Text style={styles.title}>Animal House</Text>
         </View>
 
         <View style={styles.headerRight}>
-          {onStartDaily && (
+          {!isOnboarding && onStartDaily && (
             <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
           )}
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={onOpenStats}
-            accessibilityLabel="View stats"
-            accessibilityRole="button"
-          >
-            <Text style={styles.headerIconText}>📊</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={onOpenSettings}
-            accessibilityLabel="Settings"
-            accessibilityRole="button"
-          >
-            <Text style={styles.headerIconText}>⚙️</Text>
-          </TouchableOpacity>
+          {!isOnboarding && (
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={onOpenStats}
+              accessibilityLabel="View stats"
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerIconText}>📊</Text>
+            </TouchableOpacity>
+          )}
+          {!isOnboarding && (
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={onOpenSettings}
+              accessibilityLabel="Settings"
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerIconText}>⚙️</Text>
+            </TouchableOpacity>
+          )}
+          {!isOnboarding && (
           <JuicyButton
             style={styles.playButton}
             onPress={() => onPlayPuzzle()}
@@ -341,11 +373,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             <Text style={styles.playButtonText}>PLAY</Text>
           </JuicyButton>
+          )}
         </View>
       </View>
 
-      {/* DEV button for testing */}
-      {__DEV__ && (
+      {/* DEV button for testing (hidden during onboarding) */}
+      {__DEV__ && !isOnboarding && (
         <TouchableOpacity
           style={styles.devButton}
           onPress={handleDevButton}
@@ -354,8 +387,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Next Unlock Progress Bar */}
-      {unlockFlow.nextUnlock && (
+      {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
+      {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
         <TouchableOpacity
           style={styles.unlockProgressContainer}
           onPress={() => unlockFlow.setShowShop(true)}
@@ -388,8 +421,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Words Offered Counter — tappable to open the Word Ledger */}
-      {(progress.totalWordsFormed || 0) > 0 && (
+      {/* Words Offered Counter — tappable to open the Word Ledger (hidden during onboarding) */}
+      {!isOnboarding && (progress.totalWordsFormed || 0) > 0 && (
         <TouchableOpacity
           style={[
             styles.wordsOfferedHomeContainer,
@@ -779,6 +812,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     onPress={async () => {
                       await unlockFlow.handlePurchase(unlockFlow.nextUnlock!);
                       unlockFlow.setShowInvitePrompt(false);
+                      // During onboarding, advance to fox_invited step
+                      // (skips the standard intro dialogue — FoxGuide handles it)
+                      if (onboardingStep === 'home_empty' && onAdvanceOnboarding) {
+                        setShowIntroDialogue(false);
+                        setIntroAnimal(null);
+                        await onAdvanceOnboarding('fox_invited');
+                      }
                     }}
                     disabled={progress ? progress.amber < unlockFlow.nextUnlock!.cost : false}
                     accessibilityLabel={unlockFlow.nextUnlock!.cost === 0 ? 'Welcome friend' : `Invite for ${unlockFlow.nextUnlock!.cost} amber`}
@@ -794,6 +834,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </Text>
                   </TouchableOpacity>
 
+                  {/* Hide "Maybe Later" during onboarding — player must invite Fox */}
+                  {!isOnboarding && (
                   <TouchableOpacity
                     style={styles.inviteCloseButton}
                     onPress={() => unlockFlow.setShowInvitePrompt(false)}
@@ -802,6 +844,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   >
                     <Text style={styles.inviteCloseButtonText}>Maybe Later</Text>
                   </TouchableOpacity>
+                  )}
                 </>
               );
             })()}

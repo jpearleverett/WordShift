@@ -20,6 +20,7 @@ import { clearWordHistory } from '../services/wordHistory';
 import { clearAllSessions } from '../services/dialogueSession';
 import { clearEvents } from '../services/eventLogger';
 import { resetTutorial } from './Tutorial';
+import { resetOnboarding } from '../services/onboarding';
 import { hapticLight } from '../services/haptics';
 
 interface SettingsScreenProps {
@@ -58,6 +59,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               clearAllSessions(),
               clearEvents(),
               resetTutorial(),
+              resetOnboarding(),
               resetSettings(),
             ]);
             const fresh = await getSettings();
