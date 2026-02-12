@@ -10,7 +10,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
-import { CandyColors, getPhaseSurfaceTheme } from '../../theme/colors';
+import { CandyColors } from '../../theme/colors';
 
 // Room background images - maps theme to image asset
 const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
@@ -66,14 +66,6 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   ritualWords = [],
 }) => {
   const themeColors = ROOM_THEME_COLORS[room.theme];
-  const surfaceTheme = getPhaseSurfaceTheme(currentPhase);
-
-  const tintStyle = (() => {
-    if (currentPhase <= 1) return null;
-    if (currentPhase === 2) return { backgroundColor: 'rgba(40, 30, 66, 0.18)' };
-    if (currentPhase === 3) return { backgroundColor: 'rgba(14, 10, 30, 0.34)' };
-    return { backgroundColor: 'rgba(22, 8, 18, 0.44)' };
-  })();
 
   if (!room.isUnlocked) {
     // Locked room appearance
@@ -113,32 +105,13 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         style={styles.backgroundImage}
         resizeMode="cover"
       />
-      {tintStyle && <View style={[styles.roomPhaseTint, tintStyle]} />}
 
       {/* Room frame */}
-      <View
-        style={[
-          styles.frame,
-          {
-            borderColor: currentPhase >= 3 ? surfaceTheme.glassBorder : themeColors.accent,
-            borderWidth: currentPhase >= 4 ? 5 : 4,
-          },
-        ]}
-      />
+      <View style={[styles.frame, { borderColor: themeColors.accent }]} />
 
       {/* Room name plate */}
-      <View
-        style={[
-          styles.namePlate,
-          {
-            backgroundColor: currentPhase >= 3 ? surfaceTheme.badgeBg : 'rgba(0, 0, 0, 0.65)',
-            borderColor: currentPhase >= 3 ? surfaceTheme.badgeBorder : 'rgba(255, 255, 255, 0.15)',
-          },
-        ]}
-      >
-        <Text style={[styles.roomName, currentPhase >= 3 && { color: surfaceTheme.textSecondary }]}>
-          {room.name}
-        </Text>
+      <View style={styles.namePlate}>
+        <Text style={styles.roomName}>{room.name}</Text>
       </View>
 
       {/* Animal if present and unlocked */}
@@ -230,9 +203,6 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     borderRadius: 8,
     backgroundColor: 'transparent',
-  },
-  roomPhaseTint: {
-    ...StyleSheet.absoluteFillObject,
   },
   namePlate: {
     position: 'absolute',

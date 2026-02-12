@@ -10,7 +10,7 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import { CandyColors, getPhaseTheme, getPhaseSurfaceTheme } from '../theme/colors';
+import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
 import { getFullProgress } from '../services/amberCurrency';
 import { getWordsOfferedText } from '../services/phaseNarrative';
@@ -51,7 +51,6 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
   };
 
   const phaseTheme = getPhaseTheme(phase);
-  const surfaceTheme = getPhaseSurfaceTheme(phase);
 
   // Phase-aware titles
   const getTitle = (): string => {
@@ -72,37 +71,32 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
 
   const isDread = (word: string): boolean => DREAD_WORD_SET.has(word.toUpperCase());
 
-  const bgColor = phaseTheme.bgPrimary;
+  const bgColor = phase <= 1 ? CandyColors.purple.main
+    : phase === 2 ? '#3A3060'
+    : phase === 3 ? '#1A1530'
+    : '#0F0818';
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={[
-            styles.backButton,
-            {
-              backgroundColor: surfaceTheme.glassSoft,
-              borderColor: surfaceTheme.glassBorder,
-            },
-          ]}
+          style={styles.backButton}
           onPress={onClose}
           accessibilityLabel="Close ledger"
           accessibilityRole="button"
         >
-          <Text style={[styles.backButtonText, { color: surfaceTheme.textSecondary }]}>← Back</Text>
+          <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
         <View style={styles.titleArea}>
           <Text style={[
             styles.title,
-            { color: surfaceTheme.textPrimary },
             phase >= 3 && styles.titleDark,
           ]}>
             {getTitle()}
           </Text>
           <Text style={[
             styles.subtitle,
-            { color: surfaceTheme.textMuted },
             phase >= 3 && styles.subtitleDark,
           ]}>
             {getSubtitle()}
@@ -111,17 +105,8 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
       </View>
 
       {/* Word count */}
-      <View
-        style={[
-          styles.countContainer,
-          {
-            backgroundColor: surfaceTheme.glassSoft,
-            borderColor: surfaceTheme.glassBorder,
-          },
-          phase >= 3 && styles.countContainerDark,
-        ]}
-      >
-        <Text style={[styles.countText, { color: surfaceTheme.textSecondary }, phase >= 3 && styles.countTextDark]}>
+      <View style={[styles.countContainer, phase >= 3 && styles.countContainerDark]}>
+        <Text style={[styles.countText, phase >= 3 && styles.countTextDark]}>
           {getWordsOfferedText(totalFormed, phase)}
         </Text>
       </View>
@@ -150,9 +135,6 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
                   key={`${word}-${index}`}
                   style={[
                     styles.wordChip,
-                    {
-                      borderColor: phase >= 2 ? surfaceTheme.glassBorder : 'transparent',
-                    },
                     phase <= 1 && styles.wordChipBright,
                     phase === 2 && styles.wordChipMuted,
                     phase >= 3 && styles.wordChipDark,
@@ -161,7 +143,6 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
                 >
                   <Text style={[
                     styles.wordText,
-                    { color: surfaceTheme.textSecondary },
                     phase <= 1 && styles.wordTextBright,
                     phase >= 3 && styles.wordTextDark,
                     dread && styles.wordTextDread,
@@ -188,12 +169,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backButton: {
-    alignSelf: 'flex-start',
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
     marginBottom: 8,
-    borderRadius: 12,
-    borderWidth: 1,
   },
   backButtonText: {
     fontSize: 16,
@@ -226,11 +204,11 @@ const styles = StyleSheet.create({
   },
   countContainer: {
     alignSelf: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 16,
     marginBottom: 16,
-    borderWidth: 1,
   },
   countContainerDark: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
@@ -263,7 +241,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderWidth: 1,
   },
   wordChipBright: {
     backgroundColor: 'rgba(255, 182, 255, 0.2)',

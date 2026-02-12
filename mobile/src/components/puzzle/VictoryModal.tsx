@@ -7,7 +7,7 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
-import { CandyColors, getPhaseTheme, getPhaseSurfaceTheme } from '../../theme/colors';
+import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
 import {
   getVictoryTitle,
@@ -80,33 +80,24 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onShare,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
-  const surfaceTheme = getPhaseSurfaceTheme(phase);
 
   if (!visible) return null;
 
   return (
-    <View style={[styles.modalOverlay, { backgroundColor: surfaceTheme.modalOverlay }]}>
+    <View style={styles.modalOverlay}>
       <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-          <Animated.View
-            style={[
-              styles.victoryModal,
-              {
-                backgroundColor: surfaceTheme.cardBg,
-                borderColor: surfaceTheme.cardBorder,
-                shadowColor: surfaceTheme.cardShadow,
-                transform: [{ scale: modalScale }],
-                opacity: modalOpacity,
-              },
-            ]}
-          >
+          <Animated.View style={[styles.victoryModal, {
+            transform: [{ scale: modalScale }],
+            opacity: modalOpacity,
+          }]}>
             <View style={[styles.victoryGlow, {
               backgroundColor: phaseTheme.victoryGlowColor,
             }]} />
-            <View style={[styles.modalShine, { backgroundColor: surfaceTheme.glassShine }]} />
+            <View style={styles.modalShine} />
 
             {/* Stars — choreographed pop-in */}
             <View style={styles.starsContainer}>
@@ -139,7 +130,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {getVictoryTitle(earnedStars, phase)}
             </Text>
-            <Text style={[styles.victorySubtitle, { color: surfaceTheme.textMuted }]}>
+            <Text style={styles.victorySubtitle}>
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
@@ -193,7 +184,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             })()}
 
             {/* Performance feedback — phase-aware tone */}
-            <Text style={[styles.victoryFeedback, { color: surfaceTheme.textMuted }]}>
+            <Text style={styles.victoryFeedback}>
               {getVictoryFeedback(earnedStars, phase)}
             </Text>
 
@@ -262,48 +253,32 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </Text>
             )}
 
-            <View
-              style={[
-                styles.victoryStats,
-                {
-                  backgroundColor: surfaceTheme.glassSoft,
-                  borderColor: surfaceTheme.glassBorder,
-                },
-              ]}
-            >
+            <View style={styles.victoryStats}>
               <View style={styles.victoryStatItem}>
-                <Text style={[styles.victoryStatValue, { color: phaseTheme.victoryTitleColor }]}>Lv.{level}</Text>
-                <Text style={[styles.victoryStatLabel, { color: surfaceTheme.textMuted }]}>{difficulty}</Text>
+                <Text style={styles.victoryStatValue}>Lv.{level}</Text>
+                <Text style={styles.victoryStatLabel}>{difficulty}</Text>
               </View>
               <View style={styles.victoryStatDivider} />
               <View style={styles.victoryStatItem}>
-                <Text style={[styles.victoryStatValue, { color: phaseTheme.victoryTitleColor }]}>
-                  {'\uD83D\uDC8E'} {amberBalance}
-                </Text>
-                <Text style={[styles.victoryStatLabel, { color: surfaceTheme.textMuted }]}>Total Amber</Text>
+                <Text style={styles.victoryStatValue}>{'\uD83D\uDC8E'} {amberBalance}</Text>
+                <Text style={styles.victoryStatLabel}>Total Amber</Text>
               </View>
             </View>
 
             {/* Cumulative stats */}
             {cumulativeStats && (
-              <View style={[styles.cumulativeStats, { borderTopColor: surfaceTheme.glassBorder }]}>
+              <View style={styles.cumulativeStats}>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={[styles.cumulativeStatValue, { color: surfaceTheme.textSecondary }]}>
-                    {cumulativeStats.totalStars}
-                  </Text>
-                  <Text style={[styles.cumulativeStatLabel, { color: surfaceTheme.textMuted }]}>Total Stars</Text>
+                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalStars}</Text>
+                  <Text style={styles.cumulativeStatLabel}>Total Stars</Text>
                 </View>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={[styles.cumulativeStatValue, { color: surfaceTheme.textSecondary }]}>
-                    {cumulativeStats.threeStarCount}
-                  </Text>
-                  <Text style={[styles.cumulativeStatLabel, { color: surfaceTheme.textMuted }]}>Perfect</Text>
+                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.threeStarCount}</Text>
+                  <Text style={styles.cumulativeStatLabel}>Perfect</Text>
                 </View>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={[styles.cumulativeStatValue, { color: surfaceTheme.textSecondary }]}>
-                    {cumulativeStats.totalPuzzlesCompleted}
-                  </Text>
-                  <Text style={[styles.cumulativeStatLabel, { color: surfaceTheme.textMuted }]}>Puzzles</Text>
+                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalPuzzlesCompleted}</Text>
+                  <Text style={styles.cumulativeStatLabel}>Puzzles</Text>
                 </View>
               </View>
             )}
@@ -311,13 +286,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {/* Action buttons */}
             <View style={styles.victoryButtonRow}>
               <TouchableOpacity
-                style={[
-                  styles.shareButton,
-                  {
-                    backgroundColor: surfaceTheme.glassStrong,
-                    borderColor: surfaceTheme.glassBorder,
-                  },
-                ]}
+                style={styles.shareButton}
                 onPress={onShare}
                 accessibilityLabel="Share result"
                 accessibilityRole="button"
@@ -326,36 +295,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.homeButton,
-                  {
-                    backgroundColor: surfaceTheme.glassSoft,
-                    borderColor: surfaceTheme.glassBorder,
-                  },
-                ]}
+                style={styles.homeButton}
                 onPress={onReturnHome}
                 accessibilityLabel="Return home"
                 accessibilityRole="button"
               >
-                <Text style={[styles.homeButtonText, { color: surfaceTheme.textSecondary }]}>
-                  {'\uD83C\uDFE0'} HOME
-                </Text>
+                <Text style={styles.homeButtonText}>{'\uD83C\uDFE0'} HOME</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.nextLevelButton,
-                  {
-                    backgroundColor: surfaceTheme.accent,
-                    shadowColor: surfaceTheme.accent,
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                  },
-                ]}
+                style={styles.nextLevelButton}
                 onPress={onNextLevel}
                 accessibilityLabel="Next level"
                 accessibilityRole="button"
               >
-                <View style={[styles.buttonShine, { backgroundColor: surfaceTheme.glassShine }]} />
+                <View style={styles.buttonShine} />
                 <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
               </TouchableOpacity>
             </View>
@@ -368,6 +322,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(76, 29, 149, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -402,7 +357,6 @@ const styles = StyleSheet.create({
     shadowRadius: 32,
     elevation: 20,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   victoryGlow: {
     position: 'absolute',
@@ -459,7 +413,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     marginBottom: 24,
-    borderWidth: 1,
   },
   victoryStatItem: {
     alignItems: 'center',
@@ -517,7 +470,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 16,
     paddingHorizontal: 16,
-    borderWidth: 1,
   },
   shareButtonText: {
     fontSize: 20,
@@ -527,7 +479,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 18,
     paddingHorizontal: 20,
-    borderWidth: 1,
   },
   homeButtonText: {
     color: CandyColors.gray[600],
@@ -545,7 +496,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
-    borderWidth: 1,
   },
   nextLevelButtonText: {
     color: CandyColors.white,

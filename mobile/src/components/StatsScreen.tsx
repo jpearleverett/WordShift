@@ -8,7 +8,7 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import { CandyColors, getPhaseSurfaceTheme, getPhaseTheme } from '../theme/colors';
+import { CandyColors } from '../theme/colors';
 import { CumulativeStats, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
 import { getDailyStatus } from '../services/dailyChallenge';
@@ -31,8 +31,6 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   phase = 0,
 }) => {
   const effectivePhase = phase || currentPhase;
-  const surfaceTheme = getPhaseSurfaceTheme(effectivePhase);
-  const phaseTheme = getPhaseTheme(effectivePhase);
   const [stats, setStats] = useState<CumulativeStats | null>(null);
   const [achievements, setAchievements] = useState<(Achievement & { isUnlocked: boolean; unlockedAt: number | null })[]>([]);
   const [dailyStatus, setDailyStatus] = useState<{ totalCompleted: number; bestStreak: number } | null>(null);
@@ -53,29 +51,28 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const unlockedAchievements = achievements.filter(a => a.isUnlocked);
   const totalAchievements = getTotalCount();
 
-  const phaseCardStyle = effectivePhase >= 3
-    ? { backgroundColor: surfaceTheme.cardBg, borderColor: surfaceTheme.cardBorder, shadowColor: surfaceTheme.cardShadow }
-    : undefined;
+  const phaseCardStyle = effectivePhase >= 4
+    ? { backgroundColor: '#D0C0E0' }
+    : effectivePhase >= 3
+      ? { backgroundColor: '#E8E0F0' }
+      : undefined;
 
   return (
-    <View style={[styles.container, { backgroundColor: effectivePhase >= 2 ? phaseTheme.bgPrimary : CandyColors.gray[100] }]}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={[
         styles.header,
-        {
-          backgroundColor: phaseTheme.bgSecondary,
-          borderBottomColor: surfaceTheme.glassBorder,
-        },
+        effectivePhase >= 4 && { backgroundColor: '#4A3570' },
       ]}>
         <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <Text style={[styles.backButtonText, { color: surfaceTheme.textSecondary }]}>{'<'} Back</Text>
+          <Text style={styles.backButtonText}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: surfaceTheme.textPrimary }]}>Statistics</Text>
+        <Text style={styles.title}>Statistics</Text>
         <View style={styles.backButton} />
       </View>
 
       {/* Tab bar */}
-      <View style={[styles.tabBar, { backgroundColor: phaseTheme.bgTertiary }]}>
+      <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tab, selectedTab === 'overview' && styles.tabActive]}
           onPress={() => setSelectedTab('overview')}
@@ -102,16 +99,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         {selectedTab === 'overview' ? (
           <>
             {/* Hero stats */}
-            <View
-              style={[
-                styles.heroRow,
-                effectivePhase >= 3 && {
-                  backgroundColor: surfaceTheme.cardBg,
-                  borderColor: surfaceTheme.cardBorder,
-                  shadowColor: surfaceTheme.cardShadow,
-                },
-              ]}
-            >
+            <View style={[
+              styles.heroRow,
+              effectivePhase >= 3 && effectivePhase < 4 && { backgroundColor: '#E8E0F0' },
+              effectivePhase >= 4 && { backgroundColor: '#D0C0E0' },
+            ]}>
               <View style={styles.heroStat}>
                 <Text style={styles.heroValue}>{stats.totalPuzzlesCompleted}</Text>
                 <Text style={styles.heroLabel}>Puzzles</Text>
@@ -328,7 +320,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 16,
     backgroundColor: CandyColors.purple.main,
-    borderBottomWidth: 1,
   },
   backButton: {
     width: 80,
@@ -386,7 +377,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 4,
-    borderWidth: 1,
   },
   heroStat: {
     flex: 1,
@@ -424,11 +414,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    elevation: 3,
   },
   rowDivider: {
     height: 1,
