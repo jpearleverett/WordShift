@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DialogueSession, DIALOGUE_SESSION_CONFIG, DialoguePhase, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
+import { DialogueSession, DialoguePhase, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_dialogue_sessions';
 
@@ -81,22 +81,11 @@ function getEffectiveMaxDialogues(): number {
 }
 
 /**
- * Check if an animal is in grace period (recently unlocked, no cooldowns yet)
- */
-function isInGracePeriod(session: DialogueSession): boolean {
-  const sessionsCompleted = session.sessionsCompleted ?? 0;
-  return sessionsCompleted < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
-}
-
-/**
  * Check if a session's cooldown has expired
  * Returns puzzles remaining (0 or negative means cooldown complete)
- * Animals in grace period skip cooldowns entirely
  */
 function getCooldownRemaining(session: DialogueSession): number {
   if (session.puzzlesAtSessionEnd === null) return 0;
-  // Grace period: newly unlocked animals skip cooldowns
-  if (isInGracePeriod(session)) return 0;
   const puzzlesSinceEnd = currentPuzzleCount - session.puzzlesAtSessionEnd;
   return getPuzzlesBetweenSessions(currentPhase) - puzzlesSinceEnd;
 }
@@ -122,8 +111,10 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
     const remaining = getCooldownRemaining(session);
 
     if (remaining <= 0) {
-      // Cooldown complete - clear session and make available
-      sessionsCache.delete(animalId);
+      // Cooldown complete - reset session for new round, preserving sessionsCompleted
+      session.dialoguesInSession = 0;
+      session.puzzlesAtSessionEnd = null;
+      sessionsCache.set(animalId, session);
       await saveSessions();
       return { available: true };
     }
@@ -139,15 +130,6 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
   // Session is active - check if max dialogues reached (phase-aware limit)
   const maxDialogues = getEffectiveMaxDialogues();
   if (session.dialoguesInSession >= maxDialogues) {
-    // Too many dialogues - enter cooldown (unless in grace period)
-    if (isInGracePeriod(session)) {
-      // Grace period: reset session instead of cooldown
-      session.dialoguesInSession = 0;
-      session.sessionsCompleted = (session.sessionsCompleted ?? 0) + 1;
-      sessionsCache.set(animalId, session);
-      await saveSessions();
-      return { available: true };
-    }
     await startCooldown(animalId);
     return {
       available: false,

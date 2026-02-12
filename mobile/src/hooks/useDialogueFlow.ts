@@ -9,12 +9,14 @@ import {
   TUTORIAL_CALLBACK_DIALOGUES,
   getCoordinatedEventLine,
   getWordThresholdDialogue,
+  getTotalDialogueCount,
 } from '../services/animalDialogue';
 import {
   checkDialogueAvailability,
   recordDialogue,
   endSession,
   getSessionStatus,
+  isOnCooldown,
 } from '../services/dialogueSession';
 import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted, recordConsumedCoordinatedEvent, hasSeenGuaranteedCrossRef, markGuaranteedCrossRefSeen } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
@@ -330,16 +332,34 @@ export function useDialogueFlow({
     }
   }, [dialogueSlide, progress]);
 
+  // Recompute hasNewDialogue for a specific animal after session changes
+  const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
+    if (!animal.isUnlocked || !progress) return false;
+    if (isOnCooldown(animal.id)) return false;
+    const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
+    const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
+    return animal.currentDialogueIndex < totalDialogues;
+  }, [progress]);
+
   // Handle closing dialogue (and ending session)
   const handleCloseDialogue = useCallback(async () => {
-    if (selectedAnimal) {
-      await endSession(selectedAnimal.id);
+    const closingAnimal = selectedAnimal;
+    if (closingAnimal) {
+      await endSession(closingAnimal.id);
+      // Update hasNewDialogue for the animal that was talking
+      setAnimals(prev =>
+        prev.map(a =>
+          a.id === closingAnimal.id
+            ? { ...a, hasNewDialogue: recomputeHasNewDialogue(a) }
+            : a
+        )
+      );
     }
     setShowDialogue(false);
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
-  }, [selectedAnimal]);
+  }, [selectedAnimal, recomputeHasNewDialogue, setAnimals]);
 
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
@@ -352,9 +372,9 @@ export function useDialogueFlow({
       return;
     }
 
-    // Regular dialogue advance
+    // Regular dialogue advance — check if session is still available
     const availability = await checkDialogueAvailability(selectedAnimal.id);
-    if (!availability.available && availability.reason !== 'max_dialogues') {
+    if (!availability.available) {
       handleCloseDialogue();
       setCooldownMessage(
         `${selectedAnimal.name} wants to rest now. Come back after solving some puzzles!`
@@ -379,10 +399,14 @@ export function useDialogueFlow({
       const newIndex = selectedAnimal.currentDialogueIndex + 1;
       await markDialogueRead(selectedAnimal.id, newIndex);
 
+      const updatedAnimal = { ...selectedAnimal, currentDialogueIndex: newIndex };
+      const totalDialogues = getTotalDialogueCount(selectedAnimal.type, animalPhase);
+      const hasNewDialogue = !isOnCooldown(selectedAnimal.id) && newIndex < totalDialogues;
+
       setAnimals(prev =>
         prev.map(a =>
           a.id === selectedAnimal.id
-            ? { ...a, currentDialogueIndex: newIndex }
+            ? { ...a, currentDialogueIndex: newIndex, hasNewDialogue }
             : a
         )
       );
