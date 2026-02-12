@@ -19,20 +19,6 @@ const EFFECTIVE_MAX = getDialoguesPerSession(0);
 // At phase 0, getPuzzlesBetweenSessions returns 1 (not the raw PUZZLES_BETWEEN_SESSIONS of 3)
 const EFFECTIVE_COOLDOWN = getPuzzlesBetweenSessions(0);
 
-/**
- * Helper: exhaust grace period for an animal by completing multiple sessions
- * so cooldown tests work as expected (grace period = 3 sessions).
- */
-async function exhaustGracePeriod(animalId: string): Promise<void> {
-  for (let s = 0; s < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS; s++) {
-    for (let d = 0; d < EFFECTIVE_MAX; d++) {
-      await recordDialogue(animalId);
-    }
-    // Grace period auto-resets session; force cooldown exit for next round
-    await checkDialogueAvailability(animalId);
-  }
-}
-
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
   await clearAllSessions();
@@ -52,11 +38,7 @@ describe('checkDialogueAvailability', () => {
     expect(result.available).toBe(true);
   });
 
-  test('animal becomes unavailable after max dialogues (past grace period)', async () => {
-    // Exhaust grace period first so cooldowns apply
-    await exhaustGracePeriod('fox');
-
-    // Now record max dialogues
+  test('animal becomes unavailable after max dialogues', async () => {
     for (let i = 0; i < EFFECTIVE_MAX; i++) {
       await recordDialogue('fox');
     }
@@ -65,13 +47,19 @@ describe('checkDialogueAvailability', () => {
     expect(result.reason).toBe('max_dialogues');
   });
 
-  test('animal resets session during grace period instead of cooldown', async () => {
-    // During grace period, hitting max dialogues resets session instead of cooldown
+  test('animal becomes available again after cooldown expires', async () => {
     for (let i = 0; i < EFFECTIVE_MAX; i++) {
       await recordDialogue('fox');
     }
+    // Trigger max_dialogues cooldown
+    await checkDialogueAvailability('fox');
+
+    // Still on cooldown
+    expect((await checkDialogueAvailability('fox')).available).toBe(false);
+
+    // Complete required puzzles
+    updatePuzzleCount(EFFECTIVE_COOLDOWN);
     const result = await checkDialogueAvailability('fox');
-    // Grace period: session resets, animal stays available
     expect(result.available).toBe(true);
   });
 });
@@ -99,19 +87,22 @@ describe('recordDialogue', () => {
 });
 
 describe('endSession', () => {
-  test('starts cooldown when ending active session (past grace period)', async () => {
-    await exhaustGracePeriod('fox');
+  test('starts cooldown when ending active session', async () => {
     await recordDialogue('fox');
     await endSession('fox');
     expect(isOnCooldown('fox')).toBe(true);
   });
 
-  test('does not cooldown during grace period', async () => {
-    // During grace period, ending session still enters cooldown state but getCooldownRemaining returns 0
+  test('cooldown works from the very first session', async () => {
+    // Even the first session should trigger a real cooldown
     await recordDialogue('fox');
     await endSession('fox');
-    // Grace period: cooldown remaining is 0 so isOnCooldown returns false
-    expect(isOnCooldown('fox')).toBe(false);
+    expect(isOnCooldown('fox')).toBe(true);
+
+    // Must solve puzzles before talking again
+    const result = await checkDialogueAvailability('fox');
+    expect(result.available).toBe(false);
+    expect(result.reason).toBe('cooldown');
   });
 
   test('does nothing if no session exists', async () => {
@@ -125,15 +116,13 @@ describe('isOnCooldown', () => {
     expect(isOnCooldown('fox')).toBe(false);
   });
 
-  test('returns true after session ends (past grace period)', async () => {
-    await exhaustGracePeriod('fox');
+  test('returns true after session ends', async () => {
     await recordDialogue('fox');
     await endSession('fox');
     expect(isOnCooldown('fox')).toBe(true);
   });
 
   test('returns false after enough puzzles completed', async () => {
-    await exhaustGracePeriod('fox');
     updatePuzzleCount(0);
     await recordDialogue('fox');
     await endSession('fox');
@@ -158,8 +147,7 @@ describe('getSessionStatus', () => {
     expect(status.dialoguesRemaining).toBe(EFFECTIVE_MAX - 1);
   });
 
-  test('returns cooldown when on cooldown (past grace period)', async () => {
-    await exhaustGracePeriod('fox');
+  test('returns cooldown when on cooldown', async () => {
     await recordDialogue('fox');
     await endSession('fox');
     const status = getSessionStatus('fox');
@@ -168,7 +156,6 @@ describe('getSessionStatus', () => {
   });
 
   test('returns available after cooldown expires', async () => {
-    await exhaustGracePeriod('fox');
     updatePuzzleCount(0);
     await recordDialogue('fox');
     await endSession('fox');
@@ -195,8 +182,7 @@ describe('formatTimeRemaining', () => {
 });
 
 describe('cooldown lifecycle', () => {
-  test('full session → cooldown → available cycle (past grace period)', async () => {
-    await exhaustGracePeriod('fox');
+  test('full session → cooldown → available cycle', async () => {
     updatePuzzleCount(0);
 
     // Start session
@@ -219,19 +205,54 @@ describe('cooldown lifecycle', () => {
     expect(afterPuzzles.available).toBe(true);
   });
 
-  test('grace period lifecycle: session resets without cooldown', async () => {
+  test('multiple sessions preserve sessionsCompleted across cooldowns', async () => {
     updatePuzzleCount(0);
 
-    // Start session (first session, grace period active)
-    expect((await checkDialogueAvailability('fox')).available).toBe(true);
+    // First session
+    await recordDialogue('fox');
+    await endSession('fox');
+    expect(isOnCooldown('fox')).toBe(true);
 
-    // Use all dialogues at phase 0 limit
-    for (let i = 0; i < EFFECTIVE_MAX; i++) {
-      await recordDialogue('fox');
-    }
+    // Clear cooldown
+    updatePuzzleCount(EFFECTIVE_COOLDOWN);
+    expect(isOnCooldown('fox')).toBe(false);
 
-    // Grace period: session resets, still available
-    const after = await checkDialogueAvailability('fox');
-    expect(after.available).toBe(true);
+    // Second session — animal should still be available after cooldown
+    const result = await checkDialogueAvailability('fox');
+    expect(result.available).toBe(true);
+
+    await recordDialogue('fox');
+    await endSession('fox');
+    expect(isOnCooldown('fox')).toBe(true);
+  });
+
+  test('closing dialogue early still triggers cooldown', async () => {
+    // Read just 1 dialogue then close
+    await recordDialogue('fox');
+    await endSession('fox');
+
+    // Should be on cooldown even though max wasn't reached
+    expect(isOnCooldown('fox')).toBe(true);
+    const result = await checkDialogueAvailability('fox');
+    expect(result.available).toBe(false);
+    expect(result.reason).toBe('cooldown');
+  });
+
+  test('cannot bypass cooldown by tapping animal again immediately', async () => {
+    await recordDialogue('fox');
+    await endSession('fox');
+
+    // Tapping again should NOT work
+    const result = await checkDialogueAvailability('fox');
+    expect(result.available).toBe(false);
+
+    // Still can't talk
+    const result2 = await checkDialogueAvailability('fox');
+    expect(result2.available).toBe(false);
+
+    // Only after solving puzzles
+    updatePuzzleCount(EFFECTIVE_COOLDOWN);
+    const result3 = await checkDialogueAvailability('fox');
+    expect(result3.available).toBe(true);
   });
 });
