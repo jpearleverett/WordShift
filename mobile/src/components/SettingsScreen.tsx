@@ -10,7 +10,7 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
-import { CandyColors, getPhaseSurfaceTheme, getPhaseTheme } from '../theme/colors';
+import { CandyColors } from '../theme/colors';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
 import { clearStats } from '../services/starRating';
 import { clearAchievements } from '../services/achievements';
@@ -24,13 +24,10 @@ import { hapticLight } from '../services/haptics';
 
 interface SettingsScreenProps {
   onClose: () => void;
-  phase?: number;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, phase = 0 }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<GameSettings | null>(null);
-  const surfaceTheme = getPhaseSurfaceTheme(phase);
-  const phaseTheme = getPhaseTheme(phase);
 
   useEffect(() => {
     getSettings().then(setSettings);
@@ -75,27 +72,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, phase =
   if (!settings) return null;
 
   return (
-    <View style={[styles.container, { backgroundColor: phase >= 2 ? phaseTheme.bgPrimary : CandyColors.gray[100] }]}>
-      <View style={[styles.header, { backgroundColor: phaseTheme.bgSecondary, borderBottomColor: surfaceTheme.glassBorder }]}>
+    <View style={styles.container}>
+      <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <Text style={[styles.backButtonText, { color: surfaceTheme.textSecondary }]}>{'<'} Back</Text>
+          <Text style={styles.backButtonText}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: surfaceTheme.textPrimary }]}>Settings</Text>
+        <Text style={styles.title}>Settings</Text>
         <View style={styles.backButton} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Sound & Haptics */}
-        <Text style={[styles.sectionTitle, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>FEEDBACK</Text>
-        <View style={[styles.section, { backgroundColor: surfaceTheme.cardBg, borderColor: surfaceTheme.cardBorder }]}>
+        <Text style={styles.sectionTitle}>FEEDBACK</Text>
+        <View style={styles.section}>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[700] }]}>
-                Sound Effects
-              </Text>
-              <Text style={[styles.settingDescription, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>
-                Play sounds on moves and victories
-              </Text>
+              <Text style={styles.settingLabel}>Sound Effects</Text>
+              <Text style={styles.settingDescription}>Play sounds on moves and victories</Text>
             </View>
             <Switch
               value={settings.soundEnabled}
@@ -111,12 +104,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, phase =
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[700] }]}>
-                Haptic Feedback
-              </Text>
-              <Text style={[styles.settingDescription, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>
-                Vibration on taps and interactions
-              </Text>
+              <Text style={styles.settingLabel}>Haptic Feedback</Text>
+              <Text style={styles.settingDescription}>Vibration on taps and interactions</Text>
             </View>
             <Switch
               value={settings.hapticsEnabled}
@@ -130,16 +119,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, phase =
         </View>
 
         {/* Accessibility */}
-        <Text style={[styles.sectionTitle, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>ACCESSIBILITY</Text>
-        <View style={[styles.section, { backgroundColor: surfaceTheme.cardBg, borderColor: surfaceTheme.cardBorder }]}>
+        <Text style={styles.sectionTitle}>ACCESSIBILITY</Text>
+        <View style={styles.section}>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingLabel, { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[700] }]}>
-                Reduced Motion
-              </Text>
-              <Text style={[styles.settingDescription, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>
-                Minimize animations for accessibility
-              </Text>
+              <Text style={styles.settingLabel}>Reduced Motion</Text>
+              <Text style={styles.settingDescription}>Minimize animations for accessibility</Text>
             </View>
             <Switch
               value={settings.reducedMotion}
@@ -153,27 +138,27 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, phase =
         </View>
 
         {/* Data */}
-        <Text style={[styles.sectionTitle, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>DATA</Text>
-        <View style={[styles.section, { backgroundColor: surfaceTheme.cardBg, borderColor: surfaceTheme.cardBorder }]}>
-          <TouchableOpacity style={[styles.dangerRow, phase >= 2 && { backgroundColor: 'rgba(140, 50, 70, 0.12)' }]} onPress={handleResetData}>
+        <Text style={styles.sectionTitle}>DATA</Text>
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.dangerRow} onPress={handleResetData}>
             <Text style={styles.dangerText}>Reset All Progress</Text>
-            <Text style={[styles.dangerDescription, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>
+            <Text style={styles.dangerDescription}>
               Clears statistics, achievements, and daily challenge history
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* About */}
-        <Text style={[styles.sectionTitle, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>ABOUT</Text>
-        <View style={[styles.section, { backgroundColor: surfaceTheme.cardBg, borderColor: surfaceTheme.cardBorder }]}>
+        <Text style={styles.sectionTitle}>ABOUT</Text>
+        <View style={styles.section}>
           <View style={styles.aboutRow}>
-            <Text style={[styles.aboutLabel, { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[600] }]}>WordShift</Text>
-            <Text style={[styles.aboutValue, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>v1.0.0</Text>
+            <Text style={styles.aboutLabel}>WordShift</Text>
+            <Text style={styles.aboutValue}>v1.0.0</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.aboutRow}>
-            <Text style={[styles.aboutLabel, { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[600] }]}>Made with</Text>
-            <Text style={[styles.aboutValue, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[400] }]}>love and existential dread</Text>
+            <Text style={styles.aboutLabel}>Made with</Text>
+            <Text style={styles.aboutValue}>love and existential dread</Text>
           </View>
         </View>
 
@@ -196,7 +181,6 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
     paddingBottom: 16,
     backgroundColor: CandyColors.purple.main,
-    borderBottomWidth: 1,
   },
   backButton: {
     width: 80,
@@ -229,11 +213,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    elevation: 4,
   },
   settingRow: {
     flexDirection: 'row',

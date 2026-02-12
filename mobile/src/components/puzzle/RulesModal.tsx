@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Modal,
 } from 'react-native';
-import { CandyColors, getPhaseSurfaceTheme, getPhaseTheme } from '../../theme/colors';
+import { CandyColors } from '../../theme/colors';
 import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -29,91 +29,46 @@ export const RulesModal: React.FC<RulesModalProps> = ({
   onClose,
 }) => {
   const rules = getRulesText(phase);
-  const surfaceTheme = getPhaseSurfaceTheme(phase);
-  const phaseTheme = getPhaseTheme(phase);
-
-  const getStepColor = (index: number) => {
-    if (phase <= 1) {
-      return STEP_COLORS[index % STEP_COLORS.length];
-    }
-    if (phase === 2) {
-      return { bg: '#5A4B86', text: '#D7CCF5' };
-    }
-    if (phase === 3) {
-      return { bg: '#4A355F', text: '#BFA8D8' };
-    }
-    if (phase >= 4) {
-      return { bg: '#4B2234', text: '#D8A8B8' };
-    }
-    return STEP_COLORS[index % STEP_COLORS.length];
-  };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <TouchableOpacity
-        style={[styles.modalOverlay, { backgroundColor: surfaceTheme.modalOverlay }]}
+        style={styles.modalOverlay}
         activeOpacity={1}
         onPress={onClose}
       >
-        <View
-          style={[
-            styles.rulesModal,
-            {
-              backgroundColor: surfaceTheme.cardBg,
-              borderColor: surfaceTheme.cardBorder,
-              shadowColor: surfaceTheme.cardShadow,
-            },
-          ]}
-          onStartShouldSetResponder={() => true}
-        >
-          <View style={[styles.modalShine, { backgroundColor: surfaceTheme.glassShine }]} />
+        <View style={styles.rulesModal} onStartShouldSetResponder={() => true}>
+          <View style={styles.modalShine} />
 
           <TouchableOpacity
-            style={[
-              styles.closeButton,
-              {
-                backgroundColor: surfaceTheme.glassStrong,
-                borderColor: surfaceTheme.glassBorder,
-              },
-            ]}
+            style={styles.closeButton}
             onPress={onClose}
           >
-            <Text style={[styles.closeButtonText, { color: surfaceTheme.textSecondary }]}>{'\u2715'}</Text>
+            <Text style={styles.closeButtonText}>{'\u2715'}</Text>
           </TouchableOpacity>
 
-          <Text style={[styles.rulesTitle, { color: phaseTheme.victoryTitleColor }]}>{rules.title}</Text>
+          <Text style={styles.rulesTitle}>{rules.title}</Text>
 
           {rules.steps.map((step, idx) => {
-            const color = getStepColor(idx);
+            const color = STEP_COLORS[idx % STEP_COLORS.length];
             return (
               <View key={idx} style={styles.ruleItem}>
                 <View style={[styles.ruleNumber, { backgroundColor: color.bg }]}>
                   <Text style={[styles.ruleNumberText, { color: color.text }]}>{idx + 1}</Text>
                 </View>
                 <View style={styles.ruleContent}>
-                  <Text style={[styles.ruleHeading, { color: phase >= 2 ? surfaceTheme.textSecondary : CandyColors.gray[700] }]}>
-                    {step.heading}
-                  </Text>
-                  <Text style={[styles.ruleDesc, { color: phase >= 2 ? surfaceTheme.textMuted : CandyColors.gray[500] }]}>
-                    {step.desc}
-                  </Text>
+                  <Text style={styles.ruleHeading}>{step.heading}</Text>
+                  <Text style={styles.ruleDesc}>{step.desc}</Text>
                 </View>
               </View>
             );
           })}
 
           <TouchableOpacity
-            style={[
-              styles.gotItButton,
-              {
-                backgroundColor: surfaceTheme.accent,
-                shadowColor: surfaceTheme.accent,
-              },
-              phase >= 4 && styles.gotItButtonDark,
-            ]}
+            style={styles.gotItButton}
             onPress={onClose}
           >
-            <View style={[styles.buttonShine, { backgroundColor: surfaceTheme.glassShine }]} />
+            <View style={styles.buttonShine} />
             <Text style={styles.gotItButtonText}>{rules.dismissLabel}</Text>
           </TouchableOpacity>
         </View>
@@ -125,6 +80,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(76, 29, 149, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -140,16 +96,17 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 32,
   },
   rulesModal: {
+    backgroundColor: CandyColors.white,
     borderRadius: 32,
     padding: 28,
     width: '100%',
     maxWidth: 340,
+    shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.4,
     shadowRadius: 32,
     elevation: 20,
     overflow: 'hidden',
-    borderWidth: 1,
   },
   closeButton: {
     position: 'absolute',
@@ -158,18 +115,20 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: CandyColors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
-    borderWidth: 1,
   },
   closeButtonText: {
     fontSize: 18,
+    color: CandyColors.gray[400],
     fontWeight: '700',
   },
   rulesTitle: {
     fontSize: 26,
     fontWeight: '900',
+    color: CandyColors.purple.main,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -214,10 +173,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 8,
-  },
-  gotItButtonDark: {
-    borderWidth: 1,
-    borderColor: 'rgba(212, 156, 176, 0.18)',
   },
   buttonShine: {
     position: 'absolute',

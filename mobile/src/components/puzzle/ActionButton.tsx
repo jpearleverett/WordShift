@@ -7,8 +7,6 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { getPhaseSurfaceTheme } from '../../theme/colors';
-import { getSettingsSync } from '../../services/settings';
 
 interface ActionButtonProps {
   icon: string;
@@ -17,7 +15,6 @@ interface ActionButtonProps {
   onPress: () => void;
   disabled: boolean;
   accessibilityLabel?: string;
-  phase?: number;
 }
 
 export const ActionButton: React.FC<ActionButtonProps> = ({
@@ -27,22 +24,13 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   onPress,
   disabled,
   accessibilityLabel,
-  phase = 0,
 }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
-  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const reducedMotion = getSettingsSync().reducedMotion;
-  const surfaceTheme = getPhaseSurfaceTheme(phase);
 
   useEffect(() => {
-    if (glowLoopRef.current) {
-      glowLoopRef.current.stop();
-      glowLoopRef.current = null;
-    }
-
-    if (!disabled && !reducedMotion) {
-      const glowLoop = Animated.loop(
+    if (!disabled) {
+      Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
@@ -57,24 +45,12 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
             useNativeDriver: false,
           }),
         ])
-      );
-      glowLoopRef.current = glowLoop;
-      glowLoop.start();
-    } else {
-      glowAnim.setValue(disabled ? 0.12 : 0.45);
+      ).start();
     }
-
-    return () => {
-      if (glowLoopRef.current) {
-        glowLoopRef.current.stop();
-        glowLoopRef.current = null;
-      }
-      glowAnim.stopAnimation();
-    };
-  }, [disabled, reducedMotion, glowAnim]);
+    return () => glowAnim.stopAnimation();
+  }, [disabled]);
 
   const handlePressIn = () => {
-    if (reducedMotion) return;
     Animated.spring(scaleAnim, {
       toValue: 0.9,
       friction: 5,
@@ -84,7 +60,6 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   };
 
   const handlePressOut = () => {
-    if (reducedMotion) return;
     Animated.spring(scaleAnim, {
       toValue: 1,
       friction: 3,
@@ -113,9 +88,6 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         style={[
           styles.actionButton,
           disabled && styles.actionButtonDisabled,
-          {
-            shadowColor: colors.border,
-          },
           { transform: [{ scale: scaleAnim }] },
         ]}
       >
@@ -125,7 +97,6 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
             style={[
               styles.actionButtonGlow,
               { backgroundColor: colors.glow, opacity: glowOpacity },
-              phase >= 3 && styles.actionButtonGlowDark,
             ]}
           />
         )}
@@ -135,19 +106,10 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           style={[
             styles.actionButtonIcon,
             { backgroundColor: colors.bg },
-            {
-              borderColor: surfaceTheme.glassBorder,
-              shadowColor: colors.border,
-            },
           ]}
         >
           {/* Top bevel */}
-          <View
-            style={[
-              styles.actionButtonBevel,
-              { backgroundColor: surfaceTheme.glassShine },
-            ]}
-          />
+          <View style={styles.actionButtonBevel} />
 
           {/* Icon */}
           <Text style={styles.actionButtonIconText}>{icon}</Text>
@@ -162,15 +124,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         />
 
         {/* Label */}
-        <Text
-          style={[
-            styles.actionButtonLabel,
-            { color: surfaceTheme.textSecondary },
-            phase >= 4 && styles.actionButtonLabelDark,
-          ]}
-        >
-          {label}
-        </Text>
+        <Text style={styles.actionButtonLabel}>{label}</Text>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -180,13 +134,9 @@ const styles = StyleSheet.create({
   actionButton: {
     alignItems: 'center',
     position: 'relative',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 5,
   },
   actionButtonDisabled: {
-    opacity: 0.42,
+    opacity: 0.5,
   },
   actionButtonGlow: {
     position: 'absolute',
@@ -195,9 +145,6 @@ const styles = StyleSheet.create({
     right: -4,
     bottom: 20,
     borderRadius: 20,
-  },
-  actionButtonGlowDark: {
-    transform: [{ scale: 1.04 }],
   },
   actionButtonIcon: {
     width: 64,
@@ -210,7 +157,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
-    borderWidth: 1,
   },
   actionButtonBevel: {
     position: 'absolute',
@@ -218,6 +164,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
   },
@@ -238,9 +185,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 10,
     fontWeight: '900',
+    color: 'rgba(255, 255, 255, 0.8)',
     letterSpacing: 1.5,
-  },
-  actionButtonLabelDark: {
-    color: 'rgba(214, 184, 198, 0.88)',
   },
 });
