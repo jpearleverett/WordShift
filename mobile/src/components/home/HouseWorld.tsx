@@ -10,10 +10,8 @@ import {
 } from 'react-native';
 import {
   GestureHandlerRootView,
-  PinchGestureHandler,
   PanGestureHandler,
   State,
-  PinchGestureHandlerGestureEvent,
   PanGestureHandlerGestureEvent,
 } from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase } from '../../types/homeWorld';
@@ -535,9 +533,6 @@ const ROOM_GAP = 6;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
-// Zoom constraints
-const MIN_SCALE = 0.75;
-const MAX_SCALE = 1.7;
 
 interface HouseWorldProps {
   rooms: Room[];
@@ -557,16 +552,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   ritualWords = [],
 }) => {
   // Animated values
-  const scale = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
 
   // Refs for gesture tracking
-  const pinchRef = useRef<PinchGestureHandler>(null);
   const panRef = useRef<PanGestureHandler>(null);
 
   // State tracking for gestures
-  const baseScale = useRef(1);
-  const lastScale = useRef(1);
   const baseTranslateY = useRef(0);
 
   // Memoize night star positions/sizes to prevent flicker on re-render
@@ -718,43 +709,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
            HOUSE_PADDING * 2;
   };
 
-  // Pinch gesture handler
-  const onPinchGestureEvent = (event: PinchGestureHandlerGestureEvent) => {
-    const { scale: gestureScale } = event.nativeEvent;
-    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * gestureScale));
-    scale.setValue(newScale);
-  };
-
-  const onPinchHandlerStateChange = (event: PinchGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      const currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseScale.current * event.nativeEvent.scale));
-      baseScale.current = currentScale;
-      lastScale.current = currentScale;
-
-      // Smooth snap if too zoomed out
-      if (currentScale < 0.8) {
-        Animated.spring(scale, {
-          toValue: 0.8,
-          friction: 5,
-          useNativeDriver: true,
-        }).start(() => {
-          baseScale.current = 0.8;
-          lastScale.current = 0.8;
-        });
-      }
-    }
-  };
-
-  // Calculate pan bounds based on content size and zoom level
+  // Calculate pan bounds based on content size
   const getPanBounds = () => {
-    const currentScale = lastScale.current;
     // Full height of the house structure including container margins
     const totalContentHeight = 50 + 80 + houseHeight + 25; // marginTop + roof + body + foundation
     // The house sits 150px below the container bottom (marginBottom: -150),
     // so the top overflows above the screen when the house is tall
     const topOverflow = Math.max(0, totalContentHeight - SCREEN_HEIGHT - 150);
     // Allow extra padding above the house for comfortable viewing
-    const maxPan = Math.max(200, topOverflow + 100) * currentScale;
+    const maxPan = Math.max(200, topOverflow + 100);
     return maxPan;
   };
 
@@ -786,33 +749,25 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         <FloatingParticle key={particle.id} particle={particle} />
       ))}
 
-      {/* Gesture handlers with simultaneous recognition */}
+      {/* Pan gesture handler - vertical only */}
       <PanGestureHandler
         ref={panRef}
-        simultaneousHandlers={pinchRef}
         onGestureEvent={onPanGestureEvent}
         onHandlerStateChange={onPanHandlerStateChange}
         minDist={10}
         avgTouches
       >
         <Animated.View style={styles.gestureContainer}>
-          <PinchGestureHandler
-            ref={pinchRef}
-            simultaneousHandlers={panRef}
-            onGestureEvent={onPinchGestureEvent}
-            onHandlerStateChange={onPinchHandlerStateChange}
+          <Animated.View
+            style={[
+              styles.transformContainer,
+              {
+                transform: [
+                  { translateY },
+                ],
+              },
+            ]}
           >
-            <Animated.View
-              style={[
-                styles.transformContainer,
-                {
-                  transform: [
-                    { translateY },
-                    { scale },
-                  ],
-                },
-              ]}
-            >
               {/* Sky background - inside transform so it moves with the scene.
                   Oversized to prevent gaps at any zoom/pan combination.
                   Top offset grows with house height so the fill color above
@@ -997,7 +952,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 </View>
               </View>
             </Animated.View>
-          </PinchGestureHandler>
+          </Animated.View>
         </Animated.View>
       </PanGestureHandler>
     </GestureHandlerRootView>
@@ -1012,9 +967,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#6fb7df', // Matches sky_day bottom edge so no gaps when zoomed out
   },
 
-  // Sky background - moves with scene, oversized to prevent gaps.
-  // At MIN_SCALE (0.6) the visible area is ~1.67x screen in each dimension.
-  // Vertical pan adds up to ±150px in content coords. 3x height covers all cases.
+  // Sky background - moves with scene, oversized to prevent gaps during pan.
   skyBackground: {
     position: 'absolute',
     top: -SCREEN_HEIGHT * 0.2,
