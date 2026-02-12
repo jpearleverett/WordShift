@@ -724,7 +724,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const getPanBounds = () => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + connectorHeight; // marginTop + roof + body + foundation + connectors
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - containerHeight);
     return {
@@ -760,7 +760,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // translateY shifts the view down, bringing the roof into view.
   useEffect(() => {
     const connectorHeight = Math.max(0, numRows - 1) * 10;
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + connectorHeight;
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
     const overflow = Math.max(0, totalContentHeight - containerHeight);
 
     translateY.setValue(overflow);
@@ -1078,6 +1078,7 @@ const styles = StyleSheet.create({
   houseContainer: {
     alignItems: 'center',
     marginTop: 50,
+    marginBottom: 40,
   },
 
   // Roof
