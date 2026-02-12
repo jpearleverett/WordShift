@@ -88,7 +88,7 @@ mobile/
 │   │   └── useUnlockFlow.ts     # Unlock/shop logic: rooms, animals, decorations, purchases
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
-│   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails (compact mode for 6+ letters)
+│   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails, resonant word glow (compact mode for 6+ letters)
 │   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + native-driver pulse
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial for phase changes
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
@@ -122,7 +122,7 @@ mobile/
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette, tile colors, PhaseTheme system
 │   └── services/
-│       ├── localGenerator.ts    # Puzzle generation with DFS, quality scoring, dread words
+│       ├── localGenerator.ts    # Puzzle generation with DFS, quality scoring, phase-tiered dread words, resonance tier export
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
@@ -595,7 +595,14 @@ Puzzle words gradually shift to match the ritual narrative:
 - Phase 3: Dread words (DOOM, DARK, COLD, NUMB, GRAVE, ECHO) — something approaching
 - Phase 4: Cosmic/ritual words (ABYSS, RIFT, SUMMON, PORTAL, GATE, ETERNAL) — the summoning
 
-The `DREAD_WORDS` set in `localGenerator.ts` contains 200+ words organized by phase. The dread bonus formula is `phase * phase * 2.5` (Phase 4 = +40 score), making ritual-themed words strongly preferred at higher phases.
+**Phase-tiered scoring**: Dread words are organized into four separate tier sets (`DREAD_WORDS_PHASE_1` through `DREAD_WORDS_PHASE_4`) in `localGenerator.ts`, with a `DREAD_WORD_TIER` lookup map assigning each word to its earliest tier. The scoring formula is `phase² × 2.5 × proximity_multiplier`, where the multiplier depends on the distance between the word's tier and the current phase:
+- Same tier as current phase: 1.0× (full bonus — these words dominate)
+- Adjacent tier (±1): 0.5× (foreshadowing from future tier, echoes from past)
+- Distant tier (±2+): 0.15× (faint presence)
+
+This creates natural vocabulary evolution: Phase 2 puzzles gravitate toward VOID/EMPTY/FADE, while ABYSS only appears as rare foreshadowing. By Phase 4, cosmic words dominate and earlier-tier words echo in the background.
+
+**Resonant word visuals**: Words belonging to a dread tier get a visual "resonance" glow on their letter tiles (see Letter Tile Animation Evolution below). `getWordPhaseTier(word)` exported from `localGenerator.ts` returns 0 (not dread) or 1-4 (tier). `Row.tsx` computes resonance from `rowData.originalWord` and passes `isResonant` to all child `LetterTile` components.
 
 ## Phase-Aware Visual Theming
 
@@ -616,6 +623,7 @@ Letter tiles physically change behavior across phases to make puzzles *feel* dif
 - **Wobble speed** (`getWobbleDurations(phase)`): Phase 0 fast (150/300ms) → Phase 4 ponderous (400/800ms)
 - **Bounce height** (`getBounceHeight(phase)`): Phase 0 high (-4) → Phase 4 barely lifts (-1.5)
 - **Trail glow** (Phase 3+): Selected tiles emit shadow pulses. Phase 3: purple glow. Phase 4: crimson glow. Uses `useNativeDriver: false` for shadow animation.
+- **Resonance glow** (Phase 1+): Tiles belonging to dread-tier words (`isResonant` prop) show a phase-aware inner glow overlay that intensifies across the narrative. Phase 1: subliminal warm gold shimmer (opacity 0.02-0.05, 4s cycle). Phase 2: faint purple-blue pulse (0.04-0.12, 3s). Phase 3: visible dark purple aura (0.08-0.20, 2.5s). Phase 4: crimson breathing light (0.12-0.28, 2s). Phase 5: ghostly mauve (0.06-0.10). Uses `useNativeDriver: true` (opacity only). Respects `reducedMotion` (static glow) and `shouldSimplifyAnimations()` (skips animation loop).
 - **Phase 5 tile colors**: Purple-gray tints for locked/selected/default tiles (distinct from Phase 4 crimson)
 
 ### Home Screen Background Colors
@@ -672,12 +680,14 @@ DFS-based word chain generator with quality scoring:
 - **Quality threshold**: Rejects puzzles scoring below 45/100
 - **Multi-candidate**: Generates 3 puzzles, selects highest scoring
 - **Word history integration**: Penalizes/excludes recently used words
+- **Phase-tiered dread words**: 200+ words split into 4 tier sets (curiosity → emptiness → dread → cosmic). Scoring weights by tier proximity to current phase (same tier: 1.0×, adjacent: 0.5×, distant: 0.15×)
 
 Key functions:
 - `generateLocalPuzzle(difficulty, overrides?)` - Main entry point (2.5s timeout); optional `overrides` for custom `wordLength` and `targetRows` (used by daily challenge)
 - `findPath()` - Recursive DFS to find valid word chains
 - `scorePuzzleChain()` - Evaluates puzzle quality (includes freshness scoring)
-- `isDreadWord(word)` - Check if a word is in the dread words set (used for dread pulse visual feedback at Phase 2+)
+- `isDreadWord(word)` - Check if a word is in the combined dread words set (used for dread pulse visual feedback at Phase 2+)
+- `getWordPhaseTier(word)` - Returns 0 (not dread) or 1-4 (phase tier); used by `Row.tsx` to determine tile resonance visuals
 
 ### Star Rating System (`starRating.ts`)
 
