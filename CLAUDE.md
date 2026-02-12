@@ -112,7 +112,7 @@ mobile/
 │   │   ├── WordLedger.tsx       # Scrollable ritual word history screen (phase-aware styling)
 │   │   └── home/
 │   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
-│   │       ├── HouseWorld.tsx   # Zoomable house view (vertical pan only, pinch zoom)
+│   │       ├── HouseWorld.tsx   # Pannable house view (vertical pan only)
 │   │       ├── RoomView.tsx     # Individual room with decorations
 │   │       ├── AnimalSprite.tsx # Animated animal characters with movement + emotions
 │   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
@@ -572,15 +572,16 @@ Milestone bonuses at key puzzle counts use phase-aware messages. Each `MILESTONE
 **House Structure** (`HouseWorld.tsx`):
 - Single-column layout of rooms stacked vertically (bottom-up)
 - Only unlocked rooms are rendered
-- Vertical-only pan + pinch zoom via `react-native-gesture-handler` (horizontal pan disabled to prevent side gaps)
-- Pan bounds dynamically calculated from total house height to ensure all rooms are reachable (accounts for marginBottom offset); phase background color blends seamlessly above the sky image when panning to upper rooms
-- Sky background is inside the transform container (moves with scene) but oversized (1.4x in each dimension) to prevent gaps at any zoom/pan combo
+- Vertical-only pan via `react-native-gesture-handler` (horizontal pan disabled to prevent side gaps)
+- Layout uses `justifyContent: 'flex-end'` to anchor house at viewport bottom; `houseContainer` has `marginTop: 50` and `marginBottom: 40` (gap between foundation and screen edge)
+- **Initial pan position**: On mount and when rooms change, `translateY` is set to the overflow amount (total content height minus measured container height) so the roof is visible. Container height is measured via `onLayout` for accuracy
+- **Asymmetric pan bounds**: `min: 0` (prevents panning below the house / empty space below foundation), `max: overflow + 50` (allows panning up to see the roof plus padding). Content height includes margins, roof, house body, foundation, and ArrangementConnector heights between rooms
+- Sky background is inside the transform container (moves with scene), sized to screen dimensions (1x)
 - Phase-aware sky: `sky_day.png` → `sky_dusk.png` → `sky_storm.png` → `sky_shadow.png`
 - Phase-aware background color behind sky image (`PHASE_BG_COLORS`): Phase 0-1 `#6fb7df`, Phase 2 `#514378`, Phase 3 `#060612`, Phase 4 `#1a122a`
-- Animated emoji sky elements (clouds, sun/moon, birds, shooting stars, night stars) inside the transform container — they zoom/pan with the scene
+- Animated emoji sky elements (clouds, sun/moon, birds, shooting stars, night stars) inside the transform container — they pan with the scene
 - No landscape emojis (trees, fence removed for cleaner look)
 - Room dimensions: `ROOM_WIDTH` (250) and `ROOM_HEIGHT` (~123, maintains 2:1 aspect ratio of room PNGs)
-- Zoom: MIN_SCALE (0.75) to MAX_SCALE (2.0), snaps back to 0.8 if zoomed below
 - **Arrangement pattern** (Phase 2+): Visual sigil lines connecting rooms. Phase 2: thin purple. Phase 3: thicker with nodes. Phase 4: crimson pulsing. Accepts `ritualWords` prop for room word echoes
 - **Room word echoes** (Phase 2+): Faint text of recent puzzle words scattered across room backgrounds in `RoomView.tsx`. Opacity/density/color scales with phase
 - **Shadow Presence** (Phase 2+): `ShadowPresence` internal component in `HouseWorld.tsx` renders a dark silhouette above the house roof. Phase 2: barely visible (opacity 0.06, 60% scale). Phase 3: growing (0.15, 80%). Phase 4: full presence (0.30, 100%) with crimson "eyes". Provides a looming visual before `shadow_figure.png` asset is created
@@ -938,7 +939,7 @@ Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
 - Dictionary limited to common English words (no proper nouns, abbreviations)
 - Arc layout uses `overflow: visible` - elements can extend beyond row container
 - Dialogue sessions persist across app restarts (cooldowns continue)
-- House view uses `react-native-gesture-handler` for vertical pan + pinch zoom (horizontal pan disabled; GestureHandlerRootView wraps content)
+- House view uses `react-native-gesture-handler` for vertical pan (horizontal pan disabled; GestureHandlerRootView wraps content)
 - TouchableOpacity in home screen components must be imported from `react-native-gesture-handler` for proper touch handling
 - HomeScreen.tsx uses react-native TouchableOpacity (not RNGH) for modal content
 - Daily challenge uses Math.random override for seeded generation (guarded against concurrency)
