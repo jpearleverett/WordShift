@@ -1052,7 +1052,7 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginBottom: -250,
+    marginBottom: -220,
     marginTop: 50,
   },
 
