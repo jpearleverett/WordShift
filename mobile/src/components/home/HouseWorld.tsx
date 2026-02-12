@@ -713,11 +713,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const getPanBounds = () => {
     // Full height of the house structure including container margins
     const totalContentHeight = 50 + 80 + houseHeight + 25; // marginTop + roof + body + foundation
-    // The house sits 50px above the container bottom (marginBottom: -50),
-    // so the top overflows above the screen when the house is tall
-    const topOverflow = Math.max(0, totalContentHeight - SCREEN_HEIGHT - 50);
+    // How much the house overflows above the visible screen
+    const topOverflow = Math.max(0, totalContentHeight - SCREEN_HEIGHT);
     // Allow extra padding above the house for comfortable viewing
-    const maxPan = Math.max(200, topOverflow + 100);
+    const maxPan = Math.max(100, topOverflow + 100);
     return maxPan;
   };
 
@@ -1052,7 +1051,6 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginBottom: -50,
     marginTop: 50,
   },
 
