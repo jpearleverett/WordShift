@@ -952,7 +952,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 </View>
               </View>
             </Animated.View>
-          </Animated.View>
         </Animated.View>
       </PanGestureHandler>
     </GestureHandlerRootView>
