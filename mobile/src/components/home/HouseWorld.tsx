@@ -709,23 +709,22 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
            HOUSE_PADDING * 2;
   };
 
-  // Calculate pan bounds based on content size
+  // Calculate how far user can pan upward to reveal higher rooms
   const getPanBounds = () => {
-    // Full height of the house structure including container margins
-    const totalContentHeight = 50 + 80 + houseHeight + 25; // marginTop + roof + body + foundation
-    // How much the house overflows above the visible screen
-    const topOverflow = Math.max(0, totalContentHeight - SCREEN_HEIGHT);
-    // Allow extra padding above the house for comfortable viewing
-    const maxPan = Math.max(100, topOverflow + 100);
-    return maxPan;
+    // Total visual height of the house structure
+    const totalHouseHeight = 80 + houseHeight + 25; // roof + body + foundation
+    // How much the house extends above the visible screen
+    const overflow = Math.max(0, totalHouseHeight - SCREEN_HEIGHT + 100); // +100 for comfortable top padding
+    return overflow;
   };
 
-  // Pan gesture handler - vertical only to prevent horizontal gaps
+  // Pan gesture handler - vertical only, upward only (negative translateY)
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
     const { translationY } = event.nativeEvent;
 
-    const maxTranslateY = getPanBounds();
-    const newY = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
+    const maxPan = getPanBounds();
+    // Clamp between -maxPan (scrolled to top) and 0 (foundation at bottom)
+    const newY = Math.max(-maxPan, Math.min(0, baseTranslateY.current + translationY));
 
     translateY.setValue(newY);
   };
@@ -733,9 +732,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
       const { translationY } = event.nativeEvent;
-      const maxTranslateY = getPanBounds();
+      const maxPan = getPanBounds();
 
-      baseTranslateY.current = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
+      baseTranslateY.current = Math.max(-maxPan, Math.min(0, baseTranslateY.current + translationY));
     }
   };
 
@@ -1044,14 +1043,15 @@ const styles = StyleSheet.create({
   // Transform container
   transformContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
   },
 
-  // House container
+  // House container - pinned to bottom so foundation always sits at screen edge
   houseContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginTop: 50,
   },
 
   // Roof
