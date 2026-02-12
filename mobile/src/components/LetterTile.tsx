@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'reac
 import { Letter } from '../types';
 import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 
 interface LetterTileProps {
   letter: Letter;
@@ -12,6 +13,8 @@ interface LetterTileProps {
   highlight?: 'default' | 'source' | 'locked';
   phase?: number;
   compact?: boolean;
+  /** Whether this tile belongs to a word that resonates with the current narrative phase */
+  isResonant?: boolean;
 }
 
 // Compact tile dimensions for 6+ letter words
@@ -29,6 +32,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   highlight = 'default',
   phase = 0,
   compact = false,
+  isResonant = false,
 }) => {
   const settings = getSettingsSync();
 
@@ -39,6 +43,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const shineAnim = useRef(new Animated.Value(0)).current;
   const wobbleAnim = useRef(new Animated.Value(0)).current;
   const trailGlowAnim = useRef(new Animated.Value(0)).current;
+  const resonanceAnim = useRef(new Animated.Value(0)).current;
 
   // Loop refs for proper cleanup (prevents memory leaks)
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -46,6 +51,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const wobbleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const trailGlowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const resonanceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Phase-aware animation parameters for selected tiles
   const getSelectedSpringParams = () => {
@@ -257,6 +263,68 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       trailGlowAnim.stopAnimation();
     };
   }, [isSelected, phase]);
+
+  // Resonance glow — phase-aware inner light for dread/ritual words.
+  // Phase 1: subliminal shimmer. Phase 2: faint pulse. Phase 3: visible aura.
+  // Phase 4: crimson breathing. Phase 5: ghostly settled glow.
+  useEffect(() => {
+    if (!isResonant || phase < 1) {
+      resonanceAnim.setValue(0);
+      return;
+    }
+
+    if (settings.reducedMotion || shouldSimplifyAnimations()) {
+      // Static resonance glow (no animation)
+      resonanceAnim.setValue(0.5);
+      return () => { resonanceAnim.setValue(0); };
+    }
+
+    // Phase 1: very slow, barely perceptible shimmer
+    // Phase 2-3: moderate pulse
+    // Phase 4: faster breathing
+    const cycleDuration = phase >= 4 ? 2000 : phase >= 3 ? 2500 : phase >= 2 ? 3000 : 4000;
+
+    const resonanceLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(resonanceAnim, {
+          toValue: 1,
+          duration: cycleDuration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(resonanceAnim, {
+          toValue: 0,
+          duration: cycleDuration,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    resonanceLoopRef.current = resonanceLoop;
+    resonanceLoop.start();
+
+    return () => {
+      if (resonanceLoopRef.current) {
+        resonanceLoopRef.current.stop();
+        resonanceLoopRef.current = null;
+      }
+      resonanceAnim.stopAnimation();
+    };
+  }, [isResonant, phase]);
+
+  // Resonance visual config — color and opacity range per phase
+  const getResonanceConfig = () => {
+    if (phase >= 5) return { color: '#7B6B8A', minOpacity: 0.06, maxOpacity: 0.10 };   // Ghostly mauve
+    if (phase >= 4) return { color: '#8B0000', minOpacity: 0.12, maxOpacity: 0.28 };   // Crimson
+    if (phase >= 3) return { color: '#4A2080', minOpacity: 0.08, maxOpacity: 0.20 };   // Dark purple
+    if (phase >= 2) return { color: '#6B5B95', minOpacity: 0.04, maxOpacity: 0.12 };   // Purple-blue
+    return { color: '#DAA520', minOpacity: 0.02, maxOpacity: 0.05 };                   // Warm gold (Phase 1)
+  };
+  const resonanceConfig = isResonant && phase >= 1 ? getResonanceConfig() : null;
+  const resonanceOpacity = resonanceConfig ? resonanceAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [resonanceConfig.minOpacity, resonanceConfig.maxOpacity],
+  }) : null;
 
   const handlePressIn = () => {
     if (settings.reducedMotion) return;
@@ -483,6 +551,20 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         {/* Glossy shine overlay */}
         <View style={styles.glossyShine} />
 
+        {/* Resonance glow — inner light for dread/ritual words */}
+        {resonanceConfig && (
+          <Animated.View
+            style={[
+              styles.resonanceOverlay,
+              {
+                backgroundColor: resonanceConfig.color,
+                opacity: resonanceOpacity!,
+              },
+            ]}
+            pointerEvents="none"
+          />
+        )}
+
         {/* Letter text with shadow */}
         <Text
           style={[
@@ -651,6 +733,10 @@ const styles = StyleSheet.create({
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  resonanceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 14,
   },
 });
 
