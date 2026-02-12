@@ -25,8 +25,16 @@ import { useVictoryFlow } from './src/hooks/useVictoryFlow';
 import { useAchievementQueue } from './src/hooks/useAchievementQueue';
 import { logEvent } from './src/services/eventLogger';
 // Feature imports
-import { Tutorial, hasTutorialCompleted } from './src/components/Tutorial';
+import { hasTutorialCompleted, markTutorialCompleted } from './src/components/Tutorial';
 import { SettingsScreen } from './src/components/SettingsScreen';
+import { FoxGuide } from './src/components/FoxGuide';
+import {
+  OnboardingStep,
+  getOnboardingStep,
+  setOnboardingStep,
+  ONBOARDING_FOX_LINES,
+} from './src/services/onboarding';
+import { markTutorialSeedsPlanted } from './src/services/amberCurrency';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
@@ -68,21 +76,15 @@ export default function App() {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
 
-  // Auto-dismiss interjection after 4 seconds
-  useEffect(() => {
-    if (showInterjection) {
-      const timeout = setTimeout(() => setShowInterjection(false), 4000);
-      return () => clearTimeout(timeout);
-    }
-  }, [showInterjection]);
-
   // StarBurst effect state for valid moves
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
     active: false, x: 0, y: 0,
   });
 
-  // Tutorial state
-  const [showTutorial, setShowTutorial] = useState(false);
+  // Onboarding state (replaces old tutorial overlay)
+  const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
+  const [onboardingLineIndex, setOnboardingLineIndex] = useState(0);
+  const [onboardingReady, setOnboardingReady] = useState(false);
 
   // Daily challenge state
   const [isPlayingDaily, setIsPlayingDaily] = useState(false);
@@ -98,6 +100,14 @@ export default function App() {
   const [interjection, setInterjection] = useState<{ animalName: string; text: string } | null>(null);
   const [showInterjection, setShowInterjection] = useState(false);
 
+  // Auto-dismiss interjection after 4 seconds
+  useEffect(() => {
+    if (showInterjection) {
+      const timeout = setTimeout(() => setShowInterjection(false), 4000);
+      return () => clearTimeout(timeout);
+    }
+  }, [showInterjection]);
+
   // In-progress ritual echo chain — words formed during current puzzle
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
 
@@ -107,16 +117,32 @@ export default function App() {
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
 
-  // Initialize on mount
+  // Initialize on mount — check onboarding state
   useEffect(() => {
     initAudio();
     startFrameMonitoring();
-    // Check if tutorial needed
-    hasTutorialCompleted().then(completed => {
-      if (!completed) {
-        setShowTutorial(true);
+
+    (async () => {
+      // Check legacy tutorial flag first for backward compat
+      const tutorialDone = await hasTutorialCompleted();
+      const step = await getOnboardingStep();
+
+      if (tutorialDone && step === 'not_started') {
+        // Existing player who completed old tutorial — skip onboarding
+        await setOnboardingStep('complete');
+        setOnboardingStepState('complete');
+      } else if (step === 'not_started') {
+        // Fresh install — start onboarding
+        await setOnboardingStep('home_empty');
+        setOnboardingStepState('home_empty');
+        setOnboardingLineIndex(0);
+      } else {
+        // Resume onboarding from where they left off
+        setOnboardingStepState(step);
+        setOnboardingLineIndex(0);
       }
-    });
+      setOnboardingReady(true);
+    })();
   }, []);
 
   // Animated screen transition (instant if reducedMotion)
@@ -141,6 +167,16 @@ export default function App() {
       }).start();
     });
   }, [screenFade]);
+
+  // Onboarding helpers (declared early so other callbacks can reference them)
+  const isOnboarding = onboardingStep !== 'complete';
+
+  /** Advance onboarding to next step */
+  const advanceOnboarding = useCallback(async (step: OnboardingStep) => {
+    await setOnboardingStep(step);
+    setOnboardingStepState(step);
+    setOnboardingLineIndex(0);
+  }, []);
 
   // Start puzzle when navigating to puzzle screen
   const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
@@ -280,6 +316,11 @@ export default function App() {
       // Check achievements after brief delay to not block victory display
       setTimeout(() => achievementActions.checkForAchievements(victory), 500);
 
+      // During onboarding, advance to puzzle_complete step
+      if (onboardingStep === 'puzzle_tutorial') {
+        setTimeout(() => advanceOnboarding('puzzle_complete'), 1000);
+      }
+
       // Trigger animal whisper after a delay (appears below the victory modal)
       setTimeout(async () => {
         try {
@@ -339,7 +380,7 @@ export default function App() {
         triggerDreadPulse(persistence.currentPhase);
       }
     }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions]);
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions, onboardingStep, advanceOnboarding]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
     hapticLight();
@@ -430,12 +471,131 @@ export default function App() {
     puzzleActions.startNewGame(puzzle.difficulty, newMode);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty]);
 
-  // Tutorial overlay
-  if (showTutorial) {
+  // ========================================================================
+  // Onboarding flow helpers (continued)
+  // ========================================================================
+
+  /** Handle "Continue" tap on the FoxGuide during onboarding */
+  const handleOnboardingContinue = useCallback(async () => {
+    switch (onboardingStep) {
+      case 'home_empty':
+        // This is handled by HomeScreen — tapping the den triggers fox_invited
+        break;
+
+      case 'fox_invited': {
+        const lines = ONBOARDING_FOX_LINES.fox_invited;
+        if (onboardingLineIndex < lines.length - 1) {
+          setOnboardingLineIndex(prev => prev + 1);
+        } else {
+          // Fox intro done — go to puzzle
+          await advanceOnboarding('going_to_puzzle');
+          // Small delay then navigate to puzzle
+          setTimeout(async () => {
+            await advanceOnboarding('puzzle_tutorial');
+            persistenceActions.refreshStats();
+            setRitualEchoWords([]);
+            transitionTo('puzzle', () => {
+              puzzleActions.startNewGame('EASY');
+              logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
+            });
+          }, 300);
+        }
+        break;
+      }
+
+      case 'puzzle_tutorial': {
+        // Contextual guidance — handled by puzzle screen interactions
+        // This handles the intro line before the player starts
+        const lines = ONBOARDING_FOX_LINES.puzzle_tutorial_intro;
+        if (onboardingLineIndex < lines.length - 1) {
+          setOnboardingLineIndex(prev => prev + 1);
+        }
+        // After intro, guide is hidden until player makes moves
+        break;
+      }
+
+      case 'puzzle_complete': {
+        const lines = ONBOARDING_FOX_LINES.puzzle_tutorial_complete;
+        if (onboardingLineIndex < lines.length - 1) {
+          setOnboardingLineIndex(prev => prev + 1);
+        } else {
+          // Navigate back to home for unlock explanation
+          await advanceOnboarding('returning_home');
+          hapticLight();
+          puzzleActions.setShowConfetti(false);
+          victoryActions.resetVictory();
+          setRitualEchoWords([]);
+          transitionTo('home', async () => {
+            puzzleActions.setGameState(GameState.IDLE);
+            await advanceOnboarding('unlock_explained');
+          });
+        }
+        break;
+      }
+
+      case 'unlock_explained': {
+        const lines = ONBOARDING_FOX_LINES.unlock_explained;
+        if (onboardingLineIndex < lines.length - 1) {
+          setOnboardingLineIndex(prev => prev + 1);
+        } else {
+          // Onboarding complete!
+          await markTutorialCompleted();
+          await markTutorialSeedsPlanted().catch(() => {});
+          await advanceOnboarding('complete');
+        }
+        break;
+      }
+
+      default:
+        break;
+    }
+  }, [onboardingStep, onboardingLineIndex, advanceOnboarding, transitionTo, puzzleActions, persistenceActions, victoryActions, hapticLight]);
+
+  /** Skip onboarding entirely */
+  const handleSkipOnboarding = useCallback(async () => {
+    await markTutorialCompleted();
+    await markTutorialSeedsPlanted().catch(() => {});
+    await advanceOnboarding('complete');
+  }, [advanceOnboarding]);
+
+  /** Get current Fox guide text for the active onboarding step */
+  const getOnboardingFoxText = useCallback((): string => {
+    const key = onboardingStep === 'puzzle_tutorial'
+      ? 'puzzle_tutorial_intro'
+      : onboardingStep;
+    const lines = ONBOARDING_FOX_LINES[key];
+    if (!lines || lines.length === 0) return '';
+    return lines[Math.min(onboardingLineIndex, lines.length - 1)] || '';
+  }, [onboardingStep, onboardingLineIndex]);
+
+  /** Get the Fox guide button text for the current step */
+  const getOnboardingButtonText = useCallback((): string => {
+    switch (onboardingStep) {
+      case 'fox_invited': {
+        const lines = ONBOARDING_FOX_LINES.fox_invited;
+        if (onboardingLineIndex === 0) return 'Nice to meet you!';
+        if (onboardingLineIndex >= lines.length - 1) return "Let's go!";
+        return 'Next';
+      }
+      case 'puzzle_tutorial':
+        return 'Got it!';
+      case 'puzzle_complete':
+        return "Let's go home!";
+      case 'unlock_explained': {
+        const lines = ONBOARDING_FOX_LINES.unlock_explained;
+        if (onboardingLineIndex >= lines.length - 1) return "Let's play!";
+        return 'Next';
+      }
+      default:
+        return 'Continue';
+    }
+  }, [onboardingStep, onboardingLineIndex]);
+
+  // Show loading while onboarding state is being determined
+  if (!onboardingReady) {
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: '#1A1A2E' }}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <Tutorial onComplete={() => setShowTutorial(false)} />
       </View>
     );
   }
@@ -500,6 +660,8 @@ export default function App() {
                 onOpenStats={() => transitionTo('stats')}
                 onOpenLedger={() => transitionTo('ledger')}
                 onStartDaily={handleStartDaily}
+                onboardingStep={onboardingStep}
+                onAdvanceOnboarding={advanceOnboarding}
               />
               {/* Achievement toast overlay */}
               <AchievementToast
@@ -507,6 +669,22 @@ export default function App() {
                 onDismiss={achievementActions.dismissAchievement}
                 phase={persistence.currentPhase}
               />
+              {/* Fox Guide overlay — shown during onboarding on home screen */}
+              {isOnboarding && currentScreen === 'home' && (
+                (onboardingStep === 'home_empty' ||
+                 onboardingStep === 'fox_invited' ||
+                 onboardingStep === 'unlock_explained') && (
+                  <FoxGuide
+                    visible={true}
+                    text={getOnboardingFoxText()}
+                    buttonText={getOnboardingButtonText()}
+                    onContinue={onboardingStep === 'home_empty' ? undefined : handleOnboardingContinue}
+                    showSkip={onboardingStep !== 'unlock_explained'}
+                    onSkip={handleSkipOnboarding}
+                    position="bottom"
+                  />
+                )
+              )}
             </Animated.View>
           </View>
         </ErrorBoundary>
@@ -547,14 +725,19 @@ export default function App() {
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.headerHomeButton}
-            onPress={handleGoHome}
-            accessibilityLabel="Go home"
-            accessibilityRole="button"
-          >
-            <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
-          </TouchableOpacity>
+          {/* Hide home button during onboarding tutorial */}
+          {!isOnboarding ? (
+            <TouchableOpacity
+              style={styles.headerHomeButton}
+              onPress={handleGoHome}
+              accessibilityLabel="Go home"
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerHomeText}>{'\uD83C\uDFE0'}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerHomeButton} />
+          )}
 
           <View style={styles.headerTitleArea}>
             {isPlayingDaily ? (
@@ -591,7 +774,8 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        {/* Stats Row */}
+        {/* Stats Row — hidden during onboarding to reduce clutter */}
+        {isOnboarding ? null : (
         <View style={styles.statsRow}>
           <View style={styles.leftStatsGroup}>
             <LevelDisplay level={puzzle.level} />
@@ -633,6 +817,7 @@ export default function App() {
             onToggleChallengeMode={handleToggleChallengeMode}
           />
         </View>
+        )}
 
         {/* Toast Message */}
         <View style={styles.toastContainer}>
@@ -682,7 +867,7 @@ export default function App() {
           />
         </View>
 
-        {/* Bottom Controls */}
+        {/* Bottom Controls — simplified during onboarding (no NEW button) */}
         <View style={styles.controls}>
           <ActionButton
             icon="↩"
@@ -706,6 +891,7 @@ export default function App() {
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
           />
+          {!isOnboarding && (
           <ActionButton
             icon="🔄"
             label="NEW"
@@ -721,6 +907,7 @@ export default function App() {
             }}
             disabled={false}
           />
+          )}
         </View>
 
         {/* Rules Modal — phase-aware text */}
@@ -779,6 +966,35 @@ export default function App() {
           style={[styles.dreadPulseOverlay, { opacity: dreadPulseOpacity }]}
           pointerEvents="none"
         />
+
+        {/* Fox Guide overlay — shown during onboarding on puzzle screen */}
+        {isOnboarding && (onboardingStep === 'puzzle_tutorial' || onboardingStep === 'puzzle_complete') && (
+          <FoxGuide
+            visible={true}
+            text={
+              onboardingStep === 'puzzle_complete'
+                ? ONBOARDING_FOX_LINES.puzzle_tutorial_complete[
+                    Math.min(onboardingLineIndex, ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1)
+                  ]
+                : puzzle.gameState === GameState.PLAYING && puzzle.selectedLetter
+                  ? ONBOARDING_FOX_LINES.puzzle_tutorial_drop[0]
+                  : puzzle.gameState === GameState.PLAYING
+                    ? ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
+                    : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
+            }
+            buttonText={
+              onboardingStep === 'puzzle_complete'
+                ? "Let's go home!"
+                : undefined
+            }
+            onContinue={
+              onboardingStep === 'puzzle_complete'
+                ? handleOnboardingContinue
+                : undefined
+            }
+            position="bottom"
+          />
+        )}
       </Animated.View>
       </View>
       </ErrorBoundary>

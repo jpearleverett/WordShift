@@ -1,3 +1,9 @@
+/**
+ * @deprecated The Tutorial overlay component is replaced by the new multi-screen
+ * onboarding flow (see src/services/onboarding.ts and src/components/FoxGuide.tsx).
+ * The utility functions (hasTutorialCompleted, markTutorialCompleted, resetTutorial)
+ * are still used for backward compatibility with existing installs.
+ */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
