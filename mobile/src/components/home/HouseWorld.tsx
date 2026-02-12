@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -560,6 +560,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // State tracking for gestures
   const baseTranslateY = useRef(0);
 
+  // Track container height for proper initial positioning
+  const [containerHeight, setContainerHeight] = useState(SCREEN_HEIGHT);
+  const onContainerLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
+    const { height } = event.nativeEvent.layout;
+    if (height > 0) {
+      setContainerHeight(height);
+    }
+  }, []);
+
   // Memoize night star positions/sizes to prevent flicker on re-render
   const nightStars = useMemo(() =>
     [...Array(12)].map((_, i) => ({
@@ -710,22 +719,26 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   };
 
   // Calculate pan bounds based on content size
+  // Returns asymmetric bounds: min=0 (house bottom at viewport bottom),
+  // max=overflow (house top at viewport top)
   const getPanBounds = () => {
-    // Full height of the house structure including container margins
-    const totalContentHeight = 50 + 80 + houseHeight + 25; // marginTop + roof + body + foundation
-    // How much the house overflows above the visible screen
-    const topOverflow = Math.max(0, totalContentHeight - SCREEN_HEIGHT);
-    // Allow extra padding above the house for comfortable viewing
-    const maxPan = Math.max(100, topOverflow + 100);
-    return maxPan;
+    // Full height of the house structure including margins and connectors
+    const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + connectorHeight; // marginTop + roof + body + foundation + connectors
+    // How much the house overflows above the visible viewport
+    const overflow = Math.max(0, totalContentHeight - containerHeight);
+    return {
+      min: 0,  // Don't allow panning below the house (prevents empty space below foundation)
+      max: Math.max(0, overflow + 50),  // Allow panning up to see the roof + small padding
+    };
   };
 
   // Pan gesture handler - vertical only to prevent horizontal gaps
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
     const { translationY } = event.nativeEvent;
 
-    const maxTranslateY = getPanBounds();
-    const newY = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
+    const bounds = getPanBounds();
+    const newY = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
 
     translateY.setValue(newY);
   };
@@ -733,13 +746,26 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
       const { translationY } = event.nativeEvent;
-      const maxTranslateY = getPanBounds();
+      const bounds = getPanBounds();
 
-      baseTranslateY.current = Math.max(-maxTranslateY, Math.min(maxTranslateY, baseTranslateY.current + translationY));
+      baseTranslateY.current = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
     }
   };
 
   const houseHeight = calculateHouseHeight();
+
+  // Set initial pan position so the house is properly framed.
+  // With flex-end, the house bottom is at the viewport bottom and the roof
+  // extends above when the house is taller than the viewport. A positive
+  // translateY shifts the view down, bringing the roof into view.
+  useEffect(() => {
+    const connectorHeight = Math.max(0, numRows - 1) * 10;
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + connectorHeight;
+    const overflow = Math.max(0, totalContentHeight - containerHeight);
+
+    translateY.setValue(overflow);
+    baseTranslateY.current = overflow;
+  }, [numRows, containerHeight]);
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
@@ -756,7 +782,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         minDist={10}
         avgTouches
       >
-        <Animated.View style={styles.gestureContainer}>
+        <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
           <Animated.View
             style={[
               styles.transformContainer,
