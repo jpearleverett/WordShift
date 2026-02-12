@@ -48,7 +48,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (384 tests, 18 suites)
+npx jest --no-coverage   # Run all tests (386 tests, 18 suites)
 ```
 
 ## Tech Stack
@@ -67,7 +67,7 @@ npx jest --no-coverage   # Run all tests (384 tests, 18 suites)
 
 ```
 mobile/
-├── App.tsx                      # Main app (~830 lines): screen routing, wires hooks together
+├── App.tsx                      # Main app (~1080 lines): screen routing, onboarding orchestration, wires hooks together
 ├── assets/                      # Image assets (see Asset System below)
 │   ├── characters/              # Animal character sprites
 │   ├── rooms/                   # Room background images
@@ -93,7 +93,8 @@ mobile/
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial for phase changes
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
 │   │   ├── ErrorBoundary.tsx    # React error boundary wrapper
-│   │   ├── Tutorial.tsx         # Fox-guided interactive onboarding with mini-puzzle
+│   │   ├── FoxGuide.tsx         # Floating Fox speech bubble overlay (used during onboarding)
+│   │   ├── Tutorial.tsx         # [DEPRECATED] Old mini-puzzle tutorial overlay; utility functions still used for backward compat
 │   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
@@ -140,9 +141,10 @@ mobile/
 │       ├── eventLogger.ts       # Analytics event logging
 │       ├── deviceTier.ts        # Device capability detection for animation scaling
 │       ├── performanceMonitor.ts # Frame rate, render timing, puzzle gen metrics
+│       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (384 tests, 18 suites)
+├── src/__tests__/               # Test suites (386 tests, 18 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -798,26 +800,61 @@ Educational hints show the target word with phase-aware tone:
 - Falls back to phase-aware undo suggestion if player is off the solution path
 - Challenge mode blocks hints entirely
 
-## Tutorial System (`components/Tutorial.tsx`)
+## Onboarding System (Multi-Screen Guided Intro)
 
-Fox-guided interactive onboarding with a real mini-puzzle. Ember (Fox) greets the player and walks them through a single puzzle move: HEAT → ATE (pick H from HEAT → EAT, drop H into ATE → HATE).
+New players experience a guided multi-screen onboarding flow instead of a popup tutorial. The player uses the **real** home screen and puzzle screen from the start, with Fox (Ember) guiding them through each step via a floating `FoxGuide` speech bubble overlay.
 
-**7 tutorial phases**: `welcome` → `show_puzzle` → `pick_letter` → `letter_picked` → `drop_letter` → `move_complete` → `house_intro`
+### Onboarding Flow
 
-**Components**:
-- `FoxCharacter` — Fox talk sprite with emoji fallback, bounce animation when speaking
-- `MiniTile` — Smaller LetterTile (44x54) with 3D candy styling, pulse animation for guided hints
-- `MiniSlot` — Pulsing dashed-border drop zones
-- `SpeechBubble` — Fade-in dialogue with emphasis variant
+| Step | Screen | What Happens |
+|------|--------|-------------|
+| `home_empty` | Home | Player sees empty Cozy Den. Invite prompt auto-appears, guiding them to welcome Fox. |
+| `fox_invited` | Home | Fox intro dialogue via FoxGuide (4 lines). Fox introduces himself and the world. |
+| `going_to_puzzle` | Transition | Fox says "Follow me!" — screen transitions to puzzle. |
+| `puzzle_tutorial` | Puzzle | Real EASY puzzle with contextual Fox tips (pick/drop guidance). UI simplified: no difficulty selector, no NEW button, no home button. |
+| `puzzle_complete` | Puzzle | Victory plays, Fox congratulates. "Let's go home!" button. |
+| `returning_home` | Transition | Screen transitions back to home. |
+| `unlock_explained` | Home | Fox explains amber & unlock system (3 lines). Unlock progress bar visible. |
+| `complete` | Home | Onboarding done. All UI elements appear. Player is free. |
+
+### Architecture
+
+**State Machine** (`services/onboarding.ts`):
+- `OnboardingStep` type with 8 steps + `not_started`
+- `getOnboardingStep()` / `setOnboardingStep()` — AsyncStorage persistence with in-memory cache
+- `isOnboardingComplete()` / `resetOnboarding()` — Query and reset helpers
+- `ONBOARDING_FOX_LINES` — Fox dialogue text for each step (keyed by step name)
+
+**FoxGuide Component** (`components/FoxGuide.tsx`):
+- Floating Fox sprite + speech bubble overlay, positioned at bottom of any screen
+- Fox talk sprite (with emoji fallback), bounce animation when speaking
+- Fade in/out + spring slide animations, text fade on change
+- Continue button, optional Skip button
+- Respects `reducedMotion` setting
+
+**App.tsx Orchestration**:
+- `onboardingStep` state replaces old `showTutorial`
+- On mount: checks legacy `wordshift_tutorial_completed` for backward compat, then reads `wordshift_onboarding_step`
+- `handleOnboardingContinue()` — advances through dialogue lines and transitions between screens
+- `handleSkipOnboarding()` — marks onboarding + tutorial as complete
+- FoxGuide rendered on both home screen (home_empty, fox_invited, unlock_explained) and puzzle screen (puzzle_tutorial, puzzle_complete)
+- During onboarding: hides difficulty selector, stats row, NEW button, home button on puzzle screen; hides PLAY, shop, settings, stats, daily challenge on home screen
+
+**HomeScreen Integration**:
+- Accepts `onboardingStep` and `onAdvanceOnboarding` props
+- Auto-shows invite prompt during `home_empty` step
+- Hides "Maybe Later" button during onboarding (player must invite Fox)
+- After Fox is invited: suppresses standard intro dialogue, advances to `fox_invited` step
+- Shows unlock progress bar during `unlock_explained` step
 
 **Narrative seeds** (innocent now, ominous in retrospect):
 - "We've been waiting for someone like you."
 - "Every puzzle you solve helps us build the house."
 - "The others are going to love you. There's so much more to discover... together."
 
-**Features**: Interactive mini-puzzle (not just text slides), progress dots (5 stages), skip button, content fade transitions, spring animations for celebration.
+**Backward Compatibility**: Existing players who completed the old `Tutorial` overlay are detected via the `wordshift_tutorial_completed` AsyncStorage flag and skip onboarding automatically. The old `Tutorial` component is deprecated but preserved; its utility functions (`hasTutorialCompleted`, `markTutorialCompleted`, `resetTutorial`) are still used. `resetOnboarding()` is called alongside `resetTutorial()` in Settings > Reset All Data.
 
-Checks `AsyncStorage` for `wordshift_tutorial_completed`. Exports: `hasTutorialCompleted()`, `markTutorialCompleted()`, `resetTutorial()`, `Tutorial`.
+**Persistence**: `wordshift_onboarding_step` in AsyncStorage. If the app closes mid-onboarding, it resumes from the last saved step.
 
 ## Coding Conventions
 
