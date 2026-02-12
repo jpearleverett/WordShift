@@ -219,12 +219,15 @@ const FUN_WORDS = new Set([
   'CRYPT', 'TOMB', 'HAUNT', 'CURSE', 'DOOM', 'FATE', 'OMEN'
 ]);
 
-// Existential dread words - gradually introduced at higher phases
-// These words get bonus scoring at higher phases to create thematic puzzles
-const DREAD_WORDS = new Set([
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PHASE 1 - CURIOSITY & WONDERING (Subtle philosophical undertones)
-  // ═══════════════════════════════════════════════════════════════════════════
+// ============================================================================
+// PHASE-TIERED DREAD WORDS — Words that resonate at specific narrative phases
+// Each tier represents when the word first becomes narratively relevant.
+// The generator weights words by proximity to the current phase, creating
+// natural vocabulary evolution: curiosity → emptiness → dread → cosmic horror.
+// ============================================================================
+
+// PHASE 1 — Curiosity & Wondering (subtle philosophical undertones)
+const DREAD_WORDS_PHASE_1 = new Set([
   // Questioning
   'THINK', 'PONDER', 'WONDER', 'DOUBT', 'MAYBE', 'COULD', 'MIGHT', 'SEEM',
   'ASK', 'WHY', 'HOW', 'WHAT', 'WHEN', 'WHERE', 'WHO', 'QUERY',
@@ -237,10 +240,10 @@ const DREAD_WORDS = new Set([
   // Change
   'SHIFT', 'CHANGE', 'MORPH', 'ALTER', 'VARY', 'FLUX', 'FLOW', 'TURN',
   'GROW', 'SHRINK', 'EXPAND', 'CONTRACT', 'SWELL', 'PULSE', 'CYCLE',
+]);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PHASE 2 - QUESTIONING EXISTENCE (Impermanence & isolation)
-  // ═══════════════════════════════════════════════════════════════════════════
+// PHASE 2 — Questioning Existence (impermanence & isolation)
+const DREAD_WORDS_PHASE_2 = new Set([
   // Emptiness
   'VOID', 'EMPTY', 'HOLLOW', 'SHELL', 'HUSK', 'VACANT', 'BARREN', 'BARE',
   'BLANK', 'NULL', 'ZERO', 'NONE', 'LACK', 'WANT', 'NEED', 'MISS',
@@ -256,11 +259,11 @@ const DREAD_WORDS = new Set([
   // Time
   'TIME', 'PASS', 'BRIEF', 'SHORT', 'GONE', 'PAST', 'WAS', 'WERE',
   'MOMENT', 'INSTANT', 'FLASH', 'BLINK', 'SWIFT', 'QUICK', 'HASTY', 'RUSH',
-  'AGE', 'ERA', 'EPOCH', 'SPAN', 'TERM', 'PHASE', 'STAGE', 'CYCLE',
+  'AGE', 'ERA', 'EPOCH', 'SPAN', 'TERM', 'PHASE', 'STAGE',
+]);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PHASE 3 - EXISTENTIAL DREAD (Mortality & darkness)
-  // ═══════════════════════════════════════════════════════════════════════════
+// PHASE 3 — Existential Dread (mortality & darkness)
+const DREAD_WORDS_PHASE_3 = new Set([
   // Fear & Dread
   'DREAD', 'FEAR', 'FRIGHT', 'TERROR', 'HORROR', 'PANIC', 'ALARM', 'SHOCK',
   'WORRY', 'FRET', 'ANGST', 'STRESS', 'STRAIN', 'TENSE', 'RIGID', 'STIFF',
@@ -274,25 +277,25 @@ const DREAD_WORDS = new Set([
   'END', 'FINAL', 'LAST', 'CEASE', 'DONE', 'OVER', 'FINISH', 'CLOSE',
   'COMPLETE', 'CONCLUDE', 'TERMINATE', 'EXPIRE', 'LAPSE', 'ELAPSE',
   // Death imagery
-  'DUST', 'ASH', 'GHOST', 'HAUNT', 'SPIRIT', 'SOUL', 'WRAITH', 'SHADE',
+  'DUST', 'ASH', 'GHOST', 'HAUNT', 'SPIRIT', 'SOUL', 'WRAITH',
   'GRAVE', 'TOMB', 'CRYPT', 'BURIAL', 'MOURN', 'GRIEVE', 'WEEP', 'SOB',
-  'BONE', 'SKULL', 'CORPSE', 'REMAINS', 'RELIC', 'FOSSIL', 'TRACE', 'MARK',
+  'BONE', 'SKULL', 'CORPSE', 'REMAINS', 'RELIC', 'FOSSIL', 'MARK',
   // Remnants
   'ECHO', 'REMAIN', 'LINGER', 'PERSIST', 'ENDURE', 'SURVIVE', 'OUTLAST',
   'MEMORY', 'RECALL', 'RECORD', 'ARCHIVE', 'LEGACY', 'HEIR',
   // Vastness
   'VAST', 'HUGE', 'IMMENSE', 'MASSIVE', 'ENDLESS', 'BOUNDLESS', 'INFINITE',
   'ETERNAL', 'FOREVER', 'NEVER', 'ALWAYS', 'CONSTANT', 'PERPETUAL',
+]);
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PHASE 4 - COMPLETE CRISIS (Cosmic horror & finality)
-  // ═══════════════════════════════════════════════════════════════════════════
+// PHASE 4 — Complete Crisis (cosmic horror & finality)
+const DREAD_WORDS_PHASE_4 = new Set([
   // Destruction
   'DOOM', 'RUIN', 'RAVAGE', 'WRECK', 'DESTROY', 'ANNIHILATE', 'OBLITERATE',
   'ABYSS', 'CHASM', 'RIFT', 'TEAR', 'REND', 'SHATTER', 'SMASH', 'CRUSH',
   'COLLAPSE', 'IMPLODE', 'EXPLODE', 'BURST', 'RUPTURE', 'FRACTURE',
   // Nothingness
-  'NOTHING', 'OBLIVION', 'ABSENCE', 'VACUUM', 'EMPTY', 'HOLLOW', 'VOID',
+  'NOTHING', 'OBLIVION', 'ABSENCE', 'VACUUM',
   'FORMLESS', 'SHAPELESS', 'NAMELESS', 'FACELESS', 'UNKNOWN', 'UNSEEN',
   // Truth & Illusion
   'TRUTH', 'REAL', 'FAKE', 'FALSE', 'LIE', 'MASK', 'VEIL', 'HIDE',
@@ -302,19 +305,45 @@ const DREAD_WORDS = new Set([
   'DELUSION', 'FANCY', 'WHIM', 'FIGMENT', 'FANTASY', 'REVERIE',
   // Boundaries & Thresholds
   'HORIZON', 'EDGE', 'BRINK', 'VERGE', 'BORDER', 'MARGIN', 'RIM', 'FRINGE',
-  'LIMIT', 'BOUND', 'EXTENT', 'REACH', 'SCOPE', 'RANGE', 'SPAN',
+  'LIMIT', 'BOUND', 'EXTENT', 'REACH', 'SCOPE', 'RANGE',
   'GATE', 'DOOR', 'PORTAL', 'PASSAGE', 'THRESHOLD', 'ENTRY', 'EXIT',
   // Cosmic/Existential
   'COSMOS', 'SPACE', 'STAR', 'MOON', 'SUN', 'PLANET', 'ORBIT', 'SPHERE',
-  'INFINITE', 'ETERNAL', 'TIMELESS', 'AGELESS', 'DEATHLESS', 'UNDYING',
-  'MORTAL', 'FINITE', 'FLEETING', 'TRANSIENT', 'BRIEF', 'MOMENTARY',
+  'TIMELESS', 'AGELESS', 'DEATHLESS', 'UNDYING',
+  'MORTAL', 'FINITE', 'FLEETING', 'TRANSIENT', 'MOMENTARY',
   // Transformation
-  'BECOME', 'TRANSFORM', 'TRANSMUTE', 'CONVERT', 'SHIFT', 'MORPH', 'EVOLVE',
-  'DISSOLVE', 'MELT', 'FADE', 'VANISH', 'DISAPPEAR', 'EVAPORATE', 'DISPERSE',
+  'BECOME', 'TRANSFORM', 'TRANSMUTE', 'CONVERT', 'EVOLVE',
+  'DISSOLVE', 'MELT', 'VANISH', 'DISAPPEAR', 'EVAPORATE', 'DISPERSE',
   // Final words
   'FAREWELL', 'GOODBYE', 'ADIEU', 'PARTING', 'LEAVE', 'DEPART', 'GO',
   'ACCEPT', 'SUBMIT', 'YIELD', 'SURRENDER', 'RELEASE', 'LET', 'ALLOW',
-  'PEACE', 'REST', 'SLEEP', 'SLUMBER', 'REPOSE', 'QUIET', 'STILL', 'CALM'
+  'SLUMBER', 'REPOSE',
+]);
+
+// Build tier lookup map — each word gets its earliest (lowest) tier.
+// This determines when a word first becomes narratively relevant.
+const DREAD_WORD_TIER = new Map<string, number>();
+function _buildTierMap() {
+  const tiers: [Set<string>, number][] = [
+    [DREAD_WORDS_PHASE_1, 1],
+    [DREAD_WORDS_PHASE_2, 2],
+    [DREAD_WORDS_PHASE_3, 3],
+    [DREAD_WORDS_PHASE_4, 4],
+  ];
+  for (const [words, tier] of tiers) {
+    for (const w of words) {
+      if (!DREAD_WORD_TIER.has(w)) DREAD_WORD_TIER.set(w, tier);
+    }
+  }
+}
+_buildTierMap();
+
+// Combined set (backward compat for isDreadWord, calculateRitualEnergy, extractTriggerWords)
+const DREAD_WORDS = new Set([
+  ...DREAD_WORDS_PHASE_1,
+  ...DREAD_WORDS_PHASE_2,
+  ...DREAD_WORDS_PHASE_3,
+  ...DREAD_WORDS_PHASE_4,
 ]);
 
 // Current phase for word selection (cached, updated during generation)
@@ -349,12 +378,19 @@ function scoreWordInterestingness(
     score += 30;
   }
 
-  // Bonus for dread words based on current phase
-  // Higher phases = stronger preference for existential words
-  if (DREAD_WORDS.has(word) && currentDreadPhase > 0) {
-    // Phase 1: +5, Phase 2: +15, Phase 3: +25, Phase 4: +40
-    const dreadBonus = currentDreadPhase * currentDreadPhase * 2.5;
-    score += dreadBonus;
+  // Phase-tiered dread word scoring — strongly prefers words from the current
+  // phase's vocabulary, with diminishing bonuses for adjacent tiers.
+  // This creates natural word evolution: curiosity → emptiness → dread → cosmic.
+  if (currentDreadPhase > 0) {
+    const tier = DREAD_WORD_TIER.get(word);
+    if (tier) {
+      // Base bonus scales quadratically with phase
+      const baseBonus = currentDreadPhase * currentDreadPhase * 2.5;
+      // Tier proximity: current phase tier gets full bonus, adjacent tiers less
+      const tierDiff = Math.abs(tier - currentDreadPhase);
+      const multiplier = tierDiff === 0 ? 1.0 : tierDiff === 1 ? 0.5 : 0.15;
+      score += baseBonus * multiplier;
+    }
   }
 
   // Score based on letter composition
@@ -699,7 +735,7 @@ function weightedShuffle(
 
   scored.sort((a, b) => b.score - a.score);
 
-  const topCount = Math.ceil(scored.length * 0.6);
+  const topCount = Math.ceil(scored.length * 0.75);
   const topWords = shuffle(scored.slice(0, topCount).map(s => s.word));
   const restWords = shuffle(scored.slice(topCount).map(s => s.word));
 
@@ -727,7 +763,7 @@ export const generateLocalPuzzle = async (
     min: WORD_SETS[wordLength - 1],
     base: WORD_SETS[wordLength],
     max: WORD_SETS[wordLength + 1],
-    baseArray: Array.from(WORD_SETS[wordLength])
+    baseArray: shuffle(Array.from(WORD_SETS[wordLength]))
   };
 
   const GLOBAL_TIMEOUT = 2500;
@@ -941,15 +977,14 @@ async function findPath(
             word: w,
             tempState: combined,
             insertionIndex: k,
-            score: wordScore + insertionScore + Math.random() * 10
+            score: wordScore + insertionScore + Math.random() * 25
           });
-          break;
         }
       }
     }
 
     potentialNextWords.sort((a, b) => b.score - a.score);
-    const candidatesToExplore = potentialNextWords.slice(0, 25);
+    const candidatesToExplore = shuffle(potentialNextWords.slice(0, 25));
 
     for (const nextCandidate of candidatesToExplore) {
       if (Date.now() - state.startTime > timeoutLimit) return null;
@@ -1051,6 +1086,20 @@ export function extractTriggerWords(words: string[]): string[] {
  */
 export function isDreadWord(word: string): boolean {
   return DREAD_WORDS.has(word.toUpperCase());
+}
+
+/**
+ * Get the narrative phase tier a word belongs to.
+ * Returns 0 if the word is not a dread word, 1-4 for its phase tier.
+ * Used by UI components to determine visual resonance effects on tiles.
+ *
+ * Tier 1: Curiosity (THINK, DRIFT, WONDER)
+ * Tier 2: Emptiness (VOID, EMPTY, FADE)
+ * Tier 3: Dread (DOOM, DARK, GRAVE)
+ * Tier 4: Cosmic horror (ABYSS, RIFT, PORTAL)
+ */
+export function getWordPhaseTier(word: string): number {
+  return DREAD_WORD_TIER.get(word.toUpperCase()) ?? 0;
 }
 
 /**

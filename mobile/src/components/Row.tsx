@@ -12,6 +12,7 @@ import { LetterTile } from './LetterTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { getWordPhaseTier } from '../services/localGenerator';
 
 const ROW_HORIZONTAL_MARGIN = 12;
 const ROW_PADDING = 8;
@@ -280,6 +281,11 @@ export const Row: React.FC<RowProps> = memo(({
   const isCompleted = rowIndex < activeRowIndex;
   const showSlots = isTarget && selectedLetter && !isProcessing;
 
+  // Resonance: check if this row's word belongs to a dread tier relevant to the current phase.
+  // Only visible at Phase 1+ — creates the subliminal "these words feel different" effect.
+  const wordTier = getWordPhaseTier(rowData.originalWord);
+  const isRowResonant = phase >= 1 && wordTier > 0;
+
   // Animation values
   const scaleAnim = useRef(new Animated.Value(isSource ? 1 : 0.9)).current;
   const opacityAnim = useRef(new Animated.Value(isSource ? 1 : 0.3)).current;
@@ -467,6 +473,7 @@ export const Row: React.FC<RowProps> = memo(({
               highlight={letter.isLocked ? 'locked' : 'default'}
               phase={phase}
               compact={compactTiles}
+              isResonant={isRowResonant}
             />
           </Animated.View>
         );
@@ -490,6 +497,7 @@ export const Row: React.FC<RowProps> = memo(({
         onPress={() => onLetterPress(letter, rowIndex)}
         phase={phase}
         compact={compactTiles}
+        isResonant={isRowResonant}
       />
     ));
   };
