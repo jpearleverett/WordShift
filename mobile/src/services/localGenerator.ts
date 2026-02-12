@@ -699,7 +699,7 @@ function weightedShuffle(
 
   scored.sort((a, b) => b.score - a.score);
 
-  const topCount = Math.ceil(scored.length * 0.6);
+  const topCount = Math.ceil(scored.length * 0.75);
   const topWords = shuffle(scored.slice(0, topCount).map(s => s.word));
   const restWords = shuffle(scored.slice(topCount).map(s => s.word));
 
@@ -727,7 +727,7 @@ export const generateLocalPuzzle = async (
     min: WORD_SETS[wordLength - 1],
     base: WORD_SETS[wordLength],
     max: WORD_SETS[wordLength + 1],
-    baseArray: Array.from(WORD_SETS[wordLength])
+    baseArray: shuffle(Array.from(WORD_SETS[wordLength]))
   };
 
   const GLOBAL_TIMEOUT = 2500;
@@ -941,15 +941,14 @@ async function findPath(
             word: w,
             tempState: combined,
             insertionIndex: k,
-            score: wordScore + insertionScore + Math.random() * 10
+            score: wordScore + insertionScore + Math.random() * 25
           });
-          break;
         }
       }
     }
 
     potentialNextWords.sort((a, b) => b.score - a.score);
-    const candidatesToExplore = potentialNextWords.slice(0, 25);
+    const candidatesToExplore = shuffle(potentialNextWords.slice(0, 25));
 
     for (const nextCandidate of candidatesToExplore) {
       if (Date.now() - state.startTime > timeoutLimit) return null;
