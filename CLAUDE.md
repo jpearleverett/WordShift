@@ -477,17 +477,17 @@ When Fox is first tapped at Phase 4, a one-time tutorial callback dialogue is sh
 Animals have conversation sessions with puzzle-based cooldowns to pace interactions:
 
 **Session Parameters** (in `dialogueSession.ts` and `types/homeWorld.ts`):
-- Max dialogues per session: 8
-- Cooldown: Phase-aware via `getPuzzlesBetweenSessions(phase)` — Phase 0: 1 puzzle, Phase 1: 2 puzzles, Phase 2+: 3 puzzles (encourages early-game animal bonding)
-- **Grace period**: First 3 sessions after unlock have no cooldown (`GRACE_PERIOD_SESSIONS`)
+- Max dialogues per session: Phase-aware via `getDialoguesPerSession(phase)` — Phase 0-1: 4, Phase 2-3: 5, Phase 4: 6
+- Cooldown: Phase-aware via `getPuzzlesBetweenSessions(phase)` — Phase 0: 2 puzzles, Phase 1: 3 puzzles, Phase 2: 4 puzzles, Phase 3-4: 5 puzzles
+- **Grace period**: First 1 session after unlock has no cooldown (`GRACE_PERIOD_SESSIONS`). Wired into `checkDialogueAvailability`, `isOnCooldown`, and `getSessionStatus` in `dialogueSession.ts`.
 - Dialogue progress persists (animals remember where they left off)
 
 **Session Flow**:
 1. Player taps animal -> starts session if available
 2. Pre-dialogue pages shown first (trigger reactions, cross-animal refs, coordinated events) — each as a separate conversation page, tapped through with "Next". These don't count toward session limits.
-3. Regular dialogue follows, up to 8 dialogues per session
+3. Regular dialogue follows, up to 4-6 dialogues per session (phase-aware)
 4. Session ends when: max dialogues reached or player leaves
-5. Cooldown begins -> must complete 1-3 puzzles to talk again (skipped during grace period)
+5. Cooldown begins -> must complete 2-5 puzzles to talk again (skipped during grace period)
 6. After cooldown -> animal continues from next dialogue (not repeat)
 
 **UI Indicators**:
@@ -507,11 +507,11 @@ The house is built from the ground up, one room at a time. What begins as "build
 
 **Unlock Flow**: Invite animal -> Build room -> Invite animal -> Build room...
 1. **Fox (Ember)** - FREE to invite into Cozy Den (starter)
-2. **Kitchen** - 30 amber to build above Cozy Den
-3. **Pangolin (Panko)** - 25 amber to invite into Kitchen
-4. **Study** - 50 amber to build
-5. **Owl (Archimedes)** - 40 amber to invite
-6. ...continues alternating rooms and animals
+2. **Kitchen** - 50 amber to build above Cozy Den
+3. **Pangolin (Panko)** - 100 amber to invite into Kitchen
+4. **Study** - 100 amber to build
+5. **Owl (Archimedes)** - 100 amber to invite
+6. ...continues alternating rooms (escalating: 50-475 amber) and animals (flat: 100 amber each)
 
 **Unlock Progress Bar**: Home screen shows amber progress toward next unlock with a visual bar.
 
@@ -965,8 +965,9 @@ Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
 
 ### Home Screen - Adjusting dialogue sessions
 Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
-- `DIALOGUES_PER_SESSION` - Max dialogues before cooldown (default: 8)
-- `getPuzzlesBetweenSessions(phase)` - Phase-aware cooldown: Phase 0=1, Phase 1=2, Phase 2+=3 puzzles
+- `getDialoguesPerSession(phase)` - Phase-aware max dialogues: Phase 0-1=4, Phase 2-3=5, Phase 4=6
+- `getPuzzlesBetweenSessions(phase)` - Phase-aware cooldown: Phase 0=2, Phase 1=3, Phase 2=4, Phase 3-4=5 puzzles
+- `GRACE_PERIOD_SESSIONS` - Sessions before cooldown kicks in for new animals (default: 1)
 
 ### Home Screen - Adjusting streak grace period
 Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:

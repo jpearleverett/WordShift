@@ -273,12 +273,12 @@ export interface DialogueSession {
  * Pacing designed for 10-15 hour total gameplay
  */
 export const DIALOGUE_SESSION_CONFIG = {
-  // Number of dialogues allowed per session before cooldown (generous for exploration)
-  DIALOGUES_PER_SESSION: 8,
-  // Number of puzzles required before next session is available (reduced for less friction)
-  PUZZLES_BETWEEN_SESSIONS: 3,
+  // Number of dialogues allowed per session before cooldown
+  DIALOGUES_PER_SESSION: 5,
+  // Number of puzzles required before next session is available
+  PUZZLES_BETWEEN_SESSIONS: 4,
   // Number of sessions before cooldown kicks in for newly unlocked animals (grace period)
-  GRACE_PERIOD_SESSIONS: 3,
+  GRACE_PERIOD_SESSIONS: 1,
 };
 
 /**
@@ -288,14 +288,14 @@ export function getDialoguesPerSession(phase: DialoguePhase): number {
   switch (phase) {
     case 0:
     case 1:
-      return 6;  // Cozy, bite-sized conversations
+      return 4;  // Brief check-ins, parceled out over more sessions
     case 2:
     case 3:
-      return 8;  // More to unpack as things get darker
+      return 5;  // Moderate conversations as things darken
     case 4:
-      return 10; // The cult has a LOT to say
+      return 6;  // The cult reveals itself in measured doses
     default:
-      return 8;
+      return 5;
   }
 }
 
@@ -307,16 +307,16 @@ export function getDialoguesPerSession(phase: DialoguePhase): number {
 export function getPuzzlesBetweenSessions(phase: DialoguePhase): number {
   switch (phase) {
     case 0:
-      return 1;  // Very short — let the player bond with Fox early
+      return 2;  // Short — let the player bond early but not binge
     case 1:
-      return 2;  // Still short — building relationships
+      return 3;  // Building relationships with breathing room
     case 2:
-      return 3;  // Standard cooldown
+      return 4;  // Standard cooldown — dialogue carries more weight
     case 3:
     case 4:
-      return 3;  // Deliberate pacing — each dialogue carries more weight
+      return 5;  // Deliberate pacing — each revelation needs space
     default:
-      return 3;
+      return 4;
   }
 }
 

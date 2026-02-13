@@ -430,7 +430,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_pangolin',
     type: 'character',
-    cost: 40,
+    cost: 100,
     isUnlocked: false,
     order: 3,
     targetId: 'pangolin',
@@ -458,7 +458,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_owl',
     type: 'character',
-    cost: 80,
+    cost: 100,
     isUnlocked: false,
     order: 5,
     targetId: 'owl',
@@ -482,7 +482,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_axolotl',
     type: 'character',
-    cost: 110,
+    cost: 100,
     isUnlocked: false,
     order: 7,
     targetId: 'axolotl',
@@ -510,7 +510,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_sloth',
     type: 'character',
-    cost: 160,
+    cost: 100,
     isUnlocked: false,
     order: 9,
     targetId: 'sloth',
@@ -534,7 +534,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_fennec',
     type: 'character',
-    cost: 185,
+    cost: 100,
     isUnlocked: false,
     order: 11,
     targetId: 'fennec_fox',
@@ -562,7 +562,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_capybara',
     type: 'character',
-    cost: 225,
+    cost: 100,
     isUnlocked: false,
     order: 13,
     targetId: 'capybara',
@@ -586,7 +586,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_wombat',
     type: 'character',
-    cost: 275,
+    cost: 100,
     isUnlocked: false,
     order: 15,
     targetId: 'wombat',
@@ -614,7 +614,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_rabbit',
     type: 'character',
-    cost: 325,
+    cost: 100,
     isUnlocked: false,
     order: 17,
     targetId: 'rabbit',
@@ -638,7 +638,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_red_panda',
     type: 'character',
-    cost: 400,
+    cost: 100,
     isUnlocked: false,
     order: 19,
     targetId: 'red_panda',

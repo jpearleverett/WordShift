@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DialogueSession, DialoguePhase, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
+import { DialogueSession, DialoguePhase, DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_dialogue_sessions';
 
@@ -108,10 +108,13 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
 
   // Check if on cooldown (waiting for puzzles)
   if (session.puzzlesAtSessionEnd !== null) {
+    // Grace period: skip cooldown for newly unlocked animals' first sessions
+    const inGracePeriod = (session.sessionsCompleted ?? 0) <= DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
+
     const remaining = getCooldownRemaining(session);
 
-    if (remaining <= 0) {
-      // Cooldown complete - reset session for new round, preserving sessionsCompleted
+    if (remaining <= 0 || inGracePeriod) {
+      // Cooldown complete (or grace period) - reset session for new round, preserving sessionsCompleted
       session.dialoguesInSession = 0;
       session.puzzlesAtSessionEnd = null;
       sessionsCache.set(animalId, session);
@@ -148,6 +151,9 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
 export function isOnCooldown(animalId: string): boolean {
   const session = sessionsCache.get(animalId);
   if (!session || session.puzzlesAtSessionEnd === null) return false;
+  // Grace period: skip cooldown for newly unlocked animals' first sessions
+  const inGracePeriod = (session.sessionsCompleted ?? 0) <= DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
+  if (inGracePeriod) return false;
   return getCooldownRemaining(session) > 0;
 }
 
@@ -237,8 +243,9 @@ export function getSessionStatus(animalId: string): {
 
   // Check if on cooldown
   if (session.puzzlesAtSessionEnd !== null) {
+    const inGracePeriod = (session.sessionsCompleted ?? 0) <= DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
     const remaining = getCooldownRemaining(session);
-    if (remaining <= 0) {
+    if (remaining <= 0 || inGracePeriod) {
       return { status: 'available' };
     }
     return { status: 'cooldown', puzzlesRemaining: remaining };
@@ -258,7 +265,7 @@ export function formatTimeRemaining(puzzles: number): string {
   // Keep this vague so player doesn't know exact number
   if (puzzles <= 1) {
     return 'almost ready';
-  } else if (puzzles <= 2) {
+  } else if (puzzles <= 3) {
     return 'a little longer';
   } else {
     return 'needs more puzzles';
