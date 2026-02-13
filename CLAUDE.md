@@ -181,11 +181,11 @@ mobile/assets/
 │   ├── owl/                    # ✓ Complete
 │   ├── axolotl/                # ✓ Complete
 │   ├── capybara/               # ✓ Complete
-│   ├── sloth/                  # Placeholder only (needs sprites)
-│   ├── fennec_fox/             # Placeholder only (needs sprites)
-│   ├── wombat/                 # Placeholder only (needs sprites)
-│   ├── rabbit/                 # Placeholder only (needs sprites)
-│   └── red_panda/              # Placeholder only (needs sprites)
+│   ├── sloth/                  # ✓ Complete
+│   ├── fennec_fox/             # ✓ Complete
+│   ├── wombat/                 # ✓ Complete
+│   ├── rabbit/                 # ✓ Complete
+│   └── red_panda/              # ✓ Complete
 │
 ├── rooms/                       # Room background images (280x140 recommended)
 │   ├── cozy_den.png            # Fox's room - fireplace, armchair, rug, lamp
@@ -252,8 +252,7 @@ const foxIdleImage = require('../../assets/characters/fox/idle.png');
 
 The home screen now uses image assets for:
 - **Character sprites** (`idle.png`, `talk.png`, `robed.png`) in `AnimalSprite.tsx`:
-  - **Have sprites**: Fox, Pangolin, Owl, Axolotl, Capybara (all 3 variants each)
-  - **Emoji fallback**: Fennec Fox, Sloth, Wombat, Rabbit, Red Panda (no sprites yet)
+  - **All 10 animals have sprites**: Fox, Pangolin, Owl, Axolotl, Capybara, Fennec Fox, Sloth, Wombat, Rabbit, Red Panda (all 3 variants each)
 - **All 10 room backgrounds** in `RoomView.tsx` - fully wired up
 - **Environment images** in `HouseWorld.tsx`:
   - `sky_day.png` / `sky_dusk.png` / `sky_storm.png` / `sky_shadow.png` - phase-aware sky background (day → dusk → storm → shadow)
@@ -261,7 +260,7 @@ The home screen now uses image assets for:
 - Trees, fence, and ground emoji have been removed for a cleaner look
 - **Not yet created**: `shadow_figure.png`, `ground.png`, all house structure elements (`house/` folder empty), tree/cloud/bird sprites
 
-As more character sprites are added, update `CHARACTER_SPRITES` in `AnimalSprite.tsx`.
+All 10 character sprites are wired up in `CHARACTER_SPRITES` in `AnimalSprite.tsx`.
 
 ## Game Mechanics
 
