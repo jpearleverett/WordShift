@@ -16,6 +16,12 @@ export interface PhaseTransitionEvent {
   bgColor: string;
   textColor: string;
   accentColor: string;
+  /** Ambient particles rendered during the entire cinematic */
+  particles?: CinematicParticleConfig;
+  /** Whether to show a vignette overlay that closes in */
+  vignette?: boolean;
+  /** Screen shake intensity (0 = none, 1 = heavy) */
+  shakeIntensity?: number;
 }
 
 export interface PhaseScene {
@@ -23,6 +29,24 @@ export interface PhaseScene {
   emoji?: string;
   delay: number; // ms before showing this scene
   duration: number; // ms to display this scene
+  /** Visual effect for this scene (rendered by PhaseTransitionOverlay) */
+  effect?: 'fade' | 'pulse' | 'shake' | 'flash' | 'particles_rise' | 'particles_fall' | 'vignette_close';
+  /** Intensity of the effect (0-1, default 0.5) */
+  effectIntensity?: number;
+}
+
+/**
+ * Particle configuration for cinematic transitions.
+ * Rendered as animated elements behind/around the text.
+ */
+export interface CinematicParticleConfig {
+  count: number;
+  color: string;
+  /** 'rise' = float upward, 'fall' = rain down, 'drift' = horizontal float */
+  direction: 'rise' | 'fall' | 'drift';
+  speed: number; // pixels per second
+  size: number;  // diameter in pixels
+  opacity: number;
 }
 
 const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
@@ -32,29 +56,35 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     bgColor: '#2D2B55',
     textColor: '#E8E4F0',
     accentColor: '#B794F4',
+    particles: { count: 8, color: '#B794F4', direction: 'rise', speed: 20, size: 4, opacity: 0.3 },
     scenes: [
       {
         text: 'The letters have always moved this way.',
         emoji: '💭',
         delay: 0,
         duration: 3000,
+        effect: 'fade',
       },
       {
         text: 'But lately, you\'ve started to notice...',
         delay: 3200,
         duration: 3000,
+        effect: 'fade',
       },
       {
         text: 'The words seem to want something.',
         emoji: '✨',
         delay: 6400,
         duration: 3000,
+        effect: 'pulse',
+        effectIntensity: 0.3,
       },
       {
         text: 'Your friends have new things to share.',
         emoji: '🏠',
         delay: 9600,
         duration: 2500,
+        effect: 'fade',
       },
     ],
   },
@@ -64,28 +94,36 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     bgColor: '#1A1832',
     textColor: '#C4B5D9',
     accentColor: '#9B7DC8',
+    particles: { count: 10, color: '#9B7DC8', direction: 'fall', speed: 15, size: 3, opacity: 0.2 },
+    vignette: true,
     scenes: [
       {
         text: 'The words are changing.',
         emoji: '🌙',
         delay: 0,
         duration: 3000,
+        effect: 'fade',
       },
       {
         text: 'Or maybe you are.',
         delay: 3200,
         duration: 3000,
+        effect: 'pulse',
+        effectIntensity: 0.4,
       },
       {
         text: 'Your friends speak differently now.\nHave you noticed?',
         delay: 6400,
         duration: 3500,
+        effect: 'fade',
       },
       {
         text: 'The house feels... quieter.',
         emoji: '🏚️',
         delay: 10100,
         duration: 2500,
+        effect: 'vignette_close',
+        effectIntensity: 0.3,
       },
     ],
   },
@@ -95,27 +133,38 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     bgColor: '#0D0B1A',
     textColor: '#9B8FB5',
     accentColor: '#6B4F8A',
+    particles: { count: 12, color: '#6B4F8A', direction: 'rise', speed: 10, size: 5, opacity: 0.15 },
+    vignette: true,
+    shakeIntensity: 0.3,
     scenes: [
       {
         text: 'Something is different.',
         emoji: '👁️',
         delay: 0,
         duration: 3000,
+        effect: 'flash',
+        effectIntensity: 0.2,
       },
       {
         text: 'The letters tremble before they settle.',
         delay: 3200,
         duration: 3000,
+        effect: 'shake',
+        effectIntensity: 0.4,
       },
       {
         text: 'Your friends speak of endings.\nOf purpose. Of something approaching.',
         delay: 6400,
         duration: 4000,
+        effect: 'particles_rise',
+        effectIntensity: 0.6,
       },
       {
         text: 'You should check on them.',
         delay: 10600,
         duration: 2500,
+        effect: 'vignette_close',
+        effectIntensity: 0.5,
       },
     ],
   },
@@ -125,28 +174,39 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
     bgColor: '#050208',
     textColor: '#7A6B8A',
     accentColor: '#8B2252',
+    particles: { count: 15, color: '#8B2252', direction: 'rise', speed: 8, size: 6, opacity: 0.2 },
+    vignette: true,
+    shakeIntensity: 0.5,
     scenes: [
       {
         text: 'The arrangement is nearly complete.',
         emoji: '🌑',
         delay: 0,
         duration: 3500,
+        effect: 'flash',
+        effectIntensity: 0.3,
       },
       {
         text: 'Every puzzle you solved brought us here.',
         delay: 3700,
         duration: 3500,
+        effect: 'pulse',
+        effectIntensity: 0.5,
       },
       {
         text: 'Your friends are waiting.\nThey\'ve been waiting for a long time.',
         delay: 7400,
         duration: 4000,
+        effect: 'shake',
+        effectIntensity: 0.6,
       },
       {
         text: 'Go home. See what you\'ve built.',
         emoji: '🏠',
         delay: 11600,
         duration: 3000,
+        effect: 'vignette_close',
+        effectIntensity: 0.8,
       },
     ],
   },
@@ -183,6 +243,9 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
   bgColor: '#050208',
   textColor: '#C4A882',
   accentColor: '#8B6914',
+  particles: { count: 20, color: '#8B6914', direction: 'rise', speed: 12, size: 4, opacity: 0.25 },
+  vignette: true,
+  shakeIntensity: 0.4,
   scenes: [
     {
       text: 'The house is complete.',
@@ -228,6 +291,9 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
   bgColor: '#020005',
   textColor: '#6B5A7A',
   accentColor: '#8B2252',
+  particles: { count: 25, color: '#8B2252', direction: 'rise', speed: 6, size: 7, opacity: 0.3 },
+  vignette: true,
+  shakeIntensity: 0.7,
   scenes: [
     {
       text: 'The last word has been shifted.',
@@ -278,6 +344,8 @@ export const POST_REVELATION_EVENT: PhaseTransitionEvent = {
   bgColor: '#0A0510',
   textColor: '#8A7A9A',
   accentColor: '#4A3060',
+  particles: { count: 10, color: '#4A3060', direction: 'drift', speed: 5, size: 4, opacity: 0.15 },
+  vignette: true,
   scenes: [
     {
       text: 'The shadow settles.',

@@ -468,8 +468,44 @@ const arrangementStyles = StyleSheet.create({
  * ShadowPresence — A growing dark silhouette behind the house.
  * Invisible at Phase 0-1. Faint at Phase 2. Prominent at Phase 4.
  * Represents the entity being summoned, visible before any animal mentions it.
+ *
+ * Enhanced: Animated breathing (scale pulse), wispy tendrils at Phase 3+,
+ * pulsing crimson eyes at Phase 4 with glow effect.
  */
 const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
+  const breatheAnim = React.useRef(new Animated.Value(0)).current;
+  const eyePulseAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (phase < 2) return;
+
+    // Breathing animation — slow scale pulse
+    const breatheLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheAnim, { toValue: 1, duration: phase >= 4 ? 3000 : 4000, useNativeDriver: true }),
+        Animated.timing(breatheAnim, { toValue: 0, duration: phase >= 4 ? 3000 : 4000, useNativeDriver: true }),
+      ])
+    );
+    breatheLoop.start();
+
+    // Eye pulse at Phase 4
+    let eyeLoop: Animated.CompositeAnimation | undefined;
+    if (phase >= 4) {
+      eyeLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(eyePulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+          Animated.timing(eyePulseAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
+        ])
+      );
+      eyeLoop.start();
+    }
+
+    return () => {
+      breatheLoop.stop();
+      eyeLoop?.stop();
+    };
+  }, [phase]);
+
   if (phase < 2) return null;
 
   const opacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : 0.30;
@@ -477,8 +513,18 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
   const height = 180 * scaleVal;
   const width = 100 * scaleVal;
 
+  const breatheScale = breatheAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.0, phase >= 4 ? 1.06 : 1.03],
+  });
+
+  const eyeOpacity = phase >= 4 ? eyePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 1.0],
+  }) : 0.7;
+
   return (
-    <View style={{
+    <Animated.View style={{
       position: 'absolute',
       top: -height * 0.3,
       alignSelf: 'center',
@@ -486,6 +532,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
       height: height,
       opacity: opacity,
       zIndex: -1,
+      transform: [{ scale: breatheScale }],
     }}>
       {/* Central body - tall dark oval */}
       <View style={{
@@ -496,9 +543,34 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
         borderBottomLeftRadius: width * 0.15,
         borderBottomRightRadius: width * 0.15,
       }} />
-      {/* "Eyes" at Phase 4 - two faint reddish dots */}
+      {/* Wispy tendrils at Phase 3+ — narrower extensions on sides */}
+      {phase >= 3 && (
+        <>
+          <View style={{
+            position: 'absolute',
+            bottom: height * 0.1,
+            left: -width * 0.15,
+            width: width * 0.2,
+            height: height * 0.4,
+            backgroundColor: 'rgba(20, 5, 30, 0.5)',
+            borderRadius: width * 0.1,
+            transform: [{ rotate: '-15deg' }],
+          }} />
+          <View style={{
+            position: 'absolute',
+            bottom: height * 0.1,
+            right: -width * 0.15,
+            width: width * 0.2,
+            height: height * 0.4,
+            backgroundColor: 'rgba(20, 5, 30, 0.5)',
+            borderRadius: width * 0.1,
+            transform: [{ rotate: '15deg' }],
+          }} />
+        </>
+      )}
+      {/* "Eyes" at Phase 4 - pulsing reddish dots with glow */}
       {phase >= 4 && (
-        <View style={{
+        <Animated.View style={{
           position: 'absolute',
           top: height * 0.25,
           left: 0,
@@ -506,22 +578,31 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
           flexDirection: 'row',
           justifyContent: 'center',
           gap: width * 0.2,
+          opacity: eyeOpacity,
         }}>
           <View style={{
-            width: 6,
-            height: 4,
-            borderRadius: 3,
-            backgroundColor: 'rgba(180, 40, 60, 0.7)',
+            width: 8,
+            height: 5,
+            borderRadius: 4,
+            backgroundColor: 'rgba(200, 40, 60, 0.9)',
+            shadowColor: '#FF0000',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: 6,
           }} />
           <View style={{
-            width: 6,
-            height: 4,
-            borderRadius: 3,
-            backgroundColor: 'rgba(180, 40, 60, 0.7)',
+            width: 8,
+            height: 5,
+            borderRadius: 4,
+            backgroundColor: 'rgba(200, 40, 60, 0.9)',
+            shadowColor: '#FF0000',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: 6,
           }} />
-        </View>
+        </Animated.View>
       )}
-    </View>
+    </Animated.View>
   );
 };
 

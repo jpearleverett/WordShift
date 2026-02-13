@@ -210,6 +210,7 @@ export interface HomeWorldProgress {
 export interface AmberReward {
   EASY: number;
   MEDIUM: number;
+  MEDIUM_PLUS: number;
   HARD: number;
 }
 
@@ -344,6 +345,7 @@ export const PHASE_THRESHOLDS = [0, 25, 75, 150, 250];
 export const AMBER_REWARDS: AmberReward = {
   EASY: 5,
   MEDIUM: 10,
+  MEDIUM_PLUS: 15,
   HARD: 20,
 };
 
@@ -361,6 +363,7 @@ export const MILESTONE_BONUSES: { puzzles: number; amber: number; message: strin
   { puzzles: 50, amber: 75, message: 'Puzzle enthusiast!', darkMessage: 'The pattern takes shape.' },
   { puzzles: 75, amber: 100, message: 'Word wizard!', darkMessage: 'The words know your touch now.', dreadMessage: 'Seventy-five incantations spoken.' },
   { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
+  { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
   { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },
   { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The house trembles.', dreadMessage: 'The ritual deepens. Two hundred incantations.' },
   { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'The arrangement nears completion.', dreadMessage: 'Two hundred fifty offerings. Something stirs.' },
@@ -444,6 +447,7 @@ export const NARRATIVE_ACCELERATION = {
   STREAK_MULTIPLIER: 1.25,
   // Difficulty-based: harder puzzles accelerate, easy stays neutral
   HARD_MULTIPLIER: 1.5,
+  MEDIUM_PLUS_MULTIPLIER: 1.25,
   MEDIUM_MULTIPLIER: 1.0,
   EASY_MULTIPLIER: 1.0,
   // Challenge mode: completing in challenge mode counts double

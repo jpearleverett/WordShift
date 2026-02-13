@@ -48,14 +48,14 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (386 tests, 18 suites)
+npx jest --no-coverage   # Run all tests (389 tests, 18 suites)
 ```
 
 ## Tech Stack
 
 - **Framework**: React Native with Expo SDK 54
 - **Language**: TypeScript (strict)
-- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats'`)
+- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'`)
 - **State**: React useState/useEffect (no external state library)
 - **Persistence**: AsyncStorage with in-memory cache pattern
 - **Haptics**: expo-haptics (settings-gated)
@@ -131,10 +131,18 @@ mobile/
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
-│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules, animal whispers, interjections, micro-events
-│       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials)
+│       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules, animal whispers, interjections, micro-events, victory glitch seeds
+│       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials with particle configs and scene effects)
 │       ├── achievements.ts      # 36 achievements across 6 categories
-│       ├── shareResults.ts      # Wordle-style emoji grid sharing
+│       ├── shareResults.ts      # Enhanced Wordle-style sharing with word chains, animal whispers, cosmetic frames
+│       ├── weeklyQuests.ts      # Weekly quest system: 4 rotating quests, amber rewards, phase-aware descriptions
+│       ├── puzzleVariety.ts     # Puzzle variant modes: Reverse, Blind, Speed (60s timer), Chain (3 linked puzzles)
+│       ├── cosmeticRewards.ts   # Cosmetic rewards: tile themes, confetti styles, share frames (unlocked by achievements)
+│       ├── whisperGallery.ts    # Collectible archive of all seen whispers, dialogue, and narrative moments
+│       ├── dialogueChoices.ts   # Player choice points at Phase 3 — illusion of agency in the narrative
+│       ├── sacrifice.ts         # Phase 4+ amber sacrifice mechanic — voluntary offerings to the arrangement
+│       ├── notifications.ts     # Push notification scheduling: daily reminders, re-engagement, phase-aware messages
+│       ├── cloudSave.ts         # Cloud save infrastructure: provider interface, data collection, sync status
 │       ├── settings.ts          # User preferences (sound, haptics, reducedMotion)
 │       ├── haptics.ts           # Haptic feedback (settings-gated)
 │       ├── audio.ts             # Sound effects (placeholder, awaiting assets)
@@ -270,6 +278,25 @@ All 10 character sprites are wired up in `CHARACTER_SPRITES` in `AnimalSprite.ts
 4. Both resulting words must be valid English words
 5. Progress through all rows to win
 
+### Difficulty Levels
+
+| Difficulty | Word Length | Rows | Amber | Description |
+|-----------|-------------|------|-------|-------------|
+| EASY | 4 letters | 3 | 5 | Quick intro puzzles |
+| MEDIUM | 4 letters | 4 | 10 | The standard experience |
+| MEDIUM_PLUS | 5 letters | 4 | 15 | Bridge between MEDIUM and HARD |
+| HARD | 5 letters | 5 | 20 | Full challenge |
+
+### Puzzle Variant Modes (`puzzleVariety.ts`)
+
+Every ~10th puzzle (or 10% random chance after puzzle 15), players may be offered a variant:
+- **Reverse Shift**: Drop letter first, then choose where to remove (1.3x amber)
+- **Blind Shift**: Target words hidden until a letter is placed (1.4x amber)
+- **Speed Shift**: 60-second timer, 3 rows (1.5x amber)
+- **Chain Shift**: 3 linked mini-puzzles in sequence (2.0x amber)
+
+Variant descriptions shift tone at Phase 3+ (dark descriptions).
+
 ## App Architecture
 
 ### Custom Hooks
@@ -324,7 +351,7 @@ Game logic is extracted into six custom hooks:
 ### Screen Navigation
 
 State-based routing in `App.tsx`:
-- `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger'`
+- `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'ledger'`
 - Screen transitions use `Animated.timing` fade (150ms out, 200ms in)
 - Transitions instant when `reducedMotion` setting is enabled
 - `transitionTo(screen, callback?)` handles all navigation
@@ -398,7 +425,7 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 ### Currency System (Amber)
 
 - Players earn **Amber** by completing puzzles
-- Rewards: EASY=5, MEDIUM=10, HARD=20 base
+- Rewards: EASY=5, MEDIUM=10, MEDIUM_PLUS=15, HARD=20 base
 - Star bonuses: 3-star +50%, 2-star +25%
 - Challenge mode: 1.5x amber multiplier
 - Streak multiplier: 10% per day (max 100%, requires MIN_STREAK_FOR_BONUS=2)
@@ -911,6 +938,122 @@ Test on physical device via Expo Go app:
 9. Test Reset All Data -> verify complete reset including tutorial/amber/unlocks
 10. Test stats screen shows correct streak
 
+## New Systems (Assessment-Driven Enhancements)
+
+### Early Darkness Seeds (Phase 0 Narrative Hook)
+
+Phase 0 now contains subtle "wrongness" to foreshadow the horror:
+- **Victory Glitch**: ~8% chance of a brief flash text ("WE SEE YOU", "CLOSER") during Phase 0 victories. First victory always glitches. Generated by `getVictoryGlitch()` in `phaseNarrative.ts`. Rendered as a 200ms flash by the victory flow.
+- **Seed Move Messages**: ~5% chance of a "wrong" move message at Phase 0 ("The letters remember.", "Something shifted.") replacing the normal upbeat messages. Implemented in `getPhase0MoveMessageWithSeed()`.
+- **Onboarding Seeds**: Fox's intro lines have subtle ominous pauses: "We've been waiting for someone like you.\n...A long time." and "They need you." at the end.
+
+### Weekly Quests System (`weeklyQuests.ts`)
+
+4 rotating quests generated each Monday, with seeded deterministic selection:
+- Quest types: solve_count, solve_difficulty, earn_stars, daily_complete, no_hints, challenge_mode, earn_amber
+- Rewards: 20-100 amber per quest
+- Phase-aware descriptions (Phase 3+: dark ritual-themed text)
+- `loadWeeklyQuests(phase)` — loads or generates quests for current week
+- `updateQuestProgress(event, phase)` — called after puzzle completion, returns newly completed quests
+- `claimQuestReward(questId)` — claim amber + optional cosmetic
+- `getTimeUntilReset()` — time until next Monday reset
+- `getWeekId()` — ISO week identifier for deterministic generation
+
+### Cosmetic Rewards System (`cosmeticRewards.ts`)
+
+Achievements unlock cosmetic customizations (purely visual):
+- **Tile Themes** (6): Candy Classic (default), Dark Scholar (Phase 3), Ocean Depths (100 puzzles), Ember Glow (30-day streak), The Void (Phase 4), Golden Hour (25 three-star)
+- **Confetti Styles** (4): Rainbow Burst (default), Golden Shower (30-day streak), Dark Embers (Phase 3), Starfall (25 three-star)
+- **Share Frames** (4): Basic (default), Animal Friends (all animals), The Arrangement (Phase 4), Fire Streak (60-day streak)
+
+Key functions:
+- `syncCosmeticsWithAchievements(unlockedIds)` — call after achievement check to unlock corresponding cosmetics
+- `equipCosmetic(id)` / `getEquippedCosmetic(category)` — equip and query
+- `getActiveTileColors()` — returns custom tile color array or null for defaults
+
+### Whisper Gallery (`whisperGallery.ts`)
+
+Collectible archive screen recording every whisper, dialogue snippet, and narrative moment:
+- `recordWhisper(entry)` — records a whisper/dialogue, deduplicates by content hash
+- `getGroupedEntries()` — entries grouped by animal, sorted by phase then time
+- `getGalleryStats()` — collection stats (total, by animal, by phase, by type)
+- Phase-aware titles: "Whisper Gallery" → "The Echoes" → "Voices in the Walls" → "The Archive"
+- Cap: 500 entries (keeps most recent)
+
+### Player Choice Points (`dialogueChoices.ts`)
+
+At Phase 3, each animal offers a single dialogue choice that creates the illusion of agency:
+- Two options per animal (e.g., Fox: "What arrangement?" vs. "I don't want to know.")
+- Both paths converge — the narrative is the same regardless
+- Responses are animal-specific and character-consistent
+- Phase 4 callbacks reference the player's earlier choice
+- `getChoiceForAnimal(type, phase, dialogueIndex)` — returns choice content or null
+- `recordChoice(type, choice)` — saves choice, returns response + convergence
+- `getPhase4ChoiceCallback(type, choice)` — callback text for Phase 4
+
+### Sacrifice Mechanic (`sacrifice.ts`)
+
+Phase 4+ feature: players can voluntarily "offer" amber to the arrangement:
+- Amber is destroyed — no gameplay benefit
+- Phase-aware response messages (first sacrifice special, milestones at 1/5/10/25/50/100)
+- `performSacrifice(amount, phase)` — destroys amber, returns response message
+- `isSacrificeAvailable(phase)` — only Phase 4+
+- `getSacrificeAmounts(balance)` — suggested amounts based on current balance
+
+### Push Notifications (`notifications.ts`)
+
+Local push notification scheduling via expo-notifications (lazy-loaded):
+- **Daily Reminders**: Phase-aware morning messages ("Your daily puzzle is ready" → "The daily offering awaits")
+- **Re-engagement**: Fires after 2 days of inactivity ("Ember is wondering where you've been" → "The keepers await your return")
+- Preferences: master toggle, daily reminder hour, re-engagement toggle
+- `scheduleAllNotifications(phase)` — called on app launch and after puzzle completion
+- `getNotificationPrefs()` / `setNotificationPrefs(prefs)` — preferences management
+
+### Cloud Save Infrastructure (`cloudSave.ts`)
+
+Client-side cloud sync layer with pluggable backend:
+- `CloudProvider` interface: upload, download, hasNewerSave, isReady
+- Currently uses `NoOpProvider` (logs operations, no actual backend)
+- `collectLocalSaveData()` — gathers all 16 AsyncStorage keys into a CloudSaveData object
+- `restoreFromCloudData(data)` — overwrites local with cloud data
+- `uploadToCloud()` / `downloadFromCloud()` — provider-mediated sync
+- `markPendingChanges()` — tracks unsaved local changes
+- Swap provider via `setCloudProvider(provider)` when real backend is connected
+
+### Enhanced Phase Transition Cinematics
+
+Phase transition events now include visual effect configs:
+- Per-scene effects: `fade`, `pulse`, `shake`, `flash`, `particles_rise`, `particles_fall`, `vignette_close`
+- Per-event ambient particles: `CinematicParticleConfig` with count, color, direction, speed, size, opacity
+- Per-event vignette overlay and screen shake intensity
+- Phase 1: subtle fade + rising purple particles
+- Phase 2: vignette close + falling particles
+- Phase 3: flash + shake + rising particles
+- Phase 4: heavy shake + crimson particles + full vignette
+
+### Enhanced Shadow Figure (`HouseWorld.tsx`)
+
+The ShadowPresence component now features:
+- **Animated breathing**: Slow scale pulse (1.0→1.03 at Phase 2, 1.0→1.06 at Phase 4)
+- **Wispy tendrils**: Side extensions at Phase 3+ (rotated semi-transparent shapes)
+- **Pulsing eyes**: Phase 4 crimson dots with red shadow glow, opacity pulses 0.5→1.0
+- All animations use `useNativeDriver: true` and clean up in useEffect return
+
+### Enhanced Social Sharing (`shareResults.ts`)
+
+Share results now include:
+- **Word chain display**: Horizontal (Phase 0-2: "FLAME → FAME → FRAME") or vertical (Phase 3+: arrows become ↓)
+- **Animal whisper**: Post-puzzle whisper text included as a quote
+- **Cosmetic share frames**: Animal border, ritual frame, or fire streak border decorations
+- **MEDIUM_PLUS difficulty**: Orange 🟠 emoji indicator
+
+### Smoothed Unlock Curve
+
+Adjusted costs to remove the retention cliff at puzzles 100-150:
+- Burrow: 325 → **250** amber
+- Garden: 400 → **300** amber
+- New milestone bonus at puzzle 125: **100 amber** ("Halfway to mastery!")
+
 ## Common Tasks
 
 ### Adding new word categories
@@ -956,7 +1099,7 @@ Add to `tileColors` array in `theme/colors.ts`
 
 ### Home Screen - Adjusting amber rewards
 Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
-- EASY: 5, MEDIUM: 10, HARD: 20
+- EASY: 5, MEDIUM: 10, MEDIUM_PLUS: 15, HARD: 20
 
 ### Home Screen - Adjusting dialogue phases
 Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:

@@ -574,7 +574,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_burrow',
     type: 'room',
-    cost: 325,
+    cost: 250,  // Reduced from 325 to smooth unlock curve at puzzles 100-150
     isUnlocked: false,
     order: 14,
     targetId: 'burrow',
@@ -602,7 +602,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_garden',
     type: 'room',
-    cost: 400,
+    cost: 300,  // Reduced from 400 to smooth unlock curve at puzzles 100-150
     isUnlocked: false,
     order: 16,
     targetId: 'garden',

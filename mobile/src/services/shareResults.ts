@@ -19,6 +19,14 @@ interface ShareableResult {
   dailyDate?: string;
   moveCount: number;
   isChallenge?: boolean;
+  /** Word chain for enhanced sharing (e.g., ["FLAME", "FAME", "FRAME"]) */
+  wordChain?: string[];
+  /** Post-puzzle animal whisper text */
+  animalWhisper?: string;
+  /** Current narrative phase (for theming) */
+  phase?: number;
+  /** Share frame style from cosmetics */
+  shareFrame?: string;
 }
 
 /**
@@ -39,6 +47,7 @@ function difficultyEmoji(difficulty: Difficulty): string {
   switch (difficulty) {
     case 'EASY': return '🟢';
     case 'MEDIUM': return '🟡';
+    case 'MEDIUM_PLUS': return '🟠';
     case 'HARD': return '🔴';
   }
 }
@@ -68,6 +77,39 @@ function performanceGrid(moveCount: number, hintsUsed: number, invalidAttempts: 
 }
 
 /**
+ * Generate the word chain display (e.g., "FLAME → FAME → FRAME")
+ */
+function formatWordChain(words: string[], phase: number): string {
+  if (phase >= 3) {
+    // Vertical chain for dark phases
+    return words.join('\n↓\n');
+  }
+  return words.join(' → ');
+}
+
+/**
+ * Apply share frame decorations based on cosmetic frame style
+ */
+function applyFrame(lines: string[], frameStyle?: string): string[] {
+  if (!frameStyle || frameStyle === 'frame_basic') return lines;
+
+  switch (frameStyle) {
+    case 'frame_animal_border': {
+      const animals = '🦊🦉🦔🦎🦫🦊🦥🐻🐰🐼';
+      return [animals, ...lines, animals];
+    }
+    case 'frame_ritual': {
+      return ['◈━━━━━━━━━━◈', ...lines, '◈━━━━━━━━━━◈'];
+    }
+    case 'frame_streak': {
+      return ['🔥━━━━━━━━━━🔥', ...lines, '🔥━━━━━━━━━━🔥'];
+    }
+    default:
+      return lines;
+  }
+}
+
+/**
  * Generate shareable text for a puzzle result
  */
 export function generateShareText(result: ShareableResult): string {
@@ -83,13 +125,28 @@ export function generateShareText(result: ShareableResult): string {
   lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${result.difficulty}${challengeTag}`);
   lines.push(performanceGrid(result.moveCount, result.hintsUsed, result.invalidAttempts));
 
+  // Word chain (enhanced sharing)
+  if (result.wordChain && result.wordChain.length > 0) {
+    const phase = result.phase || 0;
+    lines.push('');
+    lines.push(formatWordChain(result.wordChain, phase));
+  }
+
   if (result.isChallenge && result.hintsUsed === 0 && result.invalidAttempts <= 1) {
     lines.push('Challenge Mode — flawless!');
   } else if (result.hintsUsed === 0 && result.invalidAttempts <= 1) {
     lines.push('No hints, no mistakes!');
   }
 
-  return lines.join('\n');
+  // Animal whisper
+  if (result.animalWhisper) {
+    lines.push('');
+    lines.push(`"${result.animalWhisper}"`);
+  }
+
+  // Apply cosmetic frame
+  const framed = applyFrame(lines, result.shareFrame);
+  return framed.join('\n');
 }
 
 /**
