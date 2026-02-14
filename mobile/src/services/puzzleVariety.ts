@@ -345,24 +345,22 @@ export function getVariantSelectorOptions(
   ];
 
   for (const variant of BASE_VARIANTS) {
+    const unlocked = isVariantUnlocked(variant, puzzlesSolved, currentPhase);
+    if (!unlocked) {
+      continue;
+    }
     options.push({
       variant,
       config: VARIANT_CONFIGS[variant],
       group: 'base',
-      unlocked: isVariantUnlocked(variant, puzzlesSolved, currentPhase),
+      unlocked,
       unlockHint: getVariantUnlockHint(variant, puzzlesSolved, currentPhase, uiPhase),
     });
   }
 
   for (const variant of COMBO_VARIANTS) {
     const unlocked = isVariantUnlocked(variant, puzzlesSolved, currentPhase);
-    const requirement = VARIANT_UNLOCK_REQUIREMENTS[variant];
-    const remainingPuzzles = Math.max(0, requirement.puzzlesSolved - puzzlesSolved);
-    const isNearUnlock = !unlocked &&
-      remainingPuzzles <= 25 &&
-      currentPhase >= Math.max(0, requirement.minDepthPhase - 1);
-
-    if (!unlocked && !isNearUnlock) {
+    if (!unlocked) {
       continue;
     }
 

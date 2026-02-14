@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getTodayString,
   getDailyDifficulty,
+  isDailyChallengeUnlocked,
+  getDailyChallengeUnlockProgress,
   isDailyCompleted,
   recordDailyCompletion,
   getDailyStatus,
@@ -73,6 +75,28 @@ describe('dailyChallenge', () => {
     expect(getDailyDifficulty('2026-02-09')).toBe('HARD');
     expect(getDailyDifficulty('2026-02-10')).toBe('HARD');
     expect(getDailyDifficulty('2026-02-11')).toBe('HARD');
+  });
+
+  test('daily challenge unlocks after enough puzzle progress', () => {
+    expect(isDailyChallengeUnlocked(0, 0)).toBe(false);
+    expect(isDailyChallengeUnlocked(19, 0)).toBe(false);
+    expect(isDailyChallengeUnlocked(20, 0)).toBe(true);
+    expect(isDailyChallengeUnlocked(5, 1)).toBe(true);
+  });
+
+  test('daily challenge unlock progress reports remaining puzzles', () => {
+    expect(getDailyChallengeUnlockProgress(0, 0)).toEqual({
+      unlocked: false,
+      puzzlesRemaining: 20,
+    });
+    expect(getDailyChallengeUnlockProgress(12, 0)).toEqual({
+      unlocked: false,
+      puzzlesRemaining: 8,
+    });
+    expect(getDailyChallengeUnlockProgress(20, 0)).toEqual({
+      unlocked: true,
+      puzzlesRemaining: 0,
+    });
   });
 
   test('isDailyCompleted returns false initially', async () => {

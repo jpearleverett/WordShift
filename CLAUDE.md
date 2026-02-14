@@ -66,7 +66,7 @@ npx jest --no-coverage   # Run all tests (680 tests, 26 suites)
 
 ```
 mobile/
-├── App.tsx                      # Main app (~1080 lines): screen routing, onboarding orchestration, wires hooks together
+├── App.tsx                      # Main app: screen routing, onboarding orchestration, wires hooks together
 ├── assets/                      # Image assets (see Asset System below)
 │   ├── characters/              # Animal character sprites
 │   ├── rooms/                   # Room background images
@@ -84,7 +84,7 @@ mobile/
 │   │   ├── useVictoryFlow.ts    # Victory animation choreography (stars, modal, phase flash)
 │   │   ├── useAchievementQueue.ts # Achievement checking + toast queue processing
 │   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging
-│   │   └── useUnlockFlow.ts     # Unlock/shop logic: rooms, animals, purchases
+│   │   └── useUnlockFlow.ts     # Home unlock flow: in-world room/animal prompts, purchases, modal state
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails, resonant word glow (compact mode for 6+ letters)
@@ -97,7 +97,7 @@ mobile/
 │   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements (two tabs)
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
-│   │   ├── DailyChallengeCard.tsx # Compact circular daily challenge button (in header row)
+│   │   ├── DailyChallengeCard.tsx # Compact circular daily challenge button (header, shown after unlock)
 │   │   ├── puzzle/              # Extracted puzzle screen UI components
 │   │   │   ├── ActionButton.tsx # 3D-styled button with glow animation + spring press
 │   │   │   ├── AnimatedLogo.tsx # Animated WORDSHIFT logo with bounce + subtle rotation
@@ -105,14 +105,14 @@ mobile/
 │   │   │   ├── Toast.tsx        # Animated toast notification (slide-in + error shake)
 │   │   │   ├── VictoryModal.tsx # Victory screen modal (stars, stats, amber breakdown)
 │   │   │   ├── RulesModal.tsx   # Phase-aware "How to Play" rules modal
-│   │   │   ├── DifficultyMenu.tsx # Phase-aware setup menu: difficulty + challenge + variant/combo selector with lock states
+│   │   │   ├── DifficultyMenu.tsx # Phase-aware setup menu: difficulty + challenge + variant/combo selector (unlocked styles only)
 │   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper from animals (fade in/out)
 │   │   │   ├── RitualEchoChain.tsx # In-puzzle real-time word chain display (phase-aware styling)
 │   │   │   └── index.ts         # Puzzle component exports
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive screen (phase-aware)
 │   │   ├── WordLedger.tsx       # Scrollable ritual word history screen (phase-aware styling)
 │   │   └── home/
-│   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
+│   │       ├── HomeScreen.tsx   # Main home screen with animal house, in-world unlock prompts, unlock progress
 │   │       ├── HouseWorld.tsx   # Pannable house view (vertical pan only)
 │   │       ├── RoomView.tsx     # Individual room rendering
 │   │       ├── AnimalSprite.tsx # Animated animal characters with movement + emotions
@@ -304,11 +304,11 @@ Variants are now player-selected from the setup menu (not randomly injected). Pl
 - **No Vowel / No Consonant**: Restriction variants that lock one letter class.
 - **Combos**: `reverse_blind`, `blind_no_vowel`, `blind_no_consonant`, `speed_no_vowel`, `speed_no_consonant`.
 
-Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions), and lock hints are also phase-aware without exposing raw phase numbers to players.
-- **Progressive disclosure**: combo variants are only shown once unlocked or near unlock; otherwise the setup menu shows a “more combinations later” message.
+Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants and combos stay fully hidden until unlocked, so players only see styles they can actually select.
+- **Progressive disclosure**: combo variants are only shown once unlocked; until then, the setup menu shows a generic “more combinations later” message (without showing locked entries).
 - **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
 - **Economy anti-farm**: variant multipliers were rebalanced for selectable play and now taper with repeated back-to-back use of the same variant through `applyVariantAmberBonus()` in `amberCurrency.ts`.
-- **Wired in**: `DifficultyMenu.tsx` renders unlock-aware variant cards (selected/active/locked states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
+- **Wired in**: `DifficultyMenu.tsx` renders only unlocked variant cards (selected/active states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
 
 ## App Architecture
 
@@ -352,11 +352,12 @@ Game logic is extracted into six custom hooks:
 - `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words (per-animal filtering), checks for sacrifice reactions (Phase 4+), checks for tutorial callbacks (Fox Phase 4), rolls for cross-animal references (frequency scales with phase: 10% → 60%, guaranteed first for Vanguard animals), checks for coordinated dialogue events at puzzle milestones, and checks for word threshold dialogues
 - `handleNextDialogue()` - Advance dialogue, record progress, check session limits
 - `handleCloseDialogue()` - End session, clean up state
+- One-time early-game Fox nudge: injects `getFoxPostTutorialPlayPrompt(...)` and calls `onFoxPlayPrompt` to highlight PLAY after the first post-tutorial Fox session
 - Returns: `selectedAnimal`, `showDialogue`, `dialogueText`, `sessionInfo`, `cooldownMessage`, `isTalking`, `triggerReaction`, `crossAnimalRef`
 - Animations: cooldown toast slide-in/out, dialogue modal spring, talking sprite alternation (idle/talk every 300ms)
 
 **`useUnlockFlow()`** (`src/hooks/useUnlockFlow.ts`):
-- Unlock/shop logic for home screen: rooms, animals, purchases
+- Home unlock flow for rooms/animals: in-world prompts, modal state, purchases
 - `handlePurchase(unlock)` - Execute purchase, trigger celebration, show intro dialogue for new characters
 - `handleRoomPress(room)` - Handle locked room tap or room needing an animal
 - `refreshUnlockData(freshRooms, freshAnimals)` - Refresh state from storage (avoids stale closures)
@@ -415,7 +416,9 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
 - **Always HARD**: 6-letter base words, 5 rows (uses `generateLocalPuzzle('HARD', { wordLength: 6, targetRows: 5 })`)
 - Requires 5-letter, 6-letter, and 7-letter words in dictionary for the pick/drop chain mechanic
 - Streak tracking: consecutive days of daily completion (2-day grace period)
-- DailyChallengeCard: compact 42px circular button in the home screen header row (not completed → pulsing glow, tap starts challenge; completed → checkmark with stars; streak badge when streak > 1)
+- **Unlock gated**: hidden until `isDailyChallengeUnlocked(puzzlesSolved, currentPhase)` returns true (20 puzzles solved, or naturally by phase progression at Phase 1+)
+- **One-time intro scene**: when it unlocks, Fox introduces Daily Challenge via `getDailyChallengeIntroLines(...)` (tracked by `hasSeenDailyChallengeIntro()` / `markDailyChallengeIntroSeen()`)
+- DailyChallengeCard: compact 42px circular button in the home screen header row once unlocked (not completed → pulsing glow, tap starts challenge; completed → checkmark with stars; streak badge when streak > 1)
 
 ### Settings System (`services/settings.ts`)
 
@@ -436,6 +439,7 @@ Wordle-style emoji grid sharing:
 ## Home Screen & Animal House
 
 The home screen features a multi-story house with unlockable rooms and animal characters.
+- Header amber is display-only (non-tappable); room/animal progression is driven through in-world unlock prompts on the house.
 
 ### Currency System (Amber)
 
@@ -544,7 +548,7 @@ The house is built from the ground up, one room at a time. What begins as "build
 **Starting State**:
 - Player starts with one empty room (Cozy Den) on the ground floor
 - No animals unlocked - must invite the first one
-- House only shows unlocked rooms (single vertical stack)
+- House shows unlocked rooms plus the next locked room preview when the next unlock is a room (with in-world build prompt/cost)
 
 **Unlock Flow**: Invite animal -> Build room -> Invite animal -> Build room...
 1. **Fox (Ember)** - FREE to invite into Cozy Den (starter)
@@ -558,7 +562,7 @@ The house is built from the ground up, one room at a time. What begins as "build
 
 ### Phase-Aware Room Descriptions
 
-Room descriptions evolve with the narrative phase. `getRoomDescription(roomId, phase)` in `homeWorldData.ts` returns different descriptions per phase (e.g., Kitchen at Phase 0: "A cozy space where friends gather around good food" → Phase 4: "The ovens have been repurposed. Something else is being prepared."). Used in the shop modal for room-type unlocks.
+Room descriptions evolve with the narrative phase. `getRoomDescription(roomId, phase)` in `homeWorldData.ts` returns different descriptions per phase (e.g., Kitchen at Phase 0: "A cozy space where friends gather around good food" → Phase 4: "The ovens have been repurposed. Something else is being prepared."). Used in unlock/detail modal copy for room purchases.
 
 ### Incantation System (Puzzle-Narrative Connection)
 
@@ -608,7 +612,7 @@ Milestone bonuses at key puzzle counts use phase-aware messages. Each `MILESTONE
 
 **House Structure** (`HouseWorld.tsx`):
 - Single-column layout of rooms stacked vertically (bottom-up)
-- Only unlocked rooms are rendered
+- Unlocked rooms are rendered, plus one pending room preview when the next unlock is a room
 - Vertical-only pan via `react-native-gesture-handler` (horizontal pan disabled to prevent side gaps)
 - Layout uses `justifyContent: 'flex-end'` to anchor house at viewport bottom; `houseContainer` has `marginTop: 50` and `marginBottom: 40` (gap between foundation and screen edge)
 - **Initial pan position**: On mount and when rooms change, `translateY` is set to the overflow amount (total content height minus measured container height) so the roof is visible. Container height is measured via `onLayout` for accuracy
@@ -667,9 +671,9 @@ The victory modal visually transforms across narrative phases via additional `Ph
 The setup dropdown adapts to the narrative phase:
 - Accepts `phase` prop
 - Includes sections for **Difficulty**, **Challenge mode**, and **Puzzle Style** (variant/combo selector)
-- Shows clear **selected**, **active**, and **locked** states for variants
-- Locked variants display phase-aware unlock hints that avoid exposing internal phase labels
-- Combo styles are progressively disclosed (shown when near unlock or unlocked, hidden otherwise)
+- Shows clear **selected** and **active** states for available variants
+- Locked variants and combos are fully hidden until unlocked (no greyed/disabled cards)
+- Combo styles are progressively disclosed (section appears only after at least one combo unlocks; otherwise a generic “more combinations later” message is shown)
 - **Phase 0-2**: Bright menu styling and lighter copy tone
 - **Phase 3+**: Dark background, phase-themed text colors from `getPhaseTheme()`, darker ritualized copy tone
 
@@ -790,6 +794,8 @@ Manages amber balance, streak, and phase progression:
 - `markFinalPuzzleCompleted()` / `isFinalPuzzleCompleted()` - Final puzzle endgame tracking
 - `markPostRevelation()` / `isPostRevelation()` - Phase 5 post-revelation state
 - `markTutorialSeedsPlanted()` / `wereTutorialSeedsPlanted()` - Tutorial callback tracking for Fox at Phase 4
+- `hasSeenDailyChallengeIntro()` / `markDailyChallengeIntroSeen()` - One-time Daily Challenge intro tracking
+- `hasSeenFoxPlayNudge()` / `markFoxPlayNudgeSeen()` - One-time post-tutorial Fox "play more" nudge tracking
 - `recordConsumedCoordinatedEvent(theme)` / `getConsumedCoordinatedEvents()` - Track consumed coordinated dialogue events
 - `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` - Track guaranteed first cross-reference for Vanguard animals at each phase
 - `clearProgress()` - Full reset (includes guaranteed cross-ref keys)
@@ -866,7 +872,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 | `home_empty` | Home | Player sees empty Cozy Den. Invite prompt auto-appears, guiding them to welcome Fox. |
 | `fox_invited` | Home | Fox intro dialogue via FoxGuide (4 lines). Fox introduces himself and the world. |
 | `going_to_puzzle` | Transition | Fox says "Follow me!" — screen transitions to puzzle. |
-| `puzzle_tutorial` | Puzzle | Real EASY puzzle with contextual Fox tips (pick/drop guidance). UI simplified: no difficulty selector, no NEW button, no home button. |
+| `puzzle_tutorial` | Puzzle | Real EASY puzzle with contextual Fox tips. The exact letter to pick and target slot are highlighted, and tutorial input is guided to prevent early dead-ends. UI simplified: no difficulty selector, no NEW button, no home button. |
 | `puzzle_complete` | Puzzle | Victory plays, Fox congratulates. "Let's go home!" button. |
 | `returning_home` | Transition | Screen transitions back to home. |
 | `unlock_explained` | Home | Fox explains amber & unlock system (3 lines). Unlock progress bar visible. |
@@ -881,7 +887,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - `ONBOARDING_FOX_LINES` — Fox dialogue text for each step (keyed by step name)
 
 **FoxGuide Component** (`components/FoxGuide.tsx`):
-- Floating Fox sprite + speech bubble overlay, positioned at bottom of any screen
+- Floating Fox sprite + speech bubble overlay with dynamic placement (`top`/`middle`/`bottom`) and optional `anchorStyle` for context-aware positioning
 - Fox talk sprite (with emoji fallback), bounce animation when speaking
 - Fade in/out + spring slide animations, text fade on change
 - Continue button, optional Skip button
@@ -893,7 +899,8 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - `handleOnboardingContinue()` — advances through dialogue lines and transitions between screens
 - `handleSkipOnboarding()` — marks onboarding + tutorial as complete
 - FoxGuide rendered on both home screen (home_empty, fox_invited, unlock_explained) and puzzle screen (puzzle_tutorial, puzzle_complete)
-- During onboarding: hides difficulty selector, stats row, NEW button, home button on puzzle screen; hides PLAY, shop, settings, stats, daily challenge on home screen
+- `tutorialGuidance` derives the exact source letter/target slot from solution steps and drives guided highlights + input guardrails during `puzzle_tutorial`
+- During onboarding: hides difficulty selector, stats row, NEW button, home button on puzzle screen; hides PLAY, settings, stats, daily challenge on home screen
 
 **HomeScreen Integration**:
 - Accepts `onboardingStep` and `onAdvanceOnboarding` props
@@ -961,7 +968,7 @@ Test on physical device via Expo Go app:
 3. Test all three difficulty modes
 4. Verify puzzle generation doesn't hang (should complete in <3s)
 5. Test tutorial on fresh install
-6. Test daily challenge (always 6-letter words / 5 rows; same puzzle if opened twice same day)
+6. Test daily challenge gating + unlock intro (hidden before unlock threshold; Fox intro appears once; challenge remains deterministic 6-letter/5-row and same puzzle if opened twice on the same day)
 7. Test home screen unlock flow (Fox free -> build Kitchen -> invite Panko)
 8. Test settings (toggle reduced motion -> verify no confetti/particles)
 9. Test Reset All Data -> verify complete reset including tutorial/amber/unlocks

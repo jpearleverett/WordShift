@@ -8,12 +8,9 @@ import {
   Easing,
   Image,
   ImageSourcePropType,
-  Dimensions,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Fox talk sprite with fallback
 let foxTalkSprite: ImageSourcePropType | null = null;
@@ -33,7 +30,9 @@ interface FoxGuideProps {
   /** Called when the player taps the button */
   onContinue?: () => void;
   /** Position on screen */
-  position?: 'bottom' | 'top';
+  position?: 'bottom' | 'top' | 'middle';
+  /** Optional absolute positioning override for context-aware placement */
+  anchorStyle?: { top?: number; bottom?: number; left?: number; right?: number };
   /** Whether to show the skip button */
   showSkip?: boolean;
   /** Called when skip is tapped */
@@ -52,6 +51,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   buttonText = 'Continue',
   onContinue,
   position = 'bottom',
+  anchorStyle,
   showSkip = false,
   onSkip,
   speaking = true,
@@ -136,12 +136,14 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   if (!visible) return null;
 
   const isTop = position === 'top';
+  const isMiddle = position === 'middle';
+  const resolvedPositionStyle = anchorStyle || (isTop ? styles.containerTop : isMiddle ? styles.containerMiddle : styles.containerBottom);
 
   return (
     <Animated.View
       style={[
         styles.container,
-        isTop ? styles.containerTop : styles.containerBottom,
+        resolvedPositionStyle,
         {
           opacity: fadeAnim,
           transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
@@ -224,30 +226,33 @@ const styles = StyleSheet.create({
   containerTop: {
     top: 100,
   },
+  containerMiddle: {
+    top: 220,
+  },
   guideCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(50, 20, 100, 0.94)',
-    borderRadius: 24,
-    padding: 16,
+    backgroundColor: 'rgba(26, 16, 44, 0.95)',
+    borderRadius: 20,
+    padding: 12,
     alignItems: 'center',
-    shadowColor: CandyColors.purple.dark,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(168, 85, 247, 0.3)',
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(190, 145, 255, 0.28)',
   },
   foxContainer: {
-    width: 64,
-    height: 64,
-    marginRight: 12,
+    width: 58,
+    height: 58,
+    marginRight: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   foxImage: {
-    width: 64,
-    height: 64,
+    width: 58,
+    height: 58,
   },
   foxEmoji: {
     fontSize: 40,
@@ -256,24 +261,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   speechBubble: {
-    backgroundColor: 'rgba(245, 240, 255, 0.95)',
-    borderRadius: 16,
-    padding: 12,
-    paddingLeft: 16,
+    backgroundColor: 'rgba(248, 244, 255, 0.97)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingLeft: 14,
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.15)',
+    borderColor: 'rgba(128, 83, 210, 0.24)',
   },
   speechAccentBar: {
     position: 'absolute',
     left: 0,
-    top: 6,
-    bottom: 6,
-    width: 3,
+    top: 5,
+    bottom: 5,
+    width: 2,
     borderRadius: 2,
     backgroundColor: CandyColors.purple.light,
-    opacity: 0.7,
+    opacity: 0.85,
   },
   speechShine: {
     position: 'absolute',
@@ -287,16 +293,16 @@ const styles = StyleSheet.create({
   },
   speechText: {
     fontSize: 14,
-    color: CandyColors.gray[700],
-    lineHeight: 21,
+    color: '#3D3158',
+    lineHeight: 20,
     letterSpacing: 0.1,
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: 8,
-    gap: 12,
+    marginTop: 7,
+    gap: 10,
   },
   skipButton: {
     paddingVertical: 8,
@@ -304,14 +310,14 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(255, 255, 255, 0.62)',
     fontWeight: '600',
   },
   continueButton: {
-    backgroundColor: CandyColors.purple.main,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 16,
+    backgroundColor: '#7A49D8',
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     shadowColor: CandyColors.purple.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
@@ -332,10 +338,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 16,
   },
   continueButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
     color: CandyColors.white,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
 });
 

@@ -268,6 +268,66 @@ export default function App() {
     setOnboardingLineIndex(0);
   }, []);
 
+  // Onboarding tutorial guidance: exact source letter + target slot from solver steps.
+  const tutorialGuidance = useMemo(() => {
+    if (onboardingStep !== 'puzzle_tutorial') return null;
+    if (puzzle.gameState !== GameState.PLAYING) return null;
+    if (!puzzle.solution || puzzle.solution.length === 0) return null;
+
+    const targetRowIndex = puzzle.moveDirection === 'down'
+      ? puzzle.activeRowIndex + 1
+      : puzzle.activeRowIndex - 1;
+    if (targetRowIndex < 0 || targetRowIndex >= puzzle.rows.length) return null;
+
+    const sourceRow = puzzle.rows[puzzle.activeRowIndex];
+    const targetRow = puzzle.rows[targetRowIndex];
+    if (!sourceRow || !targetRow) return null;
+
+    const currentSourceWord = sourceRow.words.map(l => l.char).join('');
+    const currentTargetWord = targetRow.words.map(l => l.char).join('');
+    const relevantStep = puzzle.solution.find(step =>
+      step.stepIndex === puzzle.activeRowIndex
+      && step.sourceWord === currentSourceWord
+      && step.targetWord === currentTargetWord
+    );
+    if (!relevantStep) return null;
+
+    let sourceLetterId: string | null = null;
+    for (let i = 0; i < sourceRow.words.length; i++) {
+      const candidate = sourceRow.words.filter((_, idx) => idx !== i).map(l => l.char).join('');
+      if (sourceRow.words[i].char === relevantStep.letterToMove && candidate === relevantStep.sourceWord) {
+        sourceLetterId = sourceRow.words[i].id;
+        break;
+      }
+    }
+
+    let targetSlotIndex: number | null = null;
+    for (let i = 0; i <= targetRow.words.length; i++) {
+      const candidate = [
+        ...targetRow.words.slice(0, i).map(l => l.char),
+        relevantStep.letterToMove,
+        ...targetRow.words.slice(i).map(l => l.char),
+      ].join('');
+      if (candidate === relevantStep.targetWord) {
+        targetSlotIndex = i;
+        break;
+      }
+    }
+
+    return {
+      sourceLetterId,
+      targetSlotIndex,
+      letterToMove: relevantStep.letterToMove,
+    };
+  }, [
+    onboardingStep,
+    puzzle.gameState,
+    puzzle.solution,
+    puzzle.moveDirection,
+    puzzle.activeRowIndex,
+    puzzle.rows,
+  ]);
+
   // Start puzzle when navigating to puzzle screen
   const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
     hapticLight();
@@ -319,6 +379,21 @@ export default function App() {
     // Block interaction during victory processing
     if (victoryFlow.isProcessingVictory) return;
     if (puzzle.gameState === GameState.GAME_OVER) return;
+
+    // Onboarding tutorial: keep drops focused on the guided slot.
+    if (
+      onboardingStep === 'puzzle_tutorial' &&
+      puzzle.gameState === GameState.PLAYING &&
+      puzzle.selectedLetter &&
+      tutorialGuidance?.targetSlotIndex !== null &&
+      tutorialGuidance?.targetSlotIndex !== undefined &&
+      targetIndex !== tutorialGuidance.targetSlotIndex
+    ) {
+      hapticError();
+      soundInvalidMove();
+      puzzleActions.setMessage('Drop it into the highlighted slot.');
+      return;
+    }
 
     const result = await puzzleActions.handleSlotPress(targetIndex);
 
@@ -516,13 +591,51 @@ export default function App() {
         triggerDreadPulse(persistence.currentPhase);
       }
     }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, puzzle.gameState, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions, onboardingStep, advanceOnboarding]);
+  }, [
+    puzzleActions,
+    puzzle.difficulty,
+    puzzle.selectedLetter,
+    puzzle.gameState,
+    persistenceActions,
+    isPlayingDaily,
+    victoryFlow.isProcessingVictory,
+    victoryActions,
+    achievementActions,
+    onboardingStep,
+    advanceOnboarding,
+    tutorialGuidance,
+  ]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
+    if (
+      onboardingStep === 'puzzle_tutorial' &&
+      puzzle.gameState === GameState.PLAYING &&
+      puzzle.selectedLetter &&
+      letter.id !== puzzle.selectedLetter.id
+    ) {
+      hapticSelection();
+      soundTap();
+      puzzleActions.setMessage('Keep that letter selected, then drop it into the highlighted slot.');
+      return;
+    }
+
+    if (
+      onboardingStep === 'puzzle_tutorial' &&
+      puzzle.gameState === GameState.PLAYING &&
+      !puzzle.selectedLetter &&
+      tutorialGuidance?.sourceLetterId &&
+      letter.id !== tutorialGuidance.sourceLetterId
+    ) {
+      hapticSelection();
+      soundTap();
+      puzzleActions.setMessage(`Try the highlighted "${tutorialGuidance.letterToMove}" tile first.`);
+      return;
+    }
+
     hapticLight();
     soundTap();
     puzzleActions.handleLetterPress(letter, rowIndex);
-  }, [puzzleActions]);
+  }, [puzzleActions, onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
 
   const handleUndo = useCallback(() => {
     hapticLight();
@@ -854,7 +967,14 @@ export default function App() {
                     onContinue={onboardingStep === 'home_empty' ? undefined : handleOnboardingContinue}
                     showSkip={onboardingStep !== 'unlock_explained'}
                     onSkip={handleSkipOnboarding}
-                    position="bottom"
+                    position={onboardingStep === 'home_empty' ? 'middle' : 'bottom'}
+                    anchorStyle={onboardingStep === 'home_empty'
+                      ? {
+                          top: Math.min(SCREEN_HEIGHT * 0.56, 430),
+                          left: 12,
+                          right: 12,
+                        }
+                      : undefined}
                   />
                 )
               )}
@@ -1071,6 +1191,9 @@ export default function App() {
                   idx !== puzzle.activeRowIndex &&
                   !puzzle.blindRevealedRows.includes(idx)
                 }
+                guidanceActive={onboardingStep === 'puzzle_tutorial'}
+                guidedLetterId={tutorialGuidance?.sourceLetterId || null}
+                guidedSlotIndex={tutorialGuidance?.targetSlotIndex ?? null}
               />
             ))}
           </ScrollView>
@@ -1201,9 +1324,17 @@ export default function App() {
                     Math.min(onboardingLineIndex, ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1)
                   ]
                 : puzzle.gameState === GameState.PLAYING && puzzle.selectedLetter
-                  ? ONBOARDING_FOX_LINES.puzzle_tutorial_drop[0]
+                  ? (
+                    tutorialGuidance?.targetSlotIndex !== null && tutorialGuidance?.targetSlotIndex !== undefined
+                      ? `Great. Now drop "${tutorialGuidance.letterToMove}" into the highlighted slot.`
+                      : ONBOARDING_FOX_LINES.puzzle_tutorial_drop[0]
+                  )
                   : puzzle.gameState === GameState.PLAYING
-                    ? ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
+                    ? (
+                      tutorialGuidance?.letterToMove
+                        ? `Tap the highlighted "${tutorialGuidance.letterToMove}" tile first.`
+                        : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
+                    )
                     : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
             }
             buttonText={
@@ -1216,7 +1347,24 @@ export default function App() {
                 ? handleOnboardingContinue
                 : undefined
             }
-            position="bottom"
+            position={
+              onboardingStep === 'puzzle_complete'
+                ? 'bottom'
+                : puzzle.gameState === GameState.PLAYING
+                  ? 'middle'
+                  : 'top'
+            }
+            anchorStyle={
+              onboardingStep !== 'puzzle_complete' && puzzle.gameState === GameState.PLAYING
+                ? {
+                    top: puzzle.selectedLetter
+                      ? Math.min(SCREEN_HEIGHT * 0.48, 360)
+                      : Math.min(SCREEN_HEIGHT * 0.30, 250),
+                    left: 12,
+                    right: 12,
+                  }
+                : undefined
+            }
           />
         )}
       </Animated.View>

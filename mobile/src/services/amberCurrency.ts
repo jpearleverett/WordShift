@@ -16,6 +16,8 @@ import {
 
 const PROGRESS_STORAGE_KEY = 'wordshift_home_progress';
 const TRANSACTIONS_STORAGE_KEY = 'wordshift_amber_transactions';
+const DAILY_CHALLENGE_INTRO_SEEN_KEY = 'wordshift_daily_challenge_intro_seen';
+const FOX_PLAY_NUDGE_SEEN_KEY = 'wordshift_fox_play_nudge_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -582,6 +584,8 @@ export async function clearProgress(): Promise<void> {
     progressCache = getDefaultProgress();
     await AsyncStorage.removeItem(PROGRESS_STORAGE_KEY);
     await AsyncStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
+    await AsyncStorage.removeItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -989,6 +993,46 @@ export async function markGuaranteedCrossRefSeen(phase: number): Promise<void> {
   try {
     const key = `wordshift_guaranteed_crossref_phase_${phase}`;
     await AsyncStorage.setItem(key, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Track whether the daily challenge unlock explanation has been shown.
+ */
+export async function hasSeenDailyChallengeIntro(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markDailyChallengeIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(DAILY_CHALLENGE_INTRO_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Track whether Fox's one-time post-tutorial "play more" nudge has appeared.
+ */
+export async function hasSeenFoxPlayNudge(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(FOX_PLAY_NUDGE_SEEN_KEY);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markFoxPlayNudgeSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(FOX_PLAY_NUDGE_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

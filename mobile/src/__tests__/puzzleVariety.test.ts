@@ -223,23 +223,24 @@ describe('puzzleVariety', () => {
       expect(mid).not.toContain('chain');
     });
 
-    it('builds selector options with lock hints', () => {
+    it('builds selector options with only unlocked variants', () => {
       const options = getVariantSelectorOptions(50, 1, 1);
-      const standard = options.find(o => o.variant === 'standard');
-      const reverse = options.find(o => o.variant === 'reverse');
-      const combo = options.find(o => o.variant === 'reverse_blind');
-
-      expect(standard?.unlocked).toBe(true);
-      expect(reverse?.unlocked).toBe(true);
-      expect(combo).toBeUndefined();
+      expect(options.every(o => o.unlocked)).toBe(true);
+      expect(options.map(o => o.variant)).toEqual(['standard', 'reverse', 'blind', 'no_vowel']);
+      expect(options.find(o => o.variant === 'speed')).toBeUndefined();
+      expect(options.find(o => o.variant === 'reverse_blind')).toBeUndefined();
     });
 
-    it('shows combo options when near unlock', () => {
+    it('keeps combo options hidden until unlocked', () => {
       const options = getVariantSelectorOptions(110, 1, 1);
-      const combo = options.find(o => o.variant === 'reverse_blind');
-      expect(combo).toBeDefined();
-      expect(combo?.unlocked).toBe(false);
-      expect(combo?.unlockHint.toLowerCase()).not.toContain('phase');
+      expect(options.find(o => o.variant === 'reverse_blind')).toBeUndefined();
+      expect(options.find(o => o.variant === 'blind_no_vowel')).toBeUndefined();
+    });
+
+    it('shows combo options once unlocked', () => {
+      const options = getVariantSelectorOptions(120, 2, 2);
+      expect(options.find(o => o.variant === 'reverse_blind')?.unlocked).toBe(true);
+      expect(options.find(o => o.variant === 'blind_no_vowel')?.unlocked).toBe(true);
     });
 
     it('validates known variant keys', () => {

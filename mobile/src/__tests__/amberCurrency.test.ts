@@ -16,6 +16,10 @@ import {
   markIntroSeen,
   getStreakInfo,
   applyVariantAmberBonus,
+  hasSeenDailyChallengeIntro,
+  markDailyChallengeIntroSeen,
+  hasSeenFoxPlayNudge,
+  markFoxPlayNudgeSeen,
 } from '../services/amberCurrency';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -277,5 +281,19 @@ describe('intro tracking', () => {
     await markIntroSeen('fox');
     expect(await hasSeenIntro('fox')).toBe(true);
     expect(await hasSeenIntro('owl')).toBe(false);
+  });
+});
+
+describe('one-time narrative flags', () => {
+  test('daily challenge intro flag persists when marked', async () => {
+    expect(await hasSeenDailyChallengeIntro()).toBe(false);
+    await markDailyChallengeIntroSeen();
+    expect(await hasSeenDailyChallengeIntro()).toBe(true);
+  });
+
+  test('fox play nudge flag persists when marked', async () => {
+    expect(await hasSeenFoxPlayNudge()).toBe(false);
+    await markFoxPlayNudgeSeen();
+    expect(await hasSeenFoxPlayNudge()).toBe(true);
   });
 });
