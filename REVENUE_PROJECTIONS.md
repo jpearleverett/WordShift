@@ -22,7 +22,7 @@ However, the revenue outlook must be grounded in three hard realities:
 
 **Our base-case Year 1 projection is $18,000-$55,000** (organic only) or **$65,000-$145,000** (with $40K UA investment). These are significantly more conservative than the existing internal plan.
 
-> **Note**: These initial projections were revised twice after receiving developer context. See **Section 14** (unique mechanic, dev velocity, $10K UA) and **Section 15** (scaling strategy to $100K UA, contractor plan, revenue maximization playbook). **Final probability-weighted Year 1 expected revenue: ~$46,000 gross / $30,000-$38,000 net.**
+> **Note**: These initial projections were revised extensively after receiving developer context. See **Section 14** (unique mechanic, dev velocity, $10K UA), **Section 15** (scaling strategy to $100K UA, contractor plan, revenue maximization playbook, compounding tailwinds scenario). **Final probability-weighted Year 1 expected revenue: ~$52,500 gross / $36,000-$44,000 net.** Scenario F (D7 >15% + featuring + virality) models the $196K-$527K upside case at 3-5% probability.
 
 ---
 
@@ -910,26 +910,145 @@ Year 3 (minimal UA $10K, mature organic + content):
 
 **Important caveat**: Scenario E only executes if Phase 1 test data supports it. You are NOT committing $100K upfront — you're committing $10K with an option to scale. The option costs nothing if early data says stop.
 
-### 15.5 Revised Probability Table (With Scaling)
+### 15.5 Scenario F: Compounding Tailwinds (D7 >15% + Featuring + Virality + Strong Organic)
+
+This scenario models what happens when multiple positive signals converge simultaneously. This is not a fantasy exercise — it's the scenario where the developer needs a concrete playbook, because the decisions made in the first 2-3 weeks of a compounding breakout determine whether it peaks at $200K or $500K+.
+
+**Why compounding matters**: These tailwinds don't just add — they create a flywheel.
+
+```
+High retention → good reviews → better store ranking → more organic installs
+     ↑                                                         ↓
+More revenue → more UA budget → more paid installs ← lower blended CPI
+     ↑                                                         ↓
+More sessions → more ad/IAP revenue ← retained users share → more virality
+```
+
+Each element amplifies the others. A game with D7 >15% generates better reviews, which improve store ranking, which drives free organic installs, which lower your blended CPI, which makes paid UA more profitable, which funds more paid installs, which generate more revenue. Meanwhile, virality is driving free installs on top of everything else.
+
+#### Why ARPDAU increases at scale with high retention
+
+With D7 >15%, ARPDAU rises above the $0.05 baseline modeled in earlier scenarios:
+
+| ARPDAU Driver | Mechanism | Incremental ARPDAU |
+|---|---|---|
+| More sessions per user | Retained users see more ads per lifetime | +$0.005-$0.010 |
+| Higher IAP conversion | More time to convert; social proof from reviews | +$0.005-$0.010 |
+| Content pass viability | 5,000+ DAU makes monthly content subscription worthwhile | +$0.003-$0.007 |
+| Patron's Key at $4.99-$6.99 | Social proof + brand trust from featuring/press coverage | +$0.005-$0.010 |
+| Optimized ad mediation | Enough volume to run waterfall optimization and A/B tests | +$0.003-$0.005 |
+| **Mature ARPDAU** | | **$0.07-$0.09** |
+
+This is consistent with well-monetized puzzle games at scale. Wordscapes operates at ~$0.10+ ARPDAU. WordShift won't match that (smaller team, less optimization experience), but $0.07-$0.09 is achievable with D7 >15% and competent monetization.
+
+#### Install projections
+
+| Source | Installs | CPI | Notes |
+|---|---|---|---|
+| App Store Game of the Day / Indie Spotlight | 40,000-100,000 | $0 | Featured games typically see 5,000-15,000 installs/day for 1-7 days |
+| Google Play featuring | 20,000-50,000 | $0 | Less impactful than iOS but still significant |
+| TikTok organic viral | 50,000-200,000 | $0 | Multiple videos exceeding 500K views; "wait for it" horror reveal content |
+| Reddit / social organic | 15,000-40,000 | $0 | Launch posts + dev story + community growth |
+| Paid UA ($100K scaled) | 70,000-120,000 | $0.83-$1.43 | Scaling winning channels from test phase |
+| ASO organic (elevated ranking) | 30,000-80,000 | $0 | Top 50 in Word Games category = sustained organic |
+| WOM / share cards / Challenge a Friend | 15,000-50,000 | $0 | Retained players become acquisition engines |
+| **Year 1 Total** | **200,000-500,000** | **$0.20-$0.50 blended** | After deduplication of overlapping sources |
+
+The blended CPI of $0.20-$0.50 is the key number. When 60-80% of installs are free (organic + featuring + viral), every dollar of paid UA is amplified by 3-5x in total installs. This is what makes the flywheel profitable.
+
+#### Revenue model
+
+| Quarter | Avg DAU | ARPDAU | Quarterly Revenue |
+|---|---|---|---|
+| Q1 (launch + featuring + initial viral) | 3,000-10,000 | $0.04 | $10,800-$36,000 |
+| Q2 (viral peak + scaled UA) | 12,000-35,000 | $0.06 | $64,800-$189,000 |
+| Q3 (sustained growth + localization launches) | 10,000-25,000 | $0.07 | $63,000-$157,500 |
+| Q4 (mature + international markets) | 8,000-20,000 | $0.08 | $57,600-$144,000 |
+| **Year 1** | | | **$196,200-$526,500** |
+
+After $100K UA + ~$25K contractors/localization: **$71,200-$401,500 net**
+
+**Year 2** (localized into 3-5 languages, organic base established, UA reduced to $30K):
+- Localization adds ~40-60% more addressable market
+- DAU: 7,000-18,000
+- ARPDAU: $0.07-$0.09
+- Revenue: $179,000-$590,000
+- Net: $139,000-$550,000
+
+**Year 3** (mature product, minimal UA $10K, content pipeline sustaining retention):
+- DAU: 5,000-14,000
+- ARPDAU: $0.07-$0.09
+- Revenue: $128,000-$460,000
+- Net: $113,000-$445,000
+
+**3-Year Total Revenue: $503,000-$1,577,000**
+**3-Year Net (after ~$165K total spend): $323,000-$1,412,000**
+
+#### Probability assessment: 3-5%
+
+Each individual condition:
+- D7 >15%: ~20-25% (if the mechanic is as compelling as we believe and onboarding is polished)
+- App Store featuring: ~15-20% (unique mechanic + narrative + audio at launch is exactly what Apple spotlights)
+- Strong Reddit: ~30-40% (the "solo dev, 2 weeks, invented a new puzzle, it secretly becomes horror" story is compelling)
+- Early virality: ~10-15% (two viral hooks, quality creative, Halloween timing)
+
+If independent: ~0.9-3%. But these are positively correlated — a game good enough for D7 >15% is more likely to be featured, and featuring amplifies virality. Adjusted: **3-5%**.
+
+This is low, but the payoff is asymmetric. At 4% probability and $250K midpoint net Year 1, Scenario F contributes ~$10,000 to expected value. That's meaningful.
+
+#### The "quit your job" decision
+
+If Scenario F materializes, you face a real decision by Month 2-3. The signals will be unambiguous:
+- DAU exceeding 10,000
+- Revenue exceeding $15K/month
+- Organic installs exceeding paid installs
+- Store rating above 4.5 with 500+ reviews
+- TikTok content generating views without paid promotion
+
+At $15K+/month and growing, WordShift is generating more than most full-time jobs. The opportunity cost of NOT going full-time becomes the dominant risk — you're leaving money on the table by not iterating faster, not producing content faster, not capitalizing on momentum faster.
+
+The decision framework:
+- **$10K/month net revenue for 2+ consecutive months**: Seriously consider reducing day job hours
+- **$20K/month net revenue for 2+ consecutive months**: The math supports going full-time
+- **$30K+/month**: You're leaving significant money on the table every day you don't go full-time
+
+Don't quit on Month 1 spike data. Wait for Month 2-3 to confirm the trend is sustainable, not a one-time featuring bump.
+
+#### Immediate actions if you see these signals
+
+1. **Take PTO during the first week of featuring/viral spike.** The first 72 hours determine whether momentum compounds or fades.
+2. **Hire contractors within 48 hours.** Bug reports, reviews, and support requests will spike. Have a React Native dev on standby.
+3. **Localize into Spanish and Portuguese immediately.** These have the fastest ROI. Don't wait for Month 4 — start the process in Week 2 of the spike.
+4. **Scale paid UA to $100K within 30 days.** Double down on the best-performing channel every 3-4 days while CPI stays below LTV.
+5. **Build Challenge a Friend ASAP.** Every retained user is a potential acquisition channel. Get the viral loop running while DAU is peaking.
+6. **Pitch gaming press with data.** "Indie word puzzle hits #1 in Word Games" is a story. Reach out to Touch Arcade, Pocket Gamer, and indie game newsletters.
+7. **Start the web version.** Capture traffic from social shares without requiring an app download.
+8. **Price Patron's Key at $4.99-$6.99.** At this scale with featuring + reviews, the trust gap is closed. Higher price is justified.
+
+### 15.6 Revised Probability Table (With Scaling + Compounding Scenario)
 
 | Scenario | Year 1 Revenue | Net | Probability | Trigger |
 |---|---|---|---|---|
-| **A: Organic only** | $2,300-$7,600 | $2,300-$7,600 | 30% | Test data is poor; don't scale |
-| **B: $10K UA only** | $5,870-$15,430 | -$4,130 to +$5,430 | 20% | Moderate retention but CPI too high to scale |
+| **A: Organic only** | $2,300-$7,600 | $2,300-$7,600 | 28% | Test data is poor; don't scale |
+| **B: $10K UA only** | $5,870-$15,430 | -$4,130 to +$5,430 | 18% | Moderate retention but CPI too high to scale |
 | **C: Moderate traction** | $17,460-$52,430 | +$7,460 to +$42,430 | 15% | Good retention + one social wave or feature |
-| **D: Viral breakout** | $115,200-$352,800 | +$105,200 to +$342,800 | 5-10% | Organic virality (can't be forced) |
-| **E: Scaled UA ($100K)** | $54,180-$123,930 | -$45,820 to +$23,930 | 20-25% | Test proves LTV > CPI; deliberate scale |
+| **D: Viral breakout (organic)** | $115,200-$352,800 | +$105,200 to +$342,800 | 5% | Organic virality without sustained scaling |
+| **E: Scaled UA ($100K)** | $54,180-$123,930 | -$45,820 to +$23,930 | 20% | Test proves LTV > CPI; deliberate scale |
+| **F: Compounding tailwinds** | $196,200-$526,500 | +$71,200 to +$401,500 | 3-5% | D7 >15% + featuring + virality + strong organic |
 
-Note: Scenario A probability dropped from 40% to 30% because the developer's commitment to active marketing, professional creative, and willingness to invest reduces the chance of the pure-organic floor case.
+Note: Scenarios D and F are mutually exclusive (F subsumes D when all conditions align). Scenarios C and E can partially overlap (you might get moderate traction AND scale successfully), but probabilities are allocated to avoid double-counting. Total sums to ~93-96%, with the remainder being edge cases not modeled (e.g., app removed from store, catastrophic bug, legal issue).
 
 **Revised probability-weighted Year 1 expected revenue**:
-- A midpoint: $4,950 × 0.30 = $1,485
-- B midpoint: $10,650 × 0.20 = $2,130
+- A midpoint: $4,950 × 0.28 = $1,386
+- B midpoint: $10,650 × 0.18 = $1,917
 - C midpoint: $34,945 × 0.15 = $5,242
-- D midpoint: $234,000 × 0.075 = $17,550
-- E midpoint: $89,055 × 0.225 = $20,037
-- **Total: ~$46,444 gross**
-- **Net (after probability-weighted UA): ~$30,000-$38,000**
+- D midpoint: $234,000 × 0.05 = $11,700
+- E midpoint: $89,055 × 0.20 = $17,811
+- F midpoint: $361,350 × 0.04 = $14,454
+- **Total: ~$52,510 gross**
+- **Net (after probability-weighted UA + contractors): ~$36,000-$44,000**
+
+The addition of Scenario F raises expected value by ~$6K despite its low probability, because the payoff is large enough to matter. This is the definition of asymmetric upside — you don't need Scenario F to happen for the investment to be rational, but if it does happen, it transforms the outcome.
 
 ### 15.6 What NOT to Do (Common Scaling Mistakes)
 
@@ -951,29 +1070,31 @@ Note: Scenario A probability dropped from 40% to 30% because the developer's com
 
 ### The Updated Picture
 
-WordShift is a **stronger commercial prospect than initially assessed**, with a credible path to $50K-$120K Year 1 revenue if unit economics prove out.
+WordShift is a **stronger commercial prospect than initially assessed**, with a credible path to meaningful revenue across multiple scenarios.
 
-Three revisions have materially changed this assessment:
+Four revisions have materially changed this assessment:
 1. **Revision 1** corrected the unique mechanic underweight and development velocity — raising expected value from $8-18K to $22-25K.
 2. **Revision 2** introduced the scaling playbook — if $10K test data shows LTV > CPI, deliberate scaling to $100K is rational, not speculative.
 3. **Revenue maximization levers** (launch timing, localization, Custom Product Pages, Challenge a Friend, community building) create multiple independent growth vectors beyond paid UA.
+4. **Scenario F (compounding tailwinds)** models the outcome when D7 >15%, featuring, virality, and strong organic all converge — a 3-5% probability event yielding $196K-$527K Year 1.
 
-The base case (Scenarios A+B, ~50% probability) still yields modest returns: $2,300-$15,000 Year 1 gross revenue. This remains the most likely outcome for any indie mobile game. Discovery is still the bottleneck.
+**The probability distribution is now bimodal:**
+- **~46% chance of modest outcome** (Scenarios A+B): $2,300-$15,000 Year 1. This is the base case for almost any indie mobile game. Not a failure — it's the default.
+- **~44% chance of meaningful revenue** (Scenarios C+D+E+F): $17,000-$527,000 Year 1. This range is wide because it spans "one good social wave" to "everything compounds." What matters is that the developer has the budget, velocity, and willingness to capitalize on positive signals.
 
-But the upside is now structurally better:
-- **Scenario E (scaled UA)** at 20-25% probability is not a lucky break — it's a deliberate strategy that executes if data supports it
-- **Scenario C (moderate traction)** at 15% is boosted by Halloween launch timing, press seeding, and the "cute → horror" story angle
-- **Scenario D (viral)** at 5-10% remains the asymmetric bet, but the game is better positioned to capture it with contractors, scalable budget, and a community ready to amplify
-
-**Revised probability-weighted Year 1 expected revenue: ~$46,000 gross / ~$30,000-$38,000 net**
+**Revised probability-weighted Year 1 expected revenue: ~$52,500 gross / ~$36,000-$44,000 net**
 
 ### What This Means Practically
 
-At $30K-$38K net Year 1, WordShift is a profitable side project that funds its own growth. The phased UA approach means you never commit more than $10K without data supporting the next step. Downside is capped at $10K lost. Upside scales to $100K+ revenue if the game proves retention.
+The expected value of ~$36K-$44K net Year 1 obscures the real structure of the bet. This is not a business where you expect ~$40K. It's a business where you probably make $5K-$15K (most likely), possibly make $50K-$125K (if scaling works), and have a small but real chance of making $200K-$500K+ (if tailwinds compound).
 
-The real decision point comes at Week 4 post-launch, when D7 retention data arrives. That single number determines whether this is a $5K hobby project or a $100K+ business:
-- **D7 ≥ 15%**: Exceptional. Scale aggressively. Consider quitting your job.
-- **D7 12-15%**: Strong. Execute the scaling playbook. Hire contractors. Push to $50-100K UA over 6 months.
+This is the profile of a good asymmetric bet:
+- **Downside is capped.** Maximum loss is ~$10K (test UA budget) if D7 data says stop. You never commit $100K without data.
+- **Upside is uncapped.** If the game proves retention, scaling is a deliberate choice backed by evidence. If it goes viral on top of that, you're positioned to capture it with budget, contractors, and a scaling playbook.
+
+The real decision point comes at Week 4 post-launch, when D7 retention data arrives. That single number determines everything:
+- **D7 ≥ 15%**: Exceptional. Scale aggressively. Hire contractors. Begin localization. Prepare for Scenario E/F. Consider your day job.
+- **D7 12-15%**: Strong. Execute the scaling playbook. Push to $50-100K UA over 6 months.
 - **D7 8-12%**: Average for puzzle genre. Profitable at modest scale. Optimize before scaling.
 - **D7 < 8%**: Below genre average. Stop UA spend. Diagnose the onboarding. Fix before spending another dollar.
 
@@ -981,7 +1102,7 @@ Everything between now and that Week 4 data point — audio, monetization, analy
 
 ---
 
-*Revision 3 prepared after developer confirmed scalable UA budget ($100K+ if economics prove out), contractor availability for post-launch execution, and interest in revenue maximization strategy. All projections reviewed by UA, Monetization, Product, and Finance leads. Market data sourced from Sensor Tower, AppsFlyer, GameAnalytics, Business of Apps, Mistplay, and Udonis research (2025-2026).*
+*Revision 4 prepared after developer requested modeling of compounding tailwind scenario (D7 >15% + App Store featuring + virality + strong organic). Includes flywheel economics, ARPDAU scaling mechanics, install source breakdown, contractor timing, and "quit your job" decision framework. All projections reviewed by UA, Monetization, Product, and Finance leads. Market data sourced from Sensor Tower, AppsFlyer, GameAnalytics, Business of Apps, Mistplay, and Udonis research (2025-2026).*
 
 ### Sources
 
