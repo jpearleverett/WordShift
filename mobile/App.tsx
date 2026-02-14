@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -60,6 +60,15 @@ import { isDreadWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges } from './src/services/cloudSave';
+import {
+  hasVariantModifier,
+  getVariantTimeLimit,
+  getVariantTimeLimitForDifficulty,
+  getVariantSelectorOptions,
+  isVariantUnlocked,
+  PuzzleVariant,
+  VARIANT_CONFIGS,
+} from './src/services/puzzleVariety';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery';
@@ -75,6 +84,30 @@ export default function App() {
   const [persistence, persistenceActions] = useGamePersistence();
   const [victoryFlow, victoryActions] = useVictoryFlow();
   const [achievementState, achievementActions] = useAchievementQueue();
+  const setPuzzleGameState = puzzleActions.setGameState;
+  const setPuzzleMessage = puzzleActions.setMessage;
+  const setSelectedVariant = puzzleActions.setSelectedVariant;
+
+  const puzzlesSolvedForVariantUnlocks = persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0;
+  const variantSelectorOptions = useMemo(() => {
+    return getVariantSelectorOptions(
+      puzzlesSolvedForVariantUnlocks,
+      persistence.currentPhase,
+      persistence.currentPhase
+    );
+  }, [puzzlesSolvedForVariantUnlocks, persistence.currentPhase]);
+
+  // Clamp selected variant if progression changed (e.g. after reset/migration).
+  useEffect(() => {
+    if (!isVariantUnlocked(puzzle.selectedVariant, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
+      setSelectedVariant('standard');
+    }
+  }, [
+    puzzle.selectedVariant,
+    puzzlesSolvedForVariantUnlocks,
+    persistence.currentPhase,
+    setSelectedVariant,
+  ]);
 
   // Sync narrative phase from persistence into puzzle hook
   useEffect(() => {
@@ -108,6 +141,7 @@ export default function App() {
   // Victory glitch state (brief flash text during Phase 0 victories)
   const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
   const [showVictoryGlitch, setShowVictoryGlitch] = useState(false);
+  const [completionCoda, setCompletionCoda] = useState<{ title: string; text: string } | null>(null);
 
   // Auto-dismiss interjection after 4 seconds
   useEffect(() => {
@@ -117,8 +151,52 @@ export default function App() {
     }
   }, [showInterjection]);
 
+  // Speed variants: run countdown while puzzle is active.
+  useEffect(() => {
+    const isSpeedVariant = hasVariantModifier(puzzle.currentVariant, 'speed');
+    if (!isSpeedVariant || puzzle.gameState !== GameState.PLAYING) {
+      setSpeedTimeRemaining(null);
+      return;
+    }
+
+    const limit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
+      ?? getVariantTimeLimit(puzzle.currentVariant)
+      ?? 60;
+    setSpeedTimeRemaining(limit);
+    const startedAt = Date.now();
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      const remaining = Math.max(0, limit - elapsed);
+      setSpeedTimeRemaining(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+        setPuzzleGameState(GameState.GAME_OVER);
+        setPuzzleMessage(
+          persistence.currentPhase >= 3
+            ? 'Time collapsed. The arrangement closed this path.'
+            : 'Time is up! Start a new puzzle and try again.'
+        );
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [
+    puzzle.currentVariant,
+    puzzle.gameState,
+    puzzle.level,
+    puzzle.currentChainLink,
+    persistence.currentPhase,
+    setPuzzleGameState,
+    setPuzzleMessage,
+  ]);
+
   // In-progress ritual echo chain — words formed during current puzzle
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
+
+  // Speed variant countdown
+  const [speedTimeRemaining, setSpeedTimeRemaining] = useState<number | null>(null);
 
   // Dread pulse state (flashes on dread word formation)
   const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
@@ -198,6 +276,7 @@ export default function App() {
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     transitionTo('puzzle', () => {
       puzzleActions.startNewGame(diff);
       setIsPlayingDaily(false);
@@ -212,6 +291,7 @@ export default function App() {
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     transitionTo('puzzle', async () => {
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);
@@ -238,8 +318,17 @@ export default function App() {
   const handleSlotPress = useCallback(async (targetIndex: number) => {
     // Block interaction during victory processing
     if (victoryFlow.isProcessingVictory) return;
+    if (puzzle.gameState === GameState.GAME_OVER) return;
 
     const result = await puzzleActions.handleSlotPress(targetIndex);
+
+    if (result?.chainAdvanced) {
+      // Chain mode advanced to the next link (not a final victory yet).
+      hapticMedium();
+      soundValidMove();
+      setRitualEchoWords([]);
+      return;
+    }
 
     if (result?.completed) {
       // Lock interaction during async victory chain
@@ -311,12 +400,22 @@ export default function App() {
             if (!finalDone) {
               // First puzzle after house completion at Phase 4 = the "final puzzle"
               await markFinalPuzzleCompleted();
+              setCompletionCoda({
+                title: 'THE HOUSE STANDS COMPLETE',
+                text: persistence.currentPhase >= 3
+                  ? 'You finished what was being built. There is no pretending now.'
+                  : 'You completed the house and reached the final path.',
+              });
               setTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
                 // First puzzle after final puzzle = post-revelation (Phase 5)
                 await markPostRevelation();
+                setCompletionCoda({
+                  title: 'THE PATTERN REMEMBERS YOU',
+                  text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
+                });
                 setTimeout(() => setPhaseTransitionEvent(POST_REVELATION_EVENT), 1500);
               }
             }
@@ -417,7 +516,7 @@ export default function App() {
         triggerDreadPulse(persistence.currentPhase);
       }
     }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions, onboardingStep, advanceOnboarding]);
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, puzzle.gameState, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions, onboardingStep, advanceOnboarding]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
     hapticLight();
@@ -445,6 +544,7 @@ export default function App() {
     setShowInterjection(false);
     setInterjection(null);
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     puzzleActions.handleNextLevel();
   }, [puzzleActions, victoryActions]);
 
@@ -456,6 +556,7 @@ export default function App() {
     setShowInterjection(false);
     setInterjection(null);
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     transitionTo('home', () => {
       puzzleActions.setGameState(GameState.IDLE);
     });
@@ -480,8 +581,27 @@ export default function App() {
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
     setRitualEchoWords([]);
-    puzzleActions.startNewGame(d, puzzle.gameMode);
-  }, [puzzleActions, puzzle.gameMode]);
+    setCompletionCoda(null);
+    puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
+  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant]);
+
+  const handleSelectVariant = useCallback((variant: PuzzleVariant) => {
+    if (!isVariantUnlocked(variant, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
+      return;
+    }
+    hapticSelection();
+    soundTap();
+    setRitualEchoWords([]);
+    setCompletionCoda(null);
+    puzzleActions.setSelectedVariant(variant);
+    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
+  }, [
+    puzzleActions,
+    puzzle.difficulty,
+    puzzle.gameMode,
+    puzzlesSolvedForVariantUnlocks,
+    persistence.currentPhase,
+  ]);
 
   // Trigger dread pulse when a dread word is formed during a puzzle
   const triggerDreadPulse = useCallback((phase: number) => {
@@ -504,9 +624,10 @@ export default function App() {
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode);
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty]);
+    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant]);
 
   // ========================================================================
   // Onboarding flow helpers (continued)
@@ -842,12 +963,43 @@ export default function App() {
                 )}
               </View>
             )}
+            {speedTimeRemaining !== null && (
+              <View style={[
+                styles.speedBadge,
+                speedTimeRemaining <= 10 && styles.speedBadgeUrgent,
+              ]}>
+                <Text style={styles.speedBadgeText}>⏱ {speedTimeRemaining}s</Text>
+              </View>
+            )}
+            {hasVariantModifier(puzzle.currentVariant, 'chain') && puzzle.chainLength > 1 && (
+              <View style={styles.chainBadge}>
+                <Text style={styles.chainBadgeText}>
+                  LINK {puzzle.currentChainLink}/{puzzle.chainLength}
+                </Text>
+              </View>
+            )}
+            {puzzle.currentVariant !== 'standard' && (
+              <View style={[
+                styles.variantBadge,
+                persistence.currentPhase >= 3 && styles.variantBadgeDark,
+              ]}>
+                <Text style={styles.variantBadgeIcon}>
+                  {VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '✨'}
+                </Text>
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {VARIANT_CONFIGS[puzzle.currentVariant]?.title || 'Variant'}
+                </Text>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity
             style={styles.difficultyButton}
             onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
-            accessibilityLabel={`Difficulty: ${puzzle.difficulty}. Tap to change`}
+            accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
             <View style={styles.difficultyButtonShine} />
@@ -867,8 +1019,12 @@ export default function App() {
             currentDifficulty={puzzle.difficulty}
             gameMode={puzzle.gameMode}
             phase={persistence.currentPhase}
+            currentVariant={puzzle.selectedVariant}
+            activeVariant={puzzle.currentVariant}
+            variantOptions={variantSelectorOptions}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
+            onSelectVariant={handleSelectVariant}
           />
         </View>
         )}
@@ -903,12 +1059,18 @@ export default function App() {
                 rowData={row}
                 rowIndex={idx}
                 activeRowIndex={puzzle.activeRowIndex}
+                moveDirection={puzzle.moveDirection}
                 selectedLetter={puzzle.selectedLetter}
                 onLetterPress={handleLetterPress}
                 onSlotPress={handleSlotPress}
                 isProcessing={puzzle.isProcessing}
                 phase={persistence.currentPhase}
                 wordLength={puzzle.currentWordLength}
+                concealLetters={
+                  hasVariantModifier(puzzle.currentVariant, 'blind') &&
+                  idx !== puzzle.activeRowIndex &&
+                  !puzzle.blindRevealedRows.includes(idx)
+                }
               />
             ))}
           </ScrollView>
@@ -932,7 +1094,7 @@ export default function App() {
               glow: CandyColors.yellow.glow,
             }}
             onPress={handleUndo}
-            disabled={puzzle.history.length === 0 || puzzle.gameState === GameState.WON}
+            disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
           <ActionButton
             icon="💡"
@@ -981,6 +1143,7 @@ export default function App() {
           phase={persistence.currentPhase}
           isPlayingDaily={isPlayingDaily}
           victoryData={victoryFlow.victoryData}
+          completionCoda={completionCoda}
           cumulativeStats={persistence.cumulativeStats}
           completedWords={puzzle.lastCompletedWords}
           incantationName={puzzle.lastIncantationName}
@@ -1286,6 +1449,61 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+  speedBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  speedBadgeUrgent: {
+    backgroundColor: 'rgba(210, 40, 70, 0.78)',
+  },
+  speedBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: CandyColors.white,
+    letterSpacing: 0.3,
+  },
+  chainBadge: {
+    backgroundColor: 'rgba(95, 180, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  chainBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(220, 240, 255, 0.95)',
+    letterSpacing: 0.3,
+  },
+  variantBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: 180,
+  },
+  variantBadgeDark: {
+    backgroundColor: 'rgba(35, 18, 45, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(130, 70, 120, 0.35)',
+  },
+  variantBadgeIcon: {
+    fontSize: 10,
+  },
+  variantBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(255, 255, 255, 0.85)',
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  variantBadgeTextDark: {
+    color: 'rgba(220, 170, 200, 0.95)',
   },
 
   // Phase indicator badge

@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (684 tests, 25 suites)
+npx jest --no-coverage   # Run all tests (680 tests, 26 suites)
 ```
 
 ## Tech Stack
@@ -105,7 +105,7 @@ mobile/
 │   │   │   ├── Toast.tsx        # Animated toast notification (slide-in + error shake)
 │   │   │   ├── VictoryModal.tsx # Victory screen modal (stars, stats, amber breakdown)
 │   │   │   ├── RulesModal.tsx   # Phase-aware "How to Play" rules modal
-│   │   │   ├── DifficultyMenu.tsx # Difficulty selector dropdown + challenge mode toggle
+│   │   │   ├── DifficultyMenu.tsx # Phase-aware setup menu: difficulty + challenge + variant/combo selector with lock states
 │   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper from animals (fade in/out)
 │   │   │   ├── RitualEchoChain.tsx # In-puzzle real-time word chain display (phase-aware styling)
 │   │   │   └── index.ts         # Puzzle component exports
@@ -136,7 +136,7 @@ mobile/
 │       ├── achievements.ts      # 33 achievements across 6 categories
 │       ├── shareResults.ts      # Enhanced Wordle-style sharing with word chains, animal whispers
 │       ├── weeklyQuests.ts      # Weekly quest system: 4 rotating quests, amber rewards, phase-aware descriptions
-│       ├── puzzleVariety.ts     # Puzzle variant modes: Reverse, Blind, Speed (60s timer), Chain (3 linked puzzles)
+│       ├── puzzleVariety.ts     # Puzzle variant configs, unlock requirements, selector options, restrictions, and combo metadata
 │       ├── whisperGallery.ts    # Collectible archive of all seen whispers, dialogue, and narrative moments
 │       ├── dialogueChoices.ts   # Player choice points at Phase 3 — illusion of agency in the narrative
 │       ├── sacrifice.ts         # Phase 4+ amber sacrifice mechanic — voluntary offerings to the arrangement
@@ -151,10 +151,11 @@ mobile/
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (684 tests, 25 suites)
+├── src/__tests__/               # Test suites (680 tests, 26 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
+│   ├── animalDialogueVariants.test.ts # Variant tutorial dialogue coverage across variants/animals/phases
 │   ├── amberCurrency.test.ts
 │   ├── cloudSave.test.ts        # Cloud save infrastructure: providers, sync, collect/restore
 │   ├── components.test.ts       # Component data contracts, phase theme, rules modal
@@ -295,14 +296,19 @@ All 10 character sprites are wired up in `CHARACTER_SPRITES` in `AnimalSprite.ts
 
 ### Puzzle Variant Modes (`puzzleVariety.ts`)
 
-Every ~10th puzzle (or 10% random chance after puzzle 15), players may be offered a variant:
-- **Reverse Shift**: Drop letter first, then choose where to remove (1.3x amber)
-- **Blind Shift**: Target words hidden until a letter is placed (1.4x amber)
-- **Speed Shift**: 60-second timer, 3 rows (1.5x amber)
-- **Chain Shift**: 3 linked mini-puzzles in sequence (2.0x amber)
+Variants are now player-selected from the setup menu (not randomly injected). Players can choose any unlocked base variant or combo before starting a puzzle, and a preferred variant is persisted for future runs.
+- **Reverse Shift**: Standard rules down to the bottom, then return all the way back up to the first row.
+- **Blind Shift**: Unreached rows stay concealed until revealed by progress.
+- **Speed Shift**: 60-second timed run.
+- **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
+- **No Vowel / No Consonant**: Restriction variants that lock one letter class.
+- **Combos**: `reverse_blind`, `blind_no_vowel`, `blind_no_consonant`, `speed_no_vowel`, `speed_no_consonant`.
 
-Variant descriptions shift tone at Phase 3+ (dark descriptions).
-- **Wired in**: `usePuzzleGame.ts` checks `shouldOfferVariant(level, phase)` in `startNewGame` (standard mode only), applies `getVariantOverrides(variant, difficulty)` to puzzle generation. `handleSlotPress` returns `variant` in completion data. `useGamePersistence.ts` applies `getVariantAmberMultiplier(variant)` as a post-multiplier bonus on amber rewards
+Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions), and lock hints are also phase-aware without exposing raw phase numbers to players.
+- **Progressive disclosure**: combo variants are only shown once unlocked or near unlock; otherwise the setup menu shows a “more combinations later” message.
+- **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
+- **Economy anti-farm**: variant multipliers were rebalanced for selectable play and now taper with repeated back-to-back use of the same variant through `applyVariantAmberBonus()` in `amberCurrency.ts`.
+- **Wired in**: `DifficultyMenu.tsx` renders unlock-aware variant cards (selected/active/locked states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
 
 ## App Architecture
 
@@ -313,7 +319,8 @@ Game logic is extracted into six custom hooks:
 **`usePuzzleGame()`** (`src/hooks/usePuzzleGame.ts`):
 - All puzzle state: rows, selected letter, game state, hints, validation, gameMode, currentPhase
 - `initGame(words, hint?, solution?, wordLength?)` - Load pre-generated puzzle
-- `startNewGame(difficulty?, mode?)` - Generate and start a random puzzle (standard or challenge)
+- `startNewGame(difficulty?, mode?, variant?)` - Generate and start a puzzle using the selected/preferred variant (or explicit override)
+- `setSelectedVariant(variant)` - Update preferred variant and persist it for subsequent runs
 - `handleLetterPress(letter, rowIndex)` - Pick a letter
 - `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode; intermediate moves return `{ completed: false, formedWord }` for dread word detection
 - `handleHint()` - Show phase-aware hint (blocked in challenge mode)
@@ -378,6 +385,7 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
    - **Ritual Echo** (all phases): Completed word chain displayed below title. Phase 0-1: bright candy styling. Phase 2: muted. Phase 3+: dark, arrows become vertical (↓). Header reframes from "Your Word Journey:" → "The Offering:"
    - **Named Incantation** (Phase 2+): Puzzle chain name shown in ritual echo. Phase 2: innocent ("The HEAT Dance"). Phase 3: shadowy ("The HEAT's Shadow"). Phase 4: ritual ("Offering: HEAT to COLD")
    - **Words Offered** (all phases): Running total of words formed across all puzzles
+   - **Completion Coda** (endgame): first final-puzzle/post-revelation wins show a dedicated acknowledgement block in VictoryModal for stronger emotional closure
    - Phase-aware feedback text shifts tone with narrative phase
 6. If phase changed: `PhaseTransitionOverlay` plays cinematic multi-scene interstitial, then `playPhaseChangeFlash()` does dramatic double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
@@ -656,10 +664,14 @@ The victory modal visually transforms across narrative phases via additional `Ph
 - VictoryModal uses `getPhaseTheme(phase)` for overlay color, card background, all text colors, stat container backgrounds, and divider lines
 
 ### Phase-Aware Difficulty Menu (`DifficultyMenu.tsx`)
-The difficulty selector dropdown adapts to the narrative phase:
+The setup dropdown adapts to the narrative phase:
 - Accepts `phase` prop
-- **Phase 0-2**: Unchanged bright white menu with standard styling
-- **Phase 3+**: Dark background, phase-themed text colors from `getPhaseTheme()`, dark dividers between difficulty options
+- Includes sections for **Difficulty**, **Challenge mode**, and **Puzzle Style** (variant/combo selector)
+- Shows clear **selected**, **active**, and **locked** states for variants
+- Locked variants display phase-aware unlock hints that avoid exposing internal phase labels
+- Combo styles are progressively disclosed (shown when near unlock or unlocked, hidden otherwise)
+- **Phase 0-2**: Bright menu styling and lighter copy tone
+- **Phase 3+**: Dark background, phase-themed text colors from `getPhaseTheme()`, darker ritualized copy tone
 
 ### Letter Tile Animation Evolution (`LetterTile.tsx`)
 Letter tiles physically change behavior across phases to make puzzles *feel* different:
@@ -768,9 +780,12 @@ Manages amber balance, streak, and phase progression:
 - `updateStreak()` - Grace period of STREAK_RESET_DAYS (2 days)
 - `getStreakInfo()` - Current streak, multiplier, bonus percentage
 - `getFullProgress()` - All progress data (amber, puzzles, phase, unlocks)
-- `getPuzzlesUntilNextPhase()` - Uses `phaseProgress` (accelerated) not raw `puzzlesSolved`
+- `getPuzzlesUntilNextPhase()` - Uses weighted `phaseProgress` plus minimum puzzle-exposure pacing guardrails
 - `recordRitualWords(words, triggerWords, ritualEnergy)` - Record words to ledger, queue triggers, accumulate ritual energy
 - `consumeTriggerWords(animalType?)` - Dequeue trigger words for a specific animal (per-animal filtering; without arg: legacy consume-all)
+- `recordVariantEncounter(variant)` / `consumePendingVariantTutorial()` - Queue/consume one-time animal explanations for newly encountered variants
+- `setPreferredPuzzleVariant(variant)` / `getPreferredPuzzleVariant()` - Persist and load the player's preferred setup-menu variant
+- `applyVariantAmberBonus(variant, baseAmberAward, configuredMultiplier)` - Applies persisted variant bonus with repeat-use anti-farm decay
 - `markHouseCompleted()` / `isHouseCompleted()` - House completion ceremony tracking
 - `markFinalPuzzleCompleted()` / `isFinalPuzzleCompleted()` - Final puzzle endgame tracking
 - `markPostRevelation()` / `isPostRevelation()` - Phase 5 post-revelation state
@@ -924,7 +939,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 684 tests, 25 suites
+cd mobile && npx jest --no-coverage  # 680 tests, 26 suites
 ```
 
 **Test patterns:**

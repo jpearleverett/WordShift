@@ -744,7 +744,7 @@ function weightedShuffle(
 
 export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
-  overrides?: { wordLength?: number; targetRows?: number }
+  overrides?: { wordLength?: number; targetRows?: number; startWord?: string }
 ): Promise<PuzzleConfig> => {
   const targetRows = overrides?.targetRows ?? (
     difficulty === 'EASY' ? 3 :
@@ -758,6 +758,7 @@ export const generateLocalPuzzle = async (
     difficulty === 'MEDIUM_PLUS' ? 5 :
     5 // HARD
   );
+  const forcedStartWord = overrides?.startWord?.toUpperCase();
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();
@@ -777,8 +778,8 @@ export const generateLocalPuzzle = async (
   };
 
   const GLOBAL_TIMEOUT = 2500;
-  const CANDIDATES_TO_GENERATE = 3; // Generate 3 candidates for better selection
-  const MIN_ACCEPTABLE_SCORE = 45; // Reject puzzles below this threshold
+  const CANDIDATES_TO_GENERATE = forcedStartWord ? 1 : 3; // Forced starts prioritize continuity over variety
+  const MIN_ACCEPTABLE_SCORE = forcedStartWord ? 0 : 45; // Chain continuity should accept any valid path
   const generatedPuzzles: GeneratedPuzzle[] = [];
 
   const state: GenState = {
@@ -787,7 +788,13 @@ export const generateLocalPuzzle = async (
   };
 
   // Weight and filter words based on history
-  const candidatesW1 = weightedShuffle(dicts.baseArray, wordLength, recencyMap);
+  const candidatesW1 = forcedStartWord
+    ? [forcedStartWord, forcedStartWord, forcedStartWord, forcedStartWord]
+    : weightedShuffle(dicts.baseArray, wordLength, recencyMap);
+
+  if (forcedStartWord && !dicts.base.has(forcedStartWord)) {
+    throw new Error(`Forced start word "${forcedStartWord}" is not valid for word length ${wordLength}`);
+  }
   let candidateIndex = 0;
 
   while (generatedPuzzles.length < CANDIDATES_TO_GENERATE &&

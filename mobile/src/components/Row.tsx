@@ -27,12 +27,14 @@ interface RowProps {
   rowData: RowData;
   rowIndex: number;
   activeRowIndex: number;
+  moveDirection?: 'down' | 'up';
   selectedLetter: Letter | null;
   onLetterPress: (letter: Letter, rowIndex: number) => void;
   onSlotPress: (targetIndex: number) => void;
   isProcessing: boolean;
   phase?: number;
   wordLength?: number;
+  concealLetters?: boolean;
 }
 
 // Phase-aware row color helper
@@ -267,18 +269,23 @@ export const Row: React.FC<RowProps> = memo(({
   rowData,
   rowIndex,
   activeRowIndex,
+  moveDirection = 'down',
   selectedLetter,
   onLetterPress,
   onSlotPress,
   isProcessing,
   phase = 0,
   wordLength = 4,
+  concealLetters = false,
 }) => {
   const compactTiles = wordLength >= 6;
   const phaseColors = getPhaseRowColors(phase);
+  const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
   const isSource = rowIndex === activeRowIndex;
-  const isTarget = rowIndex === activeRowIndex + 1;
-  const isCompleted = rowIndex < activeRowIndex;
+  const isTarget = rowIndex === targetRowIndex;
+  const isCompleted = moveDirection === 'down'
+    ? rowIndex < activeRowIndex
+    : rowIndex > activeRowIndex;
   const showSlots = isTarget && selectedLetter && !isProcessing;
 
   // Resonance: check if this row's word belongs to a dread tier relevant to the current phase.
@@ -459,6 +466,9 @@ export const Row: React.FC<RowProps> = memo(({
       } else {
         const letterIndex = Math.floor(i / 2);
         const letter = letters[letterIndex];
+        const displayLetter = (concealLetters && !isSource)
+          ? { ...letter, char: '•' }
+          : letter;
         // No wrapper View - LetterTile renders directly with animation
         elements.push(
           <Animated.View
@@ -469,7 +479,7 @@ export const Row: React.FC<RowProps> = memo(({
             ]}
           >
             <LetterTile
-              letter={letter}
+              letter={displayLetter}
               highlight={letter.isLocked ? 'locked' : 'default'}
               phase={phase}
               compact={compactTiles}
@@ -487,10 +497,14 @@ export const Row: React.FC<RowProps> = memo(({
     const letters = rowData.words;
 
     // Standard display for non-target rows
-    return letters.map((letter) => (
+    return letters.map((letter) => {
+      const displayLetter = (concealLetters && !isSource)
+        ? { ...letter, char: '•' }
+        : letter;
+      return (
       <LetterTile
         key={letter.id}
-        letter={letter}
+        letter={displayLetter}
         isSelected={selectedLetter?.id === letter.id}
         isInteractable={isSource && !isProcessing && !letter.isLocked}
         highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
@@ -499,7 +513,8 @@ export const Row: React.FC<RowProps> = memo(({
         compact={compactTiles}
         isResonant={isRowResonant}
       />
-    ));
+      );
+    });
   };
 
   const glowOpacity = glowAnim.interpolate({

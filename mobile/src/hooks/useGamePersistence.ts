@@ -13,6 +13,8 @@ import {
   getAmberBalance,
   getCurrentPhase,
   recordRitualWords,
+  recordVariantEncounter,
+  applyVariantAmberBonus,
 } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
@@ -41,6 +43,10 @@ export interface VictoryData {
   variantBonus: number;
   /** Puzzle variant used */
   variant: PuzzleVariant;
+  /** Effective multiplier after anti-farm decay */
+  variantAppliedMultiplier?: number;
+  /** Repeat decay factor (1.0 = no decay) */
+  variantRepeatDecay?: number;
 }
 
 export interface PersistenceState {
@@ -50,7 +56,14 @@ export interface PersistenceState {
 }
 
 export interface PersistenceActions {
-  recordVictory: (difficulty: Difficulty, hintsUsed: number, invalidAttempts: number, gameMode?: GameMode, completedWords?: string[]) => Promise<VictoryData>;
+  recordVictory: (
+    difficulty: Difficulty,
+    hintsUsed: number,
+    invalidAttempts: number,
+    gameMode?: GameMode,
+    completedWords?: string[],
+    variant?: PuzzleVariant
+  ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
 }
@@ -128,13 +141,21 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate);
 
-      // Apply variant amber multiplier (bonus on top of base)
+      // Apply variant bonus with anti-farm decay and persistence.
       const variantMultiplier = getVariantAmberMultiplier(variant);
       let variantBonus = 0;
-      if (variantMultiplier > 1.0) {
-        variantBonus = Math.round(amberResult.amount * (variantMultiplier - 1.0));
-        // Add variant bonus to balance directly
-        amberResult.newBalance += variantBonus;
+      let variantAppliedMultiplier = 1.0;
+      let variantRepeatDecay = 1.0;
+      if (variant !== 'standard' && variantMultiplier > 1.0) {
+        const variantResult = await applyVariantAmberBonus(
+          variant,
+          amberResult.amount,
+          variantMultiplier
+        );
+        variantBonus = variantResult.bonus;
+        variantAppliedMultiplier = variantResult.appliedMultiplier;
+        variantRepeatDecay = variantResult.repeatDecay;
+        amberResult.newBalance = variantResult.newBalance;
         amberResult.amount += variantBonus;
       }
 
@@ -154,6 +175,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         totalWordsFormed = ritualResult.totalWordsFormed;
       }
 
+      // Queue a one-time variant tutorial for animal dialogue.
+      if (variant && variant !== 'standard') {
+        recordVariantEncounter(variant).catch(() => {});
+      }
+
       logEvent({
         type: 'puzzle_completed',
         data: {
@@ -169,6 +195,10 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           phaseChanged: amberResult.phaseChanged,
           phaseAcceleration: amberResult.phaseAcceleration,
           ritualEnergy,
+          variant,
+          variantBonus,
+          variantAppliedMultiplier,
+          variantRepeatDecay,
         },
       });
 
@@ -199,6 +229,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy,
         variantBonus,
         variant,
+        variantAppliedMultiplier,
+        variantRepeatDecay,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -219,6 +251,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy: 0,
         variantBonus: 0,
         variant: 'standard',
+        variantAppliedMultiplier: 1.0,
+        variantRepeatDecay: 1.0,
       };
     } finally {
       recordInProgress.current = false;

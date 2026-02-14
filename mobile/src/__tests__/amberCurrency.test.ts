@@ -15,6 +15,7 @@ import {
   hasSeenIntro,
   markIntroSeen,
   getStreakInfo,
+  applyVariantAmberBonus,
 } from '../services/amberCurrency';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -81,6 +82,39 @@ describe('awardPuzzleAmber', () => {
     expect(result.puzzlesSolved).toBe(25);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(1);
+  });
+
+  test('does not advance to phase 1 too early even with inflated phaseProgress', async () => {
+    await devAddPuzzles(8);
+    const progress = await loadProgress();
+    progress.phaseProgress = 40; // Simulate external acceleration
+    progress.currentPhase = 0;
+
+    const result = await awardPuzzleAmber('HARD', 3, 'challenge', 0.8);
+    expect(result.puzzlesSolved).toBe(9);
+    expect(result.newPhase).toBe(0);
+    expect(await getCurrentPhase()).toBe(0);
+  });
+});
+
+describe('applyVariantAmberBonus', () => {
+  test('grants variant bonus and persists balance', async () => {
+    await devAddAmber(100);
+    const result = await applyVariantAmberBonus('speed', 20, 1.34);
+    expect(result.bonus).toBeGreaterThan(0);
+    const balance = await getAmberBalance();
+    expect(balance).toBe(100 + result.bonus);
+  });
+
+  test('applies decay on repeated same variant farming', async () => {
+    await devAddAmber(100);
+    const first = await applyVariantAmberBonus('speed', 20, 1.34);
+    const second = await applyVariantAmberBonus('speed', 20, 1.34);
+    const third = await applyVariantAmberBonus('speed', 20, 1.34);
+    expect(first.repeatDecay).toBe(1.0);
+    expect(second.repeatDecay).toBe(1.0);
+    expect(third.repeatDecay).toBeLessThan(1.0);
+    expect(third.bonus).toBeLessThan(first.bonus);
   });
 });
 

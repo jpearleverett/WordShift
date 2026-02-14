@@ -31,6 +31,8 @@ export interface VictoryData {
   newPhase: number;
   totalWordsFormed?: number;
   ritualEnergy?: number;
+  variantBonus?: number;
+  variantRepeatDecay?: number;
 }
 
 interface VictoryModalProps {
@@ -42,6 +44,7 @@ interface VictoryModalProps {
   phase: DialoguePhase;
   isPlayingDaily: boolean;
   victoryData: VictoryData | null;
+  completionCoda?: { title: string; text: string } | null;
   cumulativeStats: CumulativeStats | null;
   // Ritual echo data
   completedWords?: string[];
@@ -67,6 +70,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   phase,
   isPlayingDaily,
   victoryData,
+  completionCoda,
   cumulativeStats,
   completedWords,
   incantationName,
@@ -154,6 +158,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     (+{victoryData.challengeBonus} challenge!)
                   </Text>
                 )}
+                {victoryData.variantBonus && victoryData.variantBonus > 0 && (
+                  <Text style={styles.variantBonusText}>
+                    (+{victoryData.variantBonus} style{victoryData.variantRepeatDecay && victoryData.variantRepeatDecay < 1 ? ', tapered' : ''})
+                  </Text>
+                )}
               </View>
             )}
 
@@ -187,6 +196,26 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               );
             })()}
+
+            {completionCoda && (
+              <View style={[
+                styles.completionCodaContainer,
+                phase >= 3 && styles.completionCodaContainerDark,
+              ]}>
+                <Text style={[
+                  styles.completionCodaTitle,
+                  phase >= 3 && styles.completionCodaTitleDark,
+                ]}>
+                  {completionCoda.title}
+                </Text>
+                <Text style={[
+                  styles.completionCodaText,
+                  phase >= 3 && styles.completionCodaTextDark,
+                ]}>
+                  {completionCoda.text}
+                </Text>
+              </View>
+            )}
 
             {/* Performance feedback — phase-aware tone */}
             <Text style={[styles.victoryFeedback, {
@@ -554,6 +583,12 @@ const styles = StyleSheet.create({
     color: CandyColors.pink.main,
     marginLeft: 8,
   },
+  variantBonusText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: CandyColors.blue.dark,
+    marginLeft: 8,
+  },
   winStreakContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -596,6 +631,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: CandyColors.green.dark,
+  },
+  completionCodaContainer: {
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: CandyColors.blue.light + '45',
+    borderWidth: 1,
+    borderColor: CandyColors.blue.main + '60',
+  },
+  completionCodaContainerDark: {
+    backgroundColor: 'rgba(120, 38, 52, 0.24)',
+    borderColor: 'rgba(194, 76, 102, 0.5)',
+  },
+  completionCodaTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: CandyColors.blue.dark,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  completionCodaTitleDark: {
+    color: '#f1b8c6',
+  },
+  completionCodaText: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: CandyColors.gray[700],
+    textAlign: 'center',
+  },
+  completionCodaTextDark: {
+    color: '#f2dde5',
   },
   phaseChangeContainer: {
     backgroundColor: CandyColors.purple.dark,

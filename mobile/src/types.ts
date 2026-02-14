@@ -51,6 +51,8 @@ export interface MoveDelta {
   targetRowIndex: number;
   targetInsertIndex: number;
   activeRowIndexBefore: number;
+  /** Variant movement direction before this move (used by reverse mode undo). */
+  moveDirectionBefore?: 'down' | 'up';
 }
 
 /** @deprecated Use MoveDelta for new code. Kept for type compatibility. */

@@ -39,8 +39,31 @@ function getDefaultProgress(): HomeWorldProgress {
     currentStreak: 0,
     lastPlayDate: null,
     challengeCompletions: 0,
+    pendingVariantTutorials: [],
+    seenVariantTutorials: [],
+    preferredPuzzleVariant: 'standard',
+    lastVariantPlayed: 'standard',
+    sameVariantStreak: 0,
   };
 }
+
+// Narrative pacing guardrails: weighted progress can accelerate, but each phase
+// still requires a minimum amount of real puzzle exposure.
+const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
+  0: 0,
+  1: 20,
+  2: 65,
+  3: 135,
+  4: 225,
+};
+
+// Variant reward anti-farm decay by consecutive repeats of the same style.
+const VARIANT_REPEAT_DECAY = {
+  firstTwo: 1.0,
+  third: 0.85,
+  fourth: 0.7,
+  fifthPlus: 0.55,
+} as const;
 
 /**
  * Get today's date as ISO string (YYYY-MM-DD)
@@ -291,7 +314,7 @@ export async function awardPuzzleAmber(
   // Check for phase transition using weighted phase progress
   const previousPhase = progress.currentPhase;
   const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
-  let newPhase = calculatePhase(effectiveProgress);
+  let newPhase = calculatePhase(effectiveProgress, progress.puzzlesSolved);
   // Prevent phase skipping — only advance one phase at a time
   if (newPhase > previousPhase + 1) {
     newPhase = (previousPhase + 1) as DialoguePhase;
@@ -416,16 +439,28 @@ export async function unlockRoom(roomId: string, cost: number): Promise<boolean>
   return true;
 }
 
+function applyPuzzleExposureGuard(
+  candidatePhase: DialoguePhase,
+  puzzlesSolved: number
+): DialoguePhase {
+  let guarded = candidatePhase;
+  while (guarded > 0 && puzzlesSolved < MIN_PUZZLES_FOR_PHASE[guarded]) {
+    guarded = (guarded - 1) as DialoguePhase;
+  }
+  return guarded;
+}
+
 /**
- * Calculate current dialogue phase based on effective progress
- * Uses phaseProgress (weighted) when available, falls back to puzzlesSolved
+ * Calculate current dialogue phase based on effective progress.
+ * Uses phaseProgress (weighted) and then enforces minimum puzzle exposure.
  */
-function calculatePhase(effectiveProgress: number): DialoguePhase {
-  if (effectiveProgress >= PHASE_THRESHOLDS[4]) return 4;
-  if (effectiveProgress >= PHASE_THRESHOLDS[3]) return 3;
-  if (effectiveProgress >= PHASE_THRESHOLDS[2]) return 2;
-  if (effectiveProgress >= PHASE_THRESHOLDS[1]) return 1;
-  return 0;
+function calculatePhase(effectiveProgress: number, puzzlesSolved: number): DialoguePhase {
+  let candidate: DialoguePhase = 0;
+  if (effectiveProgress >= PHASE_THRESHOLDS[4]) candidate = 4;
+  else if (effectiveProgress >= PHASE_THRESHOLDS[3]) candidate = 3;
+  else if (effectiveProgress >= PHASE_THRESHOLDS[2]) candidate = 2;
+  else if (effectiveProgress >= PHASE_THRESHOLDS[1]) candidate = 1;
+  return applyPuzzleExposureGuard(candidate, puzzlesSolved);
 }
 
 /**
@@ -446,8 +481,11 @@ export async function getPuzzlesUntilNextPhase(): Promise<number | null> {
   if (currentPhase >= 4) return null; // Max phase reached
 
   const nextThreshold = PHASE_THRESHOLDS[currentPhase + 1];
+  const nextPuzzleMinimum = MIN_PUZZLES_FOR_PHASE[(currentPhase + 1) as DialoguePhase];
   const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
-  return Math.max(0, nextThreshold - effectiveProgress);
+  const weightedRemaining = Math.max(0, nextThreshold - effectiveProgress);
+  const puzzleRemaining = Math.max(0, nextPuzzleMinimum - progress.puzzlesSolved);
+  return Math.max(weightedRemaining, puzzleRemaining);
 }
 
 /**
@@ -690,6 +728,147 @@ export async function consumeTriggerWords(animalType?: string): Promise<string[]
 }
 
 /**
+ * Queue a newly encountered variant so an animal can explain it in dialogue.
+ * This is one-time per variant key to avoid repetitive tutorial chatter.
+ */
+export async function recordVariantEncounter(variant: string): Promise<void> {
+  if (!variant || variant === 'standard') return;
+  const progress = await loadProgress();
+  if (!progress.pendingVariantTutorials) progress.pendingVariantTutorials = [];
+  if (!progress.seenVariantTutorials) progress.seenVariantTutorials = [];
+
+  if (
+    progress.pendingVariantTutorials.includes(variant) ||
+    progress.seenVariantTutorials.includes(variant)
+  ) {
+    return;
+  }
+
+  progress.pendingVariantTutorials.push(variant);
+  // Keep queue small and focused on recent mechanics.
+  if (progress.pendingVariantTutorials.length > 8) {
+    progress.pendingVariantTutorials = progress.pendingVariantTutorials.slice(-8);
+  }
+
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Consume the next pending variant tutorial key.
+ * Marks it as seen immediately to prevent repeats.
+ */
+export async function consumePendingVariantTutorial(): Promise<string | null> {
+  const progress = await loadProgress();
+  if (!progress.pendingVariantTutorials) progress.pendingVariantTutorials = [];
+  if (!progress.seenVariantTutorials) progress.seenVariantTutorials = [];
+
+  const next = progress.pendingVariantTutorials.shift();
+  if (!next) {
+    return null;
+  }
+
+  if (!progress.seenVariantTutorials.includes(next)) {
+    progress.seenVariantTutorials.push(next);
+  }
+
+  progressCache = progress;
+  await saveProgress();
+  return next;
+}
+
+/**
+ * Persist the player's preferred puzzle variant for future runs.
+ */
+export async function setPreferredPuzzleVariant(variant: string): Promise<void> {
+  if (!variant) return;
+  const progress = await loadProgress();
+  progress.preferredPuzzleVariant = variant;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Load the player's preferred puzzle variant key.
+ */
+export async function getPreferredPuzzleVariant(): Promise<string> {
+  const progress = await loadProgress();
+  return progress.preferredPuzzleVariant || 'standard';
+}
+
+function getVariantRepeatDecay(repeatCount: number): number {
+  if (repeatCount <= 2) return VARIANT_REPEAT_DECAY.firstTwo;
+  if (repeatCount === 3) return VARIANT_REPEAT_DECAY.third;
+  if (repeatCount === 4) return VARIANT_REPEAT_DECAY.fourth;
+  return VARIANT_REPEAT_DECAY.fifthPlus;
+}
+
+/**
+ * Apply variant bonus amber with anti-farming decay on repeated use.
+ * Returns updated balance and the actual applied multiplier.
+ */
+export async function applyVariantAmberBonus(
+  variant: string,
+  baseAmberAward: number,
+  configuredMultiplier: number
+): Promise<{
+  bonus: number;
+  newBalance: number;
+  appliedMultiplier: number;
+  repeatCount: number;
+  repeatDecay: number;
+}> {
+  const progress = await loadProgress();
+  if (progress.lastVariantPlayed === undefined) progress.lastVariantPlayed = 'standard';
+  if (progress.sameVariantStreak === undefined) progress.sameVariantStreak = 0;
+
+  if (!variant || variant === 'standard' || configuredMultiplier <= 1.0 || baseAmberAward <= 0) {
+    progress.lastVariantPlayed = variant || 'standard';
+    progress.sameVariantStreak = 0;
+    progressCache = progress;
+    await saveProgress();
+    return {
+      bonus: 0,
+      newBalance: progress.amber,
+      appliedMultiplier: 1.0,
+      repeatCount: 0,
+      repeatDecay: 1.0,
+    };
+  }
+
+  const repeatCount = progress.lastVariantPlayed === variant
+    ? (progress.sameVariantStreak || 0) + 1
+    : 1;
+  const repeatDecay = getVariantRepeatDecay(repeatCount);
+  const appliedMultiplier = 1 + ((configuredMultiplier - 1) * repeatDecay);
+  const bonus = Math.max(0, Math.round(baseAmberAward * (appliedMultiplier - 1)));
+
+  progress.lastVariantPlayed = variant;
+  progress.sameVariantStreak = repeatCount;
+  progress.amber += bonus;
+  progress.totalAmberEarned += bonus;
+  progressCache = progress;
+  await saveProgress();
+
+  if (bonus > 0) {
+    await recordTransaction({
+      amount: bonus,
+      type: 'earn',
+      source: `variant_${variant}_x${appliedMultiplier.toFixed(2)}`,
+      timestamp: Date.now(),
+    });
+  }
+
+  return {
+    bonus,
+    newBalance: progress.amber,
+    appliedMultiplier,
+    repeatCount,
+    repeatDecay,
+  };
+}
+
+/**
  * Get total accumulated ritual energy
  */
 export async function getTotalRitualEnergy(): Promise<number> {
@@ -838,7 +1017,7 @@ export async function devAddPuzzles(amount: number): Promise<{ puzzles: number; 
 
   // Update phase based on effective progress
   const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
-  const newPhase = calculatePhase(effectiveProgress);
+  const newPhase = calculatePhase(effectiveProgress, progress.puzzlesSolved);
   progress.currentPhase = newPhase;
 
   progressCache = progress;

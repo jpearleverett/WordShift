@@ -92,6 +92,17 @@ describe('generateLocalPuzzle', () => {
     expect(hardPuzzle.wordLength).toBe(5);
   }, 15000);
 
+  test('honors forced startWord override', async () => {
+    const puzzle = await generateLocalPuzzle('EASY', { startWord: 'TIME' });
+    expect(puzzle.words[0]).toBe('TIME');
+  }, 10000);
+
+  test('throws for invalid forced startWord length', async () => {
+    await expect(generateLocalPuzzle('MEDIUM', { startWord: 'NOTALEN4' }))
+      .rejects
+      .toThrow('Forced start word');
+  }, 10000);
+
   test('generates different puzzles on repeated calls', async () => {
     const puzzle1 = await generateLocalPuzzle('MEDIUM');
     const puzzle2 = await generateLocalPuzzle('MEDIUM');
