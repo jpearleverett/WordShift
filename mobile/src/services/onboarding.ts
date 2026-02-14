@@ -94,10 +94,10 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "See these rows? We'll move one letter from here into the row below.",
   ],
   puzzle_tutorial_pick: [
-    "Start with the highlighted letter.",
+    "Start with the glowing letter.",
   ],
   puzzle_tutorial_drop: [
-    "Good. Now drop it into the highlighted slot below.",
+    "Good. Now drop it into the glowing slot below.",
   ],
   puzzle_tutorial_valid_move: [
     "You did it! Keep going until you reach the end!",

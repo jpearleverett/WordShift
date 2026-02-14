@@ -56,7 +56,7 @@ import { getAnimalWhisper, getAnimalInterjection } from './src/services/phaseNar
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
-import { isDreadWord } from './src/services/localGenerator';
+import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges } from './src/services/cloudSave';
@@ -292,15 +292,16 @@ export default function App() {
     );
     if (!relevantStep) return null;
 
+    // Find the first letter tile in the source row matching the letter to move
     let sourceLetterId: string | null = null;
     for (let i = 0; i < sourceRow.words.length; i++) {
-      const candidate = sourceRow.words.filter((_, idx) => idx !== i).map(l => l.char).join('');
-      if (sourceRow.words[i].char === relevantStep.letterToMove && candidate === relevantStep.sourceWord) {
+      if (sourceRow.words[i].char === relevantStep.letterToMove) {
         sourceLetterId = sourceRow.words[i].id;
         break;
       }
     }
 
+    // Find the insertion slot that produces a valid word
     let targetSlotIndex: number | null = null;
     for (let i = 0; i <= targetRow.words.length; i++) {
       const candidate = [
@@ -308,7 +309,7 @@ export default function App() {
         relevantStep.letterToMove,
         ...targetRow.words.slice(i).map(l => l.char),
       ].join('');
-      if (candidate === relevantStep.targetWord) {
+      if (validateWord(candidate)) {
         targetSlotIndex = i;
         break;
       }
@@ -391,7 +392,7 @@ export default function App() {
     ) {
       hapticError();
       soundInvalidMove();
-      puzzleActions.setMessage('Drop it into the highlighted slot.');
+      puzzleActions.setMessage('Drop it into the glowing slot.');
       return;
     }
 
@@ -524,8 +525,8 @@ export default function App() {
         setTimeout(() => advanceOnboarding('puzzle_complete'), 1000);
       }
 
-      // Trigger animal whisper after a delay (appears below the victory modal)
-      setTimeout(async () => {
+      // Trigger animal whisper after a delay (skip during onboarding to keep focus on FoxGuide)
+      if (!isOnboarding) setTimeout(async () => {
         try {
           const fullProgress = await getFullProgress();
           const whisperData = getAnimalWhisper(
@@ -550,8 +551,8 @@ export default function App() {
         }
       }, 1200);
 
-      // Trigger animal interjection after a longer delay (only if whisper isn't showing)
-      setTimeout(async () => {
+      // Trigger animal interjection after a longer delay (skip during onboarding)
+      if (!isOnboarding) setTimeout(async () => {
         if (showWhisper) return; // Don't stack with whisper
         try {
           const fullProgress = await getFullProgress();
@@ -615,7 +616,7 @@ export default function App() {
     ) {
       hapticSelection();
       soundTap();
-      puzzleActions.setMessage('Keep that letter selected, then drop it into the highlighted slot.');
+      puzzleActions.setMessage('Keep that letter selected, then drop it into the glowing slot.');
       return;
     }
 
@@ -628,7 +629,7 @@ export default function App() {
     ) {
       hapticSelection();
       soundTap();
-      puzzleActions.setMessage(`Try the highlighted "${tutorialGuidance.letterToMove}" tile first.`);
+      puzzleActions.setMessage(`Try the glowing "${tutorialGuidance.letterToMove}" tile first.`);
       return;
     }
 
@@ -1256,9 +1257,9 @@ export default function App() {
           onClose={() => puzzleActions.setShowRules(false)}
         />
 
-        {/* Victory Modal — extracted component */}
+        {/* Victory Modal — extracted component (hidden during onboarding so FoxGuide is visible) */}
         <VictoryModal
-          visible={puzzle.gameState === GameState.WON}
+          visible={puzzle.gameState === GameState.WON && !(isOnboarding && (onboardingStep === 'puzzle_tutorial' || onboardingStep === 'puzzle_complete'))}
           earnedStars={puzzle.earnedStars}
           level={puzzle.level}
           difficulty={puzzle.difficulty}
@@ -1318,6 +1319,7 @@ export default function App() {
         {isOnboarding && (onboardingStep === 'puzzle_tutorial' || onboardingStep === 'puzzle_complete') && (
           <FoxGuide
             visible={true}
+            variant="dialogue"
             text={
               onboardingStep === 'puzzle_complete'
                 ? ONBOARDING_FOX_LINES.puzzle_tutorial_complete[
@@ -1326,13 +1328,13 @@ export default function App() {
                 : puzzle.gameState === GameState.PLAYING && puzzle.selectedLetter
                   ? (
                     tutorialGuidance?.targetSlotIndex !== null && tutorialGuidance?.targetSlotIndex !== undefined
-                      ? `Great. Now drop "${tutorialGuidance.letterToMove}" into the highlighted slot.`
+                      ? `Now drop "${tutorialGuidance.letterToMove}" into the glowing slot below.`
                       : ONBOARDING_FOX_LINES.puzzle_tutorial_drop[0]
                   )
                   : puzzle.gameState === GameState.PLAYING
                     ? (
                       tutorialGuidance?.letterToMove
-                        ? `Tap the highlighted "${tutorialGuidance.letterToMove}" tile first.`
+                        ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
                         : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
                     )
                     : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
@@ -1347,25 +1349,24 @@ export default function App() {
                 ? handleOnboardingContinue
                 : undefined
             }
-            position={
-              onboardingStep === 'puzzle_complete'
-                ? 'bottom'
-                : puzzle.gameState === GameState.PLAYING
-                  ? 'bottom'
-                  : 'top'
-            }
+            position="bottom"
             anchorStyle={
-              onboardingStep !== 'puzzle_complete' && puzzle.gameState === GameState.PLAYING
+              onboardingStep === 'puzzle_complete'
                 ? {
-                    // Keep the tutorial prompt in the lower third so it doesn't cover
-                    // the first guided row on smaller screens.
-                    bottom: puzzle.selectedLetter
-                      ? Math.min(Math.max(SCREEN_HEIGHT * 0.16, 120), 170)
-                      : Math.min(Math.max(SCREEN_HEIGHT * 0.12, 90), 140),
-                    left: 12,
-                    right: 12,
+                    // Center the completion dialogue on screen
+                    top: Math.min(Math.max(SCREEN_HEIGHT * 0.35, 280), 380),
+                    left: 8,
+                    right: 8,
                   }
-                : undefined
+                : puzzle.gameState === GameState.PLAYING
+                  ? {
+                      // Position just below the 3 tutorial rows
+                      // (~50px status bar + ~80px header + 3 rows * ~76px + padding)
+                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.48, 350), 460),
+                      left: 8,
+                      right: 8,
+                    }
+                  : undefined
             }
           />
         )}
