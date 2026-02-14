@@ -84,8 +84,8 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 2: Fox just invited — intro dialogue
   fox_invited: [
     "Hello! I'm Ember.\nWelcome to our little home.",
-    "We've been waiting for someone like you.",
-    "This place is going to be something special — I can feel it.",
+    "We've been waiting for someone like you.\n...A long time.",
+    "This place is going to be something special.\nI can feel it in the words.",
     "But first, let me show you what we do here.\nFollow me!",
   ],
 
@@ -113,6 +113,6 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   unlock_explained: [
     "That was wonderful!\nEvery puzzle you solve earns you amber 💎",
     "You can use amber to build new rooms and invite more friends!",
-    "Keep solving puzzles and soon this place will be full of life.\nThe others are going to love you.",
+    "Keep solving puzzles and soon this place will be full of life.\nThe others are going to love you.\nThey need you.",
   ],
 };

@@ -9,6 +9,8 @@ import { getFullProgress, getDecorationCount } from '../services/amberCurrency';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { VictoryData } from './useGamePersistence';
 import { hapticHeavy } from '../services/haptics';
+import { syncCosmeticsWithAchievements } from '../services/cosmeticRewards';
+import { getUnlockedAchievementIds } from '../services/achievements';
 
 export interface AchievementQueueState {
   currentAchievement: Achievement | null;
@@ -52,6 +54,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
           byDifficulty: {
             EASY: { completed: 0, stars: 0 },
             MEDIUM: { completed: 0, stars: 0 },
+            MEDIUM_PLUS: { completed: 0, stars: 0 },
             HARD: { completed: 0, stars: 0 },
           },
           lastUpdated: 0,
@@ -77,6 +80,10 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
           return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
         });
       }
+
+      // Sync cosmetic rewards with all unlocked achievements (non-blocking)
+      const allUnlockedIds = await getUnlockedAchievementIds();
+      syncCosmeticsWithAchievements(allUnlockedIds).catch(() => {});
     } catch (err) {
       console.warn('Achievement check failed:', err);
     }

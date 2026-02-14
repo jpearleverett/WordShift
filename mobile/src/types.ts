@@ -19,7 +19,7 @@ export enum GameState {
   GAME_OVER = 'GAME_OVER',
 }
 
-export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
+export type Difficulty = 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD';
 
 export type GameMode = 'standard' | 'challenge';
 

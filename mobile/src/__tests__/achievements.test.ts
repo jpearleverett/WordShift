@@ -45,6 +45,7 @@ const defaultState: AchievementCheckState = {
     byDifficulty: {
       EASY: { completed: 0, stars: 0 },
       MEDIUM: { completed: 0, stars: 0 },
+      MEDIUM_PLUS: { completed: 0, stars: 0 },
       HARD: { completed: 0, stars: 0 },
     },
     lastUpdated: 0,
@@ -141,6 +142,7 @@ describe('achievements', () => {
         byDifficulty: {
           EASY: { completed: 10, stars: 25 },
           MEDIUM: { completed: 10, stars: 20 },
+          MEDIUM_PLUS: { completed: 3, stars: 7 },
           HARD: { completed: 5, stars: 10 },
         },
         lastUpdated: 0,

@@ -17,6 +17,8 @@ import {
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
+import { updateQuestProgress } from '../services/weeklyQuests';
+import { PuzzleVariant, getVariantAmberMultiplier } from '../services/puzzleVariety';
 
 export interface VictoryData {
   earnedStars: number;
@@ -35,6 +37,10 @@ export interface VictoryData {
   totalWordsFormed: number;
   /** Ritual energy of this puzzle */
   ritualEnergy: number;
+  /** Bonus amber from puzzle variant mode */
+  variantBonus: number;
+  /** Puzzle variant used */
+  variant: PuzzleVariant;
 }
 
 export interface PersistenceState {
@@ -86,7 +92,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     hintsUsed: number,
     invalidAttempts: number,
     gameMode: GameMode = 'standard',
-    completedWords: string[] = []
+    completedWords: string[] = [],
+    variant: PuzzleVariant = 'standard'
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
 
@@ -107,6 +114,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseAcceleration: 1.0,
         totalWordsFormed: 0,
         ritualEnergy: 0,
+        variantBonus: 0,
+        variant: 'standard',
       };
     }
 
@@ -118,6 +127,16 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
       const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate);
+
+      // Apply variant amber multiplier (bonus on top of base)
+      const variantMultiplier = getVariantAmberMultiplier(variant);
+      let variantBonus = 0;
+      if (variantMultiplier > 1.0) {
+        variantBonus = Math.round(amberResult.amount * (variantMultiplier - 1.0));
+        // Add variant bonus to balance directly
+        amberResult.newBalance += variantBonus;
+        amberResult.amount += variantBonus;
+      }
 
       setCumulativeStats(stats);
       updatePuzzleCount(amberResult.puzzlesSolved);
@@ -153,6 +172,16 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         },
       });
 
+      // Update weekly quest progress (non-blocking)
+      updateQuestProgress({
+        difficulty,
+        stars,
+        hintsUsed,
+        isDaily: false, // Caller should update for daily
+        isChallenge: gameMode === 'challenge',
+        amberEarned: amberResult.amount,
+      }, amberResult.newPhase).catch(() => {});
+
       return {
         earnedStars: stars,
         amberEarned: amberResult.amount,
@@ -168,6 +197,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseAcceleration: amberResult.phaseAcceleration,
         totalWordsFormed,
         ritualEnergy,
+        variantBonus,
+        variant,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -186,6 +217,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseAcceleration: 1.0,
         totalWordsFormed: 0,
         ritualEnergy: 0,
+        variantBonus: 0,
+        variant: 'standard',
       };
     } finally {
       recordInProgress.current = false;

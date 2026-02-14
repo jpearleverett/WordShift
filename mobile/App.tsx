@@ -47,6 +47,7 @@ import {
   getPhaseIndicator,
   getLoadingMessage,
   getRitualMicroEvent,
+  getVictoryGlitch,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress } from './src/services/amberCurrency';
@@ -54,10 +55,14 @@ import { startFrameMonitoring } from './src/services/performanceMonitor';
 import { getAnimalWhisper, getAnimalInterjection } from './src/services/phaseNarrative';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
+import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord } from './src/services/localGenerator';
+import { scheduleAllNotifications } from './src/services/notifications';
+import { recordWhisper } from './src/services/whisperGallery';
+import { markPendingChanges } from './src/services/cloudSave';
 
 // App screen type — expanded with settings, stats, and ledger
-type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger';
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -100,6 +105,10 @@ export default function App() {
   const [interjection, setInterjection] = useState<{ animalName: string; text: string } | null>(null);
   const [showInterjection, setShowInterjection] = useState(false);
 
+  // Victory glitch state (brief flash text during Phase 0 victories)
+  const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
+  const [showVictoryGlitch, setShowVictoryGlitch] = useState(false);
+
   // Auto-dismiss interjection after 4 seconds
   useEffect(() => {
     if (showInterjection) {
@@ -121,6 +130,9 @@ export default function App() {
   useEffect(() => {
     initAudio();
     startFrameMonitoring();
+
+    // Schedule notifications on app launch (non-blocking)
+    scheduleAllNotifications(0).catch(() => {});
 
     (async () => {
       // Check legacy tutorial flag first for backward compat
@@ -239,7 +251,8 @@ export default function App() {
         result.hintsUsed,
         result.invalidAttempts,
         result.gameMode,
-        result.completedWords
+        result.completedWords,
+        result.variant || 'standard'
       );
 
       // Record daily challenge completion if applicable
@@ -316,6 +329,22 @@ export default function App() {
       // Check achievements after brief delay to not block victory display
       setTimeout(() => achievementActions.checkForAchievements(victory), 500);
 
+      // Victory glitch — brief flash text at Phase 0 (~8% chance, guaranteed first puzzle)
+      const glitchText = getVictoryGlitch(persistence.currentPhase, victory.cumulativeStats?.totalPuzzlesCompleted ?? 1);
+      if (glitchText) {
+        setTimeout(() => {
+          setVictoryGlitch(glitchText);
+          setShowVictoryGlitch(true);
+          setTimeout(() => setShowVictoryGlitch(false), 200);
+        }, 300);
+      }
+
+      // Re-schedule notifications after puzzle completion
+      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+
+      // Mark cloud save as having pending changes
+      markPendingChanges().catch(() => {});
+
       // During onboarding, advance to puzzle_complete step
       if (onboardingStep === 'puzzle_tutorial') {
         setTimeout(() => advanceOnboarding('puzzle_complete'), 1000);
@@ -333,6 +362,14 @@ export default function App() {
           if (whisperData) {
             setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
             setShowWhisper(true);
+            // Record whisper in gallery
+            recordWhisper({
+              animalType: whisperData.animalType || 'unknown',
+              animalName: whisperData.animalName,
+              text: whisperData.text,
+              phase: persistence.currentPhase,
+              type: 'whisper',
+            }).catch(() => {});
           }
         } catch {
           // Whispers are non-critical
@@ -627,6 +664,20 @@ export default function App() {
       );
     }
 
+    if (currentScreen === 'gallery') {
+      return (
+        <View style={styles.screenBackground}>
+          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <WhisperGalleryScreen
+              phase={persistence.currentPhase}
+              onClose={() => transitionTo('home')}
+            />
+          </Animated.View>
+        </View>
+      );
+    }
+
     if (currentScreen === 'stats') {
       return (
         <View style={styles.screenBackground}>
@@ -659,6 +710,7 @@ export default function App() {
                 onOpenSettings={() => transitionTo('settings')}
                 onOpenStats={() => transitionTo('stats')}
                 onOpenLedger={() => transitionTo('ledger')}
+                onOpenGallery={() => transitionTo('gallery')}
                 onStartDaily={handleStartDaily}
                 onboardingStep={onboardingStep}
                 onAdvanceOnboarding={advanceOnboarding}
@@ -803,9 +855,10 @@ export default function App() {
               styles.difficultyDot,
               puzzle.difficulty === 'EASY' && styles.difficultyDotEasy,
               puzzle.difficulty === 'MEDIUM' && styles.difficultyDotMedium,
+              puzzle.difficulty === 'MEDIUM_PLUS' && styles.difficultyDotMediumPlus,
               puzzle.difficulty === 'HARD' && styles.difficultyDotHard,
             ]} />
-            <Text style={styles.difficultyText}>{puzzle.difficulty}</Text>
+            <Text style={styles.difficultyText}>{puzzle.difficulty === 'MEDIUM_PLUS' ? 'MED+' : puzzle.difficulty}</Text>
             <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
           </TouchableOpacity>
 
@@ -939,6 +992,13 @@ export default function App() {
           onReturnHome={handleReturnHome}
           onShare={handleShare}
         />
+
+        {/* Victory Glitch — brief flash text during Phase 0 victories */}
+        {showVictoryGlitch && victoryGlitch && (
+          <View style={styles.victoryGlitchOverlay} pointerEvents="none">
+            <Text style={styles.victoryGlitchText}>{victoryGlitch}</Text>
+          </View>
+        )}
 
         {/* Animal Whisper — ghost-like message from an animal after puzzle completion */}
         <AnimalWhisper
@@ -1127,6 +1187,9 @@ const styles = StyleSheet.create({
   difficultyDotMedium: {
     backgroundColor: CandyColors.yellow.main,
   },
+  difficultyDotMediumPlus: {
+    backgroundColor: CandyColors.orange.main,
+  },
   difficultyDotHard: {
     backgroundColor: CandyColors.red.main,
   },
@@ -1266,6 +1329,22 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(100, 0, 30, 1)',
     zIndex: 998,
+  },
+  victoryGlitchOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  victoryGlitchText: {
+    color: '#FF0040',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 4,
+    textShadowColor: '#FF0040',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
   interjectionContainer: {
     position: 'absolute',

@@ -27,7 +27,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
 
   return (
     <View style={styles.difficultyMenu}>
-      {(['EASY', 'MEDIUM', 'HARD'] as Difficulty[]).map(d => (
+      {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map(d => (
         <TouchableOpacity
           key={d}
           style={[
@@ -40,6 +40,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             styles.difficultyMenuDot,
             d === 'EASY' && styles.difficultyDotEasy,
             d === 'MEDIUM' && styles.difficultyDotMedium,
+            d === 'MEDIUM_PLUS' && styles.difficultyDotMediumPlus,
             d === 'HARD' && styles.difficultyDotHard,
           ]} />
           <Text
@@ -48,7 +49,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               currentDifficulty === d && styles.difficultyMenuTextActive,
             ]}
           >
-            {d}
+            {d === 'MEDIUM_PLUS' ? 'MED+' : d}
           </Text>
         </TouchableOpacity>
       ))}
@@ -117,6 +118,9 @@ const styles = StyleSheet.create({
   },
   difficultyDotMedium: {
     backgroundColor: CandyColors.yellow.main,
+  },
+  difficultyDotMediumPlus: {
+    backgroundColor: CandyColors.orange.main,
   },
   difficultyDotHard: {
     backgroundColor: CandyColors.red.main,

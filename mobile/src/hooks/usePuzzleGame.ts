@@ -4,6 +4,7 @@ import { generateLocalPuzzle, getIncantationName } from '../services/localGenera
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
 import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage } from '../services/phaseNarrative';
+import { shouldOfferVariant, getVariantOverrides, PuzzleVariant } from '../services/puzzleVariety';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -51,6 +52,7 @@ export interface PuzzleGameActions {
     gameMode: GameMode;
     completedWords: string[];
     formedWord?: string;
+    variant?: PuzzleVariant;
   } | null>;
   handleUndo: () => void;
   handleHint: () => void;
@@ -87,6 +89,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [earnedStars, setEarnedStars] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('standard');
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
+  const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
   const [lastCompletedWords, setLastCompletedWords] = useState<string[]>([]);
   const [lastIncantationName, setLastIncantationName] = useState<string | null>(null);
@@ -165,13 +168,26 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
     }
 
+    // Check for puzzle variant (only in standard mode, not daily/challenge)
+    const effectiveMode = mode ?? gameMode;
+    let variant: PuzzleVariant = 'standard';
+    if (effectiveMode === 'standard') {
+      const variantConfig = shouldOfferVariant(level, currentPhase);
+      if (variantConfig) {
+        variant = variantConfig.variant;
+      }
+    }
+    setCurrentVariant(variant);
+
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Generation timeout')), 4000)
       );
 
+      // Apply variant overrides to generation (e.g., speed mode = 3 rows)
+      const variantOverrides = getVariantOverrides(variant, selectedDifficulty);
       const puzzle = await Promise.race([
-        generateLocalPuzzle(selectedDifficulty),
+        generateLocalPuzzle(selectedDifficulty, variantOverrides),
         timeoutPromise
       ]);
 
@@ -239,6 +255,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameMode: GameMode;
     completedWords: string[];
     formedWord?: string;
+    variant?: PuzzleVariant;
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
@@ -324,7 +341,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
       setIsProcessing(false);
       // Return completion info - caller handles persistence & victory state
-      return { completed: true, hintsUsed, invalidAttempts, gameMode, completedWords };
+      return { completed: true, hintsUsed, invalidAttempts, gameMode, completedWords, variant: currentVariant };
     } else {
       setActiveRowIndex(prev => prev + 1);
       setMessage(getMoveMessage(currentPhase));

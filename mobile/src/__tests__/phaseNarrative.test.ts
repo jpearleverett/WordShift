@@ -81,13 +81,16 @@ describe('getMoveMessage', () => {
     expect(msg.length).toBeGreaterThan(0);
   });
 
-  test('phase 0 messages are upbeat', () => {
-    // getMoveMessage uses Math.random, so seed-check that all possible results are upbeat
-    // We'll call it many times and check every result is from the expected set
+  test('phase 0 messages are upbeat (with rare darkness seeds)', () => {
+    // getMoveMessage uses Math.random; Phase 0 now includes ~5% rare "seed" messages
+    // that hint at darkness. Both normal upbeat and rare seed messages are valid.
     const phase0Words = ['Delicious', 'Tasty', 'Sweet', 'Yummy', 'Perfect', 'Brilliant', 'Nice', 'Sparkling', 'Juicy', 'Wonderful'];
+    const seedWords = ['remember', 'shifted', 'feel', 'wanted'];
     for (let i = 0; i < 50; i++) {
       const msg = getMoveMessage(0);
-      expect(phase0Words.some(w => msg.includes(w))).toBe(true);
+      const isUpbeat = phase0Words.some(w => msg.includes(w));
+      const isSeed = seedWords.some(w => msg.toLowerCase().includes(w));
+      expect(isUpbeat || isSeed).toBe(true);
     }
   });
 

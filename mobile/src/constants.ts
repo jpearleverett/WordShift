@@ -70,9 +70,10 @@ export const FALLBACK_PUZZLES_HARD: string[][] = [
 ];
 
 /** Get a random fallback puzzle for the given difficulty */
-export function getRandomFallback(difficulty: 'EASY' | 'MEDIUM' | 'HARD'): string[] {
+export function getRandomFallback(difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD'): string[] {
   const pool = difficulty === 'EASY' ? FALLBACK_PUZZLES_EASY
     : difficulty === 'HARD' ? FALLBACK_PUZZLES_HARD
+    : difficulty === 'MEDIUM_PLUS' ? FALLBACK_PUZZLES_HARD  // MEDIUM_PLUS uses HARD pool (5-letter words)
     : FALLBACK_PUZZLES_MEDIUM;
   return pool[Math.floor(Math.random() * pool.length)];
 }

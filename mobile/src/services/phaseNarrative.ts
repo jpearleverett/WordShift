@@ -7,6 +7,58 @@ import { DialoguePhase, PHASE_DESCRIPTIONS } from '../types/homeWorld';
  */
 
 // ============================================================================
+// EARLY DARKNESS SEEDS — Subtle moments of wrongness in Phase 0
+// These are rare, brief disruptions to the candy-bright tone. Players won't
+// consciously notice them, but in hindsight they'll realize the cracks were
+// always there. ~8% chance per victory, plus a guaranteed first-victory glitch.
+// ============================================================================
+
+/** Brief visual glitch text that flashes for <300ms during Phase 0 victories */
+export const VICTORY_GLITCH_TEXTS = [
+  'WE SEE YOU',
+  'THANK YOU',
+  'CLOSER',
+  'THE PATTERN',
+  'AGAIN',
+  'WE REMEMBER',
+];
+
+/**
+ * Whether a victory glitch should appear at Phase 0.
+ * Returns glitch text or null. First victory always glitches.
+ */
+export function getVictoryGlitch(phase: number, puzzlesSolved: number): string | null {
+  if (phase !== 0) return null;
+  // First victory always gets a brief glitch
+  if (puzzlesSolved === 1) return VICTORY_GLITCH_TEXTS[0];
+  // ~8% chance on subsequent Phase 0 victories
+  if (Math.random() < 0.08) {
+    return VICTORY_GLITCH_TEXTS[Math.floor(Math.random() * VICTORY_GLITCH_TEXTS.length)];
+  }
+  return null;
+}
+
+/** Rare "wrong" move messages that slip into Phase 0 (~5% chance) */
+const PHASE_0_SEED_MESSAGES = [
+  'The letters remember.',
+  'Something shifted.',
+  'Did you feel that?',
+  'The word wanted that.',
+];
+
+/**
+ * Get a move message with rare Phase 0 darkness seeds mixed in.
+ * At Phase 0, there's a ~5% chance of a seed message replacing the normal one.
+ */
+function getPhase0MoveMessageWithSeed(): string {
+  if (Math.random() < 0.05) {
+    return PHASE_0_SEED_MESSAGES[Math.floor(Math.random() * PHASE_0_SEED_MESSAGES.length)];
+  }
+  const messages = MOVE_MESSAGES[0];
+  return messages[Math.floor(Math.random() * messages.length)];
+}
+
+// ============================================================================
 // VICTORY TITLES — What the player sees when they win
 // ============================================================================
 
@@ -92,6 +144,8 @@ const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
 };
 
 export function getMoveMessage(phase: DialoguePhase): string {
+  // Phase 0 has rare darkness seeds mixed in
+  if (phase === 0) return getPhase0MoveMessageWithSeed();
   const messages = MOVE_MESSAGES[phase];
   return messages[Math.floor(Math.random() * messages.length)];
 }

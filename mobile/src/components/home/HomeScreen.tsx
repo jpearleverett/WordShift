@@ -28,6 +28,7 @@ import {
   getAllDecorations,
   markHouseCompleted,
   isHouseCompleted,
+  spendAmber,
   devAddAmber,
   devAddPuzzles,
 } from '../../services/amberCurrency';
@@ -62,6 +63,13 @@ import { AmberSparkle } from './AmberSparkle';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
+import {
+  isSacrificeAvailable,
+  getSacrificeAmounts,
+  getSacrificePrompt,
+  performSacrifice,
+} from '../../services/sacrifice';
+import { getGalleryTitle } from '../../services/whisperGallery';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -71,6 +79,7 @@ interface HomeScreenProps {
   onOpenSettings?: () => void;
   onOpenStats?: () => void;
   onOpenLedger?: () => void;
+  onOpenGallery?: () => void;
   onStartDaily?: (difficulty: Difficulty) => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
@@ -84,6 +93,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenSettings,
   onOpenStats,
   onOpenLedger,
+  onOpenGallery,
   onStartDaily,
   onboardingStep,
   onAdvanceOnboarding,
@@ -111,6 +121,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // House completion ceremony state
   const [showHouseCompletion, setShowHouseCompletion] = useState(false);
   const [houseCompletionTextIndex, setHouseCompletionTextIndex] = useState(0);
+
+  // Sacrifice modal state (Phase 4+)
+  const [showSacrificeModal, setShowSacrificeModal] = useState(false);
+  const [sacrificeMessage, setSacrificeMessage] = useState<string | null>(null);
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -442,6 +456,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </TouchableOpacity>
       )}
 
+      {/* Action Row — Gallery + Sacrifice (hidden during onboarding) */}
+      {!isOnboarding && (
+        <View style={styles.actionRow}>
+          {onOpenGallery && (
+            <TouchableOpacity
+              style={styles.actionRowButton}
+              onPress={onOpenGallery}
+              accessibilityLabel="Whisper Gallery"
+              accessibilityRole="button"
+            >
+              <Text style={styles.actionRowButtonText}>
+                📜 {getGalleryTitle(progress.currentPhase)}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {isSacrificeAvailable(progress.currentPhase) && (
+            <TouchableOpacity
+              style={[styles.actionRowButton, styles.sacrificeButton]}
+              onPress={() => setShowSacrificeModal(true)}
+              accessibilityLabel="Offer amber to the arrangement"
+              accessibilityRole="button"
+            >
+              <Text style={styles.actionRowButtonText}>
+                🕯️ {getSacrificePrompt(progress.currentPhase).title}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       {/* Celebration Confetti */}
       {showCelebration && (
         <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
@@ -550,6 +594,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Text style={[styles.dialogueText, { color: dt.textColor }]}>{dialogueFlow.dialogueText}</Text>
                   </View>
 
+                  {/* Dialogue choice buttons (Phase 3 choice points) */}
+                  {dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? (
+                    <View style={styles.dialogueChoiceRow}>
+                      <TouchableOpacity
+                        style={[styles.dialogueChoiceBtn, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                        onPress={() => dialogueFlow.handleDialogueChoice('ask')}
+                        accessibilityLabel={dialogueFlow.activeChoice.options.ask}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.dialogueChoiceBtnText, { color: dt.textColor }]}>
+                          {dialogueFlow.activeChoice.options.ask}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.dialogueChoiceBtn, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                        onPress={() => dialogueFlow.handleDialogueChoice('refuse')}
+                        accessibilityLabel={dialogueFlow.activeChoice.options.refuse}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.dialogueChoiceBtnText, { color: dt.textColor }]}>
+                          {dialogueFlow.activeChoice.options.refuse}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
                   <View style={styles.dialogueFooter}>
                     <TouchableOpacity
                       style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
@@ -563,6 +632,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </Text>
                     </TouchableOpacity>
                   </View>
+                  )}
                 </View>
               </View>
             )}
@@ -1042,6 +1112,93 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Sacrifice Modal (Phase 4+) */}
+      <Modal
+        visible={showSacrificeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSacrificeModal(false)}
+      >
+        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
+          <View
+            style={[
+              styles.sacrificeModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={styles.sacrificeEmoji}>🕯️</Text>
+            <Text style={[styles.sacrificeTitle, { color: dt.nameColor }]}>
+              {getSacrificePrompt(progress.currentPhase).title}
+            </Text>
+            <Text style={[styles.sacrificeSubtitle, { color: dt.subtitleColor }]}>
+              {getSacrificePrompt(progress.currentPhase).subtitle}
+            </Text>
+            <Text style={[styles.sacrificeBalance, { color: dt.textColor }]}>
+              Your Amber: 💎 {progress.amber}
+            </Text>
+
+            {sacrificeMessage ? (
+              <View style={[styles.sacrificeResponseBox, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+                <Text style={[styles.sacrificeResponseText, { color: dt.textColor }]}>
+                  {sacrificeMessage}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg }]}
+                  onPress={() => {
+                    setSacrificeMessage(null);
+                    setShowSacrificeModal(false);
+                  }}
+                >
+                  <Text style={styles.continueButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.sacrificeAmounts}>
+                {getSacrificeAmounts(progress.amber).map(amount => (
+                  <TouchableOpacity
+                    key={amount}
+                    style={[styles.sacrificeAmountBtn, { borderColor: dt.bubbleBorder }]}
+                    onPress={async () => {
+                      const spendResult = await spendAmber(amount, 'sacrifice');
+                      if (!spendResult.success) return;
+                      const result = await performSacrifice(amount, progress.currentPhase);
+                      setProgress(prev => prev ? { ...prev, amber: spendResult.newBalance } : prev);
+                      onAmberChange?.(spendResult.newBalance);
+                      setSacrificeMessage(result.message);
+                    }}
+                    accessibilityLabel={`Offer ${amount} amber`}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.sacrificeAmountText, { color: dt.textColor }]}>
+                      💎 {amount}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                {getSacrificeAmounts(progress.amber).length === 0 && (
+                  <Text style={[styles.sacrificeNoAmber, { color: dt.subtitleColor }]}>
+                    You don't have enough amber to offer.
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {!sacrificeMessage && (
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowSacrificeModal(false)}
+              >
+                <Text style={styles.closeButtonText}>Not now</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </Modal>
 
       {/* House Completion Ceremony Modal */}
@@ -1812,6 +1969,127 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[500],
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  // Dialogue choice buttons (Phase 3)
+  dialogueChoiceRow: {
+    flexDirection: 'column',
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 4,
+  },
+  dialogueChoiceBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  dialogueChoiceBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+
+  // Action row (Gallery + Sacrifice)
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 4,
+  },
+  actionRowButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  sacrificeButton: {
+    backgroundColor: 'rgba(120, 30, 60, 0.2)',
+    borderColor: 'rgba(120, 30, 60, 0.3)',
+  },
+  actionRowButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+
+  // Sacrifice modal
+  sacrificeModal: {
+    borderRadius: 30,
+    padding: 30,
+    marginHorizontal: 20,
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
+    maxWidth: 380,
+    width: '90%',
+    borderWidth: 1,
+  },
+  sacrificeEmoji: {
+    fontSize: 50,
+    marginBottom: 12,
+  },
+  sacrificeTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  sacrificeSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+    paddingHorizontal: 10,
+  },
+  sacrificeBalance: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  sacrificeAmounts: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  sacrificeAmountBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    backgroundColor: 'rgba(100, 30, 50, 0.15)',
+  },
+  sacrificeAmountText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  sacrificeNoAmber: {
+    fontSize: 13,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  sacrificeResponseBox: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    width: '100%',
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  sacrificeResponseText: {
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginBottom: 16,
   },
 
   // House completion ceremony styles

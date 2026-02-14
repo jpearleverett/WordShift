@@ -104,6 +104,7 @@ const defaultStats = {
   byDifficulty: {
     EASY: { completed: 0, stars: 0 },
     MEDIUM: { completed: 1, stars: 3 },
+    MEDIUM_PLUS: { completed: 0, stars: 0 },
     HARD: { completed: 0, stars: 0 },
   },
   lastUpdated: Date.now(),

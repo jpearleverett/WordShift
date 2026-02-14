@@ -746,8 +746,18 @@ export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
   overrides?: { wordLength?: number; targetRows?: number }
 ): Promise<PuzzleConfig> => {
-  const targetRows = overrides?.targetRows ?? (difficulty === 'EASY' ? 3 : difficulty === 'MEDIUM' ? 4 : 5);
-  const wordLength = overrides?.wordLength ?? (difficulty === 'HARD' ? 5 : 4);
+  const targetRows = overrides?.targetRows ?? (
+    difficulty === 'EASY' ? 3 :
+    difficulty === 'MEDIUM' ? 4 :
+    difficulty === 'MEDIUM_PLUS' ? 4 :
+    5 // HARD
+  );
+  const wordLength = overrides?.wordLength ?? (
+    difficulty === 'EASY' ? 4 :
+    difficulty === 'MEDIUM' ? 4 :
+    difficulty === 'MEDIUM_PLUS' ? 5 :
+    5 // HARD
+  );
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();

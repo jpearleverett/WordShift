@@ -181,6 +181,8 @@ export function calculatePhaseAcceleration(
   // Difficulty bonus
   if (difficulty === 'HARD') {
     multiplier *= NARRATIVE_ACCELERATION.HARD_MULTIPLIER;
+  } else if (difficulty === 'MEDIUM_PLUS') {
+    multiplier *= NARRATIVE_ACCELERATION.MEDIUM_PLUS_MULTIPLIER;
   } else if (difficulty === 'EASY') {
     multiplier *= NARRATIVE_ACCELERATION.EASY_MULTIPLIER;
   }

@@ -83,6 +83,7 @@ function getDefaultStats(): CumulativeStats {
     byDifficulty: {
       EASY: { completed: 0, stars: 0 },
       MEDIUM: { completed: 0, stars: 0 },
+      MEDIUM_PLUS: { completed: 0, stars: 0 },
       HARD: { completed: 0, stars: 0 },
     },
     lastUpdated: Date.now(),
@@ -104,6 +105,10 @@ export async function loadStats(): Promise<CumulativeStats> {
       // Backward compat: add noHintPuzzleCount if missing from old data
       if (parsed.noHintPuzzleCount === undefined) {
         parsed.noHintPuzzleCount = 0;
+      }
+      // Backward compat: add MEDIUM_PLUS if missing from old data
+      if (parsed.byDifficulty && !parsed.byDifficulty.MEDIUM_PLUS) {
+        parsed.byDifficulty.MEDIUM_PLUS = { completed: 0, stars: 0 };
       }
       statsCache = parsed;
       return statsCache!;

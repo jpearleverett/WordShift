@@ -134,6 +134,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     check: (s) =>
       s.stats.byDifficulty.EASY.completed > 0 &&
       s.stats.byDifficulty.MEDIUM.completed > 0 &&
+      (s.stats.byDifficulty.MEDIUM_PLUS?.completed || 0) > 0 &&
       s.stats.byDifficulty.HARD.completed > 0,
   },
   {
@@ -447,6 +448,14 @@ export async function getAchievementsWithStatus(): Promise<
 export async function getUnlockedCount(): Promise<number> {
   const progress = await loadAchievements();
   return progress.unlockedIds.length;
+}
+
+/**
+ * Get all unlocked achievement IDs
+ */
+export async function getUnlockedAchievementIds(): Promise<string[]> {
+  const progress = await loadAchievements();
+  return [...progress.unlockedIds];
 }
 
 /**
