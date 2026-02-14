@@ -132,7 +132,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           },
         ]}
       >
-        {activeScene?.emoji && (
+        {Boolean(activeScene?.emoji) && (
           <Text style={styles.sceneEmoji}>{activeScene.emoji}</Text>
         )}
         {activeScene && (

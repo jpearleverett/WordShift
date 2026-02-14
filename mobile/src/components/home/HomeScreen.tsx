@@ -496,7 +496,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       />
 
       {/* Cooldown Message Toast */}
-      {dialogueFlow.cooldownMessage && (
+      {Boolean(dialogueFlow.cooldownMessage) && (
         <Animated.View
           style={[
             styles.cooldownToast,
