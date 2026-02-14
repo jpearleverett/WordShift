@@ -778,8 +778,8 @@ export const generateLocalPuzzle = async (
   };
 
   const GLOBAL_TIMEOUT = 2500;
-  const CANDIDATES_TO_GENERATE = 3; // Generate 3 candidates for better selection
-  const MIN_ACCEPTABLE_SCORE = 45; // Reject puzzles below this threshold
+  const CANDIDATES_TO_GENERATE = forcedStartWord ? 1 : 3; // Forced starts prioritize continuity over variety
+  const MIN_ACCEPTABLE_SCORE = forcedStartWord ? 0 : 45; // Chain continuity should accept any valid path
   const generatedPuzzles: GeneratedPuzzle[] = [];
 
   const state: GenState = {
@@ -789,7 +789,7 @@ export const generateLocalPuzzle = async (
 
   // Weight and filter words based on history
   const candidatesW1 = forcedStartWord
-    ? [forcedStartWord]
+    ? [forcedStartWord, forcedStartWord, forcedStartWord, forcedStartWord]
     : weightedShuffle(dicts.baseArray, wordLength, recencyMap);
 
   if (forcedStartWord && !dicts.base.has(forcedStartWord)) {

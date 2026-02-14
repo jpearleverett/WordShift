@@ -93,7 +93,7 @@ describe('generateLocalPuzzle', () => {
   }, 15000);
 
   test('honors forced startWord override', async () => {
-    const puzzle = await generateLocalPuzzle('MEDIUM', { startWord: 'TIME' });
+    const puzzle = await generateLocalPuzzle('EASY', { startWord: 'TIME' });
     expect(puzzle.words[0]).toBe('TIME');
   }, 10000);
 

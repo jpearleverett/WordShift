@@ -254,6 +254,7 @@ describe('usePuzzleGame', () => {
 
       let [state] = callHook();
       const vowel = state.rows[0].words.find(l => l.char === 'I')!;
+      [, actions] = callHook();
       actions.handleLetterPress(vowel, 0);
       [state] = callHook();
       expect(state.selectedLetter).toBeNull();
@@ -273,6 +274,7 @@ describe('usePuzzleGame', () => {
 
       let [state] = callHook();
       const consonant = state.rows[0].words.find(l => l.char === 'T')!;
+      [, actions] = callHook();
       actions.handleLetterPress(consonant, 0);
       [state] = callHook();
       expect(state.selectedLetter).toBeNull();
@@ -339,6 +341,7 @@ describe('usePuzzleGame', () => {
       // Descend: move M from TIME to TIED -> TIE and TIMED
       let [state] = callHook();
       const m = state.rows[0].words.find(l => l.char === 'M')!;
+      [, actions] = callHook();
       actions.handleLetterPress(m, 0);
       [, actions] = callHook();
       const first = await actions.handleSlotPress(2);
@@ -366,6 +369,7 @@ describe('usePuzzleGame', () => {
       // Complete first link quickly (same valid move as above)
       let [state] = callHook();
       const m = state.rows[0].words.find(l => l.char === 'M')!;
+      [, actions] = callHook();
       actions.handleLetterPress(m, 0);
       [, actions] = callHook();
       const result = await actions.handleSlotPress(2);
