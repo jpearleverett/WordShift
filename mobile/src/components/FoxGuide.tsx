@@ -61,6 +61,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const textFadeAnim = useRef(new Animated.Value(1)).current;
   const reducedMotion = getSettingsSync().reducedMotion;
+  const hasInteractiveControls = Boolean(onContinue || (showSkip && onSkip));
 
   // Show/hide animation
   useEffect(() => {
@@ -149,7 +150,8 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
         },
       ]}
-      pointerEvents="box-none"
+      // Let puzzle/home interactions pass through when Fox is informational only.
+      pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
     >
       <View style={styles.guideCard}>
         {/* Fox sprite */}

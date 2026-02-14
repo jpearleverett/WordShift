@@ -1351,15 +1351,17 @@ export default function App() {
               onboardingStep === 'puzzle_complete'
                 ? 'bottom'
                 : puzzle.gameState === GameState.PLAYING
-                  ? 'middle'
+                  ? 'bottom'
                   : 'top'
             }
             anchorStyle={
               onboardingStep !== 'puzzle_complete' && puzzle.gameState === GameState.PLAYING
                 ? {
-                    top: puzzle.selectedLetter
-                      ? Math.min(SCREEN_HEIGHT * 0.48, 360)
-                      : Math.min(SCREEN_HEIGHT * 0.30, 250),
+                    // Keep the tutorial prompt in the lower third so it doesn't cover
+                    // the first guided row on smaller screens.
+                    bottom: puzzle.selectedLetter
+                      ? Math.min(Math.max(SCREEN_HEIGHT * 0.16, 120), 170)
+                      : Math.min(Math.max(SCREEN_HEIGHT * 0.12, 90), 140),
                     left: 12,
                     right: 12,
                   }
