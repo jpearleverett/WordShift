@@ -545,11 +545,11 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
   const guideRingScale = guidePulseAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 1.08],
+    outputRange: [1, 1.18],
   });
   const guideRingOpacity = guidePulseAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.55, 0.95],
+    outputRange: [0.6, 1.0],
   });
 
   const content = (
@@ -714,14 +714,19 @@ const styles = StyleSheet.create({
   },
   guideRing: {
     position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: 2,
-    borderRadius: 16,
-    borderWidth: 2,
+    top: -6,
+    left: -6,
+    right: -6,
+    bottom: 0,
+    borderRadius: 18,
+    borderWidth: 3,
     borderColor: CandyColors.yellow.main,
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
+    backgroundColor: 'rgba(250, 204, 21, 0.30)',
+    shadowColor: CandyColors.yellow.main,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
+    elevation: 8,
   },
   tileBody: {
     width: 52,
@@ -737,7 +742,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tileBodyGuided: {
-    backgroundColor: 'rgba(250, 204, 21, 0.18)',
+    backgroundColor: 'rgba(250, 204, 21, 0.25)',
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
   },
   tileBodySelected: {
     shadowOpacity: 0.5,
