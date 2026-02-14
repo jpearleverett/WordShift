@@ -270,7 +270,7 @@ const Slot: React.FC<{
             styles.slot,
             compact && styles.slotCompact,
             { borderColor: isGuided ? CandyColors.yellow.main : phaseColors.slotBorderColor },
-            isGuided && styles.slotGuided,
+            isGuided && [styles.slotGuided, { borderWidth: 3 }],
           ]}
         >
           {/* Inner shimmer */}
@@ -857,13 +857,19 @@ const styles = StyleSheet.create({
   },
   guidedSlotHalo: {
     position: 'absolute',
-    top: -7,
-    left: -7,
-    right: -7,
-    bottom: -7,
-    borderRadius: 14,
-    borderWidth: 2,
+    top: -10,
+    left: -10,
+    right: -10,
+    bottom: -10,
+    borderRadius: 16,
+    borderWidth: 3,
     borderColor: CandyColors.yellow.main,
+    backgroundColor: 'rgba(250, 204, 21, 0.15)',
+    shadowColor: CandyColors.yellow.main,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
   },
   slot: {
     width: 28,
@@ -877,7 +883,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   slotGuided: {
-    backgroundColor: 'rgba(255, 246, 180, 0.95)',
+    backgroundColor: 'rgba(255, 230, 100, 0.95)',
   },
   slotCompact: {
     width: SLOT_WIDTH + 4, // Slightly wider for trapezoid visibility
@@ -959,9 +965,9 @@ const styles = StyleSheet.create({
   },
   slotGuideText: {
     position: 'absolute',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '900',
-    color: CandyColors.yellow.dark,
+    color: CandyColors.orange.main,
   },
 });
 

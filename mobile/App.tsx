@@ -283,12 +283,10 @@ export default function App() {
     const targetRow = puzzle.rows[targetRowIndex];
     if (!sourceRow || !targetRow) return null;
 
-    const currentSourceWord = sourceRow.words.map(l => l.char).join('');
-    const currentTargetWord = targetRow.words.map(l => l.char).join('');
     const relevantStep = puzzle.solution.find(step =>
       step.stepIndex === puzzle.activeRowIndex
-      && step.sourceWord === currentSourceWord
-      && step.targetWord === currentTargetWord
+      && step.sourceWord === sourceRow.originalWord
+      && step.targetWord === targetRow.originalWord
     );
     if (!relevantStep) return null;
 
@@ -823,12 +821,27 @@ export default function App() {
     }
   }, [onboardingStep, onboardingLineIndex, advanceOnboarding, transitionTo, puzzleActions, persistenceActions, victoryActions, hapticLight]);
 
-  /** Skip onboarding entirely */
+  /** Skip onboarding — during pre-puzzle steps, skip to tutorial puzzle; otherwise complete entirely */
   const handleSkipOnboarding = useCallback(async () => {
-    await markTutorialCompleted();
-    await markTutorialSeedsPlanted().catch(() => {});
-    await advanceOnboarding('complete');
-  }, [advanceOnboarding]);
+    if (onboardingStep === 'fox_invited' || onboardingStep === 'home_empty') {
+      // Skip dialogue but continue to tutorial puzzle
+      await advanceOnboarding('going_to_puzzle');
+      setTimeout(async () => {
+        await advanceOnboarding('puzzle_tutorial');
+        persistenceActions.refreshStats();
+        setRitualEchoWords([]);
+        transitionTo('puzzle', () => {
+          puzzleActions.startNewGame('EASY');
+          logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
+        });
+      }, 300);
+    } else {
+      // During/after puzzle: complete onboarding entirely
+      await markTutorialCompleted();
+      await markTutorialSeedsPlanted().catch(() => {});
+      await advanceOnboarding('complete');
+    }
+  }, [onboardingStep, advanceOnboarding, persistenceActions, puzzleActions, transitionTo]);
 
   /** Get current Fox guide text for the active onboarding step */
   const getOnboardingFoxText = useCallback((): string => {
