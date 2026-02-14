@@ -1171,3 +1171,110 @@ Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
 - Victory flow uses `isProcessingVictory` lock to prevent interaction during async chain
 - AnimatedBackground uses opacity overlay instead of JS-bridge backgroundColor animation (native driver compatible)
 - Low-end device detection is heuristic (PixelRatio + screen size) — not 100% accurate but good enough
+
+## Monetization
+
+Free-to-play with ethical hybrid monetization. Full plan in `MONETIZATION_PLAN.md`. Core principle: players pay for *expression* and *convenience*, never for *narrative progression*. The phase system, dialogue, and all 10 animals are fully earnable through play.
+
+### Ads
+
+**Rewarded video ads** (opt-in, never forced):
+- Post-victory "Bonus Amber" button: flat +8 amber (not percentage-based — prevents multiplier stacking with streak/star/challenge bonuses). 3/day cap.
+- Post-cooldown dialogue unlock: skip 1 puzzle of cooldown. 2/day cap.
+- Weekly quest bonus: +25% quest reward on claim. 4/week cap.
+- Hint recovery: restore 1 used hint for star rating purposes. 1/puzzle cap.
+
+**Interstitial ads** (between puzzles only, never mid-puzzle):
+- Phase 0-2: every 3rd puzzle completion. Phase 3+: every 5th (invested players get less interruption).
+- 3-second skip timer.
+- Exempt: first 10 puzzles (onboarding), phase transitions, daily challenge, ritualEnergy ≥ 7, within 5 puzzles of a phase boundary, Premium users.
+
+All ad placements removed for Patron's Key purchasers.
+
+### Patron's Key ($6.99, one-time IAP)
+
+| Feature | Description |
+|---|---|
+| Ad-free | All ad placements removed |
+| Exclusive tile theme | "Patron's Script" — calligraphy-styled tiles |
+| Amber drip | +2 flat amber per puzzle (post-multiplier, ~10-15% boost) |
+| Extended undo | 2 undos in Challenge mode (up from 1) |
+| Gallery highlight | Gold border on Whisper Gallery entries |
+| Cloud save | Account-bound backup/restore via `cloudSave.ts` (Firebase Auth / Game Center / Play Games). Whisper Gallery excluded from sync to prevent spoiler distribution. |
+| Patron badge | Subtle icon on share result cards |
+
+Also available as "Patron's Key + Starter Collection" bundle at $9.99 (includes 3 tile themes).
+
+### Cosmetic Shop — "The Collection"
+
+Purely visual. No gameplay or amber-earning impact.
+
+**Tile theme packs** ($1.99-$2.99, 12 at launch): Reskin LetterTile colors, borders, fonts, and animations. 8 always available, 4 phase-gated (appear after Phase 1/2/3/4 via progressive disclosure — completely hidden until reached, no locked slots, no phase labels). Phase-gated names are tonally evocative but non-spoilery ("Obsidian," "Etched"). Expand by 2-3 per quarter. Add puzzle background themes in Q2.
+
+**Room accent packs** ($0.99-$1.99): Decorative overlays on room backgrounds (fairy lights, books, candles). Phase 3+ pack ("Low Light") appears via progressive disclosure.
+
+**Confetti & victory effects** ($0.99 each): Custom particle effects for victory/StarBurst (Sakura Petals, Snowflakes, Dark Embers, etc.).
+
+**Animal accessories** ($0.99-$1.49 each, or $3.99 5-pack): Hats, scarves, glasses on animal sprites. **Suppressed at Phase 4** — robed sprites override accessories with a one-time narrative prompt ("The robes cover everything now."). Accessories return at Phase 5 (scarf on a serene post-cult animal is effectively unsettling).
+
+### Content Pass — "The Chronicle"
+
+**Monthly mini-pass** ($1.99): 5 curated puzzles, 1 cosmetic item, 2 bonus weekly quests.
+
+**Quarterly major season** ($4.99, or $16.99/year): 15 curated puzzles, 2 season-exclusive puzzle variants, exclusive tile theme, +2 amber per puzzle (flat additive to base, applied before multipliers), 8 bonus quests, and seasonal narrative echoes (found objects/journal fragments scattered across rooms — collectible lore artifacts persisting in Whisper Gallery after season ends).
+
+**No guest animals in seasonal content.** The closed 10-animal cult is the narrative's core horror device. An 11th animal — in or out of the cult — breaks it.
+
+### Mid-Game Amber Sinks (Replaces Amber Bundles)
+
+**No amber bundles for cash.** The organic economy generates ~2.5-3x the amber needed for full unlock over 300+ puzzles. Selling amber would let players build the full house by puzzle 42 while needing 225+ puzzles for Phase 4, creating a 180-puzzle engagement gap.
+
+Instead, in-game amber sinks maintain earn/spend tension through the mid-game:
+
+| Feature | Phase | Cost | Effect |
+|---|---|---|---|
+| Animal gifts | 1+ | 15-30 amber | Cosmetic gift + unique one-time dialogue line. 3 per animal, 30 total. |
+| Room upgrades | 2+ | 50-100 amber | Cosmetic room enhancements (furniture, lighting). |
+| Amber altar | 3+ | Accumulative | Visual structure on home screen that transforms as amber is poured in. Ties into ritual narrative. |
+
+**Puzzle-count gates on late unlocks** prevent amber surplus from outrunning narrative:
+
+| Unlock | Amber Cost | Min Puzzles |
+|---|---|---|
+| Jungle (Sloth) | 275 | 55 |
+| Desert (Fennec) | 225 | 75 |
+| Office (Capybara) | 200 | 95 |
+| Burrow (Wombat) | 250 | 115 |
+| Garden (Rabbit) | 300 | 140 |
+| Bamboo Attic (Red Panda) | 475 | 170 |
+
+### Additional Revenue Streams
+
+- **Gifting**: Purchase Patron's Key as a gift via share link.
+- **Creator's Commentary** ($2.99, one-time, Phase 4+ only): Developer commentary mode — which Fox lines were foreshadowing, how word lists shifted, when visual changes first appeared. "DVD extras" for narrative-invested players.
+- **Challenge a Friend** (free, UA tool): Send a specific puzzle to a friend. Recipient gets a "Join WordShift" prompt.
+- **Wildlife Partnership**: $2.99 cosmetic bundle with 50% to pangolin/axolotl conservation.
+
+### Phase-Aware Monetization Tone
+
+Monetization UI shifts through **visual desaturation**, not narrative voice. The shop feels *tired* at later phases, not *ritualistic*. The void does not sell ads.
+
+| Element | Phase 0-1 | Phase 2 | Phase 3-4 |
+|---|---|---|---|
+| Shop button | "The Collection" | "The Collection" | "Offerings" |
+| Purchase confirm | "Thank you!" | "Thanks." | "Accepted." |
+| Ad prompt | "Watch for bonus amber!" | "Watch for amber." | "More amber." |
+| Shop background | Bright, candy-colored | Muted, desaturated | Dark, minimal |
+
+### What We Will NOT Do
+
+- **Energy/lives system** — puzzles are always playable
+- **Loot boxes / gacha** — all purchases are deterministic
+- **Pay-to-skip phases** — the narrative IS the product
+- **Pay-to-win hints** — hints are educational, not a frustration-payment loop
+- **Forced/pre-roll/mid-puzzle ads** — never
+- **Paywalled animals or dialogue** — all 10 animals and 610+ lines are earnable
+- **Difficulty manipulation** — puzzles are never made harder to encourage purchases
+- **Dark patterns** — no disguised ads, no tiny X buttons, no opt-out-by-default
+- **Amber bundles for cash** — breaks the earn/spend loop
+- **Guest/temporary animals** — breaks the closed cult narrative
