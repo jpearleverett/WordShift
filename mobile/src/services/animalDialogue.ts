@@ -2430,8 +2430,8 @@ const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = 
     dark: 'When the pattern rushes you, it is testing devotion under pressure.',
   },
   chain: {
-    light: 'Chain shifts ask you to keep momentum through linked sequences. One hesitation can ripple forward.',
-    dark: 'A chain is an incantation that refuses interruption.',
+    light: 'Chain shifts link three puzzles together. Your final word becomes the next starting word, so every finish matters.',
+    dark: 'A chain is an incantation without interruption: each ending must feed the next beginning.',
   },
   no_vowel: {
     light: 'No Vowel shifts lock vowels in place. You can move only consonants.',
