@@ -293,7 +293,7 @@ const Slot: React.FC<{
           )}
 
           {isGuided && (
-            <Text style={styles.slotGuideText}>HERE</Text>
+            <Text style={styles.slotGuideText}>↓</Text>
           )}
         </View>
       </Animated.View>
@@ -377,14 +377,15 @@ export const Row: React.FC<RowProps> = memo(({
         rowGlowLoop.start();
       }
     } else if (isTarget) {
+      const guidedTarget = guidanceActive;
       Animated.parallel([
         Animated.spring(scaleAnim, {
-          toValue: 0.98,
+          toValue: guidedTarget ? 1 : 0.98,
           friction: 5,
           useNativeDriver: true,
         }),
         Animated.timing(opacityAnim, {
-          toValue: 0.9,
+          toValue: guidedTarget ? 1 : 0.9,
           duration: 300,
           useNativeDriver: true,
         }),
@@ -426,7 +427,7 @@ export const Row: React.FC<RowProps> = memo(({
     return () => {
       glowAnim.stopAnimation();
     };
-  }, [isSource, isTarget, isCompleted]);
+  }, [isSource, isTarget, isCompleted, guidanceActive]);
 
   // Animate arc when slots appear/disappear - smooth glide effect
   // Depends on both showSlots AND selectedLetter to replay animation on each selection
@@ -572,6 +573,7 @@ export const Row: React.FC<RowProps> = memo(({
   const getRowStyle = () => {
     if (isSource) return [styles.rowSource, { borderColor: phaseColors.sourceBorderColor, shadowColor: phaseColors.sourceShadowColor }];
     if (isTarget && selectedLetter) return [styles.rowTarget, { borderColor: phaseColors.targetBorderColor, shadowColor: phaseColors.targetShadowColor }];
+    if (isTarget && guidanceActive) return styles.rowGuidedTarget;
     if (isCompleted) return styles.rowCompleted;
     return styles.rowFuture;
   };
@@ -723,6 +725,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
+  },
+  rowGuidedTarget: {
+    backgroundColor: 'rgba(255, 246, 180, 0.35)',
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
+    borderStyle: 'dashed',
+    shadowColor: CandyColors.yellow.main,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
   },
   rowCompleted: {
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
@@ -946,11 +959,9 @@ const styles = StyleSheet.create({
   },
   slotGuideText: {
     position: 'absolute',
-    bottom: 4,
-    fontSize: 7,
+    fontSize: 14,
     fontWeight: '900',
-    color: CandyColors.orange.dark,
-    letterSpacing: 0.4,
+    color: CandyColors.yellow.dark,
   },
 });
 
