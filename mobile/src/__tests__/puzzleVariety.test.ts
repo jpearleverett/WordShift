@@ -14,6 +14,8 @@ import {
   isVariantCompleted,
   getVariantAmberMultiplier,
   getVariantTimeLimit,
+  getVariantTimeLimitForDifficulty,
+  getVariantChainLength,
   isLetterAllowedByVariant,
   isVariantCompatibleWithSolution,
   VARIANT_CONFIGS,
@@ -137,8 +139,9 @@ describe('puzzleVariety', () => {
     it('returns overrides for speed-like variants', () => {
       expect(getVariantOverrides('standard', 'MEDIUM')).toEqual({});
       expect(getVariantOverrides('speed', 'MEDIUM')).toEqual({ targetRows: 3 });
-      expect(getVariantOverrides('chain', 'HARD')).toEqual({ targetRows: 3 });
+      expect(getVariantOverrides('chain', 'HARD')).toEqual({ targetRows: 4 });
       expect(getVariantOverrides('speed_no_vowel', 'EASY')).toEqual({ targetRows: 3 });
+      expect(getVariantOverrides('speed', 'HARD')).toEqual({ targetRows: 4 });
     });
 
     it('returns valid overrides for every variant/difficulty pair', () => {
@@ -183,6 +186,20 @@ describe('puzzleVariety', () => {
       expect(getVariantTimeLimit('chain')).toBeNull();
     });
 
+    it('returns difficulty-aware time limits for speed variants', () => {
+      expect(getVariantTimeLimitForDifficulty('speed', 'EASY')).toBe(65);
+      expect(getVariantTimeLimitForDifficulty('speed', 'MEDIUM')).toBe(60);
+      expect(getVariantTimeLimitForDifficulty('speed_no_vowel', 'MEDIUM_PLUS')).toBe(54);
+      expect(getVariantTimeLimitForDifficulty('speed_no_consonant', 'HARD')).toBe(48);
+      expect(getVariantTimeLimitForDifficulty('reverse', 'HARD')).toBeNull();
+    });
+
+    it('scales chain length with difficulty', () => {
+      expect(getVariantChainLength('chain', 'MEDIUM')).toBe(3);
+      expect(getVariantChainLength('chain', 'HARD')).toBe(4);
+      expect(getVariantChainLength('reverse', 'HARD')).toBe(1);
+    });
+
     it('exposes unlock requirements and unlocked checks', () => {
       expect(getVariantUnlockRequirement('standard')).toBeNull();
       expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(18);
@@ -214,8 +231,14 @@ describe('puzzleVariety', () => {
 
       expect(standard?.unlocked).toBe(true);
       expect(reverse?.unlocked).toBe(true);
+      expect(combo).toBeUndefined();
+    });
+
+    it('shows combo options when near unlock', () => {
+      const options = getVariantSelectorOptions(110, 1, 1);
+      const combo = options.find(o => o.variant === 'reverse_blind');
+      expect(combo).toBeDefined();
       expect(combo?.unlocked).toBe(false);
-      expect(combo?.unlockHint).toContain('puzzles');
       expect(combo?.unlockHint.toLowerCase()).not.toContain('phase');
     });
 
@@ -258,17 +281,17 @@ describe('puzzleVariety', () => {
   describe('amber multipliers', () => {
     it('returns configured multipliers', () => {
       expect(getVariantAmberMultiplier('standard')).toBe(1.0);
-      expect(getVariantAmberMultiplier('reverse')).toBe(1.35);
-      expect(getVariantAmberMultiplier('blind')).toBe(1.4);
-      expect(getVariantAmberMultiplier('speed')).toBe(1.5);
-      expect(getVariantAmberMultiplier('chain')).toBe(2.0);
-      expect(getVariantAmberMultiplier('no_vowel')).toBe(1.35);
-      expect(getVariantAmberMultiplier('no_consonant')).toBe(1.35);
-      expect(getVariantAmberMultiplier('reverse_blind')).toBe(1.85);
-      expect(getVariantAmberMultiplier('blind_no_vowel')).toBe(1.8);
-      expect(getVariantAmberMultiplier('blind_no_consonant')).toBe(1.8);
-      expect(getVariantAmberMultiplier('speed_no_vowel')).toBe(1.95);
-      expect(getVariantAmberMultiplier('speed_no_consonant')).toBe(1.95);
+      expect(getVariantAmberMultiplier('reverse')).toBe(1.22);
+      expect(getVariantAmberMultiplier('blind')).toBe(1.28);
+      expect(getVariantAmberMultiplier('speed')).toBe(1.34);
+      expect(getVariantAmberMultiplier('chain')).toBe(1.58);
+      expect(getVariantAmberMultiplier('no_vowel')).toBe(1.2);
+      expect(getVariantAmberMultiplier('no_consonant')).toBe(1.2);
+      expect(getVariantAmberMultiplier('reverse_blind')).toBe(1.5);
+      expect(getVariantAmberMultiplier('blind_no_vowel')).toBe(1.45);
+      expect(getVariantAmberMultiplier('blind_no_consonant')).toBe(1.45);
+      expect(getVariantAmberMultiplier('speed_no_vowel')).toBe(1.52);
+      expect(getVariantAmberMultiplier('speed_no_consonant')).toBe(1.52);
     });
 
     it('falls back to 1.0 for unknown variants', () => {

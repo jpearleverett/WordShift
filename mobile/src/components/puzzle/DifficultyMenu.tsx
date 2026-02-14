@@ -198,6 +198,16 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </Text>
         )}
         {comboOptions.map(renderVariantItem)}
+        {comboOptions.length === 0 && (
+          <Text style={[
+            styles.combosComingText,
+            isDark && { color: phaseTheme.modalSecondaryTextColor },
+          ]}>
+            {phase >= 3
+              ? 'More layered arrangements will reveal themselves.'
+              : 'More combo styles unlock later as you progress.'}
+          </Text>
+        )}
       </ScrollView>
     </View>
   );
@@ -253,6 +263,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
     paddingHorizontal: 6,
+  },
+  combosComingText: {
+    fontSize: 10,
+    color: CandyColors.gray[500],
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 8,
+    lineHeight: 14,
   },
   difficultyMenuItem: {
     flexDirection: 'row',

@@ -206,6 +206,10 @@ export interface HomeWorldProgress {
   seenVariantTutorials?: string[];
   // Player-selected preferred puzzle variant key
   preferredPuzzleVariant?: string;
+  // Last played variant key used for anti-farming reward decay
+  lastVariantPlayed?: string;
+  // Number of consecutive puzzles completed with the same variant
+  sameVariantStreak?: number;
 }
 
 /**

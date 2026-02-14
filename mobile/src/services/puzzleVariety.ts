@@ -99,7 +99,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Play normally to the bottom, then carry the chain back to the top.',
     darkInstruction: 'Complete the descent, then retrace the arrangement upward.',
     icon: '🔄',
-    amberMultiplier: 1.35,
+    amberMultiplier: 1.22,
   },
   blind: {
     variant: 'blind',
@@ -109,7 +109,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Trust the pattern: upcoming words stay hidden until revealed.',
     darkInstruction: 'Step into unseen words. They reveal only when touched.',
     icon: '🫣',
-    amberMultiplier: 1.4,
+    amberMultiplier: 1.28,
   },
   speed: {
     variant: 'speed',
@@ -119,7 +119,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Three-row sprint. Move quickly and commit.',
     darkInstruction: 'No hesitation. The pattern closes fast.',
     icon: '⚡',
-    amberMultiplier: 1.5,
+    amberMultiplier: 1.34,
     timeLimit: 60,
     rowOverride: 3,
   },
@@ -131,7 +131,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Complete 3 links in a row. The last word of each link starts the next one.',
     darkInstruction: 'Do not break the chain. Each ending must become the next opening.',
     icon: '🔗',
-    amberMultiplier: 2.0,
+    amberMultiplier: 1.58,
     chainLength: 3,
     rowOverride: 3,
   },
@@ -143,7 +143,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Only consonants may be moved in this variant.',
     darkInstruction: 'Vowels are forbidden in this rite. Move consonants only.',
     icon: '🔇',
-    amberMultiplier: 1.35,
+    amberMultiplier: 1.2,
   },
   no_consonant: {
     variant: 'no_consonant',
@@ -153,7 +153,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Only vowels may be moved in this variant.',
     darkInstruction: 'Consonants are sealed. Shift only open vowels.',
     icon: '🫧',
-    amberMultiplier: 1.35,
+    amberMultiplier: 1.2,
   },
   reverse_blind: {
     variant: 'reverse_blind',
@@ -163,7 +163,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Reach the bottom, then return to the first row in partial darkness.',
     darkInstruction: 'Trace the pattern down and up while the words stay veiled.',
     icon: '🌘',
-    amberMultiplier: 1.85,
+    amberMultiplier: 1.5,
   },
   blind_no_vowel: {
     variant: 'blind_no_vowel',
@@ -173,7 +173,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Rows are hidden and only consonants may move.',
     darkInstruction: 'The hidden pattern forbids vowels. Move consonants by faith.',
     icon: '🌑',
-    amberMultiplier: 1.8,
+    amberMultiplier: 1.45,
   },
   blind_no_consonant: {
     variant: 'blind_no_consonant',
@@ -183,7 +183,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Rows are hidden and only vowels may move.',
     darkInstruction: 'The hidden pattern seals consonants. Move vowels only.',
     icon: '🩸',
-    amberMultiplier: 1.8,
+    amberMultiplier: 1.45,
   },
   speed_no_vowel: {
     variant: 'speed_no_vowel',
@@ -193,7 +193,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Three-row sprint. Only consonants may move.',
     darkInstruction: 'Hurry. Vowels are forbidden and time is collapsing.',
     icon: '⚡',
-    amberMultiplier: 1.95,
+    amberMultiplier: 1.52,
     timeLimit: 60,
     rowOverride: 3,
   },
@@ -205,7 +205,7 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     instruction: 'Three-row sprint. Only vowels may move.',
     darkInstruction: 'Hurry. Consonants are sealed and time is collapsing.',
     icon: '⚡',
-    amberMultiplier: 1.95,
+    amberMultiplier: 1.52,
     timeLimit: 60,
     rowOverride: 3,
   },
@@ -242,6 +242,13 @@ const COMBO_VARIANTS: ComboVariant[] = [
   'speed_no_vowel',
   'speed_no_consonant',
 ];
+
+const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
+  EASY: 65,
+  MEDIUM: 60,
+  MEDIUM_PLUS: 54,
+  HARD: 48,
+};
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
   reverse: { puzzlesSolved: 18, minDepthPhase: 0, group: 'base' },
@@ -348,11 +355,22 @@ export function getVariantSelectorOptions(
   }
 
   for (const variant of COMBO_VARIANTS) {
+    const unlocked = isVariantUnlocked(variant, puzzlesSolved, currentPhase);
+    const requirement = VARIANT_UNLOCK_REQUIREMENTS[variant];
+    const remainingPuzzles = Math.max(0, requirement.puzzlesSolved - puzzlesSolved);
+    const isNearUnlock = !unlocked &&
+      remainingPuzzles <= 25 &&
+      currentPhase >= Math.max(0, requirement.minDepthPhase - 1);
+
+    if (!unlocked && !isNearUnlock) {
+      continue;
+    }
+
     options.push({
       variant,
       config: VARIANT_CONFIGS[variant],
       group: 'combo',
-      unlocked: isVariantUnlocked(variant, puzzlesSolved, currentPhase),
+      unlocked,
       unlockHint: getVariantUnlockHint(variant, puzzlesSolved, currentPhase, uiPhase),
     });
   }
@@ -432,12 +450,28 @@ export function hasVariantModifier(variant: PuzzleVariant, modifier: VariantModi
  */
 export function getVariantOverrides(
   variant: PuzzleVariant,
-  _baseDifficulty: Difficulty
+  baseDifficulty: Difficulty
 ): { targetRows?: number; wordLength?: number } {
-  if (hasVariantModifier(variant, 'speed') || hasVariantModifier(variant, 'chain')) {
-    return { targetRows: 3 };
+  if (hasVariantModifier(variant, 'speed')) {
+    return { targetRows: baseDifficulty === 'HARD' ? 4 : 3 };
+  }
+  if (hasVariantModifier(variant, 'chain')) {
+    return { targetRows: (baseDifficulty === 'HARD' || baseDifficulty === 'MEDIUM_PLUS') ? 4 : 3 };
   }
   return {};
+}
+
+/**
+ * Chain runs can deepen on higher difficulties.
+ */
+export function getVariantChainLength(
+  variant: PuzzleVariant,
+  difficulty: Difficulty
+): number {
+  if (!hasVariantModifier(variant, 'chain')) return 1;
+  const base = VARIANT_CONFIGS.chain.chainLength || 3;
+  if (difficulty === 'HARD') return base + 1;
+  return base;
 }
 
 /**
@@ -446,6 +480,17 @@ export function getVariantOverrides(
 export function getVariantTimeLimit(variant: PuzzleVariant): number | null {
   if (!hasVariantModifier(variant, 'speed')) return null;
   return VARIANT_CONFIGS[variant].timeLimit || VARIANT_CONFIGS.speed.timeLimit || 60;
+}
+
+/**
+ * Difficulty-aware timer for speed variants to preserve pressure at higher tiers.
+ */
+export function getVariantTimeLimitForDifficulty(
+  variant: PuzzleVariant,
+  difficulty: Difficulty
+): number | null {
+  if (!hasVariantModifier(variant, 'speed')) return null;
+  return SPEED_TIME_LIMIT_BY_DIFFICULTY[difficulty];
 }
 
 /**

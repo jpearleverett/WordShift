@@ -139,6 +139,13 @@ const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: a
 const mockGetAmberBalance = jest.fn(async () => 100);
 const mockGetCurrentPhase = jest.fn(async () => 0);
 const mockRecordVariantEncounter = jest.fn(async (_variant?: any) => {});
+const mockApplyVariantAmberBonus = jest.fn(async (_variant?: any, _base?: any, _mult?: any) => ({
+  bonus: 0,
+  newBalance: 115,
+  appliedMultiplier: 1.0,
+  repeatCount: 1,
+  repeatDecay: 1.0,
+}));
 
 const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
   totalWordsFormed: 0,
@@ -152,6 +159,7 @@ jest.mock('../services/amberCurrency', () => ({
   getCurrentPhase: () => mockGetCurrentPhase(),
   recordRitualWords: (...args: any[]) => mockRecordRitualWords(args[0], args[1], args[2]),
   recordVariantEncounter: (...args: any[]) => mockRecordVariantEncounter(args[0]),
+  applyVariantAmberBonus: (...args: any[]) => mockApplyVariantAmberBonus(args[0], args[1], args[2]),
 }));
 
 // --- Mock dialogueSession ---
@@ -212,6 +220,13 @@ describe('useGamePersistence', () => {
     mockGetAmberBalance.mockResolvedValue(100);
     mockGetCurrentPhase.mockResolvedValue(0);
     mockGetThreeStarRate.mockReturnValue(100);
+    mockApplyVariantAmberBonus.mockResolvedValue({
+      bonus: 0,
+      newBalance: 115,
+      appliedMultiplier: 1.0,
+      repeatCount: 1,
+      repeatDecay: 1.0,
+    });
   });
 
   describe('initial state', () => {
@@ -386,6 +401,24 @@ describe('useGamePersistence', () => {
       const [, actions] = callHook();
       await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'reverse');
       expect(mockRecordVariantEncounter).toHaveBeenCalledWith('reverse');
+    });
+
+    test('applies variant bonus via anti-farm calculator', async () => {
+      mockApplyVariantAmberBonus.mockResolvedValueOnce({
+        bonus: 4,
+        newBalance: 119,
+        appliedMultiplier: 1.2,
+        repeatCount: 2,
+        repeatDecay: 1.0,
+      });
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'reverse');
+
+      expect(mockApplyVariantAmberBonus).toHaveBeenCalledWith('reverse', 15, expect.any(Number));
+      expect(result.variantBonus).toBe(4);
+      expect(result.amberBalance).toBe(119);
+      expect(result.variantAppliedMultiplier).toBeCloseTo(1.2);
     });
 
     test('handles service errors gracefully with default returns', async () => {

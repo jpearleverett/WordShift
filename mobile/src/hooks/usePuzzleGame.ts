@@ -7,6 +7,7 @@ import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, get
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant } from '../services/amberCurrency';
 import {
   getVariantOverrides,
+  getVariantChainLength,
   getVariantInstruction,
   isVariantCompatibleWithSolution,
   hasVariantModifier,
@@ -70,7 +71,8 @@ export interface PuzzleGameActions {
     puzzleHint?: string,
     puzzleSolution?: PuzzleSolutionStep[],
     wordLength?: number,
-    variant?: PuzzleVariant
+    variant?: PuzzleVariant,
+    chainLengthOverride?: number
   ) => void;
   startNewGame: (
     selectedDifficulty?: Difficulty,
@@ -250,19 +252,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     puzzleHint?: string,
     puzzleSolution?: PuzzleSolutionStep[],
     wordLength: number = 4,
-    variant: PuzzleVariant = 'standard'
+    variant: PuzzleVariant = 'standard',
+    chainLengthOverride?: number
   ) => {
     applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
       resetPerformance: true,
       variant,
     });
     const configuredChainLength = hasVariantModifier(variant, 'chain')
-      ? (VARIANT_CONFIGS.chain.chainLength || 3)
+      ? (chainLengthOverride ?? getVariantChainLength(variant, difficulty))
       : 1;
     setCurrentChainLink(1);
     setChainLength(configuredChainLength);
     setChainCompletedWords([]);
-  }, [applyBoard]);
+  }, [applyBoard, difficulty]);
 
   const generatePuzzleForVariant = useCallback(async (
     selectedDifficulty: Difficulty,
@@ -348,8 +351,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         variant,
         timeoutPromise
       );
-
-      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant);
+      const chainLen = getVariantChainLength(activeVariant, selectedDifficulty);
+      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, chainLen);
       if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
         setMessage(getVariantInstruction(config, currentPhase));
@@ -362,11 +365,32 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         hasVariantModifier(variant, 'no_vowel') || hasVariantModifier(variant, 'no_consonant')
       ) ? 'standard' : variant;
       if (selectedDifficulty === 'HARD') {
-        initGame(FALLBACK_PUZZLE_HARD, "Challenge Mode", undefined, 5, fallbackVariant);
+        initGame(
+          FALLBACK_PUZZLE_HARD,
+          "Challenge Mode",
+          undefined,
+          5,
+          fallbackVariant,
+          getVariantChainLength(fallbackVariant, selectedDifficulty)
+        );
       } else if (selectedDifficulty === 'EASY') {
-        initGame(FALLBACK_PUZZLE.slice(0, 3), "Simple Start", undefined, 4, fallbackVariant);
+        initGame(
+          FALLBACK_PUZZLE.slice(0, 3),
+          "Simple Start",
+          undefined,
+          4,
+          fallbackVariant,
+          getVariantChainLength(fallbackVariant, selectedDifficulty)
+        );
       } else {
-        initGame(FALLBACK_PUZZLE, "Classic Setup", undefined, 4, fallbackVariant);
+        initGame(
+          FALLBACK_PUZZLE,
+          "Classic Setup",
+          undefined,
+          4,
+          fallbackVariant,
+          getVariantChainLength(fallbackVariant, selectedDifficulty)
+        );
       }
       if (fallbackVariant !== 'standard') {
         const config = VARIANT_CONFIGS[fallbackVariant];

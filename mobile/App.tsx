@@ -63,6 +63,7 @@ import { markPendingChanges } from './src/services/cloudSave';
 import {
   hasVariantModifier,
   getVariantTimeLimit,
+  getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
   isVariantUnlocked,
   PuzzleVariant,
@@ -140,6 +141,7 @@ export default function App() {
   // Victory glitch state (brief flash text during Phase 0 victories)
   const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
   const [showVictoryGlitch, setShowVictoryGlitch] = useState(false);
+  const [completionCoda, setCompletionCoda] = useState<{ title: string; text: string } | null>(null);
 
   // Auto-dismiss interjection after 4 seconds
   useEffect(() => {
@@ -157,7 +159,9 @@ export default function App() {
       return;
     }
 
-    const limit = getVariantTimeLimit(puzzle.currentVariant) ?? 60;
+    const limit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
+      ?? getVariantTimeLimit(puzzle.currentVariant)
+      ?? 60;
     setSpeedTimeRemaining(limit);
     const startedAt = Date.now();
 
@@ -272,6 +276,7 @@ export default function App() {
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     transitionTo('puzzle', () => {
       puzzleActions.startNewGame(diff);
       setIsPlayingDaily(false);
@@ -286,6 +291,7 @@ export default function App() {
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     transitionTo('puzzle', async () => {
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);
@@ -394,12 +400,22 @@ export default function App() {
             if (!finalDone) {
               // First puzzle after house completion at Phase 4 = the "final puzzle"
               await markFinalPuzzleCompleted();
+              setCompletionCoda({
+                title: 'THE HOUSE STANDS COMPLETE',
+                text: persistence.currentPhase >= 3
+                  ? 'You finished what was being built. There is no pretending now.'
+                  : 'You completed the house and reached the final path.',
+              });
               setTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
                 // First puzzle after final puzzle = post-revelation (Phase 5)
                 await markPostRevelation();
+                setCompletionCoda({
+                  title: 'THE PATTERN REMEMBERS YOU',
+                  text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
+                });
                 setTimeout(() => setPhaseTransitionEvent(POST_REVELATION_EVENT), 1500);
               }
             }
@@ -528,6 +544,7 @@ export default function App() {
     setShowInterjection(false);
     setInterjection(null);
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     puzzleActions.handleNextLevel();
   }, [puzzleActions, victoryActions]);
 
@@ -539,6 +556,7 @@ export default function App() {
     setShowInterjection(false);
     setInterjection(null);
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     transitionTo('home', () => {
       puzzleActions.setGameState(GameState.IDLE);
     });
@@ -563,6 +581,7 @@ export default function App() {
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant]);
 
@@ -573,6 +592,7 @@ export default function App() {
     hapticSelection();
     soundTap();
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     puzzleActions.setSelectedVariant(variant);
     puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
   }, [
@@ -604,6 +624,7 @@ export default function App() {
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     setRitualEchoWords([]);
+    setCompletionCoda(null);
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
     puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant]);
@@ -1122,6 +1143,7 @@ export default function App() {
           phase={persistence.currentPhase}
           isPlayingDaily={isPlayingDaily}
           victoryData={victoryFlow.victoryData}
+          completionCoda={completionCoda}
           cumulativeStats={persistence.cumulativeStats}
           completedWords={puzzle.lastCompletedWords}
           incantationName={puzzle.lastIncantationName}
