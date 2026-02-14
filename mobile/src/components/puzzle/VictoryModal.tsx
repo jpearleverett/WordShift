@@ -84,13 +84,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   if (!visible) return null;
 
   return (
-    <View style={styles.modalOverlay}>
+    <View style={[styles.modalOverlay, {
+      backgroundColor: phaseTheme.modalOverlayColor,
+    }]}>
       <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
           <Animated.View style={[styles.victoryModal, {
+            backgroundColor: phaseTheme.modalBgColor,
             transform: [{ scale: modalScale }],
             opacity: modalOpacity,
           }]}>
@@ -130,7 +133,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {getVictoryTitle(earnedStars, phase)}
             </Text>
-            <Text style={styles.victorySubtitle}>
+            <Text style={[styles.victorySubtitle, {
+              color: phaseTheme.modalSecondaryTextColor,
+            }]}>
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
@@ -184,7 +189,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             })()}
 
             {/* Performance feedback — phase-aware tone */}
-            <Text style={styles.victoryFeedback}>
+            <Text style={[styles.victoryFeedback, {
+              color: phaseTheme.modalSecondaryTextColor,
+            }]}>
               {getVictoryFeedback(earnedStars, phase)}
             </Text>
 
@@ -253,32 +260,36 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </Text>
             )}
 
-            <View style={styles.victoryStats}>
+            <View style={[styles.victoryStats, {
+              backgroundColor: phaseTheme.modalStatBgColor,
+            }]}>
               <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>Lv.{level}</Text>
-                <Text style={styles.victoryStatLabel}>{difficulty}</Text>
+                <Text style={[styles.victoryStatValue, { color: phaseTheme.modalTextColor }]}>Lv.{level}</Text>
+                <Text style={[styles.victoryStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
               </View>
-              <View style={styles.victoryStatDivider} />
+              <View style={[styles.victoryStatDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
               <View style={styles.victoryStatItem}>
-                <Text style={styles.victoryStatValue}>{'\uD83D\uDC8E'} {amberBalance}</Text>
-                <Text style={styles.victoryStatLabel}>Total Amber</Text>
+                <Text style={[styles.victoryStatValue, { color: phaseTheme.modalTextColor }]}>{'\uD83D\uDC8E'} {amberBalance}</Text>
+                <Text style={[styles.victoryStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Total Amber</Text>
               </View>
             </View>
 
             {/* Cumulative stats */}
             {cumulativeStats && (
-              <View style={styles.cumulativeStats}>
+              <View style={[styles.cumulativeStats, {
+                borderTopColor: phaseTheme.modalDividerColor,
+              }]}>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalStars}</Text>
-                  <Text style={styles.cumulativeStatLabel}>Total Stars</Text>
+                  <Text style={[styles.cumulativeStatValue, { color: phaseTheme.modalTextColor }]}>{cumulativeStats.totalStars}</Text>
+                  <Text style={[styles.cumulativeStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Total Stars</Text>
                 </View>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.threeStarCount}</Text>
-                  <Text style={styles.cumulativeStatLabel}>Perfect</Text>
+                  <Text style={[styles.cumulativeStatValue, { color: phaseTheme.modalTextColor }]}>{cumulativeStats.threeStarCount}</Text>
+                  <Text style={[styles.cumulativeStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Perfect</Text>
                 </View>
                 <View style={styles.cumulativeStatItem}>
-                  <Text style={styles.cumulativeStatValue}>{cumulativeStats.totalPuzzlesCompleted}</Text>
-                  <Text style={styles.cumulativeStatLabel}>Puzzles</Text>
+                  <Text style={[styles.cumulativeStatValue, { color: phaseTheme.modalTextColor }]}>{cumulativeStats.totalPuzzlesCompleted}</Text>
+                  <Text style={[styles.cumulativeStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Puzzles</Text>
                 </View>
               </View>
             )}

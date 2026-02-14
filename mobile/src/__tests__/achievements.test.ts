@@ -59,7 +59,6 @@ const defaultState: AchievementCheckState = {
   dailyChallengesCompleted: 0,
   shareCount: 0,
   challengeCompletions: 0,
-  decorationCount: 0,
 };
 
 describe('achievements', () => {

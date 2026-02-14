@@ -141,6 +141,13 @@ export interface PhaseTheme {
   // Victory modal accent
   victoryTitleColor: string;
   victoryGlowColor: string;
+  // Victory modal backgrounds
+  modalOverlayColor: string;
+  modalBgColor: string;
+  modalTextColor: string;
+  modalSecondaryTextColor: string;
+  modalStatBgColor: string;
+  modalDividerColor: string;
   // Vignette
   vignetteColor: string;
 }
@@ -177,6 +184,12 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         ],
         victoryTitleColor: CandyColors.pink.main,
         victoryGlowColor: CandyColors.yellow.light,
+        modalOverlayColor: 'rgba(76, 29, 149, 0.7)',
+        modalBgColor: CandyColors.white,
+        modalTextColor: CandyColors.purple.main,
+        modalSecondaryTextColor: CandyColors.gray[400],
+        modalStatBgColor: CandyColors.gray[50],
+        modalDividerColor: CandyColors.gray[200],
         vignetteColor: '#4C1D95',
       };
     case 1:
@@ -201,6 +214,12 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         ],
         victoryTitleColor: '#D06090',
         victoryGlowColor: '#E8D080',
+        modalOverlayColor: 'rgba(60, 25, 120, 0.7)',
+        modalBgColor: '#FAF8FF',
+        modalTextColor: '#7050A0',
+        modalSecondaryTextColor: CandyColors.gray[400],
+        modalStatBgColor: '#F0ECF5',
+        modalDividerColor: CandyColors.gray[200],
         vignetteColor: '#3D1870',
       };
     case 2:
@@ -225,6 +244,12 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         ],
         victoryTitleColor: '#9868A8',
         victoryGlowColor: '#A8A0C0',
+        modalOverlayColor: 'rgba(40, 20, 80, 0.75)',
+        modalBgColor: '#E8E0F0',
+        modalTextColor: '#5A4080',
+        modalSecondaryTextColor: '#8878A0',
+        modalStatBgColor: '#DDD5E8',
+        modalDividerColor: '#C8C0D8',
         vignetteColor: '#2A1050',
       };
     case 3:
@@ -249,6 +274,12 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         ],
         victoryTitleColor: '#7858A0',
         victoryGlowColor: '#605880',
+        modalOverlayColor: 'rgba(15, 8, 30, 0.8)',
+        modalBgColor: '#2A2040',
+        modalTextColor: '#9880B0',
+        modalSecondaryTextColor: '#706088',
+        modalStatBgColor: '#221838',
+        modalDividerColor: '#3A2850',
         vignetteColor: '#180830',
       };
     case 4:
@@ -273,6 +304,12 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         ],
         victoryTitleColor: '#6040A0',
         victoryGlowColor: '#302840',
+        modalOverlayColor: 'rgba(10, 4, 18, 0.85)',
+        modalBgColor: '#1A1228',
+        modalTextColor: '#8060A0',
+        modalSecondaryTextColor: '#604878',
+        modalStatBgColor: '#140E20',
+        modalDividerColor: '#2A1E38',
         vignetteColor: '#0A0418',
       };
     // Phase 5 — Post-Revelation: Terrible peace
@@ -300,6 +337,12 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         ],
         victoryTitleColor: '#8070B0',   // Muted, peaceful purple
         victoryGlowColor: '#403860',    // Dim
+        modalOverlayColor: 'rgba(12, 6, 25, 0.82)',
+        modalBgColor: '#1E1630',
+        modalTextColor: '#8878B0',
+        modalSecondaryTextColor: '#685888',
+        modalStatBgColor: '#181028',
+        modalDividerColor: '#302240',
         vignetteColor: '#0C0620',       // Deep purple edge
       };
   }

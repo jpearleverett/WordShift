@@ -560,58 +560,6 @@ export async function canAfford(cost: number): Promise<boolean> {
   return progress.amber >= cost;
 }
 
-/**
- * Purchase a room decoration
- */
-export async function purchaseDecoration(
-  roomId: string,
-  decorationId: string,
-  cost: number
-): Promise<{ success: boolean; newBalance: number }> {
-  const result = await spendAmber(cost, `decoration_${decorationId}`);
-  if (!result.success) return result;
-
-  const progress = await loadProgress();
-  if (!progress.decorations) {
-    progress.decorations = {};
-  }
-  if (!progress.decorations[roomId]) {
-    progress.decorations[roomId] = [];
-  }
-  if (!progress.decorations[roomId].includes(decorationId)) {
-    progress.decorations[roomId].push(decorationId);
-  }
-  progressCache = progress;
-  await saveProgress();
-
-  return { success: true, newBalance: result.newBalance };
-}
-
-/**
- * Check if a decoration has been purchased
- */
-export async function hasDecoration(roomId: string, decorationId: string): Promise<boolean> {
-  const progress = await loadProgress();
-  return !!(progress.decorations?.[roomId]?.includes(decorationId));
-}
-
-/**
- * Get all purchased decorations
- */
-export async function getAllDecorations(): Promise<{ [roomId: string]: string[] }> {
-  const progress = await loadProgress();
-  return progress.decorations || {};
-}
-
-/**
- * Get total number of decorations purchased
- */
-export async function getDecorationCount(): Promise<number> {
-  const progress = await loadProgress();
-  if (!progress.decorations) return 0;
-  return Object.values(progress.decorations).reduce((sum, ids) => sum + ids.length, 0);
-}
-
 // ============================================================================
 // RITUAL TRACKING - The incantation ledger
 // ============================================================================

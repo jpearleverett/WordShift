@@ -208,6 +208,14 @@ async function saveSacrificeState(state: SacrificeState): Promise<void> {
 }
 
 /**
+ * Get the current sacrifice count (for dialogue reactions).
+ */
+export async function getSacrificeCount(): Promise<number> {
+  const state = await loadSacrificeState();
+  return state.sacrificeCount;
+}
+
+/**
  * Clear sacrifice data (for Settings > Reset All).
  */
 export async function clearSacrificeState(): Promise<void> {

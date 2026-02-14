@@ -44,7 +44,6 @@ export interface AchievementCheckState {
   dailyChallengesCompleted: number;
   shareCount: number;
   challengeCompletions: number;
-  decorationCount: number;
 }
 
 // ===== Achievement Definitions =====
@@ -312,32 +311,6 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '⚔️',
     category: 'mastery',
     check: (s) => s.challengeCompletions >= 25,
-  },
-
-  // Decoration achievements
-  {
-    id: 'first_decoration',
-    title: 'Interior Designer',
-    description: 'Purchase your first room decoration',
-    icon: '🎨',
-    category: 'collection',
-    check: (s) => s.decorationCount >= 1,
-  },
-  {
-    id: 'decorations_10',
-    title: 'Home Stylist',
-    description: 'Purchase 10 decorations',
-    icon: '🏡',
-    category: 'collection',
-    check: (s) => s.decorationCount >= 10,
-  },
-  {
-    id: 'decorations_all',
-    title: 'Grand Designer',
-    description: 'Purchase all 30 decorations',
-    icon: '👑',
-    category: 'collection',
-    check: (s) => s.decorationCount >= 30,
   },
 
   // Extended streak achievements
