@@ -20,6 +20,8 @@ import {
 } from '../services/dialogueSession';
 import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted, recordConsumedCoordinatedEvent, hasSeenGuaranteedCrossRef, markGuaranteedCrossRefSeen } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
+import { getChoiceForAnimal, recordChoice, PlayerChoice, DialogueChoice } from '../services/dialogueChoices';
+import { recordWhisper } from '../services/whisperGallery';
 
 interface SessionInfo {
   status: 'available' | 'in_session' | 'cooldown';
@@ -43,9 +45,12 @@ interface UseDialogueFlowReturn {
   dialogueSlide: Animated.Value;
   isTalking: boolean;
   hasMoreToShow: boolean;
+  /** Active dialogue choice for Phase 3 choice points */
+  activeChoice: DialogueChoice | null;
   handleAnimalTap: (animal: Animal) => Promise<void>;
   handleNextDialogue: () => Promise<void>;
   handleCloseDialogue: () => Promise<void>;
+  handleDialogueChoice: (choice: PlayerChoice) => Promise<void>;
 }
 
 /**
@@ -71,6 +76,8 @@ export function useDialogueFlow({
   // Pre-dialogue pages: shown before regular dialogue, one at a time
   // These are trigger reactions, cross-animal refs, coordinated events, etc.
   const [preDialoguePages, setPreDialoguePages] = useState<string[]>([]);
+  // Active dialogue choice (Phase 3 choice points)
+  const [activeChoice, setActiveChoice] = useState<DialogueChoice | null>(null);
 
   // Animations
   const dialogueSlide = useRef(new Animated.Value(0)).current;
@@ -313,6 +320,24 @@ export function useDialogueFlow({
       }
     }
 
+    // 6. Dialogue choice point (Phase 3 only) — illusion of agency
+    if (animalPhase === 3) {
+      try {
+        const choice = await getChoiceForAnimal(
+          animal.type,
+          animalPhase,
+          animal.currentDialogueIndex
+        );
+        if (choice) {
+          // Show the choice prompt as a pre-dialogue page
+          pages.push(choice.prompt);
+          setActiveChoice(choice);
+        }
+      } catch {
+        // Choice points are non-critical
+      }
+    }
+
     setPreDialoguePages(pages);
 
     const status = getSessionStatus(animal.id);
@@ -393,6 +418,18 @@ export function useDialogueFlow({
     if (hasMore) {
       await recordDialogue(selectedAnimal.id);
 
+      // Record dialogue text in whisper gallery
+      const currentText = getDialogueText();
+      if (currentText) {
+        recordWhisper({
+          animalType: selectedAnimal.type,
+          animalName: selectedAnimal.name,
+          text: currentText,
+          phase: animalPhase,
+          type: 'dialogue',
+        }).catch(() => {});
+      }
+
       const status = getSessionStatus(selectedAnimal.id);
       setSessionInfo(status);
 
@@ -426,6 +463,29 @@ export function useDialogueFlow({
     }
   }, [selectedAnimal, progress, handleCloseDialogue, setAnimals, preDialoguePages]);
 
+  // Handle player choosing a dialogue option (Phase 3 choice points)
+  const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
+    if (!selectedAnimal || !activeChoice) return;
+    try {
+      const result = await recordChoice(selectedAnimal.type, choice);
+      // Replace the current pre-dialogue page with the response, then convergence
+      setPreDialoguePages([result.response, result.convergence]);
+      setActiveChoice(null);
+
+      // Record the choice response in whisper gallery
+      recordWhisper({
+        animalType: selectedAnimal.type,
+        animalName: selectedAnimal.name,
+        text: result.response,
+        phase: 3,
+        type: 'dialogue',
+      }).catch(() => {});
+    } catch {
+      // Choice handling is non-critical, just close the choice
+      setActiveChoice(null);
+    }
+  }, [selectedAnimal, activeChoice]);
+
   return {
     selectedAnimal,
     showDialogue,
@@ -437,8 +497,10 @@ export function useDialogueFlow({
     dialogueSlide,
     isTalking,
     hasMoreToShow: computeHasMore(),
+    activeChoice,
     handleAnimalTap,
     handleNextDialogue,
     handleCloseDialogue,
+    handleDialogueChoice,
   };
 }

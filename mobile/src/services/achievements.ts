@@ -451,6 +451,14 @@ export async function getUnlockedCount(): Promise<number> {
 }
 
 /**
+ * Get all unlocked achievement IDs
+ */
+export async function getUnlockedAchievementIds(): Promise<string[]> {
+  const progress = await loadAchievements();
+  return [...progress.unlockedIds];
+}
+
+/**
  * Get total achievement count
  */
 export function getTotalCount(): number {
