@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (673 tests, 26 suites)
+npx jest --no-coverage   # Run all tests (680 tests, 26 suites)
 ```
 
 ## Tech Stack
@@ -151,7 +151,7 @@ mobile/
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (673 tests, 26 suites)
+├── src/__tests__/               # Test suites (680 tests, 26 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -305,7 +305,10 @@ Variants are now player-selected from the setup menu (not randomly injected). Pl
 - **Combos**: `reverse_blind`, `blind_no_vowel`, `blind_no_consonant`, `speed_no_vowel`, `speed_no_consonant`.
 
 Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions), and lock hints are also phase-aware without exposing raw phase numbers to players.
-- **Wired in**: `DifficultyMenu.tsx` renders unlock-aware variant cards (selected/active/locked states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies `getVariantAmberMultiplier(variant)` as a post-multiplier bonus on amber rewards.
+- **Progressive disclosure**: combo variants are only shown once unlocked or near unlock; otherwise the setup menu shows a “more combinations later” message.
+- **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
+- **Economy anti-farm**: variant multipliers were rebalanced for selectable play and now taper with repeated back-to-back use of the same variant through `applyVariantAmberBonus()` in `amberCurrency.ts`.
+- **Wired in**: `DifficultyMenu.tsx` renders unlock-aware variant cards (selected/active/locked states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
 
 ## App Architecture
 
@@ -382,6 +385,7 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
    - **Ritual Echo** (all phases): Completed word chain displayed below title. Phase 0-1: bright candy styling. Phase 2: muted. Phase 3+: dark, arrows become vertical (↓). Header reframes from "Your Word Journey:" → "The Offering:"
    - **Named Incantation** (Phase 2+): Puzzle chain name shown in ritual echo. Phase 2: innocent ("The HEAT Dance"). Phase 3: shadowy ("The HEAT's Shadow"). Phase 4: ritual ("Offering: HEAT to COLD")
    - **Words Offered** (all phases): Running total of words formed across all puzzles
+   - **Completion Coda** (endgame): first final-puzzle/post-revelation wins show a dedicated acknowledgement block in VictoryModal for stronger emotional closure
    - Phase-aware feedback text shifts tone with narrative phase
 6. If phase changed: `PhaseTransitionOverlay` plays cinematic multi-scene interstitial, then `playPhaseChangeFlash()` does dramatic double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
@@ -665,6 +669,7 @@ The setup dropdown adapts to the narrative phase:
 - Includes sections for **Difficulty**, **Challenge mode**, and **Puzzle Style** (variant/combo selector)
 - Shows clear **selected**, **active**, and **locked** states for variants
 - Locked variants display phase-aware unlock hints that avoid exposing internal phase labels
+- Combo styles are progressively disclosed (shown when near unlock or unlocked, hidden otherwise)
 - **Phase 0-2**: Bright menu styling and lighter copy tone
 - **Phase 3+**: Dark background, phase-themed text colors from `getPhaseTheme()`, darker ritualized copy tone
 
@@ -775,11 +780,12 @@ Manages amber balance, streak, and phase progression:
 - `updateStreak()` - Grace period of STREAK_RESET_DAYS (2 days)
 - `getStreakInfo()` - Current streak, multiplier, bonus percentage
 - `getFullProgress()` - All progress data (amber, puzzles, phase, unlocks)
-- `getPuzzlesUntilNextPhase()` - Uses `phaseProgress` (accelerated) not raw `puzzlesSolved`
+- `getPuzzlesUntilNextPhase()` - Uses weighted `phaseProgress` plus minimum puzzle-exposure pacing guardrails
 - `recordRitualWords(words, triggerWords, ritualEnergy)` - Record words to ledger, queue triggers, accumulate ritual energy
 - `consumeTriggerWords(animalType?)` - Dequeue trigger words for a specific animal (per-animal filtering; without arg: legacy consume-all)
 - `recordVariantEncounter(variant)` / `consumePendingVariantTutorial()` - Queue/consume one-time animal explanations for newly encountered variants
 - `setPreferredPuzzleVariant(variant)` / `getPreferredPuzzleVariant()` - Persist and load the player's preferred setup-menu variant
+- `applyVariantAmberBonus(variant, baseAmberAward, configuredMultiplier)` - Applies persisted variant bonus with repeat-use anti-farm decay
 - `markHouseCompleted()` / `isHouseCompleted()` - House completion ceremony tracking
 - `markFinalPuzzleCompleted()` / `isFinalPuzzleCompleted()` - Final puzzle endgame tracking
 - `markPostRevelation()` / `isPostRevelation()` - Phase 5 post-revelation state
@@ -933,7 +939,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 673 tests, 26 suites
+cd mobile && npx jest --no-coverage  # 680 tests, 26 suites
 ```
 
 **Test patterns:**
