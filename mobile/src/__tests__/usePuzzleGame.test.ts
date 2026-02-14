@@ -80,6 +80,11 @@ jest.mock('../services/phaseNarrative', () => ({
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
 }));
 
+jest.mock('../services/amberCurrency', () => ({
+  getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
+  setPreferredPuzzleVariant: jest.fn(async () => {}),
+}));
+
 // COMMON_WORDS needs to contain all words used in the test puzzle chain
 // and the valid words formed during moves
 jest.mock('../constants', () => ({
@@ -535,6 +540,18 @@ describe('usePuzzleGame', () => {
       // Should fall back to FALLBACK_PUZZLE
       expect(state.rows).toHaveLength(4);
       expect(state.gameState).toBe(GameState.PLAYING);
+    });
+
+    test('uses selected variant for new puzzles', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setSelectedVariant('blind');
+      [, actions] = callHook();
+      await actions.startNewGame('MEDIUM');
+
+      const [state] = callHook();
+      expect(state.currentVariant).toBe('blind');
+      expect(state.selectedVariant).toBe('blind');
     });
   });
 

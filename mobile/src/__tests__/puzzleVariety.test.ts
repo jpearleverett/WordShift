@@ -3,8 +3,14 @@ import {
   getVariantDescription,
   getVariantInstruction,
   getVariantOverrides,
+  getVariantSelectorOptions,
+  getVariantUnlockHint,
+  getVariantUnlockRequirement,
+  getUnlockedVariants,
   getVariantModifiers,
   hasVariantModifier,
+  isPuzzleVariant,
+  isVariantUnlocked,
   isVariantCompleted,
   getVariantAmberMultiplier,
   getVariantTimeLimit,
@@ -175,6 +181,54 @@ describe('puzzleVariety', () => {
       expect(getVariantTimeLimit('speed_no_consonant')).toBe(60);
       expect(getVariantTimeLimit('reverse')).toBeNull();
       expect(getVariantTimeLimit('chain')).toBeNull();
+    });
+
+    it('exposes unlock requirements and unlocked checks', () => {
+      expect(getVariantUnlockRequirement('standard')).toBeNull();
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(18);
+      expect(isVariantUnlocked('reverse', 17, 0)).toBe(false);
+      expect(isVariantUnlocked('reverse', 18, 0)).toBe(true);
+      expect(isVariantUnlocked('reverse_blind', 120, 1)).toBe(false);
+      expect(isVariantUnlocked('reverse_blind', 120, 2)).toBe(true);
+    });
+
+    it('returns unlocked variants list with standard first', () => {
+      const early = getUnlockedVariants(10, 0);
+      expect(early).toEqual(['standard']);
+
+      const mid = getUnlockedVariants(80, 1);
+      expect(mid).toContain('standard');
+      expect(mid).toContain('reverse');
+      expect(mid).toContain('blind');
+      expect(mid).toContain('no_vowel');
+      expect(mid).toContain('speed');
+      expect(mid).toContain('no_consonant');
+      expect(mid).not.toContain('chain');
+    });
+
+    it('builds selector options with lock hints', () => {
+      const options = getVariantSelectorOptions(50, 1, 1);
+      const standard = options.find(o => o.variant === 'standard');
+      const reverse = options.find(o => o.variant === 'reverse');
+      const combo = options.find(o => o.variant === 'reverse_blind');
+
+      expect(standard?.unlocked).toBe(true);
+      expect(reverse?.unlocked).toBe(true);
+      expect(combo?.unlocked).toBe(false);
+      expect(combo?.unlockHint).toContain('puzzles');
+      expect(combo?.unlockHint.toLowerCase()).not.toContain('phase');
+    });
+
+    it('validates known variant keys', () => {
+      expect(isPuzzleVariant('speed_no_vowel')).toBe(true);
+      expect(isPuzzleVariant('made_up_variant')).toBe(false);
+    });
+
+    it('uses tone-aware unlock hints', () => {
+      const light = getVariantUnlockHint('speed_no_consonant', 160, 3, 1);
+      const dark = getVariantUnlockHint('speed_no_consonant', 160, 3, 4);
+      expect(light).toContain('Unlocks');
+      expect(dark).toContain('offerings');
     });
 
     it('enforces letter movement restrictions', () => {

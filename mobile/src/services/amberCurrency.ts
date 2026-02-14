@@ -41,6 +41,7 @@ function getDefaultProgress(): HomeWorldProgress {
     challengeCompletions: 0,
     pendingVariantTutorials: [],
     seenVariantTutorials: [],
+    preferredPuzzleVariant: 'standard',
   };
 }
 
@@ -739,6 +740,25 @@ export async function consumePendingVariantTutorial(): Promise<string | null> {
   progressCache = progress;
   await saveProgress();
   return next;
+}
+
+/**
+ * Persist the player's preferred puzzle variant for future runs.
+ */
+export async function setPreferredPuzzleVariant(variant: string): Promise<void> {
+  if (!variant) return;
+  const progress = await loadProgress();
+  progress.preferredPuzzleVariant = variant;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Load the player's preferred puzzle variant key.
+ */
+export async function getPreferredPuzzleVariant(): Promise<string> {
+  const progress = await loadProgress();
+  return progress.preferredPuzzleVariant || 'standard';
 }
 
 /**

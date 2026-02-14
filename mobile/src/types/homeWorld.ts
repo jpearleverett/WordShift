@@ -204,6 +204,8 @@ export interface HomeWorldProgress {
   pendingVariantTutorials?: string[];
   // Variant tutorials already explained to the player
   seenVariantTutorials?: string[];
+  // Player-selected preferred puzzle variant key
+  preferredPuzzleVariant?: string;
 }
 
 /**

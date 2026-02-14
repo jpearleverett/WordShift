@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -60,7 +60,14 @@ import { isDreadWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges } from './src/services/cloudSave';
-import { hasVariantModifier, getVariantTimeLimit, VARIANT_CONFIGS } from './src/services/puzzleVariety';
+import {
+  hasVariantModifier,
+  getVariantTimeLimit,
+  getVariantSelectorOptions,
+  isVariantUnlocked,
+  PuzzleVariant,
+  VARIANT_CONFIGS,
+} from './src/services/puzzleVariety';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery';
@@ -78,6 +85,28 @@ export default function App() {
   const [achievementState, achievementActions] = useAchievementQueue();
   const setPuzzleGameState = puzzleActions.setGameState;
   const setPuzzleMessage = puzzleActions.setMessage;
+  const setSelectedVariant = puzzleActions.setSelectedVariant;
+
+  const puzzlesSolvedForVariantUnlocks = persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0;
+  const variantSelectorOptions = useMemo(() => {
+    return getVariantSelectorOptions(
+      puzzlesSolvedForVariantUnlocks,
+      persistence.currentPhase,
+      persistence.currentPhase
+    );
+  }, [puzzlesSolvedForVariantUnlocks, persistence.currentPhase]);
+
+  // Clamp selected variant if progression changed (e.g. after reset/migration).
+  useEffect(() => {
+    if (!isVariantUnlocked(puzzle.selectedVariant, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
+      setSelectedVariant('standard');
+    }
+  }, [
+    puzzle.selectedVariant,
+    puzzlesSolvedForVariantUnlocks,
+    persistence.currentPhase,
+    setSelectedVariant,
+  ]);
 
   // Sync narrative phase from persistence into puzzle hook
   useEffect(() => {
@@ -534,8 +563,25 @@ export default function App() {
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
     setRitualEchoWords([]);
-    puzzleActions.startNewGame(d, puzzle.gameMode);
-  }, [puzzleActions, puzzle.gameMode]);
+    puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
+  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant]);
+
+  const handleSelectVariant = useCallback((variant: PuzzleVariant) => {
+    if (!isVariantUnlocked(variant, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
+      return;
+    }
+    hapticSelection();
+    soundTap();
+    setRitualEchoWords([]);
+    puzzleActions.setSelectedVariant(variant);
+    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
+  }, [
+    puzzleActions,
+    puzzle.difficulty,
+    puzzle.gameMode,
+    puzzlesSolvedForVariantUnlocks,
+    persistence.currentPhase,
+  ]);
 
   // Trigger dread pulse when a dread word is formed during a puzzle
   const triggerDreadPulse = useCallback((phase: number) => {
@@ -559,8 +605,8 @@ export default function App() {
     hapticMedium();
     setRitualEchoWords([]);
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode);
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty]);
+    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant]);
 
   // ========================================================================
   // Onboarding flow helpers (continued)
@@ -932,7 +978,7 @@ export default function App() {
           <TouchableOpacity
             style={styles.difficultyButton}
             onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
-            accessibilityLabel={`Difficulty: ${puzzle.difficulty}. Tap to change`}
+            accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
             <View style={styles.difficultyButtonShine} />
@@ -952,8 +998,12 @@ export default function App() {
             currentDifficulty={puzzle.difficulty}
             gameMode={puzzle.gameMode}
             phase={persistence.currentPhase}
+            currentVariant={puzzle.selectedVariant}
+            activeVariant={puzzle.currentVariant}
+            variantOptions={variantSelectorOptions}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
+            onSelectVariant={handleSelectVariant}
           />
         </View>
         )}

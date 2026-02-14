@@ -59,6 +59,23 @@ export interface VariantConfig {
   chainLength?: number;
 }
 
+export interface VariantUnlockRequirement {
+  puzzlesSolved: number;
+  /**
+   * Internal gating depth. Never exposed to players as phase numbers in UI.
+   */
+  minDepthPhase: number;
+  group: 'base' | 'combo';
+}
+
+export interface VariantSelectorOption {
+  variant: PuzzleVariant;
+  config: VariantConfig;
+  group: 'core' | 'base' | 'combo';
+  unlocked: boolean;
+  unlockHint: string;
+}
+
 // ============================================================================
 // Variant Definitions
 // ============================================================================
@@ -209,33 +226,150 @@ const VARIANT_MODIFIER_MAP: Record<PuzzleVariant, VariantModifier[]> = {
   speed_no_consonant: ['speed', 'no_consonant'],
 };
 
+const BASE_VARIANTS: VariantModifier[] = [
+  'reverse',
+  'blind',
+  'no_vowel',
+  'speed',
+  'no_consonant',
+  'chain',
+];
+
+const COMBO_VARIANTS: ComboVariant[] = [
+  'reverse_blind',
+  'blind_no_vowel',
+  'blind_no_consonant',
+  'speed_no_vowel',
+  'speed_no_consonant',
+];
+
+const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
+  reverse: { puzzlesSolved: 18, minDepthPhase: 0, group: 'base' },
+  blind: { puzzlesSolved: 30, minDepthPhase: 0, group: 'base' },
+  no_vowel: { puzzlesSolved: 45, minDepthPhase: 0, group: 'base' },
+  speed: { puzzlesSolved: 60, minDepthPhase: 0, group: 'base' },
+  no_consonant: { puzzlesSolved: 75, minDepthPhase: 0, group: 'base' },
+  chain: { puzzlesSolved: 95, minDepthPhase: 0, group: 'base' },
+  reverse_blind: { puzzlesSolved: 120, minDepthPhase: 2, group: 'combo' },
+  blind_no_vowel: { puzzlesSolved: 120, minDepthPhase: 2, group: 'combo' },
+  blind_no_consonant: { puzzlesSolved: 150, minDepthPhase: 3, group: 'combo' },
+  speed_no_vowel: { puzzlesSolved: 150, minDepthPhase: 3, group: 'combo' },
+  speed_no_consonant: { puzzlesSolved: 190, minDepthPhase: 4, group: 'combo' },
+};
+
+export function isPuzzleVariant(value: string): value is PuzzleVariant {
+  return value in VARIANT_CONFIGS;
+}
+
+export function getVariantUnlockRequirement(variant: PuzzleVariant): VariantUnlockRequirement | null {
+  if (variant === 'standard') return null;
+  return VARIANT_UNLOCK_REQUIREMENTS[variant];
+}
+
+export function isVariantUnlocked(
+  variant: PuzzleVariant,
+  puzzlesSolved: number,
+  currentPhase: number
+): boolean {
+  if (variant === 'standard') return true;
+  const req = VARIANT_UNLOCK_REQUIREMENTS[variant];
+  return puzzlesSolved >= req.puzzlesSolved && currentPhase >= req.minDepthPhase;
+}
+
+export function getUnlockedVariants(
+  puzzlesSolved: number,
+  currentPhase: number
+): PuzzleVariant[] {
+  const unlocked: PuzzleVariant[] = ['standard'];
+  for (const variant of [...BASE_VARIANTS, ...COMBO_VARIANTS]) {
+    if (isVariantUnlocked(variant, puzzlesSolved, currentPhase)) {
+      unlocked.push(variant);
+    }
+  }
+  return unlocked;
+}
+
+export function getVariantUnlockHint(
+  variant: PuzzleVariant,
+  puzzlesSolved: number,
+  currentPhase: number,
+  uiPhase: number
+): string {
+  if (variant === 'standard') {
+    return uiPhase >= 3 ? 'The familiar arrangement.' : 'Classic rules.';
+  }
+  const req = VARIANT_UNLOCK_REQUIREMENTS[variant];
+  const unlocked = isVariantUnlocked(variant, puzzlesSolved, currentPhase);
+  if (unlocked) {
+    return uiPhase >= 3 ? 'Ready for the arrangement.' : 'Unlocked.';
+  }
+
+  const remainingPuzzles = Math.max(0, req.puzzlesSolved - puzzlesSolved);
+  const needsDepth = currentPhase < req.minDepthPhase;
+
+  if (remainingPuzzles > 0 && needsDepth) {
+    return uiPhase >= 3
+      ? `${remainingPuzzles} more offerings, then go deeper.`
+      : `Unlocks in ${remainingPuzzles} more puzzles. Keep progressing to unlock deeper styles.`;
+  }
+  if (remainingPuzzles > 0) {
+    return uiPhase >= 3
+      ? `${remainingPuzzles} more offerings needed.`
+      : `Unlocks in ${remainingPuzzles} more puzzle${remainingPuzzles === 1 ? '' : 's'}.`;
+  }
+  return uiPhase >= 3
+    ? 'Continue deeper into the arrangement.'
+    : 'Keep progressing to unlock this style.';
+}
+
+export function getVariantSelectorOptions(
+  puzzlesSolved: number,
+  currentPhase: number,
+  uiPhase: number
+): VariantSelectorOption[] {
+  const options: VariantSelectorOption[] = [
+    {
+      variant: 'standard',
+      config: VARIANT_CONFIGS.standard,
+      group: 'core',
+      unlocked: true,
+      unlockHint: getVariantUnlockHint('standard', puzzlesSolved, currentPhase, uiPhase),
+    },
+  ];
+
+  for (const variant of BASE_VARIANTS) {
+    options.push({
+      variant,
+      config: VARIANT_CONFIGS[variant],
+      group: 'base',
+      unlocked: isVariantUnlocked(variant, puzzlesSolved, currentPhase),
+      unlockHint: getVariantUnlockHint(variant, puzzlesSolved, currentPhase, uiPhase),
+    });
+  }
+
+  for (const variant of COMBO_VARIANTS) {
+    options.push({
+      variant,
+      config: VARIANT_CONFIGS[variant],
+      group: 'combo',
+      unlocked: isVariantUnlocked(variant, puzzlesSolved, currentPhase),
+      unlockHint: getVariantUnlockHint(variant, puzzlesSolved, currentPhase, uiPhase),
+    });
+  }
+
+  return options;
+}
+
 // ============================================================================
 // Variant Selection
 // ============================================================================
 
-function getUnlockedBaseVariants(puzzlesSolved: number): PuzzleVariant[] {
-  const variants: PuzzleVariant[] = [];
-  if (puzzlesSolved >= 18) variants.push('reverse');
-  if (puzzlesSolved >= 30) variants.push('blind');
-  if (puzzlesSolved >= 45) variants.push('no_vowel');
-  if (puzzlesSolved >= 60) variants.push('speed');
-  if (puzzlesSolved >= 75) variants.push('no_consonant');
-  if (puzzlesSolved >= 95) variants.push('chain');
-  return variants;
+function getUnlockedBaseVariants(puzzlesSolved: number, currentPhase: number): PuzzleVariant[] {
+  return BASE_VARIANTS.filter(variant => isVariantUnlocked(variant, puzzlesSolved, currentPhase));
 }
 
 function getUnlockedComboVariants(puzzlesSolved: number, currentPhase: number): PuzzleVariant[] {
-  const combos: PuzzleVariant[] = [];
-  if (puzzlesSolved >= 120 && currentPhase >= 2) {
-    combos.push('reverse_blind', 'blind_no_vowel');
-  }
-  if (puzzlesSolved >= 150 && currentPhase >= 3) {
-    combos.push('blind_no_consonant', 'speed_no_vowel');
-  }
-  if (puzzlesSolved >= 190 && currentPhase >= 4) {
-    combos.push('speed_no_consonant');
-  }
-  return combos;
+  return COMBO_VARIANTS.filter(variant => isVariantUnlocked(variant, puzzlesSolved, currentPhase));
 }
 
 /**
@@ -256,7 +390,7 @@ export function shouldOfferVariant(
   const isVariantPuzzle = puzzlesSolved % 10 === 0 || Math.random() < 0.12;
   if (!isVariantPuzzle) return null;
 
-  const basePool = getUnlockedBaseVariants(puzzlesSolved);
+  const basePool = getUnlockedBaseVariants(puzzlesSolved, currentPhase);
   if (basePool.length === 0) return null;
 
   const comboPool = getUnlockedComboVariants(puzzlesSolved, currentPhase);

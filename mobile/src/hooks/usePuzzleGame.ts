@@ -4,14 +4,15 @@ import { generateLocalPuzzle, getIncantationName } from '../services/localGenera
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
 import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage } from '../services/phaseNarrative';
+import { getPreferredPuzzleVariant, setPreferredPuzzleVariant } from '../services/amberCurrency';
 import {
-  shouldOfferVariant,
   getVariantOverrides,
   getVariantInstruction,
   isVariantCompatibleWithSolution,
   hasVariantModifier,
   isLetterAllowedByVariant,
   getVariantRestrictionError,
+  isPuzzleVariant,
   VARIANT_CONFIGS,
   PuzzleVariant,
 } from '../services/puzzleVariety';
@@ -51,6 +52,8 @@ export interface PuzzleGameState {
   lastFormedWord: string | null;
   /** Active puzzle variant key */
   currentVariant: PuzzleVariant;
+  /** Player-selected preferred variant for new runs */
+  selectedVariant: PuzzleVariant;
   /** Current movement direction ("down" for standard flow, "up" during reverse return leg) */
   moveDirection: 'down' | 'up';
   /** Rows revealed in blind variants */
@@ -69,7 +72,11 @@ export interface PuzzleGameActions {
     wordLength?: number,
     variant?: PuzzleVariant
   ) => void;
-  startNewGame: (selectedDifficulty?: Difficulty, mode?: GameMode) => Promise<void>;
+  startNewGame: (
+    selectedDifficulty?: Difficulty,
+    mode?: GameMode,
+    variant?: PuzzleVariant
+  ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   handleSlotPress: (targetIndex: number) => Promise<{
     completed: boolean;
@@ -94,6 +101,7 @@ export interface PuzzleGameActions {
   setMessage: (message: string) => void;
   setGameMode: (mode: GameMode) => void;
   setCurrentPhase: (phase: DialoguePhase) => void;
+  setSelectedVariant: (variant: PuzzleVariant) => void;
 }
 
 export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
@@ -119,6 +127,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [gameMode, setGameMode] = useState<GameMode>('standard');
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
+  const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
   const [moveDirection, setMoveDirection] = useState<'down' | 'up'>('down');
   const [blindRevealedRows, setBlindRevealedRows] = useState<number[]>([]);
   const [currentChainLink, setCurrentChainLink] = useState(1);
@@ -139,6 +148,26 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         clearTimeout(shakeErrorTimeout.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPreferredPuzzleVariant()
+      .then((stored) => {
+        if (cancelled) return;
+        if (stored && isPuzzleVariant(stored)) {
+          setSelectedVariantState(stored);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const setSelectedVariant = useCallback((variant: PuzzleVariant) => {
+    setSelectedVariantState(variant);
+    setPreferredPuzzleVariant(variant).catch(() => {});
   }, []);
 
   const shakeError = useCallback((msg: string) => {
@@ -284,7 +313,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     return { puzzle, activeVariant };
   }, []);
 
-  const startNewGame = useCallback(async (selectedDifficulty: Difficulty = difficulty, mode?: GameMode) => {
+  const startNewGame = useCallback(async (
+    selectedDifficulty: Difficulty = difficulty,
+    mode?: GameMode,
+    variantOverride?: PuzzleVariant
+  ) => {
     setGameState(GameState.LOADING);
     setMessage(getLoadingMessage(currentPhase));
     setError(null);
@@ -297,14 +330,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
     }
 
-    // Check for puzzle variant (only in standard mode, not daily/challenge)
     const effectiveMode = mode ?? gameMode;
-    let variant: PuzzleVariant = 'standard';
-    if (effectiveMode === 'standard') {
-      const variantConfig = shouldOfferVariant(level, currentPhase);
-      if (variantConfig) {
-        variant = variantConfig.variant;
-      }
+    let variant: PuzzleVariant = variantOverride ?? selectedVariant;
+    // Daily mode currently bypasses this hook path; keep this for safety.
+    if (effectiveMode !== 'standard' && variantOverride === undefined) {
+      variant = selectedVariant;
     }
     setCurrentVariant(variant);
 
@@ -343,7 +373,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getVariantInstruction(config, currentPhase));
       }
     }
-  }, [difficulty, initGame, gameMode, level, currentPhase, generatePuzzleForVariant]);
+  }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant]);
 
   const handleLetterPress = useCallback((letter: Letter, rowIndex: number) => {
     if (gameState !== GameState.PLAYING) return;
@@ -406,6 +436,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     gameMode: GameMode;
     completedWords: string[];
     formedWord?: string;
+    chainAdvanced?: boolean;
+    chainLink?: number;
+    chainLength?: number;
     variant?: PuzzleVariant;
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
@@ -726,6 +759,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     lastIncantationName,
     lastFormedWord,
     currentVariant,
+    selectedVariant,
     moveDirection,
     blindRevealedRows,
     currentChainLink,
@@ -748,6 +782,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMessage,
     setGameMode,
     setCurrentPhase,
+    setSelectedVariant,
   };
 
   return [state, actions];
