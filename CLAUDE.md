@@ -304,11 +304,11 @@ Variants are now player-selected from the setup menu (not randomly injected). Pl
 - **No Vowel / No Consonant**: Restriction variants that lock one letter class.
 - **Combos**: `reverse_blind`, `blind_no_vowel`, `blind_no_consonant`, `speed_no_vowel`, `speed_no_consonant`.
 
-Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions), and lock hints are also phase-aware without exposing raw phase numbers to players.
-- **Progressive disclosure**: combo variants are only shown once unlocked or near unlock; otherwise the setup menu shows a “more combinations later” message.
+Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants and combos stay fully hidden until unlocked, so players only see styles they can actually select.
+- **Progressive disclosure**: combo variants are only shown once unlocked; until then, the setup menu shows a generic “more combinations later” message (without showing locked entries).
 - **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
 - **Economy anti-farm**: variant multipliers were rebalanced for selectable play and now taper with repeated back-to-back use of the same variant through `applyVariantAmberBonus()` in `amberCurrency.ts`.
-- **Wired in**: `DifficultyMenu.tsx` renders unlock-aware variant cards (selected/active/locked states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
+- **Wired in**: `DifficultyMenu.tsx` renders only unlocked variant cards (selected/active states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
 
 ## App Architecture
 
@@ -667,9 +667,9 @@ The victory modal visually transforms across narrative phases via additional `Ph
 The setup dropdown adapts to the narrative phase:
 - Accepts `phase` prop
 - Includes sections for **Difficulty**, **Challenge mode**, and **Puzzle Style** (variant/combo selector)
-- Shows clear **selected**, **active**, and **locked** states for variants
-- Locked variants display phase-aware unlock hints that avoid exposing internal phase labels
-- Combo styles are progressively disclosed (shown when near unlock or unlocked, hidden otherwise)
+- Shows clear **selected** and **active** states for available variants
+- Locked variants and combos are fully hidden until unlocked (no greyed/disabled cards)
+- Combo styles are progressively disclosed (section appears only after at least one combo unlocks; otherwise a generic “more combinations later” message is shown)
 - **Phase 0-2**: Bright menu styling and lighter copy tone
 - **Phase 3+**: Dark background, phase-themed text colors from `getPhaseTheme()`, darker ritualized copy tone
 

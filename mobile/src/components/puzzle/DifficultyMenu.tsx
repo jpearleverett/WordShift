@@ -42,9 +42,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const isDark = phase >= 3;
   const title = phase >= 3 ? 'ARRANGEMENT SETUP' : 'PUZZLE SETUP';
   const styleTitle = phase >= 3 ? 'ARRANGEMENT STYLE' : 'PUZZLE STYLE';
-  const coreOptions = variantOptions.filter(option => option.group === 'core');
-  const baseOptions = variantOptions.filter(option => option.group === 'base');
-  const comboOptions = variantOptions.filter(option => option.group === 'combo');
+  const visibleOptions = variantOptions.filter(option => option.unlocked);
+  const coreOptions = visibleOptions.filter(option => option.group === 'core');
+  const baseOptions = visibleOptions.filter(option => option.group === 'base');
+  const comboOptions = visibleOptions.filter(option => option.group === 'combo');
 
   const renderVariantItem = (option: VariantSelectorOption) => {
     const isSelected = option.variant === currentVariant;
@@ -54,16 +55,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         key={option.variant}
         style={[
           styles.variantItem,
-          !option.unlocked && styles.variantItemLocked,
           isSelected && styles.variantItemSelected,
           isSelected && isDark && { backgroundColor: phaseTheme.modalTextColor + '25' },
         ]}
-        onPress={() => {
-          if (option.unlocked) {
-            onSelectVariant(option.variant);
-          }
-        }}
-        disabled={!option.unlocked}
+        onPress={() => onSelectVariant(option.variant)}
       >
         <Text style={styles.variantIcon}>{option.config.icon}</Text>
         <View style={styles.variantContent}>
@@ -80,17 +75,12 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             {isActive && (
               <Text style={styles.variantBadgeActive}>ACTIVE</Text>
             )}
-            {!option.unlocked && (
-              <Text style={styles.variantBadgeLocked}>LOCKED</Text>
-            )}
           </View>
           <Text style={[
             styles.variantDescription,
             isDark && { color: phaseTheme.modalSecondaryTextColor },
           ]}>
-            {option.unlocked
-              ? getVariantDescription(option.config, phase)
-              : option.unlockHint}
+            {getVariantDescription(option.config, phase)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -345,9 +335,6 @@ const styles = StyleSheet.create({
   variantItemSelected: {
     backgroundColor: CandyColors.purple.light + '24',
   },
-  variantItemLocked: {
-    opacity: 0.55,
-  },
   variantIcon: {
     fontSize: 16,
     marginRight: 8,
@@ -388,17 +375,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: CandyColors.green.dark,
     backgroundColor: CandyColors.green.light + '55',
-    marginLeft: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  variantBadgeLocked: {
-    fontSize: 8,
-    fontWeight: '900',
-    color: CandyColors.gray[500],
-    backgroundColor: CandyColors.gray[200],
     marginLeft: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
