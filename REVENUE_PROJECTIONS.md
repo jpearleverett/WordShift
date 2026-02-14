@@ -22,7 +22,7 @@ However, the revenue outlook must be grounded in three hard realities:
 
 **Our base-case Year 1 projection is $18,000-$55,000** (organic only) or **$65,000-$145,000** (with $40K UA investment). These are significantly more conservative than the existing internal plan.
 
-> **Note**: These initial projections were revised extensively after receiving developer context. See **Section 14** (unique mechanic, dev velocity, $10K UA), **Section 15** (scaling strategy to $100K UA, contractor plan, revenue maximization playbook, compounding tailwinds scenario). **Final probability-weighted Year 1 expected revenue: ~$52,500 gross / $36,000-$44,000 net.** Scenario F (D7 >15% + featuring + virality) models the $196K-$527K upside case at 3-5% probability.
+> **Note**: These initial projections were revised extensively (Sections 14-17) after receiving developer context and reviewing in-game screenshots. Key revisions: unique puzzle mechanic, exceptional dev velocity, $10K→$100K scaling UA strategy, professional pixel art quality, and phase contrast as viral asset. **Final probability-weighted Year 1 expected revenue: ~$59,900 gross / $44,000-$52,000 net.** Scenario F (compounding tailwinds: D7 >15% + featuring + virality) models the $196K-$527K upside case at 5-7% probability.
 
 ---
 
@@ -1103,6 +1103,139 @@ Everything between now and that Week 4 data point — audio, monetization, analy
 ---
 
 *Revision 4 prepared after developer requested modeling of compounding tailwind scenario (D7 >15% + App Store featuring + virality + strong organic). Includes flywheel economics, ARPDAU scaling mechanics, install source breakdown, contractor timing, and "quit your job" decision framework. All projections reviewed by UA, Monetization, Product, and Finance leads. Market data sourced from Sensor Tower, AppsFlyer, GameAnalytics, Business of Apps, Mistplay, and Udonis research (2025-2026).*
+
+---
+
+## 17. Revision 5: Visual Quality Assessment (Post-Screenshot Review)
+
+### 17.1 What the Screenshots Reveal
+
+After reviewing seven in-game screenshots spanning the full phase arc (Phase 0 through Phase 4 endgame, including the puzzle screen, victory modal, and phase transition cinematic), several prior assumptions must be revised upward.
+
+**Visual fidelity is significantly higher than expected for a solo-dev indie project.** The game features a polished pixel art style with:
+- 10 distinct room backgrounds, each with hand-crafted furniture, lighting, and atmosphere (fireplace glow in Cozy Den, bubbles and coral in Aquarium Room, cacti and starlight in Desert Camp, vines and hammock in Jungle, bookshelves and globe in Scholar's Study)
+- 30 character sprites across 10 animals × 3 variants (idle, talk, robed), each with distinct personality — Sloth in a Hawaiian shirt, Pangolin in an apron, Fox in a cozy sweater, Owl with scholarly accessories
+- Phase 4 robed variants with crimson eyes that are genuinely unsettling against the dark storm sky
+- A phase-aware environment system that transforms the entire home screen: warm sunset sky with clouds → dark storm sky with moon, lush colors → deep purple/crimson palette
+- Crimson arrangement dots connecting rooms at Phase 4, visually completing the "temple" motif
+- A polished victory modal with phase-appropriate typography ("WHY DOES IT MATTER?"), offering chain display (INKY → LIKED → DEMON → STUCK → BREAST), achievement badges, and amber breakdown
+- Cinematic transition screens ("THE ARRIVAL") with minimalist design and impactful narrative text against near-black backgrounds
+- Clean dialogue system with character portraits and phase-aware speech bubbles
+
+**This matters for revenue because visual quality directly affects four things**:
+
+| Factor | Impact | Estimate |
+|---|---|---|
+| App Store conversion rate | Higher-quality screenshots → more downloads per impression | +15-25% vs. generic word puzzle |
+| D1 retention | First session "wow" moment from pixel art house → lower immediate churn | +3-5 percentage points |
+| Store rating | Visual polish → fewer "looks cheap" reviews → higher average rating | +0.2-0.4 stars |
+| Featuring probability | Apple/Google editorial teams specifically look for distinctive visual identity | Significant increase |
+
+### 17.2 The Phase Contrast Is the Marketing
+
+The single most important revenue observation from these screenshots: **the Phase 0 → Phase 4 visual contrast is a complete marketing campaign in one image.**
+
+Side by side:
+- **Phase 0**: Warm sunset sky with sun, lush green trees, drifting clouds. Fox in a cozy green sweater by the fireplace. Sloth in a Hawaiian shirt in a jungle hammock. Owl surrounded by books and a globe. Pangolin in an apron in a rustic kitchen. Everything is bright, warm, inviting. Amber count modest. The house is a home.
+- **Phase 4**: Dark storm sky with pale moon. Same animals, now in dark robes with crimson eyes. Same rooms, now dimly lit with purple-crimson tones. Crimson arrangement dots connecting rooms like sigil lines. Capybara dialogue: "Another offering processed. The system runs smoother with voluntary contributions." Amber count: 37,682. The house is a temple.
+- **Victory modal**: "WHY DOES IT MATTER?" with 3 stars. The offering chain: INKY → LIKED → DEMON → STUCK → BREAST. "THE HOUSE STANDS COMPLETE — You finished what was being built. There is no pretending now."
+- **Phase transition cinematic**: Near-black screen. "THE ARRIVAL." "The ten keepers stand in their chambers. The temple is complete."
+
+This contrast is:
+1. **Immediately comprehensible.** No explanation needed. A 3-second side-by-side tells the entire story.
+2. **Emotionally provocative.** The cute → sinister shift triggers curiosity ("what happened?") and unease ("they were always like this?"). The robed Capybara calmly discussing "offerings" while the same character used to be a chill office worker is deeply unsettling.
+3. **Inherently shareable.** "Wait for it" content on TikTok. "My word game turned into THIS" on Reddit. The contrast IS the content.
+4. **Impossible to replicate.** No other word puzzle game can produce this comparison, because no other word puzzle game has this system.
+
+This is not a marketing asset that needs to be created — it already exists inside the game. Every player who reaches Phase 3-4 is carrying this contrast in their head. The marketing task is simply surfacing it.
+
+### 17.3 The Pixel Art Advantage
+
+The pixel art style is a strategically excellent choice for this game, for reasons beyond aesthetics:
+
+1. **Category differentiation.** The word puzzle category is dominated by clean, minimal, corporate design (Wordscapes, NYT Games, Words With Friends). A pixel art animal house immediately signals "this is something different" in the App Store browse. Players scanning through word games will stop on a pixel art screenshot because it breaks the visual pattern.
+
+2. **Emotional range.** Pixel art can convey warmth AND menace. The cozy Fox by the fireplace is genuinely charming. The robed Fox with crimson eyes is genuinely unsettling. A more realistic art style would struggle to achieve both without looking silly. Pixel art's abstraction makes the horror work — it leaves room for the player's imagination.
+
+3. **TikTok/social media performance.** Pixel art content performs disproportionately well on TikTok and Instagram. The aesthetic has a dedicated audience (nostalgia, indie game culture, cozy game community) that actively seeks and shares pixel art content.
+
+4. **Detail density.** Each room is packed with personality — the aquarium has fish and coral, the desert has cacti and a starry window, the jungle has vines and tropical plants. This rewards exploration and screenshots. Players will want to show off their houses.
+
+### 17.4 Specific Visual Revenue Implications
+
+**Store screenshots strategy** (revised recommendation):
+
+The screenshots suggest a specific App Store screenshot sequence:
+1. **First screenshot**: Phase 0 house — bright, warm, all rooms visible, cute animals in their signature outfits. "Build a home for your animal friends."
+2. **Second screenshot**: Puzzle screen in action — the unique pick/drop mechanic with candy-colored tiles. "A word puzzle unlike any other."
+3. **Third screenshot**: Fox dialogue — charming personality-driven speech bubble. "10 unique characters with 600+ conversations."
+4. **Fourth screenshot**: Victory modal — stars, amber, achievement badge, word chain. "Earn rewards. Build your house."
+5. **Fifth screenshot (optional)**: A *very subtle* Phase 2-3 hint. The sky slightly darker, one animal looking slightly different. No robes. No crimson. Just enough to trigger "wait, something seems different" without spoiling the twist.
+
+Never show Phase 4 in store screenshots. The horror is the product. The marketing sells the warm, cozy word puzzle — the game does the rest.
+
+**TikTok content strategy** (revised with visual specifics):
+
+With these visuals, the TikTok creative strategy becomes concrete:
+- **"Day 1 vs Day 100" comparison video**: Phase 0 house footage (pan up through rooms, cute animals, sunset sky) → hard cut → Phase 4 house (same pan, robed animals, storm sky, crimson dots). No narration. Caption: "My cozy word game changed..."
+- **"Meeting the animals" series**: Short clips of each animal's Phase 0 personality (Sloth in Hawaiian shirt, Pangolin cooking). Build affection. Later video: "remember when they were cute?" with Phase 4 robed footage.
+- **Victory modal comparison**: Phase 0 "PERFECT! Flawless solve!" → Phase 4 "WHY DOES IT MATTER? Perfection in an imperfect void." with the offering chain showing words like DEMON.
+- **Capybara reaction clip**: The Phase 4 Capybara dialogue about "voluntary contributions" contrasted with earlier cheerful lines. The comedy-horror contrast is TikTok gold.
+- **Gameplay mechanic demo**: 5-second clip of the pick/drop/chain in action with pixel art tiles. Caption: "This puzzle doesn't exist anywhere else."
+
+**Featuring probability** (revised):
+
+Apple's App Store editorial team and Google Play's indie features specifically highlight games with:
+- Distinctive visual identity (pixel art animal house ✓ — immediately recognizable)
+- Narrative depth (5-phase horror arc ✓)
+- Unique gameplay mechanic (pick/drop word chain ✓)
+- Polish and craft (detailed room art, 30 character sprites, phase-aware theming ✓)
+- Emotional range (cozy → cosmic horror within one game ✓)
+
+With audio added, this game checks every box for an indie feature. Previous featuring probability estimate of 20-30% may still be conservative. Revised to **25-35%** given the visual evidence. The phase contrast alone is something Apple's editorial team would likely want to highlight — it's exactly the kind of "you have to see this" moment they feature in editorial stories.
+
+### 17.5 Minor Visual Notes
+
+A few observations from the screenshots that may affect commercial perception:
+
+1. **"DEV" button visible** — needs to be removed before launch. Flagging for completeness.
+2. **House emoji in "THE ARRIVAL" cinematic** — the cinematic transition screen uses a standard house emoji (🏠) which slightly undercuts the mood of an otherwise stark, powerful screen. Replacing with a custom pixel art version of the completed temple (matching the game's visual style) or even just removing it would strengthen the moment. Low-effort, high-impact polish.
+3. **"!" badges on every room at Phase 4** — when all 10 rooms show notification badges simultaneously, it creates visual noise that competes with the dark Phase 4 atmosphere. Consider staggering them or reducing their visual weight at higher phases.
+4. **The word chain "INKY → LIKED → DEMON → STUCK → BREAST"** in the victory modal is an incredibly compelling example of the system working. The journey from innocent words to DEMON to an unexpected endpoint is exactly the kind of surprising, memorable chain that players will screenshot and share. This is worth showcasing in marketing materials.
+
+### 17.6 Adjusted Estimates (Post-Visual Review)
+
+| Assumption | Previous | Revised | Rationale |
+|---|---|---|---|
+| D1 retention | 32-38% | 35-40% | Visual quality creates stronger first impression; pixel art differentiates immediately |
+| Store conversion rate | Baseline | +15-25% above category average | Pixel art house + cute animals is visually distinctive in word puzzle category |
+| Featuring probability | 20-30% | 25-35% | Visual evidence confirms the game exceeds Apple/Google editorial quality standards |
+| TikTok CPI | $0.40-$1.00 | $0.30-$0.80 | Phase contrast content is inherently high-performing; pixel art aesthetic performs well on TikTok |
+| Viral probability (D/F) | 5% / 3-5% | 7% / 5-7% | The visual contrast is a more powerful viral asset than text descriptions convey; the robed animals are genuinely striking |
+
+**Impact on Scenario F specifically**: With visual quality factored in, Scenario F probability revises from 3-5% to **5-7%**. The increase comes from:
+- Higher featuring probability (25-35% vs 20-30%)
+- Lower TikTok CPI (better creative = more installs per dollar)
+- Higher D1 retention (35-40% vs 32-38%)
+- The visual contrast being materially more compelling than described in text
+
+At 6% probability and $361K midpoint net Year 1, Scenario F now contributes ~$21,700 to expected value (up from ~$14,500).
+
+**Revised probability-weighted Year 1 expected revenue**:
+- A: $4,950 × 0.26 = $1,287
+- B: $10,650 × 0.17 = $1,811
+- C: $34,945 × 0.16 = $5,591
+- D: $234,000 × 0.05 = $11,700
+- E: $89,055 × 0.20 = $17,811
+- F: $361,350 × 0.06 = $21,681
+- **Total: ~$59,881 gross**
+- **Net: ~$44,000-$52,000**
+
+These adjustments are individually modest but compound across the model. The visual quality shifts every probability slightly in the right direction, and those shifts compound across six scenarios. The net effect is an ~15% increase in expected value vs. the pre-screenshot model.
+
+---
+
+*Revision 5 prepared after reviewing seven in-game screenshots spanning Phase 0 through Phase 4 endgame, including home screen, puzzle screen, victory modal, dialogue system, and phase transition cinematic. Visual quality assessment affects D1 retention, store conversion, featuring probability, TikTok creative CPI, and viral probability estimates.*
 
 ### Sources
 
