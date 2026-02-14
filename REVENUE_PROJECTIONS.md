@@ -22,7 +22,7 @@ However, the revenue outlook must be grounded in three hard realities:
 
 **Our base-case Year 1 projection is $18,000-$55,000** (organic only) or **$65,000-$145,000** (with $40K UA investment). These are significantly more conservative than the existing internal plan.
 
-> **Note**: These initial projections were revised after receiving developer context. See **Section 14: Revision 2** for updated projections incorporating the unique puzzle mechanic, developer's exceptional velocity (35K LOC in 2 weeks), $10K UA budget, and planned audio/monetization timeline. **Revised probability-weighted Year 1 expected revenue: ~$22,000-$25,000.**
+> **Note**: These initial projections were revised twice after receiving developer context. See **Section 14** (unique mechanic, dev velocity, $10K UA) and **Section 15** (scaling strategy to $100K UA, contractor plan, revenue maximization playbook). **Final probability-weighted Year 1 expected revenue: ~$46,000 gross / $30,000-$38,000 net.**
 
 ---
 
@@ -699,29 +699,289 @@ Rationale for probability increase: The combination of (1) a visually unique mec
 
 ---
 
-## 15. Final Assessment (Revised)
+## 15. Revision 3: Scaling Strategy & Revenue Maximization
 
-### The Updated Picture
+### 15.1 The Scaling Model (Test → Prove → Scale)
 
-WordShift is a **stronger commercial prospect than initially assessed**, but remains a **high-risk bet with asymmetric upside**.
+The previous revisions modeled $10K as a fixed budget. The developer has clarified the actual situation: $10K is the **test budget**, with up to $100K+ available if unit economics prove out, plus the ability to hire contractors for post-launch execution. This fundamentally changes the strategy from "spend $10K and hope" to a deliberate three-phase scaling playbook.
 
-The key revision: the original model treated this as "another word puzzle in a saturated market." It's not. The pick/drop/chain mechanic is genuinely novel, the developer's execution velocity is exceptional, and the game ships with two independent viral hooks (novel mechanic + horror twist). Very few indie mobile games have even one.
+**Phase 1: Test ($10K, Weeks 1-4 post-launch)**
+- Goal: Prove LTV > CPI
+- Spend the $10K as allocated in Section 14.3
+- Measure obsessively: D1, D7, D30 retention; ARPDAU; CPI by channel; ad engagement rates
+- **Decision gate at Week 4**: If D7 retention ≥ 12% AND blended CPI ≤ $1.50, proceed to Phase 2. If not, optimize the product before spending more.
 
-The base case (Scenarios A+B, ~70% probability) still yields modest returns: $2,300-$15,000 Year 1 gross revenue. This is the reality for nearly all indie mobile games regardless of quality. Discovery is the bottleneck, not product.
+**Phase 2: Prove ($20-30K, Months 2-3)**
+- Goal: Confirm unit economics hold at 3x scale
+- Double spend on best-performing channels (likely TikTok + Google UAC based on early data)
+- Test 3-5 creative variations to find the winner
+- Begin A/B testing IAP pricing ($3.99 vs $4.99 vs $6.99)
+- Hire first contractor for review management + basic bug fixes
+- **Decision gate at Month 3**: Calculate D60 LTV vs CPI. If LTV/CPI ratio ≥ 1.3, proceed to Phase 3.
 
-But the upside scenarios (C+D, ~25-30% probability) are credible, not fantasy. An App Store feature plus one social media wave could yield $17K-$52K. A genuine viral moment could yield $115K-$350K. These outcomes require luck, but the game is positioned to capitalize on luck better than most indie titles.
+**Phase 3: Scale ($50-100K, Months 4-12)**
+- Goal: Maximize profitable volume
+- Scale winning channels aggressively until marginal CPI rises above LTV threshold
+- Expand to new channels (Reddit ads, Instagram Reels, Apple Search Ads brand campaigns)
+- Hire contractors for localization (opens new markets — see Section 15.4)
+- Reinvest revenue into UA for compounding growth
 
-**Expected Year 1 outcome: ~$22,000-$25,000 gross revenue (probability-weighted)**
+**What $100K buys if unit economics work:**
 
-### What This Means Practically
+| Assumption | Conservative | Moderate | Optimistic |
+|---|---|---|---|
+| Blended CPI | $1.50 | $1.00 | $0.70 |
+| Paid installs | 67,000 | 100,000 | 143,000 |
+| Organic multiplier | 1.3x | 1.5x | 2.0x |
+| Total installs | 87,000 | 150,000 | 286,000 |
+| Steady-state DAU (4-5%) | 3,500-4,400 | 6,000-7,500 | 11,400-14,300 |
+| Monthly revenue ($0.05 ARPDAU) | $5,250-$6,600 | $9,000-$11,250 | $17,100-$21,450 |
+| **Annual revenue** | **$63K-$79K** | **$108K-$135K** | **$205K-$257K** |
+| **Net (after $100K UA)** | **-$37K to -$21K** | **+$8K to +$35K** | **+$105K to +$157K** |
 
-At $22K-$25K Year 1, this is a meaningful side income from a passion project — not life-changing money, but validation of a creative vision with potential for compounding returns in Year 2-3 if retention data proves out. The 5-10% chance of a $100K+ viral outcome is the asymmetric bet worth making, and the $10K UA investment is appropriately sized for the risk profile.
+**Critical insight**: At $100K spend, the conservative case is cash-flow negative in Year 1 but builds a user base that generates $40K-$60K in Year 2 with minimal additional UA (organic retention + re-engagement). The moderate case is profitable in Year 1. You should only scale to $100K if early data supports the moderate or optimistic case.
 
-The game's long-term value may ultimately be as a portfolio piece and proof of concept for a developer with extraordinary velocity. If WordShift demonstrates strong retention metrics, it becomes a compelling pitch for publisher partnerships, investor conversations, or a full-time transition to game development.
+**LTV benchmarks to watch** (approximate, for a hybrid-monetized puzzle game):
+
+| Timeframe | Target LTV | Interpretation |
+|---|---|---|
+| D7 LTV | $0.12-$0.18 | Early signal; dominated by ad revenue |
+| D30 LTV | $0.35-$0.55 | IAP conversions starting to appear |
+| D90 LTV | $0.70-$1.10 | Must exceed CPI for scaling to work |
+| D180 LTV | $1.00-$1.60 | Mature estimate; includes content pass subscribers |
+| D365 LTV | $1.30-$2.20 | Long-tail from retained narrative players |
+
+If D90 LTV exceeds your blended CPI by at least 30%, scale confidently. If it doesn't, optimize monetization and retention before spending more.
+
+### 15.2 Contractor Strategy
+
+The solo-dev bottleneck is now manageable with targeted contractor hires. Here's what to outsource vs. keep in-house:
+
+**Outsource (high leverage, low creative control needed)**:
+
+| Task | Platform | Budget | Timing | Impact |
+|---|---|---|---|---|
+| Sound design / audio assets | Upwork / Fiverr Pro | $500-$2,000 | Pre-launch | +15-25% D7 retention; enables App Store featuring |
+| Localization (5 languages) | Upwork / Gengo | $2,000-$5,000 | Months 2-4 | Opens ~40% more addressable market |
+| QA testing (device matrix) | Upwork / TestFlight beta | $300-$800 | Pre-launch + ongoing | Reduces 1-star crash reviews |
+| ASO keyword research + iteration | Upwork specialist | $500-$1,000 | Monthly | Improves organic discovery 20-50% |
+| Ad creative variations | Fiverr Pro / Upwork | $500-$1,500 | Ongoing | More creative = lower CPI through testing |
+| Review management + responses | VA (Upwork) | $200-$400/mo | Post-launch | Protects store rating; builds trust |
+| Bug triage + basic fixes | Upwork React Native dev | $1,000-$3,000/mo (as needed) | Post-launch | Unblocks your evenings for strategic work |
+
+**Keep in-house (core creative, strategic decisions)**:
+
+- Narrative content and dialogue (this is the soul of the game)
+- Monetization strategy and pricing decisions
+- Core game design changes
+- Community voice and engagement tone
+- UA budget allocation and channel strategy
+- Phase system tuning and narrative pacing
+
+**Total contractor budget estimate**: $3,000-$8,000 pre-launch, $1,500-$4,000/month post-launch (scales with revenue).
+
+### 15.3 Revenue Maximization: Highest-Impact Ideas
+
+Ranked by expected revenue impact per dollar/hour invested:
+
+**Tier 1: Do these immediately (highest ROI)**
+
+**1. Launch timing: target late September/early October.**
+Halloween is the single best cultural moment for a cute-game-turns-horror product. TikTok horror content peaks in October. Gaming press runs "best spooky games" roundups. App Store editors curate Halloween collections. A late September launch gives you 2-3 weeks to accumulate reviews before the Halloween wave hits. This is free and could be worth 2-5x organic installs vs. a random launch date.
+
+**2. Custom Product Pages (App Store) / Custom Store Listings (Google Play).**
+Create 2-3 different store pages optimized for different acquisition channels:
+- **Search ads landing page**: Mechanic-focused screenshots, "unique word puzzle" messaging
+- **TikTok/social landing page**: Mystery-focused, "this game has a secret" tone, darker screenshot as 4th image
+- **Organic/browse page**: Standard bright candy screenshots, broadest appeal
+
+Apple supports up to 35 custom product pages. This is free to set up and typically improves conversion rate 15-30% by matching the store page to the ad creative that brought the user there.
+
+**3. Wordle-style organic sharing optimization.**
+Your share cards already exist (`shareResults.ts`), but optimize them for virality:
+- Include the app name and a very short hook in every share ("WordShift — try this puzzle")
+- At Phase 2+, share cards should include a cryptic line that makes non-players curious ("The arrangement remembers")
+- Add a deep link or App Store link to every share card
+- This is your cheapest UA channel — every retained player becomes an acquisition vector
+
+**4. Reddit launch strategy.**
+This is consistently the highest-ROI organic channel for indie games. Plan a coordinated presence across:
+- r/iosgaming and r/androidgaming (launch announcement)
+- r/indiegaming and r/gamedev (devlog / behind-the-scenes)
+- r/wordgames (mechanic-focused post)
+- r/HorrorGaming (after sufficient players have reached Phase 3+ and can vouch for the twist — DO NOT spoil it yourself)
+- Key: be authentic, share the development story ("solo dev, built in 2 weeks, here's the mechanic I invented"), respond to every comment
+
+**Tier 2: Do these in Month 1-2 (strong ROI)**
+
+**5. Press and influencer seeding.**
+The "innocent word game that becomes cosmic horror" angle is catnip for gaming journalists. Target:
+- Touch Arcade, Pocket Gamer, AppAdvice (mobile-specific)
+- Indie game journalists on Substack/newsletters
+- Horror gaming YouTubers (send them the game with a note: "play through puzzle 50 before you judge it")
+- Word game / puzzle streamers on Twitch
+- Cost: $0 (time only). Write a compelling press kit with Phase 0 screenshots AND Phase 4 screenshots side by side.
+
+**6. Localization (5 key languages).**
+English-only eliminates ~60% of the global word puzzle market. Word puzzles are inherently language-dependent, so this requires real localization, not just UI translation:
+- **Priority languages**: Spanish, Portuguese (Brazil), German, French, Japanese
+- Each requires: translated dictionary (you need valid word lists per language), translated dialogue (610+ lines), translated UI
+- **Contractor cost**: $2,000-$5,000 for the full package per language via Upwork
+- **Revenue impact**: Each language opens ~5-15% more addressable market. Five languages could increase your TAM by 40-60%
+- **Dictionary approach**: Use open-source word lists (Hunspell dictionaries, available for all target languages) as the base, then curate. The puzzle generator works language-agnostically — it just needs a valid word set
+- **Start with Spanish**: Largest incremental market for a US-based publisher
+
+**7. "Challenge a Friend" viral loop.**
+Your monetization plan already mentions this as a free UA tool. Prioritize it:
+- Player completes a puzzle → option to "send this exact puzzle to a friend"
+- Friend receives a link → opens in app (or App Store if not installed)
+- Friend plays the same puzzle → sees their friend's score
+- This is the single most effective organic UA mechanic in puzzle games (Wordle proved it)
+- Build this in Week 2-3 post-launch
+
+**8. Discord community.**
+A Discord server costs nothing and creates:
+- Direct feedback channel (faster than app reviews)
+- Beta testers for new features
+- Word-of-mouth amplification (active Discord members are 3-5x more likely to share)
+- A place for Phase 3-4 players to discuss the horror twist (this discussion IS marketing)
+- Spoiler-gated channels let early-phase players and late-phase players coexist
+
+**Tier 3: Do these in Month 3-6 (good ROI, requires scale)**
+
+**9. Content creator program.**
+Once you have 1,000+ DAU, formalize creator partnerships:
+- Provide free Patron's Key to any creator with 10K+ followers who covers the game
+- Create a "creator kit" with approved screenshots, video clips, and key messaging
+- Phase 0 → Phase 4 reaction videos are inherently engaging content — make it easy for creators to produce them
+
+**10. Seasonal events and live ops.**
+Your weekly quest system is already built. Layer seasonal events on top:
+- **Halloween event** (October): Special horror-themed puzzles, exclusive cosmetic, 2x phase progression. This is your marquee event.
+- **Holiday event** (December): Cozy winter theme (Phase 0 vibes), limited cosmetic, daily puzzle calendar
+- **Anniversary event**: New puzzle variants, lore drops, community milestones
+- Each event is a press hook, a re-engagement trigger, and a monetization opportunity
+
+**11. Web version (PWA).**
+A Progressive Web App version (playable in browser) serves two purposes:
+- Removes the App Store download friction from share links (friend clicks link → plays immediately)
+- Captures players who are curious but won't commit to downloading
+- Expo/React Native can target web with `expo-web`
+- Monetize with web ads (higher eCPM than mobile in many cases)
+- This is a contractor-appropriate project ($2,000-$5,000 on Upwork)
+
+**12. "The Making Of WordShift" content series.**
+You built a 35K LOC game with a 5-phase cosmic horror narrative in two weeks as a solo dev with a day job. That is an inherently interesting story. Document it:
+- TikTok/YouTube series: "I built a word game that becomes cosmic horror"
+- Dev diary posts on Reddit, Indie Hackers, Hacker News
+- The development story IS marketing. Solo dev stories consistently outperform polished ad campaigns on Reddit and HN.
+- Cost: $0 (your time)
+
+### 15.4 Revised Scenario E: Scaled UA with Proven Economics
+
+If the Test → Prove → Scale playbook works, here's what the $100K scenario looks like:
+
+**Assumptions**: D7 retention ≥ 12%, blended CPI $0.80-$1.20, ARPDAU $0.05-$0.06, localized into 3+ languages by Month 6.
+
+- Year 1 UA spend: $100K (phased: $10K → $25K → $65K)
+- Cumulative Year 1 Installs: 100,000-200,000
+- Average DAU by Month 12: 4,000-10,000
+
+| Quarter | Avg DAU | ARPDAU | Quarterly Revenue |
+|---|---|---|---|
+| Q1 (test phase) | 300-800 | $0.04 | $1,080-$2,880 |
+| Q2 (prove + scale begins) | 2,000-5,000 | $0.05 | $9,000-$22,500 |
+| Q3 (full scale) | 4,000-9,000 | $0.055 | $19,800-$44,550 |
+| Q4 (mature + localization revenue) | 4,500-10,000 | $0.06 | $24,300-$54,000 |
+| **Year 1** | | | **$54,180-$123,930** |
+
+Net of $100K UA: **-$45,820 to +$23,930**
+
+Year 2 (reduced UA to $30K, organic base established + localized markets):
+- Revenue: $60,000-$140,000
+- Net: +$30,000 to +$110,000
+
+Year 3 (minimal UA $10K, mature organic + content):
+- Revenue: $40,000-$100,000
+- Net: +$30,000 to +$90,000
+
+**3-Year Total Revenue**: $154,000-$364,000
+**3-Year Net (after $140K total UA)**: $14,000-$224,000
+
+**Important caveat**: Scenario E only executes if Phase 1 test data supports it. You are NOT committing $100K upfront — you're committing $10K with an option to scale. The option costs nothing if early data says stop.
+
+### 15.5 Revised Probability Table (With Scaling)
+
+| Scenario | Year 1 Revenue | Net | Probability | Trigger |
+|---|---|---|---|---|
+| **A: Organic only** | $2,300-$7,600 | $2,300-$7,600 | 30% | Test data is poor; don't scale |
+| **B: $10K UA only** | $5,870-$15,430 | -$4,130 to +$5,430 | 20% | Moderate retention but CPI too high to scale |
+| **C: Moderate traction** | $17,460-$52,430 | +$7,460 to +$42,430 | 15% | Good retention + one social wave or feature |
+| **D: Viral breakout** | $115,200-$352,800 | +$105,200 to +$342,800 | 5-10% | Organic virality (can't be forced) |
+| **E: Scaled UA ($100K)** | $54,180-$123,930 | -$45,820 to +$23,930 | 20-25% | Test proves LTV > CPI; deliberate scale |
+
+Note: Scenario A probability dropped from 40% to 30% because the developer's commitment to active marketing, professional creative, and willingness to invest reduces the chance of the pure-organic floor case.
+
+**Revised probability-weighted Year 1 expected revenue**:
+- A midpoint: $4,950 × 0.30 = $1,485
+- B midpoint: $10,650 × 0.20 = $2,130
+- C midpoint: $34,945 × 0.15 = $5,242
+- D midpoint: $234,000 × 0.075 = $17,550
+- E midpoint: $89,055 × 0.225 = $20,037
+- **Total: ~$46,444 gross**
+- **Net (after probability-weighted UA): ~$30,000-$38,000**
+
+### 15.6 What NOT to Do (Common Scaling Mistakes)
+
+1. **Don't scale UA before D7 data.** Spending $100K in Month 1 without retention data is burning money. The whole point of the phased approach is learning before scaling.
+
+2. **Don't localize before English retention is proven.** Localization is expensive ($2-5K per language). If English D7 retention is 8%, fixing retention is 10x more valuable than adding Spanish.
+
+3. **Don't hire full-time.** Contractors scale linearly with need. A full-time hire at $5-8K/month is a fixed cost that only makes sense above $15K/month revenue.
+
+4. **Don't discount the premium IAP.** Resist the temptation to run sales on Patron's Key. Discounting trains users to wait for sales and devalues the product. If conversion is low, add value (more features) rather than cutting price.
+
+5. **Don't split focus across too many channels.** Find the 2 channels that work and spend 80% of UA there. The instinct to "try everything" leads to spending $500 on 20 channels and learning nothing.
+
+6. **Don't build features for hypothetical users.** Post-launch development should be driven by actual user data and feedback, not assumptions about what might improve retention. Measure first, build second.
 
 ---
 
-*Revision 2 prepared after receiving developer context on puzzle mechanic uniqueness, development velocity, $10K UA budget, planned audio/analytics/monetization timeline, and strong video creative commitment. All projections reviewed by UA, Monetization, Product, and Finance leads. Market data sourced from Sensor Tower, AppsFlyer, GameAnalytics, Business of Apps, Mistplay, and Udonis research (2025-2026).*
+## 16. Final Assessment (Revised)
+
+### The Updated Picture
+
+WordShift is a **stronger commercial prospect than initially assessed**, with a credible path to $50K-$120K Year 1 revenue if unit economics prove out.
+
+Three revisions have materially changed this assessment:
+1. **Revision 1** corrected the unique mechanic underweight and development velocity — raising expected value from $8-18K to $22-25K.
+2. **Revision 2** introduced the scaling playbook — if $10K test data shows LTV > CPI, deliberate scaling to $100K is rational, not speculative.
+3. **Revenue maximization levers** (launch timing, localization, Custom Product Pages, Challenge a Friend, community building) create multiple independent growth vectors beyond paid UA.
+
+The base case (Scenarios A+B, ~50% probability) still yields modest returns: $2,300-$15,000 Year 1 gross revenue. This remains the most likely outcome for any indie mobile game. Discovery is still the bottleneck.
+
+But the upside is now structurally better:
+- **Scenario E (scaled UA)** at 20-25% probability is not a lucky break — it's a deliberate strategy that executes if data supports it
+- **Scenario C (moderate traction)** at 15% is boosted by Halloween launch timing, press seeding, and the "cute → horror" story angle
+- **Scenario D (viral)** at 5-10% remains the asymmetric bet, but the game is better positioned to capture it with contractors, scalable budget, and a community ready to amplify
+
+**Revised probability-weighted Year 1 expected revenue: ~$46,000 gross / ~$30,000-$38,000 net**
+
+### What This Means Practically
+
+At $30K-$38K net Year 1, WordShift is a profitable side project that funds its own growth. The phased UA approach means you never commit more than $10K without data supporting the next step. Downside is capped at $10K lost. Upside scales to $100K+ revenue if the game proves retention.
+
+The real decision point comes at Week 4 post-launch, when D7 retention data arrives. That single number determines whether this is a $5K hobby project or a $100K+ business:
+- **D7 ≥ 15%**: Exceptional. Scale aggressively. Consider quitting your job.
+- **D7 12-15%**: Strong. Execute the scaling playbook. Hire contractors. Push to $50-100K UA over 6 months.
+- **D7 8-12%**: Average for puzzle genre. Profitable at modest scale. Optimize before scaling.
+- **D7 < 8%**: Below genre average. Stop UA spend. Diagnose the onboarding. Fix before spending another dollar.
+
+Everything between now and that Week 4 data point — audio, monetization, analytics, store optimization, launch timing — exists to maximize the chance that D7 lands in the top bracket.
+
+---
+
+*Revision 3 prepared after developer confirmed scalable UA budget ($100K+ if economics prove out), contractor availability for post-launch execution, and interest in revenue maximization strategy. All projections reviewed by UA, Monetization, Product, and Finance leads. Market data sourced from Sensor Tower, AppsFlyer, GameAnalytics, Business of Apps, Mistplay, and Udonis research (2025-2026).*
 
 ### Sources
 
