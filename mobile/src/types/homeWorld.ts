@@ -200,6 +200,10 @@ export interface HomeWorldProgress {
   tutorialSeedsPlanted?: boolean;
   // Coordinated dialogue events that have been consumed (by theme name)
   consumedCoordinatedEvents?: string[];
+  // Variant tutorials queued for animal explanation dialogue
+  pendingVariantTutorials?: string[];
+  // Variant tutorials already explained to the player
+  seenVariantTutorials?: string[];
 }
 
 /**

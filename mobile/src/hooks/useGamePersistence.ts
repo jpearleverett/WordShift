@@ -13,6 +13,7 @@ import {
   getAmberBalance,
   getCurrentPhase,
   recordRitualWords,
+  recordVariantEncounter,
 } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
@@ -50,7 +51,14 @@ export interface PersistenceState {
 }
 
 export interface PersistenceActions {
-  recordVictory: (difficulty: Difficulty, hintsUsed: number, invalidAttempts: number, gameMode?: GameMode, completedWords?: string[]) => Promise<VictoryData>;
+  recordVictory: (
+    difficulty: Difficulty,
+    hintsUsed: number,
+    invalidAttempts: number,
+    gameMode?: GameMode,
+    completedWords?: string[],
+    variant?: PuzzleVariant
+  ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
 }
@@ -152,6 +160,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         const triggerWords = extractTriggerWords(completedWords);
         const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
+      }
+
+      // Queue a one-time variant tutorial for animal dialogue.
+      if (variant && variant !== 'standard') {
+        recordVariantEncounter(variant).catch(() => {});
       }
 
       logEvent({

@@ -39,6 +39,8 @@ function getDefaultProgress(): HomeWorldProgress {
     currentStreak: 0,
     lastPlayDate: null,
     challengeCompletions: 0,
+    pendingVariantTutorials: [],
+    seenVariantTutorials: [],
   };
 }
 
@@ -687,6 +689,56 @@ export async function consumeTriggerWords(animalType?: string): Promise<string[]
   progressCache = progress;
   await saveProgress();
   return consumed;
+}
+
+/**
+ * Queue a newly encountered variant so an animal can explain it in dialogue.
+ * This is one-time per variant key to avoid repetitive tutorial chatter.
+ */
+export async function recordVariantEncounter(variant: string): Promise<void> {
+  if (!variant || variant === 'standard') return;
+  const progress = await loadProgress();
+  if (!progress.pendingVariantTutorials) progress.pendingVariantTutorials = [];
+  if (!progress.seenVariantTutorials) progress.seenVariantTutorials = [];
+
+  if (
+    progress.pendingVariantTutorials.includes(variant) ||
+    progress.seenVariantTutorials.includes(variant)
+  ) {
+    return;
+  }
+
+  progress.pendingVariantTutorials.push(variant);
+  // Keep queue small and focused on recent mechanics.
+  if (progress.pendingVariantTutorials.length > 8) {
+    progress.pendingVariantTutorials = progress.pendingVariantTutorials.slice(-8);
+  }
+
+  progressCache = progress;
+  await saveProgress();
+}
+
+/**
+ * Consume the next pending variant tutorial key.
+ * Marks it as seen immediately to prevent repeats.
+ */
+export async function consumePendingVariantTutorial(): Promise<string | null> {
+  const progress = await loadProgress();
+  if (!progress.pendingVariantTutorials) progress.pendingVariantTutorials = [];
+  if (!progress.seenVariantTutorials) progress.seenVariantTutorials = [];
+
+  const next = progress.pendingVariantTutorials.shift();
+  if (!next) {
+    return null;
+  }
+
+  if (!progress.seenVariantTutorials.includes(next)) {
+    progress.seenVariantTutorials.push(next);
+  }
+
+  progressCache = progress;
+  await saveProgress();
+  return next;
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   hasMoreDialogues,
   getCrossAnimalReference,
   getTriggerWordReaction,
+  getVariantTutorialDialogue,
   TUTORIAL_CALLBACK_DIALOGUES,
   getCoordinatedEventLine,
   getWordThresholdDialogue,
@@ -20,7 +21,16 @@ import {
   getSessionStatus,
   isOnCooldown,
 } from '../services/dialogueSession';
-import { markDialogueRead, consumeTriggerWords, wereTutorialSeedsPlanted, markTutorialSeedsPlanted, recordConsumedCoordinatedEvent, hasSeenGuaranteedCrossRef, markGuaranteedCrossRefSeen } from '../services/amberCurrency';
+import {
+  markDialogueRead,
+  consumeTriggerWords,
+  consumePendingVariantTutorial,
+  wereTutorialSeedsPlanted,
+  markTutorialSeedsPlanted,
+  recordConsumedCoordinatedEvent,
+  hasSeenGuaranteedCrossRef,
+  markGuaranteedCrossRefSeen,
+} from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 import { getChoiceForAnimal, recordChoice, PlayerChoice, DialogueChoice } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
@@ -241,7 +251,26 @@ export function useDialogueFlow({
       }
     }
 
-    // 2. Coordinated event — milestone events take priority over trigger words
+    // 2. Variant tutorial note — one-time explanation for newly encountered modes
+    if (progress) {
+      try {
+        const pendingVariant = await consumePendingVariantTutorial();
+        if (pendingVariant) {
+          const variantLine = getVariantTutorialDialogue(
+            animal.type,
+            pendingVariant,
+            progress.currentPhase
+          );
+          if (variantLine) {
+            pages.push(variantLine);
+          }
+        }
+      } catch {
+        // Variant tutorial pages are non-critical
+      }
+    }
+
+    // 3. Coordinated event — milestone events take priority over trigger words
     let hasCoordinatedEvent = false;
     if (progress && progress.puzzlesSolved > 0) {
       try {
@@ -262,7 +291,7 @@ export function useDialogueFlow({
       }
     }
 
-    // 3. Trigger word reaction — use the actual per-animal reactions
+    // 4. Trigger word reaction — use the actual per-animal reactions
     if (!hasCoordinatedEvent) {
       try {
         const consumed = await consumeTriggerWords(animal.type);
@@ -281,7 +310,7 @@ export function useDialogueFlow({
       }
     }
 
-    // 4. Sacrifice reaction — animals notice when the player offers amber (Phase 4+)
+    // 5. Sacrifice reaction — animals notice when the player offers amber (Phase 4+)
     if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.currentPhase >= 4) {
       try {
         const currentCount = await getSacrificeCount();
@@ -298,7 +327,7 @@ export function useDialogueFlow({
       }
     }
 
-    // 5. Word count threshold dialogue — low priority
+    // 6. Word count threshold dialogue — low priority
     if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.totalWordsFormed) {
       const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
       const thresholdLine = getWordThresholdDialogue(
@@ -312,7 +341,7 @@ export function useDialogueFlow({
       }
     }
 
-    // 5. Cross-animal reference — frequency scales with phase
+    // 7. Cross-animal reference — frequency scales with phase
     if (progress && progress.unlockedAnimals) {
       const isVanguard = ANIMAL_AWARENESS_TIERS[animal.type] === 'vanguard';
       let forceRef = false;
@@ -342,7 +371,7 @@ export function useDialogueFlow({
       }
     }
 
-    // 6. Dialogue choice point (Phase 3 only) — illusion of agency
+    // 8. Dialogue choice point (Phase 3 only) — illusion of agency
     if (animalPhase === 3) {
       try {
         const choice = await getChoiceForAnimal(

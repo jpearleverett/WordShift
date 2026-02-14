@@ -138,6 +138,7 @@ const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: a
 
 const mockGetAmberBalance = jest.fn(async () => 100);
 const mockGetCurrentPhase = jest.fn(async () => 0);
+const mockRecordVariantEncounter = jest.fn(async (_variant?: any) => {});
 
 const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
   totalWordsFormed: 0,
@@ -150,6 +151,7 @@ jest.mock('../services/amberCurrency', () => ({
   getAmberBalance: () => mockGetAmberBalance(),
   getCurrentPhase: () => mockGetCurrentPhase(),
   recordRitualWords: (...args: any[]) => mockRecordRitualWords(args[0], args[1], args[2]),
+  recordVariantEncounter: (...args: any[]) => mockRecordVariantEncounter(args[0]),
 }));
 
 // --- Mock dialogueSession ---
@@ -378,6 +380,12 @@ describe('useGamePersistence', () => {
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number)
       );
+    });
+
+    test('records variant encounter for non-standard variant', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'reverse');
+      expect(mockRecordVariantEncounter).toHaveBeenCalledWith('reverse');
     });
 
     test('handles service errors gracefully with default returns', async () => {

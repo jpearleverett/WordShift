@@ -4,7 +4,17 @@ import { generateLocalPuzzle, getIncantationName } from '../services/localGenera
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
 import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage } from '../services/phaseNarrative';
-import { shouldOfferVariant, getVariantOverrides, PuzzleVariant } from '../services/puzzleVariety';
+import {
+  shouldOfferVariant,
+  getVariantOverrides,
+  getVariantInstruction,
+  isVariantCompatibleWithSolution,
+  hasVariantModifier,
+  isLetterAllowedByVariant,
+  getVariantRestrictionError,
+  VARIANT_CONFIGS,
+  PuzzleVariant,
+} from '../services/puzzleVariety';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -39,10 +49,22 @@ export interface PuzzleGameState {
   lastIncantationName: string | null;
   /** The word most recently formed by a valid intermediate move (null if none or cleared) */
   lastFormedWord: string | null;
+  /** Active puzzle variant key */
+  currentVariant: PuzzleVariant;
+  /** Current movement direction ("down" for standard flow, "up" during reverse return leg) */
+  moveDirection: 'down' | 'up';
+  /** Rows revealed in blind variants */
+  blindRevealedRows: number[];
 }
 
 export interface PuzzleGameActions {
-  initGame: (words: string[], puzzleHint?: string, puzzleSolution?: PuzzleSolutionStep[], wordLength?: number) => void;
+  initGame: (
+    words: string[],
+    puzzleHint?: string,
+    puzzleSolution?: PuzzleSolutionStep[],
+    wordLength?: number,
+    variant?: PuzzleVariant
+  ) => void;
   startNewGame: (selectedDifficulty?: Difficulty, mode?: GameMode) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   handleSlotPress: (targetIndex: number) => Promise<{
@@ -90,6 +112,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [gameMode, setGameMode] = useState<GameMode>('standard');
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
+  const [moveDirection, setMoveDirection] = useState<'down' | 'up'>('down');
+  const [blindRevealedRows, setBlindRevealedRows] = useState<number[]>([]);
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
   const [lastCompletedWords, setLastCompletedWords] = useState<string[]>([]);
   const [lastIncantationName, setLastIncantationName] = useState<string | null>(null);
@@ -126,7 +150,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     words: string[],
     puzzleHint?: string,
     puzzleSolution?: PuzzleSolutionStep[],
-    wordLength: number = 4
+    wordLength: number = 4,
+    variant: PuzzleVariant = 'standard'
   ) => {
     const newRows: RowData[] = words.map(word => ({
       id: generateId(),
@@ -151,6 +176,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setHintsUsed(0);
     setEarnedStars(0);
     setLastFormedWord(null);
+    setCurrentVariant(variant);
+    setMoveDirection('down');
+    setBlindRevealedRows(hasVariantModifier(variant, 'blind') ? [0] : []);
     // Reset undos for challenge mode
     setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
   }, [gameMode, currentPhase]);
@@ -184,25 +212,66 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setTimeout(() => reject(new Error('Generation timeout')), 4000)
       );
 
-      // Apply variant overrides to generation (e.g., speed mode = 3 rows)
-      const variantOverrides = getVariantOverrides(variant, selectedDifficulty);
-      const puzzle = await Promise.race([
+      let activeVariant = variant;
+      const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
+
+      // Restriction variants (no-vowel / no-consonant) can produce impossible
+      // boards if the generated solution moves forbidden letter classes.
+      let puzzle = await Promise.race([
         generateLocalPuzzle(selectedDifficulty, variantOverrides),
-        timeoutPromise
+        timeoutPromise,
       ]);
 
-      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength);
+      if (!isVariantCompatibleWithSolution(activeVariant, puzzle.solution)) {
+        let compatiblePuzzle = null as typeof puzzle | null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const retry = await Promise.race([
+            generateLocalPuzzle(selectedDifficulty, variantOverrides),
+            timeoutPromise,
+          ]);
+          if (isVariantCompatibleWithSolution(activeVariant, retry.solution)) {
+            compatiblePuzzle = retry;
+            break;
+          }
+        }
+
+        if (compatiblePuzzle) {
+          puzzle = compatiblePuzzle;
+        } else {
+          activeVariant = 'standard';
+          setCurrentVariant('standard');
+          puzzle = await Promise.race([
+            generateLocalPuzzle(selectedDifficulty, getVariantOverrides('standard', selectedDifficulty)),
+            timeoutPromise,
+          ]);
+        }
+      }
+
+      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant);
+      if (activeVariant !== 'standard') {
+        const config = VARIANT_CONFIGS[activeVariant];
+        setMessage(getVariantInstruction(config, currentPhase));
+      }
     } catch (localErr) {
       console.log("Local generation failed, using fallback:", localErr);
+      // Fallback puzzles don't include solver metadata, so restrictions may be
+      // impossible to satisfy. Revert restriction variants to standard fallback.
+      const fallbackVariant = (
+        hasVariantModifier(variant, 'no_vowel') || hasVariantModifier(variant, 'no_consonant')
+      ) ? 'standard' : variant;
       if (selectedDifficulty === 'HARD') {
-        initGame(FALLBACK_PUZZLE_HARD, "Challenge Mode", undefined, 5);
+        initGame(FALLBACK_PUZZLE_HARD, "Challenge Mode", undefined, 5, fallbackVariant);
       } else if (selectedDifficulty === 'EASY') {
-        initGame(FALLBACK_PUZZLE.slice(0, 3), "Simple Start", undefined, 4);
+        initGame(FALLBACK_PUZZLE.slice(0, 3), "Simple Start", undefined, 4, fallbackVariant);
       } else {
-        initGame(FALLBACK_PUZZLE, "Classic Setup", undefined, 4);
+        initGame(FALLBACK_PUZZLE, "Classic Setup", undefined, 4, fallbackVariant);
+      }
+      if (fallbackVariant !== 'standard') {
+        const config = VARIANT_CONFIGS[fallbackVariant];
+        setMessage(getVariantInstruction(config, currentPhase));
       }
     }
-  }, [difficulty, initGame]);
+  }, [difficulty, initGame, gameMode, level, currentPhase]);
 
   const handleLetterPress = useCallback((letter: Letter, rowIndex: number) => {
     if (gameState !== GameState.PLAYING) return;
@@ -215,10 +284,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (selectedLetter?.id === letter.id) {
       setSelectedLetter(null);
     } else {
+      if (!isLetterAllowedByVariant(currentVariant, letter.char)) {
+        shakeError(getVariantRestrictionError(currentVariant, currentPhase));
+        return;
+      }
       setSelectedLetter(letter);
       setError(null);
     }
-  }, [gameState, activeRowIndex, selectedLetter, shakeError]);
+  }, [gameState, activeRowIndex, selectedLetter, shakeError, currentVariant, currentPhase]);
 
   const handleHint = useCallback(() => {
     if (gameState !== GameState.PLAYING || isProcessing) return;
@@ -229,8 +302,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
+    const hintTargetRowIndex = moveDirection === 'down' ? activeRowIndex + 1 : activeRowIndex - 1;
+    if (hintTargetRowIndex < 0 || hintTargetRowIndex >= rows.length) {
+      setMessage(getHintFallback(currentPhase));
+      return;
+    }
+
     const currentSourceWord = rows[activeRowIndex].words.map(l => l.char).join("");
-    const currentTargetWord = rows[activeRowIndex + 1].words.map(l => l.char).join("");
+    const currentTargetWord = rows[hintTargetRowIndex].words.map(l => l.char).join("");
 
     const relevantStep = solution?.find(s =>
       s.stepIndex === activeRowIndex &&
@@ -246,7 +325,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     } else {
       setMessage(getHintFallback(currentPhase));
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, currentPhase]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, currentPhase, moveDirection]);
 
   const handleSlotPress = useCallback(async (targetIndex: number): Promise<{
     completed: boolean;
@@ -259,8 +338,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
+    const targetRowIndex = moveDirection === 'down' ? activeRowIndex + 1 : activeRowIndex - 1;
+    if (targetRowIndex < 0 || targetRowIndex >= rows.length) {
+      shakeError("No valid target row.");
+      return null;
+    }
+
     const sourceRow = rows[activeRowIndex];
-    const targetRow = rows[activeRowIndex + 1];
+    const targetRow = rows[targetRowIndex];
 
     const newSourceLetters = sourceRow.words.filter(l => l.id !== selectedLetter.id);
     const newTargetLetters = [...targetRow.words];
@@ -273,9 +358,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     setIsProcessing(true);
 
+    const isReverseReturn = hasVariantModifier(currentVariant, 'reverse') && moveDirection === 'up';
     const isStartRow = activeRowIndex === 0;
-    const expectedSourceLength = isStartRow ? currentWordLength - 1 : currentWordLength;
-    const expectedTargetLength = currentWordLength + 1;
+    const expectedSourceLength = isReverseReturn
+      ? currentWordLength
+      : (isStartRow ? currentWordLength - 1 : currentWordLength);
+    const expectedTargetLength = isReverseReturn
+      ? (targetRowIndex === 0 ? currentWordLength : currentWordLength + 1)
+      : currentWordLength + 1;
 
     if (sourceWordStr.length !== expectedSourceLength) {
       shakeError(`Need ${expectedSourceLength} letters!`);
@@ -312,15 +402,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       movedLetterChar: selectedLetter.char,
       sourceRowIndex: activeRowIndex,
       sourceLetterIndex,
-      targetRowIndex: activeRowIndex + 1,
+      targetRowIndex,
       targetInsertIndex: targetIndex,
       activeRowIndexBefore: activeRowIndex,
+      moveDirectionBefore: moveDirection,
     };
     setHistory(prev => [...prev, delta]);
 
     const newRows = [...rows];
     newRows[activeRowIndex] = { ...sourceRow, words: newSourceLetters };
-    newRows[activeRowIndex + 1] = {
+    newRows[targetRowIndex] = {
       ...targetRow,
       words: newTargetLetters.map(l => ({
         ...l,
@@ -328,12 +419,59 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       })),
     };
 
+    if (hasVariantModifier(currentVariant, 'blind')) {
+      setBlindRevealedRows(prev =>
+        prev.includes(targetRowIndex) ? prev : [...prev, targetRowIndex]
+      );
+    }
+
     setRows(newRows);
     setSelectedLetter(null);
     setError(null);
 
-    const maxMoves = rows.length - 1;
-    if (activeRowIndex === maxMoves - 1) {
+    const maxForwardSourceIndex = rows.length - 2;
+    const isReverseMode = hasVariantModifier(currentVariant, 'reverse');
+
+    if (!isReverseMode) {
+      if (activeRowIndex === maxForwardSourceIndex) {
+        // Capture the completed word chain for ritual echo
+        const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
+        setLastCompletedWords(completedWords);
+        setLastIncantationName(getIncantationName(completedWords, currentPhase));
+
+        setIsProcessing(false);
+        // Return completion info - caller handles persistence & victory state
+        return { completed: true, hintsUsed, invalidAttempts, gameMode, completedWords, variant: currentVariant };
+      }
+
+      setActiveRowIndex(prev => prev + 1);
+      setMessage(getMoveMessage(currentPhase));
+      setLastFormedWord(targetWordStr);
+      setIsProcessing(false);
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
+    }
+
+    // Reverse Shift: descend to bottom, then return to row 0.
+    if (moveDirection === 'down') {
+      if (activeRowIndex === maxForwardSourceIndex) {
+        setMoveDirection('up');
+        setActiveRowIndex(rows.length - 1);
+        setMessage(
+          currentPhase >= 3
+            ? 'The descent is complete. Return every letter to the beginning.'
+            : 'Great! Now shift letters back up to the first word.'
+        );
+      } else {
+        setActiveRowIndex(prev => prev + 1);
+        setMessage(getMoveMessage(currentPhase));
+      }
+      setLastFormedWord(targetWordStr);
+      setIsProcessing(false);
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
+    }
+
+    // Returning upward in reverse mode.
+    if (activeRowIndex === 1) {
       // Capture the completed word chain for ritual echo
       const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
       setLastCompletedWords(completedWords);
@@ -342,15 +480,28 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setIsProcessing(false);
       // Return completion info - caller handles persistence & victory state
       return { completed: true, hintsUsed, invalidAttempts, gameMode, completedWords, variant: currentVariant };
-    } else {
-      setActiveRowIndex(prev => prev + 1);
-      setMessage(getMoveMessage(currentPhase));
-      setLastFormedWord(targetWordStr);
     }
 
+    setActiveRowIndex(prev => prev - 1);
+    setMessage(getMoveMessage(currentPhase));
+    setLastFormedWord(targetWordStr);
     setIsProcessing(false);
     return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
-  }, [selectedLetter, gameState, rows, activeRowIndex, currentWordLength, shakeError, checkValidation, hintsUsed, invalidAttempts]);
+  }, [
+    selectedLetter,
+    gameState,
+    rows,
+    activeRowIndex,
+    currentWordLength,
+    shakeError,
+    checkValidation,
+    hintsUsed,
+    invalidAttempts,
+    moveDirection,
+    currentVariant,
+    currentPhase,
+    gameMode,
+  ]);
 
   const handleUndo = useCallback(() => {
     if (history.length === 0) return;
@@ -390,6 +541,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     });
 
     setActiveRowIndex(delta.activeRowIndexBefore);
+    if (delta.moveDirectionBefore) {
+      setMoveDirection(delta.moveDirectionBefore);
+    }
     setHistory(prev => prev.slice(0, -1));
     setGameState(GameState.PLAYING);
     setSelectedLetter(null);
@@ -433,6 +587,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     lastCompletedWords,
     lastIncantationName,
     lastFormedWord,
+    currentVariant,
+    moveDirection,
+    blindRevealedRows,
   };
 
   const actions: PuzzleGameActions = {

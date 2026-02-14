@@ -60,6 +60,7 @@ import { isDreadWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges } from './src/services/cloudSave';
+import { hasVariantModifier, VARIANT_CONFIGS } from './src/services/puzzleVariety';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery';
@@ -842,6 +843,22 @@ export default function App() {
                 )}
               </View>
             )}
+            {puzzle.currentVariant !== 'standard' && (
+              <View style={[
+                styles.variantBadge,
+                persistence.currentPhase >= 3 && styles.variantBadgeDark,
+              ]}>
+                <Text style={styles.variantBadgeIcon}>
+                  {VARIANT_CONFIGS[puzzle.currentVariant]?.icon || '✨'}
+                </Text>
+                <Text style={[
+                  styles.variantBadgeText,
+                  persistence.currentPhase >= 3 && styles.variantBadgeTextDark,
+                ]}>
+                  {VARIANT_CONFIGS[puzzle.currentVariant]?.title || 'Variant'}
+                </Text>
+              </View>
+            )}
           </View>
 
           <TouchableOpacity
@@ -903,12 +920,18 @@ export default function App() {
                 rowData={row}
                 rowIndex={idx}
                 activeRowIndex={puzzle.activeRowIndex}
+                moveDirection={puzzle.moveDirection}
                 selectedLetter={puzzle.selectedLetter}
                 onLetterPress={handleLetterPress}
                 onSlotPress={handleSlotPress}
                 isProcessing={puzzle.isProcessing}
                 phase={persistence.currentPhase}
                 wordLength={puzzle.currentWordLength}
+                concealLetters={
+                  hasVariantModifier(puzzle.currentVariant, 'blind') &&
+                  idx !== puzzle.activeRowIndex &&
+                  !puzzle.blindRevealedRows.includes(idx)
+                }
               />
             ))}
           </ScrollView>
@@ -1286,6 +1309,34 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+  variantBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    maxWidth: 180,
+  },
+  variantBadgeDark: {
+    backgroundColor: 'rgba(35, 18, 45, 0.75)',
+    borderWidth: 1,
+    borderColor: 'rgba(130, 70, 120, 0.35)',
+  },
+  variantBadgeIcon: {
+    fontSize: 10,
+  },
+  variantBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(255, 255, 255, 0.85)',
+    letterSpacing: 0.2,
+    flexShrink: 1,
+  },
+  variantBadgeTextDark: {
+    color: 'rgba(220, 170, 200, 0.95)',
   },
 
   // Phase indicator badge
