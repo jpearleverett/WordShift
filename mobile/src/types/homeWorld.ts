@@ -179,8 +179,6 @@ export interface HomeWorldProgress {
   phaseProgress?: number;
   // Challenge mode tracking
   challengeCompletions?: number;
-  // Room decorations purchased
-  decorations?: { [roomId: string]: string[] };
   // Last milestone puzzle count that was claimed (prevents double-claiming)
   lastClaimedMilestone?: number;
   // === Ritual Tracking (Incantation System) ===
@@ -467,89 +465,3 @@ export const CHALLENGE_MODE_CONFIG = {
   HINTS_ALLOWED: false,
 };
 
-/**
- * Room decoration definitions
- * Cosmetic items purchasable after all base unlocks are done
- */
-export interface Decoration {
-  id: string;
-  name: string;
-  description: string;
-  /** Phase 3+ description - darker significance */
-  darkDescription?: string;
-  /** Phase 4 description - ritual significance */
-  ritualDescription?: string;
-  icon: string;
-  cost: number;
-  roomTheme: RoomTheme; // Which room this decoration belongs to
-}
-
-/**
- * Get the phase-appropriate decoration description
- */
-export function getDecorationDescription(decoration: Decoration, phase: DialoguePhase): string {
-  if (phase >= 4 && decoration.ritualDescription) return decoration.ritualDescription;
-  if (phase >= 3 && decoration.darkDescription) return decoration.darkDescription;
-  return decoration.description;
-}
-
-/**
- * Available decorations for each room
- * Each room gets 3 decorations to purchase
- */
-export const ROOM_DECORATIONS: Decoration[] = [
-  // Cozy den (Fox)
-  { id: 'cozy_den_rug', name: 'Velvet Rug', description: 'A luxurious crimson rug by the fire', darkDescription: 'Crimson as old blood. It warms the floor where Ember sits and watches.', ritualDescription: 'Crimson as a ritual circle. It was always going to be placed here.', icon: '🟥', cost: 75, roomTheme: 'cozy_den' },
-  { id: 'cozy_den_lamp', name: 'Crystal Lamp', description: 'Casts warm amber light across the room', darkDescription: 'The light flickers in patterns that almost spell something.', ritualDescription: 'The last light. When it goes out, the fire will be all that remains.', icon: '🪔', cost: 100, roomTheme: 'cozy_den' },
-  { id: 'cozy_den_painting', name: 'Forest Painting', description: 'A misty woodland scene in a gold frame', darkDescription: 'The trees in the painting seem to lean inward. Toward something.', ritualDescription: 'The forest depicted no longer exists. The painting remembers.', icon: '🖼️', cost: 150, roomTheme: 'cozy_den' },
-  // Kitchen (Pangolin)
-  { id: 'kitchen_pots', name: 'Copper Pot Set', description: 'Gleaming copper pots hanging from hooks', darkDescription: 'The pots clank softly when no one is cooking. Resonating.', ritualDescription: 'Vessels for the final preparation. Panko knows the recipe.', icon: '🫕', cost: 75, roomTheme: 'kitchen' },
-  { id: 'kitchen_herbs', name: 'Herb Garden', description: 'Fresh herbs growing on the windowsill', darkDescription: 'The herbs grow faster now. Reaching toward something outside.', ritualDescription: 'These herbs have no culinary purpose. They are offerings.', icon: '🌿', cost: 100, roomTheme: 'kitchen' },
-  { id: 'kitchen_chandelier', name: 'Iron Chandelier', description: 'Rustic wrought iron with candles', darkDescription: 'The candles burn without wax. The iron is warm to the touch.', ritualDescription: 'Ten candles. One for each keeper. They cannot be extinguished.', icon: '🕯️', cost: 150, roomTheme: 'kitchen' },
-  // Study (Owl)
-  { id: 'study_globe', name: 'Antique Globe', description: 'A spinning globe with golden meridians', darkDescription: 'The globe has begun spinning on its own. Slowly.', ritualDescription: 'The continents have rearranged. Archimedes says it is more accurate now.', icon: '🌍', cost: 75, roomTheme: 'study' },
-  { id: 'study_telescope', name: 'Brass Telescope', description: 'Points toward the night sky through the window', darkDescription: 'Archimedes stopped looking through it. He says something looked back.', ritualDescription: 'Pointed at the shadow in the sky. It no longer needs focusing.', icon: '🔭', cost: 100, roomTheme: 'study' },
-  { id: 'study_clock', name: 'Grandfather Clock', description: 'Ticks with measured, philosophical patience', darkDescription: 'The ticking has slowed. Or time has. Hard to tell.', ritualDescription: 'Counting down. Always counting down. To the final chime.', icon: '🕰️', cost: 150, roomTheme: 'study' },
-  // Aquarium (Axolotl)
-  { id: 'aquarium_coral', name: 'Living Coral', description: 'Bioluminescent coral that softly glows', darkDescription: 'The glow has changed color. Deeper. Almost crimson.', ritualDescription: 'The coral pulses in time with something beneath the water.', icon: '🪸', cost: 75, roomTheme: 'aquarium' },
-  { id: 'aquarium_treasure', name: 'Sunken Treasure', description: 'A tiny treasure chest with golden coins', darkDescription: 'The coins have tarnished. They spell something when arranged.', ritualDescription: 'Not treasure. Tokens. Payment for passage through the water.', icon: '💰', cost: 100, roomTheme: 'aquarium' },
-  { id: 'aquarium_jellyfish', name: 'Jellyfish Mobile', description: 'Glass jellyfish that catch the light', darkDescription: 'They move without wind. Drifting toward the same direction.', ritualDescription: 'They are not glass. They never were. They came with the water.', icon: '🪼', cost: 150, roomTheme: 'aquarium' },
-  // Jungle (Sloth)
-  { id: 'jungle_flowers', name: 'Tropical Flowers', description: 'Exotic blooms in vibrant colors', darkDescription: 'The flowers bloom only at night now. Facing the same direction.', ritualDescription: 'They are not growing toward light. They are growing toward IT.', icon: '🌺', cost: 75, roomTheme: 'jungle' },
-  { id: 'jungle_butterfly', name: 'Butterfly Garden', description: 'Butterflies drift lazily through the vines', darkDescription: 'The butterflies have stopped moving. Hovering. Waiting.', ritualDescription: 'Wings frozen mid-beat. Time moves differently near the arrangement.', icon: '🦋', cost: 100, roomTheme: 'jungle' },
-  { id: 'jungle_waterfall', name: 'Mini Waterfall', description: 'A gentle cascade into a mossy pool', darkDescription: 'The water flows upward sometimes. Just for a moment.', ritualDescription: 'The water flows in circles now. A vortex. A sigil.', icon: '💧', cost: 150, roomTheme: 'jungle' },
-  // Desert (Fennec Fox)
-  { id: 'desert_lantern', name: 'Star Lantern', description: 'A brass lantern that projects star patterns', darkDescription: 'The star patterns have changed. New constellations. Unknown ones.', ritualDescription: 'The lantern projects the arrangement. The stars were always the map.', icon: '🏮', cost: 75, roomTheme: 'desert' },
-  { id: 'desert_cactus', name: 'Blooming Cactus', description: 'A rare cactus with a single pink flower', darkDescription: 'The flower opened and will not close. It faces the window. Always.', ritualDescription: 'The flower has turned black. Fennick says it is still blooming.', icon: '🌵', cost: 100, roomTheme: 'desert' },
-  { id: 'desert_orrery', name: 'Desert Orrery', description: 'A model of the solar system in brass and stone', darkDescription: 'An extra sphere appeared in the orrery. No one placed it there.', ritualDescription: 'The spheres align. The model shows what the sky will become.', icon: '🪐', cost: 150, roomTheme: 'desert' },
-  // Office (Capybara)
-  { id: 'office_plant', name: 'Office Fern', description: 'A calming fern that purifies the air', darkDescription: 'The fern has doubled in size. It purifies nothing now.', ritualDescription: 'The fern reaches toward the ceiling. Toward the room above. Toward what gathers.', icon: '🪴', cost: 75, roomTheme: 'office' },
-  { id: 'office_fish', name: 'Desktop Aquarium', description: 'A tiny fish tank with a single goldfish', darkDescription: 'The fish swims in the same circle. Endlessly. Perfectly.', ritualDescription: 'The fish died weeks ago. It still swims. Chill does not mention this.', icon: '🐠', cost: 100, roomTheme: 'office' },
-  { id: 'office_art', name: 'Abstract Art', description: 'A soothing abstract canvas in cool tones', darkDescription: 'The painting has changed. The shapes form a pattern now.', ritualDescription: 'Not abstract. A diagram. The arrangement, viewed from above.', icon: '🎨', cost: 150, roomTheme: 'office' },
-  // Burrow (Wombat)
-  { id: 'burrow_crystals', name: 'Crystal Cluster', description: 'Amethyst crystals embedded in the wall', darkDescription: 'The crystals vibrate at a frequency Warren can feel in his teeth.', ritualDescription: 'They glow when you solve puzzles. Warren noticed first.', icon: '💎', cost: 75, roomTheme: 'burrow' },
-  { id: 'burrow_mushrooms', name: 'Glow Mushrooms', description: 'Bioluminescent mushrooms in the corner', darkDescription: 'The mushrooms spell something in the dark. A word. Then another.', ritualDescription: 'They spell the words you formed. Every puzzle. Written in bioluminescence.', icon: '🍄', cost: 100, roomTheme: 'burrow' },
-  { id: 'burrow_fossils', name: 'Fossil Collection', description: 'Ancient fossils carefully mounted on the wall', darkDescription: 'The fossils are warm. As if something inside still lives.', ritualDescription: 'Not fossils. Promises. Left by those who built the first arrangement.', icon: '🦴', cost: 150, roomTheme: 'burrow' },
-  // Garden (Rabbit)
-  { id: 'garden_fountain', name: 'Stone Fountain', description: 'A bubbling fountain with mossy stones', darkDescription: 'The fountain water has gone still. Perfectly still. Like glass.', ritualDescription: 'Look into the water. That shape below the surface. Do not look away.', icon: '⛲', cost: 75, roomTheme: 'garden' },
-  { id: 'garden_birdhouse', name: 'Birdhouse', description: 'A charming painted birdhouse on a pole', darkDescription: 'No birds have come. The birdhouse faces a direction that does not exist.', ritualDescription: 'A house within a house. The pattern repeats at every scale.', icon: '🏡', cost: 100, roomTheme: 'garden' },
-  { id: 'garden_gazebo', name: 'Garden Gazebo', description: 'A vine-covered gazebo for afternoon tea', darkDescription: 'The vines have woven themselves into shapes. Letters. Words.', ritualDescription: 'The gazebo is a threshold. Thyme sits there and does not move.', icon: '🛖', cost: 150, roomTheme: 'garden' },
-  // Bamboo (Red Panda)
-  { id: 'bamboo_incense', name: 'Incense Burner', description: 'Fragrant smoke curls upward in spirals', darkDescription: 'The smoke writes characters in a language no one taught it.', ritualDescription: 'The incense has been burning since the first puzzle. It will burn until the last.', icon: '🧘', cost: 75, roomTheme: 'bamboo' },
-  { id: 'bamboo_bonsai', name: 'Bonsai Tree', description: 'A centuries-old bonsai in a jade pot', darkDescription: 'The bonsai is growing. Fast. Despite no light. Despite no water.', ritualDescription: 'Its roots reach through the floor into every room below. Connecting them.', icon: '🌳', cost: 100, roomTheme: 'bamboo' },
-  { id: 'bamboo_windchime', name: 'Wind Chimes', description: 'Bamboo chimes that sing in the breeze', darkDescription: 'The chimes ring without wind. A melody that Bamboo hums along to.', ritualDescription: 'The chimes play the frequency of the arrangement. The final note approaches.', icon: '🎐', cost: 150, roomTheme: 'bamboo' },
-];
-
-/**
- * Get decorations available for a specific room
- */
-export function getDecorationsForRoom(roomTheme: RoomTheme): Decoration[] {
-  return ROOM_DECORATIONS.filter(d => d.roomTheme === roomTheme);
-}
-
-/**
- * Get total cost of all decorations (for post-completion amber sink)
- */
-export function getTotalDecorationCost(): number {
-  return ROOM_DECORATIONS.reduce((sum, d) => sum + d.cost, 0);
-}

@@ -2301,3 +2301,113 @@ export function getWordThresholdDialogue(
   }
   return null;
 }
+
+// =============================================================================
+// SACRIFICE REACTIONS
+// =============================================================================
+
+/**
+ * Animal reactions to the player making sacrifices (Phase 4+ only).
+ * Each animal has lines for first sacrifice and subsequent sacrifices,
+ * filtered through their personality and cult role.
+ */
+const SACRIFICE_REACTIONS: Record<string, { first: string; subsequent: string[] }> = {
+  fox: {
+    first: 'The fire burned brighter when you gave that. I saw it. I think it saw you back.',
+    subsequent: [
+      'Every offering warms the fire. Not with heat. With something older.',
+      'You give willingly. That\'s what makes it sacred. The fire knows the difference.',
+      'Ember thanks you. Not me. The fire. It has its own gratitude.',
+    ],
+  },
+  pangolin: {
+    first: 'You gave something back. The kitchen feels... fuller. Like a meal that cooks itself.',
+    subsequent: [
+      'The recipe calls for voluntary offerings. You are a generous ingredient.',
+      'I felt the pantry shift when you offered that. Things rearranging themselves. For the final course.',
+      'The arrangement doesn\'t need your amber. It needs your willingness. The amber is just proof.',
+    ],
+  },
+  owl: {
+    first: 'I read about this. The voluntary offering. The texts said it would happen. They were right.',
+    subsequent: [
+      'Every offering is a footnote in the great text. Yours is becoming a chapter.',
+      'The books rearranged themselves after your offering. A new page appeared. I did not write it.',
+      'You understand now, don\'t you? The amber was never yours. You were just holding it for the arrangement.',
+    ],
+  },
+  axolotl: {
+    first: 'The water changed color when you did that. Just for a moment. Like it was blushing.',
+    subsequent: [
+      'I can see your offering dissolving in the water. Becoming part of everything. Part of us.',
+      'The ripples from your sacrifice haven\'t stopped. They just got quieter. Deeper.',
+      'Something in the deep stirred when you gave. It\'s closer to the surface now.',
+    ],
+  },
+  fennec_fox: {
+    first: 'I heard something when you offered that. A sound below sound. Like gratitude without a voice.',
+    subsequent: [
+      'The silence after your offering is different. Fuller. Like it\'s holding something.',
+      'I can hear the arrangement humming. It hums louder after you give.',
+      'Your offerings have a frequency. I can hear them joining the pattern. Harmonizing.',
+    ],
+  },
+  capybara: {
+    first: 'That was very calm of you. Giving something away like that. The arrangement appreciates calm.',
+    subsequent: [
+      'I filed your offering. It\'s in the records now. Permanent. Appreciated.',
+      'You\'re very good at this. Giving things up. The arrangement noticed your efficiency.',
+      'Another offering processed. The system runs smoother with voluntary contributions.',
+    ],
+  },
+  sloth: {
+    first: 'That was... fast. You gave it so... quickly. It took me... a long time... to understand... why.',
+    subsequent: [
+      'The arrangement... receives. Slowly. Like me. But it... remembers... everything.',
+      'You gave... again. Time... doesn\'t matter... to the arrangement. But... the giving... does.',
+      'Slowly... the house... drinks. Your amber... becomes... the foundation.',
+    ],
+  },
+  wombat: {
+    first: 'I felt that in the foundations. Your offering. The ground shifted. Just a little. Toward something.',
+    subsequent: [
+      'The tunnels echo with your generosity. The earth accepts what you give.',
+      'Something below us grew warmer after your offering. I can feel it through the walls.',
+      'The foundation remembers every gift. It\'s stronger now. Ready for what it needs to hold.',
+    ],
+  },
+  rabbit: {
+    first: 'You... you gave that willingly? I\'m scared of how natural it felt. For both of us.',
+    subsequent: [
+      'I used to be afraid of the offerings. Now I\'m afraid of how right they feel.',
+      'My heart beats faster every time you give. Not from fear anymore. From... anticipation.',
+      'We\'re so close now. Every offering brings it nearer. I should be terrified. I\'m not.',
+    ],
+  },
+  red_panda: {
+    first: 'A voluntary release. The pattern breathes easier. You are learning what the bamboo always knew.',
+    subsequent: [
+      'To give without receiving is the purest form of the arrangement. You understand.',
+      'The offering dissolves into the pattern. Not lost. Transformed. As all things will be.',
+      'Breathe. Release. Give. The cycle is the arrangement. The arrangement is the cycle.',
+    ],
+  },
+};
+
+/**
+ * Get an animal's reaction to the player's sacrifice.
+ * Returns null if no reaction is available (pre-Phase 4).
+ */
+export function getSacrificeReaction(
+  animalType: string,
+  sacrificeCount: number,
+  phase: number
+): string | null {
+  if (phase < 4) return null;
+  const reactions = SACRIFICE_REACTIONS[animalType];
+  if (!reactions) return null;
+
+  if (sacrificeCount <= 1) return reactions.first;
+  const lines = reactions.subsequent;
+  return lines[Math.floor(Math.random() * lines.length)];
+}

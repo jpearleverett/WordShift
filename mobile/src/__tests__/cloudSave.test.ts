@@ -158,7 +158,6 @@ describe('cloudSave', () => {
         'wordshift_achievements',
         'wordshift_share_count',
         'wordshift_weekly_quests',
-        'wordshift_cosmetics',
         'wordshift_whisper_gallery',
         'wordshift_sacrifices',
       ];
@@ -259,14 +258,12 @@ describe('cloudSave', () => {
         data: {
           wordshift_progress: '"progress_data"',
           wordshift_achievements: '"achievement_data"',
-          wordshift_cosmetics: '"cosmetic_data"',
         },
       };
 
       await restoreFromCloudData(cloudData);
       expect(await AsyncStorage.getItem('wordshift_progress')).toBe('"progress_data"');
       expect(await AsyncStorage.getItem('wordshift_achievements')).toBe('"achievement_data"');
-      expect(await AsyncStorage.getItem('wordshift_cosmetics')).toBe('"cosmetic_data"');
     });
   });
 

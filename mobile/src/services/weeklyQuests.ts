@@ -5,8 +5,8 @@ import { DialoguePhase } from '../types/homeWorld';
 /**
  * Weekly quests system for WordShift.
  *
- * Generates 3-5 quests each Monday that reset weekly.
- * Quests provide bonus amber and optional cosmetic rewards.
+ * Generates 4 quests each Monday that reset weekly.
+ * Quests provide bonus amber rewards that scale with narrative phase.
  * Quest descriptions shift tone with narrative phase.
  */
 
@@ -38,8 +38,6 @@ export interface Quest {
   completed: boolean;
   claimed: boolean;
   rewardAmber: number;
-  /** Optional cosmetic reward ID */
-  rewardCosmeticId?: string;
   /** Difficulty filter (only for solve_difficulty quests) */
   difficulty?: Difficulty;
 }
@@ -62,7 +60,6 @@ interface QuestTemplate {
   target: number;
   rewardAmber: number;
   difficulty?: Difficulty;
-  rewardCosmeticId?: string;
 }
 
 const QUEST_POOL: QuestTemplate[] = [
@@ -173,7 +170,6 @@ function generateQuests(weekId: string, phase: number): Quest[] {
       completed: false,
       claimed: false,
       rewardAmber: template.rewardAmber,
-      rewardCosmeticId: template.rewardCosmeticId,
       difficulty: template.difficulty,
     };
   });
@@ -277,9 +273,21 @@ export async function updateQuestProgress(event: {
 }
 
 /**
- * Claim a completed quest reward. Returns the amber amount awarded.
+ * Get the phase-based reward multiplier for quest rewards.
+ * Higher phases = higher quest rewards to maintain quest relevance
+ * as base amber income grows with harder puzzles and streaks.
  */
-export async function claimQuestReward(questId: string): Promise<{ amber: number; cosmeticId?: string } | null> {
+export function getPhaseRewardMultiplier(phase: number): number {
+  if (phase >= 4) return 2.0;
+  if (phase >= 3) return 1.5;
+  if (phase >= 2) return 1.25;
+  return 1.0;
+}
+
+/**
+ * Claim a completed quest reward. Returns the phase-scaled amber amount awarded.
+ */
+export async function claimQuestReward(questId: string, currentPhase: number = 0): Promise<{ amber: number } | null> {
   const state = await loadWeeklyQuests();
   const quest = state.quests.find(q => q.id === questId);
   if (!quest || !quest.completed || quest.claimed) return null;
@@ -287,9 +295,9 @@ export async function claimQuestReward(questId: string): Promise<{ amber: number
   quest.claimed = true;
   await saveQuestState(state);
 
+  const multiplier = getPhaseRewardMultiplier(currentPhase);
   return {
-    amber: quest.rewardAmber,
-    cosmeticId: quest.rewardCosmeticId,
+    amber: Math.round(quest.rewardAmber * multiplier),
   };
 }
 
@@ -302,12 +310,13 @@ export function getQuestDescription(quest: Quest, phase: number): string {
 }
 
 /**
- * Get total unclaimed amber from completed quests.
+ * Get total unclaimed amber from completed quests (phase-scaled).
  */
-export function getUnclaimedAmber(state: WeeklyQuestState): number {
+export function getUnclaimedAmber(state: WeeklyQuestState, currentPhase: number = 0): number {
+  const multiplier = getPhaseRewardMultiplier(currentPhase);
   return state.quests
     .filter(q => q.completed && !q.claimed)
-    .reduce((sum, q) => sum + q.rewardAmber, 0);
+    .reduce((sum, q) => sum + Math.round(q.rewardAmber * multiplier), 0);
 }
 
 /**

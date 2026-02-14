@@ -866,6 +866,7 @@ export default function App() {
             visible={puzzle.showDifficultyMenu}
             currentDifficulty={puzzle.difficulty}
             gameMode={puzzle.gameMode}
+            phase={persistence.currentPhase}
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
           />

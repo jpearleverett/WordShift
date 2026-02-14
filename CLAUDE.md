@@ -19,7 +19,6 @@ A word puzzle game where players shift letters between words to form valid Engli
 - **Hints**: "Move 'R' — think WARM!" → "If it matters, 'R' — see VOID."
 - **Home screen**: Sunny day, happy clouds → storm sky, shadow figure looming
 - **Animal sprites**: Cute idle poses → robed cult figures
-- **Room decorations**: Cozy furnishings → ritual objects, sigils, altars
 - **Letter tiles**: Bouncy, fast wobble → heavy, ponderous movement with trailing glow
 - **Shadow figure**: Invisible → faint silhouette → full presence with crimson eyes above house
 - **Music/sound** (future): Cheerful chimes → droning, dissonant ambience
@@ -48,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (709 tests, 26 suites)
+npx jest --no-coverage   # Run all tests (684 tests, 25 suites)
 ```
 
 ## Tech Stack
@@ -85,7 +84,7 @@ mobile/
 │   │   ├── useVictoryFlow.ts    # Victory animation choreography (stars, modal, phase flash)
 │   │   ├── useAchievementQueue.ts # Achievement checking + toast queue processing
 │   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging
-│   │   └── useUnlockFlow.ts     # Unlock/shop logic: rooms, animals, decorations, purchases
+│   │   └── useUnlockFlow.ts     # Unlock/shop logic: rooms, animals, purchases
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails, resonant word glow (compact mode for 6+ letters)
@@ -115,7 +114,7 @@ mobile/
 │   │   └── home/
 │   │       ├── HomeScreen.tsx   # Main home screen with animal house, shop, unlock progress
 │   │       ├── HouseWorld.tsx   # Pannable house view (vertical pan only)
-│   │       ├── RoomView.tsx     # Individual room with decorations
+│   │       ├── RoomView.tsx     # Individual room rendering
 │   │       ├── AnimalSprite.tsx # Animated animal characters with movement + emotions
 │   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
 │   │       ├── AmberSparkle.tsx # Animated sparkle particles floating upward
@@ -128,17 +127,16 @@ mobile/
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
-│       ├── animalDialogue.ts    # 560+ dialogue lines (Stephen King literary voice), cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds, word threshold dialogues
+│       ├── animalDialogue.ts    # 560+ dialogue lines (Stephen King literary voice), cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds, word threshold dialogues, sacrifice reactions
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
 │       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules, animal whispers, interjections, micro-events, victory glitch seeds
 │       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials with particle configs and scene effects)
-│       ├── achievements.ts      # 36 achievements across 6 categories
-│       ├── shareResults.ts      # Enhanced Wordle-style sharing with word chains, animal whispers, cosmetic frames
+│       ├── achievements.ts      # 33 achievements across 6 categories
+│       ├── shareResults.ts      # Enhanced Wordle-style sharing with word chains, animal whispers
 │       ├── weeklyQuests.ts      # Weekly quest system: 4 rotating quests, amber rewards, phase-aware descriptions
 │       ├── puzzleVariety.ts     # Puzzle variant modes: Reverse, Blind, Speed (60s timer), Chain (3 linked puzzles)
-│       ├── cosmeticRewards.ts   # Cosmetic rewards: tile themes, confetti styles, share frames (unlocked by achievements)
 │       ├── whisperGallery.ts    # Collectible archive of all seen whispers, dialogue, and narrative moments
 │       ├── dialogueChoices.ts   # Player choice points at Phase 3 — illusion of agency in the narrative
 │       ├── sacrifice.ts         # Phase 4+ amber sacrifice mechanic — voluntary offerings to the arrangement
@@ -153,14 +151,13 @@ mobile/
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (709 tests, 26 suites)
+├── src/__tests__/               # Test suites (684 tests, 25 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
 │   ├── amberCurrency.test.ts
 │   ├── cloudSave.test.ts        # Cloud save infrastructure: providers, sync, collect/restore
 │   ├── components.test.ts       # Component data contracts, phase theme, rules modal
-│   ├── cosmeticRewards.test.ts  # Cosmetic unlock/equip, sync with achievements
 │   ├── dailyChallenge.test.ts
 │   ├── dataMigration.test.ts
 │   ├── dialogueChoices.test.ts  # Player choice points, Phase 4 callbacks
@@ -345,14 +342,14 @@ Game logic is extracted into six custom hooks:
 
 **`useDialogueFlow()`** (`src/hooks/useDialogueFlow.ts`):
 - Animal dialogue session state, animations, and cooldown messaging for home screen
-- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words (per-animal filtering), checks for tutorial callbacks (Fox Phase 4), rolls for cross-animal references (frequency scales with phase: 10% → 60%, guaranteed first for Vanguard animals), checks for coordinated dialogue events at puzzle milestones, and checks for word threshold dialogues
+- `handleAnimalTap(animal)` - Check availability, start session or show cooldown message; also consumes trigger words (per-animal filtering), checks for sacrifice reactions (Phase 4+), checks for tutorial callbacks (Fox Phase 4), rolls for cross-animal references (frequency scales with phase: 10% → 60%, guaranteed first for Vanguard animals), checks for coordinated dialogue events at puzzle milestones, and checks for word threshold dialogues
 - `handleNextDialogue()` - Advance dialogue, record progress, check session limits
 - `handleCloseDialogue()` - End session, clean up state
 - Returns: `selectedAnimal`, `showDialogue`, `dialogueText`, `sessionInfo`, `cooldownMessage`, `isTalking`, `triggerReaction`, `crossAnimalRef`
 - Animations: cooldown toast slide-in/out, dialogue modal spring, talking sprite alternation (idle/talk every 300ms)
 
 **`useUnlockFlow()`** (`src/hooks/useUnlockFlow.ts`):
-- Unlock/shop logic for home screen: rooms, animals, decorations, purchases
+- Unlock/shop logic for home screen: rooms, animals, purchases
 - `handlePurchase(unlock)` - Execute purchase, trigger celebration, show intro dialogue for new characters
 - `handleRoomPress(room)` - Handle locked room tap or room needing an animal
 - `refreshUnlockData(freshRooms, freshAnimals)` - Refresh state from storage (avoids stale closures)
@@ -395,9 +392,9 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
 
 ### Achievement System (`services/achievements.ts`)
 
-36 achievements across 6 categories (puzzle, mastery, streak, collection, journey, challenge):
+33 achievements across 6 categories (puzzle, mastery, streak, collection, journey, challenge):
 - Each has `check: (state: AchievementCheckState) => boolean`
-- State includes: stats, puzzlesSolved, currentPhase, currentStreak, unlockedAnimals, challengeCompletions, decorationCount, etc.
+- State includes: stats, puzzlesSolved, currentPhase, currentStreak, unlockedAnimals, challengeCompletions, etc.
 - Persisted via AsyncStorage (`wordshift_unlocked_achievements`)
 - `checkAchievements(state)` returns newly unlocked achievements
 - `AchievementToast` component shows slide-in notification
@@ -520,7 +517,7 @@ Animals have conversation sessions with puzzle-based cooldowns to pace interacti
 
 **Session Flow**:
 1. Player taps animal -> starts session if available
-2. Pre-dialogue pages shown first (trigger reactions, cross-animal refs, coordinated events) — each as a separate conversation page, tapped through with "Next". These don't count toward session limits.
+2. Pre-dialogue pages shown first (trigger reactions, sacrifice reactions, cross-animal refs, coordinated events) — each as a separate conversation page, tapped through with "Next". These don't count toward session limits.
 3. Regular dialogue follows, up to 4-6 dialogues per session (phase-aware)
 4. Session ends when: max dialogues reached or player leaves
 5. Cooldown begins -> must complete 2-5 puzzles to talk again (skipped during grace period)
@@ -550,12 +547,6 @@ The house is built from the ground up, one room at a time. What begins as "build
 6. ...continues alternating rooms (escalating: 50-475 amber) and animals (flat: 100 amber each)
 
 **Unlock Progress Bar**: Home screen shows amber progress toward next unlock with a visual bar.
-
-### Room Decorations (Post-Completion Content)
-
-After all rooms and animals are unlocked, players can purchase cosmetic decorations (30 total, 3 per room, 75-150 amber each). At higher phases, these decorations take on a darker significance — what starts as "a velvet rug" or "copper pots" eventually feels like "ritual furnishings."
-
-Managed via `purchaseDecoration()`, `hasDecoration()`, `getAllDecorations()` in `amberCurrency.ts`. Phase-aware descriptions via `getDecorationDescription(decoration, phase)` in `types/homeWorld.ts` — supports `darkDescription` (Phase 3+) and `ritualDescription` (Phase 4+).
 
 ### Phase-Aware Room Descriptions
 
@@ -654,6 +645,21 @@ Returns phase-specific colors for backgrounds, particles, confetti, victory moda
 - **Phase 3**: Dark indigo (#2E3355), dim muted particles
 - **Phase 4**: Near-black (#1A1A2E), crimson/purple accents, dying embers
 - **Phase 5**: Terrible peace — muted purple (#252040), ghostly mauve particles, peaceful purple victory title. Distinct from Phase 4's aggression; serene resignation
+
+### Phase-Aware Victory Modal (`VictoryModal.tsx`)
+The victory modal visually transforms across narrative phases via additional `PhaseTheme` fields:
+- `modalOverlayColor`, `modalBgColor`, `modalTextColor`, `modalSecondaryTextColor`, `modalStatBgColor`, `modalDividerColor`
+- **Phase 0-1**: Bright white card, dark text, light stat containers
+- **Phase 2**: Slightly muted card background and text
+- **Phase 3**: Dark purple-gray card, light text, dim dividers
+- **Phase 4**: Near-black card with crimson accents, ghostly text
+- VictoryModal uses `getPhaseTheme(phase)` for overlay color, card background, all text colors, stat container backgrounds, and divider lines
+
+### Phase-Aware Difficulty Menu (`DifficultyMenu.tsx`)
+The difficulty selector dropdown adapts to the narrative phase:
+- Accepts `phase` prop
+- **Phase 0-2**: Unchanged bright white menu with standard styling
+- **Phase 3+**: Dark background, phase-themed text colors from `getPhaseTheme()`, dark dividers between difficulty options
 
 ### Letter Tile Animation Evolution (`LetterTile.tsx`)
 Letter tiles physically change behavior across phases to make puzzles *feel* different:
@@ -755,7 +761,7 @@ Tracks recently used words to ensure puzzle diversity:
 
 ### Amber Currency (`amberCurrency.ts`)
 
-Manages amber balance, streak, phase progression, and decorations:
+Manages amber balance, streak, and phase progression:
 
 - `awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate)` - Main entry, returns balance/phase/streak/challenge bonus
 - `calculatePhaseAcceleration(threeStarRate, streak, difficulty, gameMode)` - Weighted phase progress multiplier
@@ -763,8 +769,6 @@ Manages amber balance, streak, phase progression, and decorations:
 - `getStreakInfo()` - Current streak, multiplier, bonus percentage
 - `getFullProgress()` - All progress data (amber, puzzles, phase, unlocks)
 - `getPuzzlesUntilNextPhase()` - Uses `phaseProgress` (accelerated) not raw `puzzlesSolved`
-- `purchaseDecoration(roomId, decorationId, cost)` - Buy room decoration
-- `hasDecoration(roomId, decorationId)` / `getAllDecorations()` / `getDecorationCount()` - Decoration queries
 - `recordRitualWords(words, triggerWords, ritualEnergy)` - Record words to ledger, queue triggers, accumulate ritual energy
 - `consumeTriggerWords(animalType?)` - Dequeue trigger words for a specific animal (per-animal filtering; without arg: legacy consume-all)
 - `markHouseCompleted()` / `isHouseCompleted()` - House completion ceremony tracking
@@ -920,7 +924,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 709 tests, 26 suites
+cd mobile && npx jest --no-coverage  # 684 tests, 25 suites
 ```
 
 **Test patterns:**
@@ -961,27 +965,16 @@ Phase 0 now contains subtle "wrongness" to foreshadow the horror:
 
 4 rotating quests generated each Monday, with seeded deterministic selection:
 - Quest types: solve_count, solve_difficulty, earn_stars, daily_complete, no_hints, challenge_mode, earn_amber
-- Rewards: 20-100 amber per quest
+- Rewards: 20-100 amber per quest (base), scaled by phase
 - Phase-aware descriptions (Phase 3+: dark ritual-themed text)
+- **Phase-scaled rewards**: `getPhaseRewardMultiplier(phase)` — Phase 0-1: 1.0x, Phase 2: 1.25x, Phase 3: 1.5x, Phase 4+: 2.0x. Applied when claiming rewards, rewarding players who have progressed deeper into the narrative
 - `loadWeeklyQuests(phase)` — loads or generates quests for current week
 - `updateQuestProgress(event, phase)` — called after puzzle completion, returns newly completed quests
-- `claimQuestReward(questId)` — claim amber + optional cosmetic
+- `claimQuestReward(questId, currentPhase)` — claim amber with phase-scaled multiplier
+- `getUnclaimedAmber(currentPhase)` — total unclaimed amber with phase multiplier applied
 - `getTimeUntilReset()` — time until next Monday reset
 - `getWeekId()` — ISO week identifier for deterministic generation
 - **Wired in**: `useGamePersistence.ts` calls `updateQuestProgress(event, phase)` after each victory with difficulty, stars, hints, challenge/daily status, and amber earned
-
-### Cosmetic Rewards System (`cosmeticRewards.ts`)
-
-Achievements unlock cosmetic customizations (purely visual):
-- **Tile Themes** (6): Candy Classic (default), Dark Scholar (Phase 3), Ocean Depths (100 puzzles), Ember Glow (30-day streak), The Void (Phase 4), Golden Hour (25 three-star)
-- **Confetti Styles** (4): Rainbow Burst (default), Golden Shower (30-day streak), Dark Embers (Phase 3), Starfall (25 three-star)
-- **Share Frames** (4): Basic (default), Animal Friends (all animals), The Arrangement (Phase 4), Fire Streak (60-day streak)
-
-Key functions:
-- `syncCosmeticsWithAchievements(unlockedIds)` — call after achievement check to unlock corresponding cosmetics
-- `equipCosmetic(id)` / `getEquippedCosmetic(category)` — equip and query
-- `getActiveTileColors()` — returns custom tile color array or null for defaults
-- **Wired in**: `useAchievementQueue.ts` calls `syncCosmeticsWithAchievements(allUnlockedIds)` after each achievement check to auto-unlock corresponding cosmetics
 
 ### Whisper Gallery (`whisperGallery.ts`)
 
@@ -1013,7 +1006,10 @@ Phase 4+ feature: players can voluntarily "offer" amber to the arrangement:
 - `performSacrifice(amount, phase)` — destroys amber, returns response message
 - `isSacrificeAvailable(phase)` — only Phase 4+
 - `getSacrificeAmounts(balance)` — suggested amounts based on current balance
+- `getSacrificeCount()` — returns total number of sacrifices performed
 - **Wired in**: `HomeScreen.tsx` renders a sacrifice modal (Phase 4+ only) with amount selection buttons, amber deduction via `spendAmber()`, and response display. Accessible via "Sacrifice" button in the action row
+
+**Animals React to Sacrifices**: At Phase 4+, animals acknowledge the player's offerings. `SACRIFICE_REACTIONS` in `animalDialogue.ts` defines per-animal reactions — each animal has 1 first-sacrifice line and 3 subsequent lines reflecting their personality (e.g., Fox speaks of flames consuming the offering, Owl references ancient texts about sacrifice). `getSacrificeReaction(animalType, sacrificeCount, phase)` in `animalDialogue.ts` selects the appropriate line. Wired into `useDialogueFlow.ts` as a pre-dialogue page (shown between trigger word reactions and word threshold dialogues), so the animal naturally comments on the player's sacrifice before continuing regular dialogue.
 
 ### Push Notifications (`notifications.ts`)
 
@@ -1030,7 +1026,7 @@ Local push notification scheduling via expo-notifications (lazy-loaded):
 Client-side cloud sync layer with pluggable backend:
 - `CloudProvider` interface: upload, download, hasNewerSave, isReady
 - Currently uses `NoOpProvider` (logs operations, no actual backend)
-- `collectLocalSaveData()` — gathers all 16 AsyncStorage keys into a CloudSaveData object
+- `collectLocalSaveData()` — gathers all AsyncStorage keys into a CloudSaveData object
 - `restoreFromCloudData(data)` — overwrites local with cloud data
 - `uploadToCloud()` / `downloadFromCloud()` — provider-mediated sync
 - `markPendingChanges()` — tracks unsaved local changes
@@ -1061,7 +1057,6 @@ The ShadowPresence component now features:
 Share results now include:
 - **Word chain display**: Horizontal (Phase 0-2: "FLAME → FAME → FRAME") or vertical (Phase 3+: arrows become ↓)
 - **Animal whisper**: Post-puzzle whisper text included as a quote
-- **Cosmetic share frames**: Animal border, ritual frame, or fire streak border decorations
 - **MEDIUM_PLUS difficulty**: Orange 🟠 emoji indicator
 
 ### Smoothed Unlock Curve

@@ -10,7 +10,9 @@ import {
   getCoordinatedEventLine,
   getWordThresholdDialogue,
   getTotalDialogueCount,
+  getSacrificeReaction,
 } from '../services/animalDialogue';
+import { getSacrificeCount } from '../services/sacrifice';
 import {
   checkDialogueAvailability,
   recordDialogue,
@@ -78,6 +80,9 @@ export function useDialogueFlow({
   const [preDialoguePages, setPreDialoguePages] = useState<string[]>([]);
   // Active dialogue choice (Phase 3 choice points)
   const [activeChoice, setActiveChoice] = useState<DialogueChoice | null>(null);
+
+  // Track last-seen sacrifice count per animal to detect new sacrifices
+  const lastSeenSacrificeCount = useRef<Record<string, number>>({});
 
   // Animations
   const dialogueSlide = useRef(new Animated.Value(0)).current;
@@ -276,7 +281,24 @@ export function useDialogueFlow({
       }
     }
 
-    // 4. Word count threshold dialogue — low priority
+    // 4. Sacrifice reaction — animals notice when the player offers amber (Phase 4+)
+    if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.currentPhase >= 4) {
+      try {
+        const currentCount = await getSacrificeCount();
+        const lastSeen = lastSeenSacrificeCount.current[animal.type] || 0;
+        if (currentCount > lastSeen) {
+          const reaction = getSacrificeReaction(animal.type, currentCount, progress.currentPhase);
+          if (reaction) {
+            pages.push(reaction);
+          }
+          lastSeenSacrificeCount.current[animal.type] = currentCount;
+        }
+      } catch {
+        // Sacrifice reaction is non-critical
+      }
+    }
+
+    // 5. Word count threshold dialogue — low priority
     if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.totalWordsFormed) {
       const approxPrevious = Math.max(0, (progress.totalWordsFormed || 0) - 5);
       const thresholdLine = getWordThresholdDialogue(

@@ -5,13 +5,15 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { CandyColors } from '../../theme/colors';
+import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { Difficulty, GameMode } from '../../types';
+import { DialoguePhase } from '../../types/homeWorld';
 
 interface DifficultyMenuProps {
   visible: boolean;
   currentDifficulty: Difficulty;
   gameMode: GameMode;
+  phase?: DialoguePhase;
   onSelectDifficulty: (difficulty: Difficulty) => void;
   onToggleChallengeMode: () => void;
 }
@@ -20,19 +22,29 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   visible,
   currentDifficulty,
   gameMode,
+  phase = 0,
   onSelectDifficulty,
   onToggleChallengeMode,
 }) => {
   if (!visible) return null;
 
+  const phaseTheme = getPhaseTheme(phase);
+  const isDark = phase >= 3;
+
   return (
-    <View style={styles.difficultyMenu}>
+    <View style={[styles.difficultyMenu, isDark && {
+      backgroundColor: phaseTheme.modalBgColor,
+      shadowColor: '#000',
+    }]}>
       {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map(d => (
         <TouchableOpacity
           key={d}
           style={[
             styles.difficultyMenuItem,
             currentDifficulty === d && styles.difficultyMenuItemActive,
+            currentDifficulty === d && isDark && {
+              backgroundColor: phaseTheme.modalTextColor + '20',
+            },
           ]}
           onPress={() => onSelectDifficulty(d)}
         >
@@ -46,7 +58,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           <Text
             style={[
               styles.difficultyMenuText,
+              isDark && { color: phaseTheme.modalSecondaryTextColor },
               currentDifficulty === d && styles.difficultyMenuTextActive,
+              currentDifficulty === d && isDark && { color: phaseTheme.modalTextColor },
             ]}
           >
             {d === 'MEDIUM_PLUS' ? 'MED+' : d}
@@ -54,11 +68,16 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         </TouchableOpacity>
       ))}
       {/* Challenge mode toggle */}
-      <View style={styles.challengeMenuDivider} />
+      <View style={[styles.challengeMenuDivider, isDark && {
+        backgroundColor: phaseTheme.modalDividerColor,
+      }]} />
       <TouchableOpacity
         style={[
           styles.difficultyMenuItem,
           gameMode === 'challenge' && styles.challengeMenuItemActive,
+          gameMode === 'challenge' && isDark && {
+            backgroundColor: '#601828' + '20',
+          },
         ]}
         onPress={onToggleChallengeMode}
       >
@@ -68,11 +87,14 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
         <View style={styles.challengeMenuContent}>
           <Text style={[
             styles.difficultyMenuText,
+            isDark && { color: phaseTheme.modalSecondaryTextColor },
             gameMode === 'challenge' && styles.challengeMenuTextActive,
           ]}>
             CHALLENGE
           </Text>
-          <Text style={styles.challengeMenuDesc}>
+          <Text style={[styles.challengeMenuDesc, isDark && {
+            color: phaseTheme.modalSecondaryTextColor,
+          }]}>
             {gameMode === 'challenge' ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
           </Text>
         </View>

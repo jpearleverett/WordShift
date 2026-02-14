@@ -5,12 +5,10 @@ import {
   AchievementCheckState,
   getShareCount,
 } from '../services/achievements';
-import { getFullProgress, getDecorationCount } from '../services/amberCurrency';
+import { getFullProgress } from '../services/amberCurrency';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { VictoryData } from './useGamePersistence';
 import { hapticHeavy } from '../services/haptics';
-import { syncCosmeticsWithAchievements } from '../services/cosmeticRewards';
-import { getUnlockedAchievementIds } from '../services/achievements';
 
 export interface AchievementQueueState {
   currentAchievement: Achievement | null;
@@ -39,8 +37,6 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
       const progress = await getFullProgress();
       const shareCount = await getShareCount();
       const dailyStatus = await getDailyStatus();
-      const decorationCount = await getDecorationCount();
-
       const state: AchievementCheckState = {
         stats: victory.cumulativeStats || {
           totalPuzzlesCompleted: 0,
@@ -68,7 +64,6 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         dailyChallengesCompleted: dailyStatus.totalCompleted,
         shareCount,
         challengeCompletions: progress.challengeCompletions || 0,
-        decorationCount,
       };
 
       const newAchievements = await checkAchievements(state);
@@ -81,9 +76,6 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         });
       }
 
-      // Sync cosmetic rewards with all unlocked achievements (non-blocking)
-      const allUnlockedIds = await getUnlockedAchievementIds();
-      syncCosmeticsWithAchievements(allUnlockedIds).catch(() => {});
     } catch (err) {
       console.warn('Achievement check failed:', err);
     }

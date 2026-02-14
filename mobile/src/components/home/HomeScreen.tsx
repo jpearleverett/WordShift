@@ -14,7 +14,7 @@ import {
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
 // (inside HouseWorld's GestureHandlerRootView) correctly use RNGH's version.
-import { Animal, Room, HomeWorldProgress, Unlockable, ROOM_DECORATIONS, Decoration, getDecorationsForRoom, getDecorationDescription } from '../../types/homeWorld';
+import { Animal, Room, HomeWorldProgress, Unlockable } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors, getDialogueTheme } from '../../theme/colors';
@@ -24,8 +24,6 @@ import {
   markDialogueRead,
   markIntroSeen,
   hasSeenIntro,
-  purchaseDecoration,
-  getAllDecorations,
   markHouseCompleted,
   isHouseCompleted,
   spendAmber,
@@ -104,8 +102,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [animals, setAnimals] = useState<Animal[]>([]);
 
   // Decoration shop state
-  const [showDecorationShop, setShowDecorationShop] = useState(false);
-  const [purchasedDecorations, setPurchasedDecorations] = useState<{ [roomId: string]: string[] }>({});
 
   // Intro dialogue state
   const [showIntroDialogue, setShowIntroDialogue] = useState(false);
@@ -149,13 +145,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Load all data from storage
   const loadAllData = useCallback(async () => {
-    const [progressData, roomsData, animalsData, decorations] = await Promise.all([
+    const [progressData, roomsData, animalsData] = await Promise.all([
       getFullProgress(),
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
-      getAllDecorations(),
     ]);
-    setPurchasedDecorations(decorations);
 
     // Update puzzle count for dialogue session system
     updatePuzzleCount(progressData.puzzlesSolved);
@@ -723,18 +717,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.allUnlockedText}>
                   All characters and rooms unlocked!
                 </Text>
-                <TouchableOpacity
-                  style={styles.decorationShopButton}
-                  onPress={() => {
-                    unlockFlow.setShowShop(false);
-                    setShowDecorationShop(true);
-                  }}
-                  accessibilityLabel="Browse decorations"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.decorationShopButtonIcon}>🎨</Text>
-                  <Text style={styles.decorationShopButtonText}>Browse Decorations</Text>
-                </TouchableOpacity>
               </View>
             )}
 
@@ -1020,98 +1002,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
           </View>
         </View>
-      </Modal>
-
-      {/* Decoration Shop Modal */}
-      <Modal
-        visible={showDecorationShop}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDecorationShop(false)}
-      >
-        <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
-          activeOpacity={1}
-          onPress={() => setShowDecorationShop(false)}
-          accessibilityLabel="Close decoration shop"
-          accessibilityRole="button"
-        >
-          <View
-            style={[
-              styles.decorationShopModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
-            onStartShouldSetResponder={() => true}
-          >
-            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Room Decorations</Text>
-            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
-              Your Amber: 💎 {progress.amber}
-            </Text>
-
-            {rooms.filter(r => r.isUnlocked).map(room => {
-              const roomDecorations = getDecorationsForRoom(room.theme);
-              const roomPurchased = purchasedDecorations[room.id] || [];
-              if (roomDecorations.length === 0) return null;
-
-              return (
-                <View key={room.id} style={styles.decorationRoomSection}>
-                  <Text style={styles.decorationRoomName}>{room.name}</Text>
-                  {roomDecorations.map(dec => {
-                    const isPurchased = roomPurchased.includes(dec.id);
-                    return (
-                      <View key={dec.id} style={styles.decorationItem}>
-                        <Text style={styles.decorationIcon}>{dec.icon}</Text>
-                        <View style={styles.decorationInfo}>
-                          <Text style={styles.decorationName}>{dec.name}</Text>
-                          <Text style={styles.decorationDesc}>
-                            {getDecorationDescription(dec, progress.currentPhase)}
-                          </Text>
-                        </View>
-                        {isPurchased ? (
-                          <View style={styles.decorationOwnedBadge}>
-                            <Text style={styles.decorationOwnedText}>Owned</Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            style={[
-                              styles.decorationBuyBtn,
-                              progress.amber < dec.cost && styles.buyButtonDisabled,
-                            ]}
-                            disabled={progress.amber < dec.cost}
-                            onPress={async () => {
-                              const result = await purchaseDecoration(room.id, dec.id, dec.cost);
-                              if (result.success) {
-                                await loadAllData();
-                                onAmberChange?.(result.newBalance);
-                              }
-                            }}
-                            accessibilityLabel={`Buy ${dec.name} for ${dec.cost} amber`}
-                            accessibilityRole="button"
-                          >
-                            <Text style={styles.decorationBuyText}>💎 {dec.cost}</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
-              );
-            })}
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowDecorationShop(false)}
-              accessibilityLabel="Close decoration shop"
-              accessibilityRole="button"
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
       </Modal>
 
       {/* Sacrifice Modal (Phase 4+) */}
@@ -1876,99 +1766,6 @@ const styles = StyleSheet.create({
   introContinueButtonText: {
     fontSize: 16,
     fontWeight: '800',
-  },
-
-  // Decoration shop styles
-  decorationShopButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: CandyColors.purple.light,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginTop: 12,
-    gap: 8,
-  },
-  decorationShopButtonIcon: {
-    fontSize: 20,
-  },
-  decorationShopButtonText: {
-    color: CandyColors.purple.main,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  decorationShopModal: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 24,
-    paddingBottom: 40,
-    maxHeight: SCREEN_HEIGHT * 0.8,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  decorationRoomSection: {
-    marginBottom: 16,
-  },
-  decorationRoomName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: CandyColors.purple.main,
-    marginBottom: 8,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128, 128, 128, 0.15)',
-  },
-  decorationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-  },
-  decorationIcon: {
-    fontSize: 24,
-    marginRight: 12,
-    width: 30,
-    textAlign: 'center',
-  },
-  decorationInfo: {
-    flex: 1,
-  },
-  decorationName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: CandyColors.gray[700],
-  },
-  decorationDesc: {
-    fontSize: 11,
-    color: CandyColors.gray[400],
-    marginTop: 1,
-  },
-  decorationBuyBtn: {
-    backgroundColor: CandyColors.green.main,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  decorationBuyText: {
-    color: CandyColors.white,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  decorationOwnedBadge: {
-    backgroundColor: CandyColors.gray[200],
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  decorationOwnedText: {
-    color: CandyColors.gray[500],
-    fontSize: 12,
-    fontWeight: '700',
   },
 
   // Dialogue choice buttons (Phase 3)
