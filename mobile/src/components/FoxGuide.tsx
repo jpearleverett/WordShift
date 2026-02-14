@@ -8,16 +8,25 @@ import {
   Easing,
   Image,
   ImageSourcePropType,
+  Dimensions,
 } from 'react-native';
-import { CandyColors } from '../theme/colors';
+import { CandyColors, getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 
-// Fox talk sprite with fallback
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Fox sprites with fallback
 let foxTalkSprite: ImageSourcePropType | null = null;
+let foxIdleSprite: ImageSourcePropType | null = null;
 try {
   foxTalkSprite = require('../../assets/characters/fox/talk.png');
 } catch {
   foxTalkSprite = null;
+}
+try {
+  foxIdleSprite = require('../../assets/characters/fox/idle.png');
+} catch {
+  foxIdleSprite = null;
 }
 
 interface FoxGuideProps {
@@ -39,11 +48,16 @@ interface FoxGuideProps {
   onSkip?: () => void;
   /** Whether Fox should animate (bounce) */
   speaking?: boolean;
+  /** Visual variant: 'compact' for floating card, 'dialogue' for HomeScreen-matching dialogue box */
+  variant?: 'compact' | 'dialogue';
 }
 
 /**
  * FoxGuide — a floating Fox speech bubble overlay used during onboarding.
  * Appears at the bottom (or top) of any screen to guide the player.
+ *
+ * variant='compact' — small floating card (used on home screen onboarding)
+ * variant='dialogue' — side-by-side layout matching the HomeScreen animal dialogue box
  */
 export const FoxGuide: React.FC<FoxGuideProps> = ({
   visible,
@@ -55,6 +69,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   showSkip = false,
   onSkip,
   speaking = true,
+  variant = 'compact',
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -140,6 +155,99 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   const isMiddle = position === 'middle';
   const resolvedPositionStyle = anchorStyle || (isTop ? styles.containerTop : isMiddle ? styles.containerMiddle : styles.containerBottom);
 
+  // Dialogue theme for the dialogue variant (always Phase 0 during tutorial)
+  const dt = getDialogueTheme(0);
+
+  if (variant === 'dialogue') {
+    const foxSprite = speaking ? foxTalkSprite : foxIdleSprite;
+    return (
+      <Animated.View
+        style={[
+          styles.container,
+          resolvedPositionStyle,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
+          },
+        ]}
+        pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
+      >
+        <View style={[
+          styles.dialogueCard,
+          {
+            backgroundColor: dt.modalBg,
+            borderColor: dt.modalBorder,
+            shadowColor: dt.modalShadowColor,
+          },
+        ]}>
+          {/* Accent line at top */}
+          <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
+
+          <View style={styles.dialogueRow}>
+            {/* Sprite column — 28% width */}
+            <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
+              <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
+                {foxSprite ? (
+                  <Image
+                    source={foxSprite}
+                    style={styles.dialogueSpriteImage}
+                    resizeMode="cover"
+                    accessibilityLabel="Ember portrait"
+                  />
+                ) : (
+                  <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
+                )}
+              </Animated.View>
+            </View>
+
+            {/* Text column — 72% */}
+            <View style={styles.dialogueTextCol}>
+              <Text style={[styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
+              <View style={[styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
+
+              <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+                <Animated.Text
+                  style={[styles.dialogueText, { color: dt.textColor, opacity: textFadeAnim }]}
+                >
+                  {text}
+                </Animated.Text>
+              </View>
+
+              {/* Action row */}
+              <View style={styles.dialogueFooter}>
+                {showSkip && onSkip && (
+                  <TouchableOpacity
+                    style={styles.dialogueSkipBtn}
+                    onPress={onSkip}
+                    accessibilityLabel="Skip intro"
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.dialogueSkipText, { color: dt.subtitleColor }]}>Skip</Text>
+                  </TouchableOpacity>
+                )}
+                {onContinue && (
+                  <TouchableOpacity
+                    style={[
+                      styles.dialogueContinueBtn,
+                      { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
+                    ]}
+                    onPress={onContinue}
+                    accessibilityLabel={buttonText}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.dialogueBtnShine} />
+                    <Text style={styles.dialogueContinueBtnText}>{buttonText}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  // Compact variant (original floating card)
   return (
     <Animated.View
       style={[
@@ -215,6 +323,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // ---- Shared container ----
   container: {
     position: 'absolute',
     left: 0,
@@ -231,6 +340,8 @@ const styles = StyleSheet.create({
   containerMiddle: {
     top: 220,
   },
+
+  // ---- Compact variant (floating card) ----
   guideCard: {
     flexDirection: 'row',
     backgroundColor: 'rgba(26, 16, 44, 0.95)',
@@ -344,6 +455,109 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: CandyColors.white,
     letterSpacing: 0.4,
+  },
+
+  // ---- Dialogue variant (matches HomeScreen dialogue box) ----
+  dialogueCard: {
+    borderRadius: 22,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  dialogueAccentLine: {
+    height: 3,
+    width: '100%',
+  },
+  dialogueRow: {
+    flexDirection: 'row',
+  },
+  dialogueSpriteCol: {
+    width: '28%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  dialogueSpriteImage: {
+    width: SCREEN_WIDTH * 0.30,
+    height: SCREEN_WIDTH * 0.36,
+  },
+  dialogueSpriteEmoji: {
+    fontSize: Math.min(60, SCREEN_WIDTH * 0.15),
+  },
+  dialogueTextCol: {
+    flex: 1,
+    paddingTop: 14,
+    paddingBottom: 16,
+    paddingHorizontal: 14,
+  },
+  dialogueName: {
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  dialogueNameSep: {
+    height: 2,
+    width: 28,
+    borderRadius: 1,
+    opacity: 0.5,
+    marginBottom: 10,
+  },
+  dialogueBubble: {
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+  },
+  dialogueText: {
+    fontSize: 14,
+    lineHeight: 21,
+    letterSpacing: 0.1,
+  },
+  dialogueFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dialogueSkipBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  dialogueSkipText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dialogueContinueBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  dialogueBtnShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  dialogueContinueBtnText: {
+    color: CandyColors.white,
+    fontSize: 15,
+    fontWeight: '800',
   },
 });
 
