@@ -283,12 +283,10 @@ export default function App() {
     const targetRow = puzzle.rows[targetRowIndex];
     if (!sourceRow || !targetRow) return null;
 
-    const currentSourceWord = sourceRow.words.map(l => l.char).join('');
-    const currentTargetWord = targetRow.words.map(l => l.char).join('');
     const relevantStep = puzzle.solution.find(step =>
       step.stepIndex === puzzle.activeRowIndex
-      && step.sourceWord === currentSourceWord
-      && step.targetWord === currentTargetWord
+      && step.sourceWord === sourceRow.originalWord
+      && step.targetWord === targetRow.originalWord
     );
     if (!relevantStep) return null;
 
