@@ -52,6 +52,9 @@ interface RoomViewProps {
   currentPhase: DialoguePhase;
   isAnimalOnCooldown?: boolean;
   ritualWords?: string[];
+  unlockCost?: number | null;
+  amberBalance?: number;
+  inviteCost?: number | null;
 }
 
 export const RoomView: React.FC<RoomViewProps> = React.memo(({
@@ -64,6 +67,9 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   currentPhase,
   isAnimalOnCooldown = false,
   ritualWords = [],
+  unlockCost = null,
+  amberBalance = 0,
+  inviteCost = null,
 }) => {
   const themeColors = ROOM_THEME_COLORS[room.theme];
 
@@ -82,7 +88,23 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         <View style={styles.lockedOverlay}>
           <Text style={styles.lockIcon}>🔒</Text>
           <Text style={styles.lockedText}>{room.name}</Text>
-          <Text style={styles.lockedSubtext}>Tap to unlock</Text>
+          {unlockCost !== null ? (
+            <>
+              <Text style={styles.lockedCost}>Build: 💎 {unlockCost}</Text>
+              <Text
+                style={[
+                  styles.lockedSubtext,
+                  amberBalance >= unlockCost ? styles.lockedSubtextAffordable : styles.lockedSubtextMuted,
+                ]}
+              >
+                {amberBalance >= unlockCost
+                  ? 'Tap to build this room'
+                  : `💎 ${amberBalance} / ${unlockCost}`}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.lockedSubtext}>Tap to unlock</Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -135,7 +157,19 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         >
           <View style={styles.inviteAnimalBadge}>
             <Text style={styles.inviteAnimalIcon}>✨</Text>
-            <Text style={styles.inviteAnimalText}>Tap to Invite!</Text>
+            <Text style={styles.inviteAnimalText}>
+              {inviteCost === null
+                ? 'Tap to Invite'
+                : inviteCost === 0
+                  ? 'Invite (FREE)'
+                  : `Invite 💎 ${inviteCost}`
+              }
+            </Text>
+            {inviteCost !== null && inviteCost > 0 && (
+              <Text style={styles.inviteAnimalCostSubtext}>
+                {amberBalance >= inviteCost ? 'Tap to welcome' : `You: 💎 ${amberBalance}`}
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
       )}
@@ -247,6 +281,19 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[300],
     fontSize: 10,
   },
+  lockedSubtextAffordable: {
+    color: '#D6FFD6',
+    fontWeight: '700',
+  },
+  lockedSubtextMuted: {
+    color: CandyColors.gray[300],
+  },
+  lockedCost: {
+    color: CandyColors.yellow.main,
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
   lockedAnimalContainer: {
     position: 'absolute',
     top: '50%',
@@ -273,12 +320,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   inviteAnimalBadge: {
-    width: 80,
-    height: 70,
+    width: 104,
+    minHeight: 76,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 6,
     borderWidth: 3,
     borderColor: CandyColors.yellow.main,
     shadowColor: CandyColors.yellow.main,
@@ -295,6 +344,13 @@ const styles = StyleSheet.create({
     color: CandyColors.purple.main,
     fontSize: 10,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  inviteAnimalCostSubtext: {
+    marginTop: 2,
+    color: CandyColors.gray[700],
+    fontSize: 9,
+    fontWeight: '700',
     textAlign: 'center',
   },
   // Word echo overlay - ritual words inscribed in rooms

@@ -14,7 +14,7 @@ import {
   State,
   PanGestureHandlerGestureEvent,
 } from 'react-native-gesture-handler';
-import { Room, Animal, DialoguePhase } from '../../types/homeWorld';
+import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { isOnCooldown } from '../../services/dialogueSession';
@@ -622,6 +622,8 @@ interface HouseWorldProps {
   onAnimalPress: (animal: Animal) => void;
   onRoomPress: (room: Room) => void;
   ritualWords?: string[];
+  nextUnlock?: Unlockable | null;
+  amberBalance?: number;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
@@ -631,6 +633,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   onAnimalPress,
   onRoomPress,
   ritualWords = [],
+  nextUnlock = null,
+  amberBalance = 0,
 }) => {
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
@@ -780,18 +784,23 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     outputRange: ['0deg', '360deg'],
   });
 
-  // Get only unlocked rooms, sorted by floor
-  const unlockedRooms = rooms
-    .filter(room => room.isUnlocked)
-    .sort((a, b) => a.floor - b.floor);
+  // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
+  // This allows players to tap the house itself to build, instead of using header controls.
+  const unlockedRooms = rooms.filter(room => room.isUnlocked).sort((a, b) => a.floor - b.floor);
+  const pendingRoomUnlock = nextUnlock?.type === 'room'
+    ? rooms.find(room => room.id === nextUnlock.targetId && !room.isUnlocked) || null
+    : null;
+  const displayRooms = pendingRoomUnlock
+    ? [...unlockedRooms, pendingRoomUnlock]
+    : unlockedRooms;
 
   const getAnimalForRoom = (roomId: string): Animal | null => {
     return animals.find(a => a.roomId === roomId) || null;
   };
 
-  // Single-column layout: each room is its own row, sorted by row index descending (top to bottom)
-  const sortedRooms = [...unlockedRooms].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
-  const numRows = Math.max(1, unlockedRooms.length);
+  // Single-column layout: each room is its own row, sorted top-to-bottom.
+  const sortedRooms = [...displayRooms].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
+  const numRows = Math.max(1, displayRooms.length);
 
   const calculateHouseHeight = (): number => {
     return numRows * ROOM_HEIGHT +
@@ -1017,6 +1026,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   {/* Render rooms from top to bottom (highest row number first) */}
                   {sortedRooms.map((room, index) => {
                     const roomAnimal = getAnimalForRoom(room.id);
+                    const roomUnlockCost = (!room.isUnlocked && nextUnlock?.type === 'room' && nextUnlock.targetId === room.id)
+                      ? nextUnlock.cost
+                      : null;
+                    const inviteCost = (room.isUnlocked
+                      && roomAnimal
+                      && !roomAnimal.isUnlocked
+                      && nextUnlock?.type === 'character'
+                      && nextUnlock.targetId === roomAnimal.id)
+                      ? nextUnlock.cost
+                      : null;
                     return (
                       <React.Fragment key={room.id}>
                         <View style={styles.roomRow}>
@@ -1030,6 +1049,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             currentPhase={currentPhase}
                             isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
                             ritualWords={ritualWords}
+                            unlockCost={roomUnlockCost}
+                            amberBalance={amberBalance}
+                            inviteCost={inviteCost}
                           />
                         </View>
                         {/* Arrangement sigil connection between rooms */}
@@ -1040,7 +1062,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     );
                   })}
 
-                  {unlockedRooms.length === 0 && (
+                  {displayRooms.length === 0 && (
                     <View style={styles.emptyHouse}>
                       <Text style={styles.emptyHouseText}>🏠</Text>
                       <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>

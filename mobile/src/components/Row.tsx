@@ -35,6 +35,9 @@ interface RowProps {
   phase?: number;
   wordLength?: number;
   concealLetters?: boolean;
+  guidanceActive?: boolean;
+  guidedLetterId?: string | null;
+  guidedSlotIndex?: number | null;
 }
 
 // Phase-aware row color helper
@@ -106,7 +109,13 @@ function getPhaseRowColors(phase: number) {
 }
 
 // Animated drop slot component
-const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; phase?: number }> = ({ onPress, index, compact = false, phase = 0 }) => {
+const Slot: React.FC<{
+  onPress: () => void;
+  index: number;
+  compact?: boolean;
+  phase?: number;
+  isGuided?: boolean;
+}> = ({ onPress, index, compact = false, phase = 0, isGuided = false }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
@@ -218,7 +227,7 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; ph
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
-      accessibilityLabel={`Drop zone ${index + 1}`}
+      accessibilityLabel={isGuided ? `Guided drop zone ${index + 1}` : `Drop zone ${index + 1}`}
       accessibilityRole="button"
     >
       <Animated.View
@@ -235,12 +244,35 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; ph
         <Animated.View
           style={[
             styles.slotGlow,
-            { opacity: glowOpacity, backgroundColor: phaseColors.slotGlowColor },
+            {
+              opacity: glowOpacity,
+              backgroundColor: isGuided ? CandyColors.yellow.main : phaseColors.slotGlowColor,
+            },
           ]}
         />
 
+        {isGuided && (
+          <Animated.View
+            style={[
+              styles.guidedSlotHalo,
+              {
+                opacity: glowOpacity,
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
+            pointerEvents="none"
+          />
+        )}
+
         {/* Main slot */}
-        <View style={[styles.slot, compact && styles.slotCompact, { borderColor: phaseColors.slotBorderColor }]}>
+        <View
+          style={[
+            styles.slot,
+            compact && styles.slotCompact,
+            { borderColor: isGuided ? CandyColors.yellow.main : phaseColors.slotBorderColor },
+            isGuided && styles.slotGuided,
+          ]}
+        >
           {/* Inner shimmer */}
           <View style={styles.slotShimmer} />
 
@@ -258,6 +290,10 @@ const Slot: React.FC<{ onPress: () => void; index: number; compact?: boolean; ph
               <View style={[styles.cornerDot, styles.cornerBottomLeft, { backgroundColor: phaseColors.cornerDotColor }]} />
               <View style={[styles.cornerDot, styles.cornerBottomRight, { backgroundColor: phaseColors.cornerDotColor }]} />
             </>
+          )}
+
+          {isGuided && (
+            <Text style={styles.slotGuideText}>HERE</Text>
           )}
         </View>
       </Animated.View>
@@ -277,6 +313,9 @@ export const Row: React.FC<RowProps> = memo(({
   phase = 0,
   wordLength = 4,
   concealLetters = false,
+  guidanceActive = false,
+  guidedLetterId = null,
+  guidedSlotIndex = null,
 }) => {
   const compactTiles = wordLength >= 6;
   const phaseColors = getPhaseRowColors(phase);
@@ -460,7 +499,13 @@ export const Row: React.FC<RowProps> = memo(({
               { transform: [{ translateY }, { rotate }] },
             ]}
           >
-            <Slot onPress={() => onSlotPress(slotIndex)} index={slotIndex} compact phase={phase} />
+            <Slot
+              onPress={() => onSlotPress(slotIndex)}
+              index={slotIndex}
+              compact
+              phase={phase}
+              isGuided={guidanceActive && guidedSlotIndex === slotIndex}
+            />
           </Animated.View>
         );
       } else {
@@ -484,6 +529,7 @@ export const Row: React.FC<RowProps> = memo(({
               phase={phase}
               compact={compactTiles}
               isResonant={isRowResonant}
+              isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
             />
           </Animated.View>
         );
@@ -512,6 +558,7 @@ export const Row: React.FC<RowProps> = memo(({
         phase={phase}
         compact={compactTiles}
         isResonant={isRowResonant}
+        isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
       />
       );
     });
@@ -795,6 +842,16 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 5,
     backgroundColor: CandyColors.pink.main,
   },
+  guidedSlotHalo: {
+    position: 'absolute',
+    top: -7,
+    left: -7,
+    right: -7,
+    bottom: -7,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
+  },
   slot: {
     width: 28,
     height: 56,
@@ -805,6 +862,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  slotGuided: {
+    backgroundColor: 'rgba(255, 246, 180, 0.95)',
   },
   slotCompact: {
     width: SLOT_WIDTH + 4, // Slightly wider for trapezoid visibility
@@ -883,6 +943,14 @@ const styles = StyleSheet.create({
   cornerBottomRight: {
     bottom: 4,
     right: 4,
+  },
+  slotGuideText: {
+    position: 'absolute',
+    bottom: 4,
+    fontSize: 7,
+    fontWeight: '900',
+    color: CandyColors.orange.dark,
+    letterSpacing: 0.4,
   },
 });
 

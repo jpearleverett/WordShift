@@ -26,7 +26,7 @@ interface UseUnlockFlowReturn {
   unlockAvailability: { available: boolean; reason?: string } | null;
   nextUnlock: Unlockable | null;
   allUnlocks: Unlockable[];
-  handlePurchase: (unlock: Unlockable) => Promise<void>;
+  handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
   handleRoomPress: (room: Room) => void;
   setShowShop: (show: boolean) => void;
   setShowRoomUnlock: (room: Room | null) => void;
@@ -109,7 +109,7 @@ export function useUnlockFlow({
   }, [animals, nextUnlock]);
 
   // Handle unlock purchase
-  const handlePurchase = useCallback(async (unlock: Unlockable) => {
+  const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
     const result = await purchaseUnlock(unlock.id);
     if (result.success) {
       setShowCelebration(true);
@@ -123,7 +123,7 @@ export function useUnlockFlow({
       }
 
       // If we just unlocked a character, show their intro dialogue
-      if (unlock.type === 'character') {
+      if (unlock.type === 'character' && !options?.suppressIntro) {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
           setTimeout(() => {

@@ -14,23 +14,25 @@ import {
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
 // (inside HouseWorld's GestureHandlerRootView) correctly use RNGH's version.
-import { Animal, Room, HomeWorldProgress, Unlockable } from '../../types/homeWorld';
+import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors, getDialogueTheme } from '../../theme/colors';
 import {
-  loadProgress,
   getFullProgress,
-  markDialogueRead,
   markIntroSeen,
-  hasSeenIntro,
   markHouseCompleted,
-  isHouseCompleted,
   spendAmber,
   devAddAmber,
   devAddPuzzles,
+  hasSeenDailyChallengeIntro,
+  markDailyChallengeIntroSeen,
 } from '../../services/amberCurrency';
-import { getHouseCompletionText, getWordsOfferedText } from '../../services/phaseNarrative';
+import {
+  getDailyChallengeIntroLines,
+  getHouseCompletionText,
+  getWordsOfferedText,
+} from '../../services/phaseNarrative';
 import {
   ROOMS,
   ANIMALS,
@@ -61,6 +63,7 @@ import { AmberSparkle } from './AmberSparkle';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
+import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
 import {
   isSacrificeAvailable,
   getSacrificeAmounts,
@@ -68,6 +71,7 @@ import {
   performSacrifice,
 } from '../../services/sacrifice';
 import { getGalleryTitle } from '../../services/whisperGallery';
+import { getSettingsSync } from '../../services/settings';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -107,9 +111,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [showIntroDialogue, setShowIntroDialogue] = useState(false);
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
+  const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock'>('animal_intro');
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
+  const playPulse = useRef(new Animated.Value(0)).current;
+  const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
   // Celebration state
   const [showCelebration, setShowCelebration] = useState(false);
@@ -126,6 +134,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const dialogueFlow = useDialogueFlow({
     progress,
     setAnimals,
+    onFoxPlayPrompt: () => setHighlightPlayButton(true),
   });
 
   // loadAllData reference for unlock hook (defined below, stable via useCallback)
@@ -192,6 +201,38 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [onboardingStep, progress, unlockFlow.nextUnlock]);
 
+  // Daily challenge unlock introduction (one-time, animal-led).
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase)) return;
+
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenDailyChallengeIntro();
+      if (seen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getDailyChallengeIntroLines(progress.currentPhase));
+      setIntroContext('daily_unlock');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
   // Talking animation for intro dialogue
   const [introIsTalking, setIntroIsTalking] = useState(false);
   useEffect(() => {
@@ -223,6 +264,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     }
   }, [progress?.amber]);
 
+  // Highlight pulse for the PLAY button when Fox nudges the player onward.
+  useEffect(() => {
+    if (!highlightPlayButton) {
+      playPulse.setValue(0);
+      return;
+    }
+
+    const reducedMotion = getSettingsSync().reducedMotion;
+    if (reducedMotion) {
+      playPulse.setValue(1);
+      return;
+    }
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(playPulse, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(playPulse, {
+          toValue: 0,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+
+    return () => {
+      loop.stop();
+    };
+  }, [highlightPlayButton, playPulse]);
+
   // DEV: Add amber, advance puzzles, clear dialogue cooldowns
   const handleDevButton = async () => {
     const newBalance = await devAddAmber(5000);
@@ -236,9 +311,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleAdvanceIntroDialogue = async () => {
     if (!introAnimal || !progress) return;
 
-    const totalIntro = shouldUseCatchup()
-      ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
-      : getIntroDialogueCount(introAnimal.type);
+    const totalIntro = introOverrideLines
+      ? introOverrideLines.length
+      : shouldUseCatchup()
+        ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
+        : getIntroDialogueCount(introAnimal.type);
     const nextIndex = introDialogueIndex + 1;
 
     if (nextIndex < totalIntro) {
@@ -246,33 +323,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setIntroDialogueIndex(nextIndex);
     } else {
       // Intro complete - mark as seen and close
-      await markIntroSeen(introAnimal.id);
+      if (introContext === 'daily_unlock') {
+        await markDailyChallengeIntroSeen();
+      } else {
+        await markIntroSeen(introAnimal.id);
+      }
       setShowIntroDialogue(false);
       setIntroAnimal(null);
       setIntroDialogueIndex(0);
+      setIntroOverrideLines(null);
+      setIntroContext('animal_intro');
     }
   };
 
   // Handle closing intro dialogue
   const handleCloseIntroDialogue = async () => {
     if (introAnimal) {
-      // Mark intro as seen even if closed early
-      await markIntroSeen(introAnimal.id);
+      // Mark intros as seen even if closed early so the player isn't forced repeatedly.
+      if (introContext === 'daily_unlock') {
+        await markDailyChallengeIntroSeen();
+      } else {
+        await markIntroSeen(introAnimal.id);
+      }
     }
     setShowIntroDialogue(false);
     setIntroAnimal(null);
     setIntroDialogueIndex(0);
+    setIntroOverrideLines(null);
+    setIntroContext('animal_intro');
   };
 
   // Determine if catch-up dialogues should be used (animal unlocked at Phase 2+)
   const shouldUseCatchup = (): boolean => {
     if (!introAnimal || !progress) return false;
+    if (introOverrideLines) return false;
     return getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase) > 0;
   };
 
   // Get current intro dialogue text (uses catch-up dialogues at Phase 2+)
   const getCurrentIntroText = (): string => {
     if (!introAnimal || !progress) return '';
+    if (introOverrideLines) {
+      return introOverrideLines[introDialogueIndex] || '';
+    }
     if (shouldUseCatchup()) {
       return getCatchupIntroDialogue(introAnimal.type, progress.currentPhase, introDialogueIndex) || '';
     }
@@ -283,18 +376,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const getIntroProgress = (): string => {
     if (!introAnimal || !progress) return '';
     const current = introDialogueIndex + 1;
-    const total = shouldUseCatchup()
-      ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
-      : getIntroDialogueCount(introAnimal.type);
+    const total = introOverrideLines
+      ? introOverrideLines.length
+      : shouldUseCatchup()
+        ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
+        : getIntroDialogueCount(introAnimal.type);
     return `${current}/${total}`;
   };
 
   // Check if there are more intro dialogues
   const hasMoreIntroDialogues = (): boolean => {
     if (!introAnimal || !progress) return false;
-    const total = shouldUseCatchup()
-      ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
-      : getIntroDialogueCount(introAnimal.type);
+    const total = introOverrideLines
+      ? introOverrideLines.length
+      : shouldUseCatchup()
+        ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
+        : getIntroDialogueCount(introAnimal.type);
     return introDialogueIndex + 1 < total;
   };
 
@@ -317,38 +414,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
       {/* Header — simplified during onboarding */}
       <View style={styles.header}>
-        {!isOnboarding ? (
-          <JuicyButton
-            style={styles.amberContainer}
-            onPress={() => unlockFlow.setShowShop(true)}
-            bounceScale={0.95}
-            accessibilityLabel={`Shop. ${progress.amber} amber`}
-            accessibilityRole="button"
-          >
+        <View style={styles.headerLeft}>
+          <View style={styles.amberContainer}>
             <View style={styles.amberInner}>
               <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
                 <Text style={styles.amberEmoji}>💎</Text>
               </Animated.View>
               <Text style={styles.amberCount}>{progress.amber}</Text>
-              <Text style={styles.amberPlus}>+</Text>
-              <AmberSparkle />
-            </View>
-          </JuicyButton>
-        ) : (
-          <View style={styles.amberContainer}>
-            <View style={styles.amberInner}>
-              <Text style={styles.amberEmoji}>💎</Text>
-              <Text style={styles.amberCount}>{progress.amber}</Text>
+              {!isOnboarding && <AmberSparkle />}
             </View>
           </View>
-        )}
-
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Animal House</Text>
         </View>
 
         <View style={styles.headerRight}>
-          {!isOnboarding && onStartDaily && (
+          {!isOnboarding && onStartDaily && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
             <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
           )}
           {!isOnboarding && (
@@ -372,15 +451,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
           {!isOnboarding && (
-          <JuicyButton
-            style={styles.playButton}
-            onPress={() => onPlayPuzzle()}
-            bounceScale={0.9}
-            accessibilityLabel="Play puzzle"
-            accessibilityRole="button"
+          <Animated.View
+            style={highlightPlayButton ? {
+              transform: [{
+                scale: playPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.06],
+                }),
+              }],
+            } : undefined}
           >
-            <Text style={styles.playButtonText}>PLAY</Text>
-          </JuicyButton>
+            <JuicyButton
+              style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
+              onPress={() => {
+                setHighlightPlayButton(false);
+                onPlayPuzzle();
+              }}
+              bounceScale={0.9}
+              accessibilityLabel="Play puzzle"
+              accessibilityRole="button"
+            >
+              <Text style={styles.playButtonText}>PLAY</Text>
+            </JuicyButton>
+          </Animated.View>
           )}
         </View>
       </View>
@@ -397,12 +490,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
       {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
-        <TouchableOpacity
+        <View
           style={styles.unlockProgressContainer}
-          onPress={() => unlockFlow.setShowShop(true)}
-          activeOpacity={0.8}
           accessibilityLabel={`Next unlock: ${unlockFlow.nextUnlock.name}. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
-          accessibilityRole="button"
+          accessibilityRole="progressbar"
+          accessibilityValue={{
+            min: 0,
+            max: unlockFlow.nextUnlock.cost || 1,
+            now: Math.min(progress.amber, unlockFlow.nextUnlock.cost || 1),
+          }}
         >
           <View style={styles.unlockProgressInner}>
             <Text style={styles.unlockProgressLabel}>
@@ -422,11 +518,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
             <Text style={styles.unlockProgressText}>
               {unlockFlow.nextUnlock.cost === 0
-                ? 'FREE — Tap to invite!'
+                ? 'FREE'
                 : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
             </Text>
           </View>
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* Words Offered Counter — tappable to open the Word Ledger (hidden during onboarding) */}
@@ -493,6 +589,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onAnimalPress={dialogueFlow.handleAnimalTap}
         onRoomPress={unlockFlow.handleRoomPress}
         ritualWords={progress.ritualWords}
+        nextUnlock={unlockFlow.nextUnlock}
+        amberBalance={progress.amber}
       />
 
       {/* Cooldown Message Toast */}
@@ -862,13 +960,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       progress && progress.amber < unlockFlow.nextUnlock!.cost && styles.inviteButtonDisabled,
                     ]}
                     onPress={async () => {
-                      await unlockFlow.handlePurchase(unlockFlow.nextUnlock!);
+                      const suppressIntro = onboardingStep === 'home_empty';
+                      await unlockFlow.handlePurchase(unlockFlow.nextUnlock!, { suppressIntro });
                       unlockFlow.setShowInvitePrompt(false);
                       // During onboarding, advance to fox_invited step
                       // (skips the standard intro dialogue — FoxGuide handles it)
                       if (onboardingStep === 'home_empty' && onAdvanceOnboarding) {
+                        await markIntroSeen('fox');
                         setShowIntroDialogue(false);
                         setIntroAnimal(null);
+                        setIntroOverrideLines(null);
+                        setIntroContext('animal_intro');
                         await onAdvanceOnboarding('fox_invited');
                       }
                     }}
@@ -1186,17 +1288,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
-    paddingBottom: 12,
+    paddingBottom: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 100,
   },
+  headerLeft: {
+    flexShrink: 0,
+  },
   amberContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   amberInner: {
     flexDirection: 'row',
@@ -1212,19 +1319,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-  amberPlus: {
-    color: CandyColors.yellow.main,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  headerCenter: {
-    alignItems: 'center',
-    flex: 1,
-  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
+    marginLeft: 8,
   },
   headerIconBtn: {
     width: 34,
@@ -1237,17 +1336,9 @@ const styles = StyleSheet.create({
   headerIconText: {
     fontSize: 16,
   },
-  title: {
-    color: CandyColors.white,
-    fontSize: 18,
-    fontWeight: '900',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
   playButton: {
     backgroundColor: CandyColors.green.main,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 20,
     shadowColor: CandyColors.green.dark,
@@ -1255,6 +1346,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 4,
+  },
+  playButtonHighlighted: {
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
+    shadowColor: CandyColors.yellow.main,
+    shadowOpacity: 0.65,
+    shadowRadius: 10,
+    elevation: 8,
   },
   playButtonText: {
     color: CandyColors.white,

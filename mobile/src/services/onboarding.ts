@@ -78,26 +78,26 @@ export async function resetOnboarding(): Promise<void> {
 export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 1: Empty home — guide to invite Fox
   home_empty: [
-    "Oh! Is someone there?\nTap the den to let me in!",
+    "Hey — down here by the den.\nTap the invite and let me in.",
   ],
 
   // Step 2: Fox just invited — intro dialogue
   fox_invited: [
-    "Hello! I'm Ember.\nWelcome to our little home.",
-    "We've been waiting for someone like you.\n...A long time.",
-    "This place is going to be something special.\nI can feel it in the words.",
-    "But first, let me show you what we do here.\nFollow me!",
+    "You opened the door for me. Thank you.\nI'm Ember.",
+    "Now that we're properly met, let me show you what this place is built on.",
+    "Words shift. Patterns form. The house grows with every puzzle.",
+    "Come on — one quick puzzle together, then we build.",
   ],
 
   // Step 3: On puzzle screen — guide through the puzzle
   puzzle_tutorial_intro: [
-    "See these words? Each one is made of letters you can move.",
+    "See these rows? We'll move one letter from here into the row below.",
   ],
   puzzle_tutorial_pick: [
-    "Tap a letter in the highlighted word to pick it up!",
+    "Start with the highlighted letter.",
   ],
   puzzle_tutorial_drop: [
-    "Now tap a spot in the next word to drop it in.\nBoth words need to be real English words!",
+    "Good. Now drop it into the highlighted slot below.",
   ],
   puzzle_tutorial_valid_move: [
     "You did it! Keep going until you reach the end!",
@@ -106,13 +106,13 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Hmm, that didn't make a real word.\nTry undoing and picking a different spot!",
   ],
   puzzle_tutorial_complete: [
-    "See? You're a natural!",
+    "Perfect. You felt that click, right? That's how we build this place.",
   ],
 
   // Step 4: Back on home screen — explain unlocks
   unlock_explained: [
-    "That was wonderful!\nEvery puzzle you solve earns you amber 💎",
-    "You can use amber to build new rooms and invite more friends!",
-    "Keep solving puzzles and soon this place will be full of life.\nThe others are going to love you.\nThey need you.",
+    "That was exactly it.\nEach solve gives us amber 💎",
+    "Amber builds rooms, and rooms let us invite more friends in.",
+    "Keep playing and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],
 };

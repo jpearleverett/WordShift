@@ -443,6 +443,64 @@ export function getWordsOfferedText(totalWords: number, phase: number): string {
 }
 
 // ============================================================================
+// DAILY CHALLENGE INTRO — Animal-led unlock explanation
+// ============================================================================
+
+/**
+ * Fox explains daily challenges the first time they unlock.
+ * Tone remains phase-aware so this feature feels diegetic.
+ */
+export function getDailyChallengeIntroLines(phase: number): string[] {
+  if (phase >= 4) {
+    return [
+      "A new ritual path opened this morning. One arrangement, every day, the same for everyone who listens.",
+      "It's called the Daily Challenge. Harder words. A tighter pattern. A steadier offering.",
+      "When you're ready, take it from the header. One daily thread helps hold the whole house together.",
+    ];
+  }
+  if (phase >= 3) {
+    return [
+      "There's a new puzzle path now — one special arrangement each day.",
+      "It's called the Daily Challenge. Same words for everyone, and it asks a little more of you.",
+      "Try it from the header when you want to test yourself. The house notices the daily ones.",
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      "You've grown stronger with these words, so I want to show you something new.",
+      "The Daily Challenge appears once each day — one shared puzzle, a little tougher than usual.",
+      "Tap the daily icon in the header when you want that extra challenge.",
+    ];
+  }
+  return [
+    "You're doing great, friend. Ready for a new routine?",
+    "We just unlocked the Daily Challenge: one special puzzle each day, same for everyone.",
+    "Look for it in the header when you want a harder test and a little more amber.",
+  ];
+}
+
+// ============================================================================
+// FOX POST-TUTORIAL NUDGE — First session end CTA
+// ============================================================================
+
+/**
+ * One-time nudge at the end of Fox's first post-tutorial conversation.
+ * Keeps the guidance in-world while steering the player back to PLAY.
+ */
+export function getFoxPostTutorialPlayPrompt(phase: number): string {
+  if (phase >= 4) {
+    return "Keep playing. Bring us more amber. Bring us more words. The others are waiting for what we can build next.";
+  }
+  if (phase >= 3) {
+    return "Play a few more puzzles for me. More amber means more rooms, more friends, and a stronger pattern in the house.";
+  }
+  if (phase >= 2) {
+    return "Head back to puzzles when you're ready. More amber lets us open new rooms and welcome the others in.";
+  }
+  return "Play more puzzles and gather amber, okay? I want to invite more friends and keep building this place with you.";
+}
+
+// ============================================================================
 // HOUSE COMPLETION — All rooms built, all animals unlocked
 // ============================================================================
 

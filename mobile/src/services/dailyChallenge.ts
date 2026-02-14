@@ -65,6 +65,40 @@ function getYesterdayString(): string {
 const DAILY_STREAK_GRACE_DAYS = 2;
 
 /**
+ * Daily challenge unlock pacing.
+ * Hidden until players are settled into the core loop.
+ */
+export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 20;
+
+/**
+ * Daily challenge unlock condition.
+ * We gate by puzzle count and allow phase progression to unlock it naturally.
+ */
+export function isDailyChallengeUnlocked(
+  puzzlesSolved: number,
+  currentPhase: number
+): boolean {
+  return puzzlesSolved >= DAILY_CHALLENGE_UNLOCK_PUZZLES || currentPhase >= 1;
+}
+
+/**
+ * Progress info for UI (e.g., hidden lock hints before unlock).
+ */
+export function getDailyChallengeUnlockProgress(
+  puzzlesSolved: number,
+  currentPhase: number
+): { unlocked: boolean; puzzlesRemaining: number } {
+  const unlocked = isDailyChallengeUnlocked(puzzlesSolved, currentPhase);
+  if (unlocked) {
+    return { unlocked: true, puzzlesRemaining: 0 };
+  }
+  return {
+    unlocked: false,
+    puzzlesRemaining: Math.max(0, DAILY_CHALLENGE_UNLOCK_PUZZLES - puzzlesSolved),
+  };
+}
+
+/**
  * Check if a date string is within the daily streak grace period
  * Returns true if the date is 1 to DAILY_STREAK_GRACE_DAYS days ago
  */

@@ -30,10 +30,13 @@ import {
   recordConsumedCoordinatedEvent,
   hasSeenGuaranteedCrossRef,
   markGuaranteedCrossRefSeen,
+  hasSeenFoxPlayNudge,
+  markFoxPlayNudgeSeen,
 } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 import { getChoiceForAnimal, recordChoice, PlayerChoice, DialogueChoice } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
+import { getFoxPostTutorialPlayPrompt } from '../services/phaseNarrative';
 
 interface SessionInfo {
   status: 'available' | 'in_session' | 'cooldown';
@@ -44,6 +47,7 @@ interface SessionInfo {
 interface UseDialogueFlowParams {
   progress: HomeWorldProgress | null;
   setAnimals: React.Dispatch<React.SetStateAction<Animal[]>>;
+  onFoxPlayPrompt?: () => void;
 }
 
 interface UseDialogueFlowReturn {
@@ -78,6 +82,7 @@ interface UseDialogueFlowReturn {
 export function useDialogueFlow({
   progress,
   setAnimals,
+  onFoxPlayPrompt,
 }: UseDialogueFlowParams): UseDialogueFlowReturn {
   const [selectedAnimal, setSelectedAnimal] = useState<Animal | null>(null);
   const [showDialogue, setShowDialogue] = useState(false);
@@ -510,9 +515,25 @@ export function useDialogueFlow({
         return;
       }
     } else {
+      // One-time post-tutorial Fox nudge before closing the first session.
+      // This keeps guidance in-world and directs the player toward more puzzles.
+      if (
+        selectedAnimal.type === 'fox' &&
+        progress.currentPhase <= 1 &&
+        progress.puzzlesSolved >= 1 &&
+        progress.puzzlesSolved <= 40
+      ) {
+        const seenNudge = await hasSeenFoxPlayNudge();
+        if (!seenNudge) {
+          setPreDialoguePages([getFoxPostTutorialPlayPrompt(progress.currentPhase)]);
+          await markFoxPlayNudgeSeen();
+          onFoxPlayPrompt?.();
+          return;
+        }
+      }
       handleCloseDialogue();
     }
-  }, [selectedAnimal, progress, handleCloseDialogue, setAnimals, preDialoguePages]);
+  }, [selectedAnimal, progress, handleCloseDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {

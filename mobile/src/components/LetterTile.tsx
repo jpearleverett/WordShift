@@ -15,6 +15,8 @@ interface LetterTileProps {
   compact?: boolean;
   /** Whether this tile belongs to a word that resonates with the current narrative phase */
   isResonant?: boolean;
+  /** Tutorial guidance highlight for the recommended tile */
+  isGuided?: boolean;
 }
 
 // Compact tile dimensions for 6+ letter words
@@ -33,6 +35,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   phase = 0,
   compact = false,
   isResonant = false,
+  isGuided = false,
 }) => {
   const settings = getSettingsSync();
 
@@ -44,6 +47,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const wobbleAnim = useRef(new Animated.Value(0)).current;
   const trailGlowAnim = useRef(new Animated.Value(0)).current;
   const resonanceAnim = useRef(new Animated.Value(0)).current;
+  const guidePulseAnim = useRef(new Animated.Value(0)).current;
 
   // Loop refs for proper cleanup (prevents memory leaks)
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -52,6 +56,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const trailGlowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const resonanceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const guideLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Phase-aware animation parameters for selected tiles
   const getSelectedSpringParams = () => {
@@ -312,6 +317,46 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     };
   }, [isResonant, phase]);
 
+  // Tutorial guidance pulse for the exact recommended tile.
+  useEffect(() => {
+    if (!isGuided) {
+      guidePulseAnim.setValue(0);
+      return;
+    }
+
+    if (settings.reducedMotion) {
+      guidePulseAnim.setValue(1);
+      return;
+    }
+
+    const guideLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(guidePulseAnim, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(guidePulseAnim, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    guideLoopRef.current = guideLoop;
+    guideLoop.start();
+
+    return () => {
+      if (guideLoopRef.current) {
+        guideLoopRef.current.stop();
+        guideLoopRef.current = null;
+      }
+      guidePulseAnim.stopAnimation();
+    };
+  }, [isGuided, settings.reducedMotion, guidePulseAnim]);
+
   // Resonance visual config — color and opacity range per phase
   const getResonanceConfig = () => {
     if (phase >= 5) return { color: '#7B6B8A', minOpacity: 0.06, maxOpacity: 0.10 };   // Ghostly mauve
@@ -498,6 +543,14 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     outputRange: [0.3, phase >= 4 ? 0.7 : 0.55],
   });
   const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
+  const guideRingScale = guidePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08],
+  });
+  const guideRingOpacity = guidePulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.55, 0.95],
+  });
 
   const content = (
     <Animated.View
@@ -526,6 +579,19 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         />
       )}
 
+      {isGuided && (
+        <Animated.View
+          style={[
+            styles.guideRing,
+            {
+              opacity: guideRingOpacity,
+              transform: [{ scale: guideRingScale }],
+            },
+          ]}
+          pointerEvents="none"
+        />
+      )}
+
       {/* Main tile body */}
       <Animated.View
         style={[
@@ -536,6 +602,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
             borderBottomColor: tileStyles.borderColor,
             shadowColor: (isSelected && phase >= 3) ? trailGlowColor : tileStyles.shadowColor,
           },
+          isGuided && styles.tileBodyGuided,
           isSelected && styles.tileBodySelected,
           highlight === 'locked' && styles.tileBodyLocked,
           // Trail glow effect: pulsing shadow at Phase 3+
@@ -645,6 +712,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     transform: [{ scale: 1.15 }],
   },
+  guideRing: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: 2,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
+    backgroundColor: 'rgba(250, 204, 21, 0.14)',
+  },
   tileBody: {
     width: 52,
     height: 56,
@@ -657,6 +735,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
     overflow: 'hidden',
+  },
+  tileBodyGuided: {
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
   },
   tileBodySelected: {
     shadowOpacity: 0.5,
