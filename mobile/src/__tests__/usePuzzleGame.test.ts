@@ -246,6 +246,44 @@ describe('usePuzzleGame', () => {
       [state] = callHook();
       expect(state.selectedLetter).toBeNull();
     });
+
+    test('enforces no_vowel restrictions', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'no_vowel');
+
+      let [state] = callHook();
+      const vowel = state.rows[0].words.find(l => l.char === 'I')!;
+      actions.handleLetterPress(vowel, 0);
+      [state] = callHook();
+      expect(state.selectedLetter).toBeNull();
+      expect(state.error).toContain('No Vowel Shift');
+
+      const consonant = state.rows[0].words.find(l => l.char === 'T')!;
+      [, actions] = callHook();
+      actions.handleLetterPress(consonant, 0);
+      [state] = callHook();
+      expect(state.selectedLetter?.char).toBe('T');
+    });
+
+    test('enforces no_consonant restrictions', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'no_consonant');
+
+      let [state] = callHook();
+      const consonant = state.rows[0].words.find(l => l.char === 'T')!;
+      actions.handleLetterPress(consonant, 0);
+      [state] = callHook();
+      expect(state.selectedLetter).toBeNull();
+      expect(state.error).toContain('No Consonant Shift');
+
+      const vowel = state.rows[0].words.find(l => l.char === 'I')!;
+      [, actions] = callHook();
+      actions.handleLetterPress(vowel, 0);
+      [state] = callHook();
+      expect(state.selectedLetter?.char).toBe('I');
+    });
   });
 
   describe('handleSlotPress', () => {
@@ -291,6 +329,56 @@ describe('usePuzzleGame', () => {
       // gameState is IDLE (never initialized)
       const result = await actions.handleSlotPress(0);
       expect(result).toBeNull();
+    });
+
+    test('supports reverse mode down-and-back completion', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'reverse');
+
+      // Descend: move M from TIME to TIED -> TIE and TIMED
+      let [state] = callHook();
+      const m = state.rows[0].words.find(l => l.char === 'M')!;
+      actions.handleLetterPress(m, 0);
+      [, actions] = callHook();
+      const first = await actions.handleSlotPress(2);
+      expect(first?.completed).toBe(false);
+
+      [state] = callHook();
+      expect(state.moveDirection).toBe('up');
+      expect(state.activeRowIndex).toBe(1);
+
+      // Return: move D from TIMED back to TIE -> TIME and TIED
+      const d = state.rows[1].words.find(l => l.char === 'D')!;
+      [, actions] = callHook();
+      actions.handleLetterPress(d, 1);
+      [, actions] = callHook();
+      const second = await actions.handleSlotPress(3);
+      expect(second?.completed).toBe(true);
+      expect(second?.variant).toBe('reverse');
+    });
+
+    test('advances chain links before final completion', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'chain');
+
+      // Complete first link quickly (same valid move as above)
+      let [state] = callHook();
+      const m = state.rows[0].words.find(l => l.char === 'M')!;
+      actions.handleLetterPress(m, 0);
+      [, actions] = callHook();
+      const result = await actions.handleSlotPress(2);
+
+      expect(result?.completed).toBe(false);
+      expect(result?.chainAdvanced).toBe(true);
+      expect(result?.chainLink).toBe(2);
+      expect(result?.chainLength).toBe(3);
+
+      [state] = callHook();
+      expect(state.currentChainLink).toBe(2);
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.rows.length).toBeGreaterThan(0);
     });
   });
 

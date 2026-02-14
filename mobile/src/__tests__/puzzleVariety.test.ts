@@ -7,6 +7,7 @@ import {
   hasVariantModifier,
   isVariantCompleted,
   getVariantAmberMultiplier,
+  getVariantTimeLimit,
   isLetterAllowedByVariant,
   isVariantCompatibleWithSolution,
   VARIANT_CONFIGS,
@@ -117,6 +118,13 @@ describe('puzzleVariety', () => {
       expect(getVariantInstruction(VARIANT_CONFIGS.blind, 1)).toBe(VARIANT_CONFIGS.blind.instruction);
       expect(getVariantInstruction(VARIANT_CONFIGS.blind, 4)).toBe(VARIANT_CONFIGS.blind.darkInstruction);
     });
+
+    it('provides phase-aware instructions for every variant', () => {
+      for (const config of Object.values(VARIANT_CONFIGS)) {
+        expect(getVariantInstruction(config, 0).trim().length).toBeGreaterThan(0);
+        expect(getVariantInstruction(config, 4).trim().length).toBeGreaterThan(0);
+      }
+    });
   });
 
   describe('variant mechanics helpers', () => {
@@ -125,6 +133,23 @@ describe('puzzleVariety', () => {
       expect(getVariantOverrides('speed', 'MEDIUM')).toEqual({ targetRows: 3 });
       expect(getVariantOverrides('chain', 'HARD')).toEqual({ targetRows: 3 });
       expect(getVariantOverrides('speed_no_vowel', 'EASY')).toEqual({ targetRows: 3 });
+    });
+
+    it('returns valid overrides for every variant/difficulty pair', () => {
+      const difficulties = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as const;
+      for (const variant of Object.keys(VARIANT_CONFIGS) as PuzzleVariant[]) {
+        for (const difficulty of difficulties) {
+          const overrides = getVariantOverrides(variant, difficulty);
+          if (overrides.targetRows !== undefined) {
+            expect(overrides.targetRows).toBeGreaterThanOrEqual(3);
+            expect(overrides.targetRows).toBeLessThanOrEqual(5);
+          }
+          if (overrides.wordLength !== undefined) {
+            expect(overrides.wordLength).toBeGreaterThanOrEqual(4);
+            expect(overrides.wordLength).toBeLessThanOrEqual(6);
+          }
+        }
+      }
     });
 
     it('resolves modifiers and modifier checks', () => {
@@ -142,6 +167,14 @@ describe('puzzleVariety', () => {
       expect(isVariantCompleted('speed', 61)).toBe(false);
       expect(isVariantCompleted('speed_no_vowel', 59)).toBe(true);
       expect(isVariantCompleted('speed_no_vowel', 61)).toBe(false);
+    });
+
+    it('returns explicit time limits for speed variants', () => {
+      expect(getVariantTimeLimit('speed')).toBe(60);
+      expect(getVariantTimeLimit('speed_no_vowel')).toBe(60);
+      expect(getVariantTimeLimit('speed_no_consonant')).toBe(60);
+      expect(getVariantTimeLimit('reverse')).toBeNull();
+      expect(getVariantTimeLimit('chain')).toBeNull();
     });
 
     it('enforces letter movement restrictions', () => {

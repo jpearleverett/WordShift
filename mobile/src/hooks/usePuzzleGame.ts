@@ -55,6 +55,10 @@ export interface PuzzleGameState {
   moveDirection: 'down' | 'up';
   /** Rows revealed in blind variants */
   blindRevealedRows: number[];
+  /** Current chain link index for chain variants (1-based) */
+  currentChainLink: number;
+  /** Total links required for chain variants */
+  chainLength: number;
 }
 
 export interface PuzzleGameActions {
@@ -74,6 +78,9 @@ export interface PuzzleGameActions {
     gameMode: GameMode;
     completedWords: string[];
     formedWord?: string;
+    chainAdvanced?: boolean;
+    chainLink?: number;
+    chainLength?: number;
     variant?: PuzzleVariant;
   } | null>;
   handleUndo: () => void;
@@ -114,6 +121,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [moveDirection, setMoveDirection] = useState<'down' | 'up'>('down');
   const [blindRevealedRows, setBlindRevealedRows] = useState<number[]>([]);
+  const [currentChainLink, setCurrentChainLink] = useState(1);
+  const [chainLength, setChainLength] = useState(1);
+  const [chainCompletedWords, setChainCompletedWords] = useState<string[]>([]);
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
   const [lastCompletedWords, setLastCompletedWords] = useState<string[]>([]);
   const [lastIncantationName, setLastIncantationName] = useState<string | null>(null);
@@ -146,22 +156,39 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     return validWordsCache.current.has(word.toUpperCase());
   }, []);
 
-  const initGame = useCallback((
+  const mergeChainWords = useCallback((existing: string[], incoming: string[]): string[] => {
+    if (existing.length === 0) return [...incoming];
+    if (incoming.length === 0) return [...existing];
+    if (existing[existing.length - 1] === incoming[0]) {
+      return [...existing, ...incoming.slice(1)];
+    }
+    return [...existing, ...incoming];
+  }, []);
+
+  const applyBoard = useCallback((
     words: string[],
     puzzleHint?: string,
     puzzleSolution?: PuzzleSolutionStep[],
     wordLength: number = 4,
-    variant: PuzzleVariant = 'standard'
+    options?: {
+      resetPerformance?: boolean;
+      preserveVariant?: boolean;
+      variant?: PuzzleVariant;
+    }
   ) => {
+    const variantToUse = options?.preserveVariant ? currentVariant : (options?.variant || 'standard');
+    const resetPerformance = options?.resetPerformance ?? true;
+
     const newRows: RowData[] = words.map(word => ({
       id: generateId(),
       originalWord: word,
       words: word.split('').map(char => ({
         id: generateId(),
-        char: char,
+        char,
         isLocked: false,
       })),
     }));
+
     setRows(newRows);
     setActiveRowIndex(0);
     setSelectedLetter(null);
@@ -172,16 +199,90 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
     setCurrentWordLength(wordLength);
-    setInvalidAttempts(0);
-    setHintsUsed(0);
-    setEarnedStars(0);
     setLastFormedWord(null);
-    setCurrentVariant(variant);
     setMoveDirection('down');
-    setBlindRevealedRows(hasVariantModifier(variant, 'blind') ? [0] : []);
+    setBlindRevealedRows(hasVariantModifier(variantToUse, 'blind') ? [0] : []);
+    if (!options?.preserveVariant) {
+      setCurrentVariant(variantToUse);
+    }
+
+    if (resetPerformance) {
+      setInvalidAttempts(0);
+      setHintsUsed(0);
+      setEarnedStars(0);
+    }
+
     // Reset undos for challenge mode
     setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
-  }, [gameMode, currentPhase]);
+  }, [currentPhase, currentVariant, gameMode]);
+
+  const initGame = useCallback((
+    words: string[],
+    puzzleHint?: string,
+    puzzleSolution?: PuzzleSolutionStep[],
+    wordLength: number = 4,
+    variant: PuzzleVariant = 'standard'
+  ) => {
+    applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
+      resetPerformance: true,
+      variant,
+    });
+    const configuredChainLength = hasVariantModifier(variant, 'chain')
+      ? (VARIANT_CONFIGS.chain.chainLength || 3)
+      : 1;
+    setCurrentChainLink(1);
+    setChainLength(configuredChainLength);
+    setChainCompletedWords([]);
+  }, [applyBoard]);
+
+  const generatePuzzleForVariant = useCallback(async (
+    selectedDifficulty: Difficulty,
+    variant: PuzzleVariant,
+    timeoutPromise: Promise<never>,
+    startWord?: string
+  ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; wordLength?: number }; activeVariant: PuzzleVariant }> => {
+    let activeVariant = variant;
+    const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
+    const generationOverrides = {
+      ...variantOverrides,
+      ...(startWord ? { startWord } : {}),
+    } as { targetRows?: number; wordLength?: number; startWord?: string };
+
+    let puzzle = await Promise.race([
+      generateLocalPuzzle(selectedDifficulty, generationOverrides),
+      timeoutPromise,
+    ]);
+
+    if (!isVariantCompatibleWithSolution(activeVariant, puzzle.solution)) {
+      let compatiblePuzzle = null as typeof puzzle | null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const retry = await Promise.race([
+          generateLocalPuzzle(selectedDifficulty, generationOverrides),
+          timeoutPromise,
+        ]);
+        if (isVariantCompatibleWithSolution(activeVariant, retry.solution)) {
+          compatiblePuzzle = retry;
+          break;
+        }
+      }
+
+      if (compatiblePuzzle) {
+        puzzle = compatiblePuzzle;
+      } else {
+        activeVariant = 'standard';
+        setCurrentVariant('standard');
+        puzzle = await Promise.race([
+          generateLocalPuzzle(selectedDifficulty, {
+            ...getVariantOverrides('standard', selectedDifficulty),
+            ...(startWord ? { startWord } : {}),
+          }),
+          timeoutPromise,
+        ]);
+      }
+    }
+
+    return { puzzle, activeVariant };
+  }, []);
 
   const startNewGame = useCallback(async (selectedDifficulty: Difficulty = difficulty, mode?: GameMode) => {
     setGameState(GameState.LOADING);
@@ -212,40 +313,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setTimeout(() => reject(new Error('Generation timeout')), 4000)
       );
 
-      let activeVariant = variant;
-      const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
-
-      // Restriction variants (no-vowel / no-consonant) can produce impossible
-      // boards if the generated solution moves forbidden letter classes.
-      let puzzle = await Promise.race([
-        generateLocalPuzzle(selectedDifficulty, variantOverrides),
-        timeoutPromise,
-      ]);
-
-      if (!isVariantCompatibleWithSolution(activeVariant, puzzle.solution)) {
-        let compatiblePuzzle = null as typeof puzzle | null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const retry = await Promise.race([
-            generateLocalPuzzle(selectedDifficulty, variantOverrides),
-            timeoutPromise,
-          ]);
-          if (isVariantCompatibleWithSolution(activeVariant, retry.solution)) {
-            compatiblePuzzle = retry;
-            break;
-          }
-        }
-
-        if (compatiblePuzzle) {
-          puzzle = compatiblePuzzle;
-        } else {
-          activeVariant = 'standard';
-          setCurrentVariant('standard');
-          puzzle = await Promise.race([
-            generateLocalPuzzle(selectedDifficulty, getVariantOverrides('standard', selectedDifficulty)),
-            timeoutPromise,
-          ]);
-        }
-      }
+      const { puzzle, activeVariant } = await generatePuzzleForVariant(
+        selectedDifficulty,
+        variant,
+        timeoutPromise
+      );
 
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant);
       if (activeVariant !== 'standard') {
@@ -271,7 +343,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getVariantInstruction(config, currentPhase));
       }
     }
-  }, [difficulty, initGame, gameMode, level, currentPhase]);
+  }, [difficulty, initGame, gameMode, level, currentPhase, generatePuzzleForVariant]);
 
   const handleLetterPress = useCallback((letter: Letter, rowIndex: number) => {
     if (gameState !== GameState.PLAYING) return;
@@ -431,17 +503,81 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const maxForwardSourceIndex = rows.length - 2;
     const isReverseMode = hasVariantModifier(currentVariant, 'reverse');
+    const isChainMode = hasVariantModifier(currentVariant, 'chain');
+
+    const finalizeLinkCompletion = async (linkWords: string[]) => {
+      if (isChainMode && currentChainLink < chainLength) {
+        const nextLink = currentChainLink + 1;
+        const aggregatedWords = mergeChainWords(chainCompletedWords, linkWords);
+        setChainCompletedWords(aggregatedWords);
+
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Chain generation timeout')), 4000)
+          );
+          const startWord = linkWords[linkWords.length - 1];
+          const { puzzle, activeVariant } = await generatePuzzleForVariant(
+            difficulty,
+            currentVariant,
+            timeoutPromise,
+            startWord
+          );
+
+          applyBoard(
+            puzzle.words,
+            puzzle.hint,
+            puzzle.solution,
+            puzzle.wordLength,
+            {
+              resetPerformance: false,
+              preserveVariant: activeVariant === currentVariant,
+              variant: activeVariant,
+            }
+          );
+          setCurrentChainLink(nextLink);
+          setMessage(
+            currentPhase >= 3
+              ? `Link ${nextLink}/${chainLength}. The sequence continues.`
+              : `Chain link ${nextLink} of ${chainLength}. Keep going!`
+          );
+          setIsProcessing(false);
+          return {
+            completed: false,
+            hintsUsed,
+            invalidAttempts,
+            gameMode,
+            completedWords: aggregatedWords,
+            chainAdvanced: true,
+            chainLink: nextLink,
+            chainLength,
+            variant: currentVariant,
+          };
+        } catch (chainErr) {
+          // If the next link cannot be generated, gracefully finalize this chain.
+          console.log('Chain link generation failed, finalizing run:', chainErr);
+        }
+      }
+
+      const finalWords = isChainMode ? mergeChainWords(chainCompletedWords, linkWords) : linkWords;
+      setLastCompletedWords(finalWords);
+      setLastIncantationName(getIncantationName(finalWords, currentPhase));
+      setChainCompletedWords([]);
+      setCurrentChainLink(1);
+      setIsProcessing(false);
+      return {
+        completed: true,
+        hintsUsed,
+        invalidAttempts,
+        gameMode,
+        completedWords: finalWords,
+        variant: currentVariant,
+      };
+    };
 
     if (!isReverseMode) {
       if (activeRowIndex === maxForwardSourceIndex) {
-        // Capture the completed word chain for ritual echo
         const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
-        setLastCompletedWords(completedWords);
-        setLastIncantationName(getIncantationName(completedWords, currentPhase));
-
-        setIsProcessing(false);
-        // Return completion info - caller handles persistence & victory state
-        return { completed: true, hintsUsed, invalidAttempts, gameMode, completedWords, variant: currentVariant };
+        return await finalizeLinkCompletion(completedWords);
       }
 
       setActiveRowIndex(prev => prev + 1);
@@ -472,14 +608,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     // Returning upward in reverse mode.
     if (activeRowIndex === 1) {
-      // Capture the completed word chain for ritual echo
       const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
-      setLastCompletedWords(completedWords);
-      setLastIncantationName(getIncantationName(completedWords, currentPhase));
-
-      setIsProcessing(false);
-      // Return completion info - caller handles persistence & victory state
-      return { completed: true, hintsUsed, invalidAttempts, gameMode, completedWords, variant: currentVariant };
+      return await finalizeLinkCompletion(completedWords);
     }
 
     setActiveRowIndex(prev => prev - 1);
@@ -501,9 +631,17 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentVariant,
     currentPhase,
     gameMode,
+    currentChainLink,
+    chainLength,
+    chainCompletedWords,
+    mergeChainWords,
+    generatePuzzleForVariant,
+    difficulty,
+    applyBoard,
   ]);
 
   const handleUndo = useCallback(() => {
+    if (gameState !== GameState.PLAYING) return;
     if (history.length === 0) return;
 
     // Challenge mode: limited undos
@@ -553,7 +691,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameMode === 'challenge') {
       setUndosRemaining(prev => prev - 1);
     }
-  }, [history, gameMode, undosRemaining, shakeError]);
+  }, [history, gameMode, undosRemaining, shakeError, gameState]);
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
@@ -590,6 +728,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentVariant,
     moveDirection,
     blindRevealedRows,
+    currentChainLink,
+    chainLength,
   };
 
   const actions: PuzzleGameActions = {

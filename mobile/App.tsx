@@ -60,7 +60,7 @@ import { isDreadWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges } from './src/services/cloudSave';
-import { hasVariantModifier, VARIANT_CONFIGS } from './src/services/puzzleVariety';
+import { hasVariantModifier, getVariantTimeLimit, VARIANT_CONFIGS } from './src/services/puzzleVariety';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery';
@@ -76,6 +76,8 @@ export default function App() {
   const [persistence, persistenceActions] = useGamePersistence();
   const [victoryFlow, victoryActions] = useVictoryFlow();
   const [achievementState, achievementActions] = useAchievementQueue();
+  const setPuzzleGameState = puzzleActions.setGameState;
+  const setPuzzleMessage = puzzleActions.setMessage;
 
   // Sync narrative phase from persistence into puzzle hook
   useEffect(() => {
@@ -118,8 +120,50 @@ export default function App() {
     }
   }, [showInterjection]);
 
+  // Speed variants: run countdown while puzzle is active.
+  useEffect(() => {
+    const isSpeedVariant = hasVariantModifier(puzzle.currentVariant, 'speed');
+    if (!isSpeedVariant || puzzle.gameState !== GameState.PLAYING) {
+      setSpeedTimeRemaining(null);
+      return;
+    }
+
+    const limit = getVariantTimeLimit(puzzle.currentVariant) ?? 60;
+    setSpeedTimeRemaining(limit);
+    const startedAt = Date.now();
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      const remaining = Math.max(0, limit - elapsed);
+      setSpeedTimeRemaining(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+        setPuzzleGameState(GameState.GAME_OVER);
+        setPuzzleMessage(
+          persistence.currentPhase >= 3
+            ? 'Time collapsed. The arrangement closed this path.'
+            : 'Time is up! Start a new puzzle and try again.'
+        );
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [
+    puzzle.currentVariant,
+    puzzle.gameState,
+    puzzle.level,
+    puzzle.currentChainLink,
+    persistence.currentPhase,
+    setPuzzleGameState,
+    setPuzzleMessage,
+  ]);
+
   // In-progress ritual echo chain — words formed during current puzzle
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
+
+  // Speed variant countdown
+  const [speedTimeRemaining, setSpeedTimeRemaining] = useState<number | null>(null);
 
   // Dread pulse state (flashes on dread word formation)
   const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
@@ -239,8 +283,17 @@ export default function App() {
   const handleSlotPress = useCallback(async (targetIndex: number) => {
     // Block interaction during victory processing
     if (victoryFlow.isProcessingVictory) return;
+    if (puzzle.gameState === GameState.GAME_OVER) return;
 
     const result = await puzzleActions.handleSlotPress(targetIndex);
+
+    if (result?.chainAdvanced) {
+      // Chain mode advanced to the next link (not a final victory yet).
+      hapticMedium();
+      soundValidMove();
+      setRitualEchoWords([]);
+      return;
+    }
 
     if (result?.completed) {
       // Lock interaction during async victory chain
@@ -418,7 +471,7 @@ export default function App() {
         triggerDreadPulse(persistence.currentPhase);
       }
     }
-  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions, onboardingStep, advanceOnboarding]);
+  }, [puzzleActions, puzzle.difficulty, puzzle.selectedLetter, puzzle.gameState, persistenceActions, isPlayingDaily, victoryFlow.isProcessingVictory, victoryActions, achievementActions, onboardingStep, advanceOnboarding]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
     hapticLight();
@@ -843,6 +896,21 @@ export default function App() {
                 )}
               </View>
             )}
+            {speedTimeRemaining !== null && (
+              <View style={[
+                styles.speedBadge,
+                speedTimeRemaining <= 10 && styles.speedBadgeUrgent,
+              ]}>
+                <Text style={styles.speedBadgeText}>⏱ {speedTimeRemaining}s</Text>
+              </View>
+            )}
+            {hasVariantModifier(puzzle.currentVariant, 'chain') && puzzle.chainLength > 1 && (
+              <View style={styles.chainBadge}>
+                <Text style={styles.chainBadgeText}>
+                  LINK {puzzle.currentChainLink}/{puzzle.chainLength}
+                </Text>
+              </View>
+            )}
             {puzzle.currentVariant !== 'standard' && (
               <View style={[
                 styles.variantBadge,
@@ -955,7 +1023,7 @@ export default function App() {
               glow: CandyColors.yellow.glow,
             }}
             onPress={handleUndo}
-            disabled={puzzle.history.length === 0 || puzzle.gameState === GameState.WON}
+            disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
           <ActionButton
             icon="💡"
@@ -1309,6 +1377,33 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+  speedBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  speedBadgeUrgent: {
+    backgroundColor: 'rgba(210, 40, 70, 0.78)',
+  },
+  speedBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: CandyColors.white,
+    letterSpacing: 0.3,
+  },
+  chainBadge: {
+    backgroundColor: 'rgba(95, 180, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  chainBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: 'rgba(220, 240, 255, 0.95)',
+    letterSpacing: 0.3,
   },
   variantBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
