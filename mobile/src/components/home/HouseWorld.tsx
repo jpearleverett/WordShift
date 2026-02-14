@@ -895,7 +895,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   SKY_DAY
                 }
                 style={[styles.skyBackground, {
-                  top: -Math.max(SCREEN_HEIGHT * 0.0, houseHeight * 0.0),
+                  top: -Math.max(SCREEN_HEIGHT * 0.20, houseHeight * 0.0),
                 }]}
                 resizeMode="cover"
               />
