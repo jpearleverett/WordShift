@@ -963,6 +963,7 @@ export default function App() {
                  onboardingStep === 'unlock_explained') && (
                   <FoxGuide
                     visible={true}
+                    variant="dialogue"
                     text={getOnboardingFoxText()}
                     buttonText={getOnboardingButtonText()}
                     onContinue={onboardingStep === 'home_empty' ? undefined : handleOnboardingContinue}
@@ -1360,9 +1361,9 @@ export default function App() {
                   }
                 : puzzle.gameState === GameState.PLAYING
                   ? {
-                      // Position just below the 3 tutorial rows
-                      // (~50px status bar + ~80px header + 3 rows * ~76px + padding)
-                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.48, 350), 460),
+                      // Position below the 3 tutorial rows with clearance
+                      // (~50px status bar + ~80px header + 3 rows * ~80px + padding)
+                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.56, 420), 520),
                       left: 8,
                       right: 8,
                     }
