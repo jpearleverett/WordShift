@@ -737,8 +737,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   tileBodyGuided: {
-    borderWidth: 2,
-    borderColor: CandyColors.yellow.main,
+    backgroundColor: 'rgba(250, 204, 21, 0.18)',
   },
   tileBodySelected: {
     shadowOpacity: 0.5,
