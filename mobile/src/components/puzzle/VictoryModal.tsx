@@ -158,7 +158,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     (+{victoryData.challengeBonus} challenge!)
                   </Text>
                 )}
-                {victoryData.variantBonus && victoryData.variantBonus > 0 && (
+                {(victoryData.variantBonus ?? 0) > 0 && (
                   <Text style={styles.variantBonusText}>
                     (+{victoryData.variantBonus} style{victoryData.variantRepeatDecay && victoryData.variantRepeatDecay < 1 ? ', tapered' : ''})
                   </Text>
