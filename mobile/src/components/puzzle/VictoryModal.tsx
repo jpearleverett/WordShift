@@ -158,7 +158,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     (+{victoryData.challengeBonus} challenge!)
                   </Text>
                 )}
-                {victoryData.variantBonus && victoryData.variantBonus > 0 && (
+                {(victoryData.variantBonus ?? 0) > 0 && (
                   <Text style={styles.variantBonusText}>
                     (+{victoryData.variantBonus} style{victoryData.variantRepeatDecay && victoryData.variantRepeatDecay < 1 ? ', tapered' : ''})
                   </Text>
@@ -175,7 +175,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
 
             {/* Milestone bonus */}
-            {victoryData && victoryData.milestoneBonus > 0 && victoryData.milestoneMessage && (
+            {victoryData && victoryData.milestoneBonus > 0 && Boolean(victoryData.milestoneMessage) && (
               <View style={styles.milestoneContainer}>
                 <Text style={styles.milestoneEmoji}>{'\uD83C\uDFC6'}</Text>
                 <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
@@ -259,7 +259,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     </React.Fragment>
                   ))}
                 </View>
-                {incantationName && (
+                {Boolean(incantationName) && (
                   <Text style={[
                     styles.ritualIncantationName,
                     phase <= 1 && styles.ritualIncantationNameBright,

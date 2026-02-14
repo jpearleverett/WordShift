@@ -580,7 +580,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           )}
 
           {/* Emotion bubble */}
-          {currentEmotion && (
+          {Boolean(currentEmotion) && (
             <Animated.View
               style={[
                 styles.emotionBubble,
