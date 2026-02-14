@@ -163,20 +163,20 @@ const Slot: React.FC<{
     );
     pulseLoop.start();
 
-    // Glow animation
+    // Glow animation (native driver — only drives opacity)
     const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowAnim, {
           toValue: 1,
           duration: 1000,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(glowAnim, {
           toValue: 0,
           duration: 1000,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ])
     );
