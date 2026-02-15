@@ -20,7 +20,7 @@ import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSessi
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
 import { updateQuestProgress } from '../services/weeklyQuests';
-import { PuzzleVariant, getVariantAmberMultiplier } from '../services/puzzleVariety';
+import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
 
 export interface VictoryData {
   earnedStars: number;
@@ -186,6 +186,17 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       // Queue a one-time variant tutorial for animal dialogue.
       if (variant && variant !== 'standard') {
         recordVariantEncounter(variant).catch(() => {});
+      }
+
+      // Queue variant tutorials for any variants that just became unlocked.
+      // This ensures the animal introduces the variant as soon as it unlocks,
+      // even if the player hasn't tried it yet.
+      const newlyUnlocked = getNewlyUnlockedVariants(
+        amberResult.puzzlesSolved,
+        amberResult.newPhase
+      );
+      for (const unlockedVariant of newlyUnlocked) {
+        recordVariantEncounter(unlockedVariant).catch(() => {});
       }
 
       logEvent({

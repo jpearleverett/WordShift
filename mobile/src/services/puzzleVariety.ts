@@ -16,6 +16,7 @@
  */
 
 import { Difficulty, PuzzleSolutionStep } from '../types';
+import { isReverseSolvable } from './localGenerator';
 
 // ============================================================================
 // Types
@@ -296,6 +297,21 @@ export function getUnlockedVariants(
   return unlocked;
 }
 
+/**
+ * Returns variants that were newly unlocked by reaching `puzzlesSolved`.
+ * Compares against `puzzlesSolved - 1` to detect threshold crossings.
+ */
+export function getNewlyUnlockedVariants(
+  puzzlesSolved: number,
+  currentPhase: number
+): PuzzleVariant[] {
+  if (puzzlesSolved <= 0) return [];
+  const nowUnlocked = getUnlockedVariants(puzzlesSolved, currentPhase);
+  const previouslyUnlocked = getUnlockedVariants(puzzlesSolved - 1, currentPhase);
+  const previousSet = new Set(previouslyUnlocked);
+  return nowUnlocked.filter(v => !previousSet.has(v));
+}
+
 export function getVariantUnlockHint(
   variant: PuzzleVariant,
   puzzlesSolved: number,
@@ -548,10 +564,12 @@ export function getVariantRestrictionError(variant: PuzzleVariant, phase: number
  * Check whether a puzzle solution is compatible with variant restrictions.
  * Restriction variants can create impossible puzzles if the moved letters do
  * not match the allowed letter class. We filter those out at generation time.
+ * Reverse variants additionally require a solvable return path.
  */
 export function isVariantCompatibleWithSolution(
   variant: PuzzleVariant,
-  solution?: PuzzleSolutionStep[]
+  solution?: PuzzleSolutionStep[],
+  words?: string[]
 ): boolean {
   if (!solution || solution.length === 0) return true;
 
@@ -561,5 +579,13 @@ export function isVariantCompatibleWithSolution(
   if (hasVariantModifier(variant, 'no_consonant')) {
     return solution.every(step => isVowel(step.letterToMove));
   }
+
+  // Reverse variants: validate that the return path is solvable
+  if (hasVariantModifier(variant, 'reverse') && words && words.length >= 2) {
+    if (!isReverseSolvable(words, solution)) {
+      return false;
+    }
+  }
+
   return true;
 }

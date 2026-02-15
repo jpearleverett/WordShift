@@ -51,6 +51,24 @@ export const FALLBACK_PUZZLES_MEDIUM: string[][] = [
   ["IRON", "TIME", "OVER", "INTO"],
 ];
 
+export const FALLBACK_PUZZLES_MEDIUM_PLUS: string[][] = [
+  ["SCRAP", "THERE", "LATER", "TIMES"],
+  ["SHELL", "THERE", "LATER", "TIMES"],
+  ["STEAL", "THERE", "LATER", "TIMES"],
+  ["BEADS", "THERE", "LATER", "TIMES"],
+  ["IDEAS", "THERE", "LATER", "TIMES"],
+  ["VOTES", "THERE", "LATER", "TIMES"],
+  ["LOOKS", "THERE", "LATER", "TIMES"],
+  ["CELLS", "THERE", "LATER", "TIMES"],
+  ["BRUSH", "TIMES", "THERE", "LATER"],
+  ["SOLAR", "WORDS", "THERE", "LATER"],
+  ["BLUSH", "WORDS", "THERE", "LATER"],
+  ["TASKS", "LATER", "TIMES", "THERE"],
+  ["WITCH", "RIGHT", "TIMES", "THERE"],
+  ["PEARL", "SUPER", "THERE", "LATER"],
+  ["WRIST", "THERE", "LATER", "TIMES"],
+];
+
 export const FALLBACK_PUZZLES_HARD: string[][] = [
   ["SCRAP", "THERE", "LATER", "TIMES", "THEIR"],
   ["SHELL", "THERE", "LATER", "TIMES", "THEIR"],
@@ -73,7 +91,7 @@ export const FALLBACK_PUZZLES_HARD: string[][] = [
 export function getRandomFallback(difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' | 'HARD'): string[] {
   const pool = difficulty === 'EASY' ? FALLBACK_PUZZLES_EASY
     : difficulty === 'HARD' ? FALLBACK_PUZZLES_HARD
-    : difficulty === 'MEDIUM_PLUS' ? FALLBACK_PUZZLES_HARD  // MEDIUM_PLUS uses HARD pool (5-letter words)
+    : difficulty === 'MEDIUM_PLUS' ? FALLBACK_PUZZLES_MEDIUM_PLUS
     : FALLBACK_PUZZLES_MEDIUM;
   return pool[Math.floor(Math.random() * pool.length)];
 }

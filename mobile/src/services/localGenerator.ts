@@ -867,6 +867,177 @@ export const generateLocalPuzzle = async (
 };
 
 /**
+ * Validate that a puzzle's reverse path is solvable.
+ *
+ * Simulates the forward pass using solution steps to compute the post-forward
+ * board state, then checks if a valid DFS path exists from the last row back
+ * to row 0 (each step: pick a letter from source → valid shorter word,
+ * drop it into target → valid longer word).
+ */
+export function isReverseSolvable(
+  words: string[],
+  solution: PuzzleSolutionStep[]
+): boolean {
+  if (!solution || solution.length === 0 || words.length < 2) return false;
+
+  const wordLength = words[0].length;
+  const minDict = WORD_SETS[wordLength - 1];
+  const baseDict = WORD_SETS[wordLength];
+  const maxDict = WORD_SETS[wordLength + 1];
+
+  if (!minDict || !baseDict || !maxDict) return false;
+
+  // Simulate the forward pass to compute post-forward row states.
+  // Each row starts as its original word; each solution step removes a letter
+  // from the source row and inserts it into the target row.
+  const rowLetters: string[][] = words.map(w => w.split(''));
+
+  for (const step of solution) {
+    const srcRow = rowLetters[step.stepIndex];
+    const tgtRow = rowLetters[step.stepIndex + 1];
+
+    // Find the letter in the source row
+    const letterIdx = srcRow.indexOf(step.letterToMove);
+    if (letterIdx === -1) return false;
+
+    // Remove letter from source
+    srcRow.splice(letterIdx, 1);
+
+    // Insert letter into target at the correct position.
+    // We find the position that produces a valid (wordLength+1)-letter word.
+    const tgtStr = tgtRow.join('');
+    let inserted = false;
+    for (let k = 0; k <= tgtRow.length; k++) {
+      const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
+      if (maxDict.has(combined)) {
+        // Use this insertion position
+        tgtRow.splice(k, 0, step.letterToMove);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      // Fallback: append to end (generator found it valid, dict mismatch possible)
+      tgtRow.push(step.letterToMove);
+    }
+  }
+
+  // Post-forward state:
+  // Row 0: wordLength - 1 letters
+  // Rows 1..N-2: wordLength letters
+  // Row N-1: wordLength + 1 letters
+  const postForwardRows = rowLetters.map(r => r.join(''));
+
+  // Now check reverse solvability using iterative DFS
+  // For each step going up from row N-1 to row 1→0:
+  // Pick a letter from source (making it shorter), drop into target above (making it longer)
+  return canSolveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength);
+}
+
+/**
+ * Check if the reverse path from bottom to top is solvable.
+ * Uses iterative depth-first search with backtracking.
+ */
+function canSolveReverseIterative(
+  startRows: string[],
+  minDict: Set<string>,
+  baseDict: Set<string>,
+  maxDict: Set<string>,
+  wordLength: number
+): boolean {
+  const numSteps = startRows.length - 1;
+
+  // Stack-based DFS: each frame tracks (currentRows state, stepIndex, moveIndex)
+  // moveIndex iterates through all possible pick-letter + insert-position combos
+  interface Frame {
+    rows: string[];
+    step: number;
+    moveIdx: number;
+  }
+
+  // Enumerate all possible moves for a given step
+  function getMoves(
+    sourceWord: string,
+    targetWord: string,
+    step: number
+  ): Array<{ newSource: string; newTarget: string }> {
+    const isLastStep = step === numSteps - 1;
+    const moves: Array<{ newSource: string; newTarget: string }> = [];
+
+    for (let i = 0; i < sourceWord.length; i++) {
+      const letter = sourceWord[i];
+      const remainder = sourceWord.slice(0, i) + sourceWord.slice(i + 1);
+
+      // Remainder is always wordLength letters (source is wordLength+1, minus 1)
+      if (!baseDict.has(remainder)) continue;
+
+      for (let j = 0; j <= targetWord.length; j++) {
+        const combined = targetWord.slice(0, j) + letter + targetWord.slice(j);
+
+        // Validate combined: last step targets row 0 (needs to be wordLength)
+        const isCombinedValid = isLastStep
+          ? baseDict.has(combined)
+          : maxDict.has(combined);
+        if (!isCombinedValid) continue;
+
+        moves.push({ newSource: remainder, newTarget: combined });
+      }
+    }
+    return moves;
+  }
+
+  const stack: Frame[] = [{
+    rows: [...startRows],
+    step: 0,
+    moveIdx: 0,
+  }];
+
+  let iterations = 0;
+  const MAX_ITERATIONS = 50000;
+
+  while (stack.length > 0) {
+    if (++iterations > MAX_ITERATIONS) return false; // Safety cutoff
+
+    const frame = stack[stack.length - 1];
+    const sourceRowIdx = startRows.length - 1 - frame.step;
+    const targetRowIdx = sourceRowIdx - 1;
+
+    const sourceWord = frame.rows[sourceRowIdx];
+    const targetWord = frame.rows[targetRowIdx];
+
+    const moves = getMoves(sourceWord, targetWord, frame.step);
+
+    if (frame.moveIdx >= moves.length) {
+      // No more moves at this level — backtrack
+      stack.pop();
+      if (stack.length > 0) stack[stack.length - 1].moveIdx++;
+      continue;
+    }
+
+    const move = moves[frame.moveIdx];
+
+    // Apply the move to get new state
+    const newRows = [...frame.rows];
+    newRows[sourceRowIdx] = move.newSource;
+    newRows[targetRowIdx] = move.newTarget;
+
+    if (frame.step === numSteps - 1) {
+      // We completed all reverse steps — puzzle is solvable!
+      return true;
+    }
+
+    // Push next step
+    stack.push({
+      rows: newRows,
+      step: frame.step + 1,
+      moveIdx: 0,
+    });
+  }
+
+  return false;
+}
+
+/**
  * Recursive Depth-First Search with quality awareness
  * Now considers word history for diversity
  */
