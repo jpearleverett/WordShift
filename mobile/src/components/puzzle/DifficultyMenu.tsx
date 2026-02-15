@@ -46,6 +46,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const coreOptions = visibleOptions.filter(option => option.group === 'core');
   const baseOptions = visibleOptions.filter(option => option.group === 'base');
   const comboOptions = visibleOptions.filter(option => option.group === 'combo');
+  const hasNonStandardVariants = baseOptions.length > 0 || comboOptions.length > 0;
 
   const renderVariantItem = (option: VariantSelectorOption) => {
     const isSelected = option.variant === currentVariant;
@@ -166,37 +167,41 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </View>
         </TouchableOpacity>
 
-        <View style={[styles.challengeMenuDivider, isDark && {
-          backgroundColor: phaseTheme.modalDividerColor,
-        }]} />
+        {hasNonStandardVariants && (
+          <>
+            <View style={[styles.challengeMenuDivider, isDark && {
+              backgroundColor: phaseTheme.modalDividerColor,
+            }]} />
 
-        <Text style={[
-          styles.sectionTitle,
-          isDark && { color: phaseTheme.modalSecondaryTextColor },
-        ]}>
-          {styleTitle}
-        </Text>
-        {coreOptions.map(renderVariantItem)}
-        {baseOptions.map(renderVariantItem)}
+            <Text style={[
+              styles.sectionTitle,
+              isDark && { color: phaseTheme.modalSecondaryTextColor },
+            ]}>
+              {styleTitle}
+            </Text>
+            {coreOptions.map(renderVariantItem)}
+            {baseOptions.map(renderVariantItem)}
 
-        {comboOptions.length > 0 && (
-          <Text style={[
-            styles.sectionSubtitle,
-            isDark && { color: phaseTheme.modalSecondaryTextColor },
-          ]}>
-            COMBINATION STYLES
-          </Text>
-        )}
-        {comboOptions.map(renderVariantItem)}
-        {comboOptions.length === 0 && (
-          <Text style={[
-            styles.combosComingText,
-            isDark && { color: phaseTheme.modalSecondaryTextColor },
-          ]}>
-            {phase >= 3
-              ? 'More layered arrangements will reveal themselves.'
-              : 'More combo styles unlock later as you progress.'}
-          </Text>
+            {comboOptions.length > 0 && (
+              <Text style={[
+                styles.sectionSubtitle,
+                isDark && { color: phaseTheme.modalSecondaryTextColor },
+              ]}>
+                COMBINATION STYLES
+              </Text>
+            )}
+            {comboOptions.map(renderVariantItem)}
+            {comboOptions.length === 0 && (
+              <Text style={[
+                styles.combosComingText,
+                isDark && { color: phaseTheme.modalSecondaryTextColor },
+              ]}>
+                {phase >= 3
+                  ? 'More layered arrangements will reveal themselves.'
+                  : 'More combo styles unlock later as you progress.'}
+              </Text>
+            )}
+          </>
         )}
       </ScrollView>
     </View>
