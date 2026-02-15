@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
@@ -43,11 +43,24 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const sceneOpacity = useRef(new Animated.Value(0)).current;
   const sceneTranslateY = useRef(new Animated.Value(20)).current;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const hasSkipped = useRef(false);
+
+  const handleSkip = () => {
+    if (hasSkipped.current) return;
+    hasSkipped.current = true;
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    overlayOpacity.setValue(0);
+    onComplete();
+  };
 
   useEffect(() => {
     if (!event) return;
+    hasSkipped.current = false;
 
     const reducedMotion = getSettingsSync().reducedMotion;
+    // Scale ALL timing by 0.4x in reduced motion (not just skip animations)
+    const timeScale = reducedMotion ? 0.4 : 1.0;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     // Fade in overlay
@@ -56,7 +69,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     } else {
       Animated.timing(overlayOpacity, {
         toValue: 1,
-        duration: 600,
+        duration: 600 * timeScale,
         useNativeDriver: true,
       }).start();
     }
@@ -82,12 +95,12 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           Animated.parallel([
             Animated.timing(sceneOpacity, {
               toValue: 1,
-              duration: 400,
+              duration: 400 * timeScale,
               useNativeDriver: true,
             }),
             Animated.timing(sceneTranslateY, {
               toValue: 0,
-              duration: 400,
+              duration: 400 * timeScale,
               useNativeDriver: true,
             }),
           ]).start();
@@ -100,19 +113,19 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           } else {
             Animated.timing(sceneOpacity, {
               toValue: 0,
-              duration: 300,
+              duration: 300 * timeScale,
               useNativeDriver: true,
             }).start();
           }
-        }, scene.duration - 300);
+        }, (scene.duration - 300) * timeScale);
         timers.push(fadeOutTimer);
-      }, scene.delay + 600); // +600 for initial overlay fade-in
+      }, (scene.delay + 600) * timeScale); // +600 for initial overlay fade-in
       timers.push(showTimer);
     });
 
     // Complete after all scenes finish
     const lastScene = event.scenes[event.scenes.length - 1];
-    const totalDuration = lastScene.delay + lastScene.duration + 600 + 500;
+    const totalDuration = (lastScene.delay + lastScene.duration + 600 + 500) * timeScale;
     const completeTimer = setTimeout(() => {
       if (reducedMotion) {
         overlayOpacity.setValue(0);
@@ -174,6 +187,16 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         )}
       </Animated.View>
 
+      {/* Skip button */}
+      <TouchableOpacity
+        style={[styles.skipButton, { borderColor: event.accentColor + '80' }]}
+        onPress={handleSkip}
+        accessibilityLabel="Skip transition"
+        accessibilityRole="button"
+      >
+        <Text style={[styles.skipText, { color: event.accentColor + '80' }]}>Skip</Text>
+      </TouchableOpacity>
+
       {/* Progress dots */}
       <View style={styles.dotsContainer}>
         {event.scenes.map((_, i) => (
@@ -234,5 +257,18 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  skipButton: {
+    position: 'absolute',
+    top: 50,
+    right: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  skipText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

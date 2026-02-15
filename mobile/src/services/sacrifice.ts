@@ -216,6 +216,25 @@ export async function getSacrificeCount(): Promise<number> {
 }
 
 /**
+ * Get total amber sacrificed this week (for weekly quest tracking).
+ */
+export async function getWeeklySacrificeTotal(): Promise<number> {
+  const state = await loadSacrificeState();
+  const now = new Date();
+  // Calculate start of current week (Monday)
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+  const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysSinceMonday);
+  monday.setHours(0, 0, 0, 0);
+  const mondayMs = monday.getTime();
+
+  return state.sacrificeHistory
+    .filter(entry => entry.timestamp >= mondayMs)
+    .reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+/**
  * Clear sacrifice data (for Settings > Reset All).
  */
 export async function clearSacrificeState(): Promise<void> {

@@ -43,9 +43,9 @@ let statsCache: CumulativeStats | null = null;
 /**
  * Calculate star rating based on hints used and invalid attempts
  *
- * 3 stars: 0 hints, 0-2 invalid attempts (generous — reward exploration)
- * 2 stars: 1 hint OR 3-4 invalid attempts
- * 1 star: 2+ hints OR 5+ invalid attempts
+ * 3 stars: 0 hints, 0-1 invalid attempts (tightened for better tension)
+ * 2 stars: 1 hint OR 2-3 invalid attempts
+ * 1 star: 2+ hints OR 4+ invalid attempts
  */
 export function calculateStars(hintsUsed: number, invalidAttempts: number): number {
   // 2+ hints = 1 star max
@@ -53,17 +53,17 @@ export function calculateStars(hintsUsed: number, invalidAttempts: number): numb
     return 1;
   }
 
-  // 5+ invalid attempts = 1 star max
-  if (invalidAttempts >= 5) {
+  // 4+ invalid attempts = 1 star max
+  if (invalidAttempts >= 4) {
     return 1;
   }
 
-  // 1 hint OR 3-4 invalid attempts = 2 stars max
-  if (hintsUsed === 1 || invalidAttempts >= 3) {
+  // 1 hint OR 2-3 invalid attempts = 2 stars max
+  if (hintsUsed === 1 || invalidAttempts >= 2) {
     return 2;
   }
 
-  // 0 hints, 0-2 invalid attempts = 3 stars
+  // 0 hints, 0-1 invalid attempts = 3 stars
   return 3;
 }
 

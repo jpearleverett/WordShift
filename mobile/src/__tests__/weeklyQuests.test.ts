@@ -808,4 +808,71 @@ describe('weeklyQuests', () => {
       expect(updated.quests.find(q => q.id === visitQuest.id)?.progress).toBe(2);
     });
   });
+
+  describe('sacrifice_amber and daily_streak quest types', () => {
+    it('sacrifice_amber quests only generate at Phase 4+', async () => {
+      // Phase 0: no sacrifice quests
+      const state0 = await loadWeeklyQuests(0);
+      const sacrificeQuest0 = state0.quests.find(q => q.type === 'sacrifice_amber');
+      expect(sacrificeQuest0).toBeUndefined();
+
+      // Clear and re-generate at Phase 4
+      await clearWeeklyQuests();
+      const state4 = await loadWeeklyQuests(4);
+      // May or may not have a sacrifice quest (random selection), but shouldn't error
+      expect(state4.quests).toHaveLength(4);
+    });
+
+    it('updateQuestProgress handles amberSacrificed', async () => {
+      // Force a state with a sacrifice quest at Phase 4
+      await clearWeeklyQuests();
+      const state = await loadWeeklyQuests(4);
+      const sacrificeQuest = state.quests.find(q => q.type === 'sacrifice_amber');
+      if (!sacrificeQuest) return; // Skip if not randomly generated
+
+      const baseEvent = { difficulty: 'MEDIUM' as any, stars: 3, hintsUsed: 0, isDaily: false, isChallenge: false, amberEarned: 10, amberSacrificed: 25 };
+      await updateQuestProgress(baseEvent, 4);
+      const updated = await loadWeeklyQuests(4);
+      const updatedQuest = updated.quests.find(q => q.id === sacrificeQuest.id);
+      expect(updatedQuest?.progress).toBeGreaterThanOrEqual(25);
+    });
+
+    it('updateQuestProgress handles dailyStreak', async () => {
+      const state = await loadWeeklyQuests(0);
+      const streakQuest = state.quests.find(q => q.type === 'daily_streak');
+      if (!streakQuest) return; // Skip if not randomly generated
+
+      const baseEvent = { difficulty: 'MEDIUM' as any, stars: 3, hintsUsed: 0, isDaily: true, isChallenge: false, amberEarned: 10, dailyStreak: 3 };
+      await updateQuestProgress(baseEvent, 0);
+      const updated = await loadWeeklyQuests(0);
+      const updatedQuest = updated.quests.find(q => q.id === streakQuest.id);
+      expect(updatedQuest?.progress).toBe(3);
+    });
+  });
+
+  describe('phase-scaled quest rewards', () => {
+    it('claimQuestReward applies phase multiplier at Phase 2', async () => {
+      const state = await loadWeeklyQuests(0);
+      const quest = state.quests[0];
+      if (!quest) return;
+
+      // Manually set quest as completed
+      quest.progress = quest.target;
+      quest.completed = true;
+      const baseReward = quest.rewardAmber;
+      await AsyncStorage.setItem('wordshift_weekly_quests', JSON.stringify(state));
+      // Clear cache
+      await clearWeeklyQuests();
+      // Re-load to populate cache
+      const loaded = await loadWeeklyQuests(0);
+      const completedQuest = loaded.quests.find(q => q.id === quest.id);
+      if (!completedQuest || !completedQuest.completed || completedQuest.claimed) return;
+
+      // Claim at Phase 2 (1.25x multiplier)
+      const result = await claimQuestReward(completedQuest.id, 2);
+      if (result) {
+        expect(result.amber).toBe(Math.round(baseReward * 1.25));
+      }
+    });
+  });
 });

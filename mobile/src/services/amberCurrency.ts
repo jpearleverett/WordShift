@@ -163,6 +163,7 @@ export const STREAK_MILESTONES: {
   { streak: 3, amber: 15, message: 'Three-day streak!' },
   { streak: 7, amber: 30, message: 'One-week streak!', darkMessage: 'Seven days. The pattern notices.' },
   { streak: 14, amber: 50, message: 'Two-week streak!', darkMessage: 'Fourteen days without breaking the chain.' },
+  { streak: 21, amber: 65, message: 'Three-week streak!', darkMessage: 'Twenty-one days. It recognizes your rhythm.' },
   { streak: 30, amber: 100, message: 'Thirty-day streak!', darkMessage: 'Thirty days. The arrangement is grateful.' },
 ];
 
@@ -1005,7 +1006,20 @@ export async function applyVariantAmberBonus(
   const repeatCount = progress.lastVariantPlayed === variant
     ? (progress.sameVariantStreak || 0) + 1
     : 1;
-  const repeatDecay = getVariantRepeatDecay(repeatCount);
+  const consecutiveDecay = getVariantRepeatDecay(repeatCount);
+
+  // Weekly variant usage tracking
+  const currentWeek = getWeekId();
+  if (!progress.variantWeeklyUsage || progress.variantWeeklyUsageWeek !== currentWeek) {
+    progress.variantWeeklyUsage = {};
+    progress.variantWeeklyUsageWeek = currentWeek;
+  }
+  const weeklyUsage = (progress.variantWeeklyUsage[variant] || 0) + 1;
+  progress.variantWeeklyUsage[variant] = weeklyUsage;
+  const weeklyDecay = getWeeklyVariantDecay(weeklyUsage);
+
+  // Apply the stricter of consecutive decay vs weekly decay
+  const repeatDecay = Math.min(consecutiveDecay, weeklyDecay);
   const appliedMultiplier = 1 + ((configuredMultiplier - 1) * repeatDecay);
   const bonus = Math.max(0, Math.round(baseAmberAward * (appliedMultiplier - 1)));
 
@@ -1198,6 +1212,47 @@ export async function markFoxPlayNudgeSeen(): Promise<void> {
   } catch {
     // Non-critical
   }
+}
+
+/**
+ * Award bonus amber from non-puzzle sources (e.g., daily streak milestones).
+ * Credits amber, records a transaction, and returns the new balance.
+ */
+export async function awardBonusAmber(amount: number, source: string): Promise<number> {
+  const progress = await loadProgress();
+  progress.amber += amount;
+  progress.totalAmberEarned += amount;
+  progressCache = progress;
+  await saveProgress();
+  await recordTransaction({
+    amount,
+    type: 'earn',
+    source,
+    timestamp: Date.now(),
+  });
+  return progress.amber;
+}
+
+/**
+ * Weekly variant decay — prevents exploitation of variant amber bonuses
+ * by tracking per-variant usage per week.
+ */
+function getWeeklyVariantDecay(variantUsageThisWeek: number): number {
+  if (variantUsageThisWeek <= 3) return 1.0;
+  if (variantUsageThisWeek <= 6) return 0.85;
+  if (variantUsageThisWeek <= 10) return 0.65;
+  return 0.45;
+}
+
+/**
+ * Get the current ISO week identifier (e.g., "2026-W07").
+ */
+function getWeekId(): string {
+  const now = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const dayOfYear = Math.ceil((now.getTime() - jan1.getTime()) / (1000 * 60 * 60 * 24));
+  const weekNumber = Math.ceil((dayOfYear + jan1.getDay()) / 7);
+  return `${now.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
 }
 
 /**

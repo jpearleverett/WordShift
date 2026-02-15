@@ -167,7 +167,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </View>
         </TouchableOpacity>
 
-        {hasNonStandardVariants && (
+        {hasNonStandardVariants ? (
           <>
             <View style={[styles.challengeMenuDivider, isDark && {
               backgroundColor: phaseTheme.modalDividerColor,
@@ -202,6 +202,19 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </Text>
             )}
           </>
+        ) : (
+          <View style={[styles.variantUnlockHint, isDark && {
+            borderColor: phaseTheme.modalSecondaryTextColor + '40',
+          }]}>
+            <Text style={[
+              styles.variantUnlockHintText,
+              isDark && { color: phaseTheme.modalSecondaryTextColor },
+            ]}>
+              {phase >= 3
+                ? 'New arrangements reveal themselves as you progress deeper.'
+                : 'New puzzle styles unlock as you solve more puzzles.'}
+            </Text>
+          </View>
         )}
       </ScrollView>
     </View>
@@ -377,6 +390,24 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  variantUnlockHint: {
+    marginTop: 8,
+    marginHorizontal: 8,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: CandyColors.gray[300],
+  },
+  variantUnlockHintText: {
+    fontSize: 10,
+    color: CandyColors.gray[500],
+    lineHeight: 15,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   variantBadgeActive: {
     fontSize: 8,

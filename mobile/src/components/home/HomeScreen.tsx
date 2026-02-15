@@ -71,6 +71,7 @@ import {
   performSacrifice,
 } from '../../services/sacrifice';
 import { getGalleryTitle } from '../../services/whisperGallery';
+import { updateQuestProgress } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 
@@ -422,7 +423,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Header — simplified during onboarding */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.amberContainer}>
+          <View
+            style={styles.amberContainer}
+            accessibilityLabel={`${progress.amber} amber`}
+          >
             <View style={styles.amberInner}>
               <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
                 <Text style={styles.amberEmoji}>💎</Text>
@@ -1190,6 +1194,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       setProgress(prev => prev ? { ...prev, amber: spendResult.newBalance } : prev);
                       onAmberChange?.(spendResult.newBalance);
                       setSacrificeMessage(result.message);
+                      // Track sacrifice for weekly quest progress
+                      updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase).catch(() => {});
                     }}
                     accessibilityLabel={`Offer ${amount} amber`}
                     accessibilityRole="button"
