@@ -214,6 +214,10 @@ export interface HomeWorldProgress {
   sameVariantStreak?: number;
   // Difficulties completed at least once (for first-completion bonus)
   completedDifficulties?: string[];
+  // Per-variant weekly usage count for anti-farm decay
+  variantWeeklyUsage?: Record<string, number>;
+  // Week identifier for variant usage tracking reset
+  variantWeeklyUsageWeek?: string;
   // Streak freeze: number of streak freezes available
   streakFreezes?: number;
   // Last time a free streak freeze was granted (ISO date)

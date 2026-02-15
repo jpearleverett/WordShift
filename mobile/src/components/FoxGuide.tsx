@@ -13,7 +13,7 @@ import {
 import { CandyColors, getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Fox sprites with fallback
 let foxTalkSprite: ImageSourcePropType | null = null;
@@ -153,7 +153,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
 
   const isTop = position === 'top';
   const isMiddle = position === 'middle';
-  const resolvedPositionStyle = anchorStyle || (isTop ? styles.containerTop : isMiddle ? styles.containerMiddle : styles.containerBottom);
+  const resolvedPositionStyle = anchorStyle || (isTop ? { top: Math.max(80, SCREEN_HEIGHT * 0.12) } : isMiddle ? { top: Math.max(180, SCREEN_HEIGHT * 0.25) } : { bottom: Math.max(30, SCREEN_HEIGHT * 0.04) });
 
   // Dialogue theme for the dialogue variant (always Phase 0 during tutorial)
   const dt = getDialogueTheme(0);
@@ -260,6 +260,8 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       ]}
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
+      accessibilityRole="alert"
+      accessibilityLabel={`Ember says: ${text}`}
     >
       <View style={styles.guideCard}>
         {/* Fox sprite */}

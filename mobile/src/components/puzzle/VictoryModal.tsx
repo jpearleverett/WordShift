@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -85,6 +85,24 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 }) => {
   const phaseTheme = getPhaseTheme(phase);
 
+  // Cascade animation — 3 staggered content groups
+  const contentOpacity1 = useRef(new Animated.Value(0)).current;
+  const contentOpacity2 = useRef(new Animated.Value(0)).current;
+  const contentOpacity3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      contentOpacity1.setValue(0);
+      contentOpacity2.setValue(0);
+      contentOpacity3.setValue(0);
+      Animated.stagger(150, [
+        Animated.timing(contentOpacity1, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(contentOpacity2, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(contentOpacity3, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
   if (!visible) return null;
 
   return (
@@ -143,6 +161,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
+            {/* Group 1: Amber, streak, milestone */}
+            <Animated.View style={{ opacity: contentOpacity1 }}>
             {/* Amber earned */}
             {victoryData && (
               <View style={styles.amberEarnedContainer}>
@@ -223,7 +243,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {getVictoryFeedback(earnedStars, phase)}
             </Text>
+            </Animated.View>
 
+            {/* Group 2: Ritual echo chain */}
+            <Animated.View style={{ opacity: contentOpacity2 }}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
             {completedWords && completedWords.length > 0 && (
               <View style={[
@@ -288,7 +311,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 {getWordsOfferedText(victoryData.totalWordsFormed, phase)}
               </Text>
             )}
+            </Animated.View>
 
+            {/* Group 3: Stats and action buttons */}
+            <Animated.View style={{ opacity: contentOpacity3 }}>
             <View style={[styles.victoryStats, {
               backgroundColor: phaseTheme.modalStatBgColor,
             }]}>
@@ -353,6 +379,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
               </TouchableOpacity>
             </View>
+            </Animated.View>
           </Animated.View>
         </ScrollView>
       </View>

@@ -25,7 +25,9 @@ export type QuestType =
   | 'challenge_mode'    // Complete N puzzles in challenge mode
   | 'earn_amber'        // Earn N total amber this week
   | 'visit_animals'     // Talk to N different animals this week
-  | 'streak_days';      // Maintain a streak for N days
+  | 'streak_days'       // Maintain a streak for N days
+  | 'sacrifice_amber'   // Offer N amber to the arrangement (Phase 4+ only)
+  | 'daily_streak';     // Complete daily challenge N days in a row
 
 export interface Quest {
   id: string;
@@ -102,6 +104,13 @@ const QUEST_POOL: QuestTemplate[] = [
 
   // Streak consistency
   { type: 'streak_days', titleTemplate: 'Consistent', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Do not break the chain for {target} days', target: 3, rewardAmber: 35 },
+
+  // Daily streak
+  { type: 'daily_streak', titleTemplate: 'Daily Devotee', descTemplate: 'Complete daily challenges {target} days in a row', darkDescTemplate: 'The daily ritual observed for {target} consecutive days', target: 3, rewardAmber: 50 },
+
+  // Sacrifice (Phase 4+ only — these are filtered out for lower phases in generateQuests)
+  { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 50, rewardAmber: 40 },
+  { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 100, rewardAmber: 75 },
 ];
 
 // ============================================================================
@@ -143,8 +152,14 @@ function generateQuests(weekId: string, phase: number): Quest[] {
     return (seed >> 16) / 32768;
   };
 
+  // Filter pool by phase — sacrifice quests only available at Phase 4+
+  const phaseFiltered = QUEST_POOL.filter(t => {
+    if (t.type === 'sacrifice_amber' && phase < 4) return false;
+    return true;
+  });
+
   // Shuffle the pool deterministically
-  const shuffled = [...QUEST_POOL];
+  const shuffled = [...phaseFiltered];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(seededRandom() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
@@ -242,6 +257,10 @@ export async function updateQuestProgress(event: {
   animalsVisited?: number;
   /** Current streak length (for streak_days quests) */
   currentStreak?: number;
+  /** Current daily challenge streak (for daily_streak quests) */
+  dailyStreak?: number;
+  /** Amber sacrificed this session (for sacrifice_amber quests) */
+  amberSacrificed?: number;
 }, currentPhase: number = 0): Promise<Quest[]> {
   const state = await loadWeeklyQuests(currentPhase);
   if (!state.animalsVisitedThisWeek) {
@@ -289,6 +308,19 @@ export async function updateQuestProgress(event: {
           quest.progress = Math.min(event.currentStreak, quest.target);
         }
         progressDelta = 0; // Handled above via direct assignment
+        break;
+      case 'daily_streak':
+        // Set progress directly to current daily streak length
+        if (event.dailyStreak !== undefined) {
+          quest.progress = Math.min(event.dailyStreak, quest.target);
+        }
+        progressDelta = 0;
+        break;
+      case 'sacrifice_amber':
+        // Increment by amount sacrificed
+        if (event.amberSacrificed !== undefined && event.amberSacrificed > 0) {
+          progressDelta = event.amberSacrificed;
+        }
         break;
     }
 

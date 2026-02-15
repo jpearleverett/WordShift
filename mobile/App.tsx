@@ -35,7 +35,9 @@ import {
   setOnboardingStep,
   ONBOARDING_FOX_LINES,
 } from './src/services/onboarding';
-import { markTutorialSeedsPlanted } from './src/services/amberCurrency';
+import { markTutorialSeedsPlanted, awardBonusAmber } from './src/services/amberCurrency';
+import { checkDailyStreakMilestone, getDailyStatus } from './src/services/dailyChallenge';
+import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
@@ -288,6 +290,9 @@ export default function App() {
 
   // Dread pulse state (flashes on dread word formation)
   const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
+
+  // Screen shake for dread words at Phase 3+
+  const screenShakeRef = useRef(new Animated.Value(0)).current;
 
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
@@ -551,11 +556,30 @@ export default function App() {
 
       // Record daily challenge completion if applicable
       if (isPlayingDaily) {
+        const previousDailyStatus = await getDailyStatus();
+        const previousDailyStreak = previousDailyStatus.streak;
         await recordDailyCompletion(
           victory.earnedStars,
           result.hintsUsed,
           result.invalidAttempts
         );
+        const updatedDailyStatus = await getDailyStatus();
+
+        // Check for daily streak milestone
+        const dailyMilestone = checkDailyStreakMilestone(
+          updatedDailyStatus.streak,
+          previousDailyStreak,
+          persistence.currentPhase
+        );
+        if (dailyMilestone) {
+          await awardBonusAmber(dailyMilestone.amber, 'daily_streak_milestone');
+          setTimeout(() => {
+            puzzleActions.setMessage(`${dailyMilestone.message} (+${dailyMilestone.amber} amber)`);
+          }, 1200);
+        }
+
+        // Track daily_streak quest progress
+        updateQuestProgress({ dailyStreak: updatedDailyStatus.streak }, persistence.currentPhase).catch(() => {});
       }
 
       // Check for ritual micro-event on high-energy puzzles
@@ -905,6 +929,13 @@ export default function App() {
 
   // Trigger dread pulse when a dread word is formed during a puzzle
   const triggerDreadPulse = useCallback((phase: number) => {
+    // Haptic feedback on dread words
+    if (phase >= 3) {
+      hapticMedium();
+    } else if (phase >= 2) {
+      hapticLight();
+    }
+
     if (getSettingsSync().reducedMotion) return;
     const maxOpacity = phase >= 4 ? 0.25 : phase >= 3 ? 0.18 : 0.10;
     Animated.sequence([
@@ -919,7 +950,18 @@ export default function App() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [dreadPulseOpacity]);
+
+    // Screen shake on dread words at Phase 3+
+    if (phase >= 3) {
+      const intensity = phase >= 4 ? 4 : 2;
+      Animated.sequence([
+        Animated.timing(screenShakeRef, { toValue: intensity, duration: 50, useNativeDriver: true }),
+        Animated.timing(screenShakeRef, { toValue: -intensity, duration: 50, useNativeDriver: true }),
+        Animated.timing(screenShakeRef, { toValue: intensity * 0.5, duration: 50, useNativeDriver: true }),
+        Animated.timing(screenShakeRef, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [dreadPulseOpacity, screenShakeRef]);
 
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
@@ -1199,17 +1241,17 @@ export default function App() {
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
       <View style={styles.screenBackground}>
-      <Animated.View style={[styles.container, { opacity: screenFade }]}>
+      <Animated.View style={[styles.container, { opacity: screenFade, transform: [{ translateX: screenShakeRef }] }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* Animated Background — darkens with narrative phase */}
         <AnimatedBackground phase={persistence.currentPhase} />
 
         {/* Confetti celebration — colors shift with phase */}
-        <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} />
+        <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0} />
 
         {/* Star burst effect on valid moves */}
-        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} />
+        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} />
 
         {/* Phase change dramatic flash overlay */}
         <Animated.View
