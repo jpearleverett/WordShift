@@ -6,72 +6,16 @@ import {
   Animated,
   Easing,
   Image,
-  ImageSourcePropType,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
+import { OPTIONAL_CHARACTER_SPRITES, CharacterSpriteSet } from '../../assets/optionalAssets';
 
-// Character sprite assets - add more as they become available
-// Exported so dialogue modals can use talk sprites
-export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
-  idle: ImageSourcePropType;
-  talk?: ImageSourcePropType;
-  robed?: ImageSourcePropType;
-}>> = {
-  fox: {
-    idle: require('../../../assets/characters/fox/idle.png'),
-    talk: require('../../../assets/characters/fox/talk.png'),
-    robed: require('../../../assets/characters/fox/robed.png'),
-  },
-  pangolin: {
-    idle: require('../../../assets/characters/pangolin/idle.png'),
-    talk: require('../../../assets/characters/pangolin/talk.png'),
-    robed: require('../../../assets/characters/pangolin/robed.png'),
-  },
-  owl: {
-    idle: require('../../../assets/characters/owl/idle.png'),
-    talk: require('../../../assets/characters/owl/talk.png'),
-    robed: require('../../../assets/characters/owl/robed.png'),
-  },
-  axolotl: {
-    idle: require('../../../assets/characters/axolotl/idle.png'),
-    talk: require('../../../assets/characters/axolotl/talk.png'),
-    robed: require('../../../assets/characters/axolotl/robed.png'),
-  },
-  capybara: {
-    idle: require('../../../assets/characters/capybara/idle.png'),
-    talk: require('../../../assets/characters/capybara/talk.png'),
-    robed: require('../../../assets/characters/capybara/robed.png'),
-  },
-  fennec_fox: {
-    idle: require('../../../assets/characters/fennec_fox/idle.png'),
-    talk: require('../../../assets/characters/fennec_fox/talk.png'),
-    robed: require('../../../assets/characters/fennec_fox/robed.png'),
-  },
-  red_panda: {
-    idle: require('../../../assets/characters/red_panda/idle.png'),
-    talk: require('../../../assets/characters/red_panda/talk.png'),
-    robed: require('../../../assets/characters/red_panda/robed.png'),
-  },
-  sloth: {
-    idle: require('../../../assets/characters/sloth/idle.png'),
-    talk: require('../../../assets/characters/sloth/talk.png'),
-    robed: require('../../../assets/characters/sloth/robed.png'),
-  },
-  wombat: {
-    idle: require('../../../assets/characters/wombat/idle.png'),
-    talk: require('../../../assets/characters/wombat/talk.png'),
-    robed: require('../../../assets/characters/wombat/robed.png'),
-  },
-  rabbit: {
-    idle: require('../../../assets/characters/rabbit/idle.png'),
-    talk: require('../../../assets/characters/rabbit/talk.png'),
-    robed: require('../../../assets/characters/rabbit/robed.png'),
-  },
-};
+// Character sprite assets (optional) - falls back to emoji when unavailable.
+export const CHARACTER_SPRITES: Partial<Record<AnimalType, CharacterSpriteSet>> = OPTIONAL_CHARACTER_SPRITES;
 
 // Emotion bubble emojis based on phase
 const EMOTION_BUBBLES: Record<number, string[]> = {

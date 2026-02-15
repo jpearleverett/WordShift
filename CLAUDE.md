@@ -50,6 +50,27 @@ npx expo start --clear  # Clear cache and start
 npx jest --no-coverage   # Run all tests (760+ tests, 26 suites)
 ```
 
+## Recent Implementation Notes (2026-02)
+
+- **Phase secrecy reinforcement**: The puzzle header now uses an icon-only atmosphere badge (no textual phase labels) to keep progression implicit.
+- **Mid-session restore fidelity upgraded**:
+  - Autosave now persists the full active puzzle snapshot while playing (not just move-count checkpoints).
+  - `selectedLetter` is restored when valid, so players can return exactly where they left off.
+  - Daily saves store `dailyDate` and can resume same-day daily runs.
+- **Weekly quest wiring completed**:
+  - `recordVictory(...)` now passes `isDaily` through to quest progress updates.
+  - Animal conversations now record weekly unique animal visits via `recordAnimalVisit(...)` for `visit_animals` quests.
+- **Feedback polish upgrades**:
+  - Valid move `StarBurst` now appears at the tap location instead of screen-center fallback.
+  - Invalid drops trigger a micro-shake on the active target row for immediate spatial error feedback.
+  - Home actions gained broader haptic coverage (header actions, play, ledger/gallery/sacrifice, dialogue flow, unlock interactions).
+- **Loading-state polish**:
+  - App boot now shows a themed loading card instead of a blank dark frame.
+  - Home initial load and puzzle generation overlays include stronger visual context text.
+- **Asset robustness hardening**:
+  - Removed hardcoded PNG `require(...)` usage from core UI components.
+  - Added `src/assets/optionalAssets.ts` manifest so missing image bundles gracefully fall back to emoji/styled visuals instead of crashing.
+
 ## Tech Stack
 
 - **Framework**: React Native with Expo SDK 54
