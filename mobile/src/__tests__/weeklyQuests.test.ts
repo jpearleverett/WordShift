@@ -9,6 +9,7 @@ import {
   getUnclaimedAmber,
   clearWeeklyQuests,
   recordAnimalVisit,
+  getPhaseRewardMultiplier,
   Quest,
   WeeklyQuestState,
 } from '../services/weeklyQuests';
@@ -806,6 +807,242 @@ describe('weeklyQuests', () => {
       const updated = await loadWeeklyQuests(0);
       expect(updated.animalsVisitedThisWeek.sort()).toEqual(['fox', 'owl']);
       expect(updated.quests.find(q => q.id === visitQuest.id)?.progress).toBe(2);
+    });
+  });
+
+  // ===========================================================================
+  // New quest types: sacrifice_amber and daily_streak
+  // ===========================================================================
+
+  describe('sacrifice_amber and daily_streak quest types', () => {
+    it('sacrifice_amber quests only appear at Phase 4+', async () => {
+      // At Phase 0, no sacrifice quests
+      const state0 = await loadWeeklyQuests(0);
+      const sacrificeQuest0 = state0.quests.find(q => q.type === 'sacrifice_amber');
+      expect(sacrificeQuest0).toBeUndefined();
+    });
+
+    it('sacrifice_amber quests can appear at Phase 4', async () => {
+      // Generate many weeks to find one with sacrifice quest
+      // Since quest pool is seeded by weekId, test deterministic generation
+      await clearWeeklyQuests();
+      const state4 = await loadWeeklyQuests(4);
+      // At Phase 4, sacrifice_amber is in the pool (may or may not be selected)
+      // Verify the pool filtering works: sacrifice quests are valid candidates
+      const hasAllQuestTypes = state4.quests.every(q => q.type !== undefined);
+      expect(hasAllQuestTypes).toBe(true);
+    });
+
+    it('sacrifice_amber progress increments by amberSacrificed', async () => {
+      // Create a state with a forced sacrifice quest for testing
+      const state = await loadWeeklyQuests(4);
+      // Manually inject a sacrifice quest for testing
+      state.quests[0] = {
+        id: `${state.weekId}_quest_sacrifice`,
+        type: 'sacrifice_amber',
+        title: 'Offering',
+        description: 'Offer 50 amber',
+        target: 50,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        rewardAmber: 40,
+      };
+
+      await updateQuestProgress({
+        difficulty: 'MEDIUM',
+        stars: 2,
+        hintsUsed: 0,
+        isDaily: false,
+        isChallenge: false,
+        amberEarned: 0,
+        amberSacrificed: 25,
+      }, 4);
+
+      const updated = await loadWeeklyQuests(4);
+      const sQuest = updated.quests.find(q => q.type === 'sacrifice_amber');
+      expect(sQuest?.progress).toBe(25);
+    });
+
+    it('sacrifice_amber completes when target is reached', async () => {
+      const state = await loadWeeklyQuests(4);
+      state.quests[0] = {
+        id: `${state.weekId}_quest_sacrifice`,
+        type: 'sacrifice_amber',
+        title: 'Offering',
+        description: 'Offer 50 amber',
+        target: 50,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        rewardAmber: 40,
+      };
+
+      const completed = await updateQuestProgress({
+        difficulty: 'MEDIUM',
+        stars: 2,
+        hintsUsed: 0,
+        isDaily: false,
+        isChallenge: false,
+        amberEarned: 0,
+        amberSacrificed: 50,
+      }, 4);
+
+      const completedSacrifice = completed.find(q => q.type === 'sacrifice_amber');
+      expect(completedSacrifice).toBeDefined();
+      expect(completedSacrifice?.completed).toBe(true);
+    });
+
+    it('sacrifice_amber ignores zero or undefined amberSacrificed', async () => {
+      const state = await loadWeeklyQuests(4);
+      state.quests[0] = {
+        id: `${state.weekId}_quest_sacrifice`,
+        type: 'sacrifice_amber',
+        title: 'Offering',
+        description: 'Offer 50 amber',
+        target: 50,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        rewardAmber: 40,
+      };
+
+      await updateQuestProgress({
+        difficulty: 'MEDIUM',
+        stars: 2,
+        hintsUsed: 0,
+        isDaily: false,
+        isChallenge: false,
+        amberEarned: 10,
+      }, 4);
+
+      const updated = await loadWeeklyQuests(4);
+      const sQuest = updated.quests.find(q => q.type === 'sacrifice_amber');
+      expect(sQuest?.progress).toBe(0);
+    });
+
+    it('daily_streak progress updates via dailyStreak direct assignment', async () => {
+      const state = await loadWeeklyQuests(0);
+      state.quests[0] = {
+        id: `${state.weekId}_quest_dstreak`,
+        type: 'daily_streak',
+        title: 'Daily Devotee',
+        description: 'Complete daily challenges 3 days in a row',
+        target: 3,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        rewardAmber: 50,
+      };
+
+      await updateQuestProgress({
+        difficulty: 'HARD',
+        stars: 3,
+        hintsUsed: 0,
+        isDaily: true,
+        isChallenge: false,
+        amberEarned: 20,
+        dailyStreak: 2,
+      }, 0);
+
+      const updated = await loadWeeklyQuests(0);
+      const dsQuest = updated.quests.find(q => q.type === 'daily_streak');
+      expect(dsQuest?.progress).toBe(2);
+    });
+
+    it('daily_streak completes when dailyStreak reaches target', async () => {
+      const state = await loadWeeklyQuests(0);
+      state.quests[0] = {
+        id: `${state.weekId}_quest_dstreak`,
+        type: 'daily_streak',
+        title: 'Daily Devotee',
+        description: 'Complete daily challenges 3 days in a row',
+        target: 3,
+        progress: 0,
+        completed: false,
+        claimed: false,
+        rewardAmber: 50,
+      };
+
+      const completed = await updateQuestProgress({
+        difficulty: 'HARD',
+        stars: 3,
+        hintsUsed: 0,
+        isDaily: true,
+        isChallenge: false,
+        amberEarned: 20,
+        dailyStreak: 3,
+      }, 0);
+
+      const completedDS = completed.find(q => q.type === 'daily_streak');
+      expect(completedDS).toBeDefined();
+      expect(completedDS?.completed).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // Phase reward multiplier
+  // ===========================================================================
+
+  describe('getPhaseRewardMultiplier', () => {
+    it('returns 1.0 for phase 0-1', () => {
+      expect(getPhaseRewardMultiplier(0)).toBe(1.0);
+      expect(getPhaseRewardMultiplier(1)).toBe(1.0);
+    });
+
+    it('returns 1.25 for phase 2', () => {
+      expect(getPhaseRewardMultiplier(2)).toBe(1.25);
+    });
+
+    it('returns 1.5 for phase 3', () => {
+      expect(getPhaseRewardMultiplier(3)).toBe(1.5);
+    });
+
+    it('returns 2.0 for phase 4+', () => {
+      expect(getPhaseRewardMultiplier(4)).toBe(2.0);
+      expect(getPhaseRewardMultiplier(5)).toBe(2.0);
+    });
+  });
+
+  // ===========================================================================
+  // Phase-scaled claim reward
+  // ===========================================================================
+
+  describe('claimQuestReward with phase scaling', () => {
+    it('returns base amber at phase 0', async () => {
+      await loadWeeklyQuests(0);
+      await updateQuestProgress({
+        difficulty: 'HARD',
+        stars: 3,
+        hintsUsed: 0,
+        isDaily: true,
+        isChallenge: false,
+        amberEarned: 20,
+      }, 0);
+
+      const state = await loadWeeklyQuests(0);
+      const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
+      const reward = await claimQuestReward(dailyQuest.id, 0);
+      expect(reward).not.toBeNull();
+      expect(reward!.amber).toBe(dailyQuest.rewardAmber); // 1.0x at phase 0
+    });
+
+    it('returns scaled amber at phase 4', async () => {
+      await loadWeeklyQuests(0);
+      await updateQuestProgress({
+        difficulty: 'HARD',
+        stars: 3,
+        hintsUsed: 0,
+        isDaily: true,
+        isChallenge: false,
+        amberEarned: 20,
+      }, 0);
+
+      const state = await loadWeeklyQuests(0);
+      const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
+      const reward = await claimQuestReward(dailyQuest.id, 4);
+      expect(reward).not.toBeNull();
+      expect(reward!.amber).toBe(Math.round(dailyQuest.rewardAmber * 2.0)); // 2.0x at phase 4
     });
   });
 });

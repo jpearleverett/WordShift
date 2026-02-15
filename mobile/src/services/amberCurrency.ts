@@ -163,6 +163,7 @@ export const STREAK_MILESTONES: {
   { streak: 3, amber: 15, message: 'Three-day streak!' },
   { streak: 7, amber: 30, message: 'One-week streak!', darkMessage: 'Seven days. The pattern notices.' },
   { streak: 14, amber: 50, message: 'Two-week streak!', darkMessage: 'Fourteen days without breaking the chain.' },
+  { streak: 21, amber: 65, message: 'Three-week streak!', darkMessage: 'Twenty-one days. It recognizes your rhythm.' },
   { streak: 30, amber: 100, message: 'Thirty-day streak!', darkMessage: 'Thirty days. The arrangement is grateful.' },
 ];
 
@@ -970,6 +971,22 @@ function getVariantRepeatDecay(repeatCount: number): number {
 }
 
 /**
+ * Get a weekly diversity-aware decay for variant bonus.
+ * Tracks total usage of each variant this week (not just consecutive runs)
+ * to prevent exploitation via alternating patterns.
+ */
+function getWeeklyVariantDecay(variantUsageThisWeek: number): number {
+  // First 3 uses of any variant per week get full bonus
+  if (variantUsageThisWeek <= 3) return 1.0;
+  // Uses 4-6 get moderate decay
+  if (variantUsageThisWeek <= 6) return 0.85;
+  // Uses 7-10 get stronger decay
+  if (variantUsageThisWeek <= 10) return 0.65;
+  // 11+ uses per week get heavy decay
+  return 0.45;
+}
+
+/**
  * Apply variant bonus amber with anti-farming decay on repeated use.
  * Returns updated balance and the actual applied multiplier.
  */
@@ -1005,7 +1022,27 @@ export async function applyVariantAmberBonus(
   const repeatCount = progress.lastVariantPlayed === variant
     ? (progress.sameVariantStreak || 0) + 1
     : 1;
-  const repeatDecay = getVariantRepeatDecay(repeatCount);
+  const consecutiveDecay = getVariantRepeatDecay(repeatCount);
+
+  // Weekly usage tracking — prevents alternating exploit
+  if (!progress.variantWeeklyUsage) progress.variantWeeklyUsage = {};
+  if (!progress.variantWeeklyUsageWeek) progress.variantWeeklyUsageWeek = '';
+  const now = new Date();
+  const dayOfWeek = now.getDay() || 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (dayOfWeek - 1));
+  const currentWeekKey = monday.toISOString().split('T')[0];
+  // Reset weekly counters if new week
+  if (progress.variantWeeklyUsageWeek !== currentWeekKey) {
+    progress.variantWeeklyUsage = {};
+    progress.variantWeeklyUsageWeek = currentWeekKey;
+  }
+  const weeklyUsage = (progress.variantWeeklyUsage[variant] || 0) + 1;
+  progress.variantWeeklyUsage[variant] = weeklyUsage;
+  const weeklyDecay = getWeeklyVariantDecay(weeklyUsage);
+
+  // Apply the stricter of the two decays
+  const repeatDecay = Math.min(consecutiveDecay, weeklyDecay);
   const appliedMultiplier = 1 + ((configuredMultiplier - 1) * repeatDecay);
   const bonus = Math.max(0, Math.round(baseAmberAward * (appliedMultiplier - 1)));
 
@@ -1198,6 +1235,25 @@ export async function markFoxPlayNudgeSeen(): Promise<void> {
   } catch {
     // Non-critical
   }
+}
+
+/**
+ * Award bonus amber from a non-puzzle source (e.g., daily streak milestone, quest reward).
+ * Records a proper transaction and returns the new balance.
+ */
+export async function awardBonusAmber(amount: number, source: string): Promise<number> {
+  const progress = await loadProgress();
+  progress.amber += amount;
+  progress.totalAmberEarned += amount;
+  progressCache = progress;
+  await saveProgress();
+  await recordTransaction({
+    amount,
+    type: 'earn',
+    source,
+    timestamp: Date.now(),
+  });
+  return progress.amber;
 }
 
 /**

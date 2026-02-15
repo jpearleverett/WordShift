@@ -485,12 +485,24 @@ describe('checkStreakMilestone', () => {
     expect(result30_p4!.message).toBe('Thirty days. The arrangement is grateful.');
   });
 
+  test('21-day milestone fires correctly', () => {
+    const result = checkStreakMilestone(21, 20, 0 as any);
+    expect(result).not.toBeNull();
+    expect(result!.amber).toBe(65);
+    expect(result!.message).toBe('Three-week streak!');
+  });
+
+  test('21-day milestone uses dark message at phase 2+', () => {
+    const result = checkStreakMilestone(21, 20, 3 as any);
+    expect(result!.message).toBe('Twenty-one days. It recognizes your rhythm.');
+  });
+
   test('3-day milestone has no dark message (returns normal at any phase)', () => {
     const result = checkStreakMilestone(3, 2, 4 as any);
     expect(result!.message).toBe('Three-day streak!');
   });
 
-  test('STREAK_MILESTONES has 4 entries', () => {
-    expect(STREAK_MILESTONES).toHaveLength(4);
+  test('STREAK_MILESTONES has 5 entries', () => {
+    expect(STREAK_MILESTONES).toHaveLength(5);
   });
 });

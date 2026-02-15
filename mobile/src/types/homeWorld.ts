@@ -218,6 +218,10 @@ export interface HomeWorldProgress {
   streakFreezes?: number;
   // Last time a free streak freeze was granted (ISO date)
   lastFreeStreakFreezeDate?: string;
+  // Weekly variant usage tracking for anti-farm decay
+  variantWeeklyUsage?: Record<string, number>;
+  // Which week the variant usage counts belong to (ISO Monday date)
+  variantWeeklyUsageWeek?: string;
 }
 
 /**

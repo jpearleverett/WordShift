@@ -39,7 +39,7 @@ import { markTutorialSeedsPlanted } from './src/services/amberCurrency';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
-import { recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
+import { recordDailyCompletion, getTodayString, generateDailyPuzzle, checkDailyStreakMilestone, getDailyStatus } from './src/services/dailyChallenge';
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
@@ -53,8 +53,9 @@ import {
   NarrativeMicroBeat,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
-import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress } from './src/services/amberCurrency';
+import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress, awardBonusAmber } from './src/services/amberCurrency';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
+import { updateQuestProgress as updateWeeklyQuest } from './src/services/weeklyQuests';
 import { getAnimalWhisper, getAnimalInterjection, getHomescreenNudge } from './src/services/phaseNarrative';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
@@ -288,6 +289,8 @@ export default function App() {
 
   // Dread pulse state (flashes on dread word formation)
   const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
+  // Screen shake for dread words at Phase 3+
+  const screenShakeRef = useRef(new Animated.Value(0));
 
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
@@ -551,11 +554,37 @@ export default function App() {
 
       // Record daily challenge completion if applicable
       if (isPlayingDaily) {
+        const dailyStatusBefore = await getDailyStatus();
+        const previousDailyStreak = dailyStatusBefore.streak;
         await recordDailyCompletion(
           victory.earnedStars,
           result.hintsUsed,
           result.invalidAttempts
         );
+        // Check for daily streak milestone
+        const dailyStatusAfter = await getDailyStatus();
+        const dailyMilestone = checkDailyStreakMilestone(
+          dailyStatusAfter.streak,
+          previousDailyStreak,
+          persistence.currentPhase
+        );
+        if (dailyMilestone) {
+          const newBalance = await awardBonusAmber(dailyMilestone.amber, 'daily_streak_milestone');
+          persistenceActions.setAmberBalance(newBalance);
+          setTimeout(() => {
+            puzzleActions.setMessage(`${dailyMilestone.message} (+${dailyMilestone.amber} amber)`);
+          }, 1200);
+        }
+        // Update daily_streak quest progress
+        updateWeeklyQuest({
+          difficulty: result.difficulty || 'HARD',
+          stars: victory.earnedStars,
+          hintsUsed: result.hintsUsed,
+          isDaily: true,
+          isChallenge: false,
+          amberEarned: 0,
+          dailyStreak: dailyStatusAfter.streak,
+        }, persistence.currentPhase).catch(() => {});
       }
 
       // Check for ritual micro-event on high-energy puzzles
@@ -907,6 +936,9 @@ export default function App() {
   const triggerDreadPulse = useCallback((phase: number) => {
     if (getSettingsSync().reducedMotion) return;
     const maxOpacity = phase >= 4 ? 0.25 : phase >= 3 ? 0.18 : 0.10;
+    // Haptic rumble on dread word formation
+    if (phase >= 3) hapticMedium();
+    else hapticLight();
     Animated.sequence([
       Animated.timing(dreadPulseOpacity, {
         toValue: maxOpacity,
@@ -919,6 +951,16 @@ export default function App() {
         useNativeDriver: true,
       }),
     ]).start();
+    // Screen shake at Phase 3+ — brief horizontal jitter
+    if (phase >= 3 && screenShakeRef.current) {
+      const intensity = phase >= 4 ? 4 : 2;
+      Animated.sequence([
+        Animated.timing(screenShakeRef.current, { toValue: intensity, duration: 50, useNativeDriver: true }),
+        Animated.timing(screenShakeRef.current, { toValue: -intensity, duration: 50, useNativeDriver: true }),
+        Animated.timing(screenShakeRef.current, { toValue: intensity * 0.5, duration: 50, useNativeDriver: true }),
+        Animated.timing(screenShakeRef.current, { toValue: 0, duration: 50, useNativeDriver: true }),
+      ]).start();
+    }
   }, [dreadPulseOpacity]);
 
   const handleToggleChallengeMode = useCallback(() => {
@@ -1199,17 +1241,17 @@ export default function App() {
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
       <View style={styles.screenBackground}>
-      <Animated.View style={[styles.container, { opacity: screenFade }]}>
+      <Animated.View style={[styles.container, { opacity: screenFade, transform: [{ translateX: screenShakeRef.current }] }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* Animated Background — darkens with narrative phase */}
         <AnimatedBackground phase={persistence.currentPhase} />
 
         {/* Confetti celebration — colors shift with phase */}
-        <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} />
+        <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0} />
 
-        {/* Star burst effect on valid moves */}
-        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} />
+        {/* Star burst effect on valid moves — colors shift with phase */}
+        <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} />
 
         {/* Phase change dramatic flash overlay */}
         <Animated.View

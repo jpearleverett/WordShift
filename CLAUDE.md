@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (760+ tests, 26 suites)
+npx jest --no-coverage   # Run all tests (810+ tests, 27 suites)
 ```
 
 ## Recent Implementation Notes (2026-02)
@@ -70,6 +70,21 @@ npx jest --no-coverage   # Run all tests (760+ tests, 26 suites)
 - **Asset robustness hardening**:
   - Removed hardcoded PNG `require(...)` usage from core UI components.
   - Added `src/assets/optionalAssets.ts` manifest so missing image bundles gracefully fall back to emoji/styled visuals instead of crashing.
+- **Quality assessment enhancements** (assessment-driven 10/10 push):
+  - **Tightened star ratings**: 3 stars now requires 0-1 mistakes (was 0-2); creates more meaningful challenge tension.
+  - **Phase-aware StarBurst**: Valid move particles shift gold → amber → purple → crimson across phases.
+  - **Ritual energy confetti density**: High-energy puzzles spawn +20-40% more confetti pieces.
+  - **Victory cascade animation**: Modal content reveals in 3 staggered groups (150ms apart).
+  - **Phase transition skip button**: Top-right skip with `hasSkipped` guard; reduced motion scales timing by 0.4x.
+  - **Screen shake on dread words**: Phase 3+ horizontal jitter (2-4px) when dread words are formed.
+  - **Daily streak milestones**: Amber rewards at 3/7/14/21/30 consecutive daily completions (15-100 amber).
+  - **New weekly quests**: `sacrifice_amber` (Phase 4+ only) and `daily_streak` quest types added.
+  - **Phase-scaled quest rewards**: Quest amber multiplied by 1.0-2.0x based on narrative phase.
+  - **21-day game streak milestone**: 65 amber bonus for 3-week consecutive play streak.
+  - **Variant anti-farm weekly decay**: Per-variant weekly usage tracking prevents alternating exploit.
+  - **awardBonusAmber()**: General-purpose amber credit function with transaction recording.
+  - **Accessibility**: FoxGuide adaptive positioning, amber counter a11y labels, variant unlock hints.
+  - **Dread word haptics**: hapticMedium at Phase 3+, hapticLight at Phase 2 on dread word formation.
 
 ## Tech Stack
 
@@ -172,7 +187,7 @@ mobile/
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (760+ tests, 26 suites)
+├── src/__tests__/               # Test suites (810+ tests, 27 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -500,7 +515,7 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 - Streak multiplier: 10% per day (max 100%, requires MIN_STREAK_FOR_BONUS=2)
 - **Streak grace period**: Players can miss up to STREAK_RESET_DAYS (2) days
 - **Streak freeze**: Purchasable for 50 amber (or free once every 14 days). Consumed automatically to prevent streak reset on a missed day. Functions: `purchaseStreakFreeze()`, `getStreakFreezeCount()`, `checkFreeStreakFreeze()` in `amberCurrency.ts`
-- **Streak milestone rewards**: Tangible amber bonuses at streak milestones — 3 days (15 amber), 7 days (30), 14 days (50), 30 days (100). Phase 2+ uses dark messages (e.g., "Thirty days. The arrangement is grateful."). `checkStreakMilestone(currentStreak, previousStreak, phase)` in `amberCurrency.ts`. Toast displayed in victory flow.
+- **Streak milestone rewards**: Tangible amber bonuses at streak milestones — 3 days (15 amber), 7 days (30), 14 days (50), 21 days (65), 30 days (100). Phase 2+ uses dark messages (e.g., "Thirty days. The arrangement is grateful."). `checkStreakMilestone(currentStreak, previousStreak, phase)` in `amberCurrency.ts`. Toast displayed in victory flow.
 - Milestone bonuses at key puzzle counts (10, 15, 25, 50... up to 350)
 
 ### Animal Characters
@@ -805,10 +820,10 @@ Key functions:
 
 Grades puzzle performance without time pressure:
 
-**Star Thresholds (generous, reward exploration):**
-- **3 stars (PERFECT!)**: 0 hints, 0-2 invalid attempts
-- **2 stars (GREAT!)**: 1 hint OR 3-4 invalid attempts
-- **1 star (WELL DONE!)**: 2+ hints OR 5+ invalid attempts
+**Star Thresholds (tightened for better tension):**
+- **3 stars (PERFECT!)**: 0 hints, 0-1 invalid attempts
+- **2 stars (GREAT!)**: 1 hint OR 2-3 invalid attempts
+- **1 star (WELL DONE!)**: 2+ hints OR 4+ invalid attempts
 
 **Victory feedback shifts with narrative phase** — always positive at Phase 0, increasingly hollow/questioning at higher phases. See `phaseNarrative.ts` for the full text progression.
 
@@ -998,7 +1013,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 760+ tests, 26 suites
+cd mobile && npx jest --no-coverage  # 810+ tests, 27 suites
 ```
 
 **Test patterns:**
@@ -1168,6 +1183,94 @@ Adjusted costs to remove the retention cliff at puzzles 100-150:
 - Garden: 400 → **300** amber
 - New milestone bonus at puzzle 125: **100 amber** ("Halfway to mastery!")
 
+### Daily Streak Milestones (`dailyChallenge.ts`)
+
+Separate from main game streak, tracks consecutive daily challenge completions:
+- `DAILY_STREAK_MILESTONES`: 3 days (15 amber), 7 days (30), 14 days (50), 21 days (75), 30 days (100)
+- `checkDailyStreakMilestone(currentStreak, previousStreak, phase)` — returns milestone or null
+- Phase 3+ uses dark messages (e.g., "Seven days. The ritual deepens.")
+- **Wired in**: App.tsx checks after `recordDailyCompletion`, awards bonus amber via `awardBonusAmber()`, displays toast message
+
+### Phase-Aware StarBurst Colors (`Confetti.tsx`)
+
+StarBurst (valid move celebration) now shifts color with narrative phase:
+- Phase 0: Gold (#FFD700) — bright celebration
+- Phase 1: Amber (#F0C050) — slightly warm
+- Phase 2: Purple (#B088D0) — muted
+- Phase 3: Deep Purple (#9050B0) — shadowy
+- Phase 4: Crimson (#C03050) — ritual red
+- Defined in `STAR_BURST_COLORS` map; `phase` prop passed from App.tsx
+
+### Ritual Energy Confetti Density (`Confetti.tsx`)
+
+Confetti particle count scales with puzzle ritual energy:
+- `ritualEnergy >= 7`: +40% more confetti pieces
+- `ritualEnergy >= 4`: +20% more confetti pieces
+- Base count from `getMaxConfettiCount()` (device-tier aware)
+- `ritualEnergy` prop passed from `victoryFlow.victoryData?.ritualEnergy` in App.tsx
+
+### Victory Modal Cascade Animation (`VictoryModal.tsx`)
+
+Victory modal content now reveals in 3 staggered groups:
+- Group 1 (0ms): Amber earned, streak bonus, milestone
+- Group 2 (150ms): Ritual echo chain
+- Group 3 (300ms): Stats and action buttons
+- Each group fades in over 300ms using `Animated.stagger`
+
+### Phase Transition Skip Button (`PhaseTransitionOverlay.tsx`)
+
+Phase transition cinematics now include a skip button:
+- Positioned top-right, styled with phase accent color at 50% opacity
+- `hasSkipped` ref prevents double-skip
+- Skipping clears all pending timers and calls `onComplete()` immediately
+- Reduced motion timing scaled by 0.4x (not just skipping animations)
+
+### Screen Shake on Dread Words (`App.tsx`)
+
+At Phase 3+, forming a dread word triggers a brief screen shake:
+- Phase 3: 2px horizontal jitter (4 keyframes, 200ms total)
+- Phase 4: 4px horizontal jitter (more intense)
+- Uses `screenShakeRef` Animated.Value applied to main container's `translateX`
+- Combined with existing dread pulse (crimson overlay) and haptic feedback
+- Respects `reducedMotion` setting (skipped entirely)
+
+### Variant Anti-Farm Weekly Decay (`amberCurrency.ts`)
+
+Prevents exploitation of variant amber bonuses via weekly tracking:
+- `getWeeklyVariantDecay(usageCount)`: 1-3 uses = 1.0x, 4-6 = 0.85x, 7-10 = 0.65x, 11+ = 0.45x
+- Tracks per-variant usage per week via `variantWeeklyUsage` on HomeWorldProgress
+- `applyVariantAmberBonus` applies the stricter of consecutive decay vs weekly decay
+- Resets every Monday (same cadence as weekly quests)
+
+### New Weekly Quest Types (`weeklyQuests.ts`)
+
+Two new quest types added to the weekly quest pool:
+- **`sacrifice_amber`**: "Offer N amber to the arrangement" (targets: 50/100 amber, rewards: 40/75 amber). Phase 4+ only — filtered out of quest generation at lower phases.
+- **`daily_streak`**: "Complete daily challenges N days in a row" (target: 3 days, reward: 50 amber). Uses direct assignment via `dailyStreak` field on event object.
+- `updateQuestProgress` extended with `dailyStreak` and `amberSacrificed` optional params
+- **Wired in**: HomeScreen sacrifice flow calls `updateQuestProgress({ amberSacrificed: amount })` after each sacrifice. App.tsx calls `updateQuestProgress({ dailyStreak: streak })` after daily completion.
+
+### Phase-Scaled Quest Rewards (`weeklyQuests.ts`)
+
+Quest reward amber scales with narrative phase to maintain quest relevance:
+- `getPhaseRewardMultiplier(phase)`: Phase 0-1 = 1.0x, Phase 2 = 1.25x, Phase 3 = 1.5x, Phase 4+ = 2.0x
+- Applied in `claimQuestReward()` when player claims completed quest
+- `getUnclaimedAmber()` also applies phase multiplier for accurate display
+
+### Bonus Amber Award Function (`amberCurrency.ts`)
+
+New general-purpose function for non-puzzle amber rewards:
+- `awardBonusAmber(amount, source)` — credits amber, records transaction, returns new balance
+- Used for daily streak milestone rewards (source: `'daily_streak_milestone'`)
+- Records a proper `AmberTransaction` with earn type for audit trail
+
+### Accessibility Improvements
+
+- **FoxGuide**: Adaptive percentage-based positioning instead of hardcoded pixel values; `accessibilityRole="alert"` and descriptive `accessibilityLabel`
+- **Home screen amber display**: `accessibilityLabel` showing current amber count
+- **DifficultyMenu**: Variant unlock hint with dashed border container when no variants unlocked yet; phase-aware hint text
+- **Sacrifice buttons**: Individual `accessibilityLabel` per amount option
+
 ## Common Tasks
 
 ### Adding new word categories
@@ -1184,7 +1287,7 @@ Edit constants at top of `wordHistory.ts`:
 
 ### Adjusting star rating thresholds
 Edit `calculateStars()` function in `starRating.ts`:
-- Current: 3 stars = 0 hints + 0-2 mistakes, 2 stars = 1 hint OR 3-4 mistakes, 1 star = rest
+- Current: 3 stars = 0 hints + 0-1 mistakes, 2 stars = 1 hint OR 2-3 mistakes, 1 star = rest
 
 ### UI adjustments
 - Tile sizes/styling: `LetterTile.tsx` styles; standard tiles 52x64, compact tiles 42x52 (activated when `wordLength >= 6`)
