@@ -7,17 +7,27 @@ import {
   Animated,
   Easing,
   Image,
+  ImageSourcePropType,
   Dimensions,
 } from 'react-native';
 import { CandyColors, getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
-import { OPTIONAL_FOX_GUIDE_SPRITES } from '../assets/optionalAssets';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Fox sprites with fallback
-const foxTalkSprite = OPTIONAL_FOX_GUIDE_SPRITES.talk ?? null;
-const foxIdleSprite = OPTIONAL_FOX_GUIDE_SPRITES.idle ?? null;
+let foxTalkSprite: ImageSourcePropType | null = null;
+let foxIdleSprite: ImageSourcePropType | null = null;
+try {
+  foxTalkSprite = require('../../assets/characters/fox/talk.png');
+} catch {
+  foxTalkSprite = null;
+}
+try {
+  foxIdleSprite = require('../../assets/characters/fox/idle.png');
+} catch {
+  foxIdleSprite = null;
+}
 
 interface FoxGuideProps {
   /** Whether the guide is visible */

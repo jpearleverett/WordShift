@@ -37,8 +37,6 @@ import { getSettingsSync } from '../services/settings';
 import { getChoiceForAnimal, recordChoice, PlayerChoice, DialogueChoice } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
 import { getFoxPostTutorialPlayPrompt } from '../services/phaseNarrative';
-import { recordAnimalVisit } from '../services/weeklyQuests';
-import { hapticLight, hapticSelection } from '../services/haptics';
 
 interface SessionInfo {
   status: 'available' | 'in_session' | 'cooldown';
@@ -235,12 +233,6 @@ export function useDialogueFlow({
       return;
     }
 
-    hapticSelection();
-
-    if (progress) {
-      recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak).catch(() => {});
-    }
-
     setSelectedAnimal(animal);
     setShowDialogue(true);
 
@@ -432,7 +424,6 @@ export function useDialogueFlow({
 
   // Handle closing dialogue (and ending session)
   const handleCloseDialogue = useCallback(async () => {
-    hapticLight();
     const closingAnimal = selectedAnimal;
     if (closingAnimal) {
       await endSession(closingAnimal.id);
@@ -454,7 +445,6 @@ export function useDialogueFlow({
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
     if (!selectedAnimal || !progress) return;
-    hapticSelection();
 
     // If still showing pre-dialogue pages, advance through them
     // Pre-dialogue pages don't count toward session dialogue limits
@@ -548,7 +538,6 @@ export function useDialogueFlow({
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
     if (!selectedAnimal || !activeChoice) return;
-    hapticSelection();
     try {
       const result = await recordChoice(selectedAnimal.type, choice);
       // Replace the current pre-dialogue page with the response, then convergence

@@ -37,8 +37,6 @@ export interface SavedPuzzleState {
   currentPhase: DialoguePhase;
   lastFormedWord: string | null;
   isPlayingDaily: boolean;
-  /** Date for daily challenge saves (YYYY-MM-DD). Null for standard puzzles. */
-  dailyDate?: string | null;
   savedAt: number;
 }
 

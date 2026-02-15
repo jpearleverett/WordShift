@@ -182,12 +182,6 @@ jest.mock('../services/eventLogger', () => ({
   logEvent: (...args: any[]) => mockLogEvent(args[0]),
 }));
 
-// --- Mock weekly quests ---
-const mockUpdateQuestProgress = jest.fn(async (_event?: any, _phase?: any) => []);
-jest.mock('../services/weeklyQuests', () => ({
-  updateQuestProgress: (...args: any[]) => mockUpdateQuestProgress(args[0], args[1]),
-}));
-
 import { useGamePersistence, VictoryData, PersistenceState, PersistenceActions } from '../hooks/useGamePersistence';
 
 function callHook(): [PersistenceState, PersistenceActions] {
@@ -233,7 +227,6 @@ describe('useGamePersistence', () => {
       repeatCount: 1,
       repeatDecay: 1.0,
     });
-    mockUpdateQuestProgress.mockResolvedValue([]);
   });
 
   describe('initial state', () => {
@@ -401,16 +394,6 @@ describe('useGamePersistence', () => {
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
         'MEDIUM', 3, 'standard', expect.any(Number)
-      );
-    });
-
-    test('passes isDaily=true to weekly quest updates for daily runs', async () => {
-      const [, actions] = callHook();
-      await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'standard', true);
-
-      expect(mockUpdateQuestProgress).toHaveBeenCalledWith(
-        expect.objectContaining({ isDaily: true }),
-        expect.any(Number)
       );
     });
 

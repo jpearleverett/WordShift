@@ -4,16 +4,27 @@ import {
   Text,
   StyleSheet,
   Image,
+  ImageSourcePropType,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
-import { OPTIONAL_ROOM_BACKGROUNDS } from '../../assets/optionalAssets';
 
-// Room background images are optional; fallback visuals render when absent.
-const ROOM_BACKGROUNDS = OPTIONAL_ROOM_BACKGROUNDS;
+// Room background images - maps theme to image asset
+const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
+  cozy_den: require('../../../assets/rooms/cozy_den.png'),
+  kitchen: require('../../../assets/rooms/kitchen.png'),
+  study: require('../../../assets/rooms/study.png'),
+  aquarium: require('../../../assets/rooms/aquarium.png'),
+  jungle: require('../../../assets/rooms/jungle.png'),
+  desert: require('../../../assets/rooms/desert.png'),
+  office: require('../../../assets/rooms/office.png'),
+  burrow: require('../../../assets/rooms/burrow.png'),
+  garden: require('../../../assets/rooms/garden.png'),
+  bamboo: require('../../../assets/rooms/bamboo.png'),
+};
 
 // Word echo configuration by phase (ritual words inscribed in rooms)
 const WORD_ECHO_CONFIG: Record<number, { count: number; opacity: number; fontSize: number; color: string }> = {
@@ -30,19 +41,6 @@ const WORD_ECHO_POSITIONS = [
   { top: '68%', left: '12%', rotate: '15deg' },
   { top: '30%', left: '55%', rotate: '-8deg' },
 ];
-
-const ROOM_FALLBACK_EMOJIS: Record<RoomTheme, string> = {
-  cozy_den: '🔥',
-  kitchen: '🍲',
-  study: '📚',
-  aquarium: '🌊',
-  jungle: '🌿',
-  desert: '🏜️',
-  office: '💼',
-  burrow: '🪨',
-  garden: '🌸',
-  bamboo: '🎋',
-};
 
 interface RoomViewProps {
   room: Room;
@@ -74,7 +72,6 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   inviteCost = null,
 }) => {
   const themeColors = ROOM_THEME_COLORS[room.theme];
-  const roomBackground = ROOM_BACKGROUNDS[room.theme];
 
   if (!room.isUnlocked) {
     // Locked room appearance
@@ -124,18 +121,12 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         },
       ]}
     >
-      {/* Room background image (optional) */}
-      {roomBackground ? (
-        <Image
-          source={roomBackground}
-          style={styles.backgroundImage}
-          resizeMode="cover"
-        />
-      ) : (
-        <View style={[styles.fallbackBackground, { backgroundColor: themeColors.bg }]}>
-          <Text style={styles.fallbackEmoji}>{ROOM_FALLBACK_EMOJIS[room.theme]}</Text>
-        </View>
-      )}
+      {/* Room background image */}
+      <Image
+        source={ROOM_BACKGROUNDS[room.theme]}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
 
       {/* Room frame */}
       <View style={[styles.frame, { borderColor: themeColors.accent }]} />
@@ -236,17 +227,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 8,
-  },
-  fallbackBackground: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
-    paddingRight: 14,
-    paddingBottom: 10,
-  },
-  fallbackEmoji: {
-    fontSize: 18,
-    opacity: 0.35,
   },
   frame: {
     position: 'absolute',
