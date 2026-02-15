@@ -47,6 +47,8 @@ interface RowProps {
   guidedSlotIndex?: number | null;
   /** Incrementing signal from parent to trigger target-row invalid shake */
   invalidDropSignal?: number;
+  /** Incrementing signal from parent to trigger target-row success bounce */
+  successDropSignal?: number;
   /** Word previews for each slot position (only on target row when letter is selected) */
   slotPreviews?: SlotPreview[];
 }
@@ -127,12 +129,15 @@ const Slot: React.FC<{
   phase?: number;
   isGuided?: boolean;
   preview?: SlotPreview;
-}> = ({ onPress, index, compact = false, phase = 0, isGuided = false, preview }) => {
+  /** Incremented when a letter successfully lands in this slot (triggers catch bounce) */
+  triggerCatch?: number;
+}> = ({ onPress, index, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const catchBounceAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (settings.reducedMotion) {
@@ -153,7 +158,7 @@ const Slot: React.FC<{
 
     // Skip decorative loops on low-end devices
     if (shouldSimplifyAnimations()) {
-      return () => { scaleAnim.stopAnimation(); };
+      return () => { scaleAnim.stopAnimation(); catchBounceAnim.stopAnimation(); };
     }
 
     // Continuous pulse
@@ -202,6 +207,19 @@ const Slot: React.FC<{
       glowAnim.stopAnimation();
     };
   }, []);
+
+  // Catch bounce when a letter lands
+  useEffect(() => {
+    if (triggerCatch > 0 && !settings.reducedMotion) {
+      catchBounceAnim.setValue(1.2);
+      Animated.spring(catchBounceAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [triggerCatch]);
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],
@@ -252,7 +270,7 @@ const Slot: React.FC<{
           styles.slotOuter,
           {
             transform: [
-              { scale: Animated.multiply(scaleAnim, pulseScale) },
+              { scale: Animated.multiply(Animated.multiply(scaleAnim, pulseScale), catchBounceAnim) },
             ],
           },
         ]}
@@ -320,6 +338,7 @@ const Slot: React.FC<{
             <Text
               style={[
                 styles.slotPreviewText,
+                compact && styles.slotPreviewTextCompact,
                 preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid,
               ]}
               numberOfLines={1}
@@ -349,6 +368,7 @@ export const Row: React.FC<RowProps> = memo(({
   guidedLetterId = null,
   guidedSlotIndex = null,
   invalidDropSignal = 0,
+  successDropSignal = 0,
   slotPreviews,
 }) => {
   const compactTiles = wordLength >= 6;
@@ -373,6 +393,7 @@ export const Row: React.FC<RowProps> = memo(({
   const slideAnim = useRef(new Animated.Value(0)).current;
   const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
   const invalidShakeX = useRef(new Animated.Value(0)).current;
+  const successBounceScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Animate row transitions
@@ -498,6 +519,18 @@ export const Row: React.FC<RowProps> = memo(({
       Animated.timing(invalidShakeX, { toValue: 0, duration: 35, useNativeDriver: true }),
     ]).start();
   }, [invalidDropSignal, isTarget, invalidShakeX]);
+
+  // Brief scale bounce on the target row when a letter successfully lands.
+  useEffect(() => {
+    if (!isTarget || successDropSignal <= 0 || getSettingsSync().reducedMotion) return;
+    successBounceScale.setValue(1.08);
+    Animated.spring(successBounceScale, {
+      toValue: 1,
+      friction: 5,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [successDropSignal, isTarget, successBounceScale]);
 
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
@@ -633,7 +666,7 @@ export const Row: React.FC<RowProps> = memo(({
         styles.rowWrapper,
         {
           transform: [
-            { scale: scaleAnim },
+            { scale: Animated.multiply(scaleAnim, successBounceScale) },
             { translateX: invalidShakeX },
             { translateY: slideAnim },
           ],
@@ -1021,16 +1054,19 @@ const styles = StyleSheet.create({
   },
   slotPreviewContainer: {
     position: 'absolute',
-    bottom: -14,
+    bottom: -16,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 50,
+    width: 56,
   },
   slotPreviewText: {
-    fontSize: 7,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  slotPreviewTextCompact: {
+    fontSize: 8,
   },
   slotPreviewValid: {
     color: CandyColors.green.main,

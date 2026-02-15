@@ -75,6 +75,14 @@ export const ACHIEVEMENTS: Achievement[] = [
     check: (s) => s.stats.totalPuzzlesCompleted >= 25,
   },
   {
+    id: 'puzzle_35',
+    title: 'Pattern Seeker',
+    description: 'Complete 35 puzzles',
+    icon: '🔍',
+    category: 'puzzle',
+    check: (s) => s.stats.totalPuzzlesCompleted >= 35,
+  },
+  {
     id: 'puzzle_50',
     title: 'Puzzle Addict',
     description: 'Complete 50 puzzles',

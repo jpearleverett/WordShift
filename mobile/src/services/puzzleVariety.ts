@@ -252,9 +252,9 @@ const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
 };
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
-  reverse: { puzzlesSolved: 12, minDepthPhase: 0, group: 'base' },
-  blind: { puzzlesSolved: 22, minDepthPhase: 0, group: 'base' },
-  no_vowel: { puzzlesSolved: 38, minDepthPhase: 0, group: 'base' },
+  reverse: { puzzlesSolved: 10, minDepthPhase: 0, group: 'base' },
+  blind: { puzzlesSolved: 18, minDepthPhase: 0, group: 'base' },
+  no_vowel: { puzzlesSolved: 30, minDepthPhase: 0, group: 'base' },
   speed: { puzzlesSolved: 52, minDepthPhase: 0, group: 'base' },
   no_consonant: { puzzlesSolved: 68, minDepthPhase: 0, group: 'base' },
   chain: { puzzlesSolved: 85, minDepthPhase: 0, group: 'base' },

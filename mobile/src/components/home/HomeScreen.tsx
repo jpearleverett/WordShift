@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -411,8 +411,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
   }
 
+  const isStreakAtRisk = useMemo(() => {
+    if (!progress.currentStreak || progress.currentStreak <= 0) return false;
+    const last = progress.lastPlayDate;
+    if (!last) return false;
+    const today = new Date().toISOString().split('T')[0];
+    if (last === today) return false;
+    const lastDate = new Date(last);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 1;
+  }, [progress.currentStreak, progress.lastPlayDate]);
+
   const phaseBgColor = {
-    0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a',
+    0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',
   }[progress.currentPhase] || '#6fb7df';
 
   // Phase-aware dialogue theme for all modals and dialogue boxes
@@ -435,6 +447,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {!isOnboarding && <AmberSparkle />}
             </View>
           </View>
+          {progress.currentStreak > 0 && (
+            <View
+              style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
+              accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
+            >
+              <Text style={styles.streakBadgeEmoji}>{'\uD83D\uDD25'}</Text>
+              <Text style={[styles.streakBadgeCount, isStreakAtRisk && styles.streakAtRiskCount]}>
+                {progress.currentStreak}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.headerRight}>
@@ -1378,6 +1401,32 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontSize: 16,
     fontWeight: '800',
+  },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,165,0,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 2,
+    marginTop: 6,
+  },
+  streakAtRiskBadge: {
+    backgroundColor: 'rgba(255,60,60,0.20)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,60,60,0.4)',
+  },
+  streakBadgeEmoji: {
+    fontSize: 14,
+  },
+  streakBadgeCount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FF8C00',
+  },
+  streakAtRiskCount: {
+    color: '#FF3C3C',
   },
   headerRight: {
     flexDirection: 'row',

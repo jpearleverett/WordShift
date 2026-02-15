@@ -31,8 +31,8 @@ export function getVictoryGlitch(phase: number, puzzlesSolved: number): string |
   if (phase !== 0) return null;
   // First victory always gets a brief glitch
   if (puzzlesSolved === 1) return VICTORY_GLITCH_TEXTS[0];
-  // ~8% chance on subsequent Phase 0 victories
-  if (Math.random() < 0.08) {
+  // ~3% chance on subsequent Phase 0 victories (subtle, not bug-like)
+  if (Math.random() < 0.03) {
     return VICTORY_GLITCH_TEXTS[Math.floor(Math.random() * VICTORY_GLITCH_TEXTS.length)];
   }
   return null;
