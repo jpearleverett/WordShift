@@ -397,6 +397,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return introDialogueIndex + 1 < total;
   };
 
+  const isStreakAtRisk = useMemo(() => {
+    if (!progress || !progress.currentStreak || progress.currentStreak <= 0) return false;
+    const last = progress.lastPlayDate;
+    if (!last) return false;
+    const today = new Date().toISOString().split('T')[0];
+    if (last === today) return false;
+    const lastDate = new Date(last);
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 1;
+  }, [progress?.currentStreak, progress?.lastPlayDate]);
+
   if (!progress || rooms.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -410,18 +422,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       </View>
     );
   }
-
-  const isStreakAtRisk = useMemo(() => {
-    if (!progress.currentStreak || progress.currentStreak <= 0) return false;
-    const last = progress.lastPlayDate;
-    if (!last) return false;
-    const today = new Date().toISOString().split('T')[0];
-    if (last === today) return false;
-    const lastDate = new Date(last);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays >= 1;
-  }, [progress.currentStreak, progress.lastPlayDate]);
 
   const phaseBgColor = {
     0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',
