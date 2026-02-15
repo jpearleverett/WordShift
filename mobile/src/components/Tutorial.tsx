@@ -14,12 +14,12 @@ import {
   Easing,
   Dimensions,
   Image,
-  ImageSourcePropType,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CandyColors, getTileColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { markTutorialSeedsPlanted } from '../services/amberCurrency';
+import { OPTIONAL_FOX_GUIDE_SPRITES } from '../assets/optionalAssets';
 
 const TUTORIAL_KEY = 'wordshift_tutorial_completed';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -58,12 +58,7 @@ export async function resetTutorial(): Promise<void> {
 // Fox character — uses talk sprite if available, emoji fallback
 // ============================================================================
 
-let foxTalkSprite: ImageSourcePropType | null = null;
-try {
-  foxTalkSprite = require('../../assets/characters/fox/talk.png');
-} catch {
-  foxTalkSprite = null;
-}
+const foxTalkSprite = OPTIONAL_FOX_GUIDE_SPRITES.talk ?? null;
 
 const FoxCharacter: React.FC<{ size?: number; speaking?: boolean }> = ({ size = 80, speaking = false }) => {
   const bounceAnim = useRef(new Animated.Value(0)).current;
