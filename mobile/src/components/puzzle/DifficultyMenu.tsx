@@ -89,7 +89,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   };
 
   return (
-    <View style={[styles.difficultyMenu, isDark && {
+    <View style={[styles.difficultyMenu, !hasNonStandardVariants && styles.difficultyMenuCompact, isDark && {
       backgroundColor: phaseTheme.modalBgColor,
       shadowColor: '#000',
     }]}>
@@ -225,6 +225,9 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
     zIndex: 200,
+  },
+  difficultyMenuCompact: {
+    width: 200,
   },
   menuTitle: {
     fontSize: 12,
