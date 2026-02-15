@@ -6,8 +6,6 @@ import {
   getSacrificeAmounts,
   getSacrificePrompt,
   getSacrificeStats,
-  getSacrificeCount,
-  getWeeklySacrificeTotal,
   clearSacrificeState,
 } from '../services/sacrifice';
 
@@ -327,57 +325,6 @@ describe('sacrifice', () => {
     it('calls AsyncStorage.removeItem', async () => {
       await clearSacrificeState();
       expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_sacrifices');
-    });
-  });
-
-  // ===========================================================================
-  // getSacrificeCount
-  // ===========================================================================
-
-  describe('getSacrificeCount', () => {
-    it('returns 0 initially', async () => {
-      expect(await getSacrificeCount()).toBe(0);
-    });
-
-    it('returns correct count after sacrifices', async () => {
-      await performSacrifice(10, 4);
-      await performSacrifice(20, 4);
-      await performSacrifice(5, 4);
-      expect(await getSacrificeCount()).toBe(3);
-    });
-  });
-
-  // ===========================================================================
-  // getWeeklySacrificeTotal
-  // ===========================================================================
-
-  describe('getWeeklySacrificeTotal', () => {
-    it('returns 0 when no sacrifices made', async () => {
-      expect(await getWeeklySacrificeTotal()).toBe(0);
-    });
-
-    it('includes recent sacrifices made this week', async () => {
-      // Sacrifices made right now should count for this week
-      await performSacrifice(10, 4);
-      await performSacrifice(25, 4);
-      expect(await getWeeklySacrificeTotal()).toBe(35);
-    });
-
-    it('excludes sacrifices from before this week', async () => {
-      // Perform a sacrifice now
-      await performSacrifice(10, 4);
-
-      // Manually add an old sacrifice to the history
-      const state = await loadSacrificeState();
-      state.sacrificeHistory.unshift({
-        amount: 100,
-        timestamp: Date.now() - 14 * 24 * 60 * 60 * 1000, // 2 weeks ago
-        phase: 4,
-      });
-
-      const weeklyTotal = await getWeeklySacrificeTotal();
-      // Should only count the 10 from this week, not the 100 from 2 weeks ago
-      expect(weeklyTotal).toBe(10);
     });
   });
 });

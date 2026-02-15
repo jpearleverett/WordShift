@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
@@ -43,28 +43,11 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const sceneOpacity = useRef(new Animated.Value(0)).current;
   const sceneTranslateY = useRef(new Animated.Value(20)).current;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const hasSkipped = useRef(false);
-
-  /** Skip the cinematic and immediately complete */
-  const handleSkip = useCallback(() => {
-    if (hasSkipped.current) return;
-    hasSkipped.current = true;
-    // Clear all pending timers
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
-    // Fade out quickly and complete
-    overlayOpacity.setValue(0);
-    sceneOpacity.setValue(0);
-    onComplete();
-  }, [onComplete, overlayOpacity, sceneOpacity]);
 
   useEffect(() => {
     if (!event) return;
-    hasSkipped.current = false;
 
     const reducedMotion = getSettingsSync().reducedMotion;
-    // With reduced motion, scale down all timing by 60% to reduce wait without animations
-    const timeScale = reducedMotion ? 0.4 : 1.0;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     // Fade in overlay
@@ -85,10 +68,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
 
     // Schedule each scene
     event.scenes.forEach((scene, index) => {
-      const showDelay = Math.round((scene.delay + 600) * timeScale);
-      const sceneDur = Math.round(scene.duration * timeScale);
       const showTimer = setTimeout(() => {
-        if (hasSkipped.current) return;
         setActiveSceneIndex(index);
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
@@ -114,9 +94,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         }
 
         // Fade out scene before next one
-        const fadeOutDelay = Math.max(sceneDur - 300, 100);
         const fadeOutTimer = setTimeout(() => {
-          if (hasSkipped.current) return;
           if (reducedMotion) {
             sceneOpacity.setValue(0);
           } else {
@@ -126,17 +104,16 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
               useNativeDriver: true,
             }).start();
           }
-        }, fadeOutDelay);
+        }, scene.duration - 300);
         timers.push(fadeOutTimer);
-      }, showDelay);
+      }, scene.delay + 600); // +600 for initial overlay fade-in
       timers.push(showTimer);
     });
 
     // Complete after all scenes finish
     const lastScene = event.scenes[event.scenes.length - 1];
-    const totalDuration = Math.round((lastScene.delay + lastScene.duration + 600 + 500) * timeScale);
+    const totalDuration = lastScene.delay + lastScene.duration + 600 + 500;
     const completeTimer = setTimeout(() => {
-      if (hasSkipped.current) return;
       if (reducedMotion) {
         overlayOpacity.setValue(0);
         onComplete();
@@ -211,19 +188,6 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           />
         ))}
       </View>
-
-      {/* Skip button */}
-      <TouchableOpacity
-        style={styles.skipButton}
-        onPress={handleSkip}
-        accessibilityLabel="Skip cinematic"
-        accessibilityRole="button"
-        activeOpacity={0.6}
-      >
-        <Text style={[styles.skipText, { color: event.accentColor + '80' }]}>
-          Skip
-        </Text>
-      </TouchableOpacity>
     </Animated.View>
   );
 };
@@ -270,17 +234,5 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-  },
-  skipButton: {
-    position: 'absolute',
-    top: 50,
-    right: 24,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  skipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 1,
   },
 });
