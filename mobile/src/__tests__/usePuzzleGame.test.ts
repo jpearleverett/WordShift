@@ -97,10 +97,22 @@ jest.mock('../constants', () => ({
     'IME', 'LIED', 'LED', 'LET', 'TILE', 'MILE',
     'MET', 'TEN', 'TEND', 'DENT', 'NET',
     // Fallback puzzles
-    'STORE', 'ROUTE', 'VOTER', 'COVET', 'VOICE',
+    'SUIT', 'SITE', 'WHAT', 'HERE', 'SCRAP', 'THERE', 'LATER', 'TIMES', 'THEIR',
+    // Curated puzzle words
+    'GLOW', 'ABLE', 'EACH',
   ]),
-  FALLBACK_PUZZLE: ['LIME', 'TIME', 'TIED', 'TEND'],
-  FALLBACK_PUZZLE_HARD: ['STORE', 'ROUTE', 'VOTER', 'COVET', 'VOICE'],
+  CURATED_EARLY_PUZZLES: [
+    { words: ['GLOW', 'ABLE', 'EACH'], solution: [
+      { stepIndex: 0, sourceWord: 'GLOW', targetWord: 'ABLE', letterToMove: 'G', explanation: '' },
+      { stepIndex: 1, sourceWord: 'ABLE', targetWord: 'EACH', letterToMove: 'B', explanation: '' },
+    ] },
+  ],
+  CURATED_PUZZLE_COUNT: 1,
+  getRandomFallback: (difficulty: string) => {
+    if (difficulty === 'HARD') return ['SCRAP', 'THERE', 'LATER', 'TIMES', 'THEIR'];
+    if (difficulty === 'EASY') return ['SUIT', 'SITE', 'WHAT'];
+    return ['SUIT', 'SITE', 'WHAT', 'HERE'];
+  },
 }));
 
 import { usePuzzleGame, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
