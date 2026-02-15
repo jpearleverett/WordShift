@@ -189,6 +189,38 @@ export function getHintFallback(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// INVALID WORD MESSAGES — Phase-aware feedback when a word isn't valid
+// ============================================================================
+
+const INVALID_WORD_MESSAGES: Record<DialoguePhase, (word: string) => string> = {
+  0: (word) => `"${word}" isn't a word! Try again.`,
+  1: (word) => `"${word}" doesn't quite work. Try another spot.`,
+  2: (word) => `The pattern doesn't accept "${word}".`,
+  3: (word) => `The arrangement rejects "${word}".`,
+  4: (word) => `"${word}" dissolves into nothing.`,
+};
+
+export function getInvalidWordMessage(word: string, phase: DialoguePhase): string {
+  return INVALID_WORD_MESSAGES[phase](word);
+}
+
+// ============================================================================
+// LOCKED LETTER MESSAGES — Phase-aware feedback for locked letters
+// ============================================================================
+
+const LOCKED_LETTER_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'That letter is locked!',
+  1: 'That letter is settled in place.',
+  2: 'That letter won\'t move.',
+  3: 'That letter has been claimed.',
+  4: 'It belongs to the arrangement now.',
+};
+
+export function getLockedLetterMessage(phase: DialoguePhase): string {
+  return LOCKED_LETTER_MESSAGES[phase];
+}
+
+// ============================================================================
 // LOADING MESSAGES — What shows during puzzle generation
 // ============================================================================
 
@@ -774,4 +806,106 @@ export function getAnimalInterjection(
   const text = template.replace(/\{name\}/g, animalName);
 
   return { animalName, text };
+}
+
+// ============================================================================
+// NARRATIVE MICRO-BEATS — Break the Phase 1-2 retention valley
+// Small surprise moments at specific puzzle milestones that create
+// "water cooler" discussion without breaking the gradual narrative arc.
+// ============================================================================
+
+export interface NarrativeMicroBeat {
+  /** Type of micro-beat effect */
+  type: 'glitch_title' | 'ambient_whisper' | 'color_shift';
+  /** Text to display (if applicable) */
+  text?: string;
+  /** Replacement title that briefly flashes then corrects (glitch_title only) */
+  glitchTitle?: string;
+  /** Duration of the effect in ms */
+  durationMs: number;
+}
+
+/**
+ * Micro-beats keyed by exact puzzle count. Each fires exactly once.
+ * These are subtle moments of wrongness during the long Phase 1-2 corridor:
+ *
+ * - Puzzle 35: Victory title briefly shows wrong text then corrects itself
+ * - Puzzle 50: A whisper appears unbidden on the home screen
+ * - Puzzle 65: The victory feedback text contains an anomaly
+ * - Puzzle 100: A brief ambient whisper during puzzle solving
+ */
+const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
+  35: {
+    type: 'glitch_title',
+    glitchTitle: 'WE REMEMBER',
+    text: 'PERFECT!',
+    durationMs: 400,
+  },
+  50: {
+    type: 'ambient_whisper',
+    text: 'The light is changing. Have you noticed?',
+    durationMs: 3000,
+  },
+  65: {
+    type: 'ambient_whisper',
+    text: 'The words you\'ve formed... they remember each other.',
+    durationMs: 3000,
+  },
+  100: {
+    type: 'ambient_whisper',
+    text: 'One hundred arrangements. The house hums.',
+    durationMs: 3500,
+  },
+};
+
+/** AsyncStorage key for tracking consumed micro-beats */
+const MICRO_BEATS_SEEN_KEY = 'wordshift_micro_beats_seen';
+
+let microBeatsSeen: Set<number> | null = null;
+
+async function loadMicroBeatsSeen(): Promise<Set<number>> {
+  if (microBeatsSeen) return microBeatsSeen;
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    const raw = await AsyncStorage.getItem(MICRO_BEATS_SEEN_KEY);
+    microBeatsSeen = raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    microBeatsSeen = new Set();
+  }
+  return microBeatsSeen;
+}
+
+async function markMicroBeatSeen(puzzleCount: number): Promise<void> {
+  const seen = await loadMicroBeatsSeen();
+  seen.add(puzzleCount);
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.setItem(MICRO_BEATS_SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    // Silently fail — non-critical
+  }
+}
+
+/**
+ * Check if a narrative micro-beat should fire at this puzzle count.
+ * Returns the beat config (and marks it as consumed) or null.
+ */
+export async function checkNarrativeMicroBeat(
+  puzzlesSolved: number,
+): Promise<NarrativeMicroBeat | null> {
+  const beat = MICRO_BEATS[puzzlesSolved];
+  if (!beat) return null;
+
+  const seen = await loadMicroBeatsSeen();
+  if (seen.has(puzzlesSolved)) return null;
+
+  await markMicroBeatSeen(puzzlesSolved);
+  return beat;
+}
+
+/**
+ * Reset micro-beats tracking (for Reset All Data).
+ */
+export function resetMicroBeats(): void {
+  microBeatsSeen = null;
 }

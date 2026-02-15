@@ -62,8 +62,8 @@ describe('puzzleVariety', () => {
   });
 
   describe('shouldOfferVariant', () => {
-    it('does not offer variants before puzzle 18', () => {
-      for (let i = 0; i < 18; i++) {
+    it('does not offer variants before puzzle 12', () => {
+      for (let i = 0; i < 12; i++) {
         expect(shouldOfferVariant(i, 0)).toBeNull();
       }
     });
@@ -86,10 +86,10 @@ describe('puzzleVariety', () => {
       expect(['reverse', 'blind', 'no_vowel']).toContain(shouldOfferVariant(50, 0)!.variant);
 
       Math.random = () => 0.75;
-      expect(['reverse', 'blind', 'no_vowel', 'speed']).toContain(shouldOfferVariant(70, 0)!.variant);
+      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant']).toContain(shouldOfferVariant(70, 0)!.variant);
 
       Math.random = () => 0.9;
-      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant']).toContain(
+      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant', 'chain']).toContain(
         shouldOfferVariant(90, 0)!.variant
       );
 
@@ -202,9 +202,9 @@ describe('puzzleVariety', () => {
 
     it('exposes unlock requirements and unlocked checks', () => {
       expect(getVariantUnlockRequirement('standard')).toBeNull();
-      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(18);
-      expect(isVariantUnlocked('reverse', 17, 0)).toBe(false);
-      expect(isVariantUnlocked('reverse', 18, 0)).toBe(true);
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(12);
+      expect(isVariantUnlocked('reverse', 11, 0)).toBe(false);
+      expect(isVariantUnlocked('reverse', 12, 0)).toBe(true);
       expect(isVariantUnlocked('reverse_blind', 120, 1)).toBe(false);
       expect(isVariantUnlocked('reverse_blind', 120, 2)).toBe(true);
     });

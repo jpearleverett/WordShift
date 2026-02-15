@@ -49,8 +49,8 @@ describe('getAmberBalance', () => {
 describe('awardPuzzleAmber', () => {
   test('awards base amount for EASY 1-star', async () => {
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.baseAmount).toBe(5);
-    expect(result.amount).toBeGreaterThanOrEqual(5);
+    expect(result.baseAmount).toBe(8); // EASY base = 8
+    expect(result.amount).toBeGreaterThanOrEqual(8);
     expect(result.newBalance).toBeGreaterThan(0);
   });
 

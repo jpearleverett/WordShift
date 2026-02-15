@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { generateLocalPuzzle, getIncantationName } from '../services/localGenerator';
-import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS } from '../constants';
+import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage } from '../services/phaseNarrative';
-import { getPreferredPuzzleVariant, setPreferredPuzzleVariant } from '../services/amberCurrency';
+import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
+import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress } from '../services/amberCurrency';
 import {
   getVariantOverrides,
   getVariantChainLength,
@@ -63,6 +63,8 @@ export interface PuzzleGameState {
   currentChainLink: number;
   /** Total links required for chain variants */
   chainLength: number;
+  /** Word previews for each slot position in the target row (when letter is selected) */
+  slotPreviews?: Array<{ word: string; isValid: boolean }>;
 }
 
 export interface PuzzleGameActions {
@@ -342,6 +344,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentVariant(variant);
 
     try {
+      // Serve curated early-game puzzles for the first few solves
+      // These are hand-picked to showcase interesting letter moves
+      const progress = await getFullProgress();
+      const puzzlesSolved = progress?.puzzlesSolved ?? 0;
+      if (
+        puzzlesSolved < CURATED_PUZZLE_COUNT &&
+        (selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM') &&
+        variant === 'standard' &&
+        effectiveMode === 'standard'
+      ) {
+        const curatedWords = CURATED_EARLY_PUZZLES[puzzlesSolved];
+        initGame(curatedWords, undefined, undefined, curatedWords[0].length, 'standard', 0);
+        setMessage(getStartMessage(currentPhase));
+        return;
+      }
+
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Generation timeout')), 4000)
       );
@@ -403,7 +421,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameState !== GameState.PLAYING) return;
     if (rowIndex !== activeRowIndex) return;
     if (letter.isLocked) {
-      shakeError("That letter is locked!");
+      shakeError(getLockedLetterMessage(currentPhase));
       return;
     }
 
@@ -510,7 +528,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const isSourceValid = checkValidation(sourceWordStr);
     if (!isSourceValid) {
-      shakeError(`"${sourceWordStr}" isn't a word!`);
+      shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return null;
@@ -518,7 +536,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const isTargetValid = checkValidation(targetWordStr);
     if (!isTargetValid) {
-      shakeError(`"${targetWordStr}" isn't a word!`);
+      shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
       setIsProcessing(false);
       return null;
@@ -756,6 +774,31 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     startNewGame();
   }, [startNewGame]);
 
+  // Compute word previews for the target row when a letter is selected.
+  // Shows what word would form at each slot position — valid words in green, invalid in red.
+  const slotPreviews = useMemo(() => {
+    if (!selectedLetter || gameState !== GameState.PLAYING) return undefined;
+    const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
+    if (targetRowIndex < 0 || targetRowIndex >= rows.length) return undefined;
+
+    const targetLetters = rows[targetRowIndex].words.map(l => l.char);
+    const previews: Array<{ word: string; isValid: boolean }> = [];
+
+    // For each possible insertion position (0 through targetLetters.length)
+    for (let i = 0; i <= targetLetters.length; i++) {
+      const newWord = [
+        ...targetLetters.slice(0, i),
+        selectedLetter.char,
+        ...targetLetters.slice(i),
+      ].join('');
+      previews.push({
+        word: newWord,
+        isValid: validWordsCache.current.has(newWord),
+      });
+    }
+    return previews;
+  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState]);
+
   const state: PuzzleGameState = {
     rows,
     activeRowIndex,
@@ -788,6 +831,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     blindRevealedRows,
     currentChainLink,
     chainLength,
+    slotPreviews,
   };
 
   const actions: PuzzleGameActions = {
