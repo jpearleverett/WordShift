@@ -906,6 +906,12 @@ export async function checkNarrativeMicroBeat(
 /**
  * Reset micro-beats tracking (for Reset All Data).
  */
-export function resetMicroBeats(): void {
+export async function resetMicroBeats(): Promise<void> {
   microBeatsSeen = null;
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.removeItem(MICRO_BEATS_SEEN_KEY);
+  } catch {
+    // Silently fail — non-critical
+  }
 }

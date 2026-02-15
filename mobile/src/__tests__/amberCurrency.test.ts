@@ -20,7 +20,12 @@ import {
   markDailyChallengeIntroSeen,
   hasSeenFoxPlayNudge,
   markFoxPlayNudgeSeen,
+  purchaseStreakFreeze,
+  getStreakFreezeCount,
+  checkFreeStreakFreeze,
+  STREAK_FREEZE_AMBER_COST,
 } from '../services/amberCurrency';
+import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 beforeEach(async () => {
@@ -281,6 +286,122 @@ describe('intro tracking', () => {
     await markIntroSeen('fox');
     expect(await hasSeenIntro('fox')).toBe(true);
     expect(await hasSeenIntro('owl')).toBe(false);
+  });
+});
+
+// ============================================================================
+// First-Completion Bonus (B4)
+// ============================================================================
+
+describe('first-completion bonus', () => {
+  test('awards bonus on first EASY completion', async () => {
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.firstCompletionBonus).toBe(FIRST_COMPLETION_BONUS.EASY);
+    expect(result.newBalance).toBe(result.amount + FIRST_COMPLETION_BONUS.EASY);
+  });
+
+  test('does not award bonus on second EASY completion', async () => {
+    await awardPuzzleAmber('EASY', 1);
+    const result2 = await awardPuzzleAmber('EASY', 1);
+    expect(result2.firstCompletionBonus).toBe(0);
+  });
+
+  test('awards bonus separately for each difficulty', async () => {
+    const easy = await awardPuzzleAmber('EASY', 1);
+    expect(easy.firstCompletionBonus).toBe(FIRST_COMPLETION_BONUS.EASY);
+
+    const medium = await awardPuzzleAmber('MEDIUM', 1);
+    expect(medium.firstCompletionBonus).toBe(FIRST_COMPLETION_BONUS.MEDIUM);
+
+    const hard = await awardPuzzleAmber('HARD', 1);
+    expect(hard.firstCompletionBonus).toBe(FIRST_COMPLETION_BONUS.HARD);
+  });
+
+  test('tracks completed difficulties in progress', async () => {
+    await awardPuzzleAmber('EASY', 1);
+    await awardPuzzleAmber('MEDIUM', 1);
+
+    const progress = await loadProgress();
+    expect(progress.completedDifficulties).toContain('EASY');
+    expect(progress.completedDifficulties).toContain('MEDIUM');
+    expect(progress.completedDifficulties).not.toContain('HARD');
+  });
+
+  test('bonus persists across clear/reload cycle', async () => {
+    await awardPuzzleAmber('EASY', 1);
+    // Second call should still not get bonus (persisted)
+    const result2 = await awardPuzzleAmber('EASY', 1);
+    expect(result2.firstCompletionBonus).toBe(0);
+  });
+});
+
+// ============================================================================
+// Streak Freeze (C2)
+// ============================================================================
+
+describe('streak freeze', () => {
+  test('purchaseStreakFreeze deducts amber and increments count', async () => {
+    await devAddAmber(100);
+    const success = await purchaseStreakFreeze();
+    expect(success).toBe(true);
+
+    const balance = await getAmberBalance();
+    expect(balance).toBe(100 - STREAK_FREEZE_AMBER_COST);
+
+    const count = await getStreakFreezeCount();
+    expect(count).toBe(1);
+  });
+
+  test('purchaseStreakFreeze fails with insufficient amber', async () => {
+    await devAddAmber(10); // Less than cost (50)
+    const success = await purchaseStreakFreeze();
+    expect(success).toBe(false);
+
+    const count = await getStreakFreezeCount();
+    expect(count).toBe(0);
+
+    // Balance unchanged
+    const balance = await getAmberBalance();
+    expect(balance).toBe(10);
+  });
+
+  test('multiple freezes can be purchased and stacked', async () => {
+    await devAddAmber(200);
+    await purchaseStreakFreeze();
+    await purchaseStreakFreeze();
+    await purchaseStreakFreeze();
+
+    const count = await getStreakFreezeCount();
+    expect(count).toBe(3);
+
+    const balance = await getAmberBalance();
+    expect(balance).toBe(200 - 3 * STREAK_FREEZE_AMBER_COST);
+  });
+
+  test('checkFreeStreakFreeze grants one free freeze on first call', async () => {
+    const granted = await checkFreeStreakFreeze();
+    expect(granted).toBe(true);
+
+    const count = await getStreakFreezeCount();
+    expect(count).toBe(1);
+  });
+
+  test('checkFreeStreakFreeze does not grant again within 14 days', async () => {
+    await checkFreeStreakFreeze();
+    const granted = await checkFreeStreakFreeze();
+    expect(granted).toBe(false);
+
+    const count = await getStreakFreezeCount();
+    expect(count).toBe(1); // Still just 1
+  });
+
+  test('getStreakFreezeCount returns 0 initially', async () => {
+    const count = await getStreakFreezeCount();
+    expect(count).toBe(0);
+  });
+
+  test('STREAK_FREEZE_AMBER_COST is 50', () => {
+    expect(STREAK_FREEZE_AMBER_COST).toBe(50);
   });
 });
 
