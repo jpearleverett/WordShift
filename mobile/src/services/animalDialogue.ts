@@ -82,12 +82,12 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_0_2', text: "Grew back my whole left leg last month. Just sat there and watched it come in like a little pink flower blooming. Being me is WILD.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_3', text: "Look at my gills today! Extra frilly, extra feathery, extra everything. I feel like I'm wearing a fancy collar to a party I threw for myself.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_4', text: "Best thing about never growing up? Every single day feels like the first day of summer vacation and the last day never comes.", phase: 0, animalType: 'axolotl' },
-  { id: 'ax_0_5', text: "Bubbles are the most underrated thing in the world. They float up, they catch the light, they go pop. That's a whole life right there and it's beautiful.", phase: 0, animalType: 'axolotl' },
+  { id: 'ax_0_5', text: "Sometimes I just float in the middle of my tank and look at the ceiling. The light makes patterns on the water. It's the quietest kind of beautiful.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_6', text: "Did you know 'axolotl' means 'water monster' in the old language? Pretty adorable for a monster, right? I try to live up to the name. Blub!", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_7', text: "Waved at a fish today. Waited a full minute for a wave back. Nothing. Fish are absolutely terrible conversationalists, just awful.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_8', text: "I could live fifteen years! That's basically forever in water-time. I've got plans for every single one of them. Mostly floating-related plans.", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_9', text: "Tried the surface once. Way too dry, way too much gravity, way too much of everything not being water. Came right back home.", phase: 0, animalType: 'axolotl' },
-  { id: 'ax_0_10', text: "Favorite activity: floating. Second favorite: floating but slightly to the left. I'm a creature of simple and excellent taste.", phase: 0, animalType: 'axolotl' },
+  { id: 'ax_0_10', text: "You know what I like about you? You always come back. Some visitors just pass through, but you — you're different. In a good way!", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_11', text: "People say I always look happy — it's partly just my face, the way it's shaped, but also yeah, I really am! Can't help it!", phase: 0, animalType: 'axolotl' },
   { id: 'ax_0_12', text: "Under UV light I glow pink and sparkly, like nature decided I needed to be a party trick AND a pet. I'm not complaining one bit.", phase: 0, animalType: 'axolotl' },
 
@@ -437,13 +437,13 @@ const OWL_DIALOGUES: Dialogue[] = [
   { id: 'ow_0_12', text: "Knowledge shared is knowledge doubled. So do visit often — you're doing my research a tremendous favor.", phase: 0, animalType: 'owl' },
 
   // Phase 1 - The unknown grows (14 dialogues)
-  { id: 'ow_1_1', text: "I found a chapter today between two pages I've read a hundred times. It wasn't there before. I'm quite certain of that.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_1', text: "Have you noticed the rooms changing? The dimensions feel... different than when they were first built. Perhaps it's just my imagination.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_2', text: "The more I read, the more I realize the unknown is growing faster than my knowledge. Rather disconcerting, that.", phase: 1, animalType: 'owl' },
-  { id: 'ow_1_3', text: "Two books on my shelf directly contradict each other. Both impeccably sourced. Both, I fear, are correct.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_3', text: "Pangolin mentioned something peculiar yesterday. Something about the food tasting different. Capybara said the same about the numbers. Unrelated, surely.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_4', text: "Ember mentioned the fire forming letter-shapes last night. I found the same phenomenon described in a text from the sixteenth century.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_5', text: "There's a word that keeps appearing across different texts. Different authors, different centuries. The same word, precisely placed.", phase: 1, animalType: 'owl' },
-  { id: 'ow_1_6', text: "I counted my books again this morning. There are more than yesterday. I did not acquire any new ones. You see my concern.", phase: 1, animalType: 'owl' },
-  { id: 'ow_1_7', text: "Wisdom, they say, is knowing how little you know. By that measure I've become distressingly wise in recent weeks.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_6', text: "The words you shift — I've been tracking them. Some patterns emerge more than others. I wonder what that says about... well, about anything.", phase: 1, animalType: 'owl' },
+  { id: 'ow_1_7', text: "I heard something last night. Not from outside — from within the walls. A low hum, steady as breathing. It stopped when I held my own breath.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_8', text: "Found a passage about word-shifting in an old grimoire. Quite similar to your puzzles. I'm sure it's coincidence. Quite sure.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_9', text: "My study smells different after your puzzles. Like ozone, or the air before lightning. My feathers stand on end.", phase: 1, animalType: 'owl' },
   { id: 'ow_1_10', text: "I keep notes in the margins of everything I read. Lately, I don't recognize my own handwriting in some of them.", phase: 1, animalType: 'owl' },
@@ -1713,7 +1713,7 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   fox: {
     2: [
       "You're here at last. I've been watching the fire for a long time, waiting for you.",
-      "The den feels different now. Colder somehow, even with the flames going. Something in the air has changed.",
+      "The fire burns differently now. The flames speak in colors I haven't seen before. Everything is still warm, though. Everything is fine.",
       "The others told me about you. About your puzzles. About what happens to the words when you touch them.",
       "Sit with me by the fire. It has stories to tell. They are not all warm ones anymore.",
     ],
@@ -1759,7 +1759,7 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
     ],
     3: [
       "You. The one the books predicted. No — predicted isn't the right word. Demanded. The books demanded you.",
-      "I've read everything in this study. Every answer leads to the same question. You're the question, friend.",
+      "My books — some pages have gone dark. The words are still there, but they've rearranged themselves into something I don't fully recognize yet.",
       "My library organized itself yesterday. Alphabetically by dread. It took me hours to notice what had happened.",
       "The others have been waiting for you impatiently. I've been reading about waiting. It's all I do now.",
     ],
@@ -1799,7 +1799,7 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
     ],
     3: [
       "Finally... You... certainly... took... your... time... getting... here... I... appreciate... the... slowness...",
-      "The... others... are... agitated... about... something... I... am... slow... enough... to... see... what... it... is...",
+      "Things have... shifted... since you were last... around. The house feels... heavier. But also... more complete. You'll... see what I... mean.",
       "Your... puzzles... shook... the... branches... I... hang... from... I... felt... every... single... one...",
       "Don't... hurry... now... What... is... coming... arrives... at... its... own... speed... not... ours...",
     ],
@@ -1859,7 +1859,7 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
     ],
     3: [
       "You found me. Good. The tunnels have been bending toward you lately. Literally curving in your direction.",
-      "I dug through something yesterday that should not exist underground. I covered it up. Uncovered it. Covered it again.",
+      "My tunnels have started connecting to places I didn't dig. Passages that weren't there yesterday. G'day, by the way — hope you don't mind the new architecture.",
       "The others feel it approaching in their own ways. I feel it in the earth beneath my claws. Your puzzles wake it.",
       "Welcome to the deep, mate. It gets deeper from here. It always gets deeper.",
     ],
@@ -1885,7 +1885,7 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
     ],
     4: [
       "I didn't run this time. You should know that about me. For once in my life, I did not run.",
-      "The others are ready for what comes next. I'm not ready. But I am present. Fear and everything.",
+      "I know what's happening — I mean, I think I do — no, I DO know. It's just... saying it out loud makes it real, and I'm not sure I'm ready for — but we ARE ready. We have to be.",
       "Your puzzles frightened me from the very first one. Every word you formed made the garden tremble.",
       "Welcome. Sit with me. Have some tea. It might be the last tea we drink. But it's really good tea.",
     ],

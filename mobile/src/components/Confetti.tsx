@@ -19,13 +19,15 @@ const generateConfetti = (count: number, colors?: string[]): ConfettiPiece[] => 
   const confettiColors = colors || getPhaseTheme(0).confettiColors;
   const pieces: ConfettiPiece[] = [];
   for (let i = 0; i < count; i++) {
+    const x = Math.random() * SCREEN_WIDTH;
+    const distFromCenter = Math.abs(x - SCREEN_WIDTH / 2) / (SCREEN_WIDTH / 2);
     pieces.push({
       id: i,
-      x: Math.random() * SCREEN_WIDTH,
+      x,
       color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
       size: 8 + Math.random() * 12,
       rotation: Math.random() * 360,
-      delay: Math.random() * 300,
+      delay: distFromCenter * 400 + Math.random() * 100,
     });
   }
   return pieces;

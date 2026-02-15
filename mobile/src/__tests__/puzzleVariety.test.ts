@@ -80,7 +80,7 @@ describe('puzzleVariety', () => {
       const origRandom = Math.random;
 
       Math.random = () => 0.99;
-      expect(['reverse', 'blind']).toContain(shouldOfferVariant(30, 0)!.variant);
+      expect(['reverse', 'blind', 'no_vowel']).toContain(shouldOfferVariant(30, 0)!.variant);
 
       Math.random = () => 0.9;
       expect(['reverse', 'blind', 'no_vowel']).toContain(shouldOfferVariant(50, 0)!.variant);
@@ -202,16 +202,16 @@ describe('puzzleVariety', () => {
 
     it('exposes unlock requirements and unlocked checks', () => {
       expect(getVariantUnlockRequirement('standard')).toBeNull();
-      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(12);
-      expect(isVariantUnlocked('reverse', 11, 0)).toBe(false);
-      expect(isVariantUnlocked('reverse', 12, 0)).toBe(true);
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(10);
+      expect(isVariantUnlocked('reverse', 9, 0)).toBe(false);
+      expect(isVariantUnlocked('reverse', 10, 0)).toBe(true);
       expect(isVariantUnlocked('reverse_blind', 120, 1)).toBe(false);
       expect(isVariantUnlocked('reverse_blind', 120, 2)).toBe(true);
     });
 
     it('returns unlocked variants list with standard first', () => {
       const early = getUnlockedVariants(10, 0);
-      expect(early).toEqual(['standard']);
+      expect(early).toEqual(['standard', 'reverse']);
 
       const mid = getUnlockedVariants(80, 1);
       expect(mid).toContain('standard');

@@ -51,6 +51,8 @@ export interface VictoryData {
   streakMilestoneBonus: number;
   /** Message for streak milestone achievement */
   streakMilestoneMessage: string | null;
+  /** Titles of quests completed this victory */
+  questsCompleted?: string[];
 }
 
 export interface PersistenceState {
@@ -222,16 +224,22 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         },
       });
 
-      // Update weekly quest progress (non-blocking)
-      updateQuestProgress({
-        difficulty,
-        stars,
-        hintsUsed,
-        isDaily,
-        isChallenge: gameMode === 'challenge',
-        amberEarned: amberResult.amount,
-        currentStreak: amberResult.currentStreak,
-      }, amberResult.newPhase).catch(() => {});
+      // Update weekly quest progress and capture newly completed quests
+      let questsCompleted: string[] = [];
+      try {
+        const completedQuests = await updateQuestProgress({
+          difficulty,
+          stars,
+          hintsUsed,
+          isDaily,
+          isChallenge: gameMode === 'challenge',
+          amberEarned: amberResult.amount,
+          currentStreak: amberResult.currentStreak,
+        }, amberResult.newPhase);
+        questsCompleted = completedQuests.map(q => q.title);
+      } catch (_) {
+        // Quest progress update is non-critical
+      }
 
       return {
         earnedStars: stars,
@@ -252,6 +260,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variant,
         variantAppliedMultiplier,
         variantRepeatDecay,
+        questsCompleted,
         streakMilestoneBonus: amberResult.streakMilestoneBonus,
         streakMilestoneMessage: amberResult.streakMilestoneMessage,
       };

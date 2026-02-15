@@ -673,7 +673,7 @@ export default function App() {
         setTimeout(() => {
           setVictoryGlitch(glitchText);
           setShowVictoryGlitch(true);
-          setTimeout(() => setShowVictoryGlitch(false), 200);
+          setTimeout(() => setShowVictoryGlitch(false), 500);
         }, 300);
       }
 

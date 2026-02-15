@@ -48,6 +48,7 @@ const PARTICLE_EMOJIS_BY_PHASE: Record<number, string[]> = {
   2: ['🍂', '🌙', '💭', '🌫️'],
   3: ['🌙', '👁️', '🌫️', '💀'],
   4: ['💀', '👁️', '🌑', '⚫', '🔮'],
+  5: ['✨', '🌙', '💜'],
 };
 
 const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
@@ -382,6 +383,7 @@ const PHASE_BG_COLORS: Record<number, string> = {
   2: '#514378',
   3: '#060612',
   4: '#1a122a',
+  5: '#1E1830',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -391,11 +393,11 @@ const PHASE_BG_COLORS: Record<number, string> = {
 const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
   if (phase < 2) return null;
 
-  const lineWidth = phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
-  const lineColor = phase >= 4 ? '#8B2252' : phase >= 3 ? '#6B4C8A' : '#9B7FCF';
-  const lineOpacity = phase >= 4 ? 0.7 : phase >= 3 ? 0.4 : 0.2;
+  const lineWidth = phase === 5 ? 1.5 : phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
+  const lineColor = phase === 5 ? '#6B5B8A' : phase >= 4 ? '#8B2252' : phase >= 3 ? '#6B4C8A' : '#9B7FCF';
+  const lineOpacity = phase === 5 ? 0.3 : phase >= 4 ? 0.7 : phase >= 3 ? 0.4 : 0.2;
   const showNodes = phase >= 3;
-  const showGlow = phase >= 4;
+  const showGlow = phase === 4;
 
   return (
     <View style={arrangementStyles.connector}>
@@ -480,15 +482,16 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
     if (phase < 2) return;
 
     // Breathing animation — slow scale pulse
+    const breatheDuration = phase === 5 ? 6000 : phase >= 4 ? 3000 : 4000;
     const breatheLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breatheAnim, { toValue: 1, duration: phase >= 4 ? 3000 : 4000, useNativeDriver: true }),
-        Animated.timing(breatheAnim, { toValue: 0, duration: phase >= 4 ? 3000 : 4000, useNativeDriver: true }),
+        Animated.timing(breatheAnim, { toValue: 1, duration: breatheDuration, useNativeDriver: true }),
+        Animated.timing(breatheAnim, { toValue: 0, duration: breatheDuration, useNativeDriver: true }),
       ])
     );
     breatheLoop.start();
 
-    // Eye pulse at Phase 4
+    // Eye pulse at Phase 4+
     let eyeLoop: Animated.CompositeAnimation | undefined;
     if (phase >= 4) {
       eyeLoop = Animated.loop(
@@ -508,7 +511,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
 
   if (phase < 2) return null;
 
-  const opacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : 0.30;
+  const opacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : phase === 5 ? 0.20 : 0.30;
   const scaleVal = phase === 2 ? 0.6 : phase === 3 ? 0.8 : 1.0;
   const height = 180 * scaleVal;
   const width = 100 * scaleVal;
@@ -537,7 +540,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
       {/* Central body - tall dark oval */}
       <View style={{
         flex: 1,
-        backgroundColor: phase >= 4 ? 'rgba(80, 10, 30, 0.9)' : 'rgba(20, 5, 30, 0.9)',
+        backgroundColor: phase === 5 ? 'rgba(40, 20, 50, 0.9)' : phase >= 4 ? 'rgba(80, 10, 30, 0.9)' : 'rgba(20, 5, 30, 0.9)',
         borderTopLeftRadius: width * 0.4,
         borderTopRightRadius: width * 0.4,
         borderBottomLeftRadius: width * 0.15,
@@ -568,7 +571,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
           }} />
         </>
       )}
-      {/* "Eyes" at Phase 4 - pulsing reddish dots with glow */}
+      {/* "Eyes" at Phase 4+ - pulsing dots with glow (crimson at Phase 4, soft purple at Phase 5) */}
       {phase >= 4 && (
         <Animated.View style={{
           position: 'absolute',
@@ -584,20 +587,20 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
             width: 8,
             height: 5,
             borderRadius: 4,
-            backgroundColor: 'rgba(200, 40, 60, 0.9)',
-            shadowColor: '#FF0000',
+            backgroundColor: phase === 5 ? '#7B6B8A' : 'rgba(200, 40, 60, 0.9)',
+            shadowColor: phase === 5 ? '#7B6B8A' : '#FF0000',
             shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.8,
+            shadowOpacity: phase === 5 ? 0.5 : 0.8,
             shadowRadius: 6,
           }} />
           <View style={{
             width: 8,
             height: 5,
             borderRadius: 4,
-            backgroundColor: 'rgba(200, 40, 60, 0.9)',
-            shadowColor: '#FF0000',
+            backgroundColor: phase === 5 ? '#7B6B8A' : 'rgba(200, 40, 60, 0.9)',
+            shadowColor: phase === 5 ? '#7B6B8A' : '#FF0000',
             shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.8,
+            shadowOpacity: phase === 5 ? 0.5 : 0.8,
             shadowRadius: 6,
           }} />
         </Animated.View>

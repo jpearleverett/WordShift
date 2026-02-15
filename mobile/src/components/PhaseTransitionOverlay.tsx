@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
-import { PhaseTransitionEvent, PhaseScene } from '../services/phaseEvents';
+import { PhaseTransitionEvent, PhaseScene, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 /** Fire a haptic scaled to the scene's visual effect and event intensity */
 function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
@@ -33,6 +33,77 @@ interface PhaseTransitionOverlayProps {
   event: PhaseTransitionEvent | null;
   onComplete: () => void;
 }
+
+const CinematicParticle: React.FC<{
+  config: CinematicParticleConfig;
+  index: number;
+}> = ({ config, index }) => {
+  const translateMain = useRef(new Animated.Value(0)).current;
+  const wobble = useRef(new Animated.Value(0)).current;
+  const loopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const startX = useRef(Math.random() * SCREEN_WIDTH).current;
+  const startDelay = useRef(index * 300 + Math.random() * 500).current;
+
+  useEffect(() => {
+    if (getSettingsSync().reducedMotion) return;
+
+    const isVertical = config.direction === 'rise' || config.direction === 'fall';
+    const distance = isVertical ? SCREEN_HEIGHT + 50 : SCREEN_WIDTH + 50;
+    const duration = (distance / config.speed) * 80;
+
+    const mainAnim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(startDelay),
+        Animated.timing(translateMain, {
+          toValue: config.direction === 'rise' ? -(SCREEN_HEIGHT + 50) : distance,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateMain, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
+    );
+
+    const wobbleAnim = isVertical ? Animated.loop(
+      Animated.sequence([
+        Animated.timing(wobble, { toValue: 15, duration: 1000, useNativeDriver: true }),
+        Animated.timing(wobble, { toValue: -15, duration: 1000, useNativeDriver: true }),
+      ])
+    ) : null;
+
+    loopRef.current = mainAnim;
+    mainAnim.start();
+    wobbleAnim?.start();
+
+    return () => {
+      mainAnim.stop();
+      wobbleAnim?.stop();
+      translateMain.stopAnimation();
+      wobble.stopAnimation();
+    };
+  }, []);
+
+  const isVertical = config.direction === 'rise' || config.direction === 'fall';
+  const startY = config.direction === 'rise' ? SCREEN_HEIGHT : -50;
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: isVertical ? startX : -50,
+        top: isVertical ? startY : Math.random() * SCREEN_HEIGHT,
+        width: config.size,
+        height: config.size,
+        borderRadius: config.size / 2,
+        backgroundColor: config.color,
+        opacity: getSettingsSync().reducedMotion ? config.opacity * 0.5 : config.opacity,
+        transform: isVertical
+          ? [{ translateY: translateMain }, { translateX: wobble }]
+          : [{ translateX: translateMain }],
+      }}
+    />
+  );
+};
 
 export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   event,
@@ -162,6 +233,15 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       accessibilityRole="alert"
       accessibilityLabel={`Phase transition: ${event.title}`}
     >
+      {/* Cinematic ambient particles */}
+      {event.particles && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          {Array.from({ length: event.particles.count }, (_, i) => (
+            <CinematicParticle key={i} config={event.particles!} index={i} />
+          ))}
+        </View>
+      )}
+
       {/* Title */}
       <Text style={[styles.title, { color: event.accentColor }]}>
         {event.title}

@@ -33,6 +33,7 @@ export interface VictoryData {
   ritualEnergy?: number;
   variantBonus?: number;
   variantRepeatDecay?: number;
+  questsCompleted?: string[];
 }
 
 interface VictoryModalProps {
@@ -85,20 +86,23 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 }) => {
   const phaseTheme = getPhaseTheme(phase);
 
-  // Cascade animation — 3 staggered content groups
+  // Cascade animation — 4 staggered content groups
   const contentOpacity1 = useRef(new Animated.Value(0)).current;
   const contentOpacity2 = useRef(new Animated.Value(0)).current;
   const contentOpacity3 = useRef(new Animated.Value(0)).current;
+  const contentOpacity4 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       contentOpacity1.setValue(0);
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
-      Animated.stagger(150, [
-        Animated.timing(contentOpacity1, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(contentOpacity2, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(contentOpacity3, { toValue: 1, duration: 300, useNativeDriver: true }),
+      contentOpacity4.setValue(0);
+      Animated.stagger(200, [
+        Animated.timing(contentOpacity1, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(contentOpacity2, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(contentOpacity3, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(contentOpacity4, { toValue: 1, duration: 350, useNativeDriver: true }),
       ]).start();
     }
   }, [visible]);
@@ -200,6 +204,20 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 <Text style={styles.milestoneEmoji}>{'\uD83C\uDFC6'}</Text>
                 <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
                 <Text style={styles.milestoneBonus}>+{victoryData.milestoneBonus} Bonus Amber!</Text>
+              </View>
+            )}
+
+            {/* Quest completion badges */}
+            {victoryData?.questsCompleted && victoryData.questsCompleted.length > 0 && (
+              <View style={styles.questCompletedContainer}>
+                {victoryData.questsCompleted.map((title, i) => (
+                  <View key={i} style={[styles.questBadge, { borderColor: phaseTheme.victoryTitleColor + '40' }]}>
+                    <Text style={styles.questBadgeIcon}>{'\uD83D\uDCCB'}</Text>
+                    <Text style={[styles.questBadgeText, { color: phaseTheme.modalTextColor }]}>
+                      {title}
+                    </Text>
+                  </View>
+                ))}
               </View>
             )}
 
@@ -349,7 +367,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </View>
             )}
 
-            {/* Action buttons */}
+            </Animated.View>
+
+            {/* Group 4: Action buttons */}
+            <Animated.View style={{ opacity: contentOpacity4 }}>
             <View style={styles.victoryButtonRow}>
               <TouchableOpacity
                 style={styles.shareButton}
@@ -657,6 +678,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: CandyColors.green.dark,
+  },
+  questCompletedContainer: {
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  questBadge: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 6,
+    alignItems: 'center',
+  },
+  questBadgeIcon: {
+    fontSize: 14,
+  },
+  questBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   completionCodaContainer: {
     marginBottom: 12,

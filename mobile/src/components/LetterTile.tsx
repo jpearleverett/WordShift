@@ -57,6 +57,14 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const trailGlowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const resonanceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const guideLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const trailParticleAnims = useRef(
+    Array.from({ length: 4 }, () => ({
+      opacity: new Animated.Value(0),
+      scale: new Animated.Value(0.5),
+      translateY: new Animated.Value(0),
+    }))
+  ).current;
+  const trailParticleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Phase-aware animation parameters for selected tiles
   const getSelectedSpringParams = () => {
@@ -357,6 +365,52 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     };
   }, [isGuided, settings.reducedMotion, guidePulseAnim]);
 
+  // Particle trail for selected tiles
+  useEffect(() => {
+    if (!isSelected || settings.reducedMotion || shouldSimplifyAnimations()) {
+      // Reset particles
+      trailParticleAnims.forEach(p => {
+        p.opacity.setValue(0);
+        p.scale.setValue(0.5);
+        p.translateY.setValue(0);
+      });
+      if (trailParticleLoopRef.current) {
+        trailParticleLoopRef.current.stop();
+        trailParticleLoopRef.current = null;
+      }
+      return;
+    }
+
+    const particleAnimations = trailParticleAnims.map((p, i) =>
+      Animated.sequence([
+        Animated.delay(i * 150),
+        Animated.parallel([
+          Animated.timing(p.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+          Animated.timing(p.scale, { toValue: 1.5, duration: 600, useNativeDriver: true }),
+          Animated.timing(p.translateY, { toValue: -25, duration: 600, useNativeDriver: true }),
+        ]),
+        Animated.timing(p.opacity, { toValue: 0, duration: 100, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.timing(p.scale, { toValue: 0.5, duration: 0, useNativeDriver: true }),
+          Animated.timing(p.translateY, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ]),
+      ])
+    );
+
+    const loop = Animated.loop(Animated.stagger(150, particleAnimations));
+    trailParticleLoopRef.current = loop;
+    loop.start();
+
+    return () => {
+      loop.stop();
+      trailParticleAnims.forEach(p => {
+        p.opacity.stopAnimation();
+        p.scale.stopAnimation();
+        p.translateY.stopAnimation();
+      });
+    };
+  }, [isSelected]);
+
   // Resonance visual config — color and opacity range per phase
   const getResonanceConfig = () => {
     if (phase >= 5) return { color: '#7B6B8A', minOpacity: 0.06, maxOpacity: 0.10 };   // Ghostly mauve
@@ -514,6 +568,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   const tileStyles = getStyles();
   const isClickable = (isInteractable || isSelected) && onPress;
+  const trailColor = phase >= 4 ? '#C03050' : phase >= 3 ? '#9050B0' : '#FFD700';
 
   // Animated glow intensity
   const glowOpacity = glowAnim.interpolate({
@@ -566,6 +621,30 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         },
       ]}
     >
+      {isSelected && !settings.reducedMotion && !shouldSimplifyAnimations() && (
+        <View style={trailStyles.container} pointerEvents="none">
+          {trailParticleAnims.map((anim, i) => (
+            <Animated.View
+              key={i}
+              style={{
+                position: 'absolute',
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: trailColor,
+                opacity: anim.opacity,
+                transform: [
+                  { scale: anim.scale },
+                  { translateY: anim.translateY },
+                  { translateX: (i - 1.5) * 12 },
+                ],
+                top: -5,
+              }}
+            />
+          ))}
+        </View>
+      )}
+
       {/* Outer glow for interactable/selected */}
       {(isInteractable || isSelected) && highlight !== 'locked' && (
         <Animated.View
@@ -814,8 +893,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    width: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    width: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
     transform: [{ skewX: '-20deg' }],
   },
   lockOverlay: {
@@ -825,6 +904,17 @@ const styles = StyleSheet.create({
   resonanceOverlay: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 14,
+  },
+});
+
+const trailStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 20,
   },
 });
 
