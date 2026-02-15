@@ -13,6 +13,7 @@ import {
   getLockedLetterMessage,
   checkNarrativeMicroBeat,
   resetMicroBeats,
+  getHomescreenNudge,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -495,5 +496,104 @@ describe('checkNarrativeMicroBeat', () => {
 
     const beat = await checkNarrativeMicroBeat(35);
     expect(beat).not.toBeNull();
+  });
+
+  // New micro-beat thresholds (assessment-driven expansion)
+  test('returns a beat at puzzle 40', async () => {
+    const beat = await checkNarrativeMicroBeat(40);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+    expect(beat!.durationMs).toBeGreaterThan(0);
+  });
+
+  test('returns a beat at puzzle 55', async () => {
+    const beat = await checkNarrativeMicroBeat(55);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
+  test('returns a glitch_title beat at puzzle 80', async () => {
+    const beat = await checkNarrativeMicroBeat(80);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('glitch_title');
+    expect(beat!.glitchTitle).toBeDefined();
+    expect(beat!.durationMs).toBeGreaterThan(0);
+  });
+
+  test('returns a beat at puzzle 90', async () => {
+    const beat = await checkNarrativeMicroBeat(90);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
+  test('returns a beat at puzzle 110', async () => {
+    const beat = await checkNarrativeMicroBeat(110);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
+  test('returns a beat at puzzle 130', async () => {
+    const beat = await checkNarrativeMicroBeat(130);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
+  test('all 10 micro-beat thresholds fire independently', async () => {
+    const thresholds = [35, 40, 50, 55, 65, 80, 90, 100, 110, 130];
+    for (const t of thresholds) {
+      const beat = await checkNarrativeMicroBeat(t);
+      expect(beat).not.toBeNull();
+    }
+    // All consumed — none should fire again
+    for (const t of thresholds) {
+      expect(await checkNarrativeMicroBeat(t)).toBeNull();
+    }
+  });
+});
+
+// ============================================================================
+// Home Screen Nudge
+// ============================================================================
+
+describe('getHomescreenNudge', () => {
+  test('returns null when puzzlesSinceHome < 3', () => {
+    expect(getHomescreenNudge(0, ['fox'], 0)).toBeNull();
+    expect(getHomescreenNudge(0, ['fox'], 1)).toBeNull();
+    expect(getHomescreenNudge(0, ['fox'], 2)).toBeNull();
+  });
+
+  test('returns null when no animals are unlocked', () => {
+    expect(getHomescreenNudge(0, [], 5)).toBeNull();
+  });
+
+  test('returns object with animalName and text when conditions met', () => {
+    const result = getHomescreenNudge(0, ['fox'], 3);
+    expect(result).not.toBeNull();
+    expect(result!.animalName).toBeDefined();
+    expect(result!.animalName.length).toBeGreaterThan(0);
+    expect(result!.text).toBeDefined();
+    expect(result!.text.length).toBeGreaterThan(0);
+  });
+
+  test.each(ALL_PHASES)('returns valid nudge for phase %i', (phase) => {
+    const result = getHomescreenNudge(phase, ['fox', 'owl'], 5);
+    expect(result).not.toBeNull();
+    expect(typeof result!.text).toBe('string');
+    expect(result!.text.length).toBeGreaterThan(0);
+  });
+
+  test('nudge text contains animal name', () => {
+    // Run multiple times since animal selection is random
+    for (let i = 0; i < 20; i++) {
+      const result = getHomescreenNudge(0, ['fox'], 4);
+      if (result) {
+        expect(result.animalName).toBe('Ember');
+      }
+    }
   });
 });

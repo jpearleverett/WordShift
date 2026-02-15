@@ -1,3 +1,5 @@
+import { Difficulty } from '../types';
+
 // Home World Types - Animal house with existential journey
 
 /**
@@ -385,6 +387,7 @@ export const FIRST_COMPLETION_BONUS: AmberReward = {
  */
 export const MILESTONE_BONUSES: { puzzles: number; amber: number; message: string; darkMessage?: string; dreadMessage?: string }[] = [
   { puzzles: 10, amber: 25, message: 'First steps!' },
+  { puzzles: 15, amber: 15, message: 'Warming up!' },
   { puzzles: 25, amber: 50, message: 'Getting the hang of it!', darkMessage: 'The words are beginning to listen.' },
   { puzzles: 50, amber: 75, message: 'Puzzle enthusiast!', darkMessage: 'The pattern takes shape.' },
   { puzzles: 75, amber: 100, message: 'Word wizard!', darkMessage: 'The words know your touch now.', dreadMessage: 'Seventy-five incantations spoken.' },
@@ -485,8 +488,17 @@ export const NARRATIVE_ACCELERATION = {
  * Optional harder mode for experienced players with better rewards
  */
 export const CHALLENGE_MODE_CONFIG = {
-  // Maximum undos allowed in challenge mode (0 = no undos)
+  // Legacy constant — prefer getMaxUndos(difficulty) for challenge mode
   MAX_UNDOS: 1,
+  /** Get max undos for challenge mode, scaled by difficulty */
+  getMaxUndos: (difficulty: Difficulty): number => {
+    switch (difficulty) {
+      case 'EASY': return 2;
+      case 'MEDIUM': return 2;
+      case 'MEDIUM_PLUS': return 1;
+      case 'HARD': return 1;
+    }
+  },
   // Amber reward multiplier for challenge completions
   AMBER_MULTIPLIER: 1.5,
   // No hints allowed in challenge mode

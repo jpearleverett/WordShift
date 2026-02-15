@@ -25,6 +25,8 @@ interface ShareableResult {
   animalWhisper?: string;
   /** Current narrative phase (for theming) */
   phase?: number;
+  /** Named incantation for the puzzle chain (Phase 2+) */
+  incantationName?: string;
   /** Share frame style from cosmetics */
   shareFrame?: string;
 }
@@ -130,6 +132,11 @@ export function generateShareText(result: ShareableResult): string {
     const phase = result.phase || 0;
     lines.push('');
     lines.push(formatWordChain(result.wordChain, phase));
+  }
+
+  // Named incantation (Phase 2+)
+  if (result.incantationName) {
+    lines.push(`"${result.incantationName}"`);
   }
 
   if (result.isChallenge && result.hintsUsed === 0 && result.invalidAttempts <= 1) {

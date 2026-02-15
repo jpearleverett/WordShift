@@ -245,9 +245,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setEarnedStars(0);
     }
 
-    // Reset undos for challenge mode
-    setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
-  }, [currentPhase, currentVariant, gameMode]);
+    // Reset undos for challenge mode (scaled by difficulty)
+    setUndosRemaining(gameMode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(difficulty) : Infinity);
+  }, [currentPhase, currentVariant, gameMode, difficulty]);
 
   const initGame = useCallback((
     words: string[],
@@ -332,7 +332,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     }
     if (mode !== undefined) {
       setGameMode(mode);
-      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.MAX_UNDOS : Infinity);
+      setUndosRemaining(mode === 'challenge' ? CHALLENGE_MODE_CONFIG.getMaxUndos(selectedDifficulty) : Infinity);
     }
 
     const effectiveMode = mode ?? gameMode;
@@ -413,6 +413,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (fallbackVariant !== 'standard') {
         const config = VARIANT_CONFIGS[fallbackVariant];
         setMessage(getVariantInstruction(config, currentPhase));
+      } else if (variant !== 'standard') {
+        // Variant was dropped during fallback — notify the player
+        setMessage(
+          currentPhase >= 3
+            ? 'The arrangement could not sustain that pattern.'
+            : 'That puzzle style wasn\'t available \u2014 starting a standard puzzle instead.'
+        );
       }
     }
   }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant]);

@@ -473,8 +473,8 @@ describe('usePuzzleGame', () => {
       actions.initGame(['LIME', 'TIME', 'TIED']);
 
       let [state] = callHook();
-      // Challenge mode gives MAX_UNDOS (1) remaining
-      expect(state.undosRemaining).toBe(1);
+      // Challenge mode gives 2 undos for EASY difficulty (4-letter words)
+      expect(state.undosRemaining).toBe(2);
     });
 
     test('challenge mode blocks undo when undosRemaining is 0', () => {
@@ -485,9 +485,9 @@ describe('usePuzzleGame', () => {
       [state, actions] = callHook();
       actions.initGame(['LIME', 'TIME', 'TIED']);
 
-      // undosRemaining starts at 1 in challenge mode after initGame
+      // undosRemaining starts at 2 in challenge mode for EASY difficulty (4-letter words)
       [state, actions] = callHook();
-      expect(state.undosRemaining).toBe(1);
+      expect(state.undosRemaining).toBe(2);
       expect(state.gameMode).toBe('challenge');
     });
   });
@@ -576,6 +576,31 @@ describe('usePuzzleGame', () => {
       expect(state.showRules).toBe(false);
       expect(state.showConfetti).toBe(false);
       expect(state.level).toBe(1);
+    });
+  });
+
+  // =========================================================================
+  // Challenge mode undo scaling by difficulty
+  // =========================================================================
+
+  describe('CHALLENGE_MODE_CONFIG.getMaxUndos', () => {
+    // Import directly to test the config object
+    const { CHALLENGE_MODE_CONFIG } = require('../types/homeWorld');
+
+    test('EASY difficulty gets 2 undos', () => {
+      expect(CHALLENGE_MODE_CONFIG.getMaxUndos('EASY')).toBe(2);
+    });
+
+    test('MEDIUM difficulty gets 2 undos', () => {
+      expect(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM')).toBe(2);
+    });
+
+    test('MEDIUM_PLUS difficulty gets 1 undo', () => {
+      expect(CHALLENGE_MODE_CONFIG.getMaxUndos('MEDIUM_PLUS')).toBe(1);
+    });
+
+    test('HARD difficulty gets 1 undo', () => {
+      expect(CHALLENGE_MODE_CONFIG.getMaxUndos('HARD')).toBe(1);
     });
   });
 });
