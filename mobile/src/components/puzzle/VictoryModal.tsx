@@ -114,6 +114,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       backgroundColor: phaseTheme.modalOverlayColor,
     }]}>
       <ScrollView
+        style={styles.modalScrollView}
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
@@ -369,8 +370,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             </Animated.View>
 
-            {/* Group 4: Action buttons */}
-            <Animated.View style={{ opacity: contentOpacity4 }}>
+          </Animated.View>
+        </ScrollView>
+
+        {/* Group 4: Action buttons — fixed at bottom, outside ScrollView */}
+        <Animated.View style={[styles.buttonContainer, { opacity: modalOpacity }]}>
+          <Animated.View style={{ opacity: contentOpacity4 }}>
             <View style={styles.victoryButtonRow}>
               <TouchableOpacity
                 style={styles.shareButton}
@@ -400,9 +405,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
               </TouchableOpacity>
             </View>
-            </Animated.View>
           </Animated.View>
-        </ScrollView>
+        </Animated.View>
       </View>
   );
 };
@@ -412,6 +416,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(76, 29, 149, 0.7)',
     zIndex: 500,
+    flexDirection: 'column',
+  },
+  modalScrollView: {
+    flex: 1,
   },
   modalShine: {
     position: 'absolute',
@@ -434,7 +442,9 @@ const styles = StyleSheet.create({
   victoryModal: {
     backgroundColor: CandyColors.white,
     borderRadius: 40,
-    padding: 32,
+    paddingTop: 32,
+    paddingHorizontal: 32,
+    paddingBottom: 20,
     alignItems: 'center',
     width: '100%',
     maxWidth: 320,
@@ -545,6 +555,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: CandyColors.gray[400],
     marginTop: 2,
+  },
+  buttonContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 48,
+    alignItems: 'center',
   },
   victoryButtonRow: {
     flexDirection: 'row',
