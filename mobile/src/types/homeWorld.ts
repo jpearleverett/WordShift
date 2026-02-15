@@ -295,7 +295,7 @@ export const DIALOGUE_SESSION_CONFIG = {
   // Number of puzzles required before next session is available
   PUZZLES_BETWEEN_SESSIONS: 4,
   // Number of sessions before cooldown kicks in for newly unlocked animals (grace period)
-  GRACE_PERIOD_SESSIONS: 1,
+  GRACE_PERIOD_SESSIONS: 2,
 };
 
 /**
@@ -305,7 +305,7 @@ export function getDialoguesPerSession(phase: DialoguePhase): number {
   switch (phase) {
     case 0:
     case 1:
-      return 4;  // Brief check-ins, parceled out over more sessions
+      return 3;  // Smaller sessions = more sessions before exhaustion, extends early dialogue life
     case 2:
     case 3:
       return 5;  // Moderate conversations as things darken
@@ -392,6 +392,7 @@ export const MILESTONE_BONUSES: { puzzles: number; amber: number; message: strin
   { puzzles: 50, amber: 75, message: 'Puzzle enthusiast!', darkMessage: 'The pattern takes shape.' },
   { puzzles: 75, amber: 100, message: 'Word wizard!', darkMessage: 'The words know your touch now.', dreadMessage: 'Seventy-five incantations spoken.' },
   { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
+  { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
   { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
   { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },
   { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The house trembles.', dreadMessage: 'The ritual deepens. Two hundred incantations.' },

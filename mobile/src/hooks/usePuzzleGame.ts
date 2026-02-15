@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
+import { SavedPuzzleState } from '../services/puzzleSaveState';
 import { generateLocalPuzzle, getIncantationName } from '../services/localGenerator';
 import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
@@ -106,6 +107,7 @@ export interface PuzzleGameActions {
   setGameMode: (mode: GameMode) => void;
   setCurrentPhase: (phase: DialoguePhase) => void;
   setSelectedVariant: (variant: PuzzleVariant) => void;
+  restorePuzzleState: (saved: SavedPuzzleState) => void;
 }
 
 export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
@@ -806,6 +808,38 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     return previews;
   }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState]);
 
+  const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
+    setRows(saved.rows);
+    setActiveRowIndex(saved.activeRowIndex);
+    setSelectedLetter(null); // Don't restore mid-selection state
+    setGameState(saved.gameState as GameState);
+    setMessage(saved.message);
+    setHistory(saved.history);
+    setInvalidAttempts(saved.invalidAttempts);
+    setHintsUsed(saved.hintsUsed);
+    setUndosRemaining(saved.undosRemaining);
+    setDifficulty(saved.difficulty);
+    setCurrentWordLength(saved.currentWordLength);
+    setHint(saved.hint);
+    setSolution(saved.solution);
+    setGameMode(saved.gameMode);
+    setCurrentVariant(saved.currentVariant);
+    setSelectedVariantState(saved.selectedVariant);
+    setMoveDirection(saved.moveDirection);
+    setBlindRevealedRows(saved.blindRevealedRows);
+    setCurrentChainLink(saved.currentChainLink);
+    setChainLength(saved.chainLength);
+    setCurrentPhase(saved.currentPhase);
+    setLastFormedWord(saved.lastFormedWord);
+    // Reset UI-only state
+    setError(null);
+    setIsProcessing(false);
+    setShowRules(false);
+    setShowDifficultyMenu(false);
+    setShowConfetti(false);
+    setEarnedStars(0);
+  }, []);
+
   const state: PuzzleGameState = {
     rows,
     activeRowIndex,
@@ -858,6 +892,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameMode,
     setCurrentPhase,
     setSelectedVariant,
+    restorePuzzleState,
   };
 
   return [state, actions];

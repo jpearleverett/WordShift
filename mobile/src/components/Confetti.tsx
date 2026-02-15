@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { getPhaseTheme } from '../theme/colors';
+import { getMaxConfettiCount } from '../services/deviceTier';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -138,7 +139,7 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
         return;
       }
       const theme = getPhaseTheme(phase);
-      setPieces(generateConfetti(50, theme.confettiColors));
+      setPieces(generateConfetti(getMaxConfettiCount(), theme.confettiColors));
       const timeout = setTimeout(() => {
         onComplete?.();
       }, 3500);

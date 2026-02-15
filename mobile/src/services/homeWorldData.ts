@@ -626,7 +626,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_bamboo_attic',
     type: 'room',
-    cost: 475,
+    cost: 400,  // Reduced from 475 to smooth amber economy cliff at puzzles 140-170
     isUnlocked: false,
     order: 18,
     targetId: 'bamboo_attic',

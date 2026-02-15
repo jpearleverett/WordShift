@@ -67,6 +67,7 @@ const SYNC_KEYS = [
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
   'wordshift_notification_prefs',
+  'wordshift_in_progress_puzzle',
 ];
 
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';
