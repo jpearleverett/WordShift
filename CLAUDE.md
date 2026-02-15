@@ -67,9 +67,9 @@ npx jest --no-coverage   # Run all tests (760+ tests, 26 suites)
 - **Loading-state polish**:
   - App boot now shows a themed loading card instead of a blank dark frame.
   - Home initial load and puzzle generation overlays include stronger visual context text.
-- **Asset robustness hardening**:
-  - Removed hardcoded PNG `require(...)` usage from core UI components.
-  - Added `src/assets/optionalAssets.ts` manifest so missing image bundles gracefully fall back to emoji/styled visuals instead of crashing.
+- **Asset bindings restored**:
+  - Core UI components use static PNG `require(...)` imports for shipped character, room, and sky art.
+  - Emoji/styled visuals remain as fallbacks only for explicit sprite-fallback paths (not as a global replacement).
 
 ## Tech Stack
 
