@@ -72,6 +72,7 @@ import {
 } from '../../services/sacrifice';
 import { getGalleryTitle } from '../../services/whisperGallery';
 import { getSettingsSync } from '../../services/settings';
+import { hapticLight, hapticSelection } from '../../services/haptics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -398,7 +399,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   if (!progress || rooms.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading your home...</Text>
+        <View style={styles.loadingCard}>
+          <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
+            <Text style={styles.loadingEmoji}>🏡</Text>
+          </Animated.View>
+          <Text style={styles.loadingText}>Loading your home...</Text>
+          <Text style={styles.loadingSubtext}>Placing rooms and waking friends.</Text>
+        </View>
       </View>
     );
   }
@@ -433,7 +440,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {!isOnboarding && (
             <TouchableOpacity
               style={styles.headerIconBtn}
-              onPress={onOpenStats}
+              onPress={() => {
+                hapticLight();
+                onOpenStats?.();
+              }}
               accessibilityLabel="View stats"
               accessibilityRole="button"
             >
@@ -443,7 +453,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {!isOnboarding && (
             <TouchableOpacity
               style={styles.headerIconBtn}
-              onPress={onOpenSettings}
+              onPress={() => {
+                hapticLight();
+                onOpenSettings?.();
+              }}
               accessibilityLabel="Settings"
               accessibilityRole="button"
             >
@@ -464,6 +477,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <JuicyButton
               style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
               onPress={() => {
+                hapticSelection();
                 setHighlightPlayButton(false);
                 onPlayPuzzle();
               }}
@@ -482,7 +496,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {__DEV__ && !isOnboarding && (
         <TouchableOpacity
           style={styles.devButton}
-          onPress={handleDevButton}
+          onPress={() => {
+            hapticLight();
+            handleDevButton();
+          }}
         >
           <Text style={styles.devButtonText}>DEV</Text>
         </TouchableOpacity>
@@ -532,7 +549,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             styles.wordsOfferedHomeContainer,
             progress.currentPhase >= 3 && styles.wordsOfferedHomeContainerDark,
           ]}
-          onPress={onOpenLedger}
+          onPress={() => {
+            hapticLight();
+            onOpenLedger?.();
+          }}
           activeOpacity={0.7}
           accessibilityLabel="Open word ledger"
           accessibilityRole="button"
@@ -552,7 +572,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {onOpenGallery && (
             <TouchableOpacity
               style={styles.actionRowButton}
-              onPress={onOpenGallery}
+              onPress={() => {
+                hapticLight();
+                onOpenGallery?.();
+              }}
               accessibilityLabel="Whisper Gallery"
               accessibilityRole="button"
             >
@@ -564,7 +587,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {isSacrificeAvailable(progress.currentPhase) && (
             <TouchableOpacity
               style={[styles.actionRowButton, styles.sacrificeButton]}
-              onPress={() => setShowSacrificeModal(true)}
+              onPress={() => {
+                hapticSelection();
+                setShowSacrificeModal(true);
+              }}
               accessibilityLabel="Offer amber to the arrangement"
               accessibilityRole="button"
             >
@@ -1278,11 +1304,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: CandyColors.purple.main,
+    paddingHorizontal: 20,
+  },
+  loadingCard: {
+    minWidth: 240,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 20,
+    paddingHorizontal: 18,
+  },
+  loadingEmoji: {
+    fontSize: 34,
   },
   loadingText: {
     color: CandyColors.white,
     fontSize: 18,
     fontWeight: '700',
+  },
+  loadingSubtext: {
+    marginTop: 6,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   header: {
     flexDirection: 'row',

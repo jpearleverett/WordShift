@@ -66,7 +66,8 @@ export interface PersistenceActions {
     invalidAttempts: number,
     gameMode?: GameMode,
     completedWords?: string[],
-    variant?: PuzzleVariant
+    variant?: PuzzleVariant,
+    isDaily?: boolean
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -110,7 +111,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     invalidAttempts: number,
     gameMode: GameMode = 'standard',
     completedWords: string[] = [],
-    variant: PuzzleVariant = 'standard'
+    variant: PuzzleVariant = 'standard',
+    isDaily: boolean = false
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
 
@@ -194,6 +196,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           hintsUsed,
           invalidAttempts,
           gameMode,
+          isDaily,
           amberEarned: amberResult.amount,
           challengeBonus: amberResult.challengeBonus,
           puzzlesSolved: amberResult.puzzlesSolved,
@@ -213,7 +216,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         difficulty,
         stars,
         hintsUsed,
-        isDaily: false, // Caller should update for daily
+        isDaily,
         isChallenge: gameMode === 'challenge',
         amberEarned: amberResult.amount,
         currentStreak: amberResult.currentStreak,
