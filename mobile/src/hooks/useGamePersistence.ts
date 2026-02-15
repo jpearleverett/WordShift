@@ -47,6 +47,10 @@ export interface VictoryData {
   variantAppliedMultiplier?: number;
   /** Repeat decay factor (1.0 = no decay) */
   variantRepeatDecay?: number;
+  /** Bonus amber from streak milestone (one-time at 3/7/14/30 days) */
+  streakMilestoneBonus: number;
+  /** Message for streak milestone achievement */
+  streakMilestoneMessage: string | null;
 }
 
 export interface PersistenceState {
@@ -129,6 +133,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy: 0,
         variantBonus: 0,
         variant: 'standard',
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
       };
     }
 
@@ -210,6 +216,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         isDaily: false, // Caller should update for daily
         isChallenge: gameMode === 'challenge',
         amberEarned: amberResult.amount,
+        currentStreak: amberResult.currentStreak,
       }, amberResult.newPhase).catch(() => {});
 
       return {
@@ -231,6 +238,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variant,
         variantAppliedMultiplier,
         variantRepeatDecay,
+        streakMilestoneBonus: amberResult.streakMilestoneBonus,
+        streakMilestoneMessage: amberResult.streakMilestoneMessage,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -253,6 +262,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variant: 'standard',
         variantAppliedMultiplier: 1.0,
         variantRepeatDecay: 1.0,
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
       };
     } finally {
       recordInProgress.current = false;

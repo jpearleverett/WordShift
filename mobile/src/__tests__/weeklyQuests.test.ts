@@ -651,4 +651,132 @@ describe('weeklyQuests', () => {
       expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_weekly_quests');
     });
   });
+
+  // ===========================================================================
+  // New quest types: visit_animals and streak_days
+  // ===========================================================================
+
+  describe('visit_animals and streak_days quest types', () => {
+    it('visit_animals progress updates via animalsVisited direct assignment', async () => {
+      await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(0);
+      const visitQuest = state.quests.find(q => q.type === 'visit_animals');
+
+      if (visitQuest) {
+        await updateQuestProgress({
+          difficulty: 'MEDIUM',
+          stars: 2,
+          hintsUsed: 0,
+          isDaily: false,
+          isChallenge: false,
+          amberEarned: 10,
+          animalsVisited: 2,
+        }, 0);
+        const s1 = await loadWeeklyQuests(0);
+        expect(s1.quests.find(q => q.id === visitQuest.id)?.progress).toBe(2);
+
+        // Direct assignment — value should be replaced, not accumulated
+        await updateQuestProgress({
+          difficulty: 'MEDIUM',
+          stars: 2,
+          hintsUsed: 0,
+          isDaily: false,
+          isChallenge: false,
+          amberEarned: 10,
+          animalsVisited: 3,
+        }, 0);
+        const s2 = await loadWeeklyQuests(0);
+        expect(s2.quests.find(q => q.id === visitQuest.id)?.progress).toBe(3);
+      }
+    });
+
+    it('streak_days progress updates via currentStreak direct assignment', async () => {
+      await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(0);
+      const streakQuest = state.quests.find(q => q.type === 'streak_days');
+
+      if (streakQuest) {
+        await updateQuestProgress({
+          difficulty: 'MEDIUM',
+          stars: 2,
+          hintsUsed: 0,
+          isDaily: false,
+          isChallenge: false,
+          amberEarned: 10,
+          currentStreak: 2,
+        }, 0);
+        const s1 = await loadWeeklyQuests(0);
+        expect(s1.quests.find(q => q.id === streakQuest.id)?.progress).toBe(2);
+      }
+    });
+
+    it('visit_animals completes when animalsVisited reaches target', async () => {
+      await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(0);
+      const visitQuest = state.quests.find(q => q.type === 'visit_animals');
+
+      if (visitQuest) {
+        const completed = await updateQuestProgress({
+          difficulty: 'MEDIUM',
+          stars: 2,
+          hintsUsed: 0,
+          isDaily: false,
+          isChallenge: false,
+          amberEarned: 10,
+          animalsVisited: visitQuest.target,
+        }, 0);
+
+        const completedVisit = completed.find(q => q.type === 'visit_animals');
+        expect(completedVisit).toBeDefined();
+        expect(completedVisit?.completed).toBe(true);
+      }
+    });
+
+    it('streak_days completes when currentStreak reaches target', async () => {
+      await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(0);
+      const streakQuest = state.quests.find(q => q.type === 'streak_days');
+
+      if (streakQuest) {
+        const completed = await updateQuestProgress({
+          difficulty: 'MEDIUM',
+          stars: 2,
+          hintsUsed: 0,
+          isDaily: false,
+          isChallenge: false,
+          amberEarned: 10,
+          currentStreak: streakQuest.target,
+        }, 0);
+
+        const completedStreak = completed.find(q => q.type === 'streak_days');
+        expect(completedStreak).toBeDefined();
+        expect(completedStreak?.completed).toBe(true);
+      }
+    });
+
+    it('visit_animals and streak_days do not increment from standard puzzle events', async () => {
+      await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(0);
+      const visitQuest = state.quests.find(q => q.type === 'visit_animals');
+      const streakQuest = state.quests.find(q => q.type === 'streak_days');
+
+      // Event without animalsVisited/currentStreak should not change progress
+      await updateQuestProgress({
+        difficulty: 'MEDIUM',
+        stars: 2,
+        hintsUsed: 0,
+        isDaily: false,
+        isChallenge: false,
+        amberEarned: 10,
+      }, 0);
+
+      const s1 = await loadWeeklyQuests(0);
+      if (visitQuest) {
+        expect(s1.quests.find(q => q.id === visitQuest.id)?.progress).toBe(0);
+      }
+      if (streakQuest) {
+        expect(s1.quests.find(q => q.id === streakQuest.id)?.progress).toBe(0);
+      }
+    });
+  });
 });

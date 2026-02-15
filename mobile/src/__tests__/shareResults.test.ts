@@ -91,4 +91,45 @@ describe('shareResults', () => {
     });
     expect(text).toMatch(/🟩|🟨|🟧|🟥/);
   });
+
+  test('generateShareText includes word chain when provided', () => {
+    const text = generateShareText({
+      stars: 3,
+      difficulty: 'MEDIUM',
+      level: 5,
+      hintsUsed: 0,
+      invalidAttempts: 0,
+      moveCount: 3,
+      wordChain: ['FLAME', 'FAME', 'FRAME'],
+    });
+    expect(text).toContain('FLAME');
+    expect(text).toContain('FAME');
+    expect(text).toContain('FRAME');
+  });
+
+  test('generateShareText includes incantation name when provided', () => {
+    const text = generateShareText({
+      stars: 3,
+      difficulty: 'MEDIUM',
+      level: 5,
+      hintsUsed: 0,
+      invalidAttempts: 0,
+      moveCount: 3,
+      incantationName: 'The FLAME Dance',
+    });
+    expect(text).toContain('"The FLAME Dance"');
+  });
+
+  test('generateShareText includes animal whisper when provided', () => {
+    const text = generateShareText({
+      stars: 2,
+      difficulty: 'HARD',
+      level: 10,
+      hintsUsed: 0,
+      invalidAttempts: 1,
+      moveCount: 4,
+      animalWhisper: 'The fire knows your name.',
+    });
+    expect(text).toContain('"The fire knows your name."');
+  });
 });

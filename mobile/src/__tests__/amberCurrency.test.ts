@@ -24,6 +24,8 @@ import {
   getStreakFreezeCount,
   checkFreeStreakFreeze,
   STREAK_FREEZE_AMBER_COST,
+  checkStreakMilestone,
+  STREAK_MILESTONES,
 } from '../services/amberCurrency';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -416,5 +418,79 @@ describe('one-time narrative flags', () => {
     expect(await hasSeenFoxPlayNudge()).toBe(false);
     await markFoxPlayNudgeSeen();
     expect(await hasSeenFoxPlayNudge()).toBe(true);
+  });
+});
+
+// ============================================================================
+// Streak Milestones
+// ============================================================================
+
+describe('checkStreakMilestone', () => {
+  test('returns null when no milestone is crossed', () => {
+    expect(checkStreakMilestone(1, 0, 0 as any)).toBeNull();
+    expect(checkStreakMilestone(2, 1, 0 as any)).toBeNull();
+    expect(checkStreakMilestone(5, 4, 0 as any)).toBeNull();
+  });
+
+  test('awards 15 amber at 3-day streak', () => {
+    const result = checkStreakMilestone(3, 2, 0 as any);
+    expect(result).not.toBeNull();
+    expect(result!.amber).toBe(15);
+    expect(result!.message).toBe('Three-day streak!');
+  });
+
+  test('awards 30 amber at 7-day streak', () => {
+    const result = checkStreakMilestone(7, 6, 0 as any);
+    expect(result).not.toBeNull();
+    expect(result!.amber).toBe(30);
+    expect(result!.message).toBe('One-week streak!');
+  });
+
+  test('awards 50 amber at 14-day streak', () => {
+    const result = checkStreakMilestone(14, 13, 0 as any);
+    expect(result).not.toBeNull();
+    expect(result!.amber).toBe(50);
+  });
+
+  test('awards 100 amber at 30-day streak', () => {
+    const result = checkStreakMilestone(30, 29, 0 as any);
+    expect(result).not.toBeNull();
+    expect(result!.amber).toBe(100);
+  });
+
+  test('does not re-fire a milestone already passed', () => {
+    // previousStreak was already 3, current is 4 — should NOT trigger 3-day milestone
+    expect(checkStreakMilestone(4, 3, 0 as any)).toBeNull();
+    expect(checkStreakMilestone(8, 7, 0 as any)).toBeNull();
+  });
+
+  test('crossing multiple milestones at once returns the first one', () => {
+    // Jump from 0 to 30 — should return the 3-day milestone (first crossed)
+    const result = checkStreakMilestone(30, 0, 0 as any);
+    expect(result).not.toBeNull();
+    expect(result!.amber).toBe(15); // 3-day milestone
+  });
+
+  test('uses dark messages at phase 2+', () => {
+    const result7_p0 = checkStreakMilestone(7, 6, 0 as any);
+    expect(result7_p0!.message).toBe('One-week streak!');
+
+    const result7_p2 = checkStreakMilestone(7, 6, 2 as any);
+    expect(result7_p2!.message).toBe('Seven days. The pattern notices.');
+
+    const result14_p3 = checkStreakMilestone(14, 13, 3 as any);
+    expect(result14_p3!.message).toBe('Fourteen days without breaking the chain.');
+
+    const result30_p4 = checkStreakMilestone(30, 29, 4 as any);
+    expect(result30_p4!.message).toBe('Thirty days. The arrangement is grateful.');
+  });
+
+  test('3-day milestone has no dark message (returns normal at any phase)', () => {
+    const result = checkStreakMilestone(3, 2, 4 as any);
+    expect(result!.message).toBe('Three-day streak!');
+  });
+
+  test('STREAK_MILESTONES has 4 entries', () => {
+    expect(STREAK_MILESTONES).toHaveLength(4);
   });
 });

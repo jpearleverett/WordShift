@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   Animated,
+  Pressable,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -54,7 +55,7 @@ import {
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress } from './src/services/amberCurrency';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
-import { getAnimalWhisper, getAnimalInterjection } from './src/services/phaseNarrative';
+import { getAnimalWhisper, getAnimalInterjection, getHomescreenNudge } from './src/services/phaseNarrative';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
@@ -125,6 +126,12 @@ export default function App() {
   const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
   const [onboardingLineIndex, setOnboardingLineIndex] = useState(0);
   const [onboardingReady, setOnboardingReady] = useState(false);
+
+  // Victory animation skip-forward state
+  const victoryAnimatingRef = useRef(false);
+
+  // Home nudge — track consecutive puzzles without visiting home
+  const puzzlesSinceHomeVisit = useRef(0);
 
   // Daily challenge state
   const [isPlayingDaily, setIsPlayingDaily] = useState(false);
@@ -374,6 +381,7 @@ export default function App() {
   // Return to home screen
   const handleGoHome = useCallback(() => {
     hapticLight();
+    puzzlesSinceHomeVisit.current = 0;
     transitionTo('home', () => {
       puzzleActions.setGameState(GameState.IDLE);
       puzzleActions.setShowConfetti(false);
@@ -445,6 +453,13 @@ export default function App() {
         }
       }
 
+      // Show streak milestone toast if threshold was just crossed
+      if (victory.streakMilestoneMessage) {
+        setTimeout(() => {
+          puzzleActions.setMessage(`${victory.streakMilestoneMessage} (+${victory.streakMilestoneBonus} amber)`);
+        }, 800);
+      }
+
       puzzleActions.setEarnedStars(victory.earnedStars);
       victoryActions.setVictoryData(victory);
 
@@ -457,9 +472,12 @@ export default function App() {
       puzzleActions.setGameState(GameState.WON);
       puzzleActions.setShowConfetti(true);
       victoryActions.setProcessingVictory(false);
+      puzzlesSinceHomeVisit.current += 1;
 
-      // Play choreographed victory sequence
+      // Play choreographed victory sequence (with skip-forward window)
+      victoryAnimatingRef.current = true;
       victoryActions.playVictorySequence(victory.earnedStars);
+      setTimeout(() => { victoryAnimatingRef.current = false; }, 1200);
 
       // If phase changed, immediately show transition overlay and play dramatic flash
       if (victory.phaseChanged) {
@@ -519,7 +537,7 @@ export default function App() {
       }
 
       // Narrative micro-beat — surprise moments at specific puzzle milestones
-      checkNarrativeMicroBeat(victory.puzzlesSolved).then(beat => {
+      checkNarrativeMicroBeat(victory.cumulativeStats?.totalPuzzlesCompleted ?? 0).then(beat => {
         if (beat) {
           const delay = beat.type === 'glitch_title' ? 600 : 1800;
           setTimeout(() => {
@@ -567,11 +585,27 @@ export default function App() {
         }
       }, 1200);
 
-      // Trigger animal interjection after a longer delay (skip during onboarding)
+      // Trigger animal interjection or home nudge after a longer delay (skip during onboarding)
       if (!isOnboarding) setTimeout(async () => {
         if (showWhisper) return; // Don't stack with whisper
         try {
           const fullProgress = await getFullProgress();
+
+          // Home nudge takes priority after 3+ puzzles without visiting home
+          if (puzzlesSinceHomeVisit.current >= 3) {
+            const nudge = getHomescreenNudge(
+              persistence.currentPhase,
+              fullProgress.unlockedAnimals || [],
+              puzzlesSinceHomeVisit.current
+            );
+            if (nudge) {
+              setInterjection(nudge);
+              setShowInterjection(true);
+              return;
+            }
+          }
+
+          // Standard random interjection
           const interj = getAnimalInterjection(
             persistence.currentPhase,
             fullProgress.unlockedAnimals || [],
@@ -680,6 +714,7 @@ export default function App() {
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
+    puzzlesSinceHomeVisit.current = 0;
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);
@@ -705,8 +740,19 @@ export default function App() {
       isDaily: isPlayingDaily,
       dailyDate: isPlayingDaily ? getTodayString() : undefined,
       moveCount,
+      wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
+      animalWhisper: whisper?.text,
+      phase: persistence.currentPhase,
+      incantationName: puzzle.lastIncantationName || undefined,
     });
-  }, [victoryFlow.victoryData, puzzle, isPlayingDaily]);
+  }, [victoryFlow.victoryData, puzzle, isPlayingDaily, whisper, persistence.currentPhase]);
+
+  const handleVictoryTapAccelerate = useCallback(() => {
+    if (victoryAnimatingRef.current && victoryFlow.victoryData) {
+      victoryAnimatingRef.current = false;
+      victoryActions.skipToEnd(victoryFlow.victoryData.earnedStars);
+    }
+  }, [victoryFlow.victoryData, victoryActions]);
 
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
@@ -1293,6 +1339,15 @@ export default function App() {
           phase={persistence.currentPhase}
           onClose={() => puzzleActions.setShowRules(false)}
         />
+
+        {/* Tap-to-accelerate overlay for victory animation */}
+        {puzzle.gameState === GameState.WON && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleVictoryTapAccelerate}
+            pointerEvents="box-none"
+          />
+        )}
 
         {/* Victory Modal — extracted component (hidden during onboarding so FoxGuide is visible) */}
         <VictoryModal

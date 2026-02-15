@@ -830,9 +830,15 @@ export interface NarrativeMicroBeat {
  * These are subtle moments of wrongness during the long Phase 1-2 corridor:
  *
  * - Puzzle 35: Victory title briefly shows wrong text then corrects itself
+ * - Puzzle 40: The house is alive — first environmental foreshadowing
  * - Puzzle 50: A whisper appears unbidden on the home screen
+ * - Puzzle 55: Word-specific foreshadowing — some words leave marks
  * - Puzzle 65: The victory feedback text contains an anomaly
+ * - Puzzle 80: Second glitch title — they're listening
+ * - Puzzle 90: The animals are coordinating — collective awareness
  * - Puzzle 100: A brief ambient whisper during puzzle solving
+ * - Puzzle 110: The house is changing physically
+ * - Puzzle 130: The letters have agency — player complicity deepens
  */
 const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   35: {
@@ -841,9 +847,19 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'PERFECT!',
     durationMs: 400,
   },
+  40: {
+    type: 'ambient_whisper',
+    text: 'The house settles at night. You can almost hear it breathing.',
+    durationMs: 3000,
+  },
   50: {
     type: 'ambient_whisper',
     text: 'The light is changing. Have you noticed?',
+    durationMs: 3000,
+  },
+  55: {
+    type: 'ambient_whisper',
+    text: 'Some words leave marks where others don\'t. Have you noticed which ones?',
     durationMs: 3000,
   },
   65: {
@@ -851,10 +867,31 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The words you\'ve formed... they remember each other.',
     durationMs: 3000,
   },
+  80: {
+    type: 'glitch_title',
+    glitchTitle: 'THEY HEAR YOU',
+    text: 'PERFECT!',
+    durationMs: 350,
+  },
+  90: {
+    type: 'ambient_whisper',
+    text: 'The animals have been talking about you. All of them. At the same time.',
+    durationMs: 3500,
+  },
   100: {
     type: 'ambient_whisper',
     text: 'One hundred arrangements. The house hums.',
     durationMs: 3500,
+  },
+  110: {
+    type: 'ambient_whisper',
+    text: 'One hundred and ten arrangements. The walls are thicker now.',
+    durationMs: 3000,
+  },
+  130: {
+    type: 'ambient_whisper',
+    text: 'You feel it too, don\'t you? The way the letters know where they belong before you place them.',
+    durationMs: 4000,
   },
 };
 
@@ -914,4 +951,65 @@ export async function resetMicroBeats(): Promise<void> {
   } catch {
     // Silently fail — non-critical
   }
+}
+
+// ============================================================================
+// HOME SCREEN NUDGE — pull puzzle-focused players toward animal dialogue
+// ============================================================================
+
+const HOME_NUDGE_MESSAGES: Record<number, string[]> = {
+  0: [
+    '{name} has been waiting to talk to you. Visit the house!',
+    'Your friends miss you! Head home and say hi.',
+  ],
+  1: [
+    '{name} has something on their mind. You should visit.',
+    'The house feels quiet without you. {name} noticed.',
+  ],
+  2: [
+    '{name} has been staring at the walls. You should check on them.',
+    'Something is different at home. {name} wants to talk.',
+  ],
+  3: [
+    '{name} needs you to hear something. It cannot wait much longer.',
+    'The house is restless. {name} has been pacing.',
+  ],
+  4: [
+    'The keepers are calling for you. {name} says it is time.',
+    '{name} says: "We have waited long enough."',
+  ],
+};
+
+const ANIMAL_DISPLAY_NAMES: Record<string, string> = {
+  fox: 'Ember',
+  owl: 'Archimedes',
+  pangolin: 'Panko',
+  axolotl: 'Axel',
+  capybara: 'Chill',
+  fennec_fox: 'Fennick',
+  sloth: 'Sloane',
+  wombat: 'Warren',
+  rabbit: 'Thyme',
+  red_panda: 'Bamboo',
+};
+
+/**
+ * Get a home screen nudge message to pull puzzle-focused players toward the house.
+ * Returns null if conditions aren't met (< 3 puzzles since home visit, no animals).
+ */
+export function getHomescreenNudge(
+  phase: number,
+  unlockedAnimals: string[],
+  puzzlesSinceHome: number,
+): { animalName: string; text: string } | null {
+  if (unlockedAnimals.length === 0 || puzzlesSinceHome < 3) return null;
+
+  const clampedPhase = Math.min(4, Math.max(0, phase));
+  const messages = HOME_NUDGE_MESSAGES[clampedPhase];
+  const animalType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
+  const animalName = ANIMAL_DISPLAY_NAMES[animalType] || animalType;
+  const template = messages[Math.floor(Math.random() * messages.length)];
+  const text = template.replace(/\{name\}/g, animalName);
+
+  return { animalName, text };
 }

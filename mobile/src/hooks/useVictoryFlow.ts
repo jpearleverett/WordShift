@@ -20,6 +20,8 @@ export interface VictoryFlowActions {
   playVictorySequence: (stars: number) => void;
   playPhaseChangeFlash: () => void;
   resetVictory: () => void;
+  /** Instantly complete victory animation (tap-to-skip-forward) */
+  skipToEnd: (stars: number) => void;
 }
 
 export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
@@ -90,6 +92,14 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     ]).start();
   }, [phaseFlashOpacity]);
 
+  const skipToEnd = useCallback((stars: number) => {
+    victoryStar1.setValue(stars >= 1 ? 1 : 0);
+    victoryStar2.setValue(stars >= 2 ? 1 : 0);
+    victoryStar3.setValue(stars >= 3 ? 1 : 0);
+    victoryModalScale.setValue(1);
+    victoryModalOpacity.setValue(1);
+  }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
+
   const resetVictory = useCallback(() => {
     setVictoryData(null);
     setProcessingVictory(false);
@@ -112,6 +122,7 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     playVictorySequence,
     playPhaseChangeFlash,
     resetVictory,
+    skipToEnd,
   };
 
   return [state, actions];

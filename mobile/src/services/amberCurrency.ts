@@ -150,6 +150,41 @@ async function updateStreak(): Promise<number> {
 }
 
 // ============================================================================
+// STREAK MILESTONE REWARDS
+// ============================================================================
+
+/** Streak milestones that award one-time amber bonuses when crossed */
+export const STREAK_MILESTONES: {
+  streak: number;
+  amber: number;
+  message: string;
+  darkMessage?: string;
+}[] = [
+  { streak: 3, amber: 15, message: 'Three-day streak!' },
+  { streak: 7, amber: 30, message: 'One-week streak!', darkMessage: 'Seven days. The pattern notices.' },
+  { streak: 14, amber: 50, message: 'Two-week streak!', darkMessage: 'Fourteen days without breaking the chain.' },
+  { streak: 30, amber: 100, message: 'Thirty-day streak!', darkMessage: 'Thirty days. The arrangement is grateful.' },
+];
+
+/**
+ * Check if a streak milestone was just crossed.
+ * Returns the milestone if the current streak crosses a new threshold, null otherwise.
+ */
+export function checkStreakMilestone(
+  currentStreak: number,
+  previousStreak: number,
+  phase: DialoguePhase
+): { amber: number; message: string } | null {
+  for (const milestone of STREAK_MILESTONES) {
+    if (currentStreak >= milestone.streak && previousStreak < milestone.streak) {
+      const msg = (phase >= 2 && milestone.darkMessage) ? milestone.darkMessage : milestone.message;
+      return { amber: milestone.amber, message: msg };
+    }
+  }
+  return null;
+}
+
+// ============================================================================
 // STREAK FREEZE SYSTEM
 // ============================================================================
 
@@ -327,8 +362,13 @@ export async function awardPuzzleAmber(
   currentStreak: number;
   puzzlesSolved: number;
   phaseAcceleration: number;
+  streakMilestoneBonus: number;
+  streakMilestoneMessage: string | null;
 }> {
   const progress = await loadProgress();
+
+  // Capture previous streak before updating
+  const previousStreak = progress.currentStreak ?? 0;
 
   // Update streak first
   const currentStreak = await updateStreak();
@@ -414,6 +454,24 @@ export async function awardPuzzleAmber(
     }
   }
 
+  // Check for streak milestone bonus (one-time per milestone threshold)
+  let streakMilestoneBonus = 0;
+  let streakMilestoneMessage: string | null = null;
+  const streakMilestone = checkStreakMilestone(currentStreak, previousStreak, progress.currentPhase);
+  if (streakMilestone) {
+    streakMilestoneBonus = streakMilestone.amber;
+    streakMilestoneMessage = streakMilestone.message;
+    progress.amber += streakMilestoneBonus;
+    progress.totalAmberEarned += streakMilestoneBonus;
+
+    await recordTransaction({
+      amount: streakMilestoneBonus,
+      type: 'earn',
+      source: `streak_milestone_${currentStreak}`,
+      timestamp: Date.now(),
+    });
+  }
+
   // Check for phase transition using weighted phase progress
   const previousPhase = progress.currentPhase;
   const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
@@ -455,6 +513,8 @@ export async function awardPuzzleAmber(
     currentStreak,
     puzzlesSolved: progress.puzzlesSolved,
     phaseAcceleration,
+    streakMilestoneBonus,
+    streakMilestoneMessage,
   };
 }
 

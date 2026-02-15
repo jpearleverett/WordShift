@@ -23,7 +23,9 @@ export type QuestType =
   | 'daily_complete'    // Complete the daily challenge
   | 'no_hints'          // Complete N puzzles without hints
   | 'challenge_mode'    // Complete N puzzles in challenge mode
-  | 'earn_amber';       // Earn N total amber this week
+  | 'earn_amber'        // Earn N total amber this week
+  | 'visit_animals'     // Talk to N different animals this week
+  | 'streak_days';      // Maintain a streak for N days
 
 export interface Quest {
   id: string;
@@ -91,6 +93,13 @@ const QUEST_POOL: QuestTemplate[] = [
   // Amber earning
   { type: 'earn_amber', titleTemplate: 'Amber Collector', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'Gather {target} amber for the arrangement', target: 50, rewardAmber: 30 },
   { type: 'earn_amber', titleTemplate: 'Amber Rush', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'The coffers of the temple must be filled', target: 100, rewardAmber: 55 },
+
+  // Home engagement — encourage visiting animals
+  { type: 'visit_animals', titleTemplate: 'Social Butterfly', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'Consult {target} keepers this week', target: 3, rewardAmber: 40 },
+  { type: 'visit_animals', titleTemplate: 'Community Builder', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'The keepers require your audience', target: 5, rewardAmber: 60 },
+
+  // Streak consistency
+  { type: 'streak_days', titleTemplate: 'Consistent', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Do not break the chain for {target} days', target: 3, rewardAmber: 35 },
 ];
 
 // ============================================================================
@@ -223,6 +232,10 @@ export async function updateQuestProgress(event: {
   isDaily: boolean;
   isChallenge: boolean;
   amberEarned: number;
+  /** Number of distinct animals visited this week (for visit_animals quests) */
+  animalsVisited?: number;
+  /** Current streak length (for streak_days quests) */
+  currentStreak?: number;
 }, currentPhase: number = 0): Promise<Quest[]> {
   const state = await loadWeeklyQuests(currentPhase);
   const newlyCompleted: Quest[] = [];
@@ -254,14 +267,30 @@ export async function updateQuestProgress(event: {
       case 'earn_amber':
         progressDelta = event.amberEarned;
         break;
+      case 'visit_animals':
+        // Set progress directly to the current count (not delta-based)
+        if (event.animalsVisited !== undefined) {
+          quest.progress = Math.min(event.animalsVisited, quest.target);
+        }
+        progressDelta = 0; // Handled above via direct assignment
+        break;
+      case 'streak_days':
+        // Set progress directly to current streak length
+        if (event.currentStreak !== undefined) {
+          quest.progress = Math.min(event.currentStreak, quest.target);
+        }
+        progressDelta = 0; // Handled above via direct assignment
+        break;
     }
 
     if (progressDelta > 0) {
       quest.progress = Math.min(quest.progress + progressDelta, quest.target);
-      if (quest.progress >= quest.target && !quest.completed) {
-        quest.completed = true;
-        newlyCompleted.push(quest);
-      }
+    }
+
+    // Check for completion (handles both delta-based and direct-assignment quests)
+    if (quest.progress >= quest.target && !quest.completed) {
+      quest.completed = true;
+      newlyCompleted.push(quest);
     }
   }
 
