@@ -346,45 +346,6 @@ export function getDailyCommunityStats(dateStr?: string): {
 }
 
 /**
- * Daily streak milestones with amber rewards.
- * Rewards players for consecutive daily challenge completions.
- */
-export interface DailyStreakMilestone {
-  days: number;
-  amber: number;
-  message: string;
-  darkMessage: string;
-}
-
-export const DAILY_STREAK_MILESTONES: DailyStreakMilestone[] = [
-  { days: 3,  amber: 15,  message: 'Three days running!',        darkMessage: 'Three days observed.' },
-  { days: 7,  amber: 30,  message: 'A full week of dailies!',    darkMessage: 'Seven days. The ritual deepens.' },
-  { days: 14, amber: 50,  message: 'Two weeks strong!',          darkMessage: 'Fourteen days. The pattern holds.' },
-  { days: 21, amber: 75,  message: 'Three weeks dedicated!',     darkMessage: 'Twenty-one days. It expects you now.' },
-  { days: 30, amber: 100, message: 'One month of daily mastery!', darkMessage: 'Thirty days. The daily offering is... accepted.' },
-];
-
-/**
- * Check if a daily streak milestone was just reached.
- * Returns the milestone if the current streak matches AND the previous streak was below it.
- */
-export function checkDailyStreakMilestone(
-  currentStreak: number,
-  previousStreak: number,
-  phase: number
-): { amber: number; message: string } | null {
-  for (const milestone of DAILY_STREAK_MILESTONES) {
-    if (currentStreak >= milestone.days && previousStreak < milestone.days) {
-      return {
-        amber: milestone.amber,
-        message: phase >= 3 ? milestone.darkMessage : milestone.message,
-      };
-    }
-  }
-  return null;
-}
-
-/**
  * Clear daily challenge data (for testing)
  */
 export async function clearDailyProgress(): Promise<void> {

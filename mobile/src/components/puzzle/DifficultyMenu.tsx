@@ -191,7 +191,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </Text>
             )}
             {comboOptions.map(renderVariantItem)}
-            {comboOptions.length === 0 && baseOptions.length > 0 && (
+            {comboOptions.length === 0 && (
               <Text style={[
                 styles.combosComingText,
                 isDark && { color: phaseTheme.modalSecondaryTextColor },
@@ -202,20 +202,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </Text>
             )}
           </>
-        )}
-
-        {/* Unlock hint: show when no variants yet or next variant is close */}
-        {!hasNonStandardVariants && (
-          <View style={styles.unlockHintContainer}>
-            <Text style={[
-              styles.unlockHintText,
-              isDark && { color: phaseTheme.modalSecondaryTextColor },
-            ]}>
-              {phase >= 3
-                ? 'New arrangements reveal themselves with time.'
-                : 'New puzzle styles unlock as you solve more puzzles!'}
-            </Text>
-          </View>
         )}
       </ScrollView>
     </View>
@@ -402,22 +388,5 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
     overflow: 'hidden',
-  },
-  unlockHintContainer: {
-    marginTop: 8,
-    marginBottom: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: CandyColors.gray[300],
-  },
-  unlockHintText: {
-    fontSize: 11,
-    color: CandyColors.gray[400],
-    textAlign: 'center',
-    lineHeight: 16,
-    fontStyle: 'italic',
   },
 });

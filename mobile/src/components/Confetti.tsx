@@ -126,11 +126,9 @@ interface ConfettiProps {
   active: boolean;
   onComplete?: () => void;
   phase?: number;
-  /** Higher ritual energy (0-10) increases confetti density */
-  ritualEnergy?: number;
 }
 
-export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 0, ritualEnergy = 0 }) => {
+export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 0 }) => {
   const [pieces, setPieces] = useState<ConfettiPiece[]>([]);
 
   useEffect(() => {
@@ -141,10 +139,7 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
         return;
       }
       const theme = getPhaseTheme(phase);
-      // Scale confetti count with ritual energy (high-energy puzzles get more dramatic celebrations)
-      const baseCount = getMaxConfettiCount();
-      const energyBonus = ritualEnergy >= 7 ? Math.floor(baseCount * 0.4) : ritualEnergy >= 4 ? Math.floor(baseCount * 0.2) : 0;
-      setPieces(generateConfetti(baseCount + energyBonus, theme.confettiColors));
+      setPieces(generateConfetti(getMaxConfettiCount(), theme.confettiColors));
       const timeout = setTimeout(() => {
         onComplete?.();
       }, 3500);
@@ -170,19 +165,9 @@ interface StarBurstProps {
   active: boolean;
   x: number;
   y: number;
-  phase?: number;
 }
 
-/** Phase-aware star burst colors: gold → amber → purple → crimson */
-const STAR_BURST_COLORS: Record<number, { bg: string; shadow: string }> = {
-  0: { bg: '#FFD700', shadow: '#FFD700' },
-  1: { bg: '#F0C050', shadow: '#D4A030' },
-  2: { bg: '#B088D0', shadow: '#8B5FB0' },
-  3: { bg: '#9050B0', shadow: '#6A2080' },
-  4: { bg: '#C03050', shadow: '#901030' },
-};
-
-export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 }) => {
+export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y }) => {
   const stars = useRef(
     Array(8).fill(0).map((_, i) => ({
       scale: new Animated.Value(0),
@@ -244,8 +229,6 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
 
   if (!active) return null;
 
-  const phaseColors = STAR_BURST_COLORS[Math.min(phase, 4)] || STAR_BURST_COLORS[0];
-
   return (
     <View style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]} pointerEvents="none">
       {stars.map((star, i) => (
@@ -263,10 +246,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
             },
           ]}
         >
-          <View style={[styles.starInner, {
-            backgroundColor: phaseColors.bg,
-            shadowColor: phaseColors.shadow,
-          }]} />
+          <View style={styles.starInner} />
         </Animated.View>
       ))}
     </View>
@@ -301,8 +281,10 @@ const styles = StyleSheet.create({
   starInner: {
     width: 12,
     height: 12,
+    backgroundColor: '#FFD700',
     borderRadius: 2,
     transform: [{ rotate: '45deg' }],
+    shadowColor: '#FFD700',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
