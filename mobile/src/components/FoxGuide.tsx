@@ -13,7 +13,7 @@ import { CandyColors, getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { OPTIONAL_FOX_GUIDE_SPRITES } from '../assets/optionalAssets';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Fox sprites with fallback
 const foxTalkSprite = OPTIONAL_FOX_GUIDE_SPRITES.talk ?? null;
@@ -250,6 +250,8 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       ]}
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
+      accessibilityRole="alert"
+      accessibilityLabel={`Ember says: ${text}`}
     >
       <View style={styles.guideCard}>
         {/* Fox sprite */}
@@ -258,6 +260,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
             styles.foxContainer,
             { transform: [{ translateY: bounceAnim }] },
           ]}
+          accessibilityLabel="Ember the fox, speaking"
         >
           {foxTalkSprite ? (
             <Image
@@ -322,13 +325,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   containerBottom: {
-    bottom: 30,
+    bottom: Math.max(30, SCREEN_HEIGHT * 0.04),
   },
   containerTop: {
-    top: 100,
+    top: Math.max(60, SCREEN_HEIGHT * 0.1),
   },
   containerMiddle: {
-    top: 220,
+    top: Math.max(160, SCREEN_HEIGHT * 0.25),
   },
 
   // ---- Compact variant (floating card) ----

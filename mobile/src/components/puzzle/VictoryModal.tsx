@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
+import { getSettingsSync } from '../../services/settings';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
 import {
@@ -85,6 +86,33 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 }) => {
   const phaseTheme = getPhaseTheme(phase);
 
+  // Cascade animation: content fades in sequentially after modal appears
+  const contentOpacity1 = useRef(new Animated.Value(0)).current; // Amber/streak section
+  const contentOpacity2 = useRef(new Animated.Value(0)).current; // Ritual echo section
+  const contentOpacity3 = useRef(new Animated.Value(0)).current; // Stats + buttons
+
+  useEffect(() => {
+    if (visible) {
+      const reducedMotion = getSettingsSync().reducedMotion;
+      if (reducedMotion) {
+        contentOpacity1.setValue(1);
+        contentOpacity2.setValue(1);
+        contentOpacity3.setValue(1);
+        return;
+      }
+      // Reset
+      contentOpacity1.setValue(0);
+      contentOpacity2.setValue(0);
+      contentOpacity3.setValue(0);
+      // Staggered fade-in after modal entrance (modal takes ~800ms)
+      Animated.stagger(150, [
+        Animated.timing(contentOpacity1, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(contentOpacity2, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(contentOpacity3, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible]);
+
   if (!visible) return null;
 
   return (
@@ -143,7 +171,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
-            {/* Amber earned */}
+            {/* Amber earned — cascade group 1 */}
+            <Animated.View style={{ opacity: contentOpacity1, width: '100%', alignItems: 'center' }}>
             {victoryData && (
               <View style={styles.amberEarnedContainer}>
                 <Text style={styles.amberEarnedIcon}>{'\uD83D\uDC8E'}</Text>
@@ -223,7 +252,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {getVictoryFeedback(earnedStars, phase)}
             </Text>
+            </Animated.View>
 
+            {/* Ritual Echo — cascade group 2 */}
+            <Animated.View style={{ opacity: contentOpacity2, width: '100%', alignItems: 'center' }}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
             {completedWords && completedWords.length > 0 && (
               <View style={[
@@ -289,6 +321,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </Text>
             )}
 
+            </Animated.View>
+
+            {/* Stats + buttons — cascade group 3 */}
+            <Animated.View style={{ opacity: contentOpacity3, width: '100%', alignItems: 'center' }}>
             <View style={[styles.victoryStats, {
               backgroundColor: phaseTheme.modalStatBgColor,
             }]}>
@@ -353,6 +389,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
               </TouchableOpacity>
             </View>
+            </Animated.View>
           </Animated.View>
         </ScrollView>
       </View>
