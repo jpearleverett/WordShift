@@ -390,9 +390,6 @@ const styles = StyleSheet.create({
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(76, 29, 149, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
     zIndex: 500,
   },
   modalShine: {
@@ -409,7 +406,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 48,
   },
   victoryModal: {
     backgroundColor: CandyColors.white,

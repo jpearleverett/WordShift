@@ -647,6 +647,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <Modal
         visible={dialogueFlow.showDialogue}
         transparent
+        statusBarTranslucent
         animationType="none"
         onRequestClose={dialogueFlow.handleCloseDialogue}
       >
@@ -766,6 +767,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <Modal
         visible={unlockFlow.showShop}
         transparent
+        statusBarTranslucent
         animationType="fade"
         onRequestClose={() => unlockFlow.setShowShop(false)}
       >
@@ -865,6 +867,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <Modal
         visible={unlockFlow.showRoomUnlock !== null}
         transparent
+        statusBarTranslucent
         animationType="fade"
         onRequestClose={() => unlockFlow.setShowRoomUnlock(null)}
       >
@@ -931,6 +934,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <Modal
         visible={unlockFlow.showInvitePrompt}
         transparent
+        statusBarTranslucent
         animationType="fade"
         onRequestClose={() => unlockFlow.setShowInvitePrompt(false)}
       >
@@ -1040,6 +1044,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <Modal
         visible={showIntroDialogue}
         transparent
+        statusBarTranslucent
         animationType="fade"
         onRequestClose={handleCloseIntroDialogue}
       >
@@ -1140,6 +1145,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <Modal
         visible={showSacrificeModal}
         transparent
+        statusBarTranslucent
         animationType="fade"
         onRequestClose={() => setShowSacrificeModal(false)}
       >
@@ -1229,6 +1235,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       <Modal
         visible={showHouseCompletion}
         transparent
+        statusBarTranslucent
         animationType="fade"
         onRequestClose={() => setShowHouseCompletion(false)}
       >

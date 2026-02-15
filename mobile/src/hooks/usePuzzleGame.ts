@@ -214,6 +214,17 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const variantToUse = options?.preserveVariant ? currentVariant : (options?.variant || 'standard');
     const resetPerformance = options?.resetPerformance ?? true;
 
+    // Defensive validation: ensure all words are the same length
+    const expectedLen = words[0]?.length ?? wordLength;
+    const hasInconsistentLengths = words.some(w => w.length !== expectedLen);
+    if (hasInconsistentLengths) {
+      console.warn('Puzzle has inconsistent word lengths, falling back to safe puzzle');
+      const safeFallback = getRandomFallback(difficulty);
+      const safeLen = safeFallback[0].length;
+      // Recursive call with validated fallback — won't loop because fallback pools are consistent
+      return applyBoard(safeFallback, undefined, undefined, safeLen, options);
+    }
+
     const newRows: RowData[] = words.map(word => ({
       id: generateId(),
       originalWord: word,
@@ -289,14 +300,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       timeoutPromise,
     ]);
 
-    if (!isVariantCompatibleWithSolution(activeVariant, puzzle.solution)) {
+    if (!isVariantCompatibleWithSolution(activeVariant, puzzle.solution, puzzle.words)) {
       let compatiblePuzzle = null as typeof puzzle | null;
       for (let attempt = 0; attempt < 3; attempt++) {
         const retry = await Promise.race([
           generateLocalPuzzle(selectedDifficulty, generationOverrides),
           timeoutPromise,
         ]);
-        if (isVariantCompatibleWithSolution(activeVariant, retry.solution)) {
+        if (isVariantCompatibleWithSolution(activeVariant, retry.solution, retry.words)) {
           compatiblePuzzle = retry;
           break;
         }
