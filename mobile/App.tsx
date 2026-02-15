@@ -63,6 +63,7 @@ import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges } from './src/services/cloudSave';
+import { savePuzzleState, loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import {
   hasVariantModifier,
   getVariantTimeLimit,
@@ -116,6 +117,42 @@ export default function App() {
   useEffect(() => {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  // Auto-save puzzle state after every valid move
+  useEffect(() => {
+    if (
+      puzzle.gameState === GameState.PLAYING &&
+      puzzle.history.length > 0 &&
+      currentScreen === 'puzzle'
+    ) {
+      savePuzzleState({
+        rows: puzzle.rows,
+        activeRowIndex: puzzle.activeRowIndex,
+        selectedLetter: puzzle.selectedLetter,
+        gameState: puzzle.gameState,
+        message: puzzle.message,
+        history: puzzle.history,
+        invalidAttempts: puzzle.invalidAttempts,
+        hintsUsed: puzzle.hintsUsed,
+        undosRemaining: puzzle.undosRemaining,
+        difficulty: puzzle.difficulty,
+        currentWordLength: puzzle.currentWordLength,
+        hint: puzzle.hint,
+        solution: puzzle.solution,
+        gameMode: puzzle.gameMode,
+        currentVariant: puzzle.currentVariant,
+        selectedVariant: puzzle.selectedVariant,
+        moveDirection: puzzle.moveDirection,
+        blindRevealedRows: puzzle.blindRevealedRows,
+        currentChainLink: puzzle.currentChainLink,
+        chainLength: puzzle.chainLength,
+        currentPhase: puzzle.currentPhase,
+        lastFormedWord: puzzle.lastFormedWord,
+        isPlayingDaily,
+        savedAt: Date.now(),
+      }).catch(() => {});
+    }
+  }, [puzzle.history.length, puzzle.activeRowIndex, puzzle.gameState, currentScreen]);
 
   // StarBurst effect state for valid moves
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
@@ -349,10 +386,19 @@ export default function App() {
     const diff = difficulty || puzzle.difficulty;
     setRitualEchoWords([]);
     setCompletionCoda(null);
-    transitionTo('puzzle', () => {
-      puzzleActions.startNewGame(diff);
-      setIsPlayingDaily(false);
-      logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
+    transitionTo('puzzle', async () => {
+      // Check for saved in-progress puzzle
+      const saved = await loadPuzzleState();
+      if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily) {
+        puzzleActions.restorePuzzleState(saved);
+        setIsPlayingDaily(false);
+        logEvent({ type: 'puzzle_restored', data: { difficulty: saved.difficulty } });
+      } else {
+        clearPuzzleState().catch(() => {});
+        puzzleActions.startNewGame(diff);
+        setIsPlayingDaily(false);
+        logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
+      }
     });
   }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions]);
 
@@ -365,6 +411,7 @@ export default function App() {
     setRitualEchoWords([]);
     setCompletionCoda(null);
     transitionTo('puzzle', async () => {
+      clearPuzzleState().catch(() => {}); // Daily always starts fresh
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);
       try {
@@ -419,6 +466,9 @@ export default function App() {
     }
 
     if (result?.completed) {
+      // Clear mid-puzzle save on completion
+      clearPuzzleState().catch(() => {});
+
       // Lock interaction during async victory chain
       victoryActions.setProcessingVictory(true);
       hapticSuccess();
@@ -702,6 +752,7 @@ export default function App() {
 
   const handleNextLevel = useCallback(() => {
     hapticLight();
+    clearPuzzleState().catch(() => {});
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);

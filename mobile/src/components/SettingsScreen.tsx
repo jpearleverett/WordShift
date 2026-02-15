@@ -22,6 +22,7 @@ import { clearEvents } from '../services/eventLogger';
 import { resetTutorial } from './Tutorial';
 import { resetOnboarding } from '../services/onboarding';
 import { hapticLight } from '../services/haptics';
+import { clearPuzzleState } from '../services/puzzleSaveState';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -61,6 +62,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               resetTutorial(),
               resetOnboarding(),
               resetSettings(),
+              clearPuzzleState(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);

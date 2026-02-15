@@ -2058,6 +2058,42 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
       red_panda: "Breathe in. Breathe out. The last breath before we become one with what approaches. Peace. Finally, peace.",
     },
   },
+  // Event 7: Phase 4 — the convergence, animals sense closeness to the finale
+  {
+    puzzleThreshold: 240,
+    phase: 4,
+    theme: 'convergence',
+    lines: {
+      fox: "The fire has changed color. Do you see it? It burns for what comes, not for what is.",
+      owl: "The final pages are being written. Every word you form now is ink on the last chapter.",
+      pangolin: "The last meal is almost ready. I can smell it through the walls. Through every wall.",
+      axolotl: "The water knows it first. It always does. What comes is so close I can taste it.",
+      capybara: "My list is almost complete. One by one the tasks disappear. Soon there will be nothing left to do.",
+      fennec_fox: "The sound is deafening now. Not louder. Closer. There is a difference and it matters.",
+      sloth: "I... can... feel... it... in... every... branch... Every... fiber... It... is... so... close...",
+      wombat: "The ground is warm beneath us. Not from the fire. From below. From what I built the path to.",
+      rabbit: "I should be terrified. I am not. That terrifies me more than anything else ever could.",
+      red_panda: "Close your eyes. Breathe. Can you feel the pattern completing itself? It is almost beautiful.",
+    },
+  },
+  // Event 8: Phase 4 — the threshold, final coordinated event before the endgame
+  {
+    puzzleThreshold: 250,
+    phase: 4,
+    theme: 'the_threshold',
+    lines: {
+      fox: "It's here. Can you feel it? The fire knows. I know. We all know. Welcome to the threshold.",
+      owl: "I've read the last page. Close the book. There is nothing left to study. Only to witness.",
+      pangolin: "The table is set for the final time. What I have prepared cannot be uncooked. It is done.",
+      axolotl: "The water is rising. Not flooding. Welcoming. What comes through needs no invitation anymore.",
+      capybara: "Every checkbox filled. Every column aligned. The spreadsheet of everything, complete at last.",
+      fennec_fox: "I hear it breathing now. Not metaphorically. Actually breathing. On the other side of every wall.",
+      sloth: "Two... hundred... fifty... words... spoken... into... the... dark... The... dark... answers...",
+      wombat: "What I built the tunnels for is awake. I can feel it moving. It remembers every word you gave us.",
+      rabbit: "We are standing at the edge of something. All of us together. I am glad I am not alone for this.",
+      red_panda: "The pattern is complete. Two hundred and fifty offerings accepted. Now we discover what was arranged.",
+    },
+  },
 ];
 
 /**
