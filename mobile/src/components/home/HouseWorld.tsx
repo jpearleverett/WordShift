@@ -18,12 +18,7 @@ import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { isOnCooldown } from '../../services/dialogueSession';
-
-// Environment assets
-const SKY_DAY = require('../../../assets/environment/sky_day.png');
-const SKY_DUSK = require('../../../assets/environment/sky_dusk.png');
-const SKY_STORM = require('../../../assets/environment/sky_storm.png');
-const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
+import { OPTIONAL_ENVIRONMENT_SKIES } from '../../assets/optionalAssets';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -843,6 +838,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   };
 
   const houseHeight = calculateHouseHeight();
+  const skySource = currentPhase >= 4
+    ? OPTIONAL_ENVIRONMENT_SKIES.shadow
+    : currentPhase >= 3
+      ? OPTIONAL_ENVIRONMENT_SKIES.storm
+      : currentPhase >= 2
+        ? OPTIONAL_ENVIRONMENT_SKIES.dusk
+        : OPTIONAL_ENVIRONMENT_SKIES.day;
 
   // Set initial pan position so the house is properly framed.
   // With flex-end, the house bottom is at the viewport bottom and the roof
@@ -887,18 +889,19 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   Oversized to prevent gaps at any zoom/pan combination.
                   Top offset grows with house height so the fill color above
                   the image seamlessly extends the sky as rooms are added. */}
-              <Image
-                source={
-                  currentPhase >= 4 ? SKY_SHADOW :
-                  currentPhase >= 3 ? SKY_STORM :
-                  currentPhase >= 2 ? SKY_DUSK :
-                  SKY_DAY
-                }
-                style={[styles.skyBackground, {
+              {skySource ? (
+                <Image
+                  source={skySource}
+                  style={[styles.skyBackground, {
+                    top: -Math.max(SCREEN_HEIGHT * 0.20, houseHeight * 0.0),
+                  }]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.skyFallback, {
                   top: -Math.max(SCREEN_HEIGHT * 0.20, houseHeight * 0.0),
-                }]}
-                resizeMode="cover"
-              />
+                }]} />
+              )}
 
               {/* Animated clouds - inside transform so they move with the scene */}
               <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
@@ -1102,6 +1105,14 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 1,
     height: SCREEN_HEIGHT * 1,
     zIndex: -1,
+  },
+  skyFallback: {
+    position: 'absolute',
+    left: -SCREEN_WIDTH * 0,
+    width: SCREEN_WIDTH * 1,
+    height: SCREEN_HEIGHT * 1,
+    zIndex: -1,
+    backgroundColor: 'transparent',
   },
   // Clouds - inside transform container
   cloud: {

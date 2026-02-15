@@ -48,6 +48,8 @@ export interface WeeklyQuestState {
   weekId: string; // ISO week identifier (e.g., "2026-W07")
   quests: Quest[];
   generatedAt: number;
+  /** Distinct animal ids visited this week (for visit_animals quests) */
+  animalsVisitedThisWeek: string[];
 }
 
 // ============================================================================
@@ -203,6 +205,9 @@ export async function loadWeeklyQuests(currentPhase: number = 0): Promise<Weekly
     if (stored) {
       const parsed: WeeklyQuestState = JSON.parse(stored);
       if (parsed.weekId === currentWeek) {
+        if (!parsed.animalsVisitedThisWeek) {
+          parsed.animalsVisitedThisWeek = [];
+        }
         questStateCache = parsed;
         return parsed;
       }
@@ -214,6 +219,7 @@ export async function loadWeeklyQuests(currentPhase: number = 0): Promise<Weekly
     weekId: currentWeek,
     quests: generateQuests(currentWeek, currentPhase),
     generatedAt: Date.now(),
+    animalsVisitedThisWeek: [],
   };
 
   questStateCache = newState;
@@ -238,6 +244,9 @@ export async function updateQuestProgress(event: {
   currentStreak?: number;
 }, currentPhase: number = 0): Promise<Quest[]> {
   const state = await loadWeeklyQuests(currentPhase);
+  if (!state.animalsVisitedThisWeek) {
+    state.animalsVisitedThisWeek = [];
+  }
   const newlyCompleted: Quest[] = [];
 
   for (const quest of state.quests) {
@@ -295,6 +304,52 @@ export async function updateQuestProgress(event: {
   }
 
   if (newlyCompleted.length > 0 || state.quests.some(q => q.progress > 0)) {
+    await saveQuestState(state);
+  }
+
+  return newlyCompleted;
+}
+
+/**
+ * Record that the player visited/talked to an animal this week.
+ * Updates visit_animals quests without incrementing puzzle-count quests.
+ */
+export async function recordAnimalVisit(
+  animalId: string,
+  currentPhase: number = 0,
+  currentStreak?: number
+): Promise<Quest[]> {
+  const state = await loadWeeklyQuests(currentPhase);
+  if (!state.animalsVisitedThisWeek) {
+    state.animalsVisitedThisWeek = [];
+  }
+
+  const beforeCount = state.animalsVisitedThisWeek.length;
+  if (!state.animalsVisitedThisWeek.includes(animalId)) {
+    state.animalsVisitedThisWeek.push(animalId);
+  }
+
+  const visitedCount = state.animalsVisitedThisWeek.length;
+  const newlyCompleted: Quest[] = [];
+
+  for (const quest of state.quests) {
+    if (quest.completed) continue;
+
+    if (quest.type === 'visit_animals') {
+      quest.progress = Math.min(visitedCount, quest.target);
+    } else if (quest.type === 'streak_days' && currentStreak !== undefined) {
+      quest.progress = Math.min(currentStreak, quest.target);
+    } else {
+      continue;
+    }
+
+    if (quest.progress >= quest.target && !quest.completed) {
+      quest.completed = true;
+      newlyCompleted.push(quest);
+    }
+  }
+
+  if (visitedCount !== beforeCount || newlyCompleted.length > 0) {
     await saveQuestState(state);
   }
 
@@ -375,6 +430,9 @@ export function getTimeUntilReset(): { days: number; hours: number; minutes: num
 // ============================================================================
 
 async function saveQuestState(state: WeeklyQuestState): Promise<void> {
+  if (!state.animalsVisitedThisWeek) {
+    state.animalsVisitedThisWeek = [];
+  }
   questStateCache = state;
   try {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
