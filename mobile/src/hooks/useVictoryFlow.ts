@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from 'react';
 import { Animated } from 'react-native';
 import { VictoryData } from './useGamePersistence';
 import { getSettingsSync } from '../services/settings';
+import { hapticLight, hapticHeavy } from '../services/haptics';
 
 export interface VictoryFlowState {
   victoryData: VictoryData | null;
@@ -43,6 +44,7 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       victoryStar3.setValue(stars >= 3 ? 1 : 0);
       victoryModalScale.setValue(1);
       victoryModalOpacity.setValue(1);
+      hapticHeavy();
       return;
     }
 
@@ -76,6 +78,12 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
         Animated.timing(victoryModalOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
       ]),
     ]).start();
+
+    // Haptic rhythm synced to star stagger: tap-tap-tap-THUD
+    if (stars >= 1) setTimeout(() => hapticLight(), 100);
+    if (stars >= 2) setTimeout(() => hapticLight(), 300);
+    if (stars >= 3) setTimeout(() => hapticLight(), 500);
+    setTimeout(() => hapticHeavy(), 100 + stars * 200 + 150);
   }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
 
   const playPhaseChangeFlash = useCallback(() => {

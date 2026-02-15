@@ -2,8 +2,32 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
+import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+/** Fire a haptic scaled to the scene's visual effect and event intensity */
+function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
+  const isIntense = (shakeIntensity ?? 0) >= 0.5;
+  switch (scene.effect) {
+    case 'flash':
+    case 'shake':
+      isIntense ? hapticWarning() : hapticHeavy();
+      break;
+    case 'pulse':
+    case 'vignette_close':
+      hapticMedium();
+      break;
+    case 'fade':
+    case 'particles_rise':
+    case 'particles_fall':
+      hapticLight();
+      break;
+    default:
+      hapticLight();
+      break;
+  }
+}
 
 interface PhaseTransitionOverlayProps {
   event: PhaseTransitionEvent | null;
@@ -37,10 +61,18 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       }).start();
     }
 
+    // Opening haptic beat
+    if (!reducedMotion) {
+      hapticMedium();
+    }
+
     // Schedule each scene
     event.scenes.forEach((scene, index) => {
       const showTimer = setTimeout(() => {
         setActiveSceneIndex(index);
+        if (!reducedMotion) {
+          fireSceneHaptic(scene, event.shakeIntensity);
+        }
         if (reducedMotion) {
           sceneOpacity.setValue(1);
           sceneTranslateY.setValue(0);
