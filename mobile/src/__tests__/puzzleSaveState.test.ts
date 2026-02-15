@@ -95,13 +95,12 @@ describe('puzzleSaveState', () => {
   });
 
   it('preserves daily flag', async () => {
-    const state = makeSavedState({ isPlayingDaily: true, dailyDate: '2026-02-15' });
+    const state = makeSavedState({ isPlayingDaily: true });
     await savePuzzleState(state);
 
     const loaded = await loadPuzzleState();
     expect(loaded).not.toBeNull();
     expect(loaded!.isPlayingDaily).toBe(true);
-    expect(loaded!.dailyDate).toBe('2026-02-15');
   });
 
   it('returns cached state without hitting storage on repeated loads', async () => {

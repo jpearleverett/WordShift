@@ -7,7 +7,6 @@ import {
   purchaseUnlock,
   isUnlockAvailable,
 } from '../services/homeWorldData';
-import { hapticError, hapticLight, hapticSuccess } from '../services/haptics';
 
 interface UseUnlockFlowParams {
   progress: HomeWorldProgress | null;
@@ -97,7 +96,6 @@ export function useUnlockFlow({
 
   // Handle room tap (for locked rooms or rooms needing animals)
   const handleRoomPress = useCallback((room: Room) => {
-    hapticLight();
     if (!room.isUnlocked) {
       setShowRoomUnlock(room);
       return;
@@ -114,7 +112,6 @@ export function useUnlockFlow({
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
     const result = await purchaseUnlock(unlock.id);
     if (result.success) {
-      hapticSuccess();
       setShowCelebration(true);
 
       await loadAllData();
@@ -136,8 +133,6 @@ export function useUnlockFlow({
           }, 300);
         }
       }
-    } else {
-      hapticError();
     }
   }, [progress, loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 

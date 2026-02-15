@@ -809,12 +809,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState]);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
-    const selectedExists = saved.selectedLetter
-      ? saved.rows.some(row => row.words.some(letter => letter.id === saved.selectedLetter!.id))
-      : false;
     setRows(saved.rows);
     setActiveRowIndex(saved.activeRowIndex);
-    setSelectedLetter(selectedExists ? saved.selectedLetter : null);
+    setSelectedLetter(null); // Don't restore mid-selection state
     setGameState(saved.gameState as GameState);
     setMessage(saved.message);
     setHistory(saved.history);

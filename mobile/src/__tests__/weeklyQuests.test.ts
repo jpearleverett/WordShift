@@ -8,7 +8,6 @@ import {
   getQuestDescription,
   getUnclaimedAmber,
   clearWeeklyQuests,
-  recordAnimalVisit,
   Quest,
   WeeklyQuestState,
 } from '../services/weeklyQuests';
@@ -126,7 +125,6 @@ describe('weeklyQuests', () => {
         weekId: '2020-W01',
         quests: [],
         generatedAt: Date.now(),
-        animalsVisitedThisWeek: [],
       };
       await AsyncStorage.setItem('wordshift_weekly_quests', JSON.stringify(oldState));
       await clearWeeklyQuests(); // clear cache
@@ -142,19 +140,6 @@ describe('weeklyQuests', () => {
       for (const quest of state.quests) {
         expect(quest.id).toContain(weekId);
       }
-    });
-
-    it('backfills animalsVisitedThisWeek for legacy stored state', async () => {
-      const fresh = await loadWeeklyQuests(0);
-      const legacyState = {
-        ...fresh,
-        animalsVisitedThisWeek: undefined,
-      } as any;
-      await clearWeeklyQuests();
-      await AsyncStorage.setItem('wordshift_weekly_quests', JSON.stringify(legacyState));
-
-      const loaded = await loadWeeklyQuests(0);
-      expect(loaded.animalsVisitedThisWeek).toEqual([]);
     });
 
     it('quests have dark descriptions', async () => {
@@ -792,20 +777,6 @@ describe('weeklyQuests', () => {
       if (streakQuest) {
         expect(s1.quests.find(q => q.id === streakQuest.id)?.progress).toBe(0);
       }
-    });
-
-    it('recordAnimalVisit updates tracked distinct animals and quest progress', async () => {
-      const state = await loadWeeklyQuests(0);
-      const visitQuest = state.quests.find(q => q.type === 'visit_animals');
-      if (!visitQuest) return;
-
-      await recordAnimalVisit('fox', 0);
-      await recordAnimalVisit('fox', 0); // duplicate should not increase distinct count
-      await recordAnimalVisit('owl', 0);
-
-      const updated = await loadWeeklyQuests(0);
-      expect(updated.animalsVisitedThisWeek.sort()).toEqual(['fox', 'owl']);
-      expect(updated.quests.find(q => q.id === visitQuest.id)?.progress).toBe(2);
     });
   });
 });

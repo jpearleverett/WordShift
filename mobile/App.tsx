@@ -62,7 +62,7 @@ import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
-import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import { markPendingChanges } from './src/services/cloudSave';
 import { savePuzzleState, loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import {
   hasVariantModifier,
@@ -82,8 +82,6 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function App() {
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
-  // Daily challenge state
-  const [isPlayingDaily, setIsPlayingDaily] = useState(false);
 
   // Custom hooks - game logic & persistence separated from UI
   const [puzzle, puzzleActions] = usePuzzleGame();
@@ -120,85 +118,46 @@ export default function App() {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
 
-  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auto-save puzzle state during active play (debounced to reduce write churn).
+  // Auto-save puzzle state after every valid move
   useEffect(() => {
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
+    if (
+      puzzle.gameState === GameState.PLAYING &&
+      puzzle.history.length > 0 &&
+      currentScreen === 'puzzle'
+    ) {
+      savePuzzleState({
+        rows: puzzle.rows,
+        activeRowIndex: puzzle.activeRowIndex,
+        selectedLetter: puzzle.selectedLetter,
+        gameState: puzzle.gameState,
+        message: puzzle.message,
+        history: puzzle.history,
+        invalidAttempts: puzzle.invalidAttempts,
+        hintsUsed: puzzle.hintsUsed,
+        undosRemaining: puzzle.undosRemaining,
+        difficulty: puzzle.difficulty,
+        currentWordLength: puzzle.currentWordLength,
+        hint: puzzle.hint,
+        solution: puzzle.solution,
+        gameMode: puzzle.gameMode,
+        currentVariant: puzzle.currentVariant,
+        selectedVariant: puzzle.selectedVariant,
+        moveDirection: puzzle.moveDirection,
+        blindRevealedRows: puzzle.blindRevealedRows,
+        currentChainLink: puzzle.currentChainLink,
+        chainLength: puzzle.chainLength,
+        currentPhase: puzzle.currentPhase,
+        lastFormedWord: puzzle.lastFormedWord,
+        isPlayingDaily,
+        savedAt: Date.now(),
+      }).catch(() => {});
     }
-
-    if (puzzle.gameState === GameState.PLAYING && currentScreen === 'puzzle') {
-      autosaveTimerRef.current = setTimeout(() => {
-        savePuzzleState({
-          rows: puzzle.rows,
-          activeRowIndex: puzzle.activeRowIndex,
-          selectedLetter: puzzle.selectedLetter,
-          gameState: puzzle.gameState,
-          message: puzzle.message,
-          history: puzzle.history,
-          invalidAttempts: puzzle.invalidAttempts,
-          hintsUsed: puzzle.hintsUsed,
-          undosRemaining: puzzle.undosRemaining,
-          difficulty: puzzle.difficulty,
-          currentWordLength: puzzle.currentWordLength,
-          hint: puzzle.hint,
-          solution: puzzle.solution,
-          gameMode: puzzle.gameMode,
-          currentVariant: puzzle.currentVariant,
-          selectedVariant: puzzle.selectedVariant,
-          moveDirection: puzzle.moveDirection,
-          blindRevealedRows: puzzle.blindRevealedRows,
-          currentChainLink: puzzle.currentChainLink,
-          chainLength: puzzle.chainLength,
-          currentPhase: puzzle.currentPhase,
-          lastFormedWord: puzzle.lastFormedWord,
-          isPlayingDaily,
-          dailyDate: isPlayingDaily ? getTodayString() : null,
-          savedAt: Date.now(),
-        }).catch(() => {});
-      }, 120);
-    }
-
-    return () => {
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-        autosaveTimerRef.current = null;
-      }
-    };
-  }, [
-    currentScreen,
-    isPlayingDaily,
-    puzzle.rows,
-    puzzle.activeRowIndex,
-    puzzle.selectedLetter,
-    puzzle.gameState,
-    puzzle.message,
-    puzzle.history,
-    puzzle.invalidAttempts,
-    puzzle.hintsUsed,
-    puzzle.undosRemaining,
-    puzzle.difficulty,
-    puzzle.currentWordLength,
-    puzzle.hint,
-    puzzle.solution,
-    puzzle.gameMode,
-    puzzle.currentVariant,
-    puzzle.selectedVariant,
-    puzzle.moveDirection,
-    puzzle.blindRevealedRows,
-    puzzle.currentChainLink,
-    puzzle.chainLength,
-    puzzle.currentPhase,
-    puzzle.lastFormedWord,
-  ]);
+  }, [puzzle.history.length, puzzle.activeRowIndex, puzzle.gameState, currentScreen]);
 
   // StarBurst effect state for valid moves
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
     active: false, x: 0, y: 0,
   });
-  const [invalidDropSignal, setInvalidDropSignal] = useState(0);
 
   // Onboarding state (replaces old tutorial overlay)
   const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
@@ -210,6 +169,9 @@ export default function App() {
 
   // Home nudge — track consecutive puzzles without visiting home
   const puzzlesSinceHomeVisit = useRef(0);
+
+  // Daily challenge state
+  const [isPlayingDaily, setIsPlayingDaily] = useState(false);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
@@ -299,7 +261,6 @@ export default function App() {
 
     // Schedule notifications on app launch (non-blocking)
     scheduleAllNotifications(0).catch(() => {});
-    uploadToCloud().catch(() => {});
 
     (async () => {
       // Check legacy tutorial flag first for backward compat
@@ -428,17 +389,10 @@ export default function App() {
     transitionTo('puzzle', async () => {
       // Check for saved in-progress puzzle
       const saved = await loadPuzzleState();
-      const today = getTodayString();
-      const canRestoreDaily = Boolean(
-        saved?.isPlayingDaily && (!saved.dailyDate || saved.dailyDate === today)
-      );
-      if (saved && saved.gameState === 'PLAYING' && (!saved.isPlayingDaily || canRestoreDaily)) {
+      if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily) {
         puzzleActions.restorePuzzleState(saved);
-        setIsPlayingDaily(Boolean(saved.isPlayingDaily && canRestoreDaily));
-        logEvent({
-          type: 'puzzle_restored',
-          data: { difficulty: saved.difficulty, isDaily: Boolean(saved.isPlayingDaily && canRestoreDaily) },
-        });
+        setIsPlayingDaily(false);
+        logEvent({ type: 'puzzle_restored', data: { difficulty: saved.difficulty } });
       } else {
         clearPuzzleState().catch(() => {});
         puzzleActions.startNewGame(diff);
@@ -457,23 +411,7 @@ export default function App() {
     setRitualEchoWords([]);
     setCompletionCoda(null);
     transitionTo('puzzle', async () => {
-      const saved = await loadPuzzleState();
-      const today = getTodayString();
-      const canRestoreDaily = Boolean(
-        saved
-        && saved.gameState === 'PLAYING'
-        && saved.isPlayingDaily
-        && (!saved.dailyDate || saved.dailyDate === today)
-      );
-
-      if (canRestoreDaily && saved) {
-        puzzleActions.restorePuzzleState(saved);
-        setIsPlayingDaily(true);
-        logEvent({ type: 'puzzle_restored', data: { difficulty: saved.difficulty, isDaily: true } });
-        return;
-      }
-
-      clearPuzzleState().catch(() => {});
+      clearPuzzleState().catch(() => {}); // Daily always starts fresh
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);
       try {
@@ -497,10 +435,7 @@ export default function App() {
     });
   }, [puzzleActions, transitionTo]);
 
-  const handleSlotPress = useCallback(async (
-    targetIndex: number,
-    feedbackOrigin?: { x: number; y: number }
-  ) => {
+  const handleSlotPress = useCallback(async (targetIndex: number) => {
     // Block interaction during victory processing
     if (victoryFlow.isProcessingVictory) return;
     if (puzzle.gameState === GameState.GAME_OVER) return;
@@ -516,7 +451,6 @@ export default function App() {
     ) {
       hapticError();
       soundInvalidMove();
-      setInvalidDropSignal(prev => prev + 1);
       puzzleActions.setMessage('Drop it into the glowing slot.');
       return;
     }
@@ -545,8 +479,7 @@ export default function App() {
         result.invalidAttempts,
         result.gameMode,
         result.completedWords,
-        result.variant || 'standard',
-        isPlayingDaily
+        result.variant || 'standard'
       );
 
       // Record daily challenge completion if applicable
@@ -670,7 +603,6 @@ export default function App() {
 
       // Mark cloud save as having pending changes
       markPendingChanges().catch(() => {});
-      uploadToCloud().catch(() => {});
 
       // During onboarding, advance to puzzle_complete step
       if (onboardingStep === 'puzzle_tutorial') {
@@ -741,18 +673,13 @@ export default function App() {
       // Slot press happened but was invalid
       hapticError();
       soundInvalidMove();
-      setInvalidDropSignal(prev => prev + 1);
     } else if (result === null) {
       // No action
     } else {
       // Valid intermediate move — trigger star burst celebration
       hapticMedium();
       soundValidMove();
-      setStarBurst({
-        active: true,
-        x: feedbackOrigin?.x ?? SCREEN_WIDTH / 2,
-        y: feedbackOrigin?.y ?? SCREEN_HEIGHT * 0.4,
-      });
+      setStarBurst({ active: true, x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT * 0.4 });
       setTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
 
       // Track formed word for in-puzzle ritual echo chain
@@ -1067,13 +994,8 @@ export default function App() {
   // Show loading while onboarding state is being determined
   if (!onboardingReady) {
     return (
-      <View style={styles.initialLoadingContainer}>
+      <View style={{ flex: 1, backgroundColor: '#1A1A2E' }}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <View style={styles.initialLoadingCard}>
-          <ActivityIndicator size="large" color={CandyColors.pink.main} />
-          <Text style={styles.initialLoadingTitle}>WordShift</Text>
-          <Text style={styles.initialLoadingSubtitle}>Preparing your house...</Text>
-        </View>
       </View>
     );
   }
@@ -1254,13 +1176,12 @@ export default function App() {
                 styles.phaseBadge,
                 persistence.currentPhase >= 3 && styles.phaseBadgeDark,
                 persistence.currentPhase >= 4 && styles.phaseBadgeVoid,
-              ]}
-              accessibilityLabel="Atmosphere shifted"
-              accessibilityRole="text"
-              >
-                <Text style={styles.phaseBadgeIcon}>
-                  {getPhaseIndicator(persistence.currentPhase).icon}
-                </Text>
+              ]}>
+                <Text style={styles.phaseBadgeIcon}>{getPhaseIndicator(persistence.currentPhase).icon}</Text>
+                <Text style={[
+                  styles.phaseBadgeText,
+                  persistence.currentPhase >= 3 && styles.phaseBadgeTextDark,
+                ]}>{getPhaseIndicator(persistence.currentPhase).label}</Text>
               </View>
             )}
           </View>
@@ -1369,14 +1290,8 @@ export default function App() {
             <View style={styles.loadingOverlay}>
               <View style={styles.loadingBox}>
                 <ActivityIndicator size="large" color={CandyColors.pink.main} />
-                <Text style={styles.loadingGlyph}>{persistence.currentPhase >= 3 ? '◈' : '✦'}</Text>
                 <Text style={styles.loadingText}>
                   {getLoadingMessage(persistence.currentPhase)}
-                </Text>
-                <Text style={styles.loadingHint}>
-                  {persistence.currentPhase >= 3
-                    ? 'The pattern settles into place...'
-                    : 'This should only take a moment.'}
                 </Text>
               </View>
             </View>
@@ -1409,7 +1324,6 @@ export default function App() {
                 guidanceActive={onboardingStep === 'puzzle_tutorial'}
                 guidedLetterId={tutorialGuidance?.sourceLetterId || null}
                 guidedSlotIndex={tutorialGuidance?.targetSlotIndex ?? null}
-                invalidDropSignal={invalidDropSignal}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews
@@ -1633,36 +1547,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  initialLoadingContainer: {
-    flex: 1,
-    backgroundColor: '#1A1A2E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  initialLoadingCard: {
-    minWidth: 220,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-  },
-  initialLoadingTitle: {
-    marginTop: 14,
-    fontSize: 22,
-    fontWeight: '900',
-    color: CandyColors.white,
-    letterSpacing: 1.2,
-  },
-  initialLoadingSubtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.75)',
-    letterSpacing: 0.4,
-  },
   screenBackground: {
     flex: 1,
     backgroundColor: '#1A1A2E',
@@ -1835,19 +1719,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: CandyColors.purple.main,
-  },
-  loadingGlyph: {
-    marginTop: 8,
-    fontSize: 18,
-    color: CandyColors.purple.main,
-    opacity: 0.8,
-  },
-  loadingHint: {
-    marginTop: 6,
-    fontSize: 11,
-    color: CandyColors.gray[500],
-    fontWeight: '600',
-    letterSpacing: 0.2,
   },
 
   // Controls

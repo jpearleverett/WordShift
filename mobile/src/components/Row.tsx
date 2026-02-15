@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  GestureResponderEvent,
 } from 'react-native';
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
@@ -37,7 +36,7 @@ interface RowProps {
   moveDirection?: 'down' | 'up';
   selectedLetter: Letter | null;
   onLetterPress: (letter: Letter, rowIndex: number) => void;
-  onSlotPress: (targetIndex: number, origin?: { x: number; y: number }) => void;
+  onSlotPress: (targetIndex: number) => void;
   isProcessing: boolean;
   phase?: number;
   wordLength?: number;
@@ -45,8 +44,6 @@ interface RowProps {
   guidanceActive?: boolean;
   guidedLetterId?: string | null;
   guidedSlotIndex?: number | null;
-  /** Incrementing signal from parent to trigger target-row invalid shake */
-  invalidDropSignal?: number;
   /** Word previews for each slot position (only on target row when letter is selected) */
   slotPreviews?: SlotPreview[];
 }
@@ -121,7 +118,7 @@ function getPhaseRowColors(phase: number) {
 
 // Animated drop slot component
 const Slot: React.FC<{
-  onPress: (origin?: { x: number; y: number }) => void;
+  onPress: () => void;
   index: number;
   compact?: boolean;
   phase?: number;
@@ -235,12 +232,7 @@ const Slot: React.FC<{
 
   return (
     <TouchableOpacity
-      onPress={(event: GestureResponderEvent) => {
-        onPress({
-          x: event.nativeEvent.pageX,
-          y: event.nativeEvent.pageY,
-        });
-      }}
+      onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
@@ -348,7 +340,6 @@ export const Row: React.FC<RowProps> = memo(({
   guidanceActive = false,
   guidedLetterId = null,
   guidedSlotIndex = null,
-  invalidDropSignal = 0,
   slotPreviews,
 }) => {
   const compactTiles = wordLength >= 6;
@@ -372,7 +363,6 @@ export const Row: React.FC<RowProps> = memo(({
   const glowAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
-  const invalidShakeX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Animate row transitions
@@ -486,19 +476,6 @@ export const Row: React.FC<RowProps> = memo(({
     }
   }, [showSlots, selectedLetter?.id]);
 
-  // Micro-shake the target row on invalid drop attempts.
-  useEffect(() => {
-    if (!isTarget || invalidDropSignal <= 0) return;
-    invalidShakeX.setValue(0);
-    Animated.sequence([
-      Animated.timing(invalidShakeX, { toValue: 7, duration: 45, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: -7, duration: 45, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: 5, duration: 40, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: -5, duration: 40, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: 0, duration: 35, useNativeDriver: true }),
-    ]).start();
-  }, [invalidDropSignal, isTarget, invalidShakeX]);
-
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
     const normalizedPos = totalElements > 1
@@ -549,7 +526,7 @@ export const Row: React.FC<RowProps> = memo(({
             ]}
           >
             <Slot
-              onPress={(origin) => onSlotPress(slotIndex, origin)}
+              onPress={() => onSlotPress(slotIndex)}
               index={slotIndex}
               compact
               phase={phase}
@@ -634,7 +611,6 @@ export const Row: React.FC<RowProps> = memo(({
         {
           transform: [
             { scale: scaleAnim },
-            { translateX: invalidShakeX },
             { translateY: slideAnim },
           ],
           opacity: opacityAnim,
