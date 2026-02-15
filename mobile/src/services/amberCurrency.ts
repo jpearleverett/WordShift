@@ -4,6 +4,7 @@ import {
   HomeWorldProgress,
   AmberTransaction,
   AMBER_REWARDS,
+  FIRST_COMPLETION_BONUS,
   PHASE_THRESHOLDS,
   DialoguePhase,
   STREAK_BONUSES,
@@ -129,15 +130,96 @@ async function updateStreak(): Promise<number> {
     progress.currentStreak += 1;
     progress.lastPlayDate = today;
   } else {
-    // Missed too many days - reset streak
-    progress.currentStreak = 1;
-    progress.lastPlayDate = today;
+    // Missed too many days — check for streak freeze before resetting
+    const freezesAvailable = progress.streakFreezes ?? 0;
+    if (freezesAvailable > 0 && progress.currentStreak > 0) {
+      // Consume a streak freeze to save the streak
+      progress.streakFreezes = freezesAvailable - 1;
+      progress.currentStreak += 1;
+      progress.lastPlayDate = today;
+    } else {
+      // No freeze available — reset streak
+      progress.currentStreak = 1;
+      progress.lastPlayDate = today;
+    }
   }
 
   progressCache = progress;
   await saveProgress();
   return progress.currentStreak;
 }
+
+// ============================================================================
+// STREAK FREEZE SYSTEM
+// ============================================================================
+
+const STREAK_FREEZE_COST = 50;
+const FREE_FREEZE_INTERVAL_DAYS = 14;
+
+/**
+ * Purchase a streak freeze using amber.
+ * Returns true if purchased successfully, false if insufficient amber.
+ */
+export async function purchaseStreakFreeze(): Promise<boolean> {
+  const progress = await loadProgress();
+  if (progress.amber < STREAK_FREEZE_COST) return false;
+
+  progress.amber -= STREAK_FREEZE_COST;
+  progress.streakFreezes = (progress.streakFreezes ?? 0) + 1;
+  progressCache = progress;
+  await saveProgress();
+  await recordTransaction({
+    amount: STREAK_FREEZE_COST,
+    type: 'spend',
+    source: 'streak_freeze_purchase',
+    timestamp: Date.now(),
+  });
+  return true;
+}
+
+/**
+ * Get current streak freeze count.
+ */
+export async function getStreakFreezeCount(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.streakFreezes ?? 0;
+}
+
+/**
+ * Check and grant a free streak freeze every 14 days.
+ * Called on app launch.
+ */
+export async function checkFreeStreakFreeze(): Promise<boolean> {
+  const progress = await loadProgress();
+  const today = getTodayDateString();
+  const lastFree = progress.lastFreeStreakFreezeDate;
+
+  if (!lastFree) {
+    // First time — grant one free freeze
+    progress.streakFreezes = (progress.streakFreezes ?? 0) + 1;
+    progress.lastFreeStreakFreezeDate = today;
+    progressCache = progress;
+    await saveProgress();
+    return true;
+  }
+
+  const lastDate = new Date(lastFree);
+  const todayDate = new Date(today);
+  const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays >= FREE_FREEZE_INTERVAL_DAYS) {
+    progress.streakFreezes = (progress.streakFreezes ?? 0) + 1;
+    progress.lastFreeStreakFreezeDate = today;
+    progressCache = progress;
+    await saveProgress();
+    return true;
+  }
+
+  return false;
+}
+
+/** Cost of a streak freeze in amber */
+export const STREAK_FREEZE_AMBER_COST = STREAK_FREEZE_COST;
 
 /**
  * Load progress from AsyncStorage
@@ -238,6 +320,7 @@ export async function awardPuzzleAmber(
   challengeBonus: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
+  firstCompletionBonus: number;
   newBalance: number;
   phaseChanged: boolean;
   newPhase: DialoguePhase;
@@ -313,6 +396,24 @@ export async function awardPuzzleAmber(
     });
   }
 
+  // Check for first-completion bonus (one-time per difficulty)
+  let firstCompletionBonus = 0;
+  const completedDiffs = progress.completedDifficulties ?? [];
+  if (!completedDiffs.includes(difficulty)) {
+    firstCompletionBonus = FIRST_COMPLETION_BONUS[difficulty];
+    progress.amber += firstCompletionBonus;
+    progress.totalAmberEarned += firstCompletionBonus;
+    progress.completedDifficulties = [...completedDiffs, difficulty];
+    if (firstCompletionBonus > 0) {
+      await recordTransaction({
+        amount: firstCompletionBonus,
+        type: 'earn',
+        source: `first_completion_${difficulty.toLowerCase()}`,
+        timestamp: Date.now(),
+      });
+    }
+  }
+
   // Check for phase transition using weighted phase progress
   const previousPhase = progress.currentPhase;
   const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
@@ -347,6 +448,7 @@ export async function awardPuzzleAmber(
     challengeBonus,
     milestoneBonus,
     milestoneMessage,
+    firstCompletionBonus,
     newBalance: progress.amber,
     phaseChanged,
     newPhase,

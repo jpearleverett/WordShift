@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (680 tests, 26 suites)
+npx jest --no-coverage   # Run all tests (700+ tests, 26 suites)
 ```
 
 ## Tech Stack
@@ -151,7 +151,7 @@ mobile/
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (680 tests, 26 suites)
+├── src/__tests__/               # Test suites (700+ tests, 26 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -285,11 +285,26 @@ All 10 character sprites are wired up in `CHARACTER_SPRITES` in `AnimalSprite.ts
 4. Both resulting words must be valid English words
 5. Progress through all rows to win
 
+### Curated Early Puzzles
+
+The first 3 post-onboarding puzzles are hand-picked (not generated) to ensure a compelling first session:
+- `CURATED_EARLY_PUZZLES` in `constants.ts`: 3 MEDIUM-difficulty puzzles with interesting middle-position letter moves
+- Served in `usePuzzleGame.ts` `startNewGame()` when `puzzlesSolved < CURATED_PUZZLE_COUNT` and difficulty is EASY/MEDIUM with standard variant
+- Falls back to normal generation if conditions aren't met
+
+### Word Preview Mechanic
+
+When a letter is selected (picked up), ghost previews show what word would form at each possible slot position in the target row:
+- Valid words shown in green, invalid in red/dimmed
+- Computed via `useMemo` in `usePuzzleGame.ts`, checking each insertion position against the dictionary
+- Preview data passed to `Row.tsx` as `slotPreviews` prop, rendered as small labels below each slot
+- Transforms the puzzle from "guess and check" to "evaluate options"
+
 ### Difficulty Levels
 
 | Difficulty | Word Length | Rows | Amber | Description |
 |-----------|-------------|------|-------|-------------|
-| EASY | 4 letters | 3 | 5 | Quick intro puzzles |
+| EASY | 4 letters | 3 | 8 | Quick intro puzzles |
 | MEDIUM | 4 letters | 4 | 10 | The standard experience |
 | MEDIUM_PLUS | 5 letters | 4 | 15 | Bridge between MEDIUM and HARD |
 | HARD | 5 letters | 5 | 20 | Full challenge |
@@ -303,6 +318,16 @@ Variants are now player-selected from the setup menu (not randomly injected). Pl
 - **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
 - **No Vowel / No Consonant**: Restriction variants that lock one letter class.
 - **Combos**: `reverse_blind`, `blind_no_vowel`, `blind_no_consonant`, `speed_no_vowel`, `speed_no_consonant`.
+
+**Variant Unlock Thresholds** (puzzles solved):
+| Variant | Puzzles Required |
+|---------|-----------------|
+| Reverse Shift | 12 |
+| Blind Shift | 22 |
+| No Vowel | 38 |
+| Speed Shift | 52 |
+| No Consonant | 68 |
+| Chain Shift | 85 |
 
 Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants and combos stay fully hidden until unlocked, so players only see styles they can actually select.
 - **Progressive disclosure**: combo variants are only shown once unlocked; until then, the setup menu shows a generic “more combinations later” message (without showing locked entries).
@@ -321,8 +346,9 @@ Game logic is extracted into six custom hooks:
 - `initGame(words, hint?, solution?, wordLength?)` - Load pre-generated puzzle
 - `startNewGame(difficulty?, mode?, variant?)` - Generate and start a puzzle using the selected/preferred variant (or explicit override)
 - `setSelectedVariant(variant)` - Update preferred variant and persist it for subsequent runs
-- `handleLetterPress(letter, rowIndex)` - Pick a letter
-- `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode; intermediate moves return `{ completed: false, formedWord }` for dread word detection
+- `handleLetterPress(letter, rowIndex)` - Pick a letter; uses `getLockedLetterMessage(phase)` for locked letter feedback
+- `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode; intermediate moves return `{ completed: false, formedWord }` for dread word detection; uses `getInvalidWordMessage(word, phase)` for invalid word feedback
+- `slotPreviews` - Computed via `useMemo`: when a letter is selected, previews what word each slot insertion would form (valid/invalid)
 - `handleHint()` - Show phase-aware hint (blocked in challenge mode)
 - `handleUndo()` - Undo last move (limited to 1 in challenge mode); uses MoveDelta pattern (lightweight deltas instead of deep clones)
 - `setCurrentPhase(phase)` - Sync narrative phase from persistence layer
@@ -444,11 +470,13 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 ### Currency System (Amber)
 
 - Players earn **Amber** by completing puzzles
-- Rewards: EASY=5, MEDIUM=10, MEDIUM_PLUS=15, HARD=20 base
+- Rewards: EASY=8, MEDIUM=10, MEDIUM_PLUS=15, HARD=20 base
+- **First-completion bonus** (one-time per difficulty): EASY=+10, MEDIUM=+20, MEDIUM_PLUS=+30, HARD=+50. Tracked via `completedDifficulties` in progress
 - Star bonuses: 3-star +50%, 2-star +25%
 - Challenge mode: 1.5x amber multiplier
 - Streak multiplier: 10% per day (max 100%, requires MIN_STREAK_FOR_BONUS=2)
 - **Streak grace period**: Players can miss up to STREAK_RESET_DAYS (2) days
+- **Streak freeze**: Purchasable for 50 amber (or free once every 14 days). Consumed automatically to prevent streak reset on a missed day. Functions: `purchaseStreakFreeze()`, `getStreakFreezeCount()`, `checkFreeStreakFreeze()` in `amberCurrency.ts`
 - Milestone bonuses at key puzzle counts (10, 25, 50... up to 350)
 
 ### Animal Characters
@@ -946,7 +974,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 680 tests, 26 suites
+cd mobile && npx jest --no-coverage  # 700+ tests, 26 suites
 ```
 
 **Test patterns:**
@@ -983,11 +1011,30 @@ Phase 0 now contains subtle "wrongness" to foreshadow the horror:
 - **Seed Move Messages**: ~5% chance of a "wrong" move message at Phase 0 ("The letters remember.", "Something shifted.") replacing the normal upbeat messages. Implemented in `getPhase0MoveMessageWithSeed()`.
 - **Onboarding Seeds**: Fox's intro lines have subtle ominous pauses: "We've been waiting for someone like you.\n...A long time." and "They need you." at the end.
 
+### Narrative Micro-Beats (`phaseNarrative.ts`)
+
+One-time narrative events at specific puzzle milestones to break the Phase 1-2 retention valley:
+- **Puzzle 35** (`glitch_title`): Victory title briefly shows "WE REMEMBER" before correcting — creates a "did I imagine that?" moment
+- **Puzzle 50** (`ambient_whisper`): "The light is changing. Have you noticed?" — first environmental acknowledgment
+- **Puzzle 65** (`ambient_whisper`): "The words you've formed... they remember each other." — word-connection foreshadowing
+- **Puzzle 100** (`ambient_whisper`): "One hundred arrangements. The house hums." — milestone acknowledgment
+- `checkNarrativeMicroBeat(puzzlesSolved)` — returns beat config and marks as consumed, or null
+- `resetMicroBeats()` — clears consumed state (for Reset All)
+- Persisted via AsyncStorage (`wordshift_micro_beats_seen`)
+- **Wired in**: App.tsx checks after victory, renders overlay with fade animation
+
+### Phase-Aware Error Messages (`phaseNarrative.ts`)
+
+Invalid word and locked letter feedback shifts tone with narrative phase:
+- `getInvalidWordMessage(word, phase)` — Phase 0: `"CAT" isn't a word! Try again.` → Phase 4: `"CAT" dissolves into nothing.`
+- `getLockedLetterMessage(phase)` — Phase 0: `That letter is locked!` → Phase 4: `It belongs to the arrangement now.`
+- **Wired in**: `usePuzzleGame.ts` uses these instead of hardcoded strings in `handleLetterPress` and `handleSlotPress`
+
 ### Weekly Quests System (`weeklyQuests.ts`)
 
 4 rotating quests generated each Monday, with seeded deterministic selection:
 - Quest types: solve_count, solve_difficulty, earn_stars, daily_complete, no_hints, challenge_mode, earn_amber
-- Rewards: 20-100 amber per quest (base), scaled by phase
+- Rewards: 30-140 amber per quest (base, scaled up ~40-50% from original 20-100), scaled by phase
 - Phase-aware descriptions (Phase 3+: dark ritual-themed text)
 - **Phase-scaled rewards**: `getPhaseRewardMultiplier(phase)` — Phase 0-1: 1.0x, Phase 2: 1.25x, Phase 3: 1.5x, Phase 4+: 2.0x. Applied when claiming rewards, rewarding players who have progressed deeper into the narrative
 - `loadWeeklyQuests(phase)` — loads or generates quests for current week
@@ -1133,7 +1180,7 @@ Add to `tileColors` array in `theme/colors.ts`
 
 ### Home Screen - Adjusting amber rewards
 Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
-- EASY: 5, MEDIUM: 10, MEDIUM_PLUS: 15, HARD: 20
+- EASY: 8, MEDIUM: 10, MEDIUM_PLUS: 15, HARD: 20
 
 ### Home Screen - Adjusting dialogue phases
 Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:

@@ -55,6 +55,7 @@ jest.mock('react', () => ({
     return refStore.get(idx)!;
   },
   useCallback: (fn: Function, _deps: unknown[]) => fn,
+  useMemo: (fn: Function, _deps: unknown[]) => fn(),
 }));
 
 // --- Mock dependencies ---
@@ -78,11 +79,14 @@ jest.mock('../services/phaseNarrative', () => ({
   getHintFallback: jest.fn(() => 'Try undoing!'),
   getLoadingMessage: jest.fn(() => 'Loading...'),
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
+  getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
+  getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
 }));
 
 jest.mock('../services/amberCurrency', () => ({
   getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
   setPreferredPuzzleVariant: jest.fn(async () => {}),
+  getFullProgress: jest.fn(async () => ({ puzzlesSolved: 10 })),
 }));
 
 // COMMON_WORDS needs to contain all words used in the test puzzle chain

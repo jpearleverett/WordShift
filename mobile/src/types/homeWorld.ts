@@ -210,6 +210,12 @@ export interface HomeWorldProgress {
   lastVariantPlayed?: string;
   // Number of consecutive puzzles completed with the same variant
   sameVariantStreak?: number;
+  // Difficulties completed at least once (for first-completion bonus)
+  completedDifficulties?: string[];
+  // Streak freeze: number of streak freezes available
+  streakFreezes?: number;
+  // Last time a free streak freeze was granted (ISO date)
+  lastFreeStreakFreezeDate?: string;
 }
 
 /**
@@ -351,10 +357,22 @@ export const PHASE_THRESHOLDS = [0, 25, 75, 150, 250];
  * Amber rewards by difficulty
  */
 export const AMBER_REWARDS: AmberReward = {
-  EASY: 5,
+  EASY: 8,
   MEDIUM: 10,
   MEDIUM_PLUS: 15,
   HARD: 20,
+};
+
+/**
+ * One-time bonus amber for first completion of each difficulty level.
+ * Creates small windfall moments that feel exciting and incentivize
+ * trying harder difficulties.
+ */
+export const FIRST_COMPLETION_BONUS: AmberReward = {
+  EASY: 10,
+  MEDIUM: 20,
+  MEDIUM_PLUS: 30,
+  HARD: 50,
 };
 
 /**

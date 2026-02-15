@@ -23,6 +23,12 @@ const ARC_LIFT = 18; // How much center elements lift up relative to edges
 const SLOT_WIDTH = 14; // Narrow slots to keep letters close together
 const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
 
+/** Preview data for a single slot position */
+export interface SlotPreview {
+  word: string;
+  isValid: boolean;
+}
+
 interface RowProps {
   rowData: RowData;
   rowIndex: number;
@@ -38,6 +44,8 @@ interface RowProps {
   guidanceActive?: boolean;
   guidedLetterId?: string | null;
   guidedSlotIndex?: number | null;
+  /** Word previews for each slot position (only on target row when letter is selected) */
+  slotPreviews?: SlotPreview[];
 }
 
 // Phase-aware row color helper
@@ -115,7 +123,8 @@ const Slot: React.FC<{
   compact?: boolean;
   phase?: number;
   isGuided?: boolean;
-}> = ({ onPress, index, compact = false, phase = 0, isGuided = false }) => {
+  preview?: SlotPreview;
+}> = ({ onPress, index, compact = false, phase = 0, isGuided = false, preview }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
@@ -296,6 +305,21 @@ const Slot: React.FC<{
             <Text style={styles.slotGuideText}>↓</Text>
           )}
         </View>
+
+        {/* Word preview label */}
+        {preview && (
+          <View style={styles.slotPreviewContainer}>
+            <Text
+              style={[
+                styles.slotPreviewText,
+                preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid,
+              ]}
+              numberOfLines={1}
+            >
+              {preview.word}
+            </Text>
+          </View>
+        )}
       </Animated.View>
     </TouchableOpacity>
   );
@@ -316,6 +340,7 @@ export const Row: React.FC<RowProps> = memo(({
   guidanceActive = false,
   guidedLetterId = null,
   guidedSlotIndex = null,
+  slotPreviews,
 }) => {
   const compactTiles = wordLength >= 6;
   const phaseColors = getPhaseRowColors(phase);
@@ -506,6 +531,7 @@ export const Row: React.FC<RowProps> = memo(({
               compact
               phase={phase}
               isGuided={guidanceActive && guidedSlotIndex === slotIndex}
+              preview={slotPreviews?.[slotIndex]}
             />
           </Animated.View>
         );
@@ -968,6 +994,27 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     color: CandyColors.orange.main,
+  },
+  slotPreviewContainer: {
+    position: 'absolute',
+    bottom: -14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 50,
+  },
+  slotPreviewText: {
+    fontSize: 7,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  slotPreviewValid: {
+    color: CandyColors.green.main,
+    opacity: 0.85,
+  },
+  slotPreviewInvalid: {
+    color: CandyColors.red.light,
+    opacity: 0.45,
   },
 });
 

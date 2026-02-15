@@ -78,6 +78,25 @@ export function getRandomFallback(difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' 
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+/**
+ * Curated early-game puzzles — hand-picked to showcase the mechanic at its best.
+ * Used for the first 3 post-onboarding puzzles (puzzles 1-3). Each puzzle features
+ * interesting middle-position letter moves (no boring pluralization or edge moves)
+ * that create genuine "aha!" moments. MEDIUM difficulty to give new players a taste
+ * of the real game early.
+ */
+export const CURATED_EARLY_PUZZLES: string[][] = [
+  // Puzzle 1: FLAME → LAME → BLAME → LAMB — fire/evocative words, mid-position moves
+  ["FLAME", "LAME", "BLAME", "LAMB"],
+  // Puzzle 2: COLD → BOLD → BONE → TONE — satisfying consonant swaps in middle
+  ["COLD", "BOLD", "BONE", "TONE"],
+  // Puzzle 3: HEAT → HEAR → NEAR → NEAT — vowel shifts, all common recognizable words
+  ["HEAT", "HEAR", "NEAR", "NEAT"],
+];
+
+/** Number of curated puzzles to use before switching to generated puzzles */
+export const CURATED_PUZZLE_COUNT = CURATED_EARLY_PUZZLES.length;
+
 // Legacy exports (kept for backward compatibility)
 export const FALLBACK_PUZZLE = FALLBACK_PUZZLES_MEDIUM[0];
 export const FALLBACK_PUZZLE_HARD = FALLBACK_PUZZLES_HARD[0];

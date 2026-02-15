@@ -9,7 +9,12 @@ import {
   getPhaseChangeNarrative,
   getPhaseIndicator,
   getRulesText,
+  getInvalidWordMessage,
+  getLockedLetterMessage,
+  checkNarrativeMicroBeat,
+  resetMicroBeats,
 } from '../services/phaseNarrative';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 
 const ALL_PHASES: DialoguePhase[] = [0, 1, 2, 3, 4];
@@ -339,5 +344,156 @@ describe('getRulesText', () => {
     // Phase 0 is "Tap any colorful tile", Phase 4 is much darker
     expect(phase0Desc).toContain('colorful');
     expect(phase4Desc).not.toContain('colorful');
+  });
+});
+
+// ============================================================================
+// Phase-Aware Error Messages (C3)
+// ============================================================================
+
+describe('getInvalidWordMessage', () => {
+  test.each(ALL_PHASES)('returns a non-empty string for phase %i', (phase) => {
+    const msg = getInvalidWordMessage('BLORP', phase);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('includes the attempted word in all phases', () => {
+    for (const phase of ALL_PHASES) {
+      const msg = getInvalidWordMessage('ZXQW', phase);
+      expect(msg).toContain('ZXQW');
+    }
+  });
+
+  test('phase 0 is encouraging', () => {
+    const msg = getInvalidWordMessage('CAT', 0);
+    expect(msg).toContain("isn't a word");
+    expect(msg).toContain('Try again');
+  });
+
+  test('phase 2 references the pattern', () => {
+    const msg = getInvalidWordMessage('CAT', 2);
+    expect(msg).toContain('pattern');
+  });
+
+  test('phase 3 references the arrangement', () => {
+    const msg = getInvalidWordMessage('CAT', 3);
+    expect(msg).toContain('arrangement');
+  });
+
+  test('phase 4 is nihilistic', () => {
+    const msg = getInvalidWordMessage('CAT', 4);
+    expect(msg).toContain('dissolves');
+  });
+
+  test('each phase produces a unique message for the same word', () => {
+    const messages = ALL_PHASES.map(p => getInvalidWordMessage('TEST', p));
+    const unique = new Set(messages);
+    expect(unique.size).toBe(5);
+  });
+});
+
+describe('getLockedLetterMessage', () => {
+  test.each(ALL_PHASES)('returns a non-empty string for phase %i', (phase) => {
+    const msg = getLockedLetterMessage(phase);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('phase 0 says letter is locked', () => {
+    expect(getLockedLetterMessage(0)).toContain('locked');
+  });
+
+  test('phase 2 says letter won\'t move', () => {
+    expect(getLockedLetterMessage(2)).toContain("won't move");
+  });
+
+  test('phase 4 references the arrangement', () => {
+    expect(getLockedLetterMessage(4)).toContain('arrangement');
+  });
+
+  test('each phase produces a unique message', () => {
+    const messages = ALL_PHASES.map(p => getLockedLetterMessage(p));
+    const unique = new Set(messages);
+    expect(unique.size).toBe(5);
+  });
+});
+
+// ============================================================================
+// Narrative Micro-Beats (B3)
+// ============================================================================
+
+describe('checkNarrativeMicroBeat', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetMicroBeats();
+  });
+
+  test('returns null for non-milestone puzzle counts', async () => {
+    expect(await checkNarrativeMicroBeat(10)).toBeNull();
+    expect(await checkNarrativeMicroBeat(20)).toBeNull();
+    expect(await checkNarrativeMicroBeat(36)).toBeNull();
+    expect(await checkNarrativeMicroBeat(99)).toBeNull();
+  });
+
+  test('returns a beat at puzzle 35', async () => {
+    const beat = await checkNarrativeMicroBeat(35);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('glitch_title');
+    expect(beat!.glitchTitle).toBeDefined();
+    expect(beat!.durationMs).toBeGreaterThan(0);
+  });
+
+  test('returns a beat at puzzle 50', async () => {
+    const beat = await checkNarrativeMicroBeat(50);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
+  test('returns a beat at puzzle 65', async () => {
+    const beat = await checkNarrativeMicroBeat(65);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+  });
+
+  test('returns a beat at puzzle 100', async () => {
+    const beat = await checkNarrativeMicroBeat(100);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+  });
+
+  test('does not fire the same beat twice', async () => {
+    const first = await checkNarrativeMicroBeat(35);
+    expect(first).not.toBeNull();
+
+    const second = await checkNarrativeMicroBeat(35);
+    expect(second).toBeNull();
+  });
+
+  test('different milestones fire independently', async () => {
+    const beat35 = await checkNarrativeMicroBeat(35);
+    expect(beat35).not.toBeNull();
+
+    const beat50 = await checkNarrativeMicroBeat(50);
+    expect(beat50).not.toBeNull();
+
+    // 35 already consumed, 50 already consumed
+    expect(await checkNarrativeMicroBeat(35)).toBeNull();
+    expect(await checkNarrativeMicroBeat(50)).toBeNull();
+
+    // 65 and 100 still available
+    expect(await checkNarrativeMicroBeat(65)).not.toBeNull();
+    expect(await checkNarrativeMicroBeat(100)).not.toBeNull();
+  });
+
+  test('resetMicroBeats clears consumed state', async () => {
+    await checkNarrativeMicroBeat(35);
+    expect(await checkNarrativeMicroBeat(35)).toBeNull();
+
+    await resetMicroBeats();
+
+    const beat = await checkNarrativeMicroBeat(35);
+    expect(beat).not.toBeNull();
   });
 });

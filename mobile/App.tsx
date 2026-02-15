@@ -48,6 +48,8 @@ import {
   getLoadingMessage,
   getRitualMicroEvent,
   getVictoryGlitch,
+  checkNarrativeMicroBeat,
+  NarrativeMicroBeat,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress } from './src/services/amberCurrency';
@@ -142,6 +144,10 @@ export default function App() {
   const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
   const [showVictoryGlitch, setShowVictoryGlitch] = useState(false);
   const [completionCoda, setCompletionCoda] = useState<{ title: string; text: string } | null>(null);
+
+  // Narrative micro-beat state (subtle surprise moments at specific puzzle milestones)
+  const [microBeat, setMicroBeat] = useState<NarrativeMicroBeat | null>(null);
+  const [showMicroBeat, setShowMicroBeat] = useState(false);
 
   // Auto-dismiss interjection after 4 seconds
   useEffect(() => {
@@ -511,6 +517,18 @@ export default function App() {
           setTimeout(() => setShowVictoryGlitch(false), 200);
         }, 300);
       }
+
+      // Narrative micro-beat — surprise moments at specific puzzle milestones
+      checkNarrativeMicroBeat(victory.puzzlesSolved).then(beat => {
+        if (beat) {
+          const delay = beat.type === 'glitch_title' ? 600 : 1800;
+          setTimeout(() => {
+            setMicroBeat(beat);
+            setShowMicroBeat(true);
+            setTimeout(() => setShowMicroBeat(false), beat.durationMs);
+          }, delay);
+        }
+      }).catch(() => {});
 
       // Re-schedule notifications after puzzle completion
       scheduleAllNotifications(persistence.currentPhase).catch(() => {});
@@ -1209,6 +1227,11 @@ export default function App() {
                 guidanceActive={onboardingStep === 'puzzle_tutorial'}
                 guidedLetterId={tutorialGuidance?.sourceLetterId || null}
                 guidedSlotIndex={tutorialGuidance?.targetSlotIndex ?? null}
+                slotPreviews={
+                  idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
+                    ? puzzle.slotPreviews
+                    : undefined
+                }
               />
             ))}
           </ScrollView>
@@ -1299,6 +1322,20 @@ export default function App() {
         {showVictoryGlitch && victoryGlitch && (
           <View style={styles.victoryGlitchOverlay} pointerEvents="none">
             <Text style={styles.victoryGlitchText}>{victoryGlitch}</Text>
+          </View>
+        )}
+
+        {/* Narrative Micro-Beat — surprise moments at puzzle milestones */}
+        {showMicroBeat && microBeat && (
+          <View style={[
+            styles.victoryGlitchOverlay,
+            microBeat.type === 'ambient_whisper' && styles.microBeatWhisperOverlay,
+          ]} pointerEvents="none">
+            <Text style={[
+              microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
+            ]}>
+              {microBeat.type === 'glitch_title' ? microBeat.glitchTitle : microBeat.text}
+            </Text>
           </View>
         )}
 
@@ -1729,6 +1766,21 @@ const styles = StyleSheet.create({
     textShadowColor: '#FF0040',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 12,
+  },
+  microBeatWhisperOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  microBeatWhisperText: {
+    color: 'rgba(200, 180, 220, 0.9)',
+    fontSize: 18,
+    fontWeight: '500',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 40,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(150, 100, 200, 0.4)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   interjectionContainer: {
     position: 'absolute',
