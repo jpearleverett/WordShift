@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
 import { generateLocalPuzzle, getIncantationName } from '../services/localGenerator';
-import { FALLBACK_PUZZLE, FALLBACK_PUZZLE_HARD, COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT } from '../constants';
+import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
 import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress } from '../services/amberCurrency';
@@ -356,8 +356,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         variant === 'standard' &&
         effectiveMode === 'standard'
       ) {
-        const curatedWords = CURATED_EARLY_PUZZLES[puzzlesSolved];
-        initGame(curatedWords, undefined, undefined, curatedWords[0].length, 'standard', 0);
+        const curated = CURATED_EARLY_PUZZLES[puzzlesSolved];
+        initGame(curated.words, undefined, curated.solution, curated.words[0].length, 'standard', 0);
         setMessage(getStartMessage(currentPhase));
         return;
       }
@@ -384,34 +384,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const fallbackVariant = (
         hasVariantModifier(variant, 'no_vowel') || hasVariantModifier(variant, 'no_consonant')
       ) ? 'standard' : variant;
-      if (selectedDifficulty === 'HARD') {
-        initGame(
-          FALLBACK_PUZZLE_HARD,
-          "Challenge Mode",
-          undefined,
-          5,
-          fallbackVariant,
-          getVariantChainLength(fallbackVariant, selectedDifficulty)
-        );
-      } else if (selectedDifficulty === 'EASY') {
-        initGame(
-          FALLBACK_PUZZLE.slice(0, 3),
-          "Simple Start",
-          undefined,
-          4,
-          fallbackVariant,
-          getVariantChainLength(fallbackVariant, selectedDifficulty)
-        );
-      } else {
-        initGame(
-          FALLBACK_PUZZLE,
-          "Classic Setup",
-          undefined,
-          4,
-          fallbackVariant,
-          getVariantChainLength(fallbackVariant, selectedDifficulty)
-        );
-      }
+      const fallbackWords = getRandomFallback(selectedDifficulty);
+      const fallbackWordLen = fallbackWords[0].length;
+      initGame(
+        fallbackWords,
+        undefined,
+        undefined,
+        fallbackWordLen,
+        fallbackVariant,
+        getVariantChainLength(fallbackVariant, selectedDifficulty)
+      );
       if (fallbackVariant !== 'standard') {
         const config = VARIANT_CONFIGS[fallbackVariant];
         setMessage(getVariantInstruction(config, currentPhase));

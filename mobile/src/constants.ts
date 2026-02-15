@@ -16,57 +16,57 @@ export const COMMON_WORDS = new Set(ALL_UNIQUE_WORDS);
 // Pre-validated fallback puzzle pools — used when generation times out
 // Each puzzle is a verified valid chain (every transition removes+inserts one letter, all words valid)
 export const FALLBACK_PUZZLES_EASY: string[][] = [
-  ["CAT", "CUT", "BUT"],
-  ["RAN", "TAN", "TAP"],
-  ["HIT", "SIT", "SET"],
-  ["DOG", "DIG", "BIG"],
-  ["PEN", "PIN", "WIN"],
-  ["HOT", "HIT", "BIT"],
-  ["RUN", "BUN", "BAN"],
-  ["TOP", "TIP", "DIP"],
-  ["CAN", "MAN", "MAP"],
-  ["FUN", "FAN", "FAR"],
-  ["NET", "NUT", "CUT"],
-  ["GUM", "GUN", "FUN"],
-  ["LOG", "FOG", "FIG"],
-  ["POT", "ROT", "RAT"],
-  ["SAD", "SAT", "SET"],
+  ["PEEP", "WHAT", "HERE"],
+  ["CLIP", "WITH", "HERE"],
+  ["DARE", "LIKE", "THAN"],
+  ["BELT", "OVER", "TIME"],
+  ["CUPS", "WITH", "HERE"],
+  ["FITS", "USED", "WITH"],
+  ["GONE", "SURE", "THAT"],
+  ["POLL", "OVER", "TIME"],
+  ["MAIL", "BEST", "LAST"],
+  ["ARMY", "PART", "INTO"],
+  ["ARTS", "THAT", "WILL"],
+  ["BEEN", "YEAR", "GOOD"],
+  ["WERE", "HERE", "OVER"],
+  ["FIND", "LIKE", "THAN"],
+  ["GLOW", "ABLE", "EACH"],
 ];
 
 export const FALLBACK_PUZZLES_MEDIUM: string[][] = [
-  ["LIME", "TIME", "TIED", "TEND"],
-  ["COLD", "BOLD", "BONE", "TONE"],
-  ["HEAT", "HEAR", "NEAR", "NEAT"],
-  ["LAMP", "DAMP", "DAME", "GAME"],
-  ["SORT", "PORT", "PORE", "CORE"],
-  ["COLD", "BEND", "CUES", "CULT"],
-  ["SALT", "HOOD", "GEEK", "TILE"],
-  ["WARM", "HOOP", "TEEN", "SING"],
-  ["WINE", "HERS", "RAMP", "PATH"],
-  ["TALE", "HOSE", "RACK", "CARS"],
-  ["HOPE", "PROS", "LEAN", "DIPS"],
-  ["RACE", "LOVE", "FAIL", "POPS"],
-  ["DRUM", "RUGS", "CARE", "RUIN"],
-  ["GIFT", "LIPS", "HEAT", "BUFF"],
-  ["BONE", "LACK", "LEAK", "RAIN"],
+  ["SUIT", "SITE", "WHAT", "HERE"],
+  ["LADS", "OVER", "TIME", "USED"],
+  ["PLAY", "INTO", "BOTH", "WERE"],
+  ["GOLD", "SURE", "THAT", "WILL"],
+  ["BEAD", "WHAT", "HERE", "WERE"],
+  ["RAIN", "MOST", "BOTH", "WERE"],
+  ["SICK", "THAN", "WILL", "HERE"],
+  ["GRAY", "SURE", "THAT", "WILL"],
+  ["GANG", "YEAR", "PART", "INTO"],
+  ["FORM", "OVER", "TIME", "USED"],
+  ["LAND", "OVER", "TIME", "USED"],
+  ["LIPS", "THAT", "WILL", "HERE"],
+  ["CUTS", "THAT", "WILL", "HERE"],
+  ["SEEM", "OVER", "TIME", "USED"],
+  ["IRON", "TIME", "OVER", "INTO"],
 ];
 
 export const FALLBACK_PUZZLES_HARD: string[][] = [
-  ["STORE", "ROUTE", "VOTER", "COVET", "VOICE"],
-  ["HEART", "EARTH", "TEACH", "CHEAT", "WATCH"],
-  ["STEAM", "CRATE", "CRIME", "VERSE", "BOARD"],
-  ["CRANE", "CANER", "DANCE", "CANED", "ACNED"],
-  ["LEMON", "MELON", "MODEL", "MOULD", "MOULT"],
-  ["FLAME", "SEEPS", "DEATH", "TRADE", "WEDGE"],
-  ["SHARP", "HADES", "PURSE", "CLOUD", "THEIR"],
-  ["PROUD", "FORTH", "FORMS", "CHICK", "CLOUD"],
-  ["DRIFT", "RIVER", "RIDES", "RATIO", "RHYME"],
-  ["GRACE", "RACED", "DODGE", "RINSE", "GUIDE"],
-  ["GHOST", "RAINS", "CAMPS", "FIELD", "TICKS"],
-  ["HAVEN", "HEAVE", "GRILL", "TRUST", "CRATE"],
-  ["REALM", "EAGER", "OWING", "DUPED", "USING"],
-  ["TRACE", "MOORS", "CHANT", "BRADS", "STAIN"],
-  ["CROWD", "PRIZE", "NURSE", "BLAME", "MATTE"],
+  ["SCRAP", "THERE", "LATER", "TIMES", "THEIR"],
+  ["SHELL", "THERE", "LATER", "TIMES", "THEIR"],
+  ["CELLS", "THERE", "LATER", "TIMES", "THEIR"],
+  ["STEAL", "THERE", "LATER", "TIMES", "THEIR"],
+  ["WRIST", "THERE", "LATER", "TIMES", "THEIR"],
+  ["BEADS", "THERE", "LATER", "TIMES", "THEIR"],
+  ["BRUSH", "TIMES", "THERE", "LATER", "MAKES"],
+  ["IDEAS", "THERE", "LATER", "TIMES", "THEIR"],
+  ["PEARL", "SUPER", "THERE", "LATER", "TIMES"],
+  ["SOLAR", "WORDS", "THERE", "LATER", "TIMES"],
+  ["BLUSH", "WORDS", "THERE", "LATER", "TIMES"],
+  ["TASKS", "LATER", "TIMES", "THERE", "ASKED"],
+  ["VOTES", "THERE", "LATER", "TIMES", "THEIR"],
+  ["WITCH", "RIGHT", "TIMES", "THERE", "LATER"],
+  ["LOOKS", "THERE", "LATER", "TIMES", "THEIR"],
 ];
 
 /** Get a random fallback puzzle for the given difficulty */
@@ -79,19 +79,47 @@ export function getRandomFallback(difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' 
 }
 
 /**
- * Curated early-game puzzles — hand-picked to showcase the mechanic at its best.
- * Used for the first 3 post-onboarding puzzles (puzzles 1-3). Each puzzle features
- * interesting middle-position letter moves (no boring pluralization or edge moves)
- * that create genuine "aha!" moments. MEDIUM difficulty to give new players a taste
- * of the real game early.
+ * Curated early-game puzzles — hand-picked & verified pick-and-drop chains.
+ * Used for the first 3 post-onboarding puzzles (puzzles 0-2). All words in a chain
+ * must be the same length. Each step: pick a letter from the source (shrinking it into
+ * a valid shorter word) and drop it into the target (growing it into a valid longer word).
+ * Includes pre-computed solution steps for tutorial guidance highlighting.
  */
-export const CURATED_EARLY_PUZZLES: string[][] = [
-  // Puzzle 1: FLAME → LAME → BLAME → LAMB — fire/evocative words, mid-position moves
-  ["FLAME", "LAME", "BLAME", "LAMB"],
-  // Puzzle 2: COLD → BOLD → BONE → TONE — satisfying consonant swaps in middle
-  ["COLD", "BOLD", "BONE", "TONE"],
-  // Puzzle 3: HEAT → HEAR → NEAR → NEAT — vowel shifts, all common recognizable words
-  ["HEAT", "HEAR", "NEAR", "NEAT"],
+export interface CuratedPuzzle {
+  words: string[];
+  solution: { stepIndex: number; sourceWord: string; targetWord: string; letterToMove: string; explanation: string }[];
+}
+
+export const CURATED_EARLY_PUZZLES: CuratedPuzzle[] = [
+  // Puzzle 0 (tutorial): GLOW → ABLE → EACH — simple 3-row for EASY onboarding
+  // Pick G from GLOW → LOW; drop into ABLE → GABLE. Pick B from GABLE → GALE; drop into EACH → BEACH.
+  {
+    words: ["GLOW", "ABLE", "EACH"],
+    solution: [
+      { stepIndex: 0, sourceWord: "GLOW", targetWord: "ABLE", letterToMove: "G", explanation: "Move 'G' from GLOW to form GABLE." },
+      { stepIndex: 1, sourceWord: "ABLE", targetWord: "EACH", letterToMove: "B", explanation: "Move 'B' from GABLE to form BEACH." },
+    ],
+  },
+  // Puzzle 1: LAMP → OVER → TIME → USED — 4-row MEDIUM, satisfying mid-position moves
+  // Pick L → AMP; LOVER. Pick R → LOVE; TIMER. Pick M → TIER; MUSED.
+  {
+    words: ["LAMP", "OVER", "TIME", "USED"],
+    solution: [
+      { stepIndex: 0, sourceWord: "LAMP", targetWord: "OVER", letterToMove: "L", explanation: "Move 'L' from LAMP to form LOVER." },
+      { stepIndex: 1, sourceWord: "OVER", targetWord: "TIME", letterToMove: "R", explanation: "Move 'R' from LOVER to form TIMER." },
+      { stepIndex: 2, sourceWord: "TIME", targetWord: "USED", letterToMove: "M", explanation: "Move 'M' from TIMER to form MUSED." },
+    ],
+  },
+  // Puzzle 2: FIRE → USED → LIKE → THAN — 4-row MEDIUM, thematic fire-to-thank chain
+  // Pick F → IRE; FUSED. Pick D → FUSE; LIKED. Pick K → LIED; THANK.
+  {
+    words: ["FIRE", "USED", "LIKE", "THAN"],
+    solution: [
+      { stepIndex: 0, sourceWord: "FIRE", targetWord: "USED", letterToMove: "F", explanation: "Move 'F' from FIRE to form FUSED." },
+      { stepIndex: 1, sourceWord: "USED", targetWord: "LIKE", letterToMove: "D", explanation: "Move 'D' from FUSED to form LIKED." },
+      { stepIndex: 2, sourceWord: "LIKE", targetWord: "THAN", letterToMove: "K", explanation: "Move 'K' from LIKED to form THANK." },
+    ],
+  },
 ];
 
 /** Number of curated puzzles to use before switching to generated puzzles */
