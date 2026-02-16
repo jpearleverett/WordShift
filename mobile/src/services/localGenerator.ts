@@ -985,7 +985,7 @@ async function generateReverseChain(
 
         solution.push({
           stepIndex: step,
-          sourceWord: chain[step].word,
+          sourceWord: chain[step].tempState ?? chain[step].word,
           targetWord: t.baseWord,
           letterToMove: char,
           explanation: '',
@@ -1095,12 +1095,14 @@ export const generateLocalPuzzle = async (
 
     const solution: PuzzleSolutionStep[] = [];
     for (let s = 0; s < path.length - 1; s++) {
+      const sourceState = path[s].tempState ?? path[s].word;
+      const targetResult = path[s + 1].tempState ?? path[s + 1].word;
       solution.push({
         stepIndex: s,
-        sourceWord: path[s].word,
+        sourceWord: sourceState,
         targetWord: path[s + 1].word,
         letterToMove: path[s].letterToGive!,
-        explanation: `Move '${path[s].letterToGive}' from ${path[s].word} to form ${path[s + 1].word}.`
+        explanation: `Move '${path[s].letterToGive}' from ${sourceState} to form ${targetResult}.`
       });
     }
 
@@ -1186,13 +1188,15 @@ export const generateLocalPuzzle = async (
   for (let s = 0; s < path.length - 1; s++) {
     const sourceNode = path[s];
     const targetNode = path[s + 1];
+    const sourceState = sourceNode.tempState ?? sourceNode.word;
+    const targetResult = targetNode.tempState ?? targetNode.word;
 
     solution.push({
       stepIndex: s,
-      sourceWord: sourceNode.word,
+      sourceWord: sourceState,
       targetWord: targetNode.word,
       letterToMove: sourceNode.letterToGive!,
-      explanation: `Move '${sourceNode.letterToGive}' from ${sourceNode.word} to form ${targetNode.word}.`
+      explanation: `Move '${sourceNode.letterToGive}' from ${sourceState} to form ${targetResult}.`
     });
   }
 
