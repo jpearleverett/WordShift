@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty, GameMode } from '../types';
+import { clearPlayedPuzzles } from './puzzleBank';
 import {
   HomeWorldProgress,
   AmberTransaction,
@@ -752,6 +753,7 @@ export async function clearProgress(): Promise<void> {
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
+    await clearPlayedPuzzles();
   } catch (error) {
     console.warn('Failed to clear progress:', error);
   }

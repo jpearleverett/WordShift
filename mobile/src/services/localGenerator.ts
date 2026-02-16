@@ -382,7 +382,7 @@ const DREAD_WORDS_PHASE_4 = new Set([
 
 // Build tier lookup map — each word gets its earliest (lowest) tier.
 // This determines when a word first becomes narratively relevant.
-const DREAD_WORD_TIER = new Map<string, number>();
+export const DREAD_WORD_TIER = new Map<string, number>();
 function _buildTierMap() {
   const tiers: [Set<string>, number][] = [
     [DREAD_WORDS_PHASE_1, 1],
@@ -622,7 +622,7 @@ const SEMANTIC_CLUSTERS: Record<string, Set<string>> = {
   existential: new Set(['VOID', 'EMPTY', 'HOLLOW', 'FADE', 'WANE', 'DECAY', 'ALONE', 'LOST', 'DRIFT', 'SINK', 'FALL', 'TIME', 'PASS', 'GONE', 'END', 'LAST', 'CEASE', 'DUST', 'ASH', 'SHADOW', 'SHADE', 'GHOST', 'ECHO', 'VAST', 'DOOM', 'ABYSS', 'RIFT', 'BREAK', 'TRUTH', 'REAL', 'FAKE', 'WAKE', 'SLEEP', 'DREAM', 'EDGE', 'BRINK', 'DREAD', 'FEAR', 'COLD', 'NUMB', 'DARK', 'STILL', 'QUIET', 'FINAL', 'OVER', 'DONE'])
 };
 
-function getSemanticCluster(word: string): string | null {
+export function getSemanticCluster(word: string): string | null {
   for (const [cluster, words] of Object.entries(SEMANTIC_CLUSTERS)) {
     if (words.has(word)) return cluster;
   }
@@ -675,7 +675,7 @@ function scoreSemanticJourney(chain: PathNode[]): number {
  * Score an entire puzzle chain (0-100)
  * Enhanced with journey scoring, stricter boring penalties, and freshness
  */
-function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, number>, relaxBoring?: boolean): number {
+export function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, number>, relaxBoring?: boolean): number {
   if (chain.length < 2) return 0;
 
   let totalScore = 0;
@@ -759,7 +759,7 @@ function shuffle<T>(array: T[]): T[] {
   return newArr;
 }
 
-interface PathNode {
+export interface PathNode {
   word: string;
   tempState?: string;
   letterReceived?: string;
