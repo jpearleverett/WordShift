@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (790+ tests, 27 suites)
+npx jest --no-coverage   # Run all tests (800+ tests, 27 suites)
 ```
 
 ## Recent Implementation Notes (2026-02)
@@ -85,6 +85,14 @@ npx jest --no-coverage   # Run all tests (790+ tests, 27 suites)
   - **awardBonusAmber()**: General-purpose amber credit function with transaction recording.
   - **Accessibility**: FoxGuide adaptive positioning, amber counter a11y labels, variant unlock hints.
   - **Dread word haptics**: hapticMedium at Phase 3+, hapticLight at Phase 2 on dread word formation.
+- **Reverse mode puzzle generation overhaul**:
+  - **Cumulative locking**: All letters shifted during the forward pass stay locked throughout the entire reverse leg, giving each intermediate row exactly 2 locked positions (1 from forward, 1 from reverse).
+  - **Pre-computed adjacency index**: `getInsertionIndex(wordLength)` maps each letter to all valid (baseWord, result, position) insertion tuples. Replaces O(W×N) brute-force in `findPath` with O(1) lookups. Cached per word length (~50-100ms first build).
+  - **relaxBoring flag**: Threads through `findPath` → `scorePuzzleChain` → `scoreMoveQuality` to skip anti-boring penalties for reverse mode, widening the candidate pool. Auto-enabled when `requireReverseSolvable` is set.
+  - **Extended timeouts**: 25s internal generator + 30s wrapper for reverse variants (vs 2.5s/4s standard).
+  - **Wider candidate exploration**: 60 candidates (vs 25) for reverse mode; 100k MAX_ITERATIONS (vs 50k) for 4+ step reverse validation.
+  - **isReverseSolvable validation**: Multi-position forward simulation + iterative DFS reverse solver with per-row locked position sets.
+  - EASY and MEDIUM reverse puzzles now generate reliably in <500ms.
 
 ## Tech Stack
 
@@ -159,7 +167,7 @@ mobile/
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette, tile colors, PhaseTheme system
 │   └── services/
-│       ├── localGenerator.ts    # Puzzle generation with DFS, quality scoring, phase-tiered dread words, resonance tier export
+│       ├── localGenerator.ts    # Puzzle generation with DFS, pre-computed adjacency index, quality scoring, phase-tiered dread words, reverse-solvable validation, resonance tier export
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
@@ -187,7 +195,7 @@ mobile/
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (790+ tests, 27 suites)
+├── src/__tests__/               # Test suites (800+ tests, 27 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -348,7 +356,7 @@ When a letter is selected (picked up), ghost previews show what word would form 
 ### Puzzle Variant Modes (`puzzleVariety.ts`)
 
 Variants are now player-selected from the setup menu (not randomly injected). Players can choose any unlocked base variant or combo before starting a puzzle, and a preferred variant is persisted for future runs.
-- **Reverse Shift**: Standard rules down to the bottom, then return all the way back up to the first row.
+- **Reverse Shift**: Standard rules down to the bottom, then return all the way back up to the first row. Letters shifted during the forward pass stay locked (cumulative locking), so each intermediate row has exactly 2 locked positions during the reverse leg. Puzzle generation uses `requireReverseSolvable` to validate that the reverse path exists, with `relaxBoring` to widen the candidate pool and a pre-computed adjacency index for fast lookup (25s internal timeout, 30s wrapper).
 - **Blind Shift**: Unreached rows stay concealed until revealed by progress.
 - **Speed Shift**: 60-second timed run.
 - **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
@@ -799,20 +807,24 @@ Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250 via `NARRAT
 
 ### Puzzle Generation (`localGenerator.ts`)
 
-DFS-based word chain generator with quality scoring:
+DFS-based word chain generator with quality scoring and pre-computed adjacency index:
 
-- **Anti-boring detection**: Penalizes obvious transforms (S->plural, ED->past tense, ING, LY)
+- **Pre-computed adjacency index**: `getInsertionIndex(wordLength)` builds a `Map<letter, InsertionTarget[]>` mapping each letter to all (baseWord, result, position) tuples where inserting that letter into a base word produces a valid longer word. Cached per word length (~50-100ms first build, O(1) lookups thereafter). Replaces the O(W×N) inner loop in `findPath` with instant candidate enumeration.
+- **Anti-boring detection**: Penalizes obvious transforms (S->plural, ED->past tense, ING, LY). Skipped via `relaxBoring` flag for reverse mode where candidate pool width matters more than stylistic scoring.
 - **Position scoring**: Prefers middle-position letter moves over edge moves
 - **Semantic journey**: Bonus for traversing different word categories
-- **Quality threshold**: Rejects puzzles scoring below 45/100
-- **Multi-candidate**: Generates 3 puzzles, selects highest scoring
+- **Quality threshold**: Rejects puzzles scoring below 45/100 (30 for reverse mode)
+- **Multi-candidate**: Generates 3 puzzles, selects highest scoring (1 candidate for reverse mode)
 - **Word history integration**: Penalizes/excludes recently used words
 - **Phase-tiered dread words**: 200+ words split into 4 tier sets (curiosity → emptiness → dread → cosmic). Scoring weights by tier proximity to current phase (same tier: 1.0×, adjacent: 0.5×, distant: 0.15×)
+- **Reverse-solvable validation**: `isReverseSolvable(words, solution)` verifies that a puzzle chain can be played in reverse under cumulative locking constraints. Uses `canSolveReverseIterative` (iterative DFS, 50k-100k iteration limit) for the reverse leg and `tryForwardStep` (recursive, multi-position) for the forward leg. Each intermediate row accumulates exactly 2 locked positions (1 from forward, 1 from reverse).
 
 Key functions:
-- `generateLocalPuzzle(difficulty, overrides?)` - Main entry point (2.5s timeout); optional `overrides` for custom `wordLength` and `targetRows` (used by daily challenge)
-- `findPath()` - Recursive DFS to find valid word chains
-- `scorePuzzleChain()` - Evaluates puzzle quality (includes freshness scoring)
+- `generateLocalPuzzle(difficulty, overrides?)` - Main entry point (2.5s standard / 25s reverse timeout); optional `overrides` for `wordLength`, `targetRows`, `startWord`, `requireReverseSolvable`, `relaxBoring`
+- `getInsertionIndex(wordLength)` - Pre-computed adjacency index for instant candidate lookup (cached per word length)
+- `findPath()` - Recursive DFS to find valid word chains; uses adjacency index for candidate enumeration, `relaxBoring` to skip anti-boring penalties, explores 60 candidates for reverse (25 standard)
+- `isReverseSolvable(words, solution)` - Validates that a puzzle chain is solvable in both directions under cumulative locking
+- `scorePuzzleChain()` - Evaluates puzzle quality (includes freshness scoring, accepts `relaxBoring`)
 - `isDreadWord(word)` - Check if a word is in the combined dread words set (used for dread pulse visual feedback at Phase 2+)
 - `getWordPhaseTier(word)` - Returns 0 (not dread) or 1-4 (phase tier); used by `Row.tsx` to determine tile resonance visuals
 
@@ -1014,7 +1026,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 790+ tests, 27 suites
+cd mobile && npx jest --no-coverage  # 800+ tests, 27 suites
 ```
 
 **Test patterns:**
@@ -1341,8 +1353,8 @@ Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
 
 ## Known Constraints
 
-- Puzzle generation has 2.5s timeout to prevent UI blocking
-- 4s wrapper timeout in App.tsx as fallback
+- Puzzle generation has 2.5s timeout to prevent UI blocking (25s for reverse mode)
+- 4s wrapper timeout in App.tsx as fallback (30s for reverse variants)
 - Fallback puzzle pool: 15 pre-validated puzzles across 3 difficulty tiers (5 easy/5 medium/5 hard) used when generation times out; `getRandomFallback(difficulty)` selects randomly
 - Dictionary limited to common English words (no proper nouns, abbreviations)
 - Arc layout uses `overflow: visible` - elements can extend beyond row container
