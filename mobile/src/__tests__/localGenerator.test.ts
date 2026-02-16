@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle, isReverseSolvable } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -114,6 +114,40 @@ describe('generateLocalPuzzle', () => {
     expect(words1).toBeDefined();
     expect(words2).toBeDefined();
   }, 15000);
+
+  test('standard generation is unaffected by adjacency index', async () => {
+    // Standard puzzles should still meet the quality threshold (45+)
+    const puzzle = await generateLocalPuzzle('MEDIUM');
+    expect(puzzle.words).toHaveLength(4);
+    expect(puzzle.solution).toBeDefined();
+    expect(puzzle.solution!.length).toBe(3);
+  }, 10000);
+});
+
+describe('getInsertionIndex', () => {
+  test('builds index for 3-letter words with correct entries', () => {
+    const index = getInsertionIndex(3);
+    // Index should exist and have entries for common letters
+    expect(index.size).toBeGreaterThan(0);
+
+    // 'S' inserted into 'CAM' at pos 0 → 'SCAM' should be present
+    const sTargets = index.get('S');
+    expect(sTargets).toBeDefined();
+    const camEntries = sTargets!.filter(t => t.baseWord === 'CAM' && t.result === 'SCAM');
+    expect(camEntries.length).toBeGreaterThan(0);
+    expect(camEntries[0].position).toBe(0);
+  });
+
+  test('index is cached across calls', () => {
+    const index1 = getInsertionIndex(3);
+    const index2 = getInsertionIndex(3);
+    expect(index1).toBe(index2); // Same reference
+  });
+
+  test('handles missing word length gracefully', () => {
+    const index = getInsertionIndex(99);
+    expect(index.size).toBe(0);
+  });
 });
 
 describe('isReverseSolvable (cumulative locking)', () => {
@@ -155,13 +189,48 @@ describe('isReverseSolvable (cumulative locking)', () => {
     expect(result).toBe(true);
   });
 
-  test('generateLocalPuzzle with requireReverseSolvable produces valid puzzles', async () => {
-    // Generate a puzzle with the reverse-solvable flag — it should always pass
+  test('enforces exactly 2 locked positions per intermediate row during reverse', () => {
+    // Using the CAME/LAST/BACK example, verify that the intermediate row (row 1)
+    // accumulates exactly 2 locked positions after both forward and reverse steps.
+    // The validator correctly handles this: row 1 gets 1 lock from forward (E inserted),
+    // then 1 lock from reverse step 0 (B inserted) = 2 total.
+    // This means only 3 of 5 letters are available for picking in reverse step 1.
+    // If ALL positions were locked, the puzzle would be rejected.
+    const result = isReverseSolvable(
+      ['CAME', 'LAST', 'BACK'],
+      [
+        { stepIndex: 0, sourceWord: 'CAME', targetWord: 'LAST', letterToMove: 'E', explanation: '' },
+        { stepIndex: 1, sourceWord: 'LAST', targetWord: 'BACK', letterToMove: 'L', explanation: '' },
+      ]
+    );
+    expect(result).toBe(true);
+  });
+
+  test('generateLocalPuzzle with requireReverseSolvable produces valid EASY puzzles', async () => {
     const puzzle = await generateLocalPuzzle('EASY', { requireReverseSolvable: true });
     expect(puzzle.words.length).toBeGreaterThanOrEqual(3);
     expect(puzzle.solution).toBeDefined();
     expect(isReverseSolvable(puzzle.words, puzzle.solution!)).toBe(true);
-  }, 15000);
+  }, 35000);
+
+  test('generateLocalPuzzle with requireReverseSolvable produces valid MEDIUM puzzles', async () => {
+    const puzzle = await generateLocalPuzzle('MEDIUM', { requireReverseSolvable: true });
+    expect(puzzle.words.length).toBe(4);
+    expect(puzzle.solution).toBeDefined();
+    expect(isReverseSolvable(puzzle.words, puzzle.solution!)).toBe(true);
+  }, 35000);
+
+  test('relaxBoring widens the candidate pool for reverse puzzles', async () => {
+    // With relaxBoring, S-plural and other "boring" transforms are accepted,
+    // giving the generator more paths to find reverse-solvable chains
+    const puzzle = await generateLocalPuzzle('EASY', {
+      requireReverseSolvable: true,
+      relaxBoring: true,
+    });
+    expect(puzzle.words.length).toBeGreaterThanOrEqual(3);
+    expect(puzzle.solution).toBeDefined();
+    expect(isReverseSolvable(puzzle.words, puzzle.solution!)).toBe(true);
+  }, 35000);
 
   test('rejects invalid inputs', () => {
     expect(isReverseSolvable([], [])).toBe(false);

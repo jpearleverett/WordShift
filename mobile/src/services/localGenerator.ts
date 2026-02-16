@@ -28,6 +28,66 @@ const WORD_ARRAYS: Record<number, string[]> = {
   7: WORDS_7,
 };
 
+// ============================================================================
+// PRE-COMPUTED ADJACENCY INDEX — instant candidate lookup for puzzle generation
+// ============================================================================
+
+interface InsertionTarget {
+  /** The W-letter base word receiving the letter */
+  baseWord: string;
+  /** The W+1-letter word after insertion */
+  result: string;
+  /** Position where the letter was inserted */
+  position: number;
+}
+
+/**
+ * letter → InsertionTarget[] — all base words that can receive this letter
+ * to form a valid (W+1)-letter word.
+ */
+type InsertionIndex = Map<string, InsertionTarget[]>;
+
+const insertionIndexCache = new Map<number, InsertionIndex>();
+
+/**
+ * Build (or retrieve cached) the insertion index for a given word length.
+ * For each base word of length W and each insertion position, checks all 26
+ * letters to see if inserting produces a valid (W+1)-letter word.
+ *
+ * Cost: ~50-100ms per word length, computed once per session.
+ * Memory: ~1-2 MB per word length.
+ */
+export function getInsertionIndex(wordLength: number): InsertionIndex {
+  const cached = insertionIndexCache.get(wordLength);
+  if (cached) return cached;
+
+  const baseSet = WORD_SETS[wordLength];
+  const maxSet = WORD_SETS[wordLength + 1];
+  if (!baseSet || !maxSet) return new Map();
+
+  const index: InsertionIndex = new Map();
+
+  for (const word of baseSet) {
+    for (let j = 0; j <= word.length; j++) {
+      for (let c = 65; c <= 90; c++) {
+        const letter = String.fromCharCode(c);
+        const combined = word.slice(0, j) + letter + word.slice(j);
+        if (maxSet.has(combined)) {
+          let targets = index.get(letter);
+          if (!targets) {
+            targets = [];
+            index.set(letter, targets);
+          }
+          targets.push({ baseWord: word, result: combined, position: j });
+        }
+      }
+    }
+  }
+
+  insertionIndexCache.set(wordLength, index);
+  return index;
+}
+
 export const validateWord = (word: string): boolean => {
   return COMMON_WORDS.has(word.toUpperCase());
 };
@@ -502,16 +562,19 @@ function scoreMoveQuality(
   charIndex: number,
   targetWord: string,
   insertionIndex: number,
-  previousMovePositions: number[]
+  previousMovePositions: number[],
+  relaxBoring?: boolean
 ): number {
   let score = 50;
   const char = sourceWord[charIndex];
 
-  // === Anti-Boring Penalty ===
-  const boringPenalty = getBoringTransformPenalty(
-    sourceWord, charIndex, char, targetWord, insertionIndex
-  );
-  score -= boringPenalty;
+  // === Anti-Boring Penalty (skipped for reverse mode) ===
+  if (!relaxBoring) {
+    const boringPenalty = getBoringTransformPenalty(
+      sourceWord, charIndex, char, targetWord, insertionIndex
+    );
+    score -= boringPenalty;
+  }
 
   // === Position Variety ===
   const normalizedSourcePos = charIndex === 0 ? 0 :
@@ -612,7 +675,7 @@ function scoreSemanticJourney(chain: PathNode[]): number {
  * Score an entire puzzle chain (0-100)
  * Enhanced with journey scoring, stricter boring penalties, and freshness
  */
-function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, number>): number {
+function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, number>, relaxBoring?: boolean): number {
   if (chain.length < 2) return 0;
 
   let totalScore = 0;
@@ -640,11 +703,12 @@ function scorePuzzleChain(chain: PathNode[], recencyMap?: Map<string, number>): 
         node.moveFromIndex,
         nextNode.word,
         node.moveToIndex || 0,
-        movePositions
+        movePositions,
+        relaxBoring
       );
 
-      // Track if any move is very boring
-      if (moveScore < 20) hasBoringMove = true;
+      // Track if any move is very boring (skipped for reverse mode)
+      if (!relaxBoring && moveScore < 20) hasBoringMove = true;
 
       moveScoreSum += moveScore;
       moveCount++;
@@ -744,7 +808,7 @@ function weightedShuffle(
 
 export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
-  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean }
+  overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean }
 ): Promise<PuzzleConfig> => {
   const targetRows = overrides?.targetRows ?? (
     difficulty === 'EASY' ? 3 :
@@ -760,6 +824,7 @@ export const generateLocalPuzzle = async (
   );
   const forcedStartWord = overrides?.startWord?.toUpperCase();
   const requireReverse = overrides?.requireReverseSolvable ?? false;
+  const relaxBoring = overrides?.relaxBoring ?? requireReverse;
 
   // Load word history for diversity scoring
   const recencyMap = await getWordHistoryWithRecency();
@@ -778,9 +843,9 @@ export const generateLocalPuzzle = async (
     baseArray: shuffle(Array.from(WORD_SETS[wordLength]))
   };
 
-  const GLOBAL_TIMEOUT = 2500;
-  // When reverse-solvability is required, we need to try many more candidates
-  // since cumulative locking makes only ~2% of puzzles reverse-solvable
+  // Reverse puzzles need much longer: cumulative locking means most chains
+  // fail reverse validation, so we need to try many start words.
+  const GLOBAL_TIMEOUT = requireReverse ? 25000 : 2500;
   const CANDIDATES_TO_GENERATE = forcedStartWord ? 1 : (requireReverse ? 1 : 3);
   const MIN_ACCEPTABLE_SCORE = forcedStartWord ? 0 : (requireReverse ? 30 : 45);
   const generatedPuzzles: GeneratedPuzzle[] = [];
@@ -815,11 +880,12 @@ export const generateLocalPuzzle = async (
       GLOBAL_TIMEOUT,
       state,
       [],
-      recencyMap
+      recencyMap,
+      relaxBoring
     );
 
     if (path) {
-      const score = scorePuzzleChain(path, recencyMap);
+      const score = scorePuzzleChain(path, recencyMap, relaxBoring);
 
       // Only accept puzzles above minimum threshold
       if (score >= MIN_ACCEPTABLE_SCORE) {
@@ -1074,7 +1140,7 @@ function canSolveReverseIterative(
   }];
 
   let iterations = 0;
-  const MAX_ITERATIONS = 50000;
+  const MAX_ITERATIONS = numSteps >= 4 ? 100000 : 50000;
 
   while (stack.length > 0) {
     if (++iterations > MAX_ITERATIONS) return false; // Safety cutoff
@@ -1122,8 +1188,11 @@ function canSolveReverseIterative(
 }
 
 /**
- * Recursive Depth-First Search with quality awareness
- * Now considers word history for diversity
+ * Recursive Depth-First Search with quality awareness.
+ * Uses a pre-computed adjacency index for fast candidate lookup.
+ * When relaxBoring is true (reverse mode), skips anti-boring penalties
+ * and explores more candidates to maximize the chance of finding a
+ * reverse-solvable chain.
  */
 async function findPath(
   chain: PathNode[],
@@ -1133,7 +1202,8 @@ async function findPath(
   timeoutLimit: number,
   state: GenState,
   previousMovePositions: number[],
-  recencyMap?: Map<string, number>
+  recencyMap?: Map<string, number>,
+  relaxBoring?: boolean
 ): Promise<PathNode[] | null> {
   const now = Date.now();
   if (now - state.startTime > timeoutLimit) {
@@ -1187,8 +1257,8 @@ async function findPath(
         moveScore -= 10; // Penalize edge positions
       }
 
-      // Apply boring transform penalties at search time
-      if (charToMove === 'S' && j === currentTempWord.length - 1) {
+      // Apply boring transform penalties at search time (skipped for reverse)
+      if (!relaxBoring && charToMove === 'S' && j === currentTempWord.length - 1) {
         moveScore -= 40; // Heavy penalty for S at end
       }
 
@@ -1203,6 +1273,11 @@ async function findPath(
   // Sort by move score (best first) with some randomness
   validMoves.sort((a, b) => (b.moveScore + Math.random() * 15) - (a.moveScore + Math.random() * 15));
 
+  // Use the pre-computed adjacency index for instant candidate lookup
+  // Base word length is always chain[0].word.length (the puzzle's word length)
+  const baseWordLength = chain[0].word.length;
+  const insertionIdx = getInsertionIndex(baseWordLength);
+
   for (const move of validMoves) {
     if (Date.now() - state.startTime > timeoutLimit) return null;
 
@@ -1216,47 +1291,52 @@ async function findPath(
       score: number
     }[] = [];
 
-    for (const w of dicts.baseArray) {
-      if (usedWords.has(w)) continue;
+    // Look up all base words that can receive this letter via adjacency index
+    const targets = insertionIdx.get(charToMove);
+    if (targets) {
+      for (const t of targets) {
+        if (usedWords.has(t.baseWord)) continue;
+        if (usedWords.has(t.result)) continue;
 
-      // Skip words in hard cooldown for diversity
-      if (recencyMap && isInHardCooldown(w, recencyMap)) continue;
+        // Skip words in hard cooldown for diversity
+        if (recencyMap && isInHardCooldown(t.baseWord, recencyMap)) continue;
 
-      for (let k = 0; k <= w.length; k++) {
-        const combined = w.slice(0, k) + charToMove + w.slice(k);
-        if (dicts.max.has(combined) && !usedWords.has(combined)) {
-          // Include recency in word scoring
-          const wordScore = scoreWordInterestingness(w, w.length, recencyMap);
+        // Include recency in word scoring
+        const wordScore = scoreWordInterestingness(t.baseWord, t.baseWord.length, recencyMap);
 
-          // Calculate insertion quality
-          let insertionScore = 0;
-          const normalizedTargetPos = k === 0 ? 0 : k === w.length ? 2 : 1;
+        // Calculate insertion quality
+        let insertionScore = 0;
+        const normalizedTargetPos = t.position === 0 ? 0 : t.position === t.baseWord.length ? 2 : 1;
 
-          // STRONG bonus for middle insertion
-          if (normalizedTargetPos === 1) {
-            insertionScore += 25;
-          } else {
-            insertionScore -= 15; // Penalize edge insertions
-          }
+        // STRONG bonus for middle insertion
+        if (normalizedTargetPos === 1) {
+          insertionScore += 25;
+        } else {
+          insertionScore -= 15; // Penalize edge insertions
+        }
 
-          // Apply boring transform penalty (strong weight during search)
+        // Apply boring transform penalty (skipped for reverse mode)
+        if (!relaxBoring) {
           const boringPenalty = getBoringTransformPenalty(
-            currentTempWord, charIndex, charToMove, w, k
+            currentTempWord, charIndex, charToMove, t.baseWord, t.position
           );
           insertionScore -= boringPenalty * 0.8;
-
-          potentialNextWords.push({
-            word: w,
-            tempState: combined,
-            insertionIndex: k,
-            score: wordScore + insertionScore + Math.random() * 25
-          });
         }
+
+        potentialNextWords.push({
+          word: t.baseWord,
+          tempState: t.result,
+          insertionIndex: t.position,
+          score: wordScore + insertionScore + Math.random() * 25
+        });
       }
     }
 
     potentialNextWords.sort((a, b) => b.score - a.score);
-    const candidatesToExplore = shuffle(potentialNextWords.slice(0, 25));
+    // Reverse mode explores more candidates since the adjacency index makes
+    // enumeration fast and we need to maximize reverse-solvable chain discovery
+    const maxCandidates = relaxBoring ? 60 : 25;
+    const candidatesToExplore = shuffle(potentialNextWords.slice(0, maxCandidates));
 
     for (const nextCandidate of candidatesToExplore) {
       if (Date.now() - state.startTime > timeoutLimit) return null;
@@ -1290,7 +1370,8 @@ async function findPath(
         timeoutLimit,
         state,
         newMovePositions,
-        recencyMap
+        recencyMap,
+        relaxBoring
       );
 
       if (result) return result;
