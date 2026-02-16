@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -114,4 +114,67 @@ describe('generateLocalPuzzle', () => {
     expect(words1).toBeDefined();
     expect(words2).toBeDefined();
   }, 15000);
+});
+
+describe('isReverseSolvable', () => {
+  test('rejects puzzle where reverse path requires picking the locked letter', () => {
+    // Forward: GLOW → pick G → LOW, insert G into ABLE → GABLE
+    //          GABLE → pick B → GALE, insert B into EACH → BEACH
+    // Post-forward: ["LOW", "GALE", "BEACH"]
+    //   B is locked at position 0 in BEACH (the letter dropped in the last forward step)
+    // Reverse: Source BEACH with B locked at pos 0.
+    //   Removing B(0) → EACH is the only valid 4-letter remainder,
+    //   but B is locked and cannot be picked.
+    //   Other removals: E→BACH(not a word), A→BECH(no), C→BEAH(no), H→BEAC(no)
+    //   → No valid reverse moves exist. Puzzle is unsolvable in reverse.
+    const result = isReverseSolvable(
+      ['GLOW', 'ABLE', 'EACH'],
+      [
+        { stepIndex: 0, sourceWord: 'GLOW', targetWord: 'ABLE', letterToMove: 'G', explanation: '' },
+        { stepIndex: 1, sourceWord: 'ABLE', targetWord: 'EACH', letterToMove: 'B', explanation: '' },
+      ]
+    );
+    expect(result).toBe(false);
+  });
+
+  test('accepts puzzle with valid reverse path respecting locked letters', () => {
+    // Forward: PEEP → pick E → PEP, insert E into WHAT → WHEAT
+    //          WHEAT → pick W → HEAT, insert W into HERE → WHERE
+    // Post-forward: ["PEP", "HEAT", "WHERE"]
+    //   W is locked at position 0 in WHERE
+    // Reverse step 0: Source WHERE, locked pos 0 (W)
+    //   Remove H(1) → WERE (valid), insert H into HEAT at end → HEATH (valid)
+    // Reverse step 1: Source HEATH, locked pos 4 (H from insertion)
+    //   Remove E(1) → HATH (valid), insert E into PEP → PEEP (valid)
+    //   → Reverse is solvable!
+    const result = isReverseSolvable(
+      ['PEEP', 'WHAT', 'HERE'],
+      [
+        { stepIndex: 0, sourceWord: 'PEEP', targetWord: 'WHAT', letterToMove: 'E', explanation: '' },
+        { stepIndex: 1, sourceWord: 'WHAT', targetWord: 'HERE', letterToMove: 'W', explanation: '' },
+      ]
+    );
+    expect(result).toBe(true);
+  });
+
+  test('generated puzzles can still pass reverse validation', async () => {
+    // Generate several puzzles and verify at least some pass reverse validation.
+    // This ensures the locked-letter-aware check isn't overly restrictive.
+    let passCount = 0;
+    const attempts = 10;
+    for (let i = 0; i < attempts; i++) {
+      const puzzle = await generateLocalPuzzle('EASY');
+      if (isReverseSolvable(puzzle.words, puzzle.solution!)) {
+        passCount++;
+      }
+    }
+    // Not all puzzles are reverse-solvable, but a reasonable fraction should be
+    expect(passCount).toBeGreaterThan(0);
+  }, 30000);
+
+  test('rejects invalid inputs', () => {
+    expect(isReverseSolvable([], [])).toBe(false);
+    expect(isReverseSolvable(['WORD'], [])).toBe(false);
+    expect(isReverseSolvable(['A'], [{ stepIndex: 0, sourceWord: 'A', targetWord: 'B', letterToMove: 'A', explanation: '' }])).toBe(false);
+  });
 });

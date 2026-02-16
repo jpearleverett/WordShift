@@ -873,6 +873,11 @@ export const generateLocalPuzzle = async (
  * board state, then checks if a valid DFS path exists from the last row back
  * to row 0 (each step: pick a letter from source → valid shorter word,
  * drop it into target → valid longer word).
+ *
+ * Accounts for the game's locked-letter mechanic: when a letter is dropped
+ * into a row, it becomes locked and cannot be picked up again. During the
+ * reverse leg, each source row has one locked letter that the player cannot
+ * move. The validator must respect this constraint.
  */
 export function isReverseSolvable(
   words: string[],
@@ -892,6 +897,11 @@ export function isReverseSolvable(
   // from the source row and inserts it into the target row.
   const rowLetters: string[][] = words.map(w => w.split(''));
 
+  // Track the insertion position in each target row during the forward pass.
+  // The last row's insertion position becomes the initial locked position
+  // for the reverse leg.
+  let lastRowInsertionPos = -1;
+
   for (const step of solution) {
     const srcRow = rowLetters[step.stepIndex];
     const tgtRow = rowLetters[step.stepIndex + 1];
@@ -907,11 +917,13 @@ export function isReverseSolvable(
     // We find the position that produces a valid (wordLength+1)-letter word.
     const tgtStr = tgtRow.join('');
     let inserted = false;
+    let insertionPos = tgtRow.length; // fallback: end
     for (let k = 0; k <= tgtRow.length; k++) {
       const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
       if (maxDict.has(combined)) {
         // Use this insertion position
         tgtRow.splice(k, 0, step.letterToMove);
+        insertionPos = k;
         inserted = true;
         break;
       }
@@ -919,6 +931,11 @@ export function isReverseSolvable(
     if (!inserted) {
       // Fallback: append to end (generator found it valid, dict mismatch possible)
       tgtRow.push(step.letterToMove);
+    }
+
+    // Track insertion position for the last row (used as initial locked pos)
+    if (step.stepIndex + 1 === words.length - 1) {
+      lastRowInsertionPos = insertionPos;
     }
   }
 
@@ -931,40 +948,53 @@ export function isReverseSolvable(
   // Now check reverse solvability using iterative DFS
   // For each step going up from row N-1 to row 1→0:
   // Pick a letter from source (making it shorter), drop into target above (making it longer)
-  return canSolveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength);
+  // The locked position in the last row is where the forward pass inserted its letter.
+  return canSolveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength, lastRowInsertionPos);
 }
 
 /**
  * Check if the reverse path from bottom to top is solvable.
  * Uses iterative depth-first search with backtracking.
+ *
+ * Respects the game's locked-letter mechanic: at each reverse step, the
+ * source row has one locked letter (the most recently dropped into it) that
+ * cannot be picked. The locked position propagates: when a letter is inserted
+ * into the target at position j, that position becomes locked for the next
+ * step (when that target becomes the source).
  */
 function canSolveReverseIterative(
   startRows: string[],
   minDict: Set<string>,
   baseDict: Set<string>,
   maxDict: Set<string>,
-  wordLength: number
+  wordLength: number,
+  initialLockedPos: number
 ): boolean {
   const numSteps = startRows.length - 1;
 
-  // Stack-based DFS: each frame tracks (currentRows state, stepIndex, moveIndex)
-  // moveIndex iterates through all possible pick-letter + insert-position combos
+  // Stack-based DFS: each frame tracks (currentRows state, stepIndex, moveIndex,
+  // lockedPos — the position in the current source that is locked)
   interface Frame {
     rows: string[];
     step: number;
     moveIdx: number;
+    lockedPos: number;
   }
 
-  // Enumerate all possible moves for a given step
+  // Enumerate all possible moves for a given step, skipping the locked position
   function getMoves(
     sourceWord: string,
     targetWord: string,
-    step: number
-  ): Array<{ newSource: string; newTarget: string }> {
+    step: number,
+    lockedPos: number
+  ): Array<{ newSource: string; newTarget: string; insertPos: number }> {
     const isLastStep = step === numSteps - 1;
-    const moves: Array<{ newSource: string; newTarget: string }> = [];
+    const moves: Array<{ newSource: string; newTarget: string; insertPos: number }> = [];
 
     for (let i = 0; i < sourceWord.length; i++) {
+      // Skip the locked position — this letter cannot be picked
+      if (i === lockedPos) continue;
+
       const letter = sourceWord[i];
       const remainder = sourceWord.slice(0, i) + sourceWord.slice(i + 1);
 
@@ -980,7 +1010,7 @@ function canSolveReverseIterative(
           : maxDict.has(combined);
         if (!isCombinedValid) continue;
 
-        moves.push({ newSource: remainder, newTarget: combined });
+        moves.push({ newSource: remainder, newTarget: combined, insertPos: j });
       }
     }
     return moves;
@@ -990,6 +1020,7 @@ function canSolveReverseIterative(
     rows: [...startRows],
     step: 0,
     moveIdx: 0,
+    lockedPos: initialLockedPos,
   }];
 
   let iterations = 0;
@@ -1005,7 +1036,7 @@ function canSolveReverseIterative(
     const sourceWord = frame.rows[sourceRowIdx];
     const targetWord = frame.rows[targetRowIdx];
 
-    const moves = getMoves(sourceWord, targetWord, frame.step);
+    const moves = getMoves(sourceWord, targetWord, frame.step, frame.lockedPos);
 
     if (frame.moveIdx >= moves.length) {
       // No more moves at this level — backtrack
@@ -1026,11 +1057,13 @@ function canSolveReverseIterative(
       return true;
     }
 
-    // Push next step
+    // Push next step: the insertion position becomes the locked position
+    // in the next source (which is the current target after receiving the letter).
     stack.push({
       rows: newRows,
       step: frame.step + 1,
       moveIdx: 0,
+      lockedPos: move.insertPos,
     });
   }
 
