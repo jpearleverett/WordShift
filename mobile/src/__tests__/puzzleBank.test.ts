@@ -17,6 +17,7 @@ import { selectPreGeneratedPuzzle, clearPlayedPuzzles } from '../services/puzzle
 import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
 import { PUZZLE_BANK_REVERSE_MEDIUM_PLUS } from '../data/puzzleBankReverseMediumPlus';
+import { PUZZLE_BANK_REVERSE_MEDIUM } from '../data/puzzleBankReverseMedium';
 
 // Helper: get a recency map (empty by default)
 function emptyRecencyMap(): Map<string, number> {
@@ -203,9 +204,6 @@ describe('puzzleBank', () => {
     it('returns null for reverse at unsupported difficulties', async () => {
       const easy = await selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap(), 'reverse');
       expect(easy).toBeNull();
-
-      const medium = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
-      expect(medium).toBeNull();
     });
 
     it('returns null for unsupported variants', async () => {
@@ -420,8 +418,84 @@ describe('puzzleBank', () => {
     }
   });
 
+  describe('selectPreGeneratedPuzzle - MEDIUM reverse variant', () => {
+    const hasReverseMedPuzzles = PUZZLE_BANK_REVERSE_MEDIUM.length > 0;
+
+    if (hasReverseMedPuzzles) {
+      it('returns a valid PuzzleConfig for MEDIUM reverse', async () => {
+        const result = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
+        expect(result).not.toBeNull();
+        expect(result!.words).toBeDefined();
+        expect(result!.words.length).toBe(4); // MEDIUM = 4 rows
+        for (const word of result!.words) {
+          expect(word.length).toBe(4); // MEDIUM = 4-letter words
+        }
+        expect(result!.wordLength).toBe(4);
+        expect(result!.hint).toBeDefined();
+      });
+
+      it('returns a valid PuzzleConfig for MEDIUM reverse_blind', async () => {
+        const result = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse_blind');
+        expect(result).not.toBeNull();
+        expect(result!.words.length).toBe(4);
+      });
+
+      it('does not return the same MEDIUM reverse puzzle twice', async () => {
+        const first = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
+        const second = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
+        expect(first).not.toBeNull();
+        expect(second).not.toBeNull();
+        expect(first!.words.join(',')).not.toBe(second!.words.join(','));
+      });
+
+      it('uses separate tracking from HARD and MEDIUM_PLUS reverse puzzles', async () => {
+        await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+        await selectPreGeneratedPuzzle('MEDIUM_PLUS', 0, emptyRecencyMap(), 'reverse');
+        await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
+
+        const hardStored = await AsyncStorage.getItem('wordshift_played_reverse_puzzle_ids');
+        const mpStored = await AsyncStorage.getItem('wordshift_played_reverse_mp_puzzle_ids');
+        const medStored = await AsyncStorage.getItem('wordshift_played_reverse_med_puzzle_ids');
+
+        const hardIds = JSON.parse(hardStored!);
+        const mpIds = JSON.parse(mpStored!);
+        const medIds = JSON.parse(medStored!);
+
+        expect(hardIds.length).toBe(1);
+        expect(mpIds.length).toBe(1);
+        expect(medIds.length).toBe(1);
+      });
+
+      it('all MEDIUM reverse puzzles have 4 words of 4 letters', () => {
+        for (const puzzle of PUZZLE_BANK_REVERSE_MEDIUM) {
+          expect(puzzle.words.length).toBe(4);
+          for (const word of puzzle.words) {
+            expect(word.length).toBe(4);
+          }
+          expect(puzzle.solution.length).toBe(3);
+          expect(puzzle.wordLength).toBe(4);
+        }
+      });
+
+      it('all MEDIUM reverse puzzles have unique IDs', () => {
+        const ids = PUZZLE_BANK_REVERSE_MEDIUM.map(p => p.id);
+        const uniqueIds = new Set(ids);
+        expect(uniqueIds.size).toBe(ids.length);
+      });
+
+      it('has no ID overlap with HARD or MEDIUM_PLUS reverse banks', () => {
+        const hardIds = new Set(PUZZLE_BANK_REVERSE_HARD.map(p => p.id));
+        const mpIds = new Set(PUZZLE_BANK_REVERSE_MEDIUM_PLUS.map(p => p.id));
+        for (const puzzle of PUZZLE_BANK_REVERSE_MEDIUM) {
+          expect(hardIds.has(puzzle.id)).toBe(false);
+          expect(mpIds.has(puzzle.id)).toBe(false);
+        }
+      });
+    }
+  });
+
   describe('clearPlayedPuzzles - all banks', () => {
-    it('resets all puzzle tracking including MEDIUM_PLUS reverse', async () => {
+    it('resets all puzzle tracking including MEDIUM and MEDIUM_PLUS reverse', async () => {
       await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
       if (PUZZLE_BANK_REVERSE_HARD.length > 0) {
         await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
@@ -429,15 +503,20 @@ describe('puzzleBank', () => {
       if (PUZZLE_BANK_REVERSE_MEDIUM_PLUS.length > 0) {
         await selectPreGeneratedPuzzle('MEDIUM_PLUS', 0, emptyRecencyMap(), 'reverse');
       }
+      if (PUZZLE_BANK_REVERSE_MEDIUM.length > 0) {
+        await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
+      }
 
       await clearPlayedPuzzles();
 
       const standardStored = await AsyncStorage.getItem('wordshift_played_puzzle_ids');
       const reverseStored = await AsyncStorage.getItem('wordshift_played_reverse_puzzle_ids');
       const reverseMpStored = await AsyncStorage.getItem('wordshift_played_reverse_mp_puzzle_ids');
+      const reverseMedStored = await AsyncStorage.getItem('wordshift_played_reverse_med_puzzle_ids');
       expect(standardStored).toBeNull();
       expect(reverseStored).toBeNull();
       expect(reverseMpStored).toBeNull();
+      expect(reverseMedStored).toBeNull();
     });
   });
 

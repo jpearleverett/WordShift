@@ -383,10 +383,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // Use pre-generated puzzle bank for HARD standard/reverse variants
+      // Use pre-generated puzzle bank for supported difficulty/variant combos.
+      // Banks exist for: HARD standard/reverse/reverse_blind, MEDIUM_PLUS reverse/reverse_blind,
+      // MEDIUM reverse/reverse_blind. selectPreGeneratedPuzzle returns null for unsupported combos.
       const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'reverse_blind'];
-      const shouldUseBank = selectedDifficulty === 'HARD' && bankVariants.includes(variant)
-        && (variant !== 'standard' || effectiveMode === 'standard');
+      const bankDifficulties: Difficulty[] = ['HARD', 'MEDIUM_PLUS', 'MEDIUM'];
+      const shouldUseBank = bankDifficulties.includes(selectedDifficulty) && bankVariants.includes(variant)
+        && (variant !== 'standard' || (selectedDifficulty === 'HARD' && effectiveMode === 'standard'));
       if (shouldUseBank) {
         try {
           const recencyMap = await getWordHistoryWithRecency();
