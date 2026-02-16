@@ -10,9 +10,24 @@ const USED_PUZZLES_KEY = 'wordshift_played_puzzle_ids';
 const USED_REVERSE_PUZZLES_KEY = 'wordshift_played_reverse_puzzle_ids';
 const MAX_USED_TRACKED = 500;
 
+// Bank word novelty scoring thresholds (in bank-puzzle-selections ago)
+// Words seen recently in bank selections get graduated penalties even after
+// the general wordHistory hard cooldown (15 puzzles) has expired.
+const BANK_RECENT_THRESHOLD = 50;   // Strong penalty window
+const BANK_MEDIUM_THRESHOLD = 150;  // Moderate penalty window
+const BANK_RECENT_PENALTY = -12;    // Per word seen within BANK_RECENT_THRESHOLD
+const BANK_MEDIUM_PENALTY = -6;     // Per word seen within BANK_MEDIUM_THRESHOLD
+const BANK_NOVEL_BONUS_FULL = 15;   // All words never seen from this bank
+const BANK_NOVEL_BONUS_MOST = 8;    // 3+ novel words out of ~5
+const BANK_NOVEL_BONUS_SOME = 3;    // 1-2 novel words
+
 // In-memory caches (ordered arrays, most recently played first)
 let usedPuzzleIds: string[] | null = null;
 let usedReversePuzzleIds: string[] | null = null;
+
+// Lazy-initialized ID→allWords lookup maps (built once from static bank data)
+let standardIdToWords: Map<string, string[]> | null = null;
+let reverseIdToWords: Map<string, string[]> | null = null;
 
 /**
  * Determine the storage key and cache for a given variant.
@@ -34,6 +49,57 @@ function getStorageConfig(variant: PuzzleVariant): {
     getCache: () => usedPuzzleIds,
     setCache: (val) => { usedPuzzleIds = val; },
   };
+}
+
+/**
+ * Get or build the ID→allWords lookup map for a bank.
+ * Built lazily from static bank data on first access.
+ */
+function getIdToWordsMap(variant: PuzzleVariant): Map<string, string[]> {
+  if (variant === 'reverse' || variant === 'reverse_blind') {
+    if (!reverseIdToWords) {
+      reverseIdToWords = new Map();
+      for (const p of PUZZLE_BANK_REVERSE_HARD) {
+        reverseIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return reverseIdToWords;
+  }
+  if (!standardIdToWords) {
+    standardIdToWords = new Map();
+    for (const p of PUZZLE_BANK_HARD) {
+      standardIdToWords.set(p.id, p.allWords);
+    }
+  }
+  return standardIdToWords;
+}
+
+/**
+ * Derive a word→bankPuzzlesAgo recency map from the played puzzle ID history.
+ * This gives the bank selection a much longer memory than the general word
+ * history (which only tracks the last 15 puzzles in hard cooldown). Each word
+ * maps to how many bank selections ago it was last seen (0 = most recent).
+ * Words not in the map have never appeared in a played bank puzzle.
+ */
+function deriveBankWordRecency(
+  usedIds: string[],
+  variant: PuzzleVariant
+): Map<string, number> {
+  const idToWords = getIdToWordsMap(variant);
+  const recency = new Map<string, number>();
+
+  for (let i = 0; i < usedIds.length; i++) {
+    const words = idToWords.get(usedIds[i]);
+    if (!words) continue;
+    for (const w of words) {
+      // Only track the most recent (lowest index) occurrence
+      if (!recency.has(w)) {
+        recency.set(w, i);
+      }
+    }
+  }
+
+  return recency;
 }
 
 /**
@@ -105,12 +171,19 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
 /**
  * Score a puzzle's suitability for the current game context.
  * Higher = better match.
+ *
+ * Scoring layers (in priority order):
+ * 1. Phase appropriateness — heaviest weight, matches puzzle dread tier to narrative phase
+ * 2. Word history cooldown — short-term (15 puzzles) hard exclusion from general word history
+ * 3. Bank word novelty — long-term (150 bank selections) graduated penalty for repeated words
+ * 4. Random jitter — prevents deterministic ordering within similar scores
  */
 function scorePuzzleForContext(
   puzzle: PreGeneratedPuzzle,
   phase: DialoguePhase,
   usedSet: Set<string>,
-  recencyMap: Map<string, number>
+  recencyMap: Map<string, number>,
+  bankWordRecency: Map<string, number>
 ): number {
   let score = 0;
 
@@ -126,7 +199,7 @@ function scorePuzzleForContext(
   // (matching the "visual changes precede dialogue" principle)
   if (puzzle.dreadTier === idealTier + 1) score += 10;
 
-  // Word freshness penalty
+  // Word freshness penalty (short-term, from general word history)
   let overlapCount = 0;
   for (const word of puzzle.allWords) {
     if (isInHardCooldown(word, recencyMap)) {
@@ -136,6 +209,40 @@ function scorePuzzleForContext(
   }
   // If more than half the words are in cooldown, heavy exclusion penalty
   if (overlapCount > puzzle.allWords.length / 2) score -= 100;
+
+  // Bank word novelty scoring (long-term memory of bank selections)
+  // This fills the gap after the 15-puzzle word history cooldown expires.
+  // With only ~780 unique words across 500 standard puzzles (562 for reverse),
+  // the general cooldown forgets too quickly — this ensures the selection
+  // keeps preferring puzzles with words the player hasn't seen recently.
+  let novelWords = 0;
+  for (const word of puzzle.allWords) {
+    const bankPuzzlesAgo = bankWordRecency.get(word);
+    if (bankPuzzlesAgo === undefined) {
+      // Never seen from this bank — genuinely novel
+      novelWords++;
+    } else if (bankPuzzlesAgo < BANK_RECENT_THRESHOLD) {
+      // Seen recently in bank — strong penalty
+      // (0-14 range overlaps with wordHistory hard cooldown, which already
+      //  applies -30. This adds bank-specific penalty for the 15-49 range.)
+      if (bankPuzzlesAgo >= 15) {
+        score += BANK_RECENT_PENALTY;
+      }
+    } else if (bankPuzzlesAgo < BANK_MEDIUM_THRESHOLD) {
+      // Seen a while ago — moderate penalty
+      score += BANK_MEDIUM_PENALTY;
+    }
+    // 150+ bank selections ago: word has effectively refreshed
+  }
+
+  // Bonus for puzzles with novel words — strongly prefer fresh vocabulary
+  if (novelWords === puzzle.allWords.length) {
+    score += BANK_NOVEL_BONUS_FULL;
+  } else if (novelWords >= 3) {
+    score += BANK_NOVEL_BONUS_MOST;
+  } else if (novelWords >= 1) {
+    score += BANK_NOVEL_BONUS_SOME;
+  }
 
   // Random jitter (prevents deterministic ordering)
   score += Math.random() * 15;
@@ -195,10 +302,16 @@ export async function selectPreGeneratedPuzzle(
     }
   }
 
+  // Derive bank-specific word recency from played puzzle history.
+  // This gives the scoring function a long-term memory of which words
+  // the player has already seen from this bank, far beyond the 15-puzzle
+  // general word history cooldown.
+  const bankWordRecency = deriveBankWordRecency(used, variant);
+
   // Score all available puzzles for current context
   const scored = available.map(p => ({
     puzzle: p,
-    score: scorePuzzleForContext(p, phase, usedSet, recencyMap),
+    score: scorePuzzleForContext(p, phase, usedSet, recencyMap, bankWordRecency),
   }));
 
   // Sort by score descending
