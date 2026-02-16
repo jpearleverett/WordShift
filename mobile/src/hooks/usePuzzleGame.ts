@@ -295,9 +295,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       ...variantOverrides,
       ...(startWord ? { startWord } : {}),
       // For reverse variants, let the generator handle reverse-solvability
-      // internally so it can try many start words within the timeout
-      ...(isReverseVariant ? { requireReverseSolvable: true } : {}),
-    } as { targetRows?: number; wordLength?: number; startWord?: string; requireReverseSolvable?: boolean };
+      // internally so it can try many start words within the timeout.
+      // relaxBoring widens the candidate pool by skipping anti-boring penalties.
+      ...(isReverseVariant ? { requireReverseSolvable: true, relaxBoring: true } : {}),
+    } as { targetRows?: number; wordLength?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean };
 
     let puzzle = await Promise.race([
       generateLocalPuzzle(selectedDifficulty, generationOverrides),
@@ -306,8 +307,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (!isVariantCompatibleWithSolution(activeVariant, puzzle.solution, puzzle.words)) {
       let compatiblePuzzle = null as typeof puzzle | null;
-      // Reverse variants get more retries since they have stricter constraints
-      const maxRetries = isReverseVariant ? 5 : 3;
+      // Reverse variants use fewer retries since each attempt takes longer
+      // but is more likely to succeed with the adjacency index + relaxBoring
+      const maxRetries = isReverseVariant ? 2 : 3;
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         const retry = await Promise.race([
           generateLocalPuzzle(selectedDifficulty, generationOverrides),
@@ -379,8 +381,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
+      const isReverseGen = hasVariantModifier(variant, 'reverse');
+      const timeoutMs = isReverseGen ? 30000 : 4000;
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Generation timeout')), 4000)
+        setTimeout(() => reject(new Error('Generation timeout')), timeoutMs)
       );
 
       const { puzzle, activeVariant } = await generatePuzzleForVariant(
