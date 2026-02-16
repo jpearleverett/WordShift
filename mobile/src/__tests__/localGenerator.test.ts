@@ -116,17 +116,13 @@ describe('generateLocalPuzzle', () => {
   }, 15000);
 });
 
-describe('isReverseSolvable', () => {
-  test('rejects puzzle where reverse path requires picking the locked letter', () => {
-    // Forward: GLOW → pick G → LOW, insert G into ABLE → GABLE
+describe('isReverseSolvable (cumulative locking)', () => {
+  test('rejects puzzle where reverse path requires picking a locked letter', () => {
+    // Forward: GLOW → pick G(0) → LOW, insert G into ABLE → GABLE
     //          GABLE → pick B → GALE, insert B into EACH → BEACH
-    // Post-forward: ["LOW", "GALE", "BEACH"]
-    //   B is locked at position 0 in BEACH (the letter dropped in the last forward step)
-    // Reverse: Source BEACH with B locked at pos 0.
-    //   Removing B(0) → EACH is the only valid 4-letter remainder,
-    //   but B is locked and cannot be picked.
-    //   Other removals: E→BACH(not a word), A→BECH(no), C→BEAH(no), H→BEAC(no)
-    //   → No valid reverse moves exist. Puzzle is unsolvable in reverse.
+    // Under cumulative locking, the G inserted in row 1 stays locked.
+    // In the best insertion scenario for GABLE, the locked G prevents
+    // a valid reverse path from BEACH back through GALE to LOW.
     const result = isReverseSolvable(
       ['GLOW', 'ABLE', 'EACH'],
       [
@@ -137,40 +133,35 @@ describe('isReverseSolvable', () => {
     expect(result).toBe(false);
   });
 
-  test('accepts puzzle with valid reverse path respecting locked letters', () => {
-    // Forward: PEEP → pick E → PEP, insert E into WHAT → WHEAT
-    //          WHEAT → pick W → HEAT, insert W into HERE → WHERE
-    // Post-forward: ["PEP", "HEAT", "WHERE"]
-    //   W is locked at position 0 in WHERE
-    // Reverse step 0: Source WHERE, locked pos 0 (W)
-    //   Remove H(1) → WERE (valid), insert H into HEAT at end → HEATH (valid)
-    // Reverse step 1: Source HEATH, locked pos 4 (H from insertion)
-    //   Remove E(1) → HATH (valid), insert E into PEP → PEEP (valid)
-    //   → Reverse is solvable!
+  test('accepts puzzle with valid reverse path under cumulative locking', () => {
+    // Forward: CAME → pick E(3) → CAM, insert E into LAST → LEAST (pos 1)
+    //          LEAST → pick L(0) → EAST, insert L into BACK → BLACK (pos 1)
+    // Post-forward: ["CAM"(3), "EAST"(4), "BLACK"(5)]
+    //   EAST locked: E was inserted at pos 1 in LAST. L removed at pos 0 of LEAST.
+    //     Since 0 < 1, locked shifts to 0. So EAST has locked {0} (the E at pos 0).
+    //   BLACK locked: L inserted at pos 1. So BLACK has locked {1} (the L).
+    // Reverse step 0: Source BLACK(5), locked {1}
+    //   Remove B(0) → LACK (valid 4-letter). Insert B into EAST at pos 0 → BEAST (valid 5-letter)
+    //   BEAST locked: original {0} shifts to {1} (since insert at 0), plus new lock at {0}. → {0, 1}
+    // Reverse step 1: Source BEAST(5), locked {0, 1}. Available: positions 2,3,4
+    //   Remove S(3) → BEAT (valid 4-letter). Insert S into CAM at pos 0 → SCAM (valid 4-letter) ✓
     const result = isReverseSolvable(
-      ['PEEP', 'WHAT', 'HERE'],
+      ['CAME', 'LAST', 'BACK'],
       [
-        { stepIndex: 0, sourceWord: 'PEEP', targetWord: 'WHAT', letterToMove: 'E', explanation: '' },
-        { stepIndex: 1, sourceWord: 'WHAT', targetWord: 'HERE', letterToMove: 'W', explanation: '' },
+        { stepIndex: 0, sourceWord: 'CAME', targetWord: 'LAST', letterToMove: 'E', explanation: '' },
+        { stepIndex: 1, sourceWord: 'LAST', targetWord: 'BACK', letterToMove: 'L', explanation: '' },
       ]
     );
     expect(result).toBe(true);
   });
 
-  test('generated puzzles can still pass reverse validation', async () => {
-    // Generate several puzzles and verify at least some pass reverse validation.
-    // This ensures the locked-letter-aware check isn't overly restrictive.
-    let passCount = 0;
-    const attempts = 10;
-    for (let i = 0; i < attempts; i++) {
-      const puzzle = await generateLocalPuzzle('EASY');
-      if (isReverseSolvable(puzzle.words, puzzle.solution!)) {
-        passCount++;
-      }
-    }
-    // Not all puzzles are reverse-solvable, but a reasonable fraction should be
-    expect(passCount).toBeGreaterThan(0);
-  }, 30000);
+  test('generateLocalPuzzle with requireReverseSolvable produces valid puzzles', async () => {
+    // Generate a puzzle with the reverse-solvable flag — it should always pass
+    const puzzle = await generateLocalPuzzle('EASY', { requireReverseSolvable: true });
+    expect(puzzle.words.length).toBeGreaterThanOrEqual(3);
+    expect(puzzle.solution).toBeDefined();
+    expect(isReverseSolvable(puzzle.words, puzzle.solution!)).toBe(true);
+  }, 15000);
 
   test('rejects invalid inputs', () => {
     expect(isReverseSolvable([], [])).toBe(false);
