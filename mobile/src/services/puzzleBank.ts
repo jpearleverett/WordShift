@@ -1,38 +1,68 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PuzzleConfig, Difficulty } from '../types';
 import { PreGeneratedPuzzle, PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
+import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
+import { PuzzleVariant } from './puzzleVariety';
 
 const USED_PUZZLES_KEY = 'wordshift_played_puzzle_ids';
+const USED_REVERSE_PUZZLES_KEY = 'wordshift_played_reverse_puzzle_ids';
 const MAX_USED_TRACKED = 500;
 
-// In-memory cache (ordered array, most recently played first)
+// In-memory caches (ordered arrays, most recently played first)
 let usedPuzzleIds: string[] | null = null;
+let usedReversePuzzleIds: string[] | null = null;
+
+/**
+ * Determine the storage key and cache for a given variant.
+ */
+function getStorageConfig(variant: PuzzleVariant): {
+  key: string;
+  getCache: () => string[] | null;
+  setCache: (val: string[] | null) => void;
+} {
+  if (variant === 'reverse' || variant === 'reverse_blind') {
+    return {
+      key: USED_REVERSE_PUZZLES_KEY,
+      getCache: () => usedReversePuzzleIds,
+      setCache: (val) => { usedReversePuzzleIds = val; },
+    };
+  }
+  return {
+    key: USED_PUZZLES_KEY,
+    getCache: () => usedPuzzleIds,
+    setCache: (val) => { usedPuzzleIds = val; },
+  };
+}
 
 /**
  * Load played puzzle IDs from storage into cache.
  */
-async function loadUsedPuzzles(): Promise<string[]> {
-  if (usedPuzzleIds !== null) return usedPuzzleIds;
+async function loadUsedPuzzles(variant: PuzzleVariant = 'standard'): Promise<string[]> {
+  const config = getStorageConfig(variant);
+  const cached = config.getCache();
+  if (cached !== null) return cached;
   try {
-    const stored = await AsyncStorage.getItem(USED_PUZZLES_KEY);
+    const stored = await AsyncStorage.getItem(config.key);
     if (stored) {
-      usedPuzzleIds = JSON.parse(stored);
-      return usedPuzzleIds!;
+      const parsed = JSON.parse(stored);
+      config.setCache(parsed);
+      return parsed;
     }
   } catch {
     // Fall through to empty
   }
-  usedPuzzleIds = [];
-  return usedPuzzleIds;
+  config.setCache([]);
+  return [];
 }
 
 /**
  * Record a puzzle as played.
  */
-async function markPuzzlePlayed(puzzleId: string): Promise<void> {
-  const used = await loadUsedPuzzles();
+async function markPuzzlePlayed(puzzleId: string, variant: PuzzleVariant = 'standard'): Promise<void> {
+  const config = getStorageConfig(variant);
+  const used = await loadUsedPuzzles(variant);
 
   // Remove if already present (re-sort to front)
   const idx = used.indexOf(puzzleId);
@@ -46,27 +76,30 @@ async function markPuzzlePlayed(puzzleId: string): Promise<void> {
     used.length = MAX_USED_TRACKED;
   }
 
-  usedPuzzleIds = used;
+  config.setCache(used);
 
   try {
-    await AsyncStorage.setItem(USED_PUZZLES_KEY, JSON.stringify(used));
+    await AsyncStorage.setItem(config.key, JSON.stringify(used));
   } catch {
     // Non-critical — will retry on next play
   }
 }
 
 /**
- * Get the appropriate puzzle bank for a difficulty level.
- * Returns null if no bank exists for this difficulty.
+ * Get the appropriate puzzle bank for a difficulty level and variant.
+ * Returns null if no bank exists for this combination.
  */
-function getBankForDifficulty(difficulty: Difficulty): PreGeneratedPuzzle[] | null {
-  switch (difficulty) {
-    case 'HARD':
+function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): PreGeneratedPuzzle[] | null {
+  if (difficulty === 'HARD') {
+    if (variant === 'standard') {
       return PUZZLE_BANK_HARD.length > 0 ? PUZZLE_BANK_HARD : null;
-    // Future: case 'MEDIUM': return PUZZLE_BANK_MEDIUM;
-    default:
-      return null;
+    }
+    // reverse and reverse_blind both use the same reverse-solvable puzzles
+    if (variant === 'reverse' || variant === 'reverse_blind') {
+      return PUZZLE_BANK_REVERSE_HARD.length > 0 ? PUZZLE_BANK_REVERSE_HARD : null;
+    }
   }
+  return null;
 }
 
 /**
@@ -114,19 +147,21 @@ function scorePuzzleForContext(
  * Select a puzzle from the pre-generated bank.
  *
  * Returns a PuzzleConfig ready for initGame(), or null if no bank exists
- * for the requested difficulty.
+ * for the requested difficulty/variant combination.
  *
  * When all puzzles have been played, recycles the oldest-played puzzles.
  */
 export async function selectPreGeneratedPuzzle(
   difficulty: Difficulty,
   phase: DialoguePhase,
-  recencyMap: Map<string, number>
+  recencyMap: Map<string, number>,
+  variant: PuzzleVariant = 'standard'
 ): Promise<PuzzleConfig | null> {
-  const bank = getBankForDifficulty(difficulty);
+  const bank = getBankForSelection(difficulty, variant);
   if (!bank) return null;
 
-  const used = await loadUsedPuzzles();
+  const storageConfig = getStorageConfig(variant);
+  const used = await loadUsedPuzzles(variant);
   const usedSet = new Set(used);
 
   // Filter out already-played puzzles
@@ -138,9 +173,10 @@ export async function selectPreGeneratedPuzzle(
     const recycledIds = new Set(used.slice(halfIdx));
 
     // Remove recycled IDs from the used list
-    usedPuzzleIds = used.slice(0, halfIdx);
+    const trimmed = used.slice(0, halfIdx);
+    storageConfig.setCache(trimmed);
     try {
-      await AsyncStorage.setItem(USED_PUZZLES_KEY, JSON.stringify(usedPuzzleIds));
+      await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
     } catch {
       // Non-critical
     }
@@ -150,9 +186,9 @@ export async function selectPreGeneratedPuzzle(
     // If still empty (shouldn't happen), return all
     if (available.length === 0) {
       available = [...bank];
-      usedPuzzleIds = [];
+      storageConfig.setCache([]);
       try {
-        await AsyncStorage.setItem(USED_PUZZLES_KEY, JSON.stringify([]));
+        await AsyncStorage.setItem(storageConfig.key, JSON.stringify([]));
       } catch {
         // Non-critical
       }
@@ -173,7 +209,7 @@ export async function selectPreGeneratedPuzzle(
   const selected = scored[Math.floor(Math.random() * topN)];
 
   // Mark as played
-  await markPuzzlePlayed(selected.puzzle.id);
+  await markPuzzlePlayed(selected.puzzle.id, variant);
 
   // Convert to PuzzleConfig
   return {
@@ -189,8 +225,10 @@ export async function selectPreGeneratedPuzzle(
  */
 export async function clearPlayedPuzzles(): Promise<void> {
   usedPuzzleIds = [];
+  usedReversePuzzleIds = [];
   try {
     await AsyncStorage.removeItem(USED_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_REVERSE_PUZZLES_KEY);
   } catch {
     // Non-critical
   }

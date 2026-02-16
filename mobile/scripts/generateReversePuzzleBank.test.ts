@@ -1,10 +1,18 @@
 /**
- * Offline puzzle bank generator for WordShift.
+ * Offline puzzle bank generator for WordShift — Reverse Variant HARD mode.
  *
- * Generates 500 HARD-difficulty standard-variant puzzles across all 5 phase tiers,
- * enriches them with metadata, and writes to src/data/puzzleBankHard.ts.
+ * Generates HARD-difficulty reverse-solvable puzzles one phase at a time,
+ * writing intermediate results to JSON files. A final merge step combines
+ * all phases into src/data/puzzleBankReverseHard.ts.
  *
- * Run: cd mobile && npx jest --config scripts/jest.config.js --no-coverage --testTimeout 900000
+ * Uses high-throughput brute-force sampling to find reverse-solvable chains at ~1s/puzzle.
+ *
+ * Run single phase:
+ *   PHASE=0 npx jest --config scripts/jest.config.js --no-coverage --testTimeout 600000 --maxWorkers=1 scripts/generateReversePuzzleBank.test.ts
+ *
+ * Run all phases + merge:
+ *   for p in 0 1 2 3 4; do PHASE=$p npx jest --config scripts/jest.config.js --no-coverage --testTimeout 600000 --maxWorkers=1 -t "phase $p" scripts/generateReversePuzzleBank.test.ts; done
+ *   MERGE=1 npx jest --config scripts/jest.config.js --no-coverage --testTimeout 30000 --maxWorkers=1 -t "merge" scripts/generateReversePuzzleBank.test.ts
  */
 
 import * as fs from 'fs';
@@ -15,7 +23,6 @@ import * as crypto from 'crypto';
 // Mocks — must be before imports that use them
 // ============================================================================
 
-// Accumulated word history across all generated puzzles (for diversity)
 const generatedHistory: string[][] = [];
 let mockPhase = 0;
 
@@ -68,14 +75,20 @@ import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 // ============================================================================
 
 const PHASE_TARGETS: Record<number, number> = {
-  0: 120,
-  1: 100,
-  2: 100,
-  3: 100,
-  4: 80,
+  0: 10,
+  1: 8,
+  2: 8,
+  3: 8,
+  4: 6,
 };
 
 const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0);
+
+const TEMP_DIR = path.join(__dirname, '..', 'src', 'data');
+
+function getTempPath(phase: number): string {
+  return path.join(TEMP_DIR, `.reverseBank_phase${phase}.json`);
+}
 
 // ============================================================================
 // Helpers
@@ -116,78 +129,96 @@ function serializePuzzle(p: PreGeneratedPuzzle): string {
   return `{id:'${p.id}',words:[${p.words.map(w => `'${w}'`).join(',')}],solution:[${solutionStr}],wordLength:${p.wordLength},qualityScore:${p.qualityScore},dreadTier:${p.dreadTier},dreadWordCount:${p.dreadWordCount},allWords:[${p.allWords.map(w => `'${w}'`).join(',')}],semanticTags:[${p.semanticTags.map(t => `'${t}'`).join(',')}]}`;
 }
 
+async function generatePhase(phase: number, target: number): Promise<PreGeneratedPuzzle[]> {
+  mockPhase = phase;
+  const puzzles: PreGeneratedPuzzle[] = [];
+  const seenChains = new Set<string>();
+  let attempts = 0;
+  let failures = 0;
+  const maxAttempts = target * 8;
+
+  process.stdout.write(`\nPhase ${phase}: generating ${target} reverse puzzles...\n`);
+
+  while (puzzles.length < target && attempts < maxAttempts) {
+    attempts++;
+
+    try {
+      const puzzle = await generateLocalPuzzle('HARD', {
+        requireReverseSolvable: true,
+        relaxBoring: true,
+      });
+      const chainKey = puzzle.words.join('-');
+
+      if (seenChains.has(chainKey)) continue;
+      seenChains.add(chainKey);
+
+      const id = puzzleId(puzzle.words);
+      const dreadTier = computeDreadTier(puzzle.words);
+      const dreadWordCount = computeDreadWordCount(puzzle.words);
+      const allWords = [...new Set(puzzle.words.map(w => w.toUpperCase()))];
+      const semanticTags = computeSemanticTags(puzzle.words);
+
+      puzzles.push({
+        id,
+        words: puzzle.words,
+        solution: puzzle.solution || [],
+        wordLength: puzzle.wordLength || 5,
+        qualityScore: 50,
+        dreadTier,
+        dreadWordCount,
+        allWords,
+        semanticTags,
+      });
+
+      process.stdout.write(`  Phase ${phase}: ${puzzles.length}/${target} (attempt ${attempts})\n`);
+    } catch (err) {
+      failures++;
+    }
+  }
+
+  process.stdout.write(`  Phase ${phase}: completed ${puzzles.length}/${target} (${attempts} attempts, ${failures} failures)\n`);
+  return puzzles;
+}
+
 // ============================================================================
-// Main generation test
+// Per-phase generation tests (run one at a time to avoid OOM)
 // ============================================================================
 
-describe('Puzzle Bank Generator', () => {
-  it('generates 500 HARD standard puzzles', async () => {
+describe('Reverse Puzzle Bank Generator', () => {
+  for (const [phaseStr, target] of Object.entries(PHASE_TARGETS)) {
+    const phase = parseInt(phaseStr);
+
+    it(`generates phase ${phase} reverse puzzles`, async () => {
+      const puzzles = await generatePhase(phase, target);
+
+      // Write intermediate results to JSON
+      const tempPath = getTempPath(phase);
+      fs.writeFileSync(tempPath, JSON.stringify(puzzles, null, 2), 'utf-8');
+      process.stdout.write(`Wrote ${puzzles.length} puzzles to ${tempPath}\n`);
+
+      expect(puzzles.length).toBeGreaterThanOrEqual(Math.floor(target * 0.5));
+    }, 600000);
+  }
+
+  // ============================================================================
+  // Merge step: combine all phase JSON files into the final TypeScript file
+  // ============================================================================
+
+  it('merges all phases into puzzleBankReverseHard.ts', () => {
     const allPuzzles: PreGeneratedPuzzle[] = [];
-    const seenChains = new Set<string>();
-    let totalAttempts = 0;
-    let totalFailures = 0;
 
-    for (const [phaseStr, target] of Object.entries(PHASE_TARGETS)) {
-      const phase = parseInt(phaseStr);
-      mockPhase = phase;
-      let phaseCount = 0;
-      let phaseAttempts = 0;
-      const maxAttemptsPerPhase = target * 3; // Allow 3x retries
-
-      process.stdout.write(`\nPhase ${phase}: generating ${target} puzzles...\n`);
-
-      while (phaseCount < target && phaseAttempts < maxAttemptsPerPhase) {
-        phaseAttempts++;
-        totalAttempts++;
-
-        try {
-          const puzzle = await generateLocalPuzzle('HARD');
-          const chainKey = puzzle.words.join('-');
-
-          // Deduplicate
-          if (seenChains.has(chainKey)) {
-            continue;
-          }
-          seenChains.add(chainKey);
-
-          const id = puzzleId(puzzle.words);
-          const dreadTier = computeDreadTier(puzzle.words);
-          const dreadWordCount = computeDreadWordCount(puzzle.words);
-          const allWords = [...new Set(puzzle.words.map(w => w.toUpperCase()))];
-          const semanticTags = computeSemanticTags(puzzle.words);
-
-          const preGenPuzzle: PreGeneratedPuzzle = {
-            id,
-            words: puzzle.words,
-            solution: puzzle.solution || [],
-            wordLength: puzzle.wordLength || 5,
-            qualityScore: 50, // All generated puzzles pass the 45 threshold; use 50 as default
-            dreadTier,
-            dreadWordCount,
-            allWords,
-            semanticTags,
-          };
-
-          allPuzzles.push(preGenPuzzle);
-          phaseCount++;
-
-          if (phaseCount % 10 === 0) {
-            process.stdout.write(`  Phase ${phase}: ${phaseCount}/${target}\n`);
-          }
-        } catch (err) {
-          totalFailures++;
-          // Generation timeout or failure — retry
-        }
+    for (const phase of [0, 1, 2, 3, 4]) {
+      const tempPath = getTempPath(phase);
+      if (fs.existsSync(tempPath)) {
+        const data = JSON.parse(fs.readFileSync(tempPath, 'utf-8')) as PreGeneratedPuzzle[];
+        allPuzzles.push(...data);
+        process.stdout.write(`Phase ${phase}: loaded ${data.length} puzzles\n`);
+      } else {
+        process.stdout.write(`Phase ${phase}: no data file found at ${tempPath}\n`);
       }
-
-      process.stdout.write(`  Phase ${phase}: completed ${phaseCount}/${target} (${phaseAttempts} attempts)\n`);
     }
 
-    // Report
-    process.stdout.write(`\n=== Generation Complete ===\n`);
-    process.stdout.write(`Total puzzles: ${allPuzzles.length}\n`);
-    process.stdout.write(`Total attempts: ${totalAttempts}\n`);
-    process.stdout.write(`Total failures: ${totalFailures}\n`);
+    process.stdout.write(`\n=== Total: ${allPuzzles.length} puzzles ===\n`);
 
     // Distribution report
     const tierCounts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
@@ -200,17 +231,17 @@ describe('Puzzle Bank Generator', () => {
     }
 
     // Write output file
-    const outputPath = path.join(__dirname, '..', 'src', 'data', 'puzzleBankHard.ts');
+    const outputPath = path.join(__dirname, '..', 'src', 'data', 'puzzleBankReverseHard.ts');
 
-    const fileContent = `// AUTO-GENERATED by scripts/generatePuzzleBank.test.ts
+    const fileContent = `// AUTO-GENERATED by scripts/generateReversePuzzleBank.test.ts
 // Do not edit manually. Re-run the generator to update.
 // Generated: ${new Date().toISOString()}
 // Total puzzles: ${allPuzzles.length}
+// All puzzles validated as reverse-solvable (requireReverseSolvable: true)
 
 import { PreGeneratedPuzzle } from './puzzleBankTypes';
-export type { PreGeneratedPuzzle } from './puzzleBankTypes';
 
-export const PUZZLE_BANK_HARD: PreGeneratedPuzzle[] = [
+export const PUZZLE_BANK_REVERSE_HARD: PreGeneratedPuzzle[] = [
 ${allPuzzles.map(p => '  ' + serializePuzzle(p)).join(',\n')}
 ];
 `;
@@ -218,8 +249,14 @@ ${allPuzzles.map(p => '  ' + serializePuzzle(p)).join(',\n')}
     fs.writeFileSync(outputPath, fileContent, 'utf-8');
     process.stdout.write(`\nWrote ${allPuzzles.length} puzzles to ${outputPath}\n`);
 
-    // Assertions
-    expect(allPuzzles.length).toBeGreaterThanOrEqual(TOTAL_TARGET * 0.9); // Allow 10% shortfall
-    expect(allPuzzles.length).toBeLessThanOrEqual(TOTAL_TARGET + 50);
-  }, 900000); // 15 minute timeout
+    // Clean up temp files
+    for (const phase of [0, 1, 2, 3, 4]) {
+      const tempPath = getTempPath(phase);
+      if (fs.existsSync(tempPath)) {
+        fs.unlinkSync(tempPath);
+      }
+    }
+
+    expect(allPuzzles.length).toBeGreaterThanOrEqual(Math.floor(TOTAL_TARGET * 0.5));
+  }, 30000);
 });
