@@ -383,15 +383,24 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // Use pre-generated puzzle bank for HARD standard (bank-only, no procedural generation)
-      if (selectedDifficulty === 'HARD' && variant === 'standard' && effectiveMode === 'standard') {
+      // Use pre-generated puzzle bank for HARD standard/reverse variants
+      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'reverse_blind'];
+      const shouldUseBank = selectedDifficulty === 'HARD' && bankVariants.includes(variant)
+        && (variant !== 'standard' || effectiveMode === 'standard');
+      if (shouldUseBank) {
         try {
           const recencyMap = await getWordHistoryWithRecency();
-          const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap);
+          const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap, variant);
           if (bankPuzzle) {
-            initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, 'standard', 0);
+            const chainLen = getVariantChainLength(variant, selectedDifficulty);
+            initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, chainLen);
             await recordPuzzleWords(bankPuzzle.words);
-            setMessage(getStartMessage(currentPhase));
+            if (variant !== 'standard') {
+              const config = VARIANT_CONFIGS[variant];
+              setMessage(getVariantInstruction(config, currentPhase));
+            } else {
+              setMessage(getStartMessage(currentPhase));
+            }
             return;
           }
         } catch (bankErr) {

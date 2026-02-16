@@ -61,23 +61,7 @@ jest.mock('../src/services/wordHistory', () => ({
 // ============================================================================
 
 import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster } from '../src/services/localGenerator';
-import { PuzzleSolutionStep } from '../src/types';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface PreGeneratedPuzzle {
-  id: string;
-  words: string[];
-  solution: PuzzleSolutionStep[];
-  wordLength: number;
-  qualityScore: number;
-  dreadTier: number;
-  dreadWordCount: number;
-  allWords: string[];
-  semanticTags: string[];
-}
+import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 
 // ============================================================================
 // Generation targets per phase
@@ -223,28 +207,8 @@ describe('Puzzle Bank Generator', () => {
 // Generated: ${new Date().toISOString()}
 // Total puzzles: ${allPuzzles.length}
 
-import { PuzzleSolutionStep } from '../types';
-
-export interface PreGeneratedPuzzle {
-  /** Stable ID (deterministic hash of word chain) */
-  id: string;
-  /** The word chain */
-  words: string[];
-  /** Step-by-step solution for hints */
-  solution: PuzzleSolutionStep[];
-  /** Word length (5 for HARD) */
-  wordLength: number;
-  /** Quality score (0-100) */
-  qualityScore: number;
-  /** Highest dread word tier present (0 = no dread words, 1-4 = phase tier) */
-  dreadTier: number;
-  /** Number of dread words in the chain */
-  dreadWordCount: number;
-  /** All unique words in the chain (for fast word-overlap checking) */
-  allWords: string[];
-  /** Semantic clusters touched */
-  semanticTags: string[];
-}
+import { PreGeneratedPuzzle } from './puzzleBankTypes';
+export type { PreGeneratedPuzzle } from './puzzleBankTypes';
 
 export const PUZZLE_BANK_HARD: PreGeneratedPuzzle[] = [
 ${allPuzzles.map(p => '  ' + serializePuzzle(p)).join(',\n')}
