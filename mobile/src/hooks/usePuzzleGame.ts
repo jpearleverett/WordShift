@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
 import { generateLocalPuzzle, getIncantationName } from '../services/localGenerator';
+import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
+import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
 import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
@@ -379,6 +381,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         initGame(curated.words, undefined, curated.solution, curated.words[0].length, 'standard', 0);
         setMessage(getStartMessage(currentPhase));
         return;
+      }
+
+      // Use pre-generated puzzle bank for HARD standard (bank-only, no procedural generation)
+      if (selectedDifficulty === 'HARD' && variant === 'standard' && effectiveMode === 'standard') {
+        try {
+          const recencyMap = await getWordHistoryWithRecency();
+          const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap);
+          if (bankPuzzle) {
+            initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, 'standard', 0);
+            await recordPuzzleWords(bankPuzzle.words);
+            setMessage(getStartMessage(currentPhase));
+            return;
+          }
+        } catch (bankErr) {
+          console.log('Puzzle bank selection failed, falling back to generation:', bankErr);
+        }
       }
 
       const isReverseGen = hasVariantModifier(variant, 'reverse');
