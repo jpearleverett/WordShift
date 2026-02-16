@@ -289,11 +289,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     startWord?: string
   ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; wordLength?: number }; activeVariant: PuzzleVariant }> => {
     let activeVariant = variant;
+    const isReverseVariant = hasVariantModifier(activeVariant, 'reverse');
     const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
     const generationOverrides = {
       ...variantOverrides,
       ...(startWord ? { startWord } : {}),
-    } as { targetRows?: number; wordLength?: number; startWord?: string };
+      // For reverse variants, let the generator handle reverse-solvability
+      // internally so it can try many start words within the timeout
+      ...(isReverseVariant ? { requireReverseSolvable: true } : {}),
+    } as { targetRows?: number; wordLength?: number; startWord?: string; requireReverseSolvable?: boolean };
 
     let puzzle = await Promise.race([
       generateLocalPuzzle(selectedDifficulty, generationOverrides),
@@ -302,7 +306,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (!isVariantCompatibleWithSolution(activeVariant, puzzle.solution, puzzle.words)) {
       let compatiblePuzzle = null as typeof puzzle | null;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      // Reverse variants get more retries since they have stricter constraints
+      const maxRetries = isReverseVariant ? 5 : 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
         const retry = await Promise.race([
           generateLocalPuzzle(selectedDifficulty, generationOverrides),
           timeoutPromise,
@@ -564,7 +570,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       ...targetRow,
       words: newTargetLetters.map(l => ({
         ...l,
-        isLocked: l.id === selectedLetter.id,
+        // During reverse leg, preserve all existing locks (cumulative locking):
+        // every letter that was shifted at any point stays locked.
+        // During forward leg, only the just-moved letter is locked.
+        isLocked: isReverseReturn
+          ? (l.isLocked || l.id === selectedLetter.id)
+          : (l.id === selectedLetter.id),
       })),
     };
 
