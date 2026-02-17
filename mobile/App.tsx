@@ -61,6 +61,7 @@ import { getAnimalWhisper, getAnimalInterjection, getHomescreenNudge } from './s
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
+import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
@@ -77,7 +78,7 @@ import {
 } from './src/services/puzzleVariety';
 
 // App screen type — expanded with settings, stats, and ledger
-type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery';
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -1162,6 +1163,21 @@ export default function App() {
       );
     }
 
+    if (currentScreen === 'pit') {
+      return (
+        <View style={styles.screenBackground}>
+          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <OfferingPitScreen
+              onGoHome={() => transitionTo('home')}
+              phase={persistence.currentPhase}
+              onAmberChange={persistenceActions.setAmberBalance}
+            />
+          </Animated.View>
+        </View>
+      );
+    }
+
     if (currentScreen === 'stats') {
       return (
         <View style={styles.screenBackground}>
@@ -1195,6 +1211,7 @@ export default function App() {
                 onOpenStats={() => transitionTo('stats')}
                 onOpenLedger={() => transitionTo('ledger')}
                 onOpenGallery={() => transitionTo('gallery')}
+                onOpenPit={() => transitionTo('pit')}
                 onStartDaily={handleStartDaily}
                 onboardingStep={onboardingStep}
                 onAdvanceOnboarding={advanceOnboarding}

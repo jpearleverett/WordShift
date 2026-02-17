@@ -16,6 +16,7 @@ import {
   recordVariantEncounter,
   applyVariantAmberBonus,
 } from '../services/amberCurrency';
+import { enqueueHarvestBatch } from '../services/wordHarvest';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
@@ -53,6 +54,10 @@ export interface VictoryData {
   streakMilestoneMessage: string | null;
   /** Titles of quests completed this victory */
   questsCompleted?: string[];
+  /** Number of words harvested into the pending batch */
+  harvestWordCount: number;
+  /** Amber value queued in the harvest batch (not yet spendable) */
+  harvestAmberValue: number;
 }
 
 export interface PersistenceState {
@@ -139,6 +144,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variant: 'standard',
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
+        harvestWordCount: 0,
+        harvestAmberValue: 0,
       };
     }
 
@@ -149,9 +156,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const stats = await getCumulativeStats();
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
-      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate);
+      // creditToBalance=false: compute reward but don't add to spendable amber.
+      // The amber is queued in a harvest batch and credited when offered in the Pit.
+      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false);
 
-      // Apply variant bonus with anti-farm decay and persistence.
+      // Apply variant bonus with anti-farm decay and persistence (also deferred).
       const variantMultiplier = getVariantAmberMultiplier(variant);
       let variantBonus = 0;
       let variantAppliedMultiplier = 1.0;
@@ -160,7 +169,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         const variantResult = await applyVariantAmberBonus(
           variant,
           amberResult.amount,
-          variantMultiplier
+          variantMultiplier,
+          false
         );
         variantBonus = variantResult.bonus;
         variantAppliedMultiplier = variantResult.appliedMultiplier;
@@ -168,6 +178,27 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         amberResult.newBalance = variantResult.newBalance;
         amberResult.amount += variantBonus;
       }
+
+      // Total amber value for this puzzle (base + milestones + first-completion + streak milestone + variant)
+      const totalHarvestAmber = amberResult.amount
+        + amberResult.milestoneBonus
+        + amberResult.firstCompletionBonus
+        + amberResult.streakMilestoneBonus;
+
+      // Enqueue harvest batch with all completed words and computed amber
+      const harvestWords = completedWords.length > 0 ? completedWords : [];
+      const batchId = `harvest_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await enqueueHarvestBatch({
+        id: batchId,
+        words: harvestWords,
+        amberValue: totalHarvestAmber,
+        createdAt: Date.now(),
+        difficulty,
+        gameMode,
+        stars,
+        variant,
+        phaseAtHarvest: amberResult.newPhase,
+      });
 
       setCumulativeStats(stats);
       updatePuzzleCount(amberResult.puzzlesSolved);
@@ -263,6 +294,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         questsCompleted,
         streakMilestoneBonus: amberResult.streakMilestoneBonus,
         streakMilestoneMessage: amberResult.streakMilestoneMessage,
+        harvestWordCount: harvestWords.length,
+        harvestAmberValue: totalHarvestAmber,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -287,6 +320,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variantRepeatDecay: 1.0,
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
+        harvestWordCount: 0,
+        harvestAmberValue: 0,
       };
     } finally {
       recordInProgress.current = false;

@@ -74,6 +74,8 @@ import { getGalleryTitle } from '../../services/whisperGallery';
 import { updateQuestProgress } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticSelection } from '../../services/haptics';
+import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
+import { getPitHomeButtonLabel } from '../../services/phaseNarrative';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -84,6 +86,7 @@ interface HomeScreenProps {
   onOpenStats?: () => void;
   onOpenLedger?: () => void;
   onOpenGallery?: () => void;
+  onOpenPit?: () => void;
   onStartDaily?: (difficulty: Difficulty) => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
@@ -98,6 +101,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenStats,
   onOpenLedger,
   onOpenGallery,
+  onOpenPit,
   onStartDaily,
   onboardingStep,
   onAdvanceOnboarding,
@@ -131,6 +135,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Sacrifice modal state (Phase 4+)
   const [showSacrificeModal, setShowSacrificeModal] = useState(false);
   const [sacrificeMessage, setSacrificeMessage] = useState<string | null>(null);
+
+  // Pending harvest summary for pit badge
+  const [harvestSummary, setHarvestSummary] = useState<HarvestSummary>({ pendingAmber: 0, pendingWords: 0, pendingBatches: 0 });
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -168,6 +175,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setProgress(progressData);
     setRooms(roomsData);
     setAnimals(animalsData);
+
+    // Load pending harvest summary for pit badge
+    getPendingHarvestSummary().then(setHarvestSummary).catch(() => {});
 
     // Check for house completion (all 10 rooms + all 10 animals unlocked)
     if (!progressData.houseCompleted) {
@@ -565,6 +575,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 ? 'FREE'
                 : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
             </Text>
+            {unlockFlow.nextUnlock.cost > 0 &&
+             progress.amber < unlockFlow.nextUnlock.cost &&
+             harvestSummary.pendingAmber > 0 && onOpenPit && (
+              <TouchableOpacity
+                onPress={() => { hapticLight(); onOpenPit(); }}
+                accessibilityLabel="Claim pending amber"
+                accessibilityRole="button"
+              >
+                <Text style={styles.pitHintText}>
+                  💎 {harvestSummary.pendingAmber} pending — tap to claim
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -593,9 +616,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Action Row — Gallery + Sacrifice (hidden during onboarding) */}
+      {/* Action Row — Pit + Gallery + Sacrifice (hidden during onboarding) */}
       {!isOnboarding && (
         <View style={styles.actionRow}>
+          {onOpenPit && (
+            <TouchableOpacity
+              style={styles.actionRowButton}
+              onPress={() => {
+                hapticLight();
+                onOpenPit();
+              }}
+              accessibilityLabel={`Open ${getPitHomeButtonLabel(progress.currentPhase)}${harvestSummary.pendingBatches > 0 ? `, ${harvestSummary.pendingBatches} pending` : ''}`}
+              accessibilityRole="button"
+            >
+              <Text style={styles.actionRowButtonText}>
+                {progress.currentPhase >= 3 ? '\uD83D\uDD73\uFE0F' : progress.currentPhase >= 2 ? '\uD83C\uDF00' : '\uD83C\uDF3B'}{' '}
+                {getPitHomeButtonLabel(progress.currentPhase)}
+                {harvestSummary.pendingBatches > 0 && (
+                  <Text style={styles.pitBadgeText}> ({harvestSummary.pendingBatches})</Text>
+                )}
+              </Text>
+            </TouchableOpacity>
+          )}
           {onOpenGallery && (
             <TouchableOpacity
               style={styles.actionRowButton}
@@ -2020,6 +2062,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  pitBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: CandyColors.yellow.main,
+  },
+  pitHintText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: CandyColors.yellow.main,
+    textAlign: 'center',
+    marginTop: 4,
   },
 
   // Sacrifice modal

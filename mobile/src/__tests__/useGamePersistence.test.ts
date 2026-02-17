@@ -121,7 +121,7 @@ jest.mock('../services/starRating', () => ({
 }));
 
 // --- Mock amberCurrency ---
-const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: any) => ({
+const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: any, _c?: any) => ({
   amount: 15,
   baseAmount: 15,
   newBalance: 115,
@@ -134,12 +134,15 @@ const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: a
   milestoneBonus: 0,
   milestoneMessage: null as string | null,
   phaseAcceleration: 1.0,
+  firstCompletionBonus: 0,
+  streakMilestoneBonus: 0,
+  streakMilestoneMessage: null as string | null,
 }));
 
 const mockGetAmberBalance = jest.fn(async () => 100);
 const mockGetCurrentPhase = jest.fn(async () => 0);
 const mockRecordVariantEncounter = jest.fn(async (_variant?: any) => {});
-const mockApplyVariantAmberBonus = jest.fn(async (_variant?: any, _base?: any, _mult?: any) => ({
+const mockApplyVariantAmberBonus = jest.fn(async (_variant?: any, _base?: any, _mult?: any, _c?: any) => ({
   bonus: 0,
   newBalance: 115,
   appliedMultiplier: 1.0,
@@ -154,12 +157,12 @@ const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
 }));
 
 jest.mock('../services/amberCurrency', () => ({
-  awardPuzzleAmber: (...args: any[]) => mockAwardPuzzleAmber(args[0], args[1], args[2], args[3]),
+  awardPuzzleAmber: (...args: any[]) => mockAwardPuzzleAmber(args[0], args[1], args[2], args[3], args[4]),
   getAmberBalance: () => mockGetAmberBalance(),
   getCurrentPhase: () => mockGetCurrentPhase(),
   recordRitualWords: (...args: any[]) => mockRecordRitualWords(args[0], args[1], args[2]),
   recordVariantEncounter: (...args: any[]) => mockRecordVariantEncounter(args[0]),
-  applyVariantAmberBonus: (...args: any[]) => mockApplyVariantAmberBonus(args[0], args[1], args[2]),
+  applyVariantAmberBonus: (...args: any[]) => mockApplyVariantAmberBonus(args[0], args[1], args[2], args[3]),
 }));
 
 // --- Mock dialogueSession ---
@@ -168,6 +171,12 @@ const mockUpdateSessionPhase = jest.fn();
 jest.mock('../services/dialogueSession', () => ({
   updatePuzzleCount: (...args: any[]) => mockUpdatePuzzleCount(args[0]),
   updateSessionPhase: (...args: any[]) => mockUpdateSessionPhase(args[0]),
+}));
+
+// --- Mock wordHarvest ---
+const mockEnqueueHarvestBatch = jest.fn(async (_batch?: any) => {});
+jest.mock('../services/wordHarvest', () => ({
+  enqueueHarvestBatch: (...args: any[]) => mockEnqueueHarvestBatch(args[0]),
 }));
 
 // --- Mock localGenerator (for ritual energy) ---
@@ -220,6 +229,9 @@ describe('useGamePersistence', () => {
       milestoneBonus: 0,
       milestoneMessage: null,
       phaseAcceleration: 1.0,
+      firstCompletionBonus: 0,
+      streakMilestoneBonus: 0,
+      streakMilestoneMessage: null,
     });
 
     mockGetCumulativeStats.mockResolvedValue({ ...defaultStats });
@@ -262,6 +274,8 @@ describe('useGamePersistence', () => {
       expect(result).toHaveProperty('milestoneMessage');
       expect(result).toHaveProperty('cumulativeStats');
       expect(result).toHaveProperty('phaseAcceleration');
+      expect(result).toHaveProperty('harvestWordCount');
+      expect(result).toHaveProperty('harvestAmberValue');
     });
 
     test('calls calculateStars with correct arguments', async () => {
@@ -278,11 +292,11 @@ describe('useGamePersistence', () => {
       expect(mockRecordPuzzleCompletion).toHaveBeenCalledWith('EASY', 1, 3);
     });
 
-    test('calls awardPuzzleAmber with stars, difficulty, and mode', async () => {
+    test('calls awardPuzzleAmber with stars, difficulty, mode, and creditToBalance=false', async () => {
       const [, actions] = callHook();
       await actions.recordVictory('MEDIUM', 0, 0, 'standard');
 
-      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith('MEDIUM', 3, 'standard', expect.any(Number));
+      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith('MEDIUM', 3, 'standard', expect.any(Number), false);
     });
 
     test('calls updatePuzzleCount with puzzlesSolved', async () => {
@@ -339,6 +353,9 @@ describe('useGamePersistence', () => {
         milestoneBonus: 0,
         milestoneMessage: null,
         phaseAcceleration: 1.0,
+        firstCompletionBonus: 0,
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
       });
 
       const [, actions] = callHook();
@@ -363,6 +380,9 @@ describe('useGamePersistence', () => {
         milestoneBonus: 50,
         milestoneMessage: 'Getting the hang of it!',
         phaseAcceleration: 1.0,
+        firstCompletionBonus: 0,
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
       } as any);
 
       const [, actions] = callHook();
@@ -387,6 +407,9 @@ describe('useGamePersistence', () => {
         milestoneBonus: 25,
         milestoneMessage: 'First steps!',
         phaseAcceleration: 2.0,
+        firstCompletionBonus: 0,
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
       } as any);
 
       const [, actions] = callHook();
@@ -400,7 +423,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0);
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number)
+        'MEDIUM', 3, 'standard', expect.any(Number), false
       );
     });
 
@@ -432,7 +455,7 @@ describe('useGamePersistence', () => {
       const [, actions] = callHook();
       const result = await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'reverse');
 
-      expect(mockApplyVariantAmberBonus).toHaveBeenCalledWith('reverse', 15, expect.any(Number));
+      expect(mockApplyVariantAmberBonus).toHaveBeenCalledWith('reverse', 15, expect.any(Number), false);
       expect(result.variantBonus).toBe(4);
       expect(result.amberBalance).toBe(119);
       expect(result.variantAppliedMultiplier).toBeCloseTo(1.2);
@@ -476,8 +499,71 @@ describe('useGamePersistence', () => {
 
       // getThreeStarRate returns 50 (percentage), should be divided by 100 to get ratio 0.5
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', 0.5
+        'MEDIUM', 3, 'standard', 0.5, false
       );
+    });
+
+    test('enqueues harvest batch with correct data', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['FLAME', 'LAME', 'BLAME']);
+
+      expect(mockEnqueueHarvestBatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          words: ['FLAME', 'LAME', 'BLAME'],
+          amberValue: 15, // amount(15) + milestoneBonus(0) + firstCompletionBonus(0) + streakMilestoneBonus(0)
+          difficulty: 'MEDIUM',
+          gameMode: 'standard',
+          stars: 3,
+          variant: 'standard',
+        })
+      );
+    });
+
+    test('returns harvestWordCount and harvestAmberValue', async () => {
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['FLAME', 'LAME', 'BLAME']);
+
+      expect(result.harvestWordCount).toBe(3);
+      expect(result.harvestAmberValue).toBe(15);
+    });
+
+    test('harvest amber includes milestone and first-completion bonuses', async () => {
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
+        amount: 15,
+        baseAmount: 15,
+        newBalance: 115,
+        puzzlesSolved: 10,
+        phaseChanged: false,
+        newPhase: 0 as const,
+        streakBonus: 0,
+        challengeBonus: 0,
+        currentStreak: 1,
+        milestoneBonus: 25,
+        milestoneMessage: 'Milestone!',
+        phaseAcceleration: 1.0,
+        firstCompletionBonus: 20,
+        streakMilestoneBonus: 15,
+        streakMilestoneMessage: null,
+      });
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['A', 'B']);
+
+      // totalHarvestAmber = amount(15) + milestoneBonus(25) + firstCompletionBonus(20) + streakMilestoneBonus(15) = 75
+      expect(result.harvestAmberValue).toBe(75);
+      expect(mockEnqueueHarvestBatch).toHaveBeenCalledWith(
+        expect.objectContaining({ amberValue: 75 })
+      );
+    });
+
+    test('error case returns zero harvest data', async () => {
+      mockRecordPuzzleCompletion.mockRejectedValueOnce(new Error('fail'));
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0);
+
+      expect(result.harvestWordCount).toBe(0);
+      expect(result.harvestAmberValue).toBe(0);
     });
   });
 

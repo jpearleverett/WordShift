@@ -1013,3 +1013,115 @@ export function getHomescreenNudge(
 
   return { animalName, text };
 }
+
+// ============================================================================
+// OFFERING PIT — Phase-aware text for the word harvest / offering screen
+// ============================================================================
+
+const PIT_SCREEN_TITLES: Record<DialoguePhase, string> = {
+  0: 'Word Garden',
+  1: 'Word Garden',
+  2: 'The Collection',
+  3: 'The Offering Well',
+  4: 'The Pit',
+};
+
+export function getPitScreenTitle(phase: DialoguePhase): string {
+  return PIT_SCREEN_TITLES[phase];
+}
+
+const PIT_SCREEN_SUBTITLES: Record<DialoguePhase, string> = {
+  0: 'Your harvested words are waiting to bloom into amber.',
+  1: 'The words you gathered are ready to become something more.',
+  2: 'Words accumulate. They want to be given purpose.',
+  3: 'The harvested words pulse faintly. They know what comes next.',
+  4: 'Every word you formed was always meant to end up here.',
+};
+
+export function getPitScreenSubtitle(phase: DialoguePhase): string {
+  return PIT_SCREEN_SUBTITLES[phase];
+}
+
+const PIT_BUTTON_LABELS: Record<DialoguePhase, string> = {
+  0: 'Plant',
+  1: 'Offer',
+  2: 'Release',
+  3: 'Surrender',
+  4: 'Feed',
+};
+
+export function getPitButtonLabel(phase: DialoguePhase): string {
+  return PIT_BUTTON_LABELS[phase];
+}
+
+const PIT_OFFER_ALL_LABELS: Record<DialoguePhase, string> = {
+  0: 'Plant All',
+  1: 'Offer All',
+  2: 'Release All',
+  3: 'Surrender All',
+  4: 'Feed Everything',
+};
+
+export function getPitOfferAllLabel(phase: DialoguePhase, _pendingWords: number, _pendingAmber: number): string {
+  return PIT_OFFER_ALL_LABELS[phase];
+}
+
+const PIT_EMPTY_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'No words to plant yet. Complete a puzzle first!',
+  1: 'Nothing to offer. Solve a puzzle to harvest words.',
+  2: 'The collection is empty. The words will come.',
+  3: 'Nothing remains. The well waits.',
+  4: 'Empty. The pit is patient.',
+};
+
+export function getPitEmptyMessage(phase: DialoguePhase): string {
+  return PIT_EMPTY_MESSAGES[phase];
+}
+
+const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, (wordsOffered: number, amberAwarded: number) => string> = {
+  0: (w, a) => `${w} words planted — ${a} amber bloomed!`,
+  1: (w, a) => `${w} words offered — ${a} amber received.`,
+  2: (w, a) => `${w} words released into the pattern. ${a} amber surfaces.`,
+  3: (w, a) => `${w} words surrendered. ${a} amber seeps from below.`,
+  4: (w, a) => `${w} words consumed. ${a} amber is all that remains.`,
+};
+
+export function getPitOfferResultMessage(phase: DialoguePhase, wordsOffered: number, amberAwarded: number): string {
+  return PIT_OFFER_RESULT_MESSAGES[phase](wordsOffered, amberAwarded);
+}
+
+const PIT_LIFETIME_LABELS: Record<DialoguePhase, string> = {
+  0: 'Words planted',
+  1: 'Words offered',
+  2: 'Words released',
+  3: 'Words surrendered',
+  4: 'Words consumed',
+};
+
+export function getPitLifetimeLabel(phase: DialoguePhase): string {
+  return PIT_LIFETIME_LABELS[phase];
+}
+
+const PIT_HOME_BUTTON_LABELS: Record<DialoguePhase, string> = {
+  0: 'Garden',
+  1: 'Garden',
+  2: 'Collection',
+  3: 'The Well',
+  4: 'The Pit',
+};
+
+export function getPitHomeButtonLabel(phase: DialoguePhase): string {
+  return PIT_HOME_BUTTON_LABELS[phase];
+}
+
+const HARVEST_PENDING_LABELS: Record<DialoguePhase, string> = {
+  0: 'Harvested',
+  1: 'Harvested',
+  2: 'Gathered',
+  3: 'Claimed by the well',
+  4: 'Taken by the pit',
+};
+
+export function getHarvestPendingLabel(phase: DialoguePhase): string {
+  return HARVEST_PENDING_LABELS[phase];
+}

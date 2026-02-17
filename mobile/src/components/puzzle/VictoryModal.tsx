@@ -16,6 +16,7 @@ import {
   getRitualEchoHeader,
   getRitualEchoFooter,
   getWordsOfferedText,
+  getHarvestPendingLabel,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -34,6 +35,8 @@ export interface VictoryData {
   variantBonus?: number;
   variantRepeatDecay?: number;
   questsCompleted?: string[];
+  harvestWordCount?: number;
+  harvestAmberValue?: number;
 }
 
 interface VictoryModalProps {
@@ -167,11 +170,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Group 1: Amber, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
-            {/* Amber earned */}
-            {victoryData && (
+            {/* Amber harvested (pending in pit) */}
+            {victoryData && (victoryData.harvestAmberValue ?? 0) > 0 && (
               <View style={styles.amberEarnedContainer}>
                 <Text style={styles.amberEarnedIcon}>{'\uD83D\uDC8E'}</Text>
-                <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} Amber</Text>
+                <Text style={styles.amberEarnedText}>+{victoryData.harvestAmberValue} {getHarvestPendingLabel(phase)}</Text>
                 {victoryData.streakBonus > 0 && (
                   <Text style={styles.streakBonusText}>
                     (+{victoryData.streakBonus} streak!)
@@ -188,6 +191,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   </Text>
                 )}
               </View>
+            )}
+            {victoryData && (victoryData.harvestWordCount ?? 0) > 0 && (
+              <Text style={[styles.harvestWordCountText, { color: phaseTheme.modalSecondaryTextColor }]}>
+                {victoryData.harvestWordCount} words harvested
+              </Text>
             )}
 
             {/* Streak display */}
@@ -869,5 +877,11 @@ const styles = StyleSheet.create({
   wordsOfferedTextDark: {
     color: 'rgba(180, 100, 130, 0.8)',
     fontStyle: 'italic',
+  },
+  harvestWordCountText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
   },
 });

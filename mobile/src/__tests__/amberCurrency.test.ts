@@ -95,6 +95,21 @@ describe('awardPuzzleAmber', () => {
     expect(result.newPhase).toBe(1);
   });
 
+  test('creditToBalance=false computes reward but does not credit amber', async () => {
+    const result = await awardPuzzleAmber('MEDIUM', 3, 'standard', 0.5, false);
+    expect(result.amount).toBeGreaterThan(0);
+    // Balance should be 0 because amber was not credited
+    expect(result.newBalance).toBe(0);
+    const balance = await getAmberBalance();
+    expect(balance).toBe(0);
+  });
+
+  test('creditToBalance=false still increments puzzlesSolved', async () => {
+    await awardPuzzleAmber('EASY', 1, 'standard', 0.5, false);
+    const progress = await loadProgress();
+    expect(progress.puzzlesSolved).toBe(1);
+  });
+
   test('does not advance to phase 1 too early even with inflated phaseProgress', async () => {
     await devAddPuzzles(8);
     const progress = await loadProgress();
@@ -115,6 +130,15 @@ describe('applyVariantAmberBonus', () => {
     expect(result.bonus).toBeGreaterThan(0);
     const balance = await getAmberBalance();
     expect(balance).toBe(100 + result.bonus);
+  });
+
+  test('creditToBalance=false computes variant bonus but does not credit', async () => {
+    await devAddAmber(100);
+    const balanceBefore = await getAmberBalance();
+    const result = await applyVariantAmberBonus('speed', 20, 1.34, false);
+    expect(result.bonus).toBeGreaterThan(0);
+    const balanceAfter = await getAmberBalance();
+    expect(balanceAfter).toBe(balanceBefore); // No change
   });
 
   test('applies decay on repeated same variant farming', async () => {
