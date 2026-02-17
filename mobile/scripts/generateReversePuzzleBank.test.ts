@@ -88,8 +88,9 @@ const PHASE_TARGETS: Record<number, number> = {
 
 const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0); // 500
 
-// Max puzzles to generate per process invocation (prevents OOM)
-const BATCH_SIZE = 12;
+// Max puzzles to generate per process invocation (prevents OOM on constrained envs).
+// Uses global.gc() between puzzles when available (run with --expose-gc).
+const BATCH_SIZE = 3;
 
 const TEMP_DIR = path.join(__dirname, '..', 'src', 'data');
 
@@ -233,6 +234,11 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
       process.stdout.write(`  Phase ${phase}: ${total}/${target} (+${newPuzzles.length} this batch, attempt ${attempts})\n`);
     } catch (err) {
       failures++;
+    }
+
+    // Force GC between puzzles to prevent heap fragmentation crashes
+    if (typeof globalThis.gc === 'function') {
+      globalThis.gc();
     }
   }
 
