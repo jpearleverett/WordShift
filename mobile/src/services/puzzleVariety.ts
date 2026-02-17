@@ -28,7 +28,8 @@ export type VariantModifier =
   | 'speed'
   | 'chain'
   | 'no_vowel'
-  | 'no_consonant';
+  | 'no_consonant'
+  | 'double_shift';
 
 export type ComboVariant =
   | 'reverse_blind'
@@ -37,7 +38,10 @@ export type ComboVariant =
   | 'speed_no_vowel'
   | 'speed_no_consonant';
 
-export type PuzzleVariant = 'standard' | VariantModifier | ComboVariant;
+export type ComboVariantWithDouble =
+  | 'double_shift_blind';
+
+export type PuzzleVariant = 'standard' | VariantModifier | ComboVariant | ComboVariantWithDouble;
 
 export interface VariantConfig {
   variant: PuzzleVariant;
@@ -210,6 +214,26 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     timeLimit: 60,
     rowOverride: 3,
   },
+  double_shift: {
+    variant: 'double_shift',
+    title: 'Double Shift',
+    description: 'Move two letters at once from each word to the next.',
+    darkDescription: 'Two offerings per step. The pattern demands more.',
+    instruction: 'Pick two letters, then place each into the next word.',
+    darkInstruction: 'Two letters at a time. The arrangement grows hungrier.',
+    icon: '⏫',
+    amberMultiplier: 1.65,
+  },
+  double_shift_blind: {
+    variant: 'double_shift_blind',
+    title: 'Double Shift + Blind',
+    description: 'Move two letters at once while future rows stay hidden.',
+    darkDescription: 'Two offerings into the unseen.',
+    instruction: 'Pick two letters, then place each into a hidden next word.',
+    darkInstruction: 'Two offerings blind. The pattern does not reveal itself.',
+    icon: '⏫',
+    amberMultiplier: 1.85,
+  },
 };
 
 const VARIANT_MODIFIER_MAP: Record<PuzzleVariant, VariantModifier[]> = {
@@ -220,11 +244,13 @@ const VARIANT_MODIFIER_MAP: Record<PuzzleVariant, VariantModifier[]> = {
   chain: ['chain'],
   no_vowel: ['no_vowel'],
   no_consonant: ['no_consonant'],
+  double_shift: ['double_shift'],
   reverse_blind: ['reverse', 'blind'],
   blind_no_vowel: ['blind', 'no_vowel'],
   blind_no_consonant: ['blind', 'no_consonant'],
   speed_no_vowel: ['speed', 'no_vowel'],
   speed_no_consonant: ['speed', 'no_consonant'],
+  double_shift_blind: ['double_shift', 'blind'],
 };
 
 const BASE_VARIANTS: VariantModifier[] = [
@@ -234,14 +260,16 @@ const BASE_VARIANTS: VariantModifier[] = [
   'speed',
   'no_consonant',
   'chain',
+  'double_shift',
 ];
 
-const COMBO_VARIANTS: ComboVariant[] = [
+const COMBO_VARIANTS: (ComboVariant | ComboVariantWithDouble)[] = [
   'reverse_blind',
   'blind_no_vowel',
   'blind_no_consonant',
   'speed_no_vowel',
   'speed_no_consonant',
+  'double_shift_blind',
 ];
 
 const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
@@ -258,11 +286,13 @@ const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, Va
   speed: { puzzlesSolved: 52, minDepthPhase: 0, group: 'base' },
   no_consonant: { puzzlesSolved: 68, minDepthPhase: 0, group: 'base' },
   chain: { puzzlesSolved: 85, minDepthPhase: 0, group: 'base' },
+  double_shift: { puzzlesSolved: 40, minDepthPhase: 0, group: 'base' },
   reverse_blind: { puzzlesSolved: 100, minDepthPhase: 2, group: 'combo' },
   blind_no_vowel: { puzzlesSolved: 110, minDepthPhase: 2, group: 'combo' },
   blind_no_consonant: { puzzlesSolved: 150, minDepthPhase: 3, group: 'combo' },
   speed_no_vowel: { puzzlesSolved: 150, minDepthPhase: 3, group: 'combo' },
   speed_no_consonant: { puzzlesSolved: 190, minDepthPhase: 4, group: 'combo' },
+  double_shift_blind: { puzzlesSolved: 130, minDepthPhase: 2, group: 'combo' },
 };
 
 export function isPuzzleVariant(value: string): value is PuzzleVariant {
@@ -466,6 +496,12 @@ export function getVariantOverrides(
   variant: PuzzleVariant,
   baseDifficulty: Difficulty
 ): { targetRows?: number; wordLength?: number } {
+  if (hasVariantModifier(variant, 'double_shift')) {
+    // Double shift always uses 5-letter words (needs WORDS_3/5/7)
+    const rows = baseDifficulty === 'EASY' ? 3 :
+                 baseDifficulty === 'HARD' ? 4 : 4;
+    return { wordLength: 5, targetRows: rows };
+  }
   if (hasVariantModifier(variant, 'speed')) {
     return { targetRows: baseDifficulty === 'HARD' ? 4 : 3 };
   }
@@ -572,6 +608,9 @@ export function isVariantCompatibleWithSolution(
   words?: string[]
 ): boolean {
   if (!solution || solution.length === 0) return true;
+
+  // Double shift puzzles are always compatible (generated specifically)
+  if (hasVariantModifier(variant, 'double_shift')) return true;
 
   if (hasVariantModifier(variant, 'no_vowel')) {
     return solution.every(step => !isVowel(step.letterToMove));

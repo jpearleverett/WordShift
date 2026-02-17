@@ -2497,6 +2497,14 @@ const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = 
     light: 'Fast sprint plus no consonants. Quick planning, vowels only.',
     dark: 'Time collapsed while consonants were sealed. You kept the line anyway.',
   },
+  double_shift: {
+    light: 'Double shifts move two letters at once. Pick two from a word, place each into the next. More to juggle, more to explore.',
+    dark: 'Two offerings per step. The arrangement demands a heavier hand — two letters wrenched free and placed in a single breath.',
+  },
+  double_shift_blind: {
+    light: 'Double shift with hidden rows: two letters at once into the unknown. Trust the words you cannot see.',
+    dark: 'Two offerings into veiled words. The arrangement swallows double and shows nothing in return.',
+  },
 };
 
 function getVariantDialogueLead(animalType: AnimalType, phase: number): string {

@@ -83,18 +83,18 @@ describe('puzzleVariety', () => {
       expect(['reverse', 'blind', 'no_vowel']).toContain(shouldOfferVariant(30, 0)!.variant);
 
       Math.random = () => 0.9;
-      expect(['reverse', 'blind', 'no_vowel']).toContain(shouldOfferVariant(50, 0)!.variant);
+      expect(['reverse', 'blind', 'no_vowel', 'double_shift']).toContain(shouldOfferVariant(50, 0)!.variant);
 
       Math.random = () => 0.75;
-      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant']).toContain(shouldOfferVariant(70, 0)!.variant);
+      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant', 'double_shift']).toContain(shouldOfferVariant(70, 0)!.variant);
 
       Math.random = () => 0.9;
-      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant', 'chain']).toContain(
+      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant', 'chain', 'double_shift']).toContain(
         shouldOfferVariant(90, 0)!.variant
       );
 
       Math.random = () => 0.99;
-      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant', 'chain']).toContain(
+      expect(['reverse', 'blind', 'no_vowel', 'speed', 'no_consonant', 'chain', 'double_shift']).toContain(
         shouldOfferVariant(100, 1)!.variant
       );
 
@@ -226,7 +226,7 @@ describe('puzzleVariety', () => {
     it('builds selector options with only unlocked variants', () => {
       const options = getVariantSelectorOptions(50, 1, 1);
       expect(options.every(o => o.unlocked)).toBe(true);
-      expect(options.map(o => o.variant)).toEqual(['standard', 'reverse', 'blind', 'no_vowel']);
+      expect(options.map(o => o.variant)).toEqual(['standard', 'reverse', 'blind', 'no_vowel', 'double_shift']);
       expect(options.find(o => o.variant === 'speed')).toBeUndefined();
       expect(options.find(o => o.variant === 'reverse_blind')).toBeUndefined();
     });

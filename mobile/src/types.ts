@@ -34,6 +34,12 @@ export interface PuzzleSolutionStep {
   /** Position in the source row from which the letter is removed (0-indexed).
    *  Critical when the source word has duplicate letters. */
   removalPosition?: number;
+  /** For double shift: the two letters to move (overrides letterToMove). */
+  lettersToMove?: [string, string];
+  /** For double shift: insertion positions for both letters in order. */
+  insertionPositions?: [number, number];
+  /** For double shift: removal positions for both letters in order. */
+  removalPositions?: [number, number];
 }
 
 export interface PuzzleConfig {
@@ -43,6 +49,8 @@ export interface PuzzleConfig {
   /** Step-by-step reverse solution for hints during the reverse leg (reverse variants only). */
   reverseSolution?: PuzzleSolutionStep[];
   wordLength?: number;
+  /** When true, this puzzle uses double-shift mechanics (2 letters per step). */
+  isDoubleShift?: boolean;
 }
 
 /**
