@@ -35,6 +35,8 @@ export interface PuzzleConfig {
   words: string[];
   hint?: string;
   solution?: PuzzleSolutionStep[];
+  /** Step-by-step reverse solution for hints during the reverse leg (reverse variants only). */
+  reverseSolution?: PuzzleSolutionStep[];
   wordLength?: number;
 }
 

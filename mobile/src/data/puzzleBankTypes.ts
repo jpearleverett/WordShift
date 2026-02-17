@@ -19,4 +19,6 @@ export interface PreGeneratedPuzzle {
   allWords: string[];
   /** Semantic clusters touched */
   semanticTags: string[];
+  /** Step-by-step reverse solution for hints during the reverse leg (reverse variants only). */
+  reverseSolution?: PuzzleSolutionStep[];
 }

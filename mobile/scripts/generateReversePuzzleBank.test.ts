@@ -71,7 +71,7 @@ jest.mock('../src/services/wordHistory', () => ({
 // Imports — after mocks
 // ============================================================================
 
-import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster } from '../src/services/localGenerator';
+import { generateLocalPuzzle, isDreadWord, getWordPhaseTier, getSemanticCluster, solveReverse } from '../src/services/localGenerator';
 import { PreGeneratedPuzzle } from '../src/data/puzzleBankTypes';
 
 // ============================================================================
@@ -128,12 +128,17 @@ function computeSemanticTags(words: string[]): string[] {
   return [...tags];
 }
 
-function serializePuzzle(p: PreGeneratedPuzzle): string {
-  const solutionStr = p.solution.map(s =>
+function serializeSteps(steps: import('../src/types').PuzzleSolutionStep[]): string {
+  return steps.map(s =>
     `{stepIndex:${s.stepIndex},sourceWord:'${s.sourceWord}',targetWord:'${s.targetWord}',letterToMove:'${s.letterToMove}',explanation:\`${s.explanation}\`}`
   ).join(',');
+}
 
-  return `{id:'${p.id}',words:[${p.words.map(w => `'${w}'`).join(',')}],solution:[${solutionStr}],wordLength:${p.wordLength},qualityScore:${p.qualityScore},dreadTier:${p.dreadTier},dreadWordCount:${p.dreadWordCount},allWords:[${p.allWords.map(w => `'${w}'`).join(',')}],semanticTags:[${p.semanticTags.map(t => `'${t}'`).join(',')}]}`;
+function serializePuzzle(p: PreGeneratedPuzzle): string {
+  const solutionStr = serializeSteps(p.solution);
+  const reverseSolutionStr = p.reverseSolution ? `,reverseSolution:[${serializeSteps(p.reverseSolution)}]` : '';
+
+  return `{id:'${p.id}',words:[${p.words.map(w => `'${w}'`).join(',')}],solution:[${solutionStr}]${reverseSolutionStr},wordLength:${p.wordLength},qualityScore:${p.qualityScore},dreadTier:${p.dreadTier},dreadWordCount:${p.dreadWordCount},allWords:[${p.allWords.map(w => `'${w}'`).join(',')}],semanticTags:[${p.semanticTags.map(t => `'${t}'`).join(',')}]}`;
 }
 
 function loadExistingPuzzles(phase: number): PreGeneratedPuzzle[] {
@@ -205,10 +210,15 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
       const allWords = [...new Set(puzzle.words.map(w => w.toUpperCase()))];
       const semanticTags = computeSemanticTags(puzzle.words);
 
+      // Solve reverse path for hint support during reverse leg
+      const reverseSolutionSteps = puzzle.reverseSolution
+        ?? (puzzle.solution ? solveReverse(puzzle.words, puzzle.solution) : null);
+
       newPuzzles.push({
         id,
         words: puzzle.words,
         solution: puzzle.solution || [],
+        reverseSolution: reverseSolutionSteps ?? undefined,
         wordLength: puzzle.wordLength || 5,
         qualityScore: 50,
         dreadTier,

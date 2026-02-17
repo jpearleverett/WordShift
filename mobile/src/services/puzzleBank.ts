@@ -329,6 +329,7 @@ export async function selectPreGeneratedPuzzle(
     words: selected.puzzle.words,
     hint: `Start by shifting '${selected.puzzle.solution[0]?.letterToMove ?? '?'}'`,
     solution: selected.puzzle.solution,
+    reverseSolution: selected.puzzle.reverseSolution,
     wordLength: selected.puzzle.wordLength,
   };
 }
