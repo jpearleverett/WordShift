@@ -198,12 +198,16 @@ describe('puzzleBank', () => {
   describe('selectPreGeneratedPuzzle - reverse variant', () => {
     const hasReversePuzzles = PUZZLE_BANK_REVERSE_HARD.length > 0;
 
-    it('returns null for reverse at non-HARD difficulties', async () => {
+    it('returns puzzles for reverse at EASY and MEDIUM difficulties', async () => {
       const easy = await selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap(), 'reverse');
-      expect(easy).toBeNull();
+      expect(easy).not.toBeNull();
+      expect(easy!.words.length).toBe(3); // 3 rows
+      expect(easy!.wordLength).toBe(4);   // 4-letter words
 
       const medium = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
-      expect(medium).toBeNull();
+      expect(medium).not.toBeNull();
+      expect(medium!.words.length).toBe(4); // 4 rows
+      expect(medium!.wordLength).toBe(4);   // 4-letter words
     });
 
     it('returns null for unsupported variants', async () => {

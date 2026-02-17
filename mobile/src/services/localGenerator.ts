@@ -301,7 +301,9 @@ const DREAD_WORDS_PHASE_1 = new Set([
   // Light & atmosphere
   'GLOW', 'GLEAM', 'SHINE', 'SPARK', 'LIGHT', 'HAZE', 'MISTY', 'FOGGY', 'BLUR',
   // Strangeness
-  'EERIE', 'WEIRD', 'ODD', 'GRIM',
+  'EERIE', 'WEIRD', 'ODD', 'GRIM', 'AWE',
+  // 3-letter curiosity
+  'CUE', 'SPY', 'PRY', 'DIG',
   // Change
   'SHIFT', 'CHANGE', 'MORPH', 'ALTER', 'VARY', 'FLUX', 'FLOW', 'TURN',
   'GROW', 'SHRINK', 'EXPAND', 'SWELL', 'PULSE', 'CYCLE',
@@ -330,7 +332,9 @@ const DREAD_WORDS_PHASE_2 = new Set([
   'LONE', 'SOLO', 'SINGLE', 'ONLY', 'SOLE', 'MERE', 'REMOTE', 'DISTANT',
   'LEFT', 'EXILE',
   // Bleakness
-  'BLEAK', 'STARK', 'DINGY', 'DRAB', 'PLAIN', 'GRAY',
+  'BLEAK', 'STARK', 'DINGY', 'DRAB', 'PLAIN', 'GRAY', 'LOW',
+  // 3-letter emptiness/decay
+  'RUE', 'ILL', 'EBB', 'DRY', 'OLD', 'WAN', 'SAG', 'RUT', 'SAP',
   // Atmosphere
   'MIST', 'FOG', 'DUSK', 'MARSH', 'SWAMP', 'BOG',
   // Below
@@ -380,6 +384,8 @@ const DREAD_WORDS_PHASE_3 = new Set([
   'QUAKE', 'POUND', 'SLIT', 'GASH', 'GORE', 'STAB', 'TORN', 'HACK', 'CHOP',
   // Suffering
   'AGONY', 'GRIEF', 'WOE', 'SORROW', 'BITTER', 'BURDEN',
+  // 3-letter dread
+  'DIE', 'CRY', 'WAR', 'IRE', 'HEX', 'RAW', 'SIN', 'MAR', 'RIP', 'ROB', 'JAB',
   // Places of dread
   'VAULT', 'LAIR', 'DEN', 'PIT',
   // Remnants
@@ -432,6 +438,8 @@ const DREAD_WORDS_PHASE_4 = new Set([
   'EMBER', 'FLAME', 'BLAZE', 'TORCH',
   // Weaving
   'WOVEN', 'THREAD',
+  // 3-letter cosmic/ritual
+  'VOW', 'ORB', 'ODE', 'KEY', 'FOE', 'DYE', 'BAN',
   // Transformation
   'BECOME', 'CONVERT', 'EVOLVE',
   'MELT', 'VANISH',

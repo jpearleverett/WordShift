@@ -3,6 +3,8 @@ import { PuzzleConfig, Difficulty } from '../types';
 import { PreGeneratedPuzzle, PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
 import { PUZZLE_BANK_REVERSE_MEDIUM_PLUS } from '../data/puzzleBankReverseMediumPlus';
+import { PUZZLE_BANK_REVERSE_EASY } from '../data/puzzleBankReverseEasy';
+import { PUZZLE_BANK_REVERSE_MEDIUM } from '../data/puzzleBankReverseMedium';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
@@ -10,6 +12,8 @@ import { PuzzleVariant } from './puzzleVariety';
 const USED_PUZZLES_KEY = 'wordshift_played_puzzle_ids';
 const USED_REVERSE_PUZZLES_KEY = 'wordshift_played_reverse_puzzle_ids';
 const USED_REVERSE_MP_PUZZLES_KEY = 'wordshift_played_reverse_mp_puzzle_ids';
+const USED_REVERSE_EASY_PUZZLES_KEY = 'wordshift_played_reverse_easy_puzzle_ids';
+const USED_REVERSE_MEDIUM_PUZZLES_KEY = 'wordshift_played_reverse_medium_puzzle_ids';
 const MAX_USED_TRACKED = 500;
 
 // Bank word novelty scoring thresholds (in bank-puzzle-selections ago)
@@ -27,17 +31,27 @@ const BANK_NOVEL_BONUS_SOME = 3;    // 1-2 novel words
 let usedPuzzleIds: string[] | null = null;
 let usedReversePuzzleIds: string[] | null = null;
 let usedReverseMPPuzzleIds: string[] | null = null;
+let usedReverseEasyPuzzleIds: string[] | null = null;
+let usedReverseMediumPuzzleIds: string[] | null = null;
 
 // Lazy-initialized ID→allWords lookup maps (built once from static bank data)
 let standardIdToWords: Map<string, string[]> | null = null;
 let reverseIdToWords: Map<string, string[]> | null = null;
 let reverseMPIdToWords: Map<string, string[]> | null = null;
+let reverseEasyIdToWords: Map<string, string[]> | null = null;
+let reverseMediumIdToWords: Map<string, string[]> | null = null;
 
 /**
  * Derive a "bank key" from difficulty + variant to route to the correct
  * storage, cache, and bank data. Returns a discriminator string.
  */
 function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
+  if (difficulty === 'EASY' && (variant === 'reverse' || variant === 'reverse_blind')) {
+    return 'reverse_easy';
+  }
+  if (difficulty === 'MEDIUM' && (variant === 'reverse' || variant === 'reverse_blind')) {
+    return 'reverse_medium';
+  }
   if (difficulty === 'MEDIUM_PLUS' && (variant === 'reverse' || variant === 'reverse_blind')) {
     return 'reverse_mp';
   }
@@ -55,6 +69,20 @@ function getStorageConfig(bankKey: string): {
   getCache: () => string[] | null;
   setCache: (val: string[] | null) => void;
 } {
+  if (bankKey === 'reverse_easy') {
+    return {
+      key: USED_REVERSE_EASY_PUZZLES_KEY,
+      getCache: () => usedReverseEasyPuzzleIds,
+      setCache: (val) => { usedReverseEasyPuzzleIds = val; },
+    };
+  }
+  if (bankKey === 'reverse_medium') {
+    return {
+      key: USED_REVERSE_MEDIUM_PUZZLES_KEY,
+      getCache: () => usedReverseMediumPuzzleIds,
+      setCache: (val) => { usedReverseMediumPuzzleIds = val; },
+    };
+  }
   if (bankKey === 'reverse_mp') {
     return {
       key: USED_REVERSE_MP_PUZZLES_KEY,
@@ -81,6 +109,24 @@ function getStorageConfig(bankKey: string): {
  * Built lazily from static bank data on first access.
  */
 function getIdToWordsMap(bankKey: string): Map<string, string[]> {
+  if (bankKey === 'reverse_easy') {
+    if (!reverseEasyIdToWords) {
+      reverseEasyIdToWords = new Map();
+      for (const p of PUZZLE_BANK_REVERSE_EASY) {
+        reverseEasyIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return reverseEasyIdToWords;
+  }
+  if (bankKey === 'reverse_medium') {
+    if (!reverseMediumIdToWords) {
+      reverseMediumIdToWords = new Map();
+      for (const p of PUZZLE_BANK_REVERSE_MEDIUM) {
+        reverseMediumIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return reverseMediumIdToWords;
+  }
   if (bankKey === 'reverse_mp') {
     if (!reverseMPIdToWords) {
       reverseMPIdToWords = new Map();
@@ -201,6 +247,16 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
   if (difficulty === 'MEDIUM_PLUS') {
     if (variant === 'reverse' || variant === 'reverse_blind') {
       return PUZZLE_BANK_REVERSE_MEDIUM_PLUS.length > 0 ? PUZZLE_BANK_REVERSE_MEDIUM_PLUS : null;
+    }
+  }
+  if (difficulty === 'EASY') {
+    if (variant === 'reverse' || variant === 'reverse_blind') {
+      return PUZZLE_BANK_REVERSE_EASY.length > 0 ? PUZZLE_BANK_REVERSE_EASY : null;
+    }
+  }
+  if (difficulty === 'MEDIUM') {
+    if (variant === 'reverse' || variant === 'reverse_blind') {
+      return PUZZLE_BANK_REVERSE_MEDIUM.length > 0 ? PUZZLE_BANK_REVERSE_MEDIUM : null;
     }
   }
   return null;
@@ -380,10 +436,14 @@ export async function clearPlayedPuzzles(): Promise<void> {
   usedPuzzleIds = [];
   usedReversePuzzleIds = [];
   usedReverseMPPuzzleIds = [];
+  usedReverseEasyPuzzleIds = [];
+  usedReverseMediumPuzzleIds = [];
   try {
     await AsyncStorage.removeItem(USED_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_MP_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_REVERSE_EASY_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_REVERSE_MEDIUM_PUZZLES_KEY);
   } catch {
     // Non-critical
   }
