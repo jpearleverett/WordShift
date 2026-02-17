@@ -147,19 +147,50 @@ function serializePuzzle(p: PreGeneratedPuzzle): string {
 
 function loadExistingPuzzles(phase: number): PreGeneratedPuzzle[] {
   const tempPath = getTempPath(phase);
+  const backupPath = tempPath + '.bak';
+
+  // Try primary file first
   if (fs.existsSync(tempPath)) {
     try {
-      return JSON.parse(fs.readFileSync(tempPath, 'utf-8')) as PreGeneratedPuzzle[];
+      const data = JSON.parse(fs.readFileSync(tempPath, 'utf-8')) as PreGeneratedPuzzle[];
+      if (data.length > 0) return data;
     } catch {
-      return [];
+      // Primary corrupted — fall through to backup
     }
   }
+
+  // Try backup if primary is missing or corrupted
+  if (fs.existsSync(backupPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(backupPath, 'utf-8')) as PreGeneratedPuzzle[];
+      if (data.length > 0) {
+        // Restore backup as primary
+        fs.copyFileSync(backupPath, tempPath);
+        process.stdout.write(`  Phase ${phase}: restored ${data.length} puzzles from backup\n`);
+        return data;
+      }
+    } catch {
+      // Backup also corrupted
+    }
+  }
+
   return [];
 }
 
 function savePuzzles(phase: number, puzzles: PreGeneratedPuzzle[]): void {
   const tempPath = getTempPath(phase);
-  fs.writeFileSync(tempPath, JSON.stringify(puzzles, null, 2), 'utf-8');
+  const backupPath = tempPath + '.bak';
+  const writePath = tempPath + '.tmp';
+
+  // Atomic write: write to .tmp, then rename (rename is atomic on Linux)
+  fs.writeFileSync(writePath, JSON.stringify(puzzles, null, 2), 'utf-8');
+
+  // Keep previous good version as backup before overwriting
+  if (fs.existsSync(tempPath)) {
+    fs.copyFileSync(tempPath, backupPath);
+  }
+
+  fs.renameSync(writePath, tempPath);
 }
 
 async function generateBatch(phase: number, target: number, existing: PreGeneratedPuzzle[]): Promise<PreGeneratedPuzzle[]> {
