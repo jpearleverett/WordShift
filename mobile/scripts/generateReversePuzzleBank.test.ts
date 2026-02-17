@@ -88,8 +88,10 @@ const PHASE_TARGETS: Record<number, number> = {
 
 const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0); // 500
 
-// Max puzzles to generate per process invocation (prevents OOM)
-const BATCH_SIZE = 12;
+// Max puzzles to generate per process invocation (prevents OOM on constrained envs).
+// Uses global.gc() between puzzles when available (run with --expose-gc).
+// Saves incrementally after each puzzle so progress survives crashes.
+const BATCH_SIZE = 20;
 
 const TEMP_DIR = path.join(__dirname, '..', 'src', 'data');
 
@@ -145,19 +147,50 @@ function serializePuzzle(p: PreGeneratedPuzzle): string {
 
 function loadExistingPuzzles(phase: number): PreGeneratedPuzzle[] {
   const tempPath = getTempPath(phase);
+  const backupPath = tempPath + '.bak';
+
+  // Try primary file first
   if (fs.existsSync(tempPath)) {
     try {
-      return JSON.parse(fs.readFileSync(tempPath, 'utf-8')) as PreGeneratedPuzzle[];
+      const data = JSON.parse(fs.readFileSync(tempPath, 'utf-8')) as PreGeneratedPuzzle[];
+      if (data.length > 0) return data;
     } catch {
-      return [];
+      // Primary corrupted — fall through to backup
     }
   }
+
+  // Try backup if primary is missing or corrupted
+  if (fs.existsSync(backupPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(backupPath, 'utf-8')) as PreGeneratedPuzzle[];
+      if (data.length > 0) {
+        // Restore backup as primary
+        fs.copyFileSync(backupPath, tempPath);
+        process.stdout.write(`  Phase ${phase}: restored ${data.length} puzzles from backup\n`);
+        return data;
+      }
+    } catch {
+      // Backup also corrupted
+    }
+  }
+
   return [];
 }
 
 function savePuzzles(phase: number, puzzles: PreGeneratedPuzzle[]): void {
   const tempPath = getTempPath(phase);
-  fs.writeFileSync(tempPath, JSON.stringify(puzzles, null, 2), 'utf-8');
+  const backupPath = tempPath + '.bak';
+  const writePath = tempPath + '.tmp';
+
+  // Atomic write: write to .tmp, then rename (rename is atomic on Linux)
+  fs.writeFileSync(writePath, JSON.stringify(puzzles, null, 2), 'utf-8');
+
+  // Keep previous good version as backup before overwriting
+  if (fs.existsSync(tempPath)) {
+    fs.copyFileSync(tempPath, backupPath);
+  }
+
+  fs.renameSync(writePath, tempPath);
 }
 
 async function generateBatch(phase: number, target: number, existing: PreGeneratedPuzzle[]): Promise<PreGeneratedPuzzle[]> {
@@ -186,6 +219,8 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
     return [];
   }
 
+  // Work with a mutable copy so we can save incrementally
+  const accumulated = [...existing];
   const newPuzzles: PreGeneratedPuzzle[] = [];
   let attempts = 0;
   let failures = 0;
@@ -216,7 +251,7 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
       const reverseSolutionSteps = puzzle.reverseSolution
         ?? (puzzle.solution ? solveReverse(puzzle.words, puzzle.solution) : null);
 
-      newPuzzles.push({
+      const newPuzzle: PreGeneratedPuzzle = {
         id,
         words: puzzle.words,
         solution: puzzle.solution || [],
@@ -227,12 +262,23 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
         dreadWordCount,
         allWords,
         semanticTags,
-      });
+      };
 
-      const total = existing.length + newPuzzles.length;
+      newPuzzles.push(newPuzzle);
+      accumulated.push(newPuzzle);
+
+      // Save immediately after each puzzle so progress survives crashes
+      savePuzzles(phase, accumulated);
+
+      const total = accumulated.length;
       process.stdout.write(`  Phase ${phase}: ${total}/${target} (+${newPuzzles.length} this batch, attempt ${attempts})\n`);
     } catch (err) {
       failures++;
+    }
+
+    // Force GC between puzzles to prevent heap fragmentation crashes
+    if (typeof globalThis.gc === 'function') {
+      globalThis.gc();
     }
   }
 
@@ -258,9 +304,8 @@ describe('Reverse Puzzle Bank Generator', () => {
       }
 
       const newPuzzles = await generateBatch(phase, target, existing);
-      const combined = [...existing, ...newPuzzles];
-
-      savePuzzles(phase, combined);
+      // generateBatch saves incrementally, so reload to get accurate count
+      const combined = loadExistingPuzzles(phase);
       process.stdout.write(`Phase ${phase}: saved ${combined.length}/${target} total to temp file\n`);
 
       // Always pass — incremental progress is fine

@@ -297,9 +297,19 @@ const DREAD_WORDS_PHASE_1 = new Set([
   // Perception
   'SENSE', 'FEEL', 'NOTICE', 'WATCH', 'GAZE', 'PEER', 'GLIMPSE', 'VIEW',
   'AWARE', 'ALERT', 'AWAKE', 'KNOW', 'LEARN', 'GRASP', 'REALIZE',
+  'STARE', 'LOOK', 'SEEN', 'SIGHT',
+  // Light & atmosphere
+  'GLOW', 'GLEAM', 'SHINE', 'SPARK', 'LIGHT', 'HAZE', 'MISTY', 'FOGGY', 'BLUR',
+  // Strangeness
+  'EERIE', 'WEIRD', 'ODD', 'GRIM',
   // Change
   'SHIFT', 'CHANGE', 'MORPH', 'ALTER', 'VARY', 'FLUX', 'FLOW', 'TURN',
-  'GROW', 'SHRINK', 'EXPAND', 'CONTRACT', 'SWELL', 'PULSE', 'CYCLE',
+  'GROW', 'SHRINK', 'EXPAND', 'SWELL', 'PULSE', 'CYCLE',
+  'WHIRL', 'SWIRL', 'TWIST', 'WEAVE', 'BLEND', 'FORGE', 'MOLD', 'SHAPE', 'FORM', 'CRAFT',
+  // Pattern & signal
+  'SIGN', 'CLUE', 'HINT', 'OMEN', 'TOKEN', 'TRAIL', 'PATH', 'GUIDE', 'LEAD', 'LINK',
+  // Foundation
+  'DEEP', 'INNER', 'CORE', 'ROOT', 'SEED', 'BROOD', 'RIPPLE',
 ]);
 
 // PHASE 2 — Questioning Existence (impermanence & isolation)
@@ -310,12 +320,24 @@ const DREAD_WORDS_PHASE_2 = new Set([
   // Decay
   'FADE', 'WANE', 'DECAY', 'WILT', 'ROT', 'RUST', 'ERODE', 'WEAR',
   'CRUMBLE', 'FLAKE', 'PEEL', 'CRACK', 'CHIP', 'BREAK', 'FRAY', 'TATTER',
+  'WASTE', 'WARP', 'FADED', 'STALE', 'DUSTY', 'RUSTED',
+  // Weakness & weariness
+  'LEAN', 'THIN', 'FRAIL', 'WEAK', 'TIRED', 'WEARY', 'SPENT', 'DRAIN', 'WARY',
+  // Pain
+  'SCAR', 'WOUND', 'STING', 'ACHE', 'HURT',
   // Isolation
   'ALONE', 'APART', 'DETACH', 'SPLIT', 'SEVER', 'CUT', 'DIVIDE', 'PART',
   'LONE', 'SOLO', 'SINGLE', 'ONLY', 'SOLE', 'MERE', 'REMOTE', 'DISTANT',
+  'LEFT', 'EXILE',
+  // Bleakness
+  'BLEAK', 'STARK', 'DINGY', 'DRAB', 'PLAIN', 'GRAY',
+  // Atmosphere
+  'MIST', 'FOG', 'DUSK', 'MARSH', 'SWAMP', 'BOG',
+  // Below
+  'OUTER', 'BELOW', 'UNDER', 'DEPTH',
   // Movement/Falling
   'FLOAT', 'SINK', 'FALL', 'DROP', 'PLUNGE', 'DIVE', 'TUMBLE', 'SLIDE',
-  'SLIP', 'TRIP', 'STUMBLE', 'TOPPLE', 'CRASH', 'LAND', 'SETTLE', 'REST',
+  'SLIP', 'TRIP', 'STUMBLE', 'TOPPLE', 'CRASH', 'LAND', 'SETTLE', 'REST', 'SUNKEN',
   // Time
   'TIME', 'PASS', 'BRIEF', 'SHORT', 'GONE', 'PAST', 'WAS', 'WERE',
   'MOMENT', 'INSTANT', 'FLASH', 'BLINK', 'SWIFT', 'QUICK', 'HASTY', 'RUSH',
@@ -327,56 +349,96 @@ const DREAD_WORDS_PHASE_3 = new Set([
   // Fear & Dread
   'DREAD', 'FEAR', 'FRIGHT', 'TERROR', 'HORROR', 'PANIC', 'ALARM', 'SHOCK',
   'WORRY', 'FRET', 'ANGST', 'STRESS', 'STRAIN', 'TENSE', 'RIGID', 'STIFF',
+  // Malice
+  'CURSE', 'CURSED', 'BANE', 'WRATH', 'SPITE', 'SCORN', 'CRUEL', 'HARSH', 'STERN',
   // Darkness & Cold
-  'DARK', 'COLD', 'CHILL', 'FROST', 'ICE', 'FREEZE', 'FRIGID', 'COOL',
-  'BLACK', 'NIGHT', 'SHADE', 'SHADOW', 'GLOOM', 'MURKY', 'DIM', 'FAINT',
+  'DARK', 'DARKLY', 'COLD', 'CHILL', 'FROST', 'ICE', 'FREEZE', 'FRIGID', 'COOL',
+  'BLACK', 'NIGHT', 'SHADE', 'SHADOW', 'SHROUD', 'GLOOM', 'MURKY', 'DIM', 'FAINT',
+  'DIRE', 'SOOT', 'DAMP', 'BLOT',
+  // Bodily horror
+  'BLOOD', 'FLESH', 'SKIN', 'CLAW', 'FANG', 'BLEED', 'SWEAT', 'SHIVER',
+  'VEIN', 'LIMB', 'GUTS',
+  // Predation
+  'PREY', 'CRAWL', 'CREEP', 'LURK', 'STALK',
   // Stillness & Silence
   'NUMB', 'STILL', 'QUIET', 'HUSH', 'MUTE', 'SILENT', 'CALM', 'PEACE',
   'STATIC', 'FROZEN', 'FIXED', 'STUCK', 'HALT', 'STOP', 'PAUSE', 'WAIT',
   // Endings
   'END', 'FINAL', 'LAST', 'CEASE', 'DONE', 'OVER', 'FINISH', 'CLOSE',
-  'COMPLETE', 'CONCLUDE', 'TERMINATE', 'EXPIRE', 'LAPSE', 'ELAPSE',
+  'EXPIRE', 'LAPSE', 'ELAPSE',
   // Death imagery
+  'DEAD', 'KILL', 'DEATH', 'DYING', 'SLAIN', 'SLAY', 'DROWN', 'CHOKE',
   'DUST', 'ASH', 'GHOST', 'HAUNT', 'SPIRIT', 'SOUL', 'WRAITH',
   'GRAVE', 'TOMB', 'CRYPT', 'BURIAL', 'MOURN', 'GRIEVE', 'WEEP', 'SOB',
-  'BONE', 'SKULL', 'CORPSE', 'REMAINS', 'RELIC', 'FOSSIL', 'MARK',
+  'BONE', 'SKULL', 'CORPSE', 'RELIC', 'FOSSIL', 'MARK', 'COFFIN',
+  // Restraint & entrapment
+  'GRIP', 'SEIZE', 'CHAIN', 'SNARE', 'TRAP', 'CAGE',
+  'KNOT', 'CORD', 'LOCK', 'HELD',
+  // Sounds of dread
+  'WAIL', 'HOWL', 'MOAN', 'GLARE', 'SNEER', 'GROWL', 'HISS', 'TOLL', 'BELL',
+  // Violence
+  'QUAKE', 'POUND', 'SLIT', 'GASH', 'GORE', 'STAB', 'TORN', 'HACK', 'CHOP',
+  // Suffering
+  'AGONY', 'GRIEF', 'WOE', 'SORROW', 'BITTER', 'BURDEN',
+  // Places of dread
+  'VAULT', 'LAIR', 'DEN', 'PIT',
   // Remnants
-  'ECHO', 'REMAIN', 'LINGER', 'PERSIST', 'ENDURE', 'SURVIVE', 'OUTLAST',
+  'ECHO', 'REMAIN', 'REMAINS', 'LINGER', 'PERSIST', 'ENDURE', 'SURVIVE', 'OUTLAST',
   'MEMORY', 'RECALL', 'RECORD', 'ARCHIVE', 'LEGACY', 'HEIR',
+  // Decay (6-7 letter)
+  'WITHER', 'ERASED', 'BROKEN', 'FESTER', 'PLAGUE',
   // Vastness
-  'VAST', 'HUGE', 'IMMENSE', 'MASSIVE', 'ENDLESS', 'BOUNDLESS', 'INFINITE',
-  'ETERNAL', 'FOREVER', 'NEVER', 'ALWAYS', 'CONSTANT', 'PERPETUAL',
+  'VAST', 'HUGE', 'IMMENSE', 'MASSIVE', 'ENDLESS',
+  'ETERNAL', 'FOREVER', 'NEVER', 'ALWAYS',
 ]);
 
 // PHASE 4 — Complete Crisis (cosmic horror & finality)
 const DREAD_WORDS_PHASE_4 = new Set([
   // Destruction
-  'DOOM', 'RUIN', 'RAVAGE', 'WRECK', 'DESTROY', 'ANNIHILATE', 'OBLITERATE',
+  'DOOM', 'RUIN', 'RAVAGE', 'WRECK', 'DESTROY',
   'ABYSS', 'CHASM', 'RIFT', 'TEAR', 'REND', 'SHATTER', 'SMASH', 'CRUSH',
-  'COLLAPSE', 'IMPLODE', 'EXPLODE', 'BURST', 'RUPTURE', 'FRACTURE',
+  'IMPLODE', 'EXPLODE', 'BURST', 'RUPTURE', 'DEVOUR', 'MOLTEN',
   // Nothingness
-  'NOTHING', 'OBLIVION', 'ABSENCE', 'VACUUM',
-  'FORMLESS', 'SHAPELESS', 'NAMELESS', 'FACELESS', 'UNKNOWN', 'UNSEEN',
+  'NOTHING', 'ABSENCE', 'VACUUM',
+  'UNKNOWN', 'UNSEEN',
+  // Ritual & sacred
+  'ALTAR', 'IDOL', 'CULT', 'RITE', 'OATH', 'PACT', 'SPELL', 'CHANT',
+  'SACRED', 'RITUAL', 'OCCULT', 'ARCANE', 'SUMMON', 'INVOKE', 'BECKON',
+  'PRAY', 'TOME', 'ROBE', 'SEAL', 'ARCH',
+  // Submission
+  'BIND', 'CLAIM', 'OFFER', 'SERVE', 'KNEEL', 'BOW', 'OBEY', 'HEED',
+  'SWEAR', 'SWORN', 'ACCEPT', 'SUBMIT', 'YIELD', 'RELEASE', 'LET', 'ALLOW',
   // Truth & Illusion
   'TRUTH', 'REAL', 'FAKE', 'FALSE', 'LIE', 'MASK', 'VEIL', 'HIDE',
-  'DECEIVE', 'TRICK', 'FOOL', 'SHAM', 'FRAUD', 'HOAX', 'RUSE', 'GUISE',
+  'TRICK', 'FOOL', 'SHAM', 'FRAUD', 'HOAX', 'RUSE', 'GUISE', 'DECEIVE',
   // Dreams & Unreality
   'WAKE', 'SLEEP', 'DREAM', 'VISION', 'MIRAGE', 'PHANTOM', 'SPECTER',
-  'DELUSION', 'FANCY', 'WHIM', 'FIGMENT', 'FANTASY', 'REVERIE',
+  'FANCY', 'WHIM', 'FIGMENT', 'FANTASY', 'REVERIE',
   // Boundaries & Thresholds
   'HORIZON', 'EDGE', 'BRINK', 'VERGE', 'BORDER', 'MARGIN', 'RIM', 'FRINGE',
   'LIMIT', 'BOUND', 'EXTENT', 'REACH', 'SCOPE', 'RANGE',
-  'GATE', 'DOOR', 'PORTAL', 'PASSAGE', 'THRESHOLD', 'ENTRY', 'EXIT',
+  'GATE', 'DOOR', 'PORTAL', 'PASSAGE', 'ENTRY', 'EXIT',
+  // Entities & powers
+  'DEMON', 'FIEND', 'BEAST', 'WITCH', 'TITAN', 'GIANT',
+  'CHAOS', 'POWER', 'FORCE', 'SURGE', 'FLOOD', 'STORM',
+  'FURY', 'RAGE', 'WELD', 'FUSE',
   // Cosmic/Existential
   'COSMOS', 'SPACE', 'STAR', 'MOON', 'SUN', 'PLANET', 'ORBIT', 'SPHERE',
-  'TIMELESS', 'AGELESS', 'DEATHLESS', 'UNDYING',
-  'MORTAL', 'FINITE', 'FLEETING', 'TRANSIENT', 'MOMENTARY',
+  'REALM', 'PLANE', 'WORLD',
+  'AGELESS', 'UNDYING', 'MORTAL', 'FINITE',
+  // Awakening
+  'WOKEN', 'RISEN', 'ARISE', 'STIR', 'DWELL', 'ABIDE', 'AWAIT',
+  // Fire
+  'EMBER', 'FLAME', 'BLAZE', 'TORCH',
+  // Weaving
+  'WOVEN', 'THREAD',
   // Transformation
-  'BECOME', 'TRANSFORM', 'TRANSMUTE', 'CONVERT', 'EVOLVE',
-  'DISSOLVE', 'MELT', 'VANISH', 'DISAPPEAR', 'EVAPORATE', 'DISPERSE',
+  'BECOME', 'CONVERT', 'EVOLVE',
+  'MELT', 'VANISH',
+  // Endings & fate
+  'FATE', 'FELL',
   // Final words
-  'FAREWELL', 'GOODBYE', 'ADIEU', 'PARTING', 'LEAVE', 'DEPART', 'GO',
-  'ACCEPT', 'SUBMIT', 'YIELD', 'SURRENDER', 'RELEASE', 'LET', 'ALLOW',
+  'GOODBYE', 'ADIEU', 'PARTING', 'LEAVE', 'DEPART',
   'SLUMBER', 'REPOSE',
 ]);
 

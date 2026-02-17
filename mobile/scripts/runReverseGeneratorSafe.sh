@@ -1,20 +1,16 @@
 #!/bin/bash
-# Runs the reverse puzzle bank generator in batches until all phases are complete.
-# Each invocation generates up to BATCH_SIZE (6) puzzles per phase to stay within
-# memory limits, then the script re-runs for the same phase until target is met.
+# Runs the reverse puzzle bank generator with crash recovery.
+# Saves after each puzzle so progress survives segfaults/OOM.
+# Each process generates up to BATCH_SIZE (20) puzzles per invocation.
 #
-# Usage: cd mobile && bash scripts/runReverseGenerator.sh
+# Usage: cd mobile && bash scripts/runReverseGeneratorSafe.sh
 
-set -e
-
-export NODE_OPTIONS="--max-old-space-size=2048"
+export NODE_OPTIONS="--max-old-space-size=4096 --expose-gc"
 JEST_CMD="npx jest --config scripts/jest.config.js --no-coverage --testTimeout 600000 --maxWorkers=1"
 SCRIPT="scripts/generateReversePuzzleBank.test.ts"
 
-# Phase targets (must match generateReversePuzzleBank.test.ts)
 declare -A TARGETS=( [0]=125 [1]=100 [2]=100 [3]=100 [4]=75 )
 TOTAL=500
-
 DATA_DIR="src/data"
 
 count_phase() {
@@ -27,17 +23,26 @@ count_phase() {
   fi
 }
 
-total_count() {
-  local sum=0
+print_progress() {
+  echo "=== Progress ==="
   for p in 0 1 2 3 4; do
-    sum=$((sum + $(count_phase $p)))
+    local c=$(count_phase $p)
+    local t=${TARGETS[$p]}
+    if [ "$c" -ge "$t" ]; then
+      echo "Phase $p: $c/$t ✓"
+    elif [ "$c" -gt 0 ]; then
+      echo "Phase $p: $c/$t"
+    else
+      echo "Phase $p: -"
+    fi
   done
-  echo $sum
+  echo ""
 }
 
 echo "=== Reverse Puzzle Bank Generator ==="
-echo "Target: $TOTAL puzzles (125/100/100/100/75)"
+echo "Target: $TOTAL puzzles | Batch: 20 | Incremental saves"
 echo ""
+print_progress
 
 for phase in 0 1 2 3 4; do
   target=${TARGETS[$phase]}
@@ -45,7 +50,7 @@ for phase in 0 1 2 3 4; do
 
   while [ "$current" -lt "$target" ]; do
     echo "--- Phase $phase: $current/$target — running batch ---"
-    $JEST_CMD -t "phase $phase" "$SCRIPT" 2>&1 | tail -5
+    $JEST_CMD -t "phase $phase" "$SCRIPT" 2>&1 | tail -3
     current=$(count_phase $phase)
     echo ""
   done
@@ -54,10 +59,10 @@ for phase in 0 1 2 3 4; do
 done
 
 echo ""
-echo "=== All phases complete! Total: $(total_count)/$TOTAL ==="
-echo ""
+echo "=== All phases complete! ==="
+print_progress
 echo "Running merge step..."
-$JEST_CMD -t "merge" "$SCRIPT" 2>&1 | tail -10
+$JEST_CMD -t "merge" "$SCRIPT" 2>&1 | grep -E "Phase|Wrote|Total|PASS" | head -10
 
 echo ""
 echo "Done! Check src/data/puzzleBankReverseHard.ts"

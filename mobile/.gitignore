@@ -31,3 +31,4 @@ yarn-error.*
 
 # TypeScript
 *.tsbuildinfo
+src/data/.reverseBank_phase*.json
