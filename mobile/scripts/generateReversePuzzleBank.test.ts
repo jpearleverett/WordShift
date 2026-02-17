@@ -90,7 +90,8 @@ const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0); //
 
 // Max puzzles to generate per process invocation (prevents OOM on constrained envs).
 // Uses global.gc() between puzzles when available (run with --expose-gc).
-const BATCH_SIZE = 3;
+// Saves incrementally after each puzzle so progress survives crashes.
+const BATCH_SIZE = 20;
 
 const TEMP_DIR = path.join(__dirname, '..', 'src', 'data');
 
@@ -187,6 +188,8 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
     return [];
   }
 
+  // Work with a mutable copy so we can save incrementally
+  const accumulated = [...existing];
   const newPuzzles: PreGeneratedPuzzle[] = [];
   let attempts = 0;
   let failures = 0;
@@ -217,7 +220,7 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
       const reverseSolutionSteps = puzzle.reverseSolution
         ?? (puzzle.solution ? solveReverse(puzzle.words, puzzle.solution) : null);
 
-      newPuzzles.push({
+      const newPuzzle: PreGeneratedPuzzle = {
         id,
         words: puzzle.words,
         solution: puzzle.solution || [],
@@ -228,9 +231,15 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
         dreadWordCount,
         allWords,
         semanticTags,
-      });
+      };
 
-      const total = existing.length + newPuzzles.length;
+      newPuzzles.push(newPuzzle);
+      accumulated.push(newPuzzle);
+
+      // Save immediately after each puzzle so progress survives crashes
+      savePuzzles(phase, accumulated);
+
+      const total = accumulated.length;
       process.stdout.write(`  Phase ${phase}: ${total}/${target} (+${newPuzzles.length} this batch, attempt ${attempts})\n`);
     } catch (err) {
       failures++;
@@ -264,9 +273,8 @@ describe('Reverse Puzzle Bank Generator', () => {
       }
 
       const newPuzzles = await generateBatch(phase, target, existing);
-      const combined = [...existing, ...newPuzzles];
-
-      savePuzzles(phase, combined);
+      // generateBatch saves incrementally, so reload to get accurate count
+      const combined = loadExistingPuzzles(phase);
       process.stdout.write(`Phase ${phase}: saved ${combined.length}/${target} total to temp file\n`);
 
       // Always pass — incremental progress is fine
