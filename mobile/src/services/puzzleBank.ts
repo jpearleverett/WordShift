@@ -2,12 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PuzzleConfig, Difficulty } from '../types';
 import { PreGeneratedPuzzle, PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
+import { PUZZLE_BANK_REVERSE_MEDIUM_PLUS } from '../data/puzzleBankReverseMediumPlus';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
 
 const USED_PUZZLES_KEY = 'wordshift_played_puzzle_ids';
 const USED_REVERSE_PUZZLES_KEY = 'wordshift_played_reverse_puzzle_ids';
+const USED_REVERSE_MP_PUZZLES_KEY = 'wordshift_played_reverse_mp_puzzle_ids';
 const MAX_USED_TRACKED = 500;
 
 // Bank word novelty scoring thresholds (in bank-puzzle-selections ago)
@@ -24,20 +26,43 @@ const BANK_NOVEL_BONUS_SOME = 3;    // 1-2 novel words
 // In-memory caches (ordered arrays, most recently played first)
 let usedPuzzleIds: string[] | null = null;
 let usedReversePuzzleIds: string[] | null = null;
+let usedReverseMPPuzzleIds: string[] | null = null;
 
 // Lazy-initialized ID→allWords lookup maps (built once from static bank data)
 let standardIdToWords: Map<string, string[]> | null = null;
 let reverseIdToWords: Map<string, string[]> | null = null;
+let reverseMPIdToWords: Map<string, string[]> | null = null;
 
 /**
- * Determine the storage key and cache for a given variant.
+ * Derive a "bank key" from difficulty + variant to route to the correct
+ * storage, cache, and bank data. Returns a discriminator string.
  */
-function getStorageConfig(variant: PuzzleVariant): {
+function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
+  if (difficulty === 'MEDIUM_PLUS' && (variant === 'reverse' || variant === 'reverse_blind')) {
+    return 'reverse_mp';
+  }
+  if (variant === 'reverse' || variant === 'reverse_blind') {
+    return 'reverse';
+  }
+  return 'standard';
+}
+
+/**
+ * Determine the storage key and cache for a given bank key.
+ */
+function getStorageConfig(bankKey: string): {
   key: string;
   getCache: () => string[] | null;
   setCache: (val: string[] | null) => void;
 } {
-  if (variant === 'reverse' || variant === 'reverse_blind') {
+  if (bankKey === 'reverse_mp') {
+    return {
+      key: USED_REVERSE_MP_PUZZLES_KEY,
+      getCache: () => usedReverseMPPuzzleIds,
+      setCache: (val) => { usedReverseMPPuzzleIds = val; },
+    };
+  }
+  if (bankKey === 'reverse') {
     return {
       key: USED_REVERSE_PUZZLES_KEY,
       getCache: () => usedReversePuzzleIds,
@@ -55,8 +80,17 @@ function getStorageConfig(variant: PuzzleVariant): {
  * Get or build the ID→allWords lookup map for a bank.
  * Built lazily from static bank data on first access.
  */
-function getIdToWordsMap(variant: PuzzleVariant): Map<string, string[]> {
-  if (variant === 'reverse' || variant === 'reverse_blind') {
+function getIdToWordsMap(bankKey: string): Map<string, string[]> {
+  if (bankKey === 'reverse_mp') {
+    if (!reverseMPIdToWords) {
+      reverseMPIdToWords = new Map();
+      for (const p of PUZZLE_BANK_REVERSE_MEDIUM_PLUS) {
+        reverseMPIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return reverseMPIdToWords;
+  }
+  if (bankKey === 'reverse') {
     if (!reverseIdToWords) {
       reverseIdToWords = new Map();
       for (const p of PUZZLE_BANK_REVERSE_HARD) {
@@ -83,9 +117,9 @@ function getIdToWordsMap(variant: PuzzleVariant): Map<string, string[]> {
  */
 function deriveBankWordRecency(
   usedIds: string[],
-  variant: PuzzleVariant
+  bankKey: string
 ): Map<string, number> {
-  const idToWords = getIdToWordsMap(variant);
+  const idToWords = getIdToWordsMap(bankKey);
   const recency = new Map<string, number>();
 
   for (let i = 0; i < usedIds.length; i++) {
@@ -105,8 +139,8 @@ function deriveBankWordRecency(
 /**
  * Load played puzzle IDs from storage into cache.
  */
-async function loadUsedPuzzles(variant: PuzzleVariant = 'standard'): Promise<string[]> {
-  const config = getStorageConfig(variant);
+async function loadUsedPuzzles(bankKey: string = 'standard'): Promise<string[]> {
+  const config = getStorageConfig(bankKey);
   const cached = config.getCache();
   if (cached !== null) return cached;
   try {
@@ -126,9 +160,9 @@ async function loadUsedPuzzles(variant: PuzzleVariant = 'standard'): Promise<str
 /**
  * Record a puzzle as played.
  */
-async function markPuzzlePlayed(puzzleId: string, variant: PuzzleVariant = 'standard'): Promise<void> {
-  const config = getStorageConfig(variant);
-  const used = await loadUsedPuzzles(variant);
+async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'): Promise<void> {
+  const config = getStorageConfig(bankKey);
+  const used = await loadUsedPuzzles(bankKey);
 
   // Remove if already present (re-sort to front)
   const idx = used.indexOf(puzzleId);
@@ -160,9 +194,13 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
     if (variant === 'standard') {
       return PUZZLE_BANK_HARD.length > 0 ? PUZZLE_BANK_HARD : null;
     }
-    // reverse and reverse_blind both use the same reverse-solvable puzzles
     if (variant === 'reverse' || variant === 'reverse_blind') {
       return PUZZLE_BANK_REVERSE_HARD.length > 0 ? PUZZLE_BANK_REVERSE_HARD : null;
+    }
+  }
+  if (difficulty === 'MEDIUM_PLUS') {
+    if (variant === 'reverse' || variant === 'reverse_blind') {
+      return PUZZLE_BANK_REVERSE_MEDIUM_PLUS.length > 0 ? PUZZLE_BANK_REVERSE_MEDIUM_PLUS : null;
     }
   }
   return null;
@@ -267,8 +305,9 @@ export async function selectPreGeneratedPuzzle(
   const bank = getBankForSelection(difficulty, variant);
   if (!bank) return null;
 
-  const storageConfig = getStorageConfig(variant);
-  const used = await loadUsedPuzzles(variant);
+  const bankKey = getBankKey(difficulty, variant);
+  const storageConfig = getStorageConfig(bankKey);
+  const used = await loadUsedPuzzles(bankKey);
   const usedSet = new Set(used);
 
   // Filter out already-played puzzles
@@ -306,7 +345,7 @@ export async function selectPreGeneratedPuzzle(
   // This gives the scoring function a long-term memory of which words
   // the player has already seen from this bank, far beyond the 15-puzzle
   // general word history cooldown.
-  const bankWordRecency = deriveBankWordRecency(used, variant);
+  const bankWordRecency = deriveBankWordRecency(used, bankKey);
 
   // Score all available puzzles for current context
   const scored = available.map(p => ({
@@ -322,7 +361,7 @@ export async function selectPreGeneratedPuzzle(
   const selected = scored[Math.floor(Math.random() * topN)];
 
   // Mark as played
-  await markPuzzlePlayed(selected.puzzle.id, variant);
+  await markPuzzlePlayed(selected.puzzle.id, bankKey);
 
   // Convert to PuzzleConfig
   return {
@@ -340,9 +379,11 @@ export async function selectPreGeneratedPuzzle(
 export async function clearPlayedPuzzles(): Promise<void> {
   usedPuzzleIds = [];
   usedReversePuzzleIds = [];
+  usedReverseMPPuzzleIds = [];
   try {
     await AsyncStorage.removeItem(USED_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_REVERSE_MP_PUZZLES_KEY);
   } catch {
     // Non-critical
   }
