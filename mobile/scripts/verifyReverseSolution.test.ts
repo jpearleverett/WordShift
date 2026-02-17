@@ -34,17 +34,17 @@ import { PuzzleSolutionStep } from '../src/types';
 // ============================================================================
 
 describe('Reverse Solution Verification', () => {
-  it('generates 10 EASY reverse puzzles with full forward+reverse paths', async () => {
+  it('generates 10 HARD reverse puzzles with full forward+reverse paths', async () => {
     const COUNT = 10;
     let generated = 0;
 
     process.stdout.write(`\n${'='.repeat(80)}\n`);
-    process.stdout.write(`  REVERSE PUZZLE FULL PATH VERIFICATION\n`);
+    process.stdout.write(`  REVERSE PUZZLE FULL PATH VERIFICATION (HARD — 5 words, 5 letters)\n`);
     process.stdout.write(`${'='.repeat(80)}\n\n`);
 
     while (generated < COUNT) {
       try {
-        const puzzle = await generateLocalPuzzle('EASY', {
+        const puzzle = await generateLocalPuzzle('HARD', {
           requireReverseSolvable: true,
           relaxBoring: true,
         });
