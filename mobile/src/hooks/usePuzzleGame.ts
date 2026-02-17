@@ -390,9 +390,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // Use pre-generated puzzle bank for HARD standard/reverse variants
+      // Use pre-generated puzzle bank for standard/reverse variants at all difficulties
       const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'reverse_blind'];
-      const shouldUseBank = selectedDifficulty === 'HARD' && bankVariants.includes(variant)
+      const shouldUseBank = bankVariants.includes(variant)
         && (variant !== 'standard' || effectiveMode === 'standard');
       if (shouldUseBank) {
         try {

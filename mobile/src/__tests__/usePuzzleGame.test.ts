@@ -89,6 +89,11 @@ jest.mock('../services/amberCurrency', () => ({
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 10 })),
 }));
 
+// Mock puzzleBank to return null — tests exercise the generation path
+jest.mock('../services/puzzleBank', () => ({
+  selectPreGeneratedPuzzle: jest.fn(async () => null),
+}));
+
 // COMMON_WORDS needs to contain all words used in the test puzzle chain
 // and the valid words formed during moves
 jest.mock('../constants', () => ({

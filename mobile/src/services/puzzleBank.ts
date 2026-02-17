@@ -5,6 +5,9 @@ import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
 import { PUZZLE_BANK_REVERSE_MEDIUM_PLUS } from '../data/puzzleBankReverseMediumPlus';
 import { PUZZLE_BANK_REVERSE_EASY } from '../data/puzzleBankReverseEasy';
 import { PUZZLE_BANK_REVERSE_MEDIUM } from '../data/puzzleBankReverseMedium';
+import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
+import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
+import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
@@ -14,6 +17,9 @@ const USED_REVERSE_PUZZLES_KEY = 'wordshift_played_reverse_puzzle_ids';
 const USED_REVERSE_MP_PUZZLES_KEY = 'wordshift_played_reverse_mp_puzzle_ids';
 const USED_REVERSE_EASY_PUZZLES_KEY = 'wordshift_played_reverse_easy_puzzle_ids';
 const USED_REVERSE_MEDIUM_PUZZLES_KEY = 'wordshift_played_reverse_medium_puzzle_ids';
+const USED_STD_MP_PUZZLES_KEY = 'wordshift_played_std_mp_puzzle_ids';
+const USED_STD_MEDIUM_PUZZLES_KEY = 'wordshift_played_std_medium_puzzle_ids';
+const USED_STD_EASY_PUZZLES_KEY = 'wordshift_played_std_easy_puzzle_ids';
 const MAX_USED_TRACKED = 500;
 
 // Bank word novelty scoring thresholds (in bank-puzzle-selections ago)
@@ -33,6 +39,9 @@ let usedReversePuzzleIds: string[] | null = null;
 let usedReverseMPPuzzleIds: string[] | null = null;
 let usedReverseEasyPuzzleIds: string[] | null = null;
 let usedReverseMediumPuzzleIds: string[] | null = null;
+let usedStdMPPuzzleIds: string[] | null = null;
+let usedStdMediumPuzzleIds: string[] | null = null;
+let usedStdEasyPuzzleIds: string[] | null = null;
 
 // Lazy-initialized ID→allWords lookup maps (built once from static bank data)
 let standardIdToWords: Map<string, string[]> | null = null;
@@ -40,6 +49,9 @@ let reverseIdToWords: Map<string, string[]> | null = null;
 let reverseMPIdToWords: Map<string, string[]> | null = null;
 let reverseEasyIdToWords: Map<string, string[]> | null = null;
 let reverseMediumIdToWords: Map<string, string[]> | null = null;
+let stdMPIdToWords: Map<string, string[]> | null = null;
+let stdMediumIdToWords: Map<string, string[]> | null = null;
+let stdEasyIdToWords: Map<string, string[]> | null = null;
 
 /**
  * Derive a "bank key" from difficulty + variant to route to the correct
@@ -58,6 +70,10 @@ function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
   if (variant === 'reverse' || variant === 'reverse_blind') {
     return 'reverse';
   }
+  // Standard variant — route by difficulty
+  if (difficulty === 'EASY') return 'std_easy';
+  if (difficulty === 'MEDIUM') return 'std_medium';
+  if (difficulty === 'MEDIUM_PLUS') return 'std_mp';
   return 'standard';
 }
 
@@ -95,6 +111,27 @@ function getStorageConfig(bankKey: string): {
       key: USED_REVERSE_PUZZLES_KEY,
       getCache: () => usedReversePuzzleIds,
       setCache: (val) => { usedReversePuzzleIds = val; },
+    };
+  }
+  if (bankKey === 'std_mp') {
+    return {
+      key: USED_STD_MP_PUZZLES_KEY,
+      getCache: () => usedStdMPPuzzleIds,
+      setCache: (val) => { usedStdMPPuzzleIds = val; },
+    };
+  }
+  if (bankKey === 'std_medium') {
+    return {
+      key: USED_STD_MEDIUM_PUZZLES_KEY,
+      getCache: () => usedStdMediumPuzzleIds,
+      setCache: (val) => { usedStdMediumPuzzleIds = val; },
+    };
+  }
+  if (bankKey === 'std_easy') {
+    return {
+      key: USED_STD_EASY_PUZZLES_KEY,
+      getCache: () => usedStdEasyPuzzleIds,
+      setCache: (val) => { usedStdEasyPuzzleIds = val; },
     };
   }
   return {
@@ -144,6 +181,33 @@ function getIdToWordsMap(bankKey: string): Map<string, string[]> {
       }
     }
     return reverseIdToWords;
+  }
+  if (bankKey === 'std_mp') {
+    if (!stdMPIdToWords) {
+      stdMPIdToWords = new Map();
+      for (const p of PUZZLE_BANK_MEDIUM_PLUS) {
+        stdMPIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return stdMPIdToWords;
+  }
+  if (bankKey === 'std_medium') {
+    if (!stdMediumIdToWords) {
+      stdMediumIdToWords = new Map();
+      for (const p of PUZZLE_BANK_MEDIUM) {
+        stdMediumIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return stdMediumIdToWords;
+  }
+  if (bankKey === 'std_easy') {
+    if (!stdEasyIdToWords) {
+      stdEasyIdToWords = new Map();
+      for (const p of PUZZLE_BANK_EASY) {
+        stdEasyIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return stdEasyIdToWords;
   }
   if (!standardIdToWords) {
     standardIdToWords = new Map();
@@ -245,18 +309,27 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
     }
   }
   if (difficulty === 'MEDIUM_PLUS') {
+    if (variant === 'standard') {
+      return PUZZLE_BANK_MEDIUM_PLUS.length > 0 ? PUZZLE_BANK_MEDIUM_PLUS : null;
+    }
     if (variant === 'reverse' || variant === 'reverse_blind') {
       return PUZZLE_BANK_REVERSE_MEDIUM_PLUS.length > 0 ? PUZZLE_BANK_REVERSE_MEDIUM_PLUS : null;
     }
   }
-  if (difficulty === 'EASY') {
-    if (variant === 'reverse' || variant === 'reverse_blind') {
-      return PUZZLE_BANK_REVERSE_EASY.length > 0 ? PUZZLE_BANK_REVERSE_EASY : null;
-    }
-  }
   if (difficulty === 'MEDIUM') {
+    if (variant === 'standard') {
+      return PUZZLE_BANK_MEDIUM.length > 0 ? PUZZLE_BANK_MEDIUM : null;
+    }
     if (variant === 'reverse' || variant === 'reverse_blind') {
       return PUZZLE_BANK_REVERSE_MEDIUM.length > 0 ? PUZZLE_BANK_REVERSE_MEDIUM : null;
+    }
+  }
+  if (difficulty === 'EASY') {
+    if (variant === 'standard') {
+      return PUZZLE_BANK_EASY.length > 0 ? PUZZLE_BANK_EASY : null;
+    }
+    if (variant === 'reverse' || variant === 'reverse_blind') {
+      return PUZZLE_BANK_REVERSE_EASY.length > 0 ? PUZZLE_BANK_REVERSE_EASY : null;
     }
   }
   return null;
@@ -438,12 +511,18 @@ export async function clearPlayedPuzzles(): Promise<void> {
   usedReverseMPPuzzleIds = [];
   usedReverseEasyPuzzleIds = [];
   usedReverseMediumPuzzleIds = [];
+  usedStdMPPuzzleIds = [];
+  usedStdMediumPuzzleIds = [];
+  usedStdEasyPuzzleIds = [];
   try {
     await AsyncStorage.removeItem(USED_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_MP_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_EASY_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_MEDIUM_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_STD_MP_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_STD_MEDIUM_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_STD_EASY_PUZZLES_KEY);
   } catch {
     // Non-critical
   }
