@@ -354,8 +354,10 @@ const DREAD_WORDS_PHASE_3 = new Set([
   // Darkness & Cold
   'DARK', 'DARKLY', 'COLD', 'CHILL', 'FROST', 'ICE', 'FREEZE', 'FRIGID', 'COOL',
   'BLACK', 'NIGHT', 'SHADE', 'SHADOW', 'SHROUD', 'GLOOM', 'MURKY', 'DIM', 'FAINT',
+  'DIRE', 'SOOT', 'DAMP', 'BLOT',
   // Bodily horror
   'BLOOD', 'FLESH', 'SKIN', 'CLAW', 'FANG', 'BLEED', 'SWEAT', 'SHIVER',
+  'VEIN', 'LIMB', 'GUTS',
   // Predation
   'PREY', 'CRAWL', 'CREEP', 'LURK', 'STALK',
   // Stillness & Silence
@@ -365,16 +367,17 @@ const DREAD_WORDS_PHASE_3 = new Set([
   'END', 'FINAL', 'LAST', 'CEASE', 'DONE', 'OVER', 'FINISH', 'CLOSE',
   'EXPIRE', 'LAPSE', 'ELAPSE',
   // Death imagery
-  'DEATH', 'DYING', 'SLAIN', 'SLAY', 'DROWN', 'CHOKE',
+  'DEAD', 'KILL', 'DEATH', 'DYING', 'SLAIN', 'SLAY', 'DROWN', 'CHOKE',
   'DUST', 'ASH', 'GHOST', 'HAUNT', 'SPIRIT', 'SOUL', 'WRAITH',
   'GRAVE', 'TOMB', 'CRYPT', 'BURIAL', 'MOURN', 'GRIEVE', 'WEEP', 'SOB',
   'BONE', 'SKULL', 'CORPSE', 'RELIC', 'FOSSIL', 'MARK', 'COFFIN',
   // Restraint & entrapment
   'GRIP', 'SEIZE', 'CHAIN', 'SNARE', 'TRAP', 'CAGE',
+  'KNOT', 'CORD', 'LOCK', 'HELD',
   // Sounds of dread
-  'GLARE', 'SNEER', 'GROWL', 'HISS', 'TOLL', 'BELL',
+  'WAIL', 'HOWL', 'MOAN', 'GLARE', 'SNEER', 'GROWL', 'HISS', 'TOLL', 'BELL',
   // Violence
-  'QUAKE', 'POUND',
+  'QUAKE', 'POUND', 'SLIT', 'GASH', 'GORE', 'STAB', 'TORN', 'HACK', 'CHOP',
   // Suffering
   'AGONY', 'GRIEF', 'WOE', 'SORROW', 'BITTER', 'BURDEN',
   // Places of dread
@@ -401,6 +404,7 @@ const DREAD_WORDS_PHASE_4 = new Set([
   // Ritual & sacred
   'ALTAR', 'IDOL', 'CULT', 'RITE', 'OATH', 'PACT', 'SPELL', 'CHANT',
   'SACRED', 'RITUAL', 'OCCULT', 'ARCANE', 'SUMMON', 'INVOKE', 'BECKON',
+  'PRAY', 'TOME', 'ROBE', 'SEAL', 'ARCH',
   // Submission
   'BIND', 'CLAIM', 'OFFER', 'SERVE', 'KNEEL', 'BOW', 'OBEY', 'HEED',
   'SWEAR', 'SWORN', 'ACCEPT', 'SUBMIT', 'YIELD', 'RELEASE', 'LET', 'ALLOW',
@@ -417,6 +421,7 @@ const DREAD_WORDS_PHASE_4 = new Set([
   // Entities & powers
   'DEMON', 'FIEND', 'BEAST', 'WITCH', 'TITAN', 'GIANT',
   'CHAOS', 'POWER', 'FORCE', 'SURGE', 'FLOOD', 'STORM',
+  'FURY', 'RAGE', 'WELD', 'FUSE',
   // Cosmic/Existential
   'COSMOS', 'SPACE', 'STAR', 'MOON', 'SUN', 'PLANET', 'ORBIT', 'SPHERE',
   'REALM', 'PLANE', 'WORLD',
@@ -430,6 +435,8 @@ const DREAD_WORDS_PHASE_4 = new Set([
   // Transformation
   'BECOME', 'CONVERT', 'EVOLVE',
   'MELT', 'VANISH',
+  // Endings & fate
+  'FATE', 'FELL',
   // Final words
   'GOODBYE', 'ADIEU', 'PARTING', 'LEAVE', 'DEPART',
   'SLUMBER', 'REPOSE',
