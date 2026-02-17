@@ -989,6 +989,8 @@ async function generateReverseChain(
           targetWord: t.baseWord,
           letterToMove: char,
           explanation: '',
+          insertionPosition: t.position,
+          removalPosition: charIndex,
         });
 
         chain.push({
@@ -1102,11 +1104,15 @@ export const generateLocalPuzzle = async (
         sourceWord: sourceState,
         targetWord: path[s + 1].word,
         letterToMove: path[s].letterToGive!,
-        explanation: `Move '${path[s].letterToGive}' from ${sourceState} to form ${targetResult}.`
+        explanation: `Move '${path[s].letterToGive}' from ${sourceState} to form ${targetResult}.`,
+        insertionPosition: path[s].moveToIndex,
+        removalPosition: path[s].moveFromIndex,
       });
     }
 
-    // Solve the reverse path to capture reverse solution steps for hints
+    // Solve the reverse path to capture reverse solution steps for hints.
+    // This also updates the forward solution's insertionPositions to match
+    // the specific forward placement that makes the reverse path work.
     const reverseSolution = solveReverse(words, solution);
 
     return {
@@ -1200,7 +1206,9 @@ export const generateLocalPuzzle = async (
       sourceWord: sourceState,
       targetWord: targetNode.word,
       letterToMove: sourceNode.letterToGive!,
-      explanation: `Move '${sourceNode.letterToGive}' from ${sourceState} to form ${targetResult}.`
+      explanation: `Move '${sourceNode.letterToGive}' from ${sourceState} to form ${targetResult}.`,
+      insertionPosition: sourceNode.moveToIndex,
+      removalPosition: sourceNode.moveFromIndex,
     });
   }
 
@@ -1258,45 +1266,59 @@ export function isReverseSolvable(
 
     const step = solution[stepIdx];
     const srcRow = rowLetters[step.stepIndex];
-
-    // Find the letter in the source row
-    const letterIdx = srcRow.indexOf(step.letterToMove);
-    if (letterIdx === -1) return false;
-
-    // Shift locked positions in source after removal
     const srcLocked = lockedSets[step.stepIndex];
-    const shiftedSrcLocked = new Set<number>();
-    for (const pos of srcLocked) {
-      if (pos < letterIdx) shiftedSrcLocked.add(pos);
-      else if (pos > letterIdx) shiftedSrcLocked.add(pos - 1);
+
+    // Find ALL unlocked positions where the letter to move exists.
+    const unlockedPositions: number[] = [];
+    for (let i = 0; i < srcRow.length; i++) {
+      if (srcRow[i] === step.letterToMove && !srcLocked.has(i)) {
+        unlockedPositions.push(i);
+      }
     }
+    if (unlockedPositions.length === 0) return false;
 
-    // Build source row after removal
-    const newSrcRow = [...srcRow];
-    newSrcRow.splice(letterIdx, 1);
+    // Only validate remainder when there are duplicate occurrences (disambiguation needed).
+    // When unique, just use that position directly.
+    const validRemovePositions = unlockedPositions.length === 1
+      ? unlockedPositions
+      : unlockedPositions.filter(i => {
+          const remainder = srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('');
+          return baseDict.has(remainder);
+        });
+    if (validRemovePositions.length === 0) return false;
 
-    // Try each valid insertion position in the target row
+    // Try each valid removal position × each valid insertion position
     const tgtRow = rowLetters[step.stepIndex + 1];
     const tgtStr = tgtRow.join('');
 
-    for (let k = 0; k <= tgtRow.length; k++) {
-      const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
-      if (!maxDict.has(combined)) continue;
+    for (const letterIdx of validRemovePositions) {
+      const shiftedSrcLocked = new Set<number>();
+      for (const pos of srcLocked) {
+        if (pos < letterIdx) shiftedSrcLocked.add(pos);
+        else if (pos > letterIdx) shiftedSrcLocked.add(pos - 1);
+      }
 
-      // Build new state with this insertion position
-      const newRowLetters = rowLetters.map(r => [...r]);
-      newRowLetters[step.stepIndex] = newSrcRow;
-      const newTgtRow = [...tgtRow];
-      newTgtRow.splice(k, 0, step.letterToMove);
-      newRowLetters[step.stepIndex + 1] = newTgtRow;
+      const newSrcRow = [...srcRow];
+      newSrcRow.splice(letterIdx, 1);
 
-      const newLockedSets = lockedSets.map(s => new Set(s));
-      newLockedSets[step.stepIndex] = shiftedSrcLocked;
-      newLockedSets[step.stepIndex + 1] = new Set(lockedSets[step.stepIndex + 1]);
-      newLockedSets[step.stepIndex + 1].add(k);
+      for (let k = 0; k <= tgtRow.length; k++) {
+        const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
+        if (!maxDict.has(combined)) continue;
 
-      if (tryForwardStep(stepIdx + 1, newRowLetters, newLockedSets)) {
-        return true; // Found at least one valid combination
+        const newRowLetters = rowLetters.map(r => [...r]);
+        newRowLetters[step.stepIndex] = newSrcRow;
+        const newTgtRow = [...tgtRow];
+        newTgtRow.splice(k, 0, step.letterToMove);
+        newRowLetters[step.stepIndex + 1] = newTgtRow;
+
+        const newLockedSets = lockedSets.map(s => new Set(s));
+        newLockedSets[step.stepIndex] = shiftedSrcLocked;
+        newLockedSets[step.stepIndex + 1] = new Set(lockedSets[step.stepIndex + 1]);
+        newLockedSets[step.stepIndex + 1].add(k);
+
+        if (tryForwardStep(stepIdx + 1, newRowLetters, newLockedSets)) {
+          return true;
+        }
       }
     }
 
@@ -1352,53 +1374,72 @@ function isReverseSolvableFast(
 
     const step = solution[stepIdx];
     const srcRow = rowLetters[step.stepIndex];
-    const letterIdx = srcRow.indexOf(step.letterToMove);
-    if (letterIdx === -1) return [];
+    const srcLocked = lockedSets[step.stepIndex];
 
-    const shiftedSrcLocked = new Set<number>();
-    for (const pos of lockedSets[step.stepIndex]) {
-      if (pos < letterIdx) shiftedSrcLocked.add(pos);
-      else if (pos > letterIdx) shiftedSrcLocked.add(pos - 1);
+    // Find ALL unlocked positions where the letter to move exists.
+    const unlockedPositions: number[] = [];
+    for (let i = 0; i < srcRow.length; i++) {
+      if (srcRow[i] === step.letterToMove && !srcLocked.has(i)) {
+        unlockedPositions.push(i);
+      }
     }
+    if (unlockedPositions.length === 0) return [];
 
-    const newSrcRow = [...srcRow];
-    newSrcRow.splice(letterIdx, 1);
+    // Only validate remainder when there are duplicate occurrences (disambiguation needed).
+    const validRemovePositions = unlockedPositions.length === 1
+      ? unlockedPositions
+      : unlockedPositions.filter(i => {
+          const remainder = srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('');
+          return baseDict.has(remainder);
+        });
+    if (validRemovePositions.length === 0) return [];
 
     const tgtRow = rowLetters[step.stepIndex + 1];
     const tgtStr = tgtRow.join('');
 
-    // Find all valid insertion positions
-    const validPositions: number[] = [];
-    for (let k = 0; k <= tgtRow.length; k++) {
-      const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
-      if (maxDict.has(combined)) validPositions.push(k);
-    }
-
-    if (validPositions.length === 0) return [];
-
-    // Sample: shuffle and take up to maxPerStep
-    const sampled = shuffle(validPositions).slice(0, maxPerStep);
-
     const results: Array<{ rows: string[]; lockedSets: Set<number>[] }> = [];
-    for (const k of sampled) {
-      const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
-      const newRowLetters = rowLetters.map(r => [...r]);
-      newRowLetters[step.stepIndex] = newSrcRow;
-      const newTgtRow = [...tgtRow];
-      newTgtRow.splice(k, 0, step.letterToMove);
-      newRowLetters[step.stepIndex + 1] = newTgtRow;
 
-      const newLockedSets = lockedSets.map(s => new Set(s));
-      newLockedSets[step.stepIndex] = shiftedSrcLocked;
-      const shiftedTgtLocked = new Set<number>();
-      for (const pos of lockedSets[step.stepIndex + 1]) {
-        if (pos < k) shiftedTgtLocked.add(pos);
-        else shiftedTgtLocked.add(pos + 1);
+    for (const letterIdx of validRemovePositions) {
+      const shiftedSrcLocked = new Set<number>();
+      for (const pos of srcLocked) {
+        if (pos < letterIdx) shiftedSrcLocked.add(pos);
+        else if (pos > letterIdx) shiftedSrcLocked.add(pos - 1);
       }
-      shiftedTgtLocked.add(k);
-      newLockedSets[step.stepIndex + 1] = shiftedTgtLocked;
 
-      results.push(...buildForwardStates(stepIdx + 1, newRowLetters, newLockedSets, maxPerStep));
+      const newSrcRow = [...srcRow];
+      newSrcRow.splice(letterIdx, 1);
+
+      // Find all valid insertion positions
+      const validPositions: number[] = [];
+      for (let k = 0; k <= tgtRow.length; k++) {
+        const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
+        if (maxDict.has(combined)) validPositions.push(k);
+      }
+
+      if (validPositions.length === 0) continue;
+
+      // Sample: shuffle and take up to maxPerStep
+      const sampled = shuffle(validPositions).slice(0, maxPerStep);
+
+      for (const k of sampled) {
+        const newRowLetters = rowLetters.map(r => [...r]);
+        newRowLetters[step.stepIndex] = newSrcRow;
+        const newTgtRow = [...tgtRow];
+        newTgtRow.splice(k, 0, step.letterToMove);
+        newRowLetters[step.stepIndex + 1] = newTgtRow;
+
+        const newLockedSets = lockedSets.map(s => new Set(s));
+        newLockedSets[step.stepIndex] = shiftedSrcLocked;
+        const shiftedTgtLocked = new Set<number>();
+        for (const pos of lockedSets[step.stepIndex + 1]) {
+          if (pos < k) shiftedTgtLocked.add(pos);
+          else shiftedTgtLocked.add(pos + 1);
+        }
+        shiftedTgtLocked.add(k);
+        newLockedSets[step.stepIndex + 1] = shiftedTgtLocked;
+
+        results.push(...buildForwardStates(stepIdx + 1, newRowLetters, newLockedSets, maxPerStep));
+      }
     }
 
     return results;
@@ -1580,61 +1621,94 @@ export function solveReverse(
 
   if (!minDict || !baseDict || !maxDict) return null;
 
-  // Recursively try all valid insertion positions for each forward step.
-  // When a reverse-solvable combination is found, capture and return the reverse steps.
+  // Recursively try all valid removal + insertion position combinations for each
+  // forward step. When a reverse-solvable combination is found, capture and return
+  // the reverse steps. Also tracks which positions were chosen so we can update the
+  // forward solution steps — this ensures hints guide the player to the exact moves
+  // that make the reverse path work.
   function tryForwardStepWithSolution(
     stepIdx: number,
     rowLetters: string[][],
-    lockedSets: Set<number>[]
+    lockedSets: Set<number>[],
+    forwardPositions: Array<{ removePos: number; insertPos: number }>
   ): PuzzleSolutionStep[] | null {
     if (stepIdx >= solution.length) {
       // All forward steps done — solve reverse and capture steps
       const postForwardRows = rowLetters.map(r => r.join(''));
-      return solveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength, lockedSets);
+      const reverseResult = solveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength, lockedSets);
+      if (reverseResult !== null) {
+        // Update the forward solution's positions to match the exact
+        // removal + insertion that makes the reverse path work
+        for (let i = 0; i < forwardPositions.length; i++) {
+          solution[i].insertionPosition = forwardPositions[i].insertPos;
+          solution[i].removalPosition = forwardPositions[i].removePos;
+        }
+      }
+      return reverseResult;
     }
 
     const step = solution[stepIdx];
     const srcRow = rowLetters[step.stepIndex];
-
-    // Find the letter in the source row
-    const letterIdx = srcRow.indexOf(step.letterToMove);
-    if (letterIdx === -1) return null;
-
-    // Shift locked positions in source after removal
     const srcLocked = lockedSets[step.stepIndex];
-    const shiftedSrcLocked = new Set<number>();
-    for (const pos of srcLocked) {
-      if (pos < letterIdx) shiftedSrcLocked.add(pos);
-      else if (pos > letterIdx) shiftedSrcLocked.add(pos - 1);
+
+    // Find ALL unlocked positions where the letter to move exists.
+    const unlockedPositions: number[] = [];
+    for (let i = 0; i < srcRow.length; i++) {
+      if (srcRow[i] === step.letterToMove && !srcLocked.has(i)) {
+        unlockedPositions.push(i);
+      }
     }
+    if (unlockedPositions.length === 0) return null;
 
-    // Build source row after removal
-    const newSrcRow = [...srcRow];
-    newSrcRow.splice(letterIdx, 1);
+    // Only validate remainder when there are duplicate occurrences (disambiguation needed).
+    // For words like CHASES with two S's, removing position 3 vs 5 yields different
+    // remaining words (CHAES vs CHASE). We must try all to find the right one.
+    const validRemovePositions = unlockedPositions.length === 1
+      ? unlockedPositions
+      : unlockedPositions.filter(i => {
+          const remainder = srcRow.slice(0, i).join('') + srcRow.slice(i + 1).join('');
+          const removalDict = srcRow.length > wordLength ? baseDict : minDict;
+          return removalDict.has(remainder);
+        });
+    if (validRemovePositions.length === 0) return null;
 
-    // Try each valid insertion position in the target row
+    // Try each valid removal position × each valid insertion position
     const tgtRow = rowLetters[step.stepIndex + 1];
     const tgtStr = tgtRow.join('');
 
-    for (let k = 0; k <= tgtRow.length; k++) {
-      const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
-      if (!maxDict.has(combined)) continue;
+    for (const letterIdx of validRemovePositions) {
+      const shiftedSrcLocked = new Set<number>();
+      for (const pos of srcLocked) {
+        if (pos < letterIdx) shiftedSrcLocked.add(pos);
+        else if (pos > letterIdx) shiftedSrcLocked.add(pos - 1);
+      }
 
-      // Build new state with this insertion position
-      const newRowLetters = rowLetters.map(r => [...r]);
-      newRowLetters[step.stepIndex] = newSrcRow;
-      const newTgtRow = [...tgtRow];
-      newTgtRow.splice(k, 0, step.letterToMove);
-      newRowLetters[step.stepIndex + 1] = newTgtRow;
+      const newSrcRow = [...srcRow];
+      newSrcRow.splice(letterIdx, 1);
 
-      const newLockedSets = lockedSets.map(s => new Set(s));
-      newLockedSets[step.stepIndex] = shiftedSrcLocked;
-      newLockedSets[step.stepIndex + 1] = new Set(lockedSets[step.stepIndex + 1]);
-      newLockedSets[step.stepIndex + 1].add(k);
+      for (let k = 0; k <= tgtRow.length; k++) {
+        const combined = tgtStr.slice(0, k) + step.letterToMove + tgtStr.slice(k);
+        if (!maxDict.has(combined)) continue;
 
-      const result = tryForwardStepWithSolution(stepIdx + 1, newRowLetters, newLockedSets);
-      if (result !== null) {
-        return result;
+        // Build new state with this removal + insertion combination
+        const newRowLetters = rowLetters.map(r => [...r]);
+        newRowLetters[step.stepIndex] = newSrcRow;
+        const newTgtRow = [...tgtRow];
+        newTgtRow.splice(k, 0, step.letterToMove);
+        newRowLetters[step.stepIndex + 1] = newTgtRow;
+
+        const newLockedSets = lockedSets.map(s => new Set(s));
+        newLockedSets[step.stepIndex] = shiftedSrcLocked;
+        newLockedSets[step.stepIndex + 1] = new Set(lockedSets[step.stepIndex + 1]);
+        newLockedSets[step.stepIndex + 1].add(k);
+
+        const result = tryForwardStepWithSolution(
+          stepIdx + 1, newRowLetters, newLockedSets,
+          [...forwardPositions, { removePos: letterIdx, insertPos: k }]
+        );
+        if (result !== null) {
+          return result;
+        }
       }
     }
 
@@ -1644,7 +1718,7 @@ export function solveReverse(
   const initialRowLetters = words.map(w => w.split(''));
   const initialLockedSets: Set<number>[] = words.map(() => new Set<number>());
 
-  return tryForwardStepWithSolution(0, initialRowLetters, initialLockedSets);
+  return tryForwardStepWithSolution(0, initialRowLetters, initialLockedSets, []);
 }
 
 /**
@@ -1777,6 +1851,7 @@ function solveReverseIterative(
             targetWord: f.appliedMove.targetWordBefore,
             letterToMove: f.appliedMove.letter,
             explanation: `Move '${f.appliedMove.letter}' from ${f.appliedMove.sourceWordBefore} to form ${f.appliedMove.newTarget}.`,
+            insertionPosition: f.appliedMove.insertPos,
           });
         }
       }
@@ -1788,6 +1863,7 @@ function solveReverseIterative(
         targetWord: targetWord,
         letterToMove: move.letter,
         explanation: `Move '${move.letter}' from ${sourceWord} to form ${move.newTarget}.`,
+        insertionPosition: move.insertPos,
       });
 
       return reverseSteps;

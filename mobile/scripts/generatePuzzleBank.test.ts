@@ -109,9 +109,11 @@ function computeSemanticTags(words: string[]): string[] {
 }
 
 function serializePuzzle(p: PreGeneratedPuzzle): string {
-  const solutionStr = p.solution.map(s =>
-    `{stepIndex:${s.stepIndex},sourceWord:'${s.sourceWord}',targetWord:'${s.targetWord}',letterToMove:'${s.letterToMove}',explanation:\`${s.explanation}\`}`
-  ).join(',');
+  const solutionStr = p.solution.map(s => {
+    const insertPos = s.insertionPosition !== undefined ? `,insertionPosition:${s.insertionPosition}` : '';
+    const removePos = s.removalPosition !== undefined ? `,removalPosition:${s.removalPosition}` : '';
+    return `{stepIndex:${s.stepIndex},sourceWord:'${s.sourceWord}',targetWord:'${s.targetWord}',letterToMove:'${s.letterToMove}',explanation:\`${s.explanation}\`${insertPos}${removePos}}`;
+  }).join(',');
 
   return `{id:'${p.id}',words:[${p.words.map(w => `'${w}'`).join(',')}],solution:[${solutionStr}],wordLength:${p.wordLength},qualityScore:${p.qualityScore},dreadTier:${p.dreadTier},dreadWordCount:${p.dreadWordCount},allWords:[${p.allWords.map(w => `'${w}'`).join(',')}],semanticTags:[${p.semanticTags.map(t => `'${t}'`).join(',')}]}`;
 }

@@ -129,9 +129,11 @@ function computeSemanticTags(words: string[]): string[] {
 }
 
 function serializeSteps(steps: import('../src/types').PuzzleSolutionStep[]): string {
-  return steps.map(s =>
-    `{stepIndex:${s.stepIndex},sourceWord:'${s.sourceWord}',targetWord:'${s.targetWord}',letterToMove:'${s.letterToMove}',explanation:\`${s.explanation}\`}`
-  ).join(',');
+  return steps.map(s => {
+    const insertPos = s.insertionPosition !== undefined ? `,insertionPosition:${s.insertionPosition}` : '';
+    const removePos = s.removalPosition !== undefined ? `,removalPosition:${s.removalPosition}` : '';
+    return `{stepIndex:${s.stepIndex},sourceWord:'${s.sourceWord}',targetWord:'${s.targetWord}',letterToMove:'${s.letterToMove}',explanation:\`${s.explanation}\`${insertPos}${removePos}}`;
+  }).join(',');
 }
 
 function serializePuzzle(p: PreGeneratedPuzzle): string {
