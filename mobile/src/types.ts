@@ -29,12 +29,19 @@ export interface PuzzleSolutionStep {
   targetWord: string;
   letterToMove: string;
   explanation: string;
+  /** Position in the target row where the letter should be inserted (0-indexed). */
+  insertionPosition?: number;
+  /** Position in the source row from which the letter is removed (0-indexed).
+   *  Critical when the source word has duplicate letters. */
+  removalPosition?: number;
 }
 
 export interface PuzzleConfig {
   words: string[];
   hint?: string;
   solution?: PuzzleSolutionStep[];
+  /** Step-by-step reverse solution for hints during the reverse leg (reverse variants only). */
+  reverseSolution?: PuzzleSolutionStep[];
   wordLength?: number;
 }
 

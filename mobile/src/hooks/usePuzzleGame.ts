@@ -36,6 +36,7 @@ export interface PuzzleGameState {
   isProcessing: boolean;
   hint: string;
   solution: PuzzleSolutionStep[] | undefined;
+  reverseSolution: PuzzleSolutionStep[] | undefined;
   difficulty: Difficulty;
   currentWordLength: number;
   showRules: boolean;
@@ -77,7 +78,8 @@ export interface PuzzleGameActions {
     puzzleSolution?: PuzzleSolutionStep[],
     wordLength?: number,
     variant?: PuzzleVariant,
-    chainLengthOverride?: number
+    chainLengthOverride?: number,
+    puzzleReverseSolution?: PuzzleSolutionStep[]
   ) => void;
   startNewGame: (
     selectedDifficulty?: Difficulty,
@@ -123,6 +125,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [isProcessing, setIsProcessing] = useState(false);
   const [hint, setHint] = useState<string>("");
   const [solution, setSolution] = useState<PuzzleSolutionStep[] | undefined>(undefined);
+  const [reverseSolution, setReverseSolution] = useState<PuzzleSolutionStep[] | undefined>(undefined);
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
   const [currentWordLength, setCurrentWordLength] = useState(4);
   const [showRules, setShowRules] = useState(false);
@@ -211,6 +214,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       resetPerformance?: boolean;
       preserveVariant?: boolean;
       variant?: PuzzleVariant;
+      reverseSolution?: PuzzleSolutionStep[];
     }
   ) => {
     const variantToUse = options?.preserveVariant ? currentVariant : (options?.variant || 'standard');
@@ -246,6 +250,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setError(null);
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
+    setReverseSolution(options?.reverseSolution);
     setCurrentWordLength(wordLength);
     setLastFormedWord(null);
     setMoveDirection('down');
@@ -270,11 +275,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     puzzleSolution?: PuzzleSolutionStep[],
     wordLength: number = 4,
     variant: PuzzleVariant = 'standard',
-    chainLengthOverride?: number
+    chainLengthOverride?: number,
+    puzzleReverseSolution?: PuzzleSolutionStep[]
   ) => {
     applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
       resetPerformance: true,
       variant,
+      reverseSolution: puzzleReverseSolution,
     });
     const configuredChainLength = hasVariantModifier(variant, 'chain')
       ? (chainLengthOverride ?? getVariantChainLength(variant, difficulty))
@@ -289,7 +296,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variant: PuzzleVariant,
     timeoutPromise: Promise<never>,
     startWord?: string
-  ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; wordLength?: number }; activeVariant: PuzzleVariant }> => {
+  ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; reverseSolution?: PuzzleSolutionStep[]; wordLength?: number }; activeVariant: PuzzleVariant }> => {
     let activeVariant = variant;
     const isReverseVariant = hasVariantModifier(activeVariant, 'reverse');
     const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
@@ -393,7 +400,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap, variant);
           if (bankPuzzle) {
             const chainLen = getVariantChainLength(variant, selectedDifficulty);
-            initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, chainLen);
+            initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, chainLen, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
             if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
@@ -420,7 +427,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         timeoutPromise
       );
       const chainLen = getVariantChainLength(activeVariant, selectedDifficulty);
-      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, chainLen);
+      initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, chainLen, puzzle.reverseSolution);
       if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
         setMessage(getVariantInstruction(config, currentPhase));
@@ -494,11 +501,27 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const currentSourceWord = rows[activeRowIndex].words.map(l => l.char).join("");
     const currentTargetWord = rows[hintTargetRowIndex].words.map(l => l.char).join("");
 
-    const relevantStep = solution?.find(s =>
-      s.stepIndex === activeRowIndex &&
-      s.sourceWord === currentSourceWord &&
-      s.targetWord === currentTargetWord
-    );
+    // Use reverse solution for the reverse leg, forward solution otherwise
+    const isReverseLeg = moveDirection === 'up';
+    const activeSolution = isReverseLeg ? reverseSolution : solution;
+
+    let relevantStep: PuzzleSolutionStep | undefined;
+
+    if (isReverseLeg && activeSolution) {
+      // During reverse: stepIndex = how many reverse steps completed so far
+      const reverseStepIndex = (rows.length - 1) - activeRowIndex;
+      relevantStep = activeSolution.find(s =>
+        s.stepIndex === reverseStepIndex &&
+        s.sourceWord === currentSourceWord &&
+        s.targetWord === currentTargetWord
+      );
+    } else {
+      relevantStep = activeSolution?.find(s =>
+        s.stepIndex === activeRowIndex &&
+        s.sourceWord === currentSourceWord &&
+        s.targetWord === currentTargetWord
+      );
+    }
 
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
@@ -508,7 +531,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     } else {
       setMessage(getHintFallback(currentPhase));
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, currentPhase, moveDirection]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection]);
 
   const handleSlotPress = useCallback(async (targetIndex: number): Promise<{
     completed: boolean;
@@ -860,6 +883,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentWordLength(saved.currentWordLength);
     setHint(saved.hint);
     setSolution(saved.solution);
+    setReverseSolution(saved.reverseSolution);
     setGameMode(saved.gameMode);
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
@@ -889,6 +913,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     isProcessing,
     hint,
     solution,
+    reverseSolution,
     difficulty,
     currentWordLength,
     showRules,

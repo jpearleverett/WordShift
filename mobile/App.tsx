@@ -147,6 +147,7 @@ export default function App() {
           currentWordLength: puzzle.currentWordLength,
           hint: puzzle.hint,
           solution: puzzle.solution,
+          reverseSolution: puzzle.reverseSolution,
           gameMode: puzzle.gameMode,
           currentVariant: puzzle.currentVariant,
           selectedVariant: puzzle.selectedVariant,

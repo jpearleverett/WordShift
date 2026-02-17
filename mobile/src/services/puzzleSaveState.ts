@@ -27,6 +27,7 @@ export interface SavedPuzzleState {
   currentWordLength: number;
   hint: string;
   solution: PuzzleSolutionStep[] | undefined;
+  reverseSolution: PuzzleSolutionStep[] | undefined;
   gameMode: GameMode;
   currentVariant: PuzzleVariant;
   selectedVariant: PuzzleVariant;

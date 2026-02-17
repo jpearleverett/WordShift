@@ -26,6 +26,7 @@ function makeSavedState(overrides: Partial<SavedPuzzleState> = {}): SavedPuzzleS
     currentWordLength: 4,
     hint: '',
     solution: undefined,
+    reverseSolution: undefined,
     gameMode: 'standard' as any,
     currentVariant: 'standard' as any,
     selectedVariant: 'standard' as any,
