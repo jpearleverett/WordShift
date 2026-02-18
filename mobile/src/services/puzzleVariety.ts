@@ -497,9 +497,13 @@ export function getVariantOverrides(
   baseDifficulty: Difficulty
 ): { targetRows?: number; wordLength?: number } {
   if (hasVariantModifier(variant, 'double_shift')) {
-    // Double shift always uses 5-letter words (needs WORDS_3/5/7)
+    // Double shift always uses 5-letter words (needs WORDS_3/5/7).
+    // W=5 is the only viable word length: W-2=3 (intermediates) and W+2=7 (tempState)
+    // must both exist in the dictionary (which covers 3-7 letters).
+    // Difficulty is differentiated purely by row count.
     const rows = baseDifficulty === 'EASY' ? 3 :
-                 baseDifficulty === 'HARD' ? 4 : 4;
+                 baseDifficulty === 'MEDIUM' ? 4 :
+                 baseDifficulty === 'MEDIUM_PLUS' ? 5 : 6;
     return { wordLength: 5, targetRows: rows };
   }
   if (hasVariantModifier(variant, 'speed')) {
