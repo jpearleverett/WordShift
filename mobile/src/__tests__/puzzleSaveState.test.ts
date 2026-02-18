@@ -31,8 +31,6 @@ function makeSavedState(overrides: Partial<SavedPuzzleState> = {}): SavedPuzzleS
     currentVariant: 'standard' as any,
     selectedVariant: 'standard' as any,
     moveDirection: 'down',
-    currentChainLink: 0,
-    chainLength: 1,
     currentPhase: 0 as any,
     lastFormedWord: null,
     isPlayingDaily: false,
@@ -121,8 +119,6 @@ describe('puzzleSaveState', () => {
     const state = makeSavedState({
       activeRowIndex: 3,
       moveDirection: 'up',
-      currentChainLink: 2,
-      chainLength: 3,
       lastFormedWord: 'FLAME',
       currentVariant: 'reverse' as any,
       invalidAttempts: 5,
@@ -133,8 +129,6 @@ describe('puzzleSaveState', () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.activeRowIndex).toBe(3);
     expect(loaded!.moveDirection).toBe('up');
-    expect(loaded!.currentChainLink).toBe(2);
-    expect(loaded!.chainLength).toBe(3);
     expect(loaded!.lastFormedWord).toBe('FLAME');
     expect(loaded!.currentVariant).toBe('reverse');
     expect(loaded!.invalidAttempts).toBe(5);

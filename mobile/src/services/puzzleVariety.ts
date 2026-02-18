@@ -22,7 +22,6 @@ import { isReverseSolvable } from './localGenerator';
 export type VariantModifier =
   | 'reverse'
   | 'speed'
-  | 'chain'
   | 'double_shift';
 
 export type PuzzleVariant = 'standard' | VariantModifier;
@@ -42,10 +41,8 @@ export interface VariantConfig {
   amberMultiplier: number;
   /** For speed mode: time limit in seconds */
   timeLimit?: number;
-  /** For speed/chain mode: override row count */
+  /** For speed mode: override row count */
   rowOverride?: number;
-  /** For chain mode: number of linked puzzles */
-  chainLength?: number;
 }
 
 export interface VariantUnlockRequirement {
@@ -101,18 +98,6 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     timeLimit: 60,
     rowOverride: 3,
   },
-  chain: {
-    variant: 'chain',
-    title: 'Chain Shift',
-    description: 'Three linked puzzles. Each final word becomes the next starting word.',
-    darkDescription: 'An unbroken sequence where each ending must feed the next beginning.',
-    instruction: 'Complete 3 links in a row. The last word of each link starts the next one.',
-    darkInstruction: 'Do not break the chain. Each ending must become the next opening.',
-    icon: '🔗',
-    amberMultiplier: 1.58,
-    chainLength: 3,
-    rowOverride: 3,
-  },
   double_shift: {
     variant: 'double_shift',
     title: 'Double Shift',
@@ -129,14 +114,12 @@ const VARIANT_MODIFIER_MAP: Record<PuzzleVariant, VariantModifier[]> = {
   standard: [],
   reverse: ['reverse'],
   speed: ['speed'],
-  chain: ['chain'],
   double_shift: ['double_shift'],
 };
 
 const BASE_VARIANTS: VariantModifier[] = [
   'reverse',
   'speed',
-  'chain',
   'double_shift',
 ];
 
@@ -148,10 +131,9 @@ const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
 };
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
-  reverse: { puzzlesSolved: 0, minDepthPhase: 0 },
-  speed: { puzzlesSolved: 0, minDepthPhase: 0 },
-  double_shift: { puzzlesSolved: 0, minDepthPhase: 0 },
-  chain: { puzzlesSolved: 0, minDepthPhase: 0 },
+  reverse: { puzzlesSolved: 10, minDepthPhase: 0 },
+  speed: { puzzlesSolved: 52, minDepthPhase: 0 },
+  double_shift: { puzzlesSolved: 40, minDepthPhase: 0 },
 };
 
 export function isPuzzleVariant(value: string): value is PuzzleVariant {
@@ -345,23 +327,7 @@ export function getVariantOverrides(
   if (hasVariantModifier(variant, 'speed')) {
     return { targetRows: baseDifficulty === 'HARD' ? 4 : 3 };
   }
-  if (hasVariantModifier(variant, 'chain')) {
-    return { targetRows: (baseDifficulty === 'HARD' || baseDifficulty === 'MEDIUM_PLUS') ? 4 : 3 };
-  }
   return {};
-}
-
-/**
- * Chain runs can deepen on higher difficulties.
- */
-export function getVariantChainLength(
-  variant: PuzzleVariant,
-  difficulty: Difficulty
-): number {
-  if (!hasVariantModifier(variant, 'chain')) return 1;
-  const base = VARIANT_CONFIGS.chain.chainLength || 3;
-  if (difficulty === 'HARD') return base + 1;
-  return base;
 }
 
 /**

@@ -15,7 +15,6 @@ import {
   getVariantAmberMultiplier,
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
-  getVariantChainLength,
   isLetterAllowedByVariant,
   isVariantCompatibleWithSolution,
   VARIANT_CONFIGS,
@@ -29,7 +28,6 @@ describe('puzzleVariety', () => {
         'standard',
         'reverse',
         'speed',
-        'chain',
         'double_shift',
       ];
 
@@ -77,7 +75,7 @@ describe('puzzleVariety', () => {
       expect(['reverse', 'speed', 'double_shift']).toContain(shouldOfferVariant(60, 0)!.variant);
 
       Math.random = () => 0.9;
-      expect(['reverse', 'speed', 'chain', 'double_shift']).toContain(
+      expect(['reverse', 'speed', 'double_shift']).toContain(
         shouldOfferVariant(90, 0)!.variant
       );
 
@@ -108,7 +106,6 @@ describe('puzzleVariety', () => {
     it('returns overrides for speed-like variants', () => {
       expect(getVariantOverrides('standard', 'MEDIUM')).toEqual({});
       expect(getVariantOverrides('speed', 'MEDIUM')).toEqual({ targetRows: 3 });
-      expect(getVariantOverrides('chain', 'HARD')).toEqual({ targetRows: 4 });
       expect(getVariantOverrides('speed', 'HARD')).toEqual({ targetRows: 4 });
     });
 
@@ -146,19 +143,12 @@ describe('puzzleVariety', () => {
     it('returns explicit time limits for speed variants', () => {
       expect(getVariantTimeLimit('speed')).toBe(60);
       expect(getVariantTimeLimit('reverse')).toBeNull();
-      expect(getVariantTimeLimit('chain')).toBeNull();
     });
 
     it('returns difficulty-aware time limits for speed variants', () => {
       expect(getVariantTimeLimitForDifficulty('speed', 'EASY')).toBe(65);
       expect(getVariantTimeLimitForDifficulty('speed', 'MEDIUM')).toBe(60);
       expect(getVariantTimeLimitForDifficulty('reverse', 'HARD')).toBeNull();
-    });
-
-    it('scales chain length with difficulty', () => {
-      expect(getVariantChainLength('chain', 'MEDIUM')).toBe(3);
-      expect(getVariantChainLength('chain', 'HARD')).toBe(4);
-      expect(getVariantChainLength('reverse', 'HARD')).toBe(1);
     });
 
     it('exposes unlock requirements and unlocked checks', () => {
@@ -176,7 +166,6 @@ describe('puzzleVariety', () => {
       expect(mid).toContain('standard');
       expect(mid).toContain('reverse');
       expect(mid).toContain('speed');
-      expect(mid).toContain('chain');
       expect(mid).toContain('double_shift');
     });
 
@@ -195,8 +184,8 @@ describe('puzzleVariety', () => {
     });
 
     it('uses tone-aware unlock hints', () => {
-      const light = getVariantUnlockHint('chain', 50, 0, 1);
-      const dark = getVariantUnlockHint('chain', 50, 0, 4);
+      const light = getVariantUnlockHint('speed', 50, 0, 1);
+      const dark = getVariantUnlockHint('speed', 50, 0, 4);
       expect(light).toContain('Unlocks');
       expect(dark).toContain('offerings');
     });
@@ -205,7 +194,7 @@ describe('puzzleVariety', () => {
       expect(isLetterAllowedByVariant('standard', 'A')).toBe(true);
       expect(isLetterAllowedByVariant('reverse', 'B')).toBe(true);
       expect(isLetterAllowedByVariant('speed', 'E')).toBe(true);
-      expect(isLetterAllowedByVariant('chain', 'T')).toBe(true);
+      expect(isLetterAllowedByVariant('double_shift', 'T')).toBe(true);
     });
 
     it('checks generated solution compatibility', () => {
@@ -220,7 +209,6 @@ describe('puzzleVariety', () => {
       expect(getVariantAmberMultiplier('standard')).toBe(1.0);
       expect(getVariantAmberMultiplier('reverse')).toBe(1.22);
       expect(getVariantAmberMultiplier('speed')).toBe(1.34);
-      expect(getVariantAmberMultiplier('chain')).toBe(1.58);
       expect(getVariantAmberMultiplier('double_shift')).toBe(1.65);
     });
 

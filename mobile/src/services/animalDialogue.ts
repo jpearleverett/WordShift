@@ -2461,10 +2461,6 @@ const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = 
     light: 'Speed shifts are short and urgent. Fewer rows, faster choices, no overthinking.',
     dark: 'When the pattern rushes you, it is testing devotion under pressure.',
   },
-  chain: {
-    light: 'Chain shifts link three puzzles together. Your final word becomes the next starting word, so every finish matters.',
-    dark: 'A chain is an incantation without interruption: each ending must feed the next beginning.',
-  },
   double_shift: {
     light: 'Double shifts move two letters at once. Pick two from a word, place each into the next. More to juggle, more to explore.',
     dark: 'Two offerings per step. The arrangement demands a heavier hand — two letters wrenched free and placed in a single breath.',

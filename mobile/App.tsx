@@ -153,8 +153,6 @@ export default function App() {
           selectedVariant: puzzle.selectedVariant,
           moveDirection: puzzle.moveDirection,
           blindRevealedRows: [],
-          currentChainLink: puzzle.currentChainLink,
-          chainLength: puzzle.chainLength,
           currentPhase: puzzle.currentPhase,
           lastFormedWord: puzzle.lastFormedWord,
           isPlayingDaily,
@@ -190,8 +188,6 @@ export default function App() {
     puzzle.currentVariant,
     puzzle.selectedVariant,
     puzzle.moveDirection,
-    puzzle.currentChainLink,
-    puzzle.chainLength,
     puzzle.currentPhase,
     puzzle.lastFormedWord,
   ]);
@@ -276,7 +272,6 @@ export default function App() {
     puzzle.currentVariant,
     puzzle.gameState,
     puzzle.level,
-    puzzle.currentChainLink,
     persistence.currentPhase,
     setPuzzleGameState,
     setPuzzleMessage,
@@ -527,14 +522,6 @@ export default function App() {
     }
 
     const result = await puzzleActions.handleSlotPress(targetIndex);
-
-    if (result?.chainAdvanced) {
-      // Chain mode advanced to the next link (not a final victory yet).
-      hapticMedium();
-      soundValidMove();
-      setRitualEchoWords([]);
-      return;
-    }
 
     if (result?.completed) {
       // Clear mid-puzzle save on completion
@@ -1342,13 +1329,6 @@ export default function App() {
                 <Text style={styles.speedBadgeText}>⏱ {speedTimeRemaining}s</Text>
               </View>
             )}
-            {hasVariantModifier(puzzle.currentVariant, 'chain') && puzzle.chainLength > 1 && (
-              <View style={styles.chainBadge}>
-                <Text style={styles.chainBadgeText}>
-                  LINK {puzzle.currentChainLink}/{puzzle.chainLength}
-                </Text>
-              </View>
-            )}
             {puzzle.currentVariant !== 'standard' && (
               <View style={[
                 styles.variantBadge,
@@ -1940,18 +1920,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '900',
     color: CandyColors.white,
-    letterSpacing: 0.3,
-  },
-  chainBadge: {
-    backgroundColor: 'rgba(95, 180, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  chainBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: 'rgba(220, 240, 255, 0.95)',
     letterSpacing: 0.3,
   },
   variantBadge: {

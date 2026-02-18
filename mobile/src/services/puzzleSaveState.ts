@@ -34,8 +34,6 @@ export interface SavedPuzzleState {
   moveDirection: 'down' | 'up';
   /** @deprecated blind mode removed — kept for backwards compatibility with existing saves */
   blindRevealedRows?: number[];
-  currentChainLink: number;
-  chainLength: number;
   currentPhase: DialoguePhase;
   lastFormedWord: string | null;
   isPlayingDaily: boolean;

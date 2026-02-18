@@ -348,29 +348,6 @@ describe('usePuzzleGame', () => {
       expect(second?.variant).toBe('reverse');
     });
 
-    test('advances chain links before final completion', async () => {
-      resetHookState();
-      let [, actions] = callHook();
-      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'chain');
-
-      // Complete first link quickly (same valid move as above)
-      let [state] = callHook();
-      const m = state.rows[0].words.find(l => l.char === 'M')!;
-      [, actions] = callHook();
-      actions.handleLetterPress(m, 0);
-      [, actions] = callHook();
-      const result = await actions.handleSlotPress(2);
-
-      expect(result?.completed).toBe(false);
-      expect(result?.chainAdvanced).toBe(true);
-      expect(result?.chainLink).toBe(2);
-      expect(result?.chainLength).toBe(3);
-
-      [state] = callHook();
-      expect(state.currentChainLink).toBe(2);
-      expect(state.gameState).toBe(GameState.PLAYING);
-      expect(state.rows.length).toBeGreaterThan(0);
-    });
   });
 
   describe('handleHint', () => {
