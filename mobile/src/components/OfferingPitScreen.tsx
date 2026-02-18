@@ -8,6 +8,8 @@ import {
   Animated,
   Platform,
   StatusBar,
+  Image,
+  Dimensions,
 } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
@@ -32,6 +34,28 @@ import {
 import { awardBonusAmber } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium } from '../services/haptics';
+
+// Pit background assets (phase-aware)
+const PIT_DAY = require('../../assets/environment/pitt_day.png');
+const PIT_DUSK = require('../../assets/environment/pitt_dusk.png');
+const PIT_NIGHT = require('../../assets/environment/pitt_night.png');
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Background colors that blend with each pit image's edges
+const PIT_BG_COLORS: Record<number, string> = {
+  0: '#6fb7df',
+  1: '#6fb7df',
+  2: '#514378',
+  3: '#060612',
+  4: '#1a122a',
+};
+
+function getPitBackground(phase: number) {
+  if (phase >= 3) return PIT_NIGHT;
+  if (phase >= 2) return PIT_DUSK;
+  return PIT_DAY;
+}
 
 interface OfferingPitScreenProps {
   phase: DialoguePhase;
@@ -134,7 +158,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50;
 
   return (
-    <View style={[styles.container, { backgroundColor: phaseTheme.bgPrimary }]}>
+    <View style={[styles.container, { backgroundColor: PIT_BG_COLORS[phase] ?? PIT_BG_COLORS[0] }]}>
+      <Image
+        source={getPitBackground(phase)}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
@@ -316,6 +345,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    zIndex: -1,
   },
   header: {
     flexDirection: 'row',
