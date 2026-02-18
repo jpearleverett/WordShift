@@ -52,6 +52,14 @@ npx jest --no-coverage   # Run all tests (840+ tests, 28 suites)
 
 ## Recent Implementation Notes (2026-02)
 
+- **Offering Pit economy (deferred amber crediting)**:
+  - Puzzle completion no longer credits amber directly — amber is queued in harvest batches via `wordHarvest.ts`.
+  - New `OfferingPitScreen.tsx` screen (navigated as `currentScreen: 'pit'`) where players offer batches to convert queued amber into spendable amber.
+  - `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred).
+  - `useGamePersistence.ts` `recordVictory()` enqueues harvest batches, returns `harvestedWords` and `pendingHarvest` in VictoryData.
+  - VictoryModal shows queued amber with phase-aware "harvest" label. Home screen action row has pit button with pending word count badge.
+  - Phase-aware narrative text for pit UI in `phaseNarrative.ts` (9 new functions).
+  - Cloud save, Reset All Data, and 19+ new tests cover the full harvest lifecycle.
 - **Phase secrecy reinforcement**: The puzzle header now uses an icon-only atmosphere badge (no textual phase labels) to keep progression implicit.
 - **Mid-session restore fidelity upgraded**:
   - Autosave now persists the full active puzzle snapshot while playing (not just move-count checkpoints).
@@ -120,7 +128,7 @@ npx jest --no-coverage   # Run all tests (840+ tests, 28 suites)
 
 - **Framework**: React Native with Expo SDK 54
 - **Language**: TypeScript (strict)
-- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'`)
+- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`)
 - **State**: React useState/useEffect (no external state library)
 - **Persistence**: AsyncStorage with in-memory cache pattern
 - **Haptics**: expo-haptics (settings-gated)
@@ -189,6 +197,7 @@ mobile/
 │   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper from animals (fade in/out)
 │   │   │   ├── RitualEchoChain.tsx # In-puzzle real-time word chain display (phase-aware styling)
 │   │   │   └── index.ts         # Puzzle component exports
+│   │   ├── OfferingPitScreen.tsx # Offering Pit screen: offer harvested words to convert queued amber
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive screen (phase-aware)
 │   │   ├── WordLedger.tsx       # Scrollable ritual word history screen (phase-aware styling)
 │   │   └── home/
@@ -231,6 +240,7 @@ mobile/
 │       ├── performanceMonitor.ts # Frame rate, render timing, puzzle gen metrics
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
+│       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
 ├── src/__tests__/               # Test suites (840+ tests, 28 suites)
 │   ├── helpers/
@@ -260,6 +270,7 @@ mobile/
 │   ├── usePuzzleGame.test.ts
 │   ├── weeklyQuests.test.ts     # Weekly quest generation, progress, rewards
 │   ├── whisperGallery.test.ts   # Whisper recording, dedup, gallery stats
+│   ├── wordHarvest.test.ts       # Offering Pit: enqueue, offer, summary, economy parity
 │   └── wordHistory.test.ts
 ├── scripts/
 │   ├── generatePuzzleBankEasy.test.ts  # Generator script for standard EASY puzzle bank (500 puzzles)
@@ -326,6 +337,9 @@ mobile/assets/
     ├── sky_dusk.png            # ✓ Muted dusk sky (Phase 2)
     ├── sky_storm.png           # ✓ Dark, ominous sky (Phase 3)
     ├── sky_shadow.png          # ✓ Near-black with entity silhouette (Phase 4)
+    ├── pitt_day.png            # ✓ Offering Pit background (Phase 0-1)
+    ├── pitt_dusk.png           # ✓ Offering Pit background (Phase 2)
+    ├── pitt_night.png          # ✓ Offering Pit background (Phase 3-4)
     ├── tree_left.png           # Planned: tree on left side of house
     ├── tree_right.png          # Planned: tree on right side of house
     ├── ground.png              # Planned: grass, path, flowers at bottom
@@ -370,6 +384,8 @@ The home screen now uses image assets for:
 - **All 10 room backgrounds** in `RoomView.tsx` - fully wired up
 - **Environment images** in `HouseWorld.tsx`:
   - `sky_day.png` / `sky_dusk.png` / `sky_storm.png` / `sky_shadow.png` - phase-aware sky background (day → dusk → storm → shadow)
+- **Pit background images** in `OfferingPitScreen.tsx`:
+  - `pitt_day.png` / `pitt_dusk.png` / `pitt_night.png` - phase-aware pit backgrounds (day → dusk → night)
 - **Animated emoji sky elements** (clouds, sun/moon, birds, shooting stars, night stars) rendered inside the transform container so they zoom/pan with the scene
 - Trees, fence, and ground emoji have been removed for a cleaner look
 - **Not yet created**: `shadow_figure.png`, `ground.png`, all house structure elements (`house/` folder empty), tree/cloud/bird sprites
@@ -488,7 +504,7 @@ Game logic is extracted into six custom hooks:
 ### Screen Navigation
 
 State-based routing in `App.tsx`:
-- `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'`
+- `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`
 - Screen transitions use `Animated.timing` fade (150ms out, 200ms in)
 - Transitions instant when `reducedMotion` setting is enabled
 - `transitionTo(screen, callback?)` handles all navigation
@@ -575,6 +591,69 @@ The home screen features a multi-story house with unlockable rooms and animal ch
 - **Streak freeze**: Purchasable for 50 amber (or free once every 14 days). Consumed automatically to prevent streak reset on a missed day. Functions: `purchaseStreakFreeze()`, `getStreakFreezeCount()`, `checkFreeStreakFreeze()` in `amberCurrency.ts`
 - **Streak milestone rewards**: Tangible amber bonuses at streak milestones — 3 days (15 amber), 7 days (30), 14 days (50), 21 days (65), 30 days (100). Phase 2+ uses dark messages (e.g., "Thirty days. The arrangement is grateful."). `checkStreakMilestone(currentStreak, previousStreak, phase)` in `amberCurrency.ts`. Toast displayed in victory flow.
 - Milestone bonuses at key puzzle counts (10, 15, 25, 50... up to 350)
+
+### Offering Pit Economy (Deferred Amber Crediting)
+
+Puzzle completion no longer credits amber directly to the spendable balance. Instead, amber is queued in **harvest batches** that the player must **offer** in the Offering Pit screen to convert into spendable amber.
+
+**Design principles:**
+- Amber remains the only unlock currency — no second token
+- Economy pacing is unchanged: offering immediately after each puzzle yields the same amber as before
+- The pit deepens the "unwitting incantation" theme — players feed words to the void
+- Phase secrecy maintained in all UI text
+
+**Flow:**
+1. Player completes a puzzle → `recordVictory()` calls `awardPuzzleAmber(creditToBalance: false)` — amber is computed but NOT added to spendable balance
+2. All reward components (base + milestones + first-completion + streak milestones + variant bonus) are summed into `totalQueuedAmber`
+3. A `HarvestBatch` is enqueued via `enqueueHarvestBatch()` containing the completed words, amber value, difficulty, stars, variant, and phase
+4. VictoryModal shows queued amber as "harvest" (phase-aware label) with a pending summary hint
+5. Player opens the Offering Pit from the Home screen action row → sees pending batches
+6. Player offers individual batches or "Offer All" → `awardBonusAmber(amount, 'word_offering')` credits amber to spendable balance
+7. Home screen pit button shows a badge with pending word count
+
+**Data model** (`wordHarvest.ts`):
+- `HarvestBatch`: id, words, amberValue, createdAt, difficulty, gameMode, stars, variant, phaseAtHarvest
+- `HarvestState`: pendingBatches, totalWordsOffered, totalBatchesOffered, totalAmberClaimed
+- `HarvestSummary`: pendingAmber, pendingWords, pendingBatches
+- Storage key: `wordshift_word_harvest`, MAX_PENDING_BATCHES = 200
+
+**Key functions** (`wordHarvest.ts`):
+- `enqueueHarvestBatch(batch)` — Add batch to pending (normalizes/deduplicates words)
+- `getHarvestState()` — Full state with pending batches and lifetime totals
+- `getPendingHarvestSummary()` — Quick summary for badges
+- `offerBatch(batchId)` — Offer one batch, returns amber awarded and remaining summary
+- `offerAllBatches()` — Offer all pending batches at once
+- `clearHarvestState()` — Reset (used by Reset All Data)
+- `generateBatchId()` — Unique ID generator
+
+**Screen** (`OfferingPitScreen.tsx`):
+- Navigated as `currentScreen: 'pit'` in App.tsx
+- Props: phase, amberBalance, onClose, onAmberChange
+- Phase-aware theming: pit visual shifts from purple circle to dark pit emoji
+- Phase-aware background images: `pitt_day.png` (Phase 0-1), `pitt_dusk.png` (Phase 2), `pitt_night.png` (Phase 3-4) with matching solid fallback colors
+- Animated pit pulse (respects reducedMotion)
+- Summary stats: pending amber, lifetime offered, spendable balance
+- Per-batch cards with difficulty, stars, word chips, individual offer buttons
+- "Offer All" primary CTA
+
+**Phase-aware narrative text** (`phaseNarrative.ts`):
+- `getPitScreenTitle(phase)` — "Word Repository" → "The Pit"
+- `getPitScreenSubtitle(phase)` — Benign → dread framing
+- `getPitButtonLabel(phase)` — "Offer" → "Feed"
+- `getPitOfferAllLabel(phase)` — "Offer All" → "Feed Everything"
+- `getPitEmptyMessage(phase)` — Empty state messages
+- `getPitOfferResultMessage(phase, words, amber)` — Result feedback
+- `getPitHomeBadgeLabel(phase)` — Home button label: "Pit" → "The Pit"
+- `getPitHarvestLabel(phase)` — VictoryModal amber label: "Harvest" → "Yield"
+- `getPitPendingAmberLabel(phase)` — Pending amber description
+
+**Integration points:**
+- `amberCurrency.ts`: `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred)
+- `useGamePersistence.ts`: `recordVictory()` enqueues harvest batch, returns `harvestedWords` and `pendingHarvest` in VictoryData
+- `VictoryModal.tsx`: Shows queued amber with phase-aware "harvest" label + pending summary hint
+- `HomeScreen.tsx`: Pit button in action row with word count badge
+- `SettingsScreen.tsx`: `clearHarvestState()` called on Reset All Data
+- `cloudSave.ts`: `wordshift_word_harvest` in SYNC_KEYS
 
 ### Animal Characters
 

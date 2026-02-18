@@ -55,27 +55,27 @@ describe('getAmberBalance', () => {
 
 describe('awardPuzzleAmber', () => {
   test('awards base amount for EASY 1-star', async () => {
-    const result = await awardPuzzleAmber('EASY', 1);
+    const result = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
     expect(result.baseAmount).toBe(8); // EASY base = 8
     expect(result.amount).toBeGreaterThanOrEqual(8);
     expect(result.newBalance).toBeGreaterThan(0);
   });
 
   test('awards more for HARD difficulty', async () => {
-    const easy = await awardPuzzleAmber('EASY', 1);
+    const easy = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
     await clearProgress();
-    const hard = await awardPuzzleAmber('HARD', 1);
+    const hard = await awardPuzzleAmber('HARD', 1, 'standard', 0, true);
     expect(hard.baseAmount).toBeGreaterThan(easy.baseAmount);
   });
 
   test('3-star bonus gives 50% more', async () => {
-    const result = await awardPuzzleAmber('MEDIUM', 3);
+    const result = await awardPuzzleAmber('MEDIUM', 3, 'standard', 0, true);
     // Base is 10, 3-star = floor(10 * 1.5) = 15
     expect(result.baseAmount).toBe(15);
   });
 
   test('2-star bonus gives 25% more', async () => {
-    const result = await awardPuzzleAmber('MEDIUM', 2);
+    const result = await awardPuzzleAmber('MEDIUM', 2, 'standard', 0, true);
     // Base is 10, 2-star = floor(10 * 1.25) = 12
     expect(result.baseAmount).toBe(12);
   });
@@ -106,12 +106,20 @@ describe('awardPuzzleAmber', () => {
     expect(result.newPhase).toBe(0);
     expect(await getCurrentPhase()).toBe(0);
   });
+
+  test('deferred crediting (default) does not increase spendable balance', async () => {
+    const result = await awardPuzzleAmber('MEDIUM', 3);
+    expect(result.amount).toBeGreaterThan(0);
+    expect(result.newBalance).toBe(0); // Not credited to balance
+    const balance = await getAmberBalance();
+    expect(balance).toBe(0);
+  });
 });
 
 describe('applyVariantAmberBonus', () => {
   test('grants variant bonus and persists balance', async () => {
     await devAddAmber(100);
-    const result = await applyVariantAmberBonus('speed', 20, 1.34);
+    const result = await applyVariantAmberBonus('speed', 20, 1.34, true);
     expect(result.bonus).toBeGreaterThan(0);
     const balance = await getAmberBalance();
     expect(balance).toBe(100 + result.bonus);
@@ -119,13 +127,21 @@ describe('applyVariantAmberBonus', () => {
 
   test('applies decay on repeated same variant farming', async () => {
     await devAddAmber(100);
-    const first = await applyVariantAmberBonus('speed', 20, 1.34);
-    const second = await applyVariantAmberBonus('speed', 20, 1.34);
-    const third = await applyVariantAmberBonus('speed', 20, 1.34);
+    const first = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    const second = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    const third = await applyVariantAmberBonus('speed', 20, 1.34, true);
     expect(first.repeatDecay).toBe(1.0);
     expect(second.repeatDecay).toBe(1.0);
     expect(third.repeatDecay).toBeLessThan(1.0);
     expect(third.bonus).toBeLessThan(first.bonus);
+  });
+
+  test('deferred crediting (default) does not increase spendable balance', async () => {
+    await devAddAmber(100);
+    const result = await applyVariantAmberBonus('speed', 20, 1.34);
+    expect(result.bonus).toBeGreaterThan(0);
+    const balance = await getAmberBalance();
+    expect(balance).toBe(100); // Not credited
   });
 });
 
@@ -297,7 +313,7 @@ describe('intro tracking', () => {
 
 describe('first-completion bonus', () => {
   test('awards bonus on first EASY completion', async () => {
-    const result = await awardPuzzleAmber('EASY', 1);
+    const result = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
     expect(result.firstCompletionBonus).toBe(FIRST_COMPLETION_BONUS.EASY);
     expect(result.newBalance).toBe(result.amount + FIRST_COMPLETION_BONUS.EASY);
   });

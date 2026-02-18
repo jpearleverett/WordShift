@@ -68,6 +68,7 @@ const SYNC_KEYS = [
   'wordshift_sacrifices',
   'wordshift_notification_prefs',
   'wordshift_in_progress_puzzle',
+  'wordshift_word_harvest',
 ];
 
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';

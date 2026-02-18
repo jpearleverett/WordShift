@@ -73,6 +73,8 @@ import {
 import { getGalleryTitle } from '../../services/whisperGallery';
 import { updateQuestProgress } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
+import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
+import { getPitHomeBadgeLabel } from '../../services/phaseNarrative';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -84,6 +86,7 @@ interface HomeScreenProps {
   onOpenStats?: () => void;
   onOpenLedger?: () => void;
   onOpenGallery?: () => void;
+  onOpenPit?: () => void;
   onStartDaily?: (difficulty: Difficulty) => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
@@ -98,6 +101,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenStats,
   onOpenLedger,
   onOpenGallery,
+  onOpenPit,
   onStartDaily,
   onboardingStep,
   onAdvanceOnboarding,
@@ -131,6 +135,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Sacrifice modal state (Phase 4+)
   const [showSacrificeModal, setShowSacrificeModal] = useState(false);
   const [sacrificeMessage, setSacrificeMessage] = useState<string | null>(null);
+
+  // Pending harvest summary for pit badge
+  const [pendingHarvest, setPendingHarvest] = useState<HarvestSummary | null>(null);
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -182,6 +189,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     // Refresh unlock data with fresh arrays (avoids stale state)
     await unlockFlow.refreshUnlockData(roomsData, animalsData);
+
+    // Load pending harvest for pit badge
+    const harvestSummary = await getPendingHarvestSummary();
+    setPendingHarvest(harvestSummary);
   }, [unlockFlow.refreshUnlockData]);
 
   // Keep the ref in sync
@@ -608,6 +619,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
               <Text style={styles.actionRowButtonText}>
                 📜 {getGalleryTitle(progress.currentPhase)}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {onOpenPit && (
+            <TouchableOpacity
+              style={styles.actionRowButton}
+              onPress={() => {
+                hapticLight();
+                onOpenPit();
+              }}
+              accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
+              accessibilityRole="button"
+            >
+              <Text style={styles.actionRowButtonText}>
+                ⭕ {getPitHomeBadgeLabel(progress.currentPhase)}
+                {pendingHarvest && pendingHarvest.pendingBatches > 0 && (
+                  ` (${pendingHarvest.pendingWords})`
+                )}
               </Text>
             </TouchableOpacity>
           )}
