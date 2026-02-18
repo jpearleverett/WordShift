@@ -17,6 +17,7 @@ import {
   devAddPuzzles,
   calculatePhaseAcceleration,
   getCurrentPhase,
+  confirmPhaseTransition,
 } from '../services/amberCurrency';
 import { checkAchievements, clearAchievements, AchievementCheckState } from '../services/achievements';
 import {
@@ -92,37 +93,48 @@ describe('Victory Flow Integration', () => {
     const phaseBefore = await getCurrentPhase();
     expect(phaseBefore).toBe(0);
 
-    // The 25th puzzle should trigger phase 0 -> 1
+    // The 25th puzzle should trigger a pending phase 0 -> 1 transition
     const result = await awardPuzzleAmber('EASY', 1);
     expect(result.puzzlesSolved).toBe(25);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(1);
+
+    // Phase is deferred — still 0 until confirmed in the pit
+    expect(await getCurrentPhase()).toBe(0);
+    const confirmed = await confirmPhaseTransition();
+    expect(confirmed).not.toBeNull();
+    expect(confirmed!.newPhase).toBe(1);
+    expect(await getCurrentPhase()).toBe(1);
   });
 
   test('phase transitions happen sequentially across all boundaries', async () => {
-    // Phase 0 -> 1 at 25 puzzles
+    // Phase 0 -> 1 at 25 puzzles (deferred, then confirmed)
     await devAddPuzzles(24);
     let result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(1);
+    await confirmPhaseTransition();
 
     // Phase 1 -> 2 at 75 puzzles
     await devAddPuzzles(49); // 25 + 49 = 74
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(2);
+    await confirmPhaseTransition();
 
     // Phase 2 -> 3 at 150 puzzles
     await devAddPuzzles(74); // 75 + 74 = 149
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(3);
+    await confirmPhaseTransition();
 
     // Phase 3 -> 4 at 250 puzzles
     await devAddPuzzles(99); // 150 + 99 = 249
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(4);
+    await confirmPhaseTransition();
 
     // Phase 4 is max — no further change
     result = await awardPuzzleAmber('EASY', 1);

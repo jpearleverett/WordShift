@@ -608,14 +608,10 @@ export default function App() {
       victoryActions.playVictorySequence(victory.earnedStars);
       setTimeout(() => { victoryAnimatingRef.current = false; }, 1200);
 
-      // If phase changed, immediately show transition overlay and play dramatic flash
-      if (victory.phaseChanged) {
-        const event = getPhaseTransitionEvent(victory.newPhase as any);
-        if (event) {
-          setPhaseTransitionEvent(event);
-        }
-        victoryActions.playPhaseChangeFlash();
-      }
+      // Phase transitions are now DEFERRED to the Offering Pit.
+      // When phaseTransitionPending is true, the phase change will be confirmed
+      // in the pit screen with a ward mark ceremony. Don't play the overlay here.
+      // (The pit callback will trigger the overlay after the ceremony completes.)
 
       // Check for endgame triggers (final puzzle + post-revelation)
       // Only when NOT already showing a phase transition
@@ -1195,6 +1191,20 @@ export default function App() {
               }}
               onOpenStats={() => transitionTo('stats')}
               onOpenSettings={() => transitionTo('settings')}
+              phaseProgressFraction={persistence.phaseProgressFraction}
+              pendingPhaseTransition={persistence.pendingPhaseTransition}
+              onPhaseTransitionConfirmed={(newPhase) => {
+                // Refresh all persistence state to pick up the new currentPhase
+                persistenceActions.refreshStats();
+                // Play the full PhaseTransitionOverlay cinematic
+                const event = getPhaseTransitionEvent(newPhase as any);
+                if (event) {
+                  setPhaseTransitionEvent(event);
+                }
+                victoryActions.playPhaseChangeFlash();
+                // Update notifications with new phase
+                scheduleAllNotifications(newPhase).catch(() => {});
+              }}
             />
           </Animated.View>
         </View>
@@ -1221,6 +1231,7 @@ export default function App() {
                 onStartDaily={handleStartDaily}
                 onboardingStep={onboardingStep}
                 onAdvanceOnboarding={advanceOnboarding}
+                pitPhaseReady={persistence.pendingPhaseTransition != null}
               />
               {/* Achievement toast overlay */}
               <AchievementToast
@@ -1548,6 +1559,7 @@ export default function App() {
           level={puzzle.level}
           difficulty={puzzle.difficulty}
           phase={persistence.currentPhase}
+          phaseTransitionPending={persistence.pendingPhaseTransition != null}
           isPlayingDaily={isPlayingDaily}
           victoryData={victoryFlow.victoryData}
           completionCoda={completionCoda}

@@ -20,7 +20,13 @@ import {
   getPitHarvestLabel,
   getPitPendingAmberLabel,
   getPitOverflowText,
+  PIT_WARD_COUNT,
+  getPitWardHint,
+  getPitTransitionReadyText,
+  getPitTransitionCeremonyText,
+  getWardMarkColors,
 } from '../services/phaseNarrative';
+import { confirmPhaseTransition } from '../services/amberCurrency';
 import {
   getHarvestState,
   offerBatch,
@@ -559,6 +565,12 @@ interface OfferingPitScreenProps {
   onAmberChange?: (newBalance: number) => void;
   onOpenStats?: () => void;
   onOpenSettings?: () => void;
+  /** 0.0 to 1.0 — how close the player is to the next phase */
+  phaseProgressFraction: number;
+  /** Non-null when a phase transition is pending and ready to confirm */
+  pendingPhaseTransition: DialoguePhase | null;
+  /** Called after the pit confirms the phase transition */
+  onPhaseTransitionConfirmed?: (newPhase: DialoguePhase) => void;
 }
 
 export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
@@ -568,6 +580,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   onAmberChange,
   onOpenStats,
   onOpenSettings,
+  phaseProgressFraction,
+  pendingPhaseTransition,
+  onPhaseTransitionConfirmed,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const reducedMotion = getSettingsSync()?.reducedMotion ?? false;
@@ -608,6 +623,105 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
   useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
+
+  // ---- Ward mark ceremony state machine ----
+  type CeremonyStatus = 'idle' | 'igniting' | 'erupting' | 'text' | 'complete';
+  const [ceremonyStatus, setCeremonyStatus] = useState<CeremonyStatus>('idle');
+  const [ceremonyIgniteStep, setCeremonyIgniteStep] = useState(-1);
+  const [ceremonyTextIndex, setCeremonyTextIndex] = useState(-1);
+  const ceremonyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Ward mark pulse animation (for pending state)
+  const wardPulseProgress = useRef(new Animated.Value(0)).current;
+  const wardPulseLoop = useRef<Animated.CompositeAnimation | null>(null);
+  // Ward ignition flash per mark
+  const wardFlashAnims = useRef<Animated.Value[]>(
+    Array.from({ length: PIT_WARD_COUNT }, () => new Animated.Value(0))
+  ).current;
+
+  // Ceremony text fade
+  const ceremonyTextOpacity = useRef(new Animated.Value(0)).current;
+  const ceremonyOverlayOpacity = useRef(new Animated.Value(0)).current;
+
+  // Ward mark positions: distributed along upper arc of the pit oval
+  const wardPositions = useMemo(() => {
+    const positions: { x: number; y: number }[] = [];
+    for (let i = 0; i < PIT_WARD_COUNT; i++) {
+      const t = PIT_WARD_COUNT > 1 ? i / (PIT_WARD_COUNT - 1) : 0.5;
+      const angle = -Math.PI * 0.85 + t * Math.PI * 0.7;
+      positions.push({
+        x: PIT_CENTER.x + PIT_OVAL.radiusX * 1.18 * Math.cos(angle),
+        y: PIT_CENTER.y + PIT_OVAL.radiusY * 1.8 * Math.sin(angle),
+      });
+    }
+    return positions;
+  }, []);
+
+  const wardColors = getWardMarkColors(phase);
+  const litCount = pendingPhaseTransition != null
+    ? PIT_WARD_COUNT
+    : Math.floor(phaseProgressFraction * PIT_WARD_COUNT);
+
+  // Ward pulse loop for pending state
+  useEffect(() => {
+    if (pendingPhaseTransition == null || reducedMotion || ceremonyStatus !== 'idle') {
+      wardPulseLoop.current?.stop();
+      wardPulseLoop.current = null;
+      wardPulseProgress.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(wardPulseProgress, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(wardPulseProgress, {
+          toValue: 0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    wardPulseLoop.current = loop;
+    loop.start();
+    return () => { loop.stop(); wardPulseLoop.current = null; };
+  }, [pendingPhaseTransition, reducedMotion, ceremonyStatus, wardPulseProgress]);
+
+  const wardPulseOpacity = wardPulseProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.6, 1.0],
+  });
+  const wardPulseScale = wardPulseProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.0, 1.15],
+  });
+
+  // Start ward ignition ceremony — defined via ref pattern because
+  // flashPitSurge and spawnShockwave are useCallbacks declared later.
+  const startCeremonyRef = useRef<() => void>(() => {});
+  const startCeremony = useCallback(() => startCeremonyRef.current(), []);
+
+  // Clean up ceremony timers on unmount
+  useEffect(() => {
+    return () => {
+      ceremonyTimers.current.forEach(clearTimeout);
+    };
+  }, []);
+
+  // Ward hint or ready text
+  const wardHintText = useMemo(() => {
+    if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
+      return getPitTransitionReadyText(pendingPhaseTransition);
+    }
+    if (phase < 4 && phaseProgressFraction >= 0.3 && pendingPhaseTransition == null) {
+      return getPitWardHint(phase, phaseProgressFraction);
+    }
+    return null;
+  }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus]);
 
   // ---- Ambient breathing glow loop ----
   useEffect(() => {
@@ -976,6 +1090,99 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     });
   }, [phase, reducedMotion, simplify]);
 
+  // ---- Ward ignition ceremony implementation (ref-based) ----
+  useEffect(() => {
+    startCeremonyRef.current = () => {
+      if (ceremonyStatus !== 'idle' || pendingPhaseTransition == null) return;
+      setCeremonyStatus('igniting');
+      setCeremonyIgniteStep(0);
+
+      ceremonyTimers.current.forEach(clearTimeout);
+      ceremonyTimers.current = [];
+
+      wardPulseLoop.current?.stop();
+      wardPulseLoop.current = null;
+
+      hapticMedium();
+
+      // Sequential ward ignition
+      for (let i = 0; i < PIT_WARD_COUNT; i++) {
+        const timer = setTimeout(() => {
+          if (!mountedRef.current) return;
+          setCeremonyIgniteStep(i);
+          wardFlashAnims[i].setValue(1);
+          Animated.timing(wardFlashAnims[i], {
+            toValue: 0,
+            duration: 600,
+            useNativeDriver: true,
+          }).start();
+          if (i < PIT_WARD_COUNT - 1) hapticLight();
+        }, i * 200);
+        ceremonyTimers.current.push(timer);
+      }
+
+      // After all wards ignite -> eruption
+      const eruptTimer = setTimeout(() => {
+        if (!mountedRef.current) return;
+        setCeremonyStatus('erupting');
+        hapticHeavy();
+        flashPitSurge();
+        spawnShockwave();
+        setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 150);
+        setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 300);
+
+        // After eruption -> ceremony text
+        const textTimer = setTimeout(() => {
+          if (!mountedRef.current) return;
+          setCeremonyStatus('text');
+          setCeremonyTextIndex(0);
+
+          Animated.timing(ceremonyOverlayOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
+
+          const texts = getPitTransitionCeremonyText(pendingPhaseTransition!);
+          let delay = 0;
+          const textTimers: ReturnType<typeof setTimeout>[] = [];
+          for (let j = 0; j < texts.length; j++) {
+            const showTimer = setTimeout(() => {
+              if (!mountedRef.current) return;
+              setCeremonyTextIndex(j);
+              ceremonyTextOpacity.setValue(0);
+              Animated.timing(ceremonyTextOpacity, {
+                toValue: 1,
+                duration: 400,
+                useNativeDriver: true,
+              }).start();
+            }, delay);
+            textTimers.push(showTimer);
+            delay += 1200;
+          }
+          ceremonyTimers.current.push(...textTimers);
+
+          const completeTimer = setTimeout(async () => {
+            if (!mountedRef.current) return;
+            const result = await confirmPhaseTransition();
+            if (result && mountedRef.current) {
+              Animated.timing(ceremonyOverlayOpacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start();
+              setCeremonyStatus('complete');
+              onPhaseTransitionConfirmed?.(result.newPhase);
+            }
+          }, delay + 400);
+          ceremonyTimers.current.push(completeTimer);
+        }, 800);
+        ceremonyTimers.current.push(textTimer);
+      }, PIT_WARD_COUNT * 200 + 200);
+      ceremonyTimers.current.push(eruptTimer);
+    };
+  }, [ceremonyStatus, pendingPhaseTransition, wardFlashAnims, flashPitSurge, spawnShockwave, ceremonyOverlayOpacity, ceremonyTextOpacity, onPhaseTransitionConfirmed]);
+
   // ---- Spawn amber rise ----
   const spawnAmberRise = useCallback((_amberAmount: number) => {
     if (reducedMotion) return;
@@ -1037,10 +1244,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
         // Refresh harvest state so pending amber/count updates in UI
         const freshState = await getHarvestState();
-        if (mountedRef.current) setHarvestState(freshState);
+        if (mountedRef.current) {
+          setHarvestState(freshState);
+          // Trigger phase transition ceremony if pending
+          if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
+            // Small delay so the batch completion message shows first
+            setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
+          }
+        }
       }
     } catch { /* batch may already be offered */ }
-  }, [phase, onAmberChange, spawnAmberRise, showResultToast]);
+  }, [phase, onAmberChange, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
 
   // ---- Handle word devoured ----
   const handleWordDevoured = useCallback((fw: FlyingWord) => {
@@ -1181,6 +1395,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         setOverflowCount(0);
         setIsOffering(false);
+        // Trigger ceremony if pending
+        if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
+          setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
+        }
       }
       return;
     }
@@ -1270,9 +1488,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setFlyingWords([]);
         setOverflowCount(0);
         setIsOffering(false);
+        // Trigger ceremony if pending
+        if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
+          setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
+        }
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast]);
+  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
 
   // ---- Summary stats ----
   const pendingAmber = useMemo(() => {
@@ -1319,6 +1541,102 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
       {/* Shockwave rings — expanding ripple on word impact */}
       {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}
+
+      {/* Ward marks — phase progression indicators around the pit rim */}
+      {phase < 4 && (litCount > 0 || pendingPhaseTransition != null) && (
+        <>
+          {wardPositions.map((pos, idx) => {
+            const isLit = idx < litCount;
+            const isPending = pendingPhaseTransition != null && ceremonyStatus === 'idle';
+            const isIgnited = ceremonyStatus === 'igniting' && idx <= ceremonyIgniteStep;
+            const flashAnim = wardFlashAnims[idx];
+
+            const baseColor = isIgnited
+              ? wardColors.pendingPulse
+              : isLit
+                ? (isPending ? wardColors.pendingPulse : wardColors.lit)
+                : wardColors.unlit;
+
+            const flashScale = flashAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 2.5],
+            });
+
+            return (
+              <Animated.View
+                key={`ward-${idx}`}
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: pos.x - 6,
+                  top: pos.y - 6,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: baseColor,
+                  opacity: isPending ? wardPulseOpacity : (isLit ? 0.9 : 1),
+                  transform: [
+                    { scale: isPending ? wardPulseScale : (isIgnited ? flashScale : 1) },
+                  ],
+                  ...(isLit && !simplify ? {
+                    shadowColor: wardColors.glow,
+                    shadowOffset: { width: 0, height: 0 },
+                    shadowOpacity: 0.8,
+                    shadowRadius: 6,
+                  } : {}),
+                }}
+              />
+            );
+          })}
+          {/* Tap target for ward ring when transition is pending */}
+          {pendingPhaseTransition != null && ceremonyStatus === 'idle' && (
+            <TouchableOpacity
+              style={{
+                position: 'absolute',
+                left: PIT_CENTER.x - PIT_OVAL.radiusX * 1.3,
+                top: PIT_CENTER.y - PIT_OVAL.radiusY * 3,
+                width: PIT_OVAL.radiusX * 2.6,
+                height: PIT_OVAL.radiusY * 4,
+              }}
+              onPress={() => {
+                hapticMedium();
+                startCeremony();
+              }}
+              accessibilityLabel="Activate the ward marks"
+              accessibilityRole="button"
+            />
+          )}
+        </>
+      )}
+
+      {/* Ward hint / ready text — shown above the pit */}
+      {wardHintText && ceremonyStatus === 'idle' && (
+        <View style={styles.wardHintContainer} pointerEvents="none">
+          <Text style={[styles.wardHintText, {
+            color: pendingPhaseTransition != null ? wardColors.pendingPulse : wardColors.lit,
+            fontSize: pendingPhaseTransition != null ? 16 : 13,
+          }]}>
+            {wardHintText}
+          </Text>
+        </View>
+      )}
+
+      {/* Ceremony overlay — text during phase transition */}
+      {(ceremonyStatus === 'text' || ceremonyStatus === 'erupting') && (
+        <Animated.View
+          style={[styles.ceremonyOverlay, { opacity: ceremonyOverlayOpacity }]}
+          pointerEvents="none"
+        >
+          {ceremonyStatus === 'text' && ceremonyTextIndex >= 0 && (
+            <Animated.Text style={[styles.ceremonyText, {
+              color: wardColors.pendingPulse,
+              opacity: ceremonyTextOpacity,
+            }]}>
+              {(getPitTransitionCeremonyText(pendingPhaseTransition ?? 1 as DialoguePhase))[ceremonyTextIndex] ?? ''}
+            </Animated.Text>
+          )}
+        </Animated.View>
+      )}
 
       {/* Particle layers */}
       {trailParticles.map(p => <TrailParticleView key={p.id} p={p} />)}
@@ -1608,5 +1926,36 @@ const styles = StyleSheet.create({
   harvestAllText: {
     color: '#FFFFFF',
     fontSize: 16, fontWeight: '900', letterSpacing: 1, textAlign: 'center',
+  },
+  // ---- Ward mark & ceremony ----
+  wardHintContainer: {
+    position: 'absolute',
+    top: PIT_CENTER.y - PIT_OVAL.radiusY * 4.5,
+    left: 30, right: 30,
+    alignItems: 'center',
+  },
+  wardHintText: {
+    fontWeight: '600',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  ceremonyOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ceremonyText: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+    paddingHorizontal: 30,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
 });

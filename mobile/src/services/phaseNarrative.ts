@@ -1169,3 +1169,96 @@ export function getPitOverflowText(phase: DialoguePhase, extraCount: number): st
   if (phase >= 2) return `+${extraCount} more words waiting`;
   return `+${extraCount} more`;
 }
+
+// ============================================================================
+// PIT PHASE TRANSITION — Ward marks and transition ceremony
+// ============================================================================
+
+/** Number of ward marks around the pit rim (visual anchors for progress) */
+export const PIT_WARD_COUNT = 7;
+
+/** Cryptic hint shown above the ward marks when transition is approaching */
+const PIT_WARD_HINTS: Record<number, string> = {
+  1: 'Something stirs below...',
+  2: 'The marks remember.',
+  3: 'The circle hungers.',
+  4: 'The pattern demands completion.',
+};
+
+export function getPitWardHint(currentPhase: DialoguePhase, fraction: number): string | null {
+  if (fraction < 0.3) return null; // Too early
+  const nextPhase = Math.min(4, currentPhase + 1);
+  return PIT_WARD_HINTS[nextPhase] ?? null;
+}
+
+/** Text shown when transition is ready (all wards lit, pending confirmation) */
+const PIT_TRANSITION_READY_TEXT: Record<number, string> = {
+  1: 'The marks glow. Something is ready.',
+  2: 'The circle is complete. Offer your words.',
+  3: 'The dark waits at the threshold. Feed it.',
+  4: 'The arrangement trembles. One more offering.',
+};
+
+export function getPitTransitionReadyText(targetPhase: DialoguePhase): string {
+  return PIT_TRANSITION_READY_TEXT[targetPhase] ?? 'Something shifts.';
+}
+
+/** Text lines shown during the ward ignition ceremony */
+const PIT_TRANSITION_CEREMONY_TEXT: Record<number, string[]> = {
+  1: [
+    'The first marks ignite.',
+    'The pit remembers your words.',
+    'Something has changed.',
+  ],
+  2: [
+    'The marks burn deeper.',
+    'The emptiness grows below.',
+    'You can feel it now.',
+  ],
+  3: [
+    'The circle screams without sound.',
+    'The dark rushes upward.',
+    'There is no going back.',
+  ],
+  4: [
+    'The final mark blazes crimson.',
+    'Every word you offered led here.',
+    'The arrangement is complete.',
+  ],
+};
+
+export function getPitTransitionCeremonyText(targetPhase: DialoguePhase): string[] {
+  return PIT_TRANSITION_CEREMONY_TEXT[targetPhase] ?? ['Something shifts.'];
+}
+
+/** Ward mark colors by current phase */
+export interface WardMarkColorSet {
+  unlit: string;
+  lit: string;
+  glow: string;
+  pendingPulse: string;
+}
+
+const WARD_MARK_COLORS: Record<number, WardMarkColorSet> = {
+  0: { unlit: 'rgba(255,255,255,0.08)', lit: '#80E8D0', glow: '#80E8D0', pendingPulse: '#A0FFE0' },
+  1: { unlit: 'rgba(255,255,255,0.06)', lit: '#B794F4', glow: '#B794F4', pendingPulse: '#D4B0FF' },
+  2: { unlit: 'rgba(255,255,255,0.05)', lit: '#9B7DC8', glow: '#6B4F8A', pendingPulse: '#B088D0' },
+  3: { unlit: 'rgba(255,255,255,0.04)', lit: '#8B2252', glow: '#5A1030', pendingPulse: '#C03050' },
+  4: { unlit: 'rgba(255,255,255,0.03)', lit: '#C03050', glow: '#8B2252', pendingPulse: '#E05070' },
+};
+
+export function getWardMarkColors(phase: DialoguePhase): WardMarkColorSet {
+  return WARD_MARK_COLORS[phase] ?? WARD_MARK_COLORS[0];
+}
+
+/** Cryptic text for VictoryModal when a phase transition is pending at the pit */
+const VICTORY_PIT_HINTS: Record<number, string> = {
+  1: 'The pit stirs. Something awaits.',
+  2: 'The marks below have changed.',
+  3: 'The dark is waiting.',
+  4: 'The arrangement demands your presence.',
+};
+
+export function getVictoryPitHint(targetPhase: DialoguePhase): string | null {
+  return VICTORY_PIT_HINTS[targetPhase] ?? null;
+}

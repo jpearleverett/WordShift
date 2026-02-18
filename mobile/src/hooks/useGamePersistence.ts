@@ -15,6 +15,8 @@ import {
   recordRitualWords,
   recordVariantEncounter,
   applyVariantAmberBonus,
+  getPhaseProgressFraction,
+  getPendingPhaseTransition,
 } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
@@ -59,12 +61,16 @@ export interface VictoryData {
   harvestedWords?: string[];
   /** Updated pending harvest summary after enqueue */
   pendingHarvest?: HarvestSummary;
+  /** True when this puzzle created a new pending phase transition in the pit */
+  phaseTransitionPending: boolean;
 }
 
 export interface PersistenceState {
   cumulativeStats: CumulativeStats | null;
   amberBalance: number;
   currentPhase: DialoguePhase;
+  phaseProgressFraction: number;
+  pendingPhaseTransition: DialoguePhase | null;
 }
 
 export interface PersistenceActions {
@@ -85,6 +91,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   const [cumulativeStats, setCumulativeStats] = useState<CumulativeStats | null>(null);
   const [amberBalance, setAmberBalance] = useState(0);
   const [currentPhase, setCurrentPhase] = useState<DialoguePhase>(0);
+  const [phaseProgressFraction, setPhaseProgressFraction] = useState(0);
+  const [pendingPhaseTransition, setPendingPhaseTransition] = useState<DialoguePhase | null>(null);
   const recordInProgress = useRef(false);
 
   useEffect(() => {
@@ -93,24 +101,32 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       getCumulativeStats(),
       getAmberBalance(),
       getCurrentPhase(),
-    ]).then(([stats, balance, phase]) => {
+      getPhaseProgressFraction(),
+      getPendingPhaseTransition(),
+    ]).then(([stats, balance, phase, fraction, pending]) => {
       setCumulativeStats(stats);
       setAmberBalance(balance);
       setCurrentPhase(phase);
+      setPhaseProgressFraction(fraction);
+      setPendingPhaseTransition(pending);
     }).catch(err => {
       console.warn('Failed to initialize persistence:', err);
     });
   }, []);
 
   const refreshStats = useCallback(async () => {
-    const [stats, balance, phase] = await Promise.all([
+    const [stats, balance, phase, fraction, pending] = await Promise.all([
       getCumulativeStats(),
       getAmberBalance(),
       getCurrentPhase(),
+      getPhaseProgressFraction(),
+      getPendingPhaseTransition(),
     ]);
     setCumulativeStats(stats);
     setAmberBalance(balance);
     setCurrentPhase(phase);
+    setPhaseProgressFraction(fraction);
+    setPendingPhaseTransition(pending);
   }, []);
 
   const recordVictory = useCallback(async (
@@ -145,6 +161,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variant: 'standard',
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
+        phaseTransitionPending: false,
       };
     }
 
@@ -204,10 +221,19 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       setCumulativeStats(stats);
       updatePuzzleCount(amberResult.puzzlesSolved);
-      updateSessionPhase(amberResult.newPhase);
+      // When phase transition is pending, keep current phase at old value.
+      // The pit screen will call confirmPhaseTransition() to advance it.
+      if (!amberResult.phaseTransitionPending) {
+        updateSessionPhase(amberResult.newPhase);
+        setCurrentPhase(amberResult.newPhase);
+      }
       // Balance stays as-is (no credit); refresh from storage to stay in sync
       setAmberBalance(amberResult.newBalance);
-      setCurrentPhase(amberResult.newPhase);
+      // Update pending phase transition state for pit screen
+      if (amberResult.phaseTransitionPending) {
+        setPendingPhaseTransition(amberResult.newPhase);
+        setPhaseProgressFraction(1.0);
+      }
 
       // Record ritual words from the completed puzzle
       let totalWordsFormed = 0;
@@ -297,6 +323,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         streakMilestoneMessage: amberResult.streakMilestoneMessage,
         harvestedWords,
         pendingHarvest,
+        phaseTransitionPending: amberResult.phaseTransitionPending,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -321,6 +348,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variantRepeatDecay: 1.0,
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
+        phaseTransitionPending: false,
       };
     } finally {
       recordInProgress.current = false;
@@ -331,6 +359,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     cumulativeStats,
     amberBalance,
     currentPhase,
+    phaseProgressFraction,
+    pendingPhaseTransition,
   };
 
   const actions: PersistenceActions = {

@@ -17,6 +17,7 @@ import {
   getRitualEchoFooter,
   getWordsOfferedText,
   getPitHarvestLabel,
+  getVictoryPitHint,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -45,6 +46,8 @@ interface VictoryModalProps {
   level: number;
   difficulty: string;
   phase: DialoguePhase;
+  /** True when a phase transition is waiting to be confirmed in the pit */
+  phaseTransitionPending?: boolean;
   isPlayingDaily: boolean;
   victoryData: VictoryData | null;
   completionCoda?: { title: string; text: string } | null;
@@ -108,6 +111,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   level,
   difficulty,
   phase,
+  phaseTransitionPending,
   isPlayingDaily,
   victoryData,
   completionCoda,
@@ -436,6 +440,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
 
+              {/* Phase transition pit hint — shown when a transition is pending */}
+              {phaseTransitionPending && victoryData?.newPhase != null && (
+                <Text style={[styles.pitHintText, { color: btn.harvestPill.text }]}>
+                  {getVictoryPitHint(victoryData.newPhase as DialoguePhase) ?? ''}
+                </Text>
+              )}
+
               {/* Harvest Now — secondary 3D candy button */}
               <TouchableOpacity
                 onPress={onGoToPit}
@@ -715,6 +726,16 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+
+  // Pit phase transition hint
+  pitHintText: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 12,
   },
 
   // Flat secondary buttons (Share, Home)
