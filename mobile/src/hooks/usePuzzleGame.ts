@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { RowData, Letter, GameState, MoveDelta, PuzzleSolutionStep, Difficulty, GameMode } from '../types';
 import { SavedPuzzleState } from '../services/puzzleSaveState';
-import { generateLocalPuzzle, getIncantationName } from '../services/localGenerator';
+import { generateLocalPuzzle, generateDoubleShiftPuzzle, getIncantationName } from '../services/localGenerator';
 import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
@@ -61,14 +61,16 @@ export interface PuzzleGameState {
   selectedVariant: PuzzleVariant;
   /** Current movement direction ("down" for standard flow, "up" during reverse return leg) */
   moveDirection: 'down' | 'up';
-  /** Rows revealed in blind variants */
-  blindRevealedRows: number[];
   /** Current chain link index for chain variants (1-based) */
   currentChainLink: number;
   /** Total links required for chain variants */
   chainLength: number;
   /** Word previews for each slot position in the target row (when letter is selected) */
   slotPreviews?: Array<{ word: string; isValid: boolean }>;
+  /** Double shift phase tracking: pick1 → pick2 → drop1 → drop2 */
+  doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
+  /** First picked letter in double shift (held while dropping second) */
+  firstPickedLetter: Letter | null;
 }
 
 export interface PuzzleGameActions {
@@ -140,7 +142,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
   const [moveDirection, setMoveDirection] = useState<'down' | 'up'>('down');
-  const [blindRevealedRows, setBlindRevealedRows] = useState<number[]>([]);
   const [currentChainLink, setCurrentChainLink] = useState(1);
   const [chainLength, setChainLength] = useState(1);
   const [chainCompletedWords, setChainCompletedWords] = useState<string[]>([]);
@@ -148,6 +149,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [lastCompletedWords, setLastCompletedWords] = useState<string[]>([]);
   const [lastIncantationName, setLastIncantationName] = useState<string | null>(null);
   const [lastFormedWord, setLastFormedWord] = useState<string | null>(null);
+
+  // Double shift state: tracks the 4-step flow (pick1 → pick2 → drop1 → drop2)
+  const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
+  const [firstPickedLetter, setFirstPickedLetter] = useState<Letter | null>(null);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -253,8 +258,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setReverseSolution(options?.reverseSolution);
     setCurrentWordLength(wordLength);
     setLastFormedWord(null);
+    setDoubleShiftPhase(hasVariantModifier(variantToUse, 'double_shift') ? 'pick1' : null);
+    setFirstPickedLetter(null);
     setMoveDirection('down');
-    setBlindRevealedRows(hasVariantModifier(variantToUse, 'blind') ? [0] : []);
     if (!options?.preserveVariant) {
       setCurrentVariant(variantToUse);
     }
@@ -296,10 +302,21 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variant: PuzzleVariant,
     timeoutPromise: Promise<never>,
     startWord?: string
-  ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; reverseSolution?: PuzzleSolutionStep[]; wordLength?: number }; activeVariant: PuzzleVariant }> => {
+  ): Promise<{ puzzle: { words: string[]; hint?: string; solution?: PuzzleSolutionStep[]; reverseSolution?: PuzzleSolutionStep[]; wordLength?: number; isDoubleShift?: boolean }; activeVariant: PuzzleVariant }> => {
     let activeVariant = variant;
+    const isDoubleShiftVariant = hasVariantModifier(activeVariant, 'double_shift');
     const isReverseVariant = hasVariantModifier(activeVariant, 'reverse');
     const variantOverrides = getVariantOverrides(activeVariant, selectedDifficulty);
+
+    // Double shift uses its own generator
+    if (isDoubleShiftVariant) {
+      let puzzle = await Promise.race([
+        generateDoubleShiftPuzzle(selectedDifficulty, variantOverrides),
+        timeoutPromise,
+      ]);
+      return { puzzle, activeVariant };
+    }
+
     const generationOverrides = {
       ...variantOverrides,
       ...(startWord ? { startWord } : {}),
@@ -390,9 +407,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // Use pre-generated puzzle bank for HARD standard/reverse variants
-      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'reverse_blind'];
-      const shouldUseBank = selectedDifficulty === 'HARD' && bankVariants.includes(variant)
+      // Use pre-generated puzzle bank for standard/reverse variants at all difficulties
+      const bankVariants: PuzzleVariant[] = ['standard', 'reverse'];
+      const shouldUseBank = bankVariants.includes(variant)
         && (variant !== 'standard' || effectiveMode === 'standard');
       if (shouldUseBank) {
         try {
@@ -436,9 +453,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       console.log("Local generation failed, using fallback:", localErr);
       // Fallback puzzles don't include solver metadata, so restrictions may be
       // impossible to satisfy. Revert restriction variants to standard fallback.
-      const fallbackVariant = (
-        hasVariantModifier(variant, 'no_vowel') || hasVariantModifier(variant, 'no_consonant')
-      ) ? 'standard' : variant;
+      const fallbackVariant = variant;
       const fallbackWords = getRandomFallback(selectedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
       initGame(
@@ -471,6 +486,73 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
+    const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
+
+    // Double shift: during drop phase, ignore letter presses on source row
+    if (isDoubleShift && (doubleShiftPhase === 'drop1' || doubleShiftPhase === 'drop2')) {
+      return;
+    }
+
+    if (isDoubleShift) {
+      if (!isLetterAllowedByVariant(currentVariant, letter.char)) {
+        shakeError(getVariantRestrictionError(currentVariant, currentPhase));
+        return;
+      }
+
+      if (doubleShiftPhase === 'pick1') {
+        // First letter selection
+        if (selectedLetter?.id === letter.id) {
+          setSelectedLetter(null); // Deselect
+        } else {
+          setSelectedLetter(letter);
+          setDoubleShiftPhase('pick2');
+          setError(null);
+        }
+      } else if (doubleShiftPhase === 'pick2') {
+        if (letter.id === selectedLetter?.id) {
+          // Deselect first letter, go back to pick1
+          setSelectedLetter(null);
+          setDoubleShiftPhase('pick1');
+          return;
+        }
+        // Tapping the same second letter again: deselect it
+        if (letter.id === firstPickedLetter?.id) {
+          setFirstPickedLetter(null);
+          return;
+        }
+
+        // Validate that removing both letters leaves a valid word
+        const sourceRow = rows[activeRowIndex];
+        const remaining = sourceRow.words
+          .filter(l => l.id !== selectedLetter?.id && l.id !== letter.id)
+          .map(l => l.char)
+          .join('');
+        const isStartRow = activeRowIndex === 0;
+        const expectedLen = isStartRow ? currentWordLength - 2 : currentWordLength;
+        if (remaining.length !== expectedLen) {
+          shakeError(`Need ${expectedLen} letters remaining!`);
+          return;
+        }
+        if (!validWordsCache.current.has(remaining)) {
+          shakeError(getInvalidWordMessage(remaining, currentPhase));
+          return;
+        }
+
+        // Both letters valid — transition to drop phase
+        setFirstPickedLetter(selectedLetter);
+        setSelectedLetter(letter);
+        // Actually, we want to drop the first-picked letter first.
+        // So: firstPickedLetter = the one we'll drop first, selectedLetter = the one for drop2
+        // Swap so selectedLetter is the first to drop
+        setFirstPickedLetter(letter); // store second picked for later
+        setSelectedLetter(selectedLetter); // keep first picked as active for drop1
+        setDoubleShiftPhase('drop1');
+        setError(null);
+      }
+      return;
+    }
+
+    // Standard single-shift letter press
     if (selectedLetter?.id === letter.id) {
       setSelectedLetter(null);
     } else {
@@ -481,7 +563,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setSelectedLetter(letter);
       setError(null);
     }
-  }, [gameState, activeRowIndex, selectedLetter, shakeError, currentVariant, currentPhase]);
+  }, [gameState, activeRowIndex, selectedLetter, shakeError, currentVariant, currentPhase, doubleShiftPhase, firstPickedLetter, rows, currentWordLength]);
 
   const handleHint = useCallback(() => {
     if (gameState !== GameState.PLAYING || isProcessing) return;
@@ -525,9 +607,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
-      setMessage(
-        getHintMessage(relevantStep.letterToMove, relevantStep.targetWord, currentPhase)
-      );
+      if (relevantStep.lettersToMove) {
+        // Double shift hint: show both letters
+        setMessage(
+          getHintMessage(
+            `${relevantStep.lettersToMove[0]}' and '${relevantStep.lettersToMove[1]}`,
+            relevantStep.targetWord,
+            currentPhase
+          )
+        );
+      } else {
+        setMessage(
+          getHintMessage(relevantStep.letterToMove, relevantStep.targetWord, currentPhase)
+        );
+      }
     } else {
       setMessage(getHintFallback(currentPhase));
     }
@@ -546,6 +639,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variant?: PuzzleVariant;
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
+
+    const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
     const targetRowIndex = moveDirection === 'down' ? activeRowIndex + 1 : activeRowIndex - 1;
     if (targetRowIndex < 0 || targetRowIndex >= rows.length) {
@@ -567,14 +662,54 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     setIsProcessing(true);
 
+    // --- DOUBLE SHIFT DROP1: Place first letter without validation ---
+    if (isDoubleShift && doubleShiftPhase === 'drop1') {
+      // Record delta for undo
+      const sourceLetterIndex = sourceRow.words.findIndex(l => l.id === selectedLetter.id);
+      const delta: MoveDelta = {
+        movedLetterId: selectedLetter.id,
+        movedLetterChar: selectedLetter.char,
+        sourceRowIndex: activeRowIndex,
+        sourceLetterIndex,
+        targetRowIndex,
+        targetInsertIndex: targetIndex,
+        activeRowIndexBefore: activeRowIndex,
+        moveDirectionBefore: moveDirection,
+      };
+      setHistory(prev => [...prev, delta]);
+
+      const newRows = [...rows];
+      newRows[activeRowIndex] = { ...sourceRow, words: newSourceLetters };
+      newRows[targetRowIndex] = { ...targetRow, words: newTargetLetters };
+
+      setRows(newRows);
+      // Switch to second letter for dropping
+      setSelectedLetter(firstPickedLetter);
+      setDoubleShiftPhase('drop2');
+      setError(null);
+      setIsProcessing(false);
+      return null; // Not completed yet — still need to drop second letter
+    }
+
+    // --- Standard validation (single shift OR double shift drop2) ---
     const isReverseReturn = hasVariantModifier(currentVariant, 'reverse') && moveDirection === 'up';
     const isStartRow = activeRowIndex === 0;
-    const expectedSourceLength = isReverseReturn
-      ? currentWordLength
-      : (isStartRow ? currentWordLength - 1 : currentWordLength);
-    const expectedTargetLength = isReverseReturn
-      ? (targetRowIndex === 0 ? currentWordLength : currentWordLength + 1)
-      : currentWordLength + 1;
+
+    let expectedSourceLength: number;
+    let expectedTargetLength: number;
+
+    if (isDoubleShift && doubleShiftPhase === 'drop2') {
+      // After dropping both: source lost 2, target gained 2
+      expectedSourceLength = isStartRow ? currentWordLength - 2 : currentWordLength;
+      expectedTargetLength = currentWordLength + 2;
+    } else {
+      expectedSourceLength = isReverseReturn
+        ? currentWordLength
+        : (isStartRow ? currentWordLength - 1 : currentWordLength);
+      expectedTargetLength = isReverseReturn
+        ? (targetRowIndex === 0 ? currentWordLength : currentWordLength + 1)
+        : currentWordLength + 1;
+    }
 
     if (sourceWordStr.length !== expectedSourceLength) {
       shakeError(`Need ${expectedSourceLength} letters!`);
@@ -592,6 +727,30 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isSourceValid) {
       shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
+      // For double shift drop2, undo the first drop too
+      if (isDoubleShift && doubleShiftPhase === 'drop2') {
+        // Undo the drop1 delta from history
+        setHistory(prev => prev.slice(0, -1));
+        // Restore the first letter from history
+        const drop1Delta = history[history.length - 1];
+        if (drop1Delta) {
+          setRows(prevRows => {
+            const restored = [...prevRows];
+            const tRow = restored[drop1Delta.targetRowIndex];
+            const sRow = restored[drop1Delta.sourceRowIndex];
+            const newTarget = tRow.words.filter(l => l.id !== drop1Delta.movedLetterId);
+            const restoredLetter: Letter = { id: drop1Delta.movedLetterId, char: drop1Delta.movedLetterChar, isLocked: false };
+            const newSource = [...sRow.words];
+            newSource.splice(drop1Delta.sourceLetterIndex, 0, restoredLetter);
+            restored[drop1Delta.targetRowIndex] = { ...tRow, words: newTarget };
+            restored[drop1Delta.sourceRowIndex] = { ...sRow, words: newSource };
+            return restored;
+          });
+        }
+        setDoubleShiftPhase('pick1');
+        setSelectedLetter(null);
+        setFirstPickedLetter(null);
+      }
       setIsProcessing(false);
       return null;
     }
@@ -600,6 +759,28 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isTargetValid) {
       shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
+      // For double shift drop2, undo the first drop too
+      if (isDoubleShift && doubleShiftPhase === 'drop2') {
+        setHistory(prev => prev.slice(0, -1));
+        const drop1Delta = history[history.length - 1];
+        if (drop1Delta) {
+          setRows(prevRows => {
+            const restored = [...prevRows];
+            const tRow = restored[drop1Delta.targetRowIndex];
+            const sRow = restored[drop1Delta.sourceRowIndex];
+            const newTarget = tRow.words.filter(l => l.id !== drop1Delta.movedLetterId);
+            const restoredLetter: Letter = { id: drop1Delta.movedLetterId, char: drop1Delta.movedLetterChar, isLocked: false };
+            const newSource = [...sRow.words];
+            newSource.splice(drop1Delta.sourceLetterIndex, 0, restoredLetter);
+            restored[drop1Delta.targetRowIndex] = { ...tRow, words: newTarget };
+            restored[drop1Delta.sourceRowIndex] = { ...sRow, words: newSource };
+            return restored;
+          });
+        }
+        setDoubleShiftPhase('pick1');
+        setSelectedLetter(null);
+        setFirstPickedLetter(null);
+      }
       setIsProcessing(false);
       return null;
     }
@@ -633,15 +814,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       })),
     };
 
-    if (hasVariantModifier(currentVariant, 'blind')) {
-      setBlindRevealedRows(prev =>
-        prev.includes(targetRowIndex) ? prev : [...prev, targetRowIndex]
-      );
-    }
-
     setRows(newRows);
     setSelectedLetter(null);
     setError(null);
+
+    // Reset double shift phase for next step
+    if (isDoubleShift) {
+      setDoubleShiftPhase('pick1');
+      setFirstPickedLetter(null);
+    }
 
     const maxForwardSourceIndex = rows.length - 2;
     const isReverseMode = hasVariantModifier(currentVariant, 'reverse');
@@ -780,6 +961,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     generatePuzzleForVariant,
     difficulty,
     applyBoard,
+    doubleShiftPhase,
+    firstPickedLetter,
+    history,
   ]);
 
   const handleUndo = useCallback(() => {
@@ -792,48 +976,70 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    const delta = history[history.length - 1];
+    const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
-    // Reconstruct previous state from delta:
-    // 1. Remove movedLetter from target row
-    // 2. Insert it back into source row at original position (unlocked)
+    // Double shift: if we're mid-drop (drop2 phase), just undo the first drop
+    if (isDoubleShift && doubleShiftPhase === 'drop2') {
+      const delta = history[history.length - 1];
+      setRows(prevRows => {
+        const newRows = [...prevRows];
+        const targetRow = newRows[delta.targetRowIndex];
+        const sourceRow = newRows[delta.sourceRowIndex];
+        const newTargetLetters = targetRow.words.filter(l => l.id !== delta.movedLetterId);
+        const restoredLetter: Letter = { id: delta.movedLetterId, char: delta.movedLetterChar, isLocked: false };
+        const newSourceLetters = [...sourceRow.words];
+        newSourceLetters.splice(delta.sourceLetterIndex, 0, restoredLetter);
+        newRows[delta.targetRowIndex] = { ...targetRow, words: newTargetLetters };
+        newRows[delta.sourceRowIndex] = { ...sourceRow, words: newSourceLetters };
+        return newRows;
+      });
+      setHistory(prev => prev.slice(0, -1));
+      setDoubleShiftPhase('pick1');
+      setSelectedLetter(null);
+      setFirstPickedLetter(null);
+      setError(null);
+      return;
+    }
+
+    // Double shift: undo both letters of a completed step (2 deltas)
+    const undoCount = isDoubleShift ? Math.min(2, history.length) : 1;
+
     setRows(prevRows => {
       const newRows = [...prevRows];
-      const targetRow = newRows[delta.targetRowIndex];
-      const sourceRow = newRows[delta.sourceRowIndex];
-
-      // Remove the moved letter from target
-      const newTargetLetters = targetRow.words.filter(l => l.id !== delta.movedLetterId);
-
-      // Re-insert into source at original position (unlocked)
-      const restoredLetter: Letter = {
-        id: delta.movedLetterId,
-        char: delta.movedLetterChar,
-        isLocked: false,
-      };
-      const newSourceLetters = [...sourceRow.words];
-      newSourceLetters.splice(delta.sourceLetterIndex, 0, restoredLetter);
-
-      newRows[delta.targetRowIndex] = { ...targetRow, words: newTargetLetters };
-      newRows[delta.sourceRowIndex] = { ...sourceRow, words: newSourceLetters };
-
+      for (let i = 0; i < undoCount; i++) {
+        const delta = history[history.length - 1 - i];
+        const targetRow = newRows[delta.targetRowIndex];
+        const sourceRow = newRows[delta.sourceRowIndex];
+        const newTargetLetters = targetRow.words.filter(l => l.id !== delta.movedLetterId);
+        const restoredLetter: Letter = { id: delta.movedLetterId, char: delta.movedLetterChar, isLocked: false };
+        const newSourceLetters = [...sourceRow.words];
+        newSourceLetters.splice(delta.sourceLetterIndex, 0, restoredLetter);
+        newRows[delta.targetRowIndex] = { ...targetRow, words: newTargetLetters };
+        newRows[delta.sourceRowIndex] = { ...sourceRow, words: newSourceLetters };
+      }
       return newRows;
     });
 
-    setActiveRowIndex(delta.activeRowIndexBefore);
-    if (delta.moveDirectionBefore) {
-      setMoveDirection(delta.moveDirectionBefore);
+    const oldestDelta = history[history.length - undoCount];
+    setActiveRowIndex(oldestDelta.activeRowIndexBefore);
+    if (oldestDelta.moveDirectionBefore) {
+      setMoveDirection(oldestDelta.moveDirectionBefore);
     }
-    setHistory(prev => prev.slice(0, -1));
+    setHistory(prev => prev.slice(0, -undoCount));
     setGameState(GameState.PLAYING);
     setSelectedLetter(null);
     setError(null);
     setMessage("Let's try again!");
 
+    if (isDoubleShift) {
+      setDoubleShiftPhase('pick1');
+      setFirstPickedLetter(null);
+    }
+
     if (gameMode === 'challenge') {
       setUndosRemaining(prev => prev - 1);
     }
-  }, [history, gameMode, undosRemaining, shakeError, gameState]);
+  }, [history, gameMode, undosRemaining, shakeError, gameState, currentVariant, doubleShiftPhase]);
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
@@ -845,6 +1051,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Shows what word would form at each slot position — valid words in green, invalid in red.
   const slotPreviews = useMemo(() => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return undefined;
+
+    const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
+
+    // For double shift, only show previews during drop phases
+    if (isDoubleShift && doubleShiftPhase !== 'drop1' && doubleShiftPhase !== 'drop2') {
+      return undefined;
+    }
+
     const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
     if (targetRowIndex < 0 || targetRowIndex >= rows.length) return undefined;
 
@@ -858,13 +1072,19 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         selectedLetter.char,
         ...targetLetters.slice(i),
       ].join('');
-      previews.push({
-        word: newWord,
-        isValid: validWordsCache.current.has(newWord),
-      });
+
+      if (isDoubleShift && doubleShiftPhase === 'drop1') {
+        // During drop1, show intermediate words (no validation — they're W+1 intermediates)
+        previews.push({ word: newWord, isValid: true });
+      } else {
+        previews.push({
+          word: newWord,
+          isValid: validWordsCache.current.has(newWord),
+        });
+      }
     }
     return previews;
-  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState]);
+  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase]);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
@@ -888,7 +1108,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
-    setBlindRevealedRows(saved.blindRevealedRows);
     setCurrentChainLink(saved.currentChainLink);
     setChainLength(saved.chainLength);
     setCurrentPhase(saved.currentPhase);
@@ -932,10 +1151,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentVariant,
     selectedVariant,
     moveDirection,
-    blindRevealedRows,
     currentChainLink,
     chainLength,
     slotPreviews,
+    doubleShiftPhase,
+    firstPickedLetter,
   };
 
   const actions: PuzzleGameActions = {

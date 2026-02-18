@@ -21,4 +21,6 @@ export interface PreGeneratedPuzzle {
   semanticTags: string[];
   /** Step-by-step reverse solution for hints during the reverse leg (reverse variants only). */
   reverseSolution?: PuzzleSolutionStep[];
+  /** When true, this puzzle uses double-shift mechanics (2 letters per step). */
+  isDoubleShift?: boolean;
 }

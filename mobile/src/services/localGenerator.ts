@@ -301,7 +301,9 @@ const DREAD_WORDS_PHASE_1 = new Set([
   // Light & atmosphere
   'GLOW', 'GLEAM', 'SHINE', 'SPARK', 'LIGHT', 'HAZE', 'MISTY', 'FOGGY', 'BLUR',
   // Strangeness
-  'EERIE', 'WEIRD', 'ODD', 'GRIM',
+  'EERIE', 'WEIRD', 'ODD', 'GRIM', 'AWE',
+  // 3-letter curiosity
+  'CUE', 'SPY', 'PRY', 'DIG',
   // Change
   'SHIFT', 'CHANGE', 'MORPH', 'ALTER', 'VARY', 'FLUX', 'FLOW', 'TURN',
   'GROW', 'SHRINK', 'EXPAND', 'SWELL', 'PULSE', 'CYCLE',
@@ -330,7 +332,9 @@ const DREAD_WORDS_PHASE_2 = new Set([
   'LONE', 'SOLO', 'SINGLE', 'ONLY', 'SOLE', 'MERE', 'REMOTE', 'DISTANT',
   'LEFT', 'EXILE',
   // Bleakness
-  'BLEAK', 'STARK', 'DINGY', 'DRAB', 'PLAIN', 'GRAY',
+  'BLEAK', 'STARK', 'DINGY', 'DRAB', 'PLAIN', 'GRAY', 'LOW',
+  // 3-letter emptiness/decay
+  'RUE', 'ILL', 'EBB', 'DRY', 'OLD', 'WAN', 'SAG', 'RUT', 'SAP',
   // Atmosphere
   'MIST', 'FOG', 'DUSK', 'MARSH', 'SWAMP', 'BOG',
   // Below
@@ -380,6 +384,8 @@ const DREAD_WORDS_PHASE_3 = new Set([
   'QUAKE', 'POUND', 'SLIT', 'GASH', 'GORE', 'STAB', 'TORN', 'HACK', 'CHOP',
   // Suffering
   'AGONY', 'GRIEF', 'WOE', 'SORROW', 'BITTER', 'BURDEN',
+  // 3-letter dread
+  'DIE', 'CRY', 'WAR', 'IRE', 'HEX', 'RAW', 'SIN', 'MAR', 'RIP', 'ROB', 'JAB',
   // Places of dread
   'VAULT', 'LAIR', 'DEN', 'PIT',
   // Remnants
@@ -432,6 +438,8 @@ const DREAD_WORDS_PHASE_4 = new Set([
   'EMBER', 'FLAME', 'BLAZE', 'TORCH',
   // Weaving
   'WOVEN', 'THREAD',
+  // 3-letter cosmic/ritual
+  'VOW', 'ORB', 'ODE', 'KEY', 'FOE', 'DYE', 'BAN',
   // Transformation
   'BECOME', 'CONVERT', 'EVOLVE',
   'MELT', 'VANISH',
@@ -2336,6 +2344,455 @@ async function findPath(
   }
 
   return null;
+}
+
+// ============================================================================
+// DOUBLE SHIFT — Move 2 letters per step instead of 1
+// ============================================================================
+
+/**
+ * Double Insertion Index: maps sorted letter pairs to valid transformations.
+ *
+ * For each (W+2)-letter word (i.e. 7-letter for W=5), enumerate all C(W+2, 2)
+ * pairs of positions. If removing those 2 letters produces a valid W-letter word,
+ * record the transformation keyed by the sorted letter pair.
+ *
+ * During generation, we look up which W-letter base words can receive a specific
+ * pair of letters to form a valid (W+2)-letter word.
+ */
+interface DoubleInsertionTarget {
+  /** The W-letter base word receiving the letters */
+  baseWord: string;
+  /** The (W+2)-letter word after both insertions */
+  result: string;
+  /**
+   * Positions in the result word where the 2 letters sit.
+   * These are the positions that, when removed from result, yield baseWord.
+   */
+  resultPositions: [number, number];
+}
+
+type DoubleInsertionIndex = Map<string, DoubleInsertionTarget[]>;
+
+const doubleInsertionIndexCache = new Map<number, DoubleInsertionIndex>();
+
+/** Normalize a letter pair to a canonical sorted key (e.g., "EL" not "LE"). */
+function letterPairKey(a: string, b: string): string {
+  return a <= b ? a + b : b + a;
+}
+
+/**
+ * Build (or retrieve cached) the double insertion index for word length W.
+ * Iterates all (W+2)-letter words and finds valid 2-letter removals.
+ */
+export function getDoubleInsertionIndex(wordLength: number): DoubleInsertionIndex {
+  const cached = doubleInsertionIndexCache.get(wordLength);
+  if (cached) return cached;
+
+  const baseSet = WORD_SETS[wordLength];
+  const maxSet = WORD_SETS[wordLength + 2];
+  if (!baseSet || !maxSet) return new Map();
+
+  const index: DoubleInsertionIndex = new Map();
+
+  for (const resultWord of maxSet) {
+    const len = resultWord.length;
+    // Enumerate all pairs of positions to remove
+    for (let i = 0; i < len - 1; i++) {
+      for (let j = i + 1; j < len; j++) {
+        // Remove positions j then i (j > i, so indices stay correct)
+        const remainder = resultWord.slice(0, i) + resultWord.slice(i + 1, j) + resultWord.slice(j + 1);
+        if (baseSet.has(remainder)) {
+          const key = letterPairKey(resultWord[i], resultWord[j]);
+          let targets = index.get(key);
+          if (!targets) {
+            targets = [];
+            index.set(key, targets);
+          }
+          targets.push({
+            baseWord: remainder,
+            result: resultWord,
+            resultPositions: [i, j],
+          });
+        }
+      }
+    }
+  }
+
+  doubleInsertionIndexCache.set(wordLength, index);
+  return index;
+}
+
+/**
+ * Find all valid 2-letter removals from a word.
+ * Returns pairs where removing the 2 letters leaves a valid shorter word.
+ */
+function findDoubleRemovals(
+  word: string,
+  validSet: Set<string>,
+  excludeLettersReceived?: [string, string]
+): Array<{
+  letters: [string, string];
+  positions: [number, number];
+  remainder: string;
+}> {
+  const results: Array<{
+    letters: [string, string];
+    positions: [number, number];
+    remainder: string;
+  }> = [];
+
+  const len = word.length;
+  for (let i = 0; i < len - 1; i++) {
+    // Don't give back a letter we just received (avoid ping-pong)
+    if (excludeLettersReceived && word[i] === excludeLettersReceived[0]) continue;
+
+    for (let j = i + 1; j < len; j++) {
+      if (excludeLettersReceived && word[j] === excludeLettersReceived[1]) continue;
+
+      const remainder = word.slice(0, i) + word.slice(i + 1, j) + word.slice(j + 1);
+      if (validSet.has(remainder)) {
+        results.push({
+          letters: [word[i], word[j]],
+          positions: [i, j],
+          remainder,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+interface DoubleShiftPathNode {
+  /** The base W-letter word for this row */
+  word: string;
+  /**
+   * Current state of this row:
+   * - Row 0: same as word (W letters)
+   * - Other rows: W+2 letters (word + 2 received letters)
+   */
+  tempState: string;
+  /** The 2 letters received from the previous row */
+  lettersReceived?: [string, string];
+  /** The 2 letters to give to the next row */
+  lettersToGive?: [string, string];
+  /** Removal positions in tempState for the 2 letters */
+  moveFromPositions?: [number, number];
+  /** Positions in the result word where the 2 letters sit */
+  moveToPositions?: [number, number];
+}
+
+interface DoubleShiftGenState {
+  startTime: number;
+  lastYieldTime: number;
+  iterations: number;
+}
+
+/**
+ * DFS to build a double-shift chain.
+ *
+ * At each step, removes 2 letters from the current row's tempState and inserts
+ * them into a candidate base word to form a valid (W+2)-letter word.
+ *
+ * Row 0 tempState is W letters, so removal produces a (W-2)-letter intermediate.
+ * Rows 1+ tempState is (W+2) letters, so removal produces a W-letter intermediate.
+ */
+async function findDoubleShiftPath(
+  chain: DoubleShiftPathNode[],
+  targetDepth: number,
+  usedWords: Set<string>,
+  wordLength: number,
+  dicts: { min2: Set<string>; base: Set<string>; max2: Set<string> },
+  doubleIdx: DoubleInsertionIndex,
+  timeoutLimit: number,
+  state: DoubleShiftGenState,
+  recencyMap?: Map<string, number>,
+): Promise<DoubleShiftPathNode[] | null> {
+  if (Date.now() - state.startTime > timeoutLimit) return null;
+
+  state.iterations++;
+  if (state.iterations % 500 === 0) {
+    if (Date.now() - state.lastYieldTime > 15) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      state.lastYieldTime = Date.now();
+    }
+  }
+
+  const currentDepth = chain.length;
+  if (currentDepth === targetDepth) return chain;
+
+  const currentNode = chain[currentDepth - 1];
+  const currentTemp = currentNode.tempState;
+
+  // Determine which set validates the remainder after removal
+  const isStartRow = currentDepth === 1;
+  const remainderSet = isStartRow ? dicts.min2 : dicts.base;
+
+  // Find all valid 2-letter removals
+  const removals = findDoubleRemovals(currentTemp, remainderSet, currentNode.lettersReceived);
+
+  // Score and sort removals
+  const scoredRemovals = removals.map(r => {
+    let score = 50;
+    // Prefer middle removals
+    const mid = currentTemp.length / 2;
+    const avgPos = (r.positions[0] + r.positions[1]) / 2;
+    const midDist = Math.abs(avgPos - mid);
+    score += (mid - midDist) * 5;
+    // Prefer interesting letters
+    if (INTERESTING_LETTERS.has(r.letters[0])) score += 10;
+    if (INTERESTING_LETTERS.has(r.letters[1])) score += 10;
+    // Penalize common boring patterns
+    const lastPos = currentTemp.length - 1;
+    if (r.letters[1] === 'S' && r.positions[1] === lastPos) score -= 30;
+    if (r.letters[0] === 'S' && r.positions[0] === lastPos) score -= 30;
+    score += Math.random() * 20;
+    return { ...r, score };
+  });
+
+  scoredRemovals.sort((a, b) => b.score - a.score);
+  const maxRemovals = Math.min(scoredRemovals.length, 15);
+
+  for (let ri = 0; ri < maxRemovals; ri++) {
+    if (Date.now() - state.startTime > timeoutLimit) return null;
+
+    const removal = scoredRemovals[ri];
+    const key = letterPairKey(removal.letters[0], removal.letters[1]);
+    const targets = doubleIdx.get(key);
+    if (!targets) continue;
+
+    // Score and filter insertion targets
+    const candidates: Array<{
+      baseWord: string;
+      result: string;
+      resultPositions: [number, number];
+      score: number;
+    }> = [];
+
+    for (const t of targets) {
+      if (usedWords.has(t.baseWord)) continue;
+      if (usedWords.has(t.result)) continue;
+      if (recencyMap && isInHardCooldown(t.baseWord, recencyMap)) continue;
+
+      let score = scoreWordInterestingness(t.baseWord, t.baseWord.length, recencyMap);
+      // Prefer middle insertion positions
+      const mid = t.result.length / 2;
+      const avgInsPos = (t.resultPositions[0] + t.resultPositions[1]) / 2;
+      score += (mid - Math.abs(avgInsPos - mid)) * 3;
+      score += Math.random() * 20;
+      candidates.push({ ...t, score });
+    }
+
+    candidates.sort((a, b) => b.score - a.score);
+    const maxCandidates = Math.min(candidates.length, 20);
+    const toExplore = shuffle(candidates.slice(0, maxCandidates));
+
+    for (const cand of toExplore) {
+      if (Date.now() - state.startTime > timeoutLimit) return null;
+
+      const updatedCurrentNode: DoubleShiftPathNode = {
+        ...currentNode,
+        lettersToGive: removal.letters,
+        moveFromPositions: removal.positions,
+        moveToPositions: cand.resultPositions,
+      };
+
+      const nextNode: DoubleShiftPathNode = {
+        word: cand.baseWord,
+        tempState: cand.result,
+        lettersReceived: removal.letters,
+      };
+
+      const newChain = [...chain.slice(0, -1), updatedCurrentNode, nextNode];
+      const newUsed = new Set(usedWords);
+      newUsed.add(removal.remainder);
+      newUsed.add(cand.baseWord);
+      newUsed.add(cand.result);
+
+      const result = await findDoubleShiftPath(
+        newChain,
+        targetDepth,
+        newUsed,
+        wordLength,
+        dicts,
+        doubleIdx,
+        timeoutLimit,
+        state,
+        recencyMap,
+      );
+
+      if (result) return result;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Score a double-shift puzzle chain (0-100).
+ * Simplified scoring: word interestingness + semantic distance.
+ */
+function scoreDoubleShiftChain(chain: DoubleShiftPathNode[], recencyMap?: Map<string, number>): number {
+  if (chain.length < 2) return 0;
+
+  let totalScore = 0;
+
+  // Word interestingness (40%)
+  const wordScores = chain.map(node => scoreWordInterestingness(node.word, node.word.length, recencyMap));
+  const avgWordScore = wordScores.reduce((a, b) => a + b, 0) / wordScores.length;
+  totalScore += avgWordScore * 0.4;
+
+  // Semantic distance start→end (30%)
+  const semanticScore = calculateSemanticDistance(chain[0].word, chain[chain.length - 1].word);
+  totalScore += semanticScore * 0.3;
+
+  // Semantic journey (15%)
+  const journeyScore = scoreSemanticJourney(chain as unknown as PathNode[]);
+  totalScore += journeyScore * 0.15;
+
+  // Dread word bonus (15%)
+  let dreadScore = 0;
+  for (const node of chain) {
+    const tier = DREAD_WORD_TIER.get(node.word);
+    if (tier) dreadScore += 15;
+  }
+  totalScore += Math.min(30, dreadScore) * 0.15;
+
+  return Math.round(Math.max(0, Math.min(100, totalScore)));
+}
+
+/**
+ * Generate a double-shift puzzle.
+ *
+ * Double shift moves 2 letters per step instead of 1:
+ * - All displayed words are W letters (W=5 for all difficulties)
+ * - Each step: remove 2 letters from W-letter word → (W-2)-letter intermediate (must be valid)
+ * - Insert those 2 letters into a (W-2)-letter base → W-letter result (forming a (W+2)-letter tempState in the target)
+ *
+ * Currently supports W=5 only (uses WORDS_3, WORDS_5, WORDS_7).
+ * W=5 is the only viable word length: W-2=3 and W+2=7 must both exist
+ * in the dictionary (which covers 3-7 letters).
+ *
+ * @param difficulty Controls row count: EASY=3, MEDIUM=4, MEDIUM_PLUS=5, HARD=6
+ * @param overrides Optional word length and row count overrides
+ * @returns PuzzleConfig with isDoubleShift=true
+ */
+export async function generateDoubleShiftPuzzle(
+  difficulty: Difficulty = 'MEDIUM',
+  overrides?: { wordLength?: number; targetRows?: number }
+): Promise<PuzzleConfig> {
+  const wordLength = overrides?.wordLength ?? 5;
+  const targetRows = overrides?.targetRows ?? (
+    difficulty === 'EASY' ? 3 :
+    difficulty === 'MEDIUM' ? 4 :
+    difficulty === 'MEDIUM_PLUS' ? 5 :
+    6 // HARD
+  );
+
+  const recencyMap = await getWordHistoryWithRecency();
+
+  try {
+    currentDreadPhase = await getCurrentPhase();
+  } catch {
+    currentDreadPhase = 0;
+  }
+
+  const dicts = {
+    min2: WORD_SETS[wordLength - 2],  // 3-letter words (remainder after removing 2 from row 0)
+    base: WORD_SETS[wordLength],       // 5-letter words (all displayed words)
+    max2: WORD_SETS[wordLength + 2],   // 7-letter words (tempState after inserting 2)
+  };
+
+  if (!dicts.min2 || !dicts.base || !dicts.max2) {
+    throw new Error(`Double shift requires word sets for lengths ${wordLength - 2}, ${wordLength}, ${wordLength + 2}`);
+  }
+
+  const doubleIdx = getDoubleInsertionIndex(wordLength);
+  const TIMEOUT = 5000; // 5 second timeout
+  const CANDIDATES_TO_GENERATE = 3;
+  const MIN_ACCEPTABLE_SCORE = 30;
+
+  const state: DoubleShiftGenState = {
+    startTime: Date.now(),
+    lastYieldTime: Date.now(),
+    iterations: 0,
+  };
+
+  const baseArray = shuffle(Array.from(dicts.base));
+  const candidates = weightedShuffle(baseArray, wordLength, recencyMap);
+
+  const generatedPuzzles: Array<{ chain: DoubleShiftPathNode[]; score: number }> = [];
+  let candidateIndex = 0;
+
+  while (
+    generatedPuzzles.length < CANDIDATES_TO_GENERATE &&
+    candidateIndex < candidates.length &&
+    Date.now() - state.startTime < TIMEOUT
+  ) {
+    const w0 = candidates[candidateIndex];
+    candidateIndex++;
+
+    const path = await findDoubleShiftPath(
+      [{ word: w0, tempState: w0 }],
+      targetRows,
+      new Set([w0]),
+      wordLength,
+      dicts,
+      doubleIdx,
+      TIMEOUT,
+      state,
+      recencyMap,
+    );
+
+    if (path) {
+      const score = scoreDoubleShiftChain(path, recencyMap);
+      if (score >= MIN_ACCEPTABLE_SCORE) {
+        generatedPuzzles.push({ chain: path, score });
+        if (score >= 60 && generatedPuzzles.length >= 2) break;
+      }
+    }
+  }
+
+  if (generatedPuzzles.length === 0) {
+    throw new Error('Could not generate valid double-shift puzzle');
+  }
+
+  generatedPuzzles.sort((a, b) => b.score - a.score);
+  const bestPuzzle = generatedPuzzles[0];
+  const path = bestPuzzle.chain;
+
+  const words = path.map(n => n.word);
+  await recordPuzzleWords(words);
+
+  // Build solution steps with both letters per step
+  const solution: PuzzleSolutionStep[] = [];
+  for (let s = 0; s < path.length - 1; s++) {
+    const sourceNode = path[s];
+    const targetNode = path[s + 1];
+    const letters = sourceNode.lettersToGive!;
+
+    solution.push({
+      stepIndex: s,
+      sourceWord: sourceNode.tempState,
+      targetWord: targetNode.word,
+      letterToMove: letters[0], // Primary for backward compat
+      lettersToMove: letters,
+      explanation: `Move '${letters[0]}' and '${letters[1]}' from ${sourceNode.tempState} to form ${targetNode.tempState}.`,
+      insertionPosition: sourceNode.moveToPositions?.[0],
+      insertionPositions: sourceNode.moveToPositions,
+      removalPosition: sourceNode.moveFromPositions?.[0],
+      removalPositions: sourceNode.moveFromPositions,
+    });
+  }
+
+  return {
+    words,
+    hint: `Start by shifting '${solution[0].lettersToMove?.[0]}' and '${solution[0].lettersToMove?.[1]}'`,
+    solution,
+    wordLength,
+    isDoubleShift: true,
+  };
 }
 
 // ============================================================================

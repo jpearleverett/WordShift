@@ -152,7 +152,7 @@ export default function App() {
           currentVariant: puzzle.currentVariant,
           selectedVariant: puzzle.selectedVariant,
           moveDirection: puzzle.moveDirection,
-          blindRevealedRows: puzzle.blindRevealedRows,
+          blindRevealedRows: [],
           currentChainLink: puzzle.currentChainLink,
           chainLength: puzzle.chainLength,
           currentPhase: puzzle.currentPhase,
@@ -190,7 +190,6 @@ export default function App() {
     puzzle.currentVariant,
     puzzle.selectedVariant,
     puzzle.moveDirection,
-    puzzle.blindRevealedRows,
     puzzle.currentChainLink,
     puzzle.chainLength,
     puzzle.currentPhase,
@@ -1444,11 +1443,7 @@ export default function App() {
                 isProcessing={puzzle.isProcessing}
                 phase={persistence.currentPhase}
                 wordLength={puzzle.currentWordLength}
-                concealLetters={
-                  hasVariantModifier(puzzle.currentVariant, 'blind') &&
-                  idx !== puzzle.activeRowIndex &&
-                  !puzzle.blindRevealedRows.includes(idx)
-                }
+                concealLetters={false}
                 guidanceActive={onboardingStep === 'puzzle_tutorial'}
                 guidedLetterId={tutorialGuidance?.sourceLetterId || null}
                 guidedSlotIndex={tutorialGuidance?.targetSlotIndex ?? null}

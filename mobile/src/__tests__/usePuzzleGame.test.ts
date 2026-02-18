@@ -89,6 +89,11 @@ jest.mock('../services/amberCurrency', () => ({
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 10 })),
 }));
 
+// Mock puzzleBank to return null — tests exercise the generation path
+jest.mock('../services/puzzleBank', () => ({
+  selectPreGeneratedPuzzle: jest.fn(async () => null),
+}));
+
 // COMMON_WORDS needs to contain all words used in the test puzzle chain
 // and the valid words formed during moves
 jest.mock('../constants', () => ({
@@ -268,45 +273,6 @@ describe('usePuzzleGame', () => {
       expect(state.selectedLetter).toBeNull();
     });
 
-    test('enforces no_vowel restrictions', () => {
-      resetHookState();
-      let [, actions] = callHook();
-      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'no_vowel');
-
-      let [state] = callHook();
-      const vowel = state.rows[0].words.find(l => l.char === 'I')!;
-      [, actions] = callHook();
-      actions.handleLetterPress(vowel, 0);
-      [state] = callHook();
-      expect(state.selectedLetter).toBeNull();
-      expect(state.error).toContain('No Vowel Shift');
-
-      const consonant = state.rows[0].words.find(l => l.char === 'T')!;
-      [, actions] = callHook();
-      actions.handleLetterPress(consonant, 0);
-      [state] = callHook();
-      expect(state.selectedLetter?.char).toBe('T');
-    });
-
-    test('enforces no_consonant restrictions', () => {
-      resetHookState();
-      let [, actions] = callHook();
-      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'no_consonant');
-
-      let [state] = callHook();
-      const consonant = state.rows[0].words.find(l => l.char === 'T')!;
-      [, actions] = callHook();
-      actions.handleLetterPress(consonant, 0);
-      [state] = callHook();
-      expect(state.selectedLetter).toBeNull();
-      expect(state.error).toContain('No Consonant Shift');
-
-      const vowel = state.rows[0].words.find(l => l.char === 'I')!;
-      [, actions] = callHook();
-      actions.handleLetterPress(vowel, 0);
-      [state] = callHook();
-      expect(state.selectedLetter?.char).toBe('I');
-    });
   });
 
   describe('handleSlotPress', () => {
@@ -561,13 +527,13 @@ describe('usePuzzleGame', () => {
     test('uses selected variant for new puzzles', async () => {
       resetHookState();
       let [, actions] = callHook();
-      actions.setSelectedVariant('blind');
+      actions.setSelectedVariant('speed');
       [, actions] = callHook();
       await actions.startNewGame('MEDIUM');
 
       const [state] = callHook();
-      expect(state.currentVariant).toBe('blind');
-      expect(state.selectedVariant).toBe('blind');
+      expect(state.currentVariant).toBe('speed');
+      expect(state.selectedVariant).toBe('speed');
     });
   });
 

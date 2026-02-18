@@ -16,6 +16,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { selectPreGeneratedPuzzle, clearPlayedPuzzles } from '../services/puzzleBank';
 import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
+import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
+import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
+import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
 
 // Helper: get a recency map (empty by default)
 function emptyRecencyMap(): Map<string, number> {
@@ -41,15 +44,21 @@ describe('puzzleBank', () => {
       expect(result!.hint).toBeDefined();
     });
 
-    it('returns null for non-HARD difficulties (no bank yet)', async () => {
+    it('returns valid puzzles for all standard difficulties', async () => {
       const easy = await selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap());
-      expect(easy).toBeNull();
+      expect(easy).not.toBeNull();
+      expect(easy!.words.length).toBe(3); // EASY = 3 rows
+      expect(easy!.wordLength).toBe(4);
 
       const medium = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap());
-      expect(medium).toBeNull();
+      expect(medium).not.toBeNull();
+      expect(medium!.words.length).toBe(4); // MEDIUM = 4 rows
+      expect(medium!.wordLength).toBe(4);
 
       const mediumPlus = await selectPreGeneratedPuzzle('MEDIUM_PLUS', 0, emptyRecencyMap());
-      expect(mediumPlus).toBeNull();
+      expect(mediumPlus).not.toBeNull();
+      expect(mediumPlus!.words.length).toBe(4); // MEDIUM_PLUS = 4 rows
+      expect(mediumPlus!.wordLength).toBe(5);
     });
 
     it('does not return the same puzzle twice in succession', async () => {
@@ -198,18 +207,19 @@ describe('puzzleBank', () => {
   describe('selectPreGeneratedPuzzle - reverse variant', () => {
     const hasReversePuzzles = PUZZLE_BANK_REVERSE_HARD.length > 0;
 
-    it('returns null for reverse at non-HARD difficulties', async () => {
+    it('returns puzzles for reverse at EASY and MEDIUM difficulties', async () => {
       const easy = await selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap(), 'reverse');
-      expect(easy).toBeNull();
+      expect(easy).not.toBeNull();
+      expect(easy!.words.length).toBe(3); // 3 rows
+      expect(easy!.wordLength).toBe(4);   // 4-letter words
 
       const medium = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
-      expect(medium).toBeNull();
+      expect(medium).not.toBeNull();
+      expect(medium!.words.length).toBe(4); // 4 rows
+      expect(medium!.wordLength).toBe(4);   // 4-letter words
     });
 
     it('returns null for unsupported variants', async () => {
-      const blind = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'blind');
-      expect(blind).toBeNull();
-
       const speed = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'speed');
       expect(speed).toBeNull();
     });
@@ -226,11 +236,6 @@ describe('puzzleBank', () => {
         expect(result!.hint).toBeDefined();
       });
 
-      it('returns a valid PuzzleConfig for HARD reverse_blind (uses reverse bank)', async () => {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse_blind');
-        expect(result).not.toBeNull();
-        expect(result!.words.length).toBe(5);
-      });
 
       it('does not return the same reverse puzzle twice', async () => {
         const first = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
@@ -345,6 +350,102 @@ describe('puzzleBank', () => {
       expect(reverseResult).not.toBeNull();
       // The reverse puzzle's words can overlap with standard words — that's fine,
       // because the banks track independently
+    });
+  });
+
+  describe('PUZZLE_BANK_EASY', () => {
+    it('contains puzzles', () => {
+      expect(PUZZLE_BANK_EASY.length).toBeGreaterThan(0);
+    });
+
+    it('all puzzles have required fields', () => {
+      for (const puzzle of PUZZLE_BANK_EASY) {
+        expect(puzzle.id).toBeTruthy();
+        expect(puzzle.words.length).toBe(3); // EASY = 3 rows
+        expect(puzzle.solution.length).toBe(2); // 3 rows = 2 steps
+        expect(puzzle.wordLength).toBe(4);
+        expect(typeof puzzle.dreadTier).toBe('number');
+        expect(puzzle.dreadTier).toBeGreaterThanOrEqual(0);
+        expect(puzzle.dreadTier).toBeLessThanOrEqual(4);
+        expect(puzzle.allWords.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('all puzzles have unique IDs', () => {
+      const ids = PUZZLE_BANK_EASY.map(p => p.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('all puzzle words are 4 letters', () => {
+      for (const puzzle of PUZZLE_BANK_EASY) {
+        for (const word of puzzle.words) {
+          expect(word.length).toBe(4);
+        }
+      }
+    });
+  });
+
+  describe('PUZZLE_BANK_MEDIUM', () => {
+    it('contains puzzles', () => {
+      expect(PUZZLE_BANK_MEDIUM.length).toBeGreaterThan(0);
+    });
+
+    it('all puzzles have required fields', () => {
+      for (const puzzle of PUZZLE_BANK_MEDIUM) {
+        expect(puzzle.id).toBeTruthy();
+        expect(puzzle.words.length).toBe(4); // MEDIUM = 4 rows
+        expect(puzzle.solution.length).toBe(3); // 4 rows = 3 steps
+        expect(puzzle.wordLength).toBe(4);
+        expect(typeof puzzle.dreadTier).toBe('number');
+        expect(puzzle.dreadTier).toBeGreaterThanOrEqual(0);
+        expect(puzzle.dreadTier).toBeLessThanOrEqual(4);
+        expect(puzzle.allWords.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('all puzzles have unique IDs', () => {
+      const ids = PUZZLE_BANK_MEDIUM.map(p => p.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('all puzzle words are 4 letters', () => {
+      for (const puzzle of PUZZLE_BANK_MEDIUM) {
+        for (const word of puzzle.words) {
+          expect(word.length).toBe(4);
+        }
+      }
+    });
+  });
+
+  describe('PUZZLE_BANK_MEDIUM_PLUS', () => {
+    it('contains puzzles', () => {
+      expect(PUZZLE_BANK_MEDIUM_PLUS.length).toBeGreaterThan(0);
+    });
+
+    it('all puzzles have required fields', () => {
+      for (const puzzle of PUZZLE_BANK_MEDIUM_PLUS) {
+        expect(puzzle.id).toBeTruthy();
+        expect(puzzle.words.length).toBe(4); // MEDIUM_PLUS = 4 rows
+        expect(puzzle.solution.length).toBe(3); // 4 rows = 3 steps
+        expect(puzzle.wordLength).toBe(5);
+        expect(typeof puzzle.dreadTier).toBe('number');
+        expect(puzzle.dreadTier).toBeGreaterThanOrEqual(0);
+        expect(puzzle.dreadTier).toBeLessThanOrEqual(4);
+        expect(puzzle.allWords.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('all puzzles have unique IDs', () => {
+      const ids = PUZZLE_BANK_MEDIUM_PLUS.map(p => p.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('all puzzle words are 5 letters', () => {
+      for (const puzzle of PUZZLE_BANK_MEDIUM_PLUS) {
+        for (const word of puzzle.words) {
+          expect(word.length).toBe(5);
+        }
+      }
     });
   });
 
