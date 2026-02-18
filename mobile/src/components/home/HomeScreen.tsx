@@ -1485,6 +1485,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 12,
     marginBottom: 4,
+    zIndex: 10,
   },
   wordsOfferedHomeContainerDark: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
@@ -1986,13 +1987,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Action row (Gallery + Sacrifice)
+  // Action row (Gallery + Pit + Sacrifice)
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 16,
     marginBottom: 4,
+    zIndex: 10,
   },
   actionRowButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
