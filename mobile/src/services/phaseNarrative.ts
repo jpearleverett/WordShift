@@ -1148,3 +1148,24 @@ const PIT_PENDING_AMBER_LABELS: Record<DialoguePhase, string> = {
 export function getPitPendingAmberLabel(phase: DialoguePhase): string {
   return PIT_PENDING_AMBER_LABELS[phase];
 }
+
+// --- Pit devour interaction text ---
+
+const PIT_DEVOUR_VERBS: Record<DialoguePhase, string> = {
+  0: 'offered',
+  1: 'offered',
+  2: 'released',
+  3: 'surrendered',
+  4: 'devoured',
+};
+
+export function getPitDevourVerb(phase: DialoguePhase): string {
+  return PIT_DEVOUR_VERBS[phase];
+}
+
+export function getPitOverflowText(phase: DialoguePhase, extraCount: number): string {
+  if (phase >= 4) return `+${extraCount} more hunger for their turn`;
+  if (phase >= 3) return `+${extraCount} more await their turn`;
+  if (phase >= 2) return `+${extraCount} more words waiting`;
+  return `+${extraCount} more`;
+}
