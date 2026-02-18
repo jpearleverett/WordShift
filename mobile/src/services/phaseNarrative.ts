@@ -1013,3 +1013,138 @@ export function getHomescreenNudge(
 
   return { animalName, text };
 }
+
+// ============================================================================
+// OFFERING PIT — Phase-aware text for the word harvest / offering screen
+// ============================================================================
+
+const PIT_SCREEN_TITLES: Record<DialoguePhase, string> = {
+  0: 'Word Repository',
+  1: 'Word Repository',
+  2: 'The Emptiness Below',
+  3: 'The Consuming Dark',
+  4: 'The Pit',
+};
+
+export function getPitScreenTitle(phase: DialoguePhase): string {
+  return PIT_SCREEN_TITLES[phase];
+}
+
+const PIT_SCREEN_SUBTITLES: Record<DialoguePhase, string> = {
+  0: 'Offer your harvested words to receive amber.',
+  1: 'Your words are ready. Offer them and receive amber.',
+  2: 'The words you\'ve gathered wait to be released.',
+  3: 'The words must be surrendered. They were never yours.',
+  4: 'Feed the arrangement. It is always hungry.',
+};
+
+export function getPitScreenSubtitle(phase: DialoguePhase): string {
+  return PIT_SCREEN_SUBTITLES[phase];
+}
+
+const PIT_BUTTON_LABELS: Record<DialoguePhase, string> = {
+  0: 'Offer',
+  1: 'Offer',
+  2: 'Release',
+  3: 'Surrender',
+  4: 'Feed',
+};
+
+export function getPitButtonLabel(phase: DialoguePhase): string {
+  return PIT_BUTTON_LABELS[phase];
+}
+
+const PIT_OFFER_ALL_LABELS: Record<DialoguePhase, string> = {
+  0: 'Offer All',
+  1: 'Offer All',
+  2: 'Release All',
+  3: 'Surrender Everything',
+  4: 'Feed It All',
+};
+
+export function getPitOfferAllLabel(phase: DialoguePhase): string {
+  return PIT_OFFER_ALL_LABELS[phase];
+}
+
+const PIT_EMPTY_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'No words to offer yet. Complete a puzzle first!',
+  1: 'Nothing pending. Play another puzzle to harvest words.',
+  2: 'The pit is empty. It waits for you to bring more.',
+  3: 'Nothing left to give. The dark is patient.',
+  4: 'Empty. But the hunger remains.',
+};
+
+export function getPitEmptyMessage(phase: DialoguePhase): string {
+  return PIT_EMPTY_MESSAGES[phase];
+}
+
+const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, string[]> = {
+  0: [
+    'Words offered! You earned {amber} amber.',
+    'Nice! {words} words converted to {amber} amber.',
+  ],
+  1: [
+    '{words} words released. {amber} amber received.',
+    'The words found their place. +{amber} amber.',
+  ],
+  2: [
+    'The words dissolved below. {amber} amber surfaced.',
+    '{words} words sank into the dark. {amber} amber returned.',
+  ],
+  3: [
+    'The arrangement accepted {words} words. {amber} amber was granted.',
+    '{words} words consumed. {amber} amber emerged from the silence.',
+  ],
+  4: [
+    'It took {words} words. It gave back {amber} amber. Was it fair? Does it matter?',
+    '{words} words devoured. {amber} amber spat back. The pit does not thank you.',
+  ],
+};
+
+export function getPitOfferResultMessage(
+  phase: DialoguePhase,
+  wordsOffered: number,
+  amberAwarded: number,
+): string {
+  const messages = PIT_OFFER_RESULT_MESSAGES[phase];
+  const template = messages[Math.floor(Math.random() * messages.length)];
+  return template
+    .replace(/\{words\}/g, String(wordsOffered))
+    .replace(/\{amber\}/g, String(amberAwarded));
+}
+
+const PIT_HOME_BADGE_LABELS: Record<DialoguePhase, string> = {
+  0: 'Repository',
+  1: 'Repository',
+  2: 'The Below',
+  3: 'The Dark',
+  4: 'The Pit',
+};
+
+export function getPitHomeBadgeLabel(phase: DialoguePhase): string {
+  return PIT_HOME_BADGE_LABELS[phase];
+}
+
+const PIT_HARVEST_LABELS: Record<DialoguePhase, string> = {
+  0: 'Words harvested',
+  1: 'Words harvested',
+  2: 'Words gathered',
+  3: 'Words taken',
+  4: 'Words claimed',
+};
+
+export function getPitHarvestLabel(phase: DialoguePhase): string {
+  return PIT_HARVEST_LABELS[phase];
+}
+
+const PIT_PENDING_AMBER_LABELS: Record<DialoguePhase, string> = {
+  0: 'Amber pending',
+  1: 'Amber pending',
+  2: 'Amber waiting',
+  3: 'Amber owed',
+  4: 'Amber owed to you',
+};
+
+export function getPitPendingAmberLabel(phase: DialoguePhase): string {
+  return PIT_PENDING_AMBER_LABELS[phase];
+}

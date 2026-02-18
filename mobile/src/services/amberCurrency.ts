@@ -343,13 +343,20 @@ export function calculatePhaseAcceleration(
 }
 
 /**
- * Award amber for completing a puzzle
+ * Award amber for completing a puzzle.
+ *
+ * When `creditToBalance` is false (default), the computed amber reward
+ * is NOT added to the player's spendable balance. All other side effects
+ * (streak, phase progression, milestones, stats) still execute normally.
+ * The caller is responsible for crediting later (e.g. via awardBonusAmber
+ * when the player offers words in the pit).
  */
 export async function awardPuzzleAmber(
   difficulty: Difficulty,
   starsEarned: number,
   gameMode: GameMode = 'standard',
-  threeStarRate: number = 0
+  threeStarRate: number = 0,
+  creditToBalance: boolean = false
 ): Promise<{
   amount: number;
   baseAmount: number;
@@ -402,7 +409,9 @@ export async function awardPuzzleAmber(
     progress.challengeCompletions = (progress.challengeCompletions || 0) + 1;
   }
 
-  progress.amber += totalAmount;
+  if (creditToBalance) {
+    progress.amber += totalAmount;
+  }
   progress.totalAmberEarned += totalAmount;
   progress.puzzlesSolved += 1;
 
@@ -425,7 +434,9 @@ export async function awardPuzzleAmber(
     milestoneBonus = milestone.amber;
     // Use phase-aware milestone message
     milestoneMessage = getMilestoneMessage(milestone, progress.currentPhase);
-    progress.amber += milestoneBonus;
+    if (creditToBalance) {
+      progress.amber += milestoneBonus;
+    }
     progress.totalAmberEarned += milestoneBonus;
     progress.lastClaimedMilestone = milestone.puzzles;
 
@@ -443,7 +454,9 @@ export async function awardPuzzleAmber(
   const completedDiffs = progress.completedDifficulties ?? [];
   if (!completedDiffs.includes(difficulty)) {
     firstCompletionBonus = FIRST_COMPLETION_BONUS[difficulty];
-    progress.amber += firstCompletionBonus;
+    if (creditToBalance) {
+      progress.amber += firstCompletionBonus;
+    }
     progress.totalAmberEarned += firstCompletionBonus;
     progress.completedDifficulties = [...completedDiffs, difficulty];
     if (firstCompletionBonus > 0) {
@@ -463,7 +476,9 @@ export async function awardPuzzleAmber(
   if (streakMilestone) {
     streakMilestoneBonus = streakMilestone.amber;
     streakMilestoneMessage = streakMilestone.message;
-    progress.amber += streakMilestoneBonus;
+    if (creditToBalance) {
+      progress.amber += streakMilestoneBonus;
+    }
     progress.totalAmberEarned += streakMilestoneBonus;
 
     await recordTransaction({
@@ -975,11 +990,15 @@ function getVariantRepeatDecay(repeatCount: number): number {
 /**
  * Apply variant bonus amber with anti-farming decay on repeated use.
  * Returns updated balance and the actual applied multiplier.
+ *
+ * When `creditToBalance` is false, the bonus is NOT added to spendable amber.
+ * The caller is responsible for crediting later.
  */
 export async function applyVariantAmberBonus(
   variant: string,
   baseAmberAward: number,
-  configuredMultiplier: number
+  configuredMultiplier: number,
+  creditToBalance: boolean = false
 ): Promise<{
   bonus: number;
   newBalance: number;
@@ -1027,7 +1046,9 @@ export async function applyVariantAmberBonus(
 
   progress.lastVariantPlayed = variant;
   progress.sameVariantStreak = repeatCount;
-  progress.amber += bonus;
+  if (creditToBalance) {
+    progress.amber += bonus;
+  }
   progress.totalAmberEarned += bonus;
   progressCache = progress;
   await saveProgress();

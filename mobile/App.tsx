@@ -65,6 +65,7 @@ import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { savePuzzleState, loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import {
   hasVariantModifier,
@@ -77,7 +78,7 @@ import {
 } from './src/services/puzzleVariety';
 
 // App screen type — expanded with settings, stats, and ledger
-type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery';
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -1165,6 +1166,24 @@ export default function App() {
       );
     }
 
+    if (currentScreen === 'pit') {
+      return (
+        <View style={styles.screenBackground}>
+          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <OfferingPitScreen
+              phase={persistence.currentPhase}
+              amberBalance={persistence.amberBalance}
+              onClose={() => transitionTo('home')}
+              onAmberChange={(newBalance) => {
+                persistenceActions.setAmberBalance(newBalance);
+              }}
+            />
+          </Animated.View>
+        </View>
+      );
+    }
+
     if (currentScreen === 'home') {
       return (
         <ErrorBoundary
@@ -1181,6 +1200,7 @@ export default function App() {
                 onOpenStats={() => transitionTo('stats')}
                 onOpenLedger={() => transitionTo('ledger')}
                 onOpenGallery={() => transitionTo('gallery')}
+                onOpenPit={() => transitionTo('pit')}
                 onStartDaily={handleStartDaily}
                 onboardingStep={onboardingStep}
                 onAdvanceOnboarding={advanceOnboarding}

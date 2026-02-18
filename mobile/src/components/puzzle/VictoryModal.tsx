@@ -16,6 +16,8 @@ import {
   getRitualEchoHeader,
   getRitualEchoFooter,
   getWordsOfferedText,
+  getPitHarvestLabel,
+  getPitPendingAmberLabel,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -34,6 +36,8 @@ export interface VictoryData {
   variantBonus?: number;
   variantRepeatDecay?: number;
   questsCompleted?: string[];
+  harvestedWords?: string[];
+  pendingHarvest?: { pendingAmber: number; pendingWords: number; pendingBatches: number };
 }
 
 interface VictoryModalProps {
@@ -167,11 +171,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Group 1: Amber, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
-            {/* Amber earned */}
+            {/* Harvested amber (queued, not yet spendable) */}
             {victoryData && (
               <View style={styles.amberEarnedContainer}>
                 <Text style={styles.amberEarnedIcon}>{'\uD83D\uDC8E'}</Text>
-                <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} Amber</Text>
+                <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} {getPitHarvestLabel(phase).toLowerCase()}</Text>
                 {victoryData.streakBonus > 0 && (
                   <Text style={styles.streakBonusText}>
                     (+{victoryData.streakBonus} streak!)
@@ -188,6 +192,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   </Text>
                 )}
               </View>
+            )}
+
+            {/* Pending harvest hint */}
+            {victoryData?.pendingHarvest && victoryData.pendingHarvest.pendingBatches > 0 && (
+              <Text style={[styles.pendingHarvestHint, { color: phaseTheme.modalSecondaryTextColor }]}>
+                {getPitPendingAmberLabel(phase)}: {'\uD83D\uDC8E'} {victoryData.pendingHarvest.pendingAmber}
+              </Text>
             )}
 
             {/* Streak display */}
@@ -868,6 +879,13 @@ const styles = StyleSheet.create({
   },
   wordsOfferedTextDark: {
     color: 'rgba(180, 100, 130, 0.8)',
+    fontStyle: 'italic',
+  },
+  pendingHarvestHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 4,
     fontStyle: 'italic',
   },
 });

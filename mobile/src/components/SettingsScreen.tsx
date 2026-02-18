@@ -23,6 +23,7 @@ import { resetTutorial } from './Tutorial';
 import { resetOnboarding } from '../services/onboarding';
 import { hapticLight } from '../services/haptics';
 import { clearPuzzleState } from '../services/puzzleSaveState';
+import { clearHarvestState } from '../services/wordHarvest';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -63,6 +64,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               resetOnboarding(),
               resetSettings(),
               clearPuzzleState(),
+              clearHarvestState(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);

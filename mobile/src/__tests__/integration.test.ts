@@ -50,8 +50,8 @@ describe('Victory Flow Integration', () => {
     const statsResult = await recordPuzzleCompletion('MEDIUM', hintsUsed, invalidAttempts);
     expect(statsResult.starsEarned).toBe(3);
 
-    // Step 3: Award amber
-    const amberResult = await awardPuzzleAmber('MEDIUM', stars);
+    // Step 3: Award amber (creditToBalance=true for direct crediting test)
+    const amberResult = await awardPuzzleAmber('MEDIUM', stars, 'standard', 0, true);
     // MEDIUM base=10, 3-star => floor(10*1.5)=15, no streak bonus (streak=1 < 2)
     // newBalance includes first-completion bonus for MEDIUM (+20)
     expect(amberResult.baseAmount).toBe(15);
@@ -131,10 +131,10 @@ describe('Victory Flow Integration', () => {
   });
 
   test('concurrent awardPuzzleAmber calls do not corrupt state', async () => {
-    // Fire two awards at the same time
+    // Fire two awards at the same time (creditToBalance=true for direct crediting)
     const [resultA, resultB] = await Promise.all([
-      awardPuzzleAmber('EASY', 1),
-      awardPuzzleAmber('EASY', 1),
+      awardPuzzleAmber('EASY', 1, 'standard', 0, true),
+      awardPuzzleAmber('EASY', 1, 'standard', 0, true),
     ]);
 
     // Both should complete without error
@@ -355,11 +355,11 @@ describe('Economy Balance', () => {
   });
 
   test('amber accumulates correctly over multiple puzzles', async () => {
-    // Solve 3 EASY puzzles with varying star ratings
+    // Solve 3 EASY puzzles with varying star ratings (creditToBalance=true)
     // First EASY puzzle also gets +10 first-completion bonus
-    await awardPuzzleAmber('EASY', 3); // floor(8*1.5)=12 + 10 first-completion = 22
-    await awardPuzzleAmber('EASY', 2); // floor(8*1.25)=10
-    await awardPuzzleAmber('EASY', 1); // 8
+    await awardPuzzleAmber('EASY', 3, 'standard', 0, true); // floor(8*1.5)=12 + 10 first-completion = 22
+    await awardPuzzleAmber('EASY', 2, 'standard', 0, true); // floor(8*1.25)=10
+    await awardPuzzleAmber('EASY', 1, 'standard', 0, true); // 8
 
     const progress = await loadProgress();
     expect(progress.puzzlesSolved).toBe(3);

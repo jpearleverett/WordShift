@@ -21,9 +21,11 @@ import { calculateRitualEnergy, extractTriggerWords } from '../services/localGen
 import { GameEvent, logEvent } from '../services/eventLogger';
 import { updateQuestProgress } from '../services/weeklyQuests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
+import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, HarvestSummary } from '../services/wordHarvest';
 
 export interface VictoryData {
   earnedStars: number;
+  /** Total amber value computed for this puzzle (queued, not yet spendable) */
   amberEarned: number;
   amberBalance: number;
   phaseChanged: boolean;
@@ -53,6 +55,10 @@ export interface VictoryData {
   streakMilestoneMessage: string | null;
   /** Titles of quests completed this victory */
   questsCompleted?: string[];
+  /** Words harvested this puzzle (for VictoryModal display) */
+  harvestedWords?: string[];
+  /** Updated pending harvest summary after enqueue */
+  pendingHarvest?: HarvestSummary;
 }
 
 export interface PersistenceState {
@@ -149,9 +155,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const stats = await getCumulativeStats();
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
-      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate);
+      // creditToBalance=false: amber is queued in a harvest batch, not credited yet
+      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false);
 
       // Apply variant bonus with anti-farm decay and persistence.
+      // creditToBalance=false: variant bonus also queued, not credited.
       const variantMultiplier = getVariantAmberMultiplier(variant);
       let variantBonus = 0;
       let variantAppliedMultiplier = 1.0;
@@ -160,7 +168,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         const variantResult = await applyVariantAmberBonus(
           variant,
           amberResult.amount,
-          variantMultiplier
+          variantMultiplier,
+          false
         );
         variantBonus = variantResult.bonus;
         variantAppliedMultiplier = variantResult.appliedMultiplier;
@@ -169,9 +178,34 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         amberResult.amount += variantBonus;
       }
 
+      // Compute total queued amber (puzzle + milestones + first-completion + streak milestone + variant)
+      const totalQueuedAmber = amberResult.amount
+        + amberResult.milestoneBonus
+        + amberResult.firstCompletionBonus
+        + amberResult.streakMilestoneBonus;
+
+      // Enqueue harvest batch with all completed words and computed amber value
+      const harvestedWords = completedWords.length > 0
+        ? [...new Set(completedWords.map(w => w.toUpperCase()))]
+        : [];
+      await enqueueHarvestBatch({
+        id: generateBatchId(),
+        words: harvestedWords,
+        amberValue: totalQueuedAmber,
+        createdAt: Date.now(),
+        difficulty,
+        gameMode,
+        stars,
+        variant,
+        phaseAtHarvest: amberResult.newPhase,
+      });
+
+      const pendingHarvest = await getPendingHarvestSummary();
+
       setCumulativeStats(stats);
       updatePuzzleCount(amberResult.puzzlesSolved);
       updateSessionPhase(amberResult.newPhase);
+      // Balance stays as-is (no credit); refresh from storage to stay in sync
       setAmberBalance(amberResult.newBalance);
       setCurrentPhase(amberResult.newPhase);
 
@@ -191,8 +225,6 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       }
 
       // Queue variant tutorials for any variants that just became unlocked.
-      // This ensures the animal introduces the variant as soon as it unlocks,
-      // even if the player hasn't tried it yet.
       const newlyUnlocked = getNewlyUnlockedVariants(
         amberResult.puzzlesSolved,
         amberResult.newPhase
@@ -210,7 +242,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           invalidAttempts,
           gameMode,
           isDaily,
-          amberEarned: amberResult.amount,
+          amberEarned: totalQueuedAmber,
           challengeBonus: amberResult.challengeBonus,
           puzzlesSolved: amberResult.puzzlesSolved,
           phase: amberResult.newPhase,
@@ -233,7 +265,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           hintsUsed,
           isDaily,
           isChallenge: gameMode === 'challenge',
-          amberEarned: amberResult.amount,
+          amberEarned: totalQueuedAmber,
           currentStreak: amberResult.currentStreak,
         }, amberResult.newPhase);
         questsCompleted = completedQuests.map(q => q.title);
@@ -243,7 +275,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       return {
         earnedStars: stars,
-        amberEarned: amberResult.amount,
+        amberEarned: totalQueuedAmber,
         amberBalance: amberResult.newBalance,
         phaseChanged: amberResult.phaseChanged,
         newPhase: amberResult.newPhase,
@@ -263,6 +295,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         questsCompleted,
         streakMilestoneBonus: amberResult.streakMilestoneBonus,
         streakMilestoneMessage: amberResult.streakMilestoneMessage,
+        harvestedWords,
+        pendingHarvest,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
