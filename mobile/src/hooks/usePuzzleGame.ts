@@ -62,10 +62,8 @@ export interface PuzzleGameState {
   moveDirection: 'down' | 'up';
   /** Word previews for each slot position in the target row (when letter is selected) */
   slotPreviews?: Array<{ word: string; isValid: boolean }>;
-  /** Double shift phase tracking: pick1 → pick2 → drop1 → drop2 */
+  /** Double shift phase tracking: pick1 → drop1 → pick2 → drop2 */
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
-  /** First picked letter in double shift (held while dropping second) */
-  firstPickedLetter: Letter | null;
 }
 
 export interface PuzzleGameActions {
@@ -138,9 +136,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [lastIncantationName, setLastIncantationName] = useState<string | null>(null);
   const [lastFormedWord, setLastFormedWord] = useState<string | null>(null);
 
-  // Double shift state: tracks the 4-step flow (pick1 → pick2 → drop1 → drop2)
+  // Double shift state: tracks the 4-step flow (pick1 → drop1 → pick2 → drop2)
   const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
-  const [firstPickedLetter, setFirstPickedLetter] = useState<Letter | null>(null);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -238,7 +235,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentWordLength(wordLength);
     setLastFormedWord(null);
     setDoubleShiftPhase(hasVariantModifier(variantToUse, 'double_shift') ? 'pick1' : null);
-    setFirstPickedLetter(null);
     setMoveDirection('down');
     if (!options?.preserveVariant) {
       setCurrentVariant(variantToUse);
@@ -457,7 +453,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
-    // Double shift: during drop phase, ignore letter presses on source row
+    // Double shift: during drop phases, ignore letter presses
     if (isDoubleShift && (doubleShiftPhase === 'drop1' || doubleShiftPhase === 'drop2')) {
       return;
     }
@@ -469,31 +465,25 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
 
       if (doubleShiftPhase === 'pick1') {
-        // First letter selection
+        // First letter selection — pick and go straight to drop1
         if (selectedLetter?.id === letter.id) {
           setSelectedLetter(null); // Deselect
         } else {
           setSelectedLetter(letter);
-          setDoubleShiftPhase('pick2');
+          setDoubleShiftPhase('drop1');
           setError(null);
         }
       } else if (doubleShiftPhase === 'pick2') {
-        if (letter.id === selectedLetter?.id) {
-          // Deselect first letter, go back to pick1
-          setSelectedLetter(null);
-          setDoubleShiftPhase('pick1');
-          return;
-        }
-        // Tapping the same second letter again: deselect it
-        if (letter.id === firstPickedLetter?.id) {
-          setFirstPickedLetter(null);
+        // Second letter selection (source row already has N-1 letters from drop1)
+        if (selectedLetter?.id === letter.id) {
+          setSelectedLetter(null); // Deselect
           return;
         }
 
-        // Validate that removing both letters leaves a valid word
+        // Validate that removing this second letter leaves a valid source word
         const sourceRow = rows[activeRowIndex];
         const remaining = sourceRow.words
-          .filter(l => l.id !== selectedLetter?.id && l.id !== letter.id)
+          .filter(l => l.id !== letter.id)
           .map(l => l.char)
           .join('');
         const isStartRow = activeRowIndex === 0;
@@ -507,15 +497,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           return;
         }
 
-        // Both letters valid — transition to drop phase
-        setFirstPickedLetter(selectedLetter);
+        // Valid — select and transition to drop2
         setSelectedLetter(letter);
-        // Actually, we want to drop the first-picked letter first.
-        // So: firstPickedLetter = the one we'll drop first, selectedLetter = the one for drop2
-        // Swap so selectedLetter is the first to drop
-        setFirstPickedLetter(letter); // store second picked for later
-        setSelectedLetter(selectedLetter); // keep first picked as active for drop1
-        setDoubleShiftPhase('drop1');
+        setDoubleShiftPhase('drop2');
         setError(null);
       }
       return;
@@ -532,7 +516,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setSelectedLetter(letter);
       setError(null);
     }
-  }, [gameState, activeRowIndex, selectedLetter, shakeError, currentVariant, currentPhase, doubleShiftPhase, firstPickedLetter, rows, currentWordLength]);
+  }, [gameState, activeRowIndex, selectedLetter, shakeError, currentVariant, currentPhase, doubleShiftPhase, rows, currentWordLength]);
 
   const handleHint = useCallback(() => {
     if (gameState !== GameState.PLAYING || isProcessing) return;
@@ -649,12 +633,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       newRows[targetRowIndex] = { ...targetRow, words: newTargetLetters };
 
       setRows(newRows);
-      // Switch to second letter for dropping
-      setSelectedLetter(firstPickedLetter);
-      setDoubleShiftPhase('drop2');
+      // Clear selection — player now picks second letter from source row
+      setSelectedLetter(null);
+      setDoubleShiftPhase('pick2');
       setError(null);
       setIsProcessing(false);
-      return null; // Not completed yet — still need to drop second letter
+      return null; // Not completed yet — still need to pick and drop second letter
     }
 
     // --- Standard validation (single shift OR double shift drop2) ---
@@ -715,7 +699,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         }
         setDoubleShiftPhase('pick1');
         setSelectedLetter(null);
-        setFirstPickedLetter(null);
       }
       setIsProcessing(false);
       return null;
@@ -745,7 +728,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         }
         setDoubleShiftPhase('pick1');
         setSelectedLetter(null);
-        setFirstPickedLetter(null);
       }
       setIsProcessing(false);
       return null;
@@ -787,7 +769,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Reset double shift phase for next step
     if (isDoubleShift) {
       setDoubleShiftPhase('pick1');
-      setFirstPickedLetter(null);
     }
 
     const maxForwardSourceIndex = rows.length - 2;
@@ -868,7 +849,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     difficulty,
     applyBoard,
     doubleShiftPhase,
-    firstPickedLetter,
     history,
   ]);
 
@@ -884,8 +864,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
-    // Double shift: if we're mid-drop (drop2 phase), just undo the first drop
-    if (isDoubleShift && doubleShiftPhase === 'drop2') {
+    // Double shift: if we're mid-step (pick2 or drop2), undo the first drop and go back to pick1
+    if (isDoubleShift && (doubleShiftPhase === 'pick2' || doubleShiftPhase === 'drop2')) {
       const delta = history[history.length - 1];
       setRows(prevRows => {
         const newRows = [...prevRows];
@@ -902,7 +882,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setHistory(prev => prev.slice(0, -1));
       setDoubleShiftPhase('pick1');
       setSelectedLetter(null);
-      setFirstPickedLetter(null);
       setError(null);
       return;
     }
@@ -939,7 +918,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (isDoubleShift) {
       setDoubleShiftPhase('pick1');
-      setFirstPickedLetter(null);
     }
 
     if (gameMode === 'challenge') {
@@ -1057,7 +1035,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     moveDirection,
     slotPreviews,
     doubleShiftPhase,
-    firstPickedLetter,
   };
 
   const actions: PuzzleGameActions = {
