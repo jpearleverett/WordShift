@@ -2034,21 +2034,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   actionRowButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   sacrificeButton: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
     borderColor: 'rgba(120, 30, 60, 0.3)',
   },
   actionRowButtonText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
 
   // Sacrifice modal

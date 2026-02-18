@@ -371,7 +371,7 @@ export const Row: React.FC<RowProps> = memo(({
   successDropSignal = 0,
   slotPreviews,
 }) => {
-  const compactTiles = wordLength >= 6;
+  const compactTiles = wordLength >= 7;
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
   const isSource = rowIndex === activeRowIndex;
