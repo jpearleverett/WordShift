@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
     right: 20,
     top: 52,
     width: 340,
-    maxHeight: 520,
+    maxHeight: 650,
     backgroundColor: CandyColors.white,
     borderRadius: 16,
     paddingTop: 10,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   scrollArea: {
-    maxHeight: 490,
+    maxHeight: 620,
   },
   scrollContent: {
     paddingHorizontal: 8,
