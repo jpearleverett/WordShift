@@ -2552,6 +2552,11 @@ async function findDoubleShiftPath(
     const lastPos = currentTemp.length - 1;
     if (r.letters[1] === 'S' && r.positions[1] === lastPos) score -= 30;
     if (r.letters[0] === 'S' && r.positions[0] === lastPos) score -= 30;
+    // Penalize adjacent removals — moving a letter pair as a block is less interesting
+    // than splitting letters from different parts of the word
+    const posGap = r.positions[1] - r.positions[0];
+    if (posGap === 1) score -= 25; // Adjacent: feels like moving a suffix chunk (ED, LY, ER)
+    else if (posGap >= 3) score += 10; // Well-separated: more strategic, rewarding
     score += Math.random() * 20;
     return { ...r, score };
   });
@@ -2585,6 +2590,10 @@ async function findDoubleShiftPath(
       const mid = t.result.length / 2;
       const avgInsPos = (t.resultPositions[0] + t.resultPositions[1]) / 2;
       score += (mid - Math.abs(avgInsPos - mid)) * 3;
+      // Penalize adjacent insertion positions — letters landing as a block is less interesting
+      const insertGap = Math.abs(t.resultPositions[1] - t.resultPositions[0]);
+      if (insertGap === 1) score -= 20; // Adjacent insertion: chunky, less strategic
+      else if (insertGap >= 3) score += 8; // Well-separated: letters split across the word
       score += Math.random() * 20;
       candidates.push({ ...t, score });
     }
@@ -2665,7 +2674,30 @@ function scoreDoubleShiftChain(chain: DoubleShiftPathNode[], recencyMap?: Map<st
   }
   totalScore += Math.min(30, dreadScore) * 0.15;
 
-  return Math.round(Math.max(0, Math.min(100, totalScore)));
+  // Letter separation bonus (additive) — reward moves where the 2 shifted letters
+  // come from / land in non-adjacent positions (more strategic, less suffix-chunky).
+  // Applied as a flat bonus on top of the base score to prioritize separated moves
+  // without reducing the weight of other quality factors.
+  let separatedMoves = 0;
+  let totalMoves = 0;
+  for (const node of chain) {
+    if (node.moveFromPositions) {
+      const removalGap = node.moveFromPositions[1] - node.moveFromPositions[0];
+      if (removalGap >= 2) separatedMoves++;
+      totalMoves++;
+    }
+    if (node.moveToPositions) {
+      const insertGap = Math.abs(node.moveToPositions[1] - node.moveToPositions[0]);
+      if (insertGap >= 2) separatedMoves++;
+      totalMoves++;
+    }
+  }
+  if (totalMoves > 0) {
+    const separationRate = separatedMoves / totalMoves;
+    totalScore += separationRate * 10; // Up to +10 bonus for fully separated chains
+  }
+
+  return Math.round(Math.max(0, Math.min(110, totalScore)));
 }
 
 /**
