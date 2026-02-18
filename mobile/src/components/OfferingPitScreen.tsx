@@ -61,6 +61,13 @@ const PIT_CENTER = {
   y: SCREEN_HEIGHT * 0.72,
 };
 
+// Pit opening oval dimensions — used to position overlays that align with
+// the pit opening in all three background images.
+const PIT_OVAL = {
+  radiusX: SCREEN_WIDTH * 0.29,
+  radiusY: SCREEN_HEIGHT * 0.06,
+};
+
 const STATUS_BAR_HEIGHT =
   Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50;
 
@@ -100,6 +107,14 @@ function getMaxImpactBurstParticles(): number {
   return shouldSimplifyAnimations() ? 4 : 8;
 }
 
+function getMaxRimParticles(): number {
+  switch (getDeviceTier()) {
+    case 'low': return 2;
+    case 'medium': return 4;
+    case 'high': return 6;
+  }
+}
+
 const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: number; burst: string }> = {
   0: { trail: '#FFD700', glow: '#FFD700', glowOpacity: 0.35, burst: '#FFE680' },
   1: { trail: '#F0C050', glow: '#F0C050', glowOpacity: 0.30, burst: '#F5D88A' },
@@ -108,11 +123,75 @@ const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: 
   4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070' },
 };
 
+// Colors that match the pit rim glow baked into each background image
+const RIM_PARTICLE_COLORS: Record<number, string> = {
+  0: '#80E8D0', // turquoise sparkles (day)
+  1: '#80E8D0',
+  2: '#FFA040', // warm orange (dusk)
+  3: '#60D8C8', // cyan supernatural (night)
+  4: '#60D8C8',
+};
+
+// Phase-aware breathing glow opacity [min, max]
+const BREATH_OPACITY: Record<number, [number, number]> = {
+  0: [0.03, 0.12],
+  1: [0.03, 0.12],
+  2: [0.05, 0.18],
+  3: [0.06, 0.22],
+  4: [0.08, 0.30],
+};
+
+// Phase-aware breathing glow scale [min, max]
+const BREATH_SCALE: Record<number, [number, number]> = {
+  0: [0.90, 1.05],
+  1: [0.90, 1.05],
+  2: [0.92, 1.06],
+  3: [0.93, 1.08],
+  4: [0.95, 1.10],
+};
+
+const BREATH_CYCLE_MS = 4000; // half-cycle: 4s in, 4s out = 8s full
+
 function getDevourDuration(phase: number): number {
   if (phase >= 3) return 600;
   if (phase >= 2) return 750;
   return 900;
 }
+
+// Compute a parametric spiral path from (startX, startY) to (centerX, centerY).
+// Returns input range [0..1] and corresponding X/Y output ranges.
+function computeSpiralPath(
+  startX: number,
+  startY: number,
+  centerX: number,
+  centerY: number,
+  rotations: number,
+  steps: number,
+): { input: number[]; outputX: number[]; outputY: number[] } {
+  const dx = startX - centerX;
+  const dy = startY - centerY;
+  const startRadius = Math.sqrt(dx * dx + dy * dy);
+  const startAngle = Math.atan2(dy, dx);
+
+  const input: number[] = [];
+  const outputX: number[] = [];
+  const outputY: number[] = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    // radius shrinks with acceleration (power > 1 means faster collapse near center)
+    const radius = startRadius * Math.pow(1 - t, 1.8);
+    const angle = startAngle + rotations * 2 * Math.PI * t;
+    input.push(t);
+    outputX.push(centerX + radius * Math.cos(angle));
+    outputY.push(centerY + radius * Math.sin(angle));
+  }
+
+  return { input, outputX, outputY };
+}
+
+const SPIRAL_STEPS = 20;
+const SPIRAL_ROTATIONS = 2.5;
 
 // ---------------------------------------------------------------------------
 // FlyingWord data type
@@ -131,7 +210,12 @@ interface FlyingWord {
   // For devour: absolute position overrides
   devourX: Animated.Value;
   devourY: Animated.Value;
-  useDevourPos: boolean; // when true, render uses devourX/Y instead of interpolated drift
+  // Spiral path — parametric keyframes computed at devour time
+  devourProgress: Animated.Value;
+  spiralInput?: number[];
+  spiralRangeX?: number[];
+  spiralRangeY?: number[];
+  useDevourPos: boolean; // when true, render uses spiral interpolation
   baseX: number;
   baseY: number;
   driftAmplitude: number;
@@ -169,6 +253,22 @@ interface AmberParticle {
   y: Animated.Value;
   opacity: Animated.Value;
   scale: Animated.Value;
+}
+
+interface RimParticle {
+  id: string;
+  x: Animated.Value;
+  y: Animated.Value;
+  opacity: Animated.Value;
+  scale: Animated.Value;
+  color: string;
+}
+
+interface ShockwaveRing {
+  id: string;
+  scale: Animated.Value;
+  opacity: Animated.Value;
+  color: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -292,9 +392,13 @@ const FloatingWordChip = React.memo(({
     outputRange: driftYRange,
   });
 
-  // Use devour position when actively spiraling, otherwise interpolated drift
-  const posX = fw.useDevourPos ? fw.devourX : driftX;
-  const posY = fw.useDevourPos ? fw.devourY : driftY;
+  // Use spiral interpolation when actively spiraling, otherwise interpolated drift
+  const posX = (fw.useDevourPos && fw.spiralInput)
+    ? fw.devourProgress.interpolate({ inputRange: fw.spiralInput, outputRange: fw.spiralRangeX! })
+    : driftX;
+  const posY = (fw.useDevourPos && fw.spiralInput)
+    ? fw.devourProgress.interpolate({ inputRange: fw.spiralInput, outputRange: fw.spiralRangeY! })
+    : driftY;
 
   return (
     <Animated.View
@@ -346,7 +450,7 @@ const chipStyles = StyleSheet.create({
 });
 
 // ---------------------------------------------------------------------------
-// Particle renderers
+// Particle & effect renderers
 // ---------------------------------------------------------------------------
 
 const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => (
@@ -400,6 +504,50 @@ const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
   />
 ));
 
+const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: p.color,
+      shadowColor: p.color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 4,
+      elevation: 3,
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+      opacity: p.opacity,
+    }}
+  />
+));
+
+const ShockwaveRingView = React.memo(({ ring }: { ring: ShockwaveRing }) => {
+  const size = PIT_OVAL.radiusX * 2.6;
+  const sizeY = PIT_OVAL.radiusY * 2.6;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: PIT_CENTER.y - sizeY / 2,
+        left: PIT_CENTER.x - size / 2,
+        width: size,
+        height: sizeY,
+        borderRadius: size / 2,
+        borderWidth: 2,
+        borderColor: ring.color,
+        transform: [{ scale: ring.scale }],
+        opacity: ring.opacity,
+      }}
+    />
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -430,6 +578,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
   const [impactParticles, setImpactParticles] = useState<ImpactParticle[]>([]);
   const [amberParticles, setAmberParticles] = useState<AmberParticle[]>([]);
+  const [rimParticles, setRimParticles] = useState<RimParticle[]>([]);
+  const [shockwaveRings, setShockwaveRings] = useState<ShockwaveRing[]>([]);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(amberBalance);
@@ -438,8 +588,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
   const finalizingBatches = useRef<Set<string>>(new Set());
-  const pitGlowOpacity = useRef(new Animated.Value(0)).current;
-  const pitGlowScale = useRef(new Animated.Value(0.8)).current;
+
+  // Surge glow — flashes on devour impact / inhale
+  const pitSurgeOpacity = useRef(new Animated.Value(0)).current;
+  const pitSurgeScale = useRef(new Animated.Value(0.8)).current;
+
+  // Breathing glow — continuous ambient pulse
+  const pitBreathProgress = useRef(new Animated.Value(0)).current;
+  const breathLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
   const flyingWordsRef = useRef<FlyingWord[]>([]);
@@ -451,6 +608,120 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
   useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
+
+  // ---- Ambient breathing glow loop ----
+  useEffect(() => {
+    if (reducedMotion) {
+      // Static mid-value glow for reduced motion
+      pitBreathProgress.setValue(0.5);
+      return;
+    }
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pitBreathProgress, {
+          toValue: 1,
+          duration: BREATH_CYCLE_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pitBreathProgress, {
+          toValue: 0,
+          duration: BREATH_CYCLE_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    breathLoopRef.current = loop;
+    loop.start();
+
+    return () => {
+      loop.stop();
+      breathLoopRef.current = null;
+    };
+  }, [reducedMotion, pitBreathProgress]);
+
+  // Derive breathing opacity and scale from progress + phase
+  const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
+  const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
+
+  const breathOpacity = pitBreathProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [breathOpacityRange[0], breathOpacityRange[1]],
+  });
+  const breathScale = pitBreathProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [breathScaleRange[0], breathScaleRange[1]],
+  });
+
+  // ---- Ambient rim particles (embers rising from pit edge) ----
+  useEffect(() => {
+    if (reducedMotion || simplify) return;
+
+    const maxRim = getMaxRimParticles();
+    const spawnInterval = 1000; // ms between spawns
+    let spawnCount = 0;
+
+    const spawnRimParticle = () => {
+      if (!mountedRef.current) return;
+      const color = RIM_PARTICLE_COLORS[phase] ?? RIM_PARTICLE_COLORS[0];
+      const angle = Math.random() * Math.PI * 2;
+      const startX = PIT_CENTER.x + PIT_OVAL.radiusX * Math.cos(angle) * (0.7 + Math.random() * 0.3);
+      const startY = PIT_CENTER.y + PIT_OVAL.radiusY * Math.sin(angle) * (0.7 + Math.random() * 0.3);
+      const riseHeight = 80 + Math.random() * 100;
+      const driftX = (Math.random() - 0.5) * 40;
+      const duration = 3000 + Math.random() * 2000;
+
+      const p: RimParticle = {
+        id: `rim_${Date.now()}_${spawnCount++}`,
+        x: new Animated.Value(startX),
+        y: new Animated.Value(startY),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(0.3 + Math.random() * 0.4),
+        color,
+      };
+
+      setRimParticles(prev => {
+        // Cap total rim particles
+        const capped = prev.length >= maxRim * 2 ? prev.slice(-maxRim) : prev;
+        return [...capped, p];
+      });
+
+      Animated.parallel([
+        Animated.timing(p.y, {
+          toValue: startY - riseHeight,
+          duration,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(p.x, {
+          toValue: startX + driftX,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(p.opacity, { toValue: 0.7 + Math.random() * 0.3, duration: duration * 0.2, useNativeDriver: true }),
+          Animated.delay(duration * 0.4),
+          Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(p.scale, { toValue: 0.8 + Math.random() * 0.4, duration: duration * 0.5, useNativeDriver: true }),
+          Animated.timing(p.scale, { toValue: 0, duration: duration * 0.5, useNativeDriver: true }),
+        ]),
+      ]).start(() => {
+        if (mountedRef.current) setRimParticles(prev => prev.filter(rp => rp.id !== p.id));
+      });
+    };
+
+    // Stagger initial spawns
+    for (let i = 0; i < maxRim; i++) {
+      setTimeout(() => spawnRimParticle(), i * (spawnInterval / maxRim));
+    }
+
+    const interval = setInterval(spawnRimParticle, spawnInterval);
+    return () => clearInterval(interval);
+  }, [phase, reducedMotion, simplify]);
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
@@ -493,6 +764,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           rotation: new Animated.Value(0),
           devourX: new Animated.Value(baseX),
           devourY: new Animated.Value(baseY),
+          devourProgress: new Animated.Value(0),
           useDevourPos: false,
           baseX,
           baseY,
@@ -574,22 +846,38 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     loopY.start();
   }, [reducedMotion, simplify]);
 
-  // ---- Pit glow + scale flash ----
-  const flashPitGlow = useCallback(() => {
+  // ---- Pit surge flash (on devour impact) ----
+  const flashPitSurge = useCallback(() => {
     if (reducedMotion) return;
     const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
-    pitGlowScale.setValue(0.8);
+    pitSurgeScale.setValue(0.8);
     Animated.parallel([
       Animated.sequence([
-        Animated.timing(pitGlowOpacity, { toValue: colors.glowOpacity, duration: 120, useNativeDriver: true }),
-        Animated.timing(pitGlowOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+        Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity, duration: 120, useNativeDriver: true }),
+        Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
       ]),
       Animated.sequence([
-        Animated.spring(pitGlowScale, { toValue: 1.2, friction: 4, tension: 200, useNativeDriver: true }),
-        Animated.timing(pitGlowScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+        Animated.spring(pitSurgeScale, { toValue: 1.2, friction: 4, tension: 200, useNativeDriver: true }),
+        Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
       ]),
     ]).start();
-  }, [phase, pitGlowOpacity, pitGlowScale, reducedMotion]);
+  }, [phase, pitSurgeOpacity, pitSurgeScale, reducedMotion]);
+
+  // ---- Pit inhale surge (on devour START — pit "pulls" the word) ----
+  const triggerInhale = useCallback(() => {
+    if (reducedMotion) return;
+    const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity * 0.6, duration: 150, useNativeDriver: true }),
+        Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(pitSurgeScale, { toValue: 1.1, duration: 150, useNativeDriver: true }),
+        Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [phase, pitSurgeOpacity, pitSurgeScale, reducedMotion]);
 
   // ---- Spawn trail particles ----
   const spawnTrail = useCallback((startX: number, startY: number) => {
@@ -654,6 +942,39 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
     setImpactParticles(prev => [...prev, ...newParticles]);
   }, [phase, reducedMotion]);
+
+  // ---- Spawn shockwave ring (expanding ripple from pit center) ----
+  const spawnShockwave = useCallback(() => {
+    if (reducedMotion || simplify) return;
+    const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
+    const ring: ShockwaveRing = {
+      id: `sw_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      scale: new Animated.Value(0),
+      opacity: new Animated.Value(0.6),
+      color: colors.glow,
+    };
+    setShockwaveRings(prev => {
+      // Limit max concurrent shockwaves
+      const trimmed = prev.length >= 3 ? prev.slice(-2) : prev;
+      return [...trimmed, ring];
+    });
+    Animated.parallel([
+      Animated.timing(ring.scale, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(ring.opacity, {
+        toValue: 0,
+        duration: 500,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      if (mountedRef.current) setShockwaveRings(prev => prev.filter(r => r.id !== ring.id));
+    });
+  }, [phase, reducedMotion, simplify]);
 
   // ---- Spawn amber rise ----
   const spawnAmberRise = useCallback((_amberAmount: number) => {
@@ -724,15 +1045,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Handle word devoured ----
   const handleWordDevoured = useCallback((fw: FlyingWord) => {
     if (!mountedRef.current) return;
-    flashPitGlow();
+    flashPitSurge();
     spawnImpactBurst();
+    spawnShockwave();
     if (!devouredPerBatch.current.has(fw.batchId)) {
       devouredPerBatch.current.set(fw.batchId, new Set());
     }
     devouredPerBatch.current.get(fw.batchId)!.add(fw.id);
     setFlyingWords(prev => prev.filter(w => w.id !== fw.id));
     tryFinalizeBatch(fw.batchId);
-  }, [flashPitGlow, spawnImpactBurst, tryFinalizeBatch]);
+  }, [flashPitSurge, spawnImpactBurst, spawnShockwave, tryFinalizeBatch]);
 
   // ---- Compute approximate current position from progress + phase offset ----
   const getCurrentPos = useCallback((fw: FlyingWord): { x: number; y: number } => {
@@ -745,7 +1067,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     };
   }, []);
 
-  // ---- Devour a single word ----
+  // ---- Devour a single word (true spiral path) ----
   const devourWord = useCallback((fw: FlyingWord) => {
     if (fw.isDevoured || isOffering) return;
     fw.isDevoured = true;
@@ -769,42 +1091,52 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const duration = getDevourDuration(phase);
 
-    // Start devour from current visual position (not baseX/baseY) for seamless transition
-    fw.devourX.setValue(currentPos.x);
-    fw.devourY.setValue(currentPos.y);
-    fw.useDevourPos = true;
-    // Force re-render with devour position
-    setFlyingWords(prev => [...prev]);
+    // Compute parametric spiral path from current position to pit center
+    const spiral = computeSpiralPath(
+      currentPos.x, currentPos.y,
+      PIT_CENTER.x, PIT_CENTER.y,
+      SPIRAL_ROTATIONS, SPIRAL_STEPS,
+    );
 
-    // Phase 1: brief pop-up (100ms)
+    // Store spiral keyframes on the FlyingWord for render interpolation
+    fw.spiralInput = spiral.input;
+    fw.spiralRangeX = spiral.outputX;
+    fw.spiralRangeY = spiral.outputY;
+    fw.devourProgress.setValue(0);
+    fw.useDevourPos = true;
+
+    // Create new object reference so React.memo re-renders this chip
+    setFlyingWords(prev => prev.map(w => w.id === fw.id ? { ...fw } : w));
+
+    // Pit "inhale" — surge as the pit pulls the word in
+    triggerInhale();
+
+    // Phase 1: brief pop-up (100ms), then Phase 2: spiral into pit
     Animated.sequence([
       Animated.spring(fw.scale, { toValue: 1.2, friction: 6, tension: 300, useNativeDriver: true }),
-      // Phase 2: spiral into pit
       Animated.parallel([
-        Animated.timing(fw.devourX, {
-          toValue: PIT_CENTER.x,
+        // True spiral via devourProgress driving interpolated X/Y
+        Animated.timing(fw.devourProgress, {
+          toValue: 1,
           duration,
-          easing: Easing.bezier(0.3, 0.1, 0.7, 0.15),
+          easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
-        Animated.timing(fw.devourY, {
-          toValue: PIT_CENTER.y,
-          duration,
-          easing: Easing.in(Easing.cubic),
-          useNativeDriver: true,
-        }),
+        // Scale shrinks as word spirals inward
         Animated.timing(fw.scale, {
           toValue: 0.05,
           duration,
           easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
+        // Single rotation (spiral path provides visual rotation itself)
         Animated.timing(fw.rotation, {
-          toValue: 6,
+          toValue: 1,
           duration,
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
         }),
+        // Fade out near the end
         Animated.sequence([
           Animated.delay(duration * 0.65),
           Animated.timing(fw.opacity, {
@@ -815,12 +1147,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         ]),
       ]),
     ]).start(() => handleWordDevoured(fw));
-  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured, getCurrentPos]);
+  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured, getCurrentPos, triggerInhale]);
 
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
 
-  // ---- Harvest All ----
+  // ---- Harvest All (with spiral paths) ----
   const handleHarvestAll = useCallback(async () => {
     if (isOffering || !harvestState || harvestState.pendingBatches.length === 0) return;
     setIsOffering(true);
@@ -881,23 +1213,46 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
 
         if (reducedMotion) {
-          fw.opacity.setValue(0); fw.scale.setValue(0); flashPitGlow(); return;
+          fw.opacity.setValue(0); fw.scale.setValue(0); flashPitSurge(); return;
         }
 
-        fw.devourX.setValue(currentPos.x);
-        fw.devourY.setValue(currentPos.y);
+        // Compute spiral path for this word (slight randomization)
+        const spiralRots = SPIRAL_ROTATIONS + (Math.random() - 0.5) * 0.8;
+        const spiral = computeSpiralPath(
+          currentPos.x, currentPos.y,
+          PIT_CENTER.x + (Math.random() - 0.5) * 20,
+          PIT_CENTER.y + (Math.random() - 0.5) * 15,
+          spiralRots, SPIRAL_STEPS,
+        );
+
+        fw.spiralInput = spiral.input;
+        fw.spiralRangeX = spiral.outputX;
+        fw.spiralRangeY = spiral.outputY;
+        fw.devourProgress.setValue(0);
         fw.useDevourPos = true;
 
+        // Create new object reference so React.memo re-renders this chip
+        setFlyingWords(prev => prev.map(w => w.id === fw.id ? { ...fw } : w));
+
         Animated.parallel([
-          Animated.timing(fw.devourX, { toValue: PIT_CENTER.x + (Math.random() - 0.5) * 20, duration, easing: Easing.bezier(0.3, 0.1, 0.7, 0.15), useNativeDriver: true }),
-          Animated.timing(fw.devourY, { toValue: PIT_CENTER.y + (Math.random() - 0.5) * 15, duration, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(fw.devourProgress, {
+            toValue: 1,
+            duration,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
           Animated.timing(fw.scale, { toValue: 0.05, duration, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-          Animated.timing(fw.rotation, { toValue: 4 + Math.random() * 3, duration, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(fw.rotation, { toValue: 0.8 + Math.random() * 0.5, duration, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
           Animated.sequence([
             Animated.delay(duration * 0.6),
             Animated.timing(fw.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
           ]),
-        ]).start(() => { if (mountedRef.current) { flashPitGlow(); if (i % 4 === 0) spawnImpactBurst(); } });
+        ]).start(() => {
+          if (mountedRef.current) {
+            flashPitSurge();
+            if (i % 4 === 0) { spawnImpactBurst(); spawnShockwave(); }
+          }
+        });
       }, i * staggerDelay);
     });
 
@@ -917,7 +1272,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setIsOffering(false);
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, flashPitGlow, showResultToast]);
+  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast]);
 
   // ---- Summary stats ----
   const pendingAmber = useMemo(() => {
@@ -939,15 +1294,31 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Pit glow overlay */}
+      {/* Ambient breathing glow — continuously pulses to make pit feel alive */}
       <Animated.View
         pointerEvents="none"
         style={[styles.pitGlow, {
           backgroundColor: glowColor,
-          opacity: pitGlowOpacity,
-          transform: [{ scale: pitGlowScale }],
+          opacity: breathOpacity,
+          transform: [{ scale: breathScale }],
         }]}
       />
+
+      {/* Pit surge glow — flashes on devour impact / inhale */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.pitGlow, {
+          backgroundColor: glowColor,
+          opacity: pitSurgeOpacity,
+          transform: [{ scale: pitSurgeScale }],
+        }]}
+      />
+
+      {/* Ambient rim particles — embers rising from pit edge */}
+      {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
+
+      {/* Shockwave rings — expanding ripple on word impact */}
+      {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}
 
       {/* Particle layers */}
       {trailParticles.map(p => <TrailParticleView key={p.id} p={p} />)}
