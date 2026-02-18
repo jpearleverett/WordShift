@@ -14,8 +14,6 @@ import {
 import { CandyColors, getPhaseTheme, getTileColor } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
 import {
-  getPitScreenTitle,
-  getPitScreenSubtitle,
   getPitOfferAllLabel,
   getPitEmptyMessage,
   getPitOfferResultMessage,
@@ -31,7 +29,7 @@ import {
 } from '../services/wordHarvest';
 import { awardBonusAmber } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
-import { hapticLight, hapticMedium, hapticSuccess } from '../services/haptics';
+import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
 
 // ---------------------------------------------------------------------------
@@ -58,7 +56,6 @@ function getPitBackground(phase: number) {
   return PIT_DAY;
 }
 
-// Pit center in background images (calibrated to asset)
 const PIT_CENTER = {
   x: SCREEN_WIDTH * 0.5,
   y: SCREEN_HEIGHT * 0.62,
@@ -67,19 +64,27 @@ const PIT_CENTER = {
 const STATUS_BAR_HEIGHT =
   Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50;
 
-// Zone where words float (above the pit)
 const FLOAT_ZONE = {
-  top: STATUS_BAR_HEIGHT + 90,
-  bottom: SCREEN_HEIGHT * 0.50,
-  left: 16,
-  right: SCREEN_WIDTH - 16,
+  top: STATUS_BAR_HEIGHT + 60,
+  bottom: SCREEN_HEIGHT * 0.48,
+  left: 10,
+  right: SCREEN_WIDTH - 10,
 };
+
+// Mini candy tile size (per letter)
+const MINI_TILE_W = 22;
+const MINI_TILE_H = 28;
+const MINI_TILE_BODY_H = 24;
+const MINI_TILE_EDGE_H = 4;
+const MINI_TILE_RADIUS = 6;
+const MINI_TILE_GAP = 1.5;
+const MINI_FONT = 13;
 
 function getMaxFloatingWords(): number {
   switch (getDeviceTier()) {
-    case 'low': return 20;
-    case 'medium': return 40;
-    case 'high': return 60;
+    case 'low': return 15;
+    case 'medium': return 30;
+    case 'high': return 50;
   }
 }
 
@@ -91,19 +96,22 @@ function getMaxAmberParticles(): number {
   return shouldSimplifyAnimations() ? 3 : 7;
 }
 
-// Phase-aware devour trail / glow colors
-const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: number }> = {
-  0: { trail: '#FFD700', glow: '#FFD700', glowOpacity: 0.30 },
-  1: { trail: '#F0C050', glow: '#F0C050', glowOpacity: 0.25 },
-  2: { trail: '#B088D0', glow: '#9060C0', glowOpacity: 0.20 },
-  3: { trail: '#5A2080', glow: '#3A1060', glowOpacity: 0.15 },
-  4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.40 },
+function getMaxImpactBurstParticles(): number {
+  return shouldSimplifyAnimations() ? 4 : 8;
+}
+
+const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: number; burst: string }> = {
+  0: { trail: '#FFD700', glow: '#FFD700', glowOpacity: 0.35, burst: '#FFE680' },
+  1: { trail: '#F0C050', glow: '#F0C050', glowOpacity: 0.30, burst: '#F5D88A' },
+  2: { trail: '#B088D0', glow: '#9060C0', glowOpacity: 0.25, burst: '#C8A8E8' },
+  3: { trail: '#5A2080', glow: '#3A1060', glowOpacity: 0.20, burst: '#7040A0' },
+  4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070' },
 };
 
 function getDevourDuration(phase: number): number {
-  if (phase >= 3) return 500;
-  if (phase >= 2) return 650;
-  return 800;
+  if (phase >= 3) return 600;
+  if (phase >= 2) return 750;
+  return 900;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,12 +122,16 @@ interface FlyingWord {
   id: string;
   word: string;
   batchId: string;
-  color: { bg: string; border: string; glow: string };
-  translateX: Animated.Value;
-  translateY: Animated.Value;
+  // Single progress values for smooth looped float (0 → 1, linear)
+  driftProgress: Animated.Value;
+  bobProgress: Animated.Value;
   opacity: Animated.Value;
   scale: Animated.Value;
   rotation: Animated.Value;
+  // For devour: absolute position overrides
+  devourX: Animated.Value;
+  devourY: Animated.Value;
+  useDevourPos: boolean; // when true, render uses devourX/Y instead of interpolated drift
   baseX: number;
   baseY: number;
   driftAmplitude: number;
@@ -127,14 +139,20 @@ interface FlyingWord {
   bobAmplitude: number;
   bobPeriod: number;
   isDevoured: boolean;
-  floatLoop: Animated.CompositeAnimation | null;
+  floatLoopX: Animated.CompositeAnimation | null;
+  floatLoopY: Animated.CompositeAnimation | null;
 }
 
-// ---------------------------------------------------------------------------
-// Ephemeral particle types
-// ---------------------------------------------------------------------------
-
 interface TrailParticle {
+  id: string;
+  x: Animated.Value;
+  y: Animated.Value;
+  opacity: Animated.Value;
+  scale: Animated.Value;
+  color: string;
+}
+
+interface ImpactParticle {
   id: string;
   x: Animated.Value;
   y: Animated.Value;
@@ -152,29 +170,122 @@ interface AmberParticle {
 }
 
 // ---------------------------------------------------------------------------
-// FloatingWordChip — single candy-styled word drifting above the pit
+// MiniCandyTile — single letter with 3D candy styling
+// ---------------------------------------------------------------------------
+
+const MiniCandyTile = React.memo(({ char }: { char: string }) => {
+  const color = getTileColor(char);
+  return (
+    <View style={tileStyles.outer}>
+      <View style={[tileStyles.body, { backgroundColor: color.bg }]}>
+        {/* Top bevel highlight */}
+        <View style={tileStyles.bevel} />
+        {/* Specular dot */}
+        <View style={tileStyles.specular} />
+        {/* Letter */}
+        <Text style={tileStyles.letter}>{char}</Text>
+      </View>
+      {/* 3D bottom edge */}
+      <View style={[tileStyles.edge, { backgroundColor: color.border }]} />
+    </View>
+  );
+});
+
+const tileStyles = StyleSheet.create({
+  outer: {
+    width: MINI_TILE_W,
+    height: MINI_TILE_H,
+    marginHorizontal: MINI_TILE_GAP / 2,
+  },
+  body: {
+    width: MINI_TILE_W,
+    height: MINI_TILE_BODY_H,
+    borderRadius: MINI_TILE_RADIUS,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  bevel: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%' as unknown as number,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderTopLeftRadius: MINI_TILE_RADIUS,
+    borderTopRightRadius: MINI_TILE_RADIUS,
+  },
+  specular: {
+    position: 'absolute',
+    top: 3,
+    right: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.65)',
+  },
+  letter: {
+    color: '#FFFFFF',
+    fontSize: MINI_FONT,
+    fontWeight: '900',
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  edge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 2,
+    right: 2,
+    height: MINI_TILE_EDGE_H,
+    borderBottomLeftRadius: MINI_TILE_RADIUS - 1,
+    borderBottomRightRadius: MINI_TILE_RADIUS - 1,
+    zIndex: -1,
+  },
+});
+
+// ---------------------------------------------------------------------------
+// FloatingWordChip — word as a row of mini candy tiles
 // ---------------------------------------------------------------------------
 
 const FloatingWordChip = React.memo(({
   fw,
   onTap,
-  phase,
 }: {
   fw: FlyingWord;
   onTap: (fw: FlyingWord) => void;
-  phase: number;
 }) => {
   const spin = fw.rotation.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
 
-  // Phase-aware shadow
-  const shadowColor = phase >= 3
-    ? 'rgba(192, 48, 80, 0.6)'
-    : phase >= 2
-      ? 'rgba(90, 32, 128, 0.5)'
-      : fw.color.glow;
+  // Derive smooth sinusoidal position from linear progress values
+  const driftX = fw.driftProgress.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [
+      fw.baseX,
+      fw.baseX + fw.driftAmplitude,
+      fw.baseX,
+      fw.baseX - fw.driftAmplitude,
+      fw.baseX,
+    ],
+  });
+
+  const driftY = fw.bobProgress.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [
+      fw.baseY,
+      fw.baseY - fw.bobAmplitude,
+      fw.baseY,
+      fw.baseY + fw.bobAmplitude,
+      fw.baseY,
+    ],
+  });
+
+  // Use devour position when actively spiraling, otherwise interpolated drift
+  const posX = fw.useDevourPos ? fw.devourX : driftX;
+  const posY = fw.useDevourPos ? fw.devourY : driftY;
 
   return (
     <Animated.View
@@ -182,8 +293,8 @@ const FloatingWordChip = React.memo(({
         chipStyles.wrapper,
         {
           transform: [
-            { translateX: fw.translateX },
-            { translateY: fw.translateY },
+            { translateX: posX },
+            { translateY: posY },
             { scale: fw.scale },
             { rotate: spin },
           ],
@@ -193,22 +304,15 @@ const FloatingWordChip = React.memo(({
       pointerEvents={fw.isDevoured ? 'none' : 'auto'}
     >
       <TouchableOpacity
-        activeOpacity={0.7}
+        activeOpacity={0.8}
         onPress={() => onTap(fw)}
         accessibilityLabel={`Word: ${fw.word}, tap to offer`}
         accessibilityRole="button"
       >
-        <View
-          style={[
-            chipStyles.chip,
-            {
-              backgroundColor: fw.color.bg,
-              borderBottomColor: fw.color.border,
-              shadowColor,
-            },
-          ]}
-        >
-          <Text style={chipStyles.chipText}>{fw.word}</Text>
+        <View style={chipStyles.tileRow}>
+          {fw.word.split('').map((ch, i) => (
+            <MiniCandyTile key={`${ch}_${i}`} char={ch} />
+          ))}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -221,30 +325,19 @@ const chipStyles = StyleSheet.create({
     top: 0,
     left: 0,
   },
-  chip: {
-    paddingHorizontal: 11,
-    paddingTop: 5,
-    paddingBottom: 7,
-    borderRadius: 14,
-    borderBottomWidth: 3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
+  tileRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
     elevation: 6,
-  },
-  chipText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
 });
 
 // ---------------------------------------------------------------------------
-// Trail particle renderer
+// Particle renderers
 // ---------------------------------------------------------------------------
 
 const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => (
@@ -258,19 +351,28 @@ const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => (
       height: 8,
       borderRadius: 4,
       backgroundColor: p.color,
-      transform: [
-        { translateX: p.x },
-        { translateY: p.y },
-        { scale: p.scale },
-      ],
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
       opacity: p.opacity,
     }}
   />
 ));
 
-// ---------------------------------------------------------------------------
-// Amber rise particle renderer
-// ---------------------------------------------------------------------------
+const ImpactParticleView = React.memo(({ p }: { p: ImpactParticle }) => (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: p.color,
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+      opacity: p.opacity,
+    }}
+  />
+));
 
 const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
   <Animated.View
@@ -283,12 +385,7 @@ const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
       height: 12,
       borderRadius: 2,
       backgroundColor: '#FFBF00',
-      transform: [
-        { translateX: p.x },
-        { translateY: p.y },
-        { scale: p.scale },
-        { rotate: '45deg' },
-      ],
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }, { rotate: '45deg' }],
       opacity: p.opacity,
     }}
   />
@@ -315,39 +412,32 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const reducedMotion = getSettingsSync()?.reducedMotion ?? false;
   const simplify = shouldSimplifyAnimations();
 
-  // ---- State ----
   const [harvestState, setHarvestState] = useState<HarvestState | null>(null);
   const [flyingWords, setFlyingWords] = useState<FlyingWord[]>([]);
   const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
+  const [impactParticles, setImpactParticles] = useState<ImpactParticle[]>([]);
   const [amberParticles, setAmberParticles] = useState<AmberParticle[]>([]);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(amberBalance);
   const [overflowCount, setOverflowCount] = useState(0);
 
-  // ---- Refs ----
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
   const finalizingBatches = useRef<Set<string>>(new Set());
   const pitGlowOpacity = useRef(new Animated.Value(0)).current;
+  const pitGlowScale = useRef(new Animated.Value(0.8)).current;
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
   const flyingWordsRef = useRef<FlyingWord[]>([]);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
+  // Stable callback ref to avoid re-rendering all chips when devourWord deps change
+  const devourWordRef = useRef<(fw: FlyingWord) => void>(() => {});
+  const stableDevourWord = useCallback((fw: FlyingWord) => devourWordRef.current(fw), []);
 
-  // Keep ref in sync with state for use in callbacks
-  useEffect(() => {
-    flyingWordsRef.current = flyingWords;
-  }, [flyingWords]);
-
-  // Sync displayBalance when parent changes
-  useEffect(() => {
-    setDisplayBalance(amberBalance);
-  }, [amberBalance]);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
+  useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
@@ -357,7 +447,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   useEffect(() => { loadState(); }, [loadState]);
 
-  // ---- Build flying words when harvest state loads ----
+  // ---- Build flying words ----
   useEffect(() => {
     if (!harvestState) return;
 
@@ -370,32 +460,36 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       batchCounts.set(batch.id, batch.words.length);
       for (let i = 0; i < batch.words.length; i++) {
         totalWords++;
-        if (allWords.length >= maxWords) continue; // count but don't render
+        if (allWords.length >= maxWords) continue;
         const word = batch.words[i];
         const id = `${batch.id}_${i}`;
-        const zoneWidth = FLOAT_ZONE.right - FLOAT_ZONE.left;
+        const wordPixelWidth = word.length * (MINI_TILE_W + MINI_TILE_GAP);
+        const zoneWidth = FLOAT_ZONE.right - FLOAT_ZONE.left - wordPixelWidth;
         const zoneHeight = FLOAT_ZONE.bottom - FLOAT_ZONE.top;
-        const baseX = FLOAT_ZONE.left + Math.random() * zoneWidth;
+        const baseX = FLOAT_ZONE.left + Math.random() * Math.max(zoneWidth, 20);
         const baseY = FLOAT_ZONE.top + Math.random() * zoneHeight;
 
         allWords.push({
           id,
           word,
           batchId: batch.id,
-          color: getTileColor(word.charAt(0)),
-          translateX: new Animated.Value(baseX),
-          translateY: new Animated.Value(baseY),
+          driftProgress: new Animated.Value(Math.random()), // random start phase
+          bobProgress: new Animated.Value(Math.random()),
           opacity: new Animated.Value(0),
           scale: new Animated.Value(0.3),
           rotation: new Animated.Value(0),
+          devourX: new Animated.Value(baseX),
+          devourY: new Animated.Value(baseY),
+          useDevourPos: false,
           baseX,
           baseY,
-          driftAmplitude: 15 + Math.random() * 25,
-          driftPeriod: 3000 + Math.random() * 3000,
-          bobAmplitude: 8 + Math.random() * 7,
-          bobPeriod: 2000 + Math.random() * 2000,
+          driftAmplitude: 12 + Math.random() * 20,
+          driftPeriod: 4000 + Math.random() * 4000,
+          bobAmplitude: 6 + Math.random() * 8,
+          bobPeriod: 3000 + Math.random() * 3000,
           isDevoured: false,
-          floatLoop: null,
+          floatLoopX: null,
+          floatLoopY: null,
         });
       }
     }
@@ -408,7 +502,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     // Staggered pop-in
     allWords.forEach((fw, i) => {
-      const delay = reducedMotion ? 0 : i * 40;
+      const delay = reducedMotion ? 0 : i * 50;
       setTimeout(() => {
         if (!mountedRef.current) return;
         if (reducedMotion) {
@@ -417,98 +511,70 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           return;
         }
         Animated.parallel([
-          Animated.spring(fw.scale, {
-            toValue: 1,
-            friction: 5,
-            tension: 120,
-            useNativeDriver: true,
-          }),
-          Animated.timing(fw.opacity, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
+          Animated.spring(fw.scale, { toValue: 1, friction: 5, tension: 120, useNativeDriver: true }),
+          Animated.timing(fw.opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
         ]).start(() => {
-          if (!mountedRef.current) return;
-          startFloatLoop(fw);
+          if (mountedRef.current) startFloatLoop(fw);
         });
       }, delay);
     });
 
     return () => {
-      // Cleanup all float loops
       allWords.forEach(fw => {
-        if (fw.floatLoop) {
-          fw.floatLoop.stop();
-          fw.floatLoop = null;
-        }
+        fw.floatLoopX?.stop();
+        fw.floatLoopY?.stop();
+        fw.floatLoopX = null;
+        fw.floatLoopY = null;
       });
     };
-    // We only rebuild flying words when harvestState identity changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [harvestState]);
 
-  // ---- Float loop for a single word ----
+  // ---- Smooth float loop using single linear progress → interpolated sine ----
   const startFloatLoop = useCallback((fw: FlyingWord) => {
     if (reducedMotion || simplify || fw.isDevoured) return;
 
-    const driftHalf = fw.driftPeriod / 2;
-    const bobHalf = fw.bobPeriod / 2;
-
-    const loop = Animated.loop(
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(fw.translateX, {
-            toValue: fw.baseX + fw.driftAmplitude,
-            duration: driftHalf,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(fw.translateX, {
-            toValue: fw.baseX - fw.driftAmplitude,
-            duration: driftHalf,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.sequence([
-          Animated.timing(fw.translateY, {
-            toValue: fw.baseY - fw.bobAmplitude,
-            duration: bobHalf,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(fw.translateY, {
-            toValue: fw.baseY + fw.bobAmplitude,
-            duration: bobHalf,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ]),
-      ])
+    // X drift: single linear timing 0→1 looped, interpolated to sine in render
+    const loopX = Animated.loop(
+      Animated.timing(fw.driftProgress, {
+        toValue: 1,
+        duration: fw.driftPeriod,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
     );
-    fw.floatLoop = loop;
-    loop.start();
+    fw.floatLoopX = loopX;
+    loopX.start();
+
+    // Y bob: same approach, different period
+    const loopY = Animated.loop(
+      Animated.timing(fw.bobProgress, {
+        toValue: 1,
+        duration: fw.bobPeriod,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    fw.floatLoopY = loopY;
+    loopY.start();
   }, [reducedMotion, simplify]);
 
-  // ---- Pit glow flash ----
+  // ---- Pit glow + scale flash ----
   const flashPitGlow = useCallback(() => {
     if (reducedMotion) return;
     const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
-    const dur = phase >= 3 ? 200 : phase >= 2 ? 250 : 300;
-    Animated.sequence([
-      Animated.timing(pitGlowOpacity, {
-        toValue: colors.glowOpacity,
-        duration: dur * 0.4,
-        useNativeDriver: true,
-      }),
-      Animated.timing(pitGlowOpacity, {
-        toValue: 0,
-        duration: dur * 0.6,
-        useNativeDriver: true,
-      }),
+    pitGlowScale.setValue(0.8);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(pitGlowOpacity, { toValue: colors.glowOpacity, duration: 120, useNativeDriver: true }),
+        Animated.timing(pitGlowOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.spring(pitGlowScale, { toValue: 1.2, friction: 4, tension: 200, useNativeDriver: true }),
+        Animated.timing(pitGlowScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+      ]),
     ]).start();
-  }, [phase, pitGlowOpacity, reducedMotion]);
+  }, [phase, pitGlowOpacity, pitGlowScale, reducedMotion]);
 
   // ---- Spawn trail particles ----
   const spawnTrail = useCallback((startX: number, startY: number) => {
@@ -517,372 +583,281 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
     const duration = getDevourDuration(phase);
     const newParticles: TrailParticle[] = [];
-
     for (let i = 0; i < count; i++) {
       const p: TrailParticle = {
-        id: `trail_${Date.now()}_${i}`,
+        id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}_${i}`,
         x: new Animated.Value(startX + (Math.random() - 0.5) * 20),
         y: new Animated.Value(startY + (Math.random() - 0.5) * 20),
         opacity: new Animated.Value(0.8),
-        scale: new Animated.Value(0.6 + Math.random() * 0.6),
+        scale: new Animated.Value(0.5 + Math.random() * 0.5),
         color: colors.trail,
       };
       newParticles.push(p);
-
-      const delay = i * 40;
+      const delay = i * 50;
       setTimeout(() => {
         Animated.parallel([
-          Animated.timing(p.x, {
-            toValue: PIT_CENTER.x + (Math.random() - 0.5) * 30,
-            duration: duration * 0.8,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(p.y, {
-            toValue: PIT_CENTER.y + (Math.random() - 0.5) * 20,
-            duration: duration * 0.8,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(p.scale, {
-            toValue: 0,
-            duration: duration * 0.8,
-            useNativeDriver: true,
-          }),
-          Animated.timing(p.opacity, {
-            toValue: 0,
-            duration: duration * 0.6,
-            delay: duration * 0.3,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          if (mountedRef.current) {
-            setTrailParticles(prev => prev.filter(tp => tp.id !== p.id));
-          }
-        });
+          Animated.timing(p.x, { toValue: PIT_CENTER.x + (Math.random() - 0.5) * 30, duration: duration * 0.75, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.timing(p.y, { toValue: PIT_CENTER.y + (Math.random() - 0.5) * 20, duration: duration * 0.75, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.timing(p.scale, { toValue: 0, duration: duration * 0.75, useNativeDriver: true }),
+          Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.5, delay: duration * 0.3, useNativeDriver: true }),
+        ]).start(() => { if (mountedRef.current) setTrailParticles(prev => prev.filter(tp => tp.id !== p.id)); });
       }, delay);
     }
-
     setTrailParticles(prev => [...prev, ...newParticles]);
   }, [phase, reducedMotion]);
 
-  // ---- Spawn amber rise particles ----
-  const spawnAmberRise = useCallback((amberAmount: number) => {
+  // ---- Spawn impact burst (radial ring at pit center) ----
+  const spawnImpactBurst = useCallback(() => {
+    if (reducedMotion) return;
+    const count = getMaxImpactBurstParticles();
+    const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
+    const newParticles: ImpactParticle[] = [];
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const dist = 40 + Math.random() * 30;
+      const p: ImpactParticle = {
+        id: `imp_${Date.now()}_${i}`,
+        x: new Animated.Value(PIT_CENTER.x),
+        y: new Animated.Value(PIT_CENTER.y),
+        opacity: new Animated.Value(0.9),
+        scale: new Animated.Value(0.3),
+        color: colors.burst,
+      };
+      newParticles.push(p);
+      Animated.parallel([
+        Animated.timing(p.x, { toValue: PIT_CENTER.x + Math.cos(angle) * dist, duration: 400, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(p.y, { toValue: PIT_CENTER.y + Math.sin(angle) * dist, duration: 400, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.sequence([
+          Animated.spring(p.scale, { toValue: 1.0, friction: 5, tension: 150, useNativeDriver: true }),
+          Animated.timing(p.scale, { toValue: 0, duration: 200, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.delay(250),
+          Animated.timing(p.opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+        ]),
+      ]).start(() => { if (mountedRef.current) setImpactParticles(prev => prev.filter(ip => ip.id !== p.id)); });
+    }
+    setImpactParticles(prev => [...prev, ...newParticles]);
+  }, [phase, reducedMotion]);
+
+  // ---- Spawn amber rise ----
+  const spawnAmberRise = useCallback((_amberAmount: number) => {
     if (reducedMotion) return;
     const count = getMaxAmberParticles();
     const newParticles: AmberParticle[] = [];
-
     for (let i = 0; i < count; i++) {
       const p: AmberParticle = {
-        id: `amber_${Date.now()}_${i}`,
+        id: `a_${Date.now()}_${i}`,
         x: new Animated.Value(PIT_CENTER.x - 6 + (Math.random() - 0.5) * 40),
         y: new Animated.Value(PIT_CENTER.y),
         opacity: new Animated.Value(0),
         scale: new Animated.Value(0.4),
       };
       newParticles.push(p);
-
       const delay = i * 80;
       setTimeout(() => {
         Animated.parallel([
-          Animated.timing(p.y, {
-            toValue: PIT_CENTER.y - 200 - Math.random() * 100,
-            duration: 1200,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(p.x, {
-            toValue: PIT_CENTER.x - 6 + (Math.random() - 0.5) * 80,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
+          Animated.timing(p.y, { toValue: PIT_CENTER.y - 200 - Math.random() * 100, duration: 1200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(p.x, { toValue: PIT_CENTER.x - 6 + (Math.random() - 0.5) * 80, duration: 1200, useNativeDriver: true }),
           Animated.sequence([
-            Animated.timing(p.opacity, {
-              toValue: 0.9,
-              duration: 200,
-              useNativeDriver: true,
-            }),
+            Animated.timing(p.opacity, { toValue: 0.9, duration: 200, useNativeDriver: true }),
             Animated.delay(500),
-            Animated.timing(p.opacity, {
-              toValue: 0,
-              duration: 500,
-              useNativeDriver: true,
-            }),
+            Animated.timing(p.opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
           ]),
-          Animated.spring(p.scale, {
-            toValue: 1.0 + Math.random() * 0.4,
-            friction: 4,
-            useNativeDriver: true,
-          }),
-        ]).start(() => {
-          if (mountedRef.current) {
-            setAmberParticles(prev => prev.filter(ap => ap.id !== p.id));
-          }
-        });
+          Animated.spring(p.scale, { toValue: 1.0 + Math.random() * 0.4, friction: 4, useNativeDriver: true }),
+        ]).start(() => { if (mountedRef.current) setAmberParticles(prev => prev.filter(ap => ap.id !== p.id)); });
       }, delay);
     }
-
     setAmberParticles(prev => [...prev, ...newParticles]);
   }, [reducedMotion]);
 
-  // ---- Show result toast ----
+  // ---- Result toast ----
   const showResultToast = useCallback((message: string) => {
     setResultMessage(message);
     resultOpacity.setValue(0);
     Animated.sequence([
-      Animated.timing(resultOpacity, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
+      Animated.timing(resultOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
       Animated.delay(2500),
-      Animated.timing(resultOpacity, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      if (mountedRef.current) setResultMessage(null);
-    });
+      Animated.timing(resultOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(() => { if (mountedRef.current) setResultMessage(null); });
   }, [resultOpacity]);
 
-  // ---- Handle batch completion (all words devoured) ----
+  // ---- Batch completion ----
   const tryFinalizeBatch = useCallback(async (batchId: string) => {
     if (finalizingBatches.current.has(batchId)) return;
     const totalWords = batchWordCounts.current.get(batchId) ?? 0;
     const devoured = devouredPerBatch.current.get(batchId);
     if (!devoured || devoured.size < totalWords) return;
-
     finalizingBatches.current.add(batchId);
-
     try {
       const result = await offerBatch(batchId);
       if (!result) return;
-
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) {
         setDisplayBalance(newBalance);
         onAmberChange?.(newBalance);
         spawnAmberRise(result.amberAwarded);
         hapticMedium();
-        showResultToast(
-          getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded)
-        );
+        showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
       }
-    } catch {
-      // Silently handle — batch may already have been offered
-    }
+    } catch { /* batch may already be offered */ }
   }, [phase, onAmberChange, spawnAmberRise, showResultToast]);
 
-  // ---- Devour a single word (spiral animation) ----
+  // ---- Handle word devoured ----
+  const handleWordDevoured = useCallback((fw: FlyingWord) => {
+    if (!mountedRef.current) return;
+    flashPitGlow();
+    spawnImpactBurst();
+    if (!devouredPerBatch.current.has(fw.batchId)) {
+      devouredPerBatch.current.set(fw.batchId, new Set());
+    }
+    devouredPerBatch.current.get(fw.batchId)!.add(fw.id);
+    setFlyingWords(prev => prev.filter(w => w.id !== fw.id));
+    tryFinalizeBatch(fw.batchId);
+  }, [flashPitGlow, spawnImpactBurst, tryFinalizeBatch]);
+
+  // ---- Devour a single word ----
   const devourWord = useCallback((fw: FlyingWord) => {
     if (fw.isDevoured || isOffering) return;
     fw.isDevoured = true;
-
     hapticLight();
 
-    // Stop float loop
-    if (fw.floatLoop) {
-      fw.floatLoop.stop();
-      fw.floatLoop = null;
-    }
+    // Stop float loops
+    fw.floatLoopX?.stop(); fw.floatLoopX = null;
+    fw.floatLoopY?.stop(); fw.floatLoopY = null;
 
-    // Spawn trail from approximate position
     spawnTrail(fw.baseX, fw.baseY);
 
-    const duration = getDevourDuration(phase);
-
     if (reducedMotion) {
-      // Instant
       fw.opacity.setValue(0);
       fw.scale.setValue(0);
       handleWordDevoured(fw);
       return;
     }
 
-    Animated.parallel([
-      // Curve toward pit X via bezier easing
-      Animated.timing(fw.translateX, {
-        toValue: PIT_CENTER.x,
-        duration,
-        easing: Easing.bezier(0.4, 0, 0.7, 0.2),
-        useNativeDriver: true,
-      }),
-      // Accelerate into pit Y
-      Animated.timing(fw.translateY, {
-        toValue: PIT_CENTER.y,
-        duration,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-      // Shrink
-      Animated.timing(fw.scale, {
-        toValue: 0.1,
-        duration,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-      // Spin — 4 full rotations
-      Animated.timing(fw.rotation, {
-        toValue: 4,
-        duration,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      // Fade in final 30%
-      Animated.sequence([
-        Animated.delay(duration * 0.7),
-        Animated.timing(fw.opacity, {
-          toValue: 0,
-          duration: duration * 0.3,
+    const duration = getDevourDuration(phase);
+
+    // Snapshot current drift position into devourX/Y, then switch to devour mode
+    // Approximate current pos from progress (we use baseX as fallback — close enough since
+    // the timing naturally continues from current native value)
+    fw.devourX.setValue(fw.baseX);
+    fw.devourY.setValue(fw.baseY);
+    fw.useDevourPos = true;
+    // Force re-render with devour position
+    setFlyingWords(prev => [...prev]);
+
+    // Phase 1: brief pop-up (100ms)
+    Animated.sequence([
+      Animated.spring(fw.scale, { toValue: 1.2, friction: 6, tension: 300, useNativeDriver: true }),
+      // Phase 2: spiral into pit
+      Animated.parallel([
+        Animated.timing(fw.devourX, {
+          toValue: PIT_CENTER.x,
+          duration,
+          easing: Easing.bezier(0.3, 0.1, 0.7, 0.15),
           useNativeDriver: true,
         }),
+        Animated.timing(fw.devourY, {
+          toValue: PIT_CENTER.y,
+          duration,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fw.scale, {
+          toValue: 0.05,
+          duration,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(fw.rotation, {
+          toValue: 6,
+          duration,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(duration * 0.65),
+          Animated.timing(fw.opacity, {
+            toValue: 0,
+            duration: duration * 0.35,
+            useNativeDriver: true,
+          }),
+        ]),
       ]),
-    ]).start(() => {
-      handleWordDevoured(fw);
-    });
-  }, [phase, isOffering, reducedMotion, spawnTrail, flashPitGlow]);
+    ]).start(() => handleWordDevoured(fw));
+  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured]);
 
-  // ---- After devour animation completes ----
-  const handleWordDevoured = useCallback((fw: FlyingWord) => {
-    if (!mountedRef.current) return;
-
-    // Flash the pit
-    flashPitGlow();
-
-    // Track batch progress
-    if (!devouredPerBatch.current.has(fw.batchId)) {
-      devouredPerBatch.current.set(fw.batchId, new Set());
-    }
-    devouredPerBatch.current.get(fw.batchId)!.add(fw.id);
-
-    // Remove from visible words
-    setFlyingWords(prev => prev.filter(w => w.id !== fw.id));
-
-    // Check batch completion
-    tryFinalizeBatch(fw.batchId);
-  }, [flashPitGlow, tryFinalizeBatch]);
+  // Keep devourWordRef in sync
+  useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
 
   // ---- Harvest All ----
   const handleHarvestAll = useCallback(async () => {
     if (isOffering || !harvestState || harvestState.pendingBatches.length === 0) return;
     setIsOffering(true);
-    hapticSuccess();
+    hapticHeavy();
 
-    // 1. Atomic economy — settle all batches immediately
     const result = await offerAllBatches();
     if (result.amberAwarded > 0) {
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
-      if (mountedRef.current) {
-        onAmberChange?.(newBalance);
-        // We'll update display balance after the cascade for dramatic effect
-      }
+      if (mountedRef.current) onAmberChange?.(newBalance);
     }
 
-    // 2. Visual cascade — stagger all words spiraling in
     const words = flyingWordsRef.current.filter(w => !w.isDevoured);
     if (words.length === 0) {
-      if (mountedRef.current) {
-        setIsOffering(false);
-        await loadState();
-      }
+      if (mountedRef.current) { setIsOffering(false); await loadState(); }
       return;
     }
 
-    const staggerDelay = Math.min(80, 2000 / words.length);
+    const staggerDelay = Math.min(70, 1800 / words.length);
 
     words.forEach((fw, i) => {
-      fw.isDevoured = true; // Mark immediately to prevent taps
-      const delay = i * staggerDelay;
-
+      fw.isDevoured = true;
       setTimeout(() => {
         if (!mountedRef.current) return;
+        fw.floatLoopX?.stop(); fw.floatLoopX = null;
+        fw.floatLoopY?.stop(); fw.floatLoopY = null;
 
-        // Stop float
-        if (fw.floatLoop) {
-          fw.floatLoop.stop();
-          fw.floatLoop = null;
-        }
-
-        // Spawn trail every 3rd word to avoid particle overload
-        if (i % 3 === 0) {
-          spawnTrail(fw.baseX, fw.baseY);
-        }
-
+        if (i % 3 === 0) spawnTrail(fw.baseX, fw.baseY);
         const duration = getDevourDuration(phase);
 
         if (reducedMotion) {
-          fw.opacity.setValue(0);
-          fw.scale.setValue(0);
-          flashPitGlow();
-          return;
+          fw.opacity.setValue(0); fw.scale.setValue(0); flashPitGlow(); return;
         }
 
+        fw.devourX.setValue(fw.baseX);
+        fw.devourY.setValue(fw.baseY);
+        fw.useDevourPos = true;
+
         Animated.parallel([
-          Animated.timing(fw.translateX, {
-            toValue: PIT_CENTER.x + (Math.random() - 0.5) * 20,
-            duration,
-            easing: Easing.bezier(0.4, 0, 0.7, 0.2),
-            useNativeDriver: true,
-          }),
-          Animated.timing(fw.translateY, {
-            toValue: PIT_CENTER.y + (Math.random() - 0.5) * 15,
-            duration,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(fw.scale, {
-            toValue: 0.1,
-            duration,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(fw.rotation, {
-            toValue: 3 + Math.random() * 2,
-            duration,
-            easing: Easing.in(Easing.cubic),
-            useNativeDriver: true,
-          }),
+          Animated.timing(fw.devourX, { toValue: PIT_CENTER.x + (Math.random() - 0.5) * 20, duration, easing: Easing.bezier(0.3, 0.1, 0.7, 0.15), useNativeDriver: true }),
+          Animated.timing(fw.devourY, { toValue: PIT_CENTER.y + (Math.random() - 0.5) * 15, duration, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(fw.scale, { toValue: 0.05, duration, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.timing(fw.rotation, { toValue: 4 + Math.random() * 3, duration, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
           Animated.sequence([
-            Animated.delay(duration * 0.65),
-            Animated.timing(fw.opacity, {
-              toValue: 0,
-              duration: duration * 0.35,
-              useNativeDriver: true,
-            }),
+            Animated.delay(duration * 0.6),
+            Animated.timing(fw.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
           ]),
-        ]).start(() => {
-          if (mountedRef.current) flashPitGlow();
-        });
-      }, delay);
+        ]).start(() => { if (mountedRef.current) { flashPitGlow(); if (i % 4 === 0) spawnImpactBurst(); } });
+      }, i * staggerDelay);
     });
 
-    // 3. After cascade finishes, show results + amber rise
-    const cascadeDuration = words.length * staggerDelay + getDevourDuration(phase) + 200;
+    const cascadeDuration = words.length * staggerDelay + getDevourDuration(phase) + 300;
     setTimeout(async () => {
       if (!mountedRef.current) return;
-
-      // Update display balance now (dramatic reveal)
       const freshState = await getHarvestState();
       if (mountedRef.current) {
         setDisplayBalance(prev => prev + result.amberAwarded);
         spawnAmberRise(result.amberAwarded);
-        showResultToast(
-          getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded)
-        );
+        showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
         setHarvestState(freshState);
         setFlyingWords([]);
         setOverflowCount(0);
         setIsOffering(false);
       }
     }, cascadeDuration);
-  }, [
-    isOffering, harvestState, phase, reducedMotion,
-    onAmberChange, spawnTrail, spawnAmberRise, flashPitGlow,
-    showResultToast, loadState,
-  ]);
+  }, [isOffering, harvestState, phase, reducedMotion, onAmberChange, spawnTrail, spawnAmberRise, spawnImpactBurst, flashPitGlow, showResultToast, loadState]);
 
-  // ---- Compute summary stats ----
+  // ---- Summary stats ----
   const pendingAmber = useMemo(() => {
     if (!harvestState) return 0;
     return harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
@@ -893,80 +868,61 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     return harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
   }, [harvestState]);
 
-  // ---- Pit glow color ----
   const glowColor = (DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0]).glow;
 
   if (!harvestState) return null;
 
   return (
     <View style={[styles.container, { backgroundColor: PIT_BG_COLORS[phase] ?? PIT_BG_COLORS[0] }]}>
-      {/* Full-screen background image */}
-      <Image
-        source={getPitBackground(phase)}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      />
+      <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Pit glow overlay (flashes on devour) */}
+      {/* Pit glow overlay */}
       <Animated.View
         pointerEvents="none"
-        style={[
-          styles.pitGlow,
-          {
-            backgroundColor: glowColor,
-            opacity: pitGlowOpacity,
-          },
-        ]}
+        style={[styles.pitGlow, {
+          backgroundColor: glowColor,
+          opacity: pitGlowOpacity,
+          transform: [{ scale: pitGlowScale }],
+        }]}
       />
 
-      {/* Trail particles layer */}
-      {trailParticles.map(p => (
-        <TrailParticleView key={p.id} p={p} />
-      ))}
-
-      {/* Amber rise particles layer */}
-      {amberParticles.map(p => (
-        <AmberParticleView key={p.id} p={p} />
-      ))}
+      {/* Particle layers */}
+      {trailParticles.map(p => <TrailParticleView key={p.id} p={p} />)}
+      {impactParticles.map(p => <ImpactParticleView key={p.id} p={p} />)}
+      {amberParticles.map(p => <AmberParticleView key={p.id} p={p} />)}
 
       {/* Floating word chips */}
       {flyingWords.map(fw => (
-        <FloatingWordChip
-          key={fw.id}
-          fw={fw}
-          onTap={devourWord}
-          phase={phase}
-        />
+        <FloatingWordChip key={fw.id} fw={fw} onTap={stableDevourWord} />
       ))}
 
-      {/* Header overlay */}
+      {/* Header — matches HomeScreen frosted glass style */}
       <View style={[styles.header, { paddingTop: STATUS_BAR_HEIGHT }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            hapticLight();
-            onClose();
-          }}
-          accessibilityLabel="Return home"
-          accessibilityRole="button"
-        >
-          <Text style={styles.backButtonText}>{'\u2190'} Home</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: phaseTheme.victoryTitleColor }]}>
-          {getPitScreenTitle(phase)}
-        </Text>
-        <View style={styles.amberBadge}>
-          <Text style={styles.amberBadgeText}>
-            {'\uD83D\uDC8E'} {displayBalance}
-          </Text>
+        <View style={styles.headerLeft}>
+          <View style={styles.amberContainer} accessibilityLabel={`${displayBalance} amber`}>
+            <View style={styles.amberInner}>
+              <Text style={styles.amberEmoji}>{'\uD83D\uDC8E'}</Text>
+              <Text style={styles.amberCount}>{displayBalance}</Text>
+            </View>
+          </View>
+          {pendingAmber > 0 && (
+            <View style={styles.pendingBadge}>
+              <Text style={styles.pendingBadgeText}>+{pendingAmber}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => { hapticLight(); onClose(); }}
+            accessibilityLabel="Return home"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerIconText}>{'\uD83C\uDFE0'}</Text>
+          </TouchableOpacity>
         </View>
       </View>
-
-      {/* Subtitle */}
-      <Text style={[styles.subtitle, { color: phaseTheme.modalSecondaryTextColor }]}>
-        {getPitScreenSubtitle(phase)}
-      </Text>
 
       {/* Empty state */}
       {pendingWordCount === 0 && !resultMessage && (
@@ -986,29 +942,23 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </View>
       )}
 
-      {/* Result toast (auto-dismiss) */}
+      {/* Result toast */}
       {resultMessage && (
         <Animated.View
-          style={[
-            styles.resultToast,
-            {
-              backgroundColor: phase >= 3 ? 'rgba(139, 26, 58, 0.85)' : 'rgba(100, 60, 180, 0.85)',
-              opacity: resultOpacity,
-            },
-          ]}
+          style={[styles.resultToast, {
+            backgroundColor: phase >= 3 ? 'rgba(139, 26, 58, 0.9)' : 'rgba(100, 60, 180, 0.9)',
+            opacity: resultOpacity,
+          }]}
           pointerEvents="none"
         >
           <Text style={styles.resultToastText}>{resultMessage}</Text>
         </Animated.View>
       )}
 
-      {/* Bottom panel: stats + harvest all */}
+      {/* Bottom panel */}
       <View style={styles.bottomPanel}>
-        {/* Summary stats row */}
         <View style={[styles.summaryRow, {
-          backgroundColor: phase >= 3
-            ? 'rgba(10, 5, 20, 0.8)'
-            : 'rgba(40, 20, 80, 0.7)',
+          backgroundColor: phase >= 3 ? 'rgba(10, 5, 20, 0.8)' : 'rgba(40, 20, 80, 0.7)',
         }]}>
           <View style={styles.summaryItem}>
             <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
@@ -1020,9 +970,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
-              {harvestState.totalWordsOffered}
-            </Text>
+            <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>{harvestState.totalWordsOffered}</Text>
             <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
               Lifetime {getPitHarvestLabel(phase)}
             </Text>
@@ -1032,13 +980,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
               {'\uD83D\uDC8E'} {displayBalance}
             </Text>
-            <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-              Spendable
-            </Text>
+            <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Spendable</Text>
           </View>
         </View>
 
-        {/* Harvest All button */}
         {pendingWordCount > 0 && (
           <TouchableOpacity
             style={[styles.harvestAllButton, {
@@ -1065,82 +1010,93 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   backgroundImage: {
     position: 'absolute',
-    top: 0,
-    left: 0,
+    top: 0, left: 0,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
   },
+  // ---- Home-screen style header ----
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 100,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  amberContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
     paddingHorizontal: 12,
-    paddingBottom: 4,
-  },
-  backButton: {
     paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
-  backButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.85)',
+  amberInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  title: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '900',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  amberBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  amberBadgeText: {
-    fontSize: 14,
+  amberEmoji: { fontSize: 20 },
+  amberCount: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '800',
+  },
+  pendingBadge: {
+    backgroundColor: 'rgba(255, 165, 0, 0.20)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pendingBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
     color: '#FFBF00',
   },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 2,
-    marginBottom: 4,
-    paddingHorizontal: 30,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginLeft: 8,
   },
+  headerIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerIconText: { fontSize: 16 },
+  // ---- Pit glow ----
   pitGlow: {
     position: 'absolute',
-    top: PIT_CENTER.y - 35,
-    left: PIT_CENTER.x - SCREEN_WIDTH * 0.3,
-    width: SCREEN_WIDTH * 0.6,
-    height: 70,
-    borderRadius: 35,
+    top: PIT_CENTER.y - 45,
+    left: PIT_CENTER.x - SCREEN_WIDTH * 0.35,
+    width: SCREEN_WIDTH * 0.7,
+    height: 90,
+    borderRadius: 45,
   },
+  // ---- Content overlays ----
   emptyContainer: {
     position: 'absolute',
     top: FLOAT_ZONE.top + 40,
-    left: 30,
-    right: 30,
+    left: 30, right: 30,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 24,
+    fontSize: 16, fontWeight: '600',
+    textAlign: 'center', lineHeight: 24,
     textShadowColor: 'rgba(0,0,0,0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -1148,15 +1104,11 @@ const styles = StyleSheet.create({
   overflowContainer: {
     position: 'absolute',
     top: FLOAT_ZONE.bottom + 4,
-    alignSelf: 'center',
-    left: 0,
-    right: 0,
+    left: 0, right: 0,
     alignItems: 'center',
   },
   overflowText: {
-    fontSize: 12,
-    fontWeight: '700',
-    fontStyle: 'italic',
+    fontSize: 12, fontWeight: '700', fontStyle: 'italic',
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
@@ -1172,15 +1124,12 @@ const styles = StyleSheet.create({
   },
   resultToastText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontSize: 14, fontWeight: '700', textAlign: 'center',
   },
+  // ---- Bottom panel ----
   bottomPanel: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    bottom: 0, left: 0, right: 0,
     paddingBottom: Platform.OS === 'ios' ? 34 : 16,
     paddingHorizontal: 16,
   },
@@ -1192,25 +1141,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginBottom: 10,
   },
-  summaryItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  summaryLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  summaryDivider: {
-    width: 1,
-    height: 28,
-    borderRadius: 1,
-  },
+  summaryItem: { flex: 1, alignItems: 'center' },
+  summaryValue: { fontSize: 16, fontWeight: '900' },
+  summaryLabel: { fontSize: 9, fontWeight: '600', marginTop: 2, textAlign: 'center' },
+  summaryDivider: { width: 1, height: 28, borderRadius: 1 },
   harvestAllButton: {
     borderRadius: 22,
     paddingVertical: 15,
@@ -1224,9 +1158,6 @@ const styles = StyleSheet.create({
   },
   harvestAllText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 1,
-    textAlign: 'center',
+    fontSize: 16, fontWeight: '900', letterSpacing: 1, textAlign: 'center',
   },
 });
