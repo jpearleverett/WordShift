@@ -131,9 +131,9 @@ const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
 };
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
-  reverse: { puzzlesSolved: 10, minDepthPhase: 0 },
-  speed: { puzzlesSolved: 52, minDepthPhase: 0 },
-  double_shift: { puzzlesSolved: 40, minDepthPhase: 0 },
+  reverse: { puzzlesSolved: 0, minDepthPhase: 0 },
+  speed: { puzzlesSolved: 0, minDepthPhase: 0 },
+  double_shift: { puzzlesSolved: 0, minDepthPhase: 0 },
 };
 
 export function isPuzzleVariant(value: string): value is PuzzleVariant {
