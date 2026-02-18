@@ -1126,11 +1126,11 @@ export function getPitHomeBadgeLabel(phase: DialoguePhase): string {
 }
 
 const PIT_HARVEST_LABELS: Record<DialoguePhase, string> = {
-  0: 'Words harvested',
-  1: 'Words harvested',
-  2: 'Words gathered',
-  3: 'Words taken',
-  4: 'Words claimed',
+  0: 'harvested',
+  1: 'harvested',
+  2: 'gathered',
+  3: 'taken',
+  4: 'claimed',
 };
 
 export function getPitHarvestLabel(phase: DialoguePhase): string {

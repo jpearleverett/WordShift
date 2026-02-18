@@ -65,6 +65,43 @@ interface VictoryModalProps {
   onShare: () => void;
 }
 
+// Phase-aware 3D button colors — matches LetterTile's phase palette
+function getButtonTheme(phase: DialoguePhase) {
+  if (phase >= 4) return {
+    primary:   { bg: '#7C3AED', edge: '#5B21B6', shadow: '#5B21B6' },
+    harvest:   { bg: '#C2410C', edge: '#9A3412', shadow: '#9A3412' },
+    secondary: { bg: '#2A2040', edge: '#1A1030', text: '#908098' },
+    share:     { bg: '#3A3050', edge: '#2A2040' },
+    harvestPill: { bg: 'rgba(194, 65, 12, 0.15)', border: 'rgba(194, 65, 12, 0.3)', text: '#E87040' },
+    modalBorder: 'rgba(90, 30, 90, 0.25)',
+  };
+  if (phase >= 3) return {
+    primary:   { bg: '#9333EA', edge: '#7C3AED', shadow: '#7C3AED' },
+    harvest:   { bg: '#EA580C', edge: '#C2410C', shadow: '#C2410C' },
+    secondary: { bg: '#3A3555', edge: '#2E3040', text: '#A0A0B0' },
+    share:     { bg: '#4A4570', edge: '#3A3555' },
+    harvestPill: { bg: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.25)', text: '#E87040' },
+    modalBorder: 'rgba(147, 51, 234, 0.2)',
+  };
+  if (phase >= 2) return {
+    primary:   { bg: CandyColors.pink.main, edge: CandyColors.pink.dark, shadow: CandyColors.pink.dark },
+    harvest:   { bg: CandyColors.orange.main, edge: CandyColors.orange.dark, shadow: CandyColors.orange.dark },
+    secondary: { bg: CandyColors.gray[300], edge: CandyColors.gray[400], text: CandyColors.gray[600] },
+    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main },
+    harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: CandyColors.orange.dark },
+    modalBorder: 'rgba(255, 255, 255, 0.3)',
+  };
+  // Phase 0-1: bright candy
+  return {
+    primary:   { bg: CandyColors.pink.main, edge: CandyColors.pink.dark, shadow: CandyColors.pink.dark },
+    harvest:   { bg: CandyColors.orange.main, edge: CandyColors.orange.dark, shadow: CandyColors.orange.dark },
+    secondary: { bg: CandyColors.gray[200], edge: CandyColors.gray[300], text: CandyColors.gray[600] },
+    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main },
+    harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: CandyColors.orange.dark },
+    modalBorder: 'rgba(255, 255, 255, 0.4)',
+  };
+}
+
 export const VictoryModal: React.FC<VictoryModalProps> = ({
   visible,
   earnedStars,
@@ -88,6 +125,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onShare,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
+  const btn = getButtonTheme(phase);
 
   // Cascade animation — 4 staggered content groups
   const contentOpacity1 = useRef(new Animated.Value(0)).current;
@@ -123,6 +161,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       >
           <Animated.View style={[styles.victoryModal, {
             backgroundColor: phaseTheme.modalBgColor,
+            borderColor: btn.modalBorder,
             transform: [{ scale: modalScale }],
             opacity: modalOpacity,
           }]}>
@@ -172,9 +211,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <Animated.View style={{ opacity: contentOpacity1 }}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
-              <View style={styles.harvestWordContainer}>
+              <View style={[styles.harvestWordContainer, {
+                backgroundColor: btn.harvestPill.bg,
+                borderColor: btn.harvestPill.border,
+              }]}>
                 <Text style={styles.harvestWordIcon}>{'\uD83C\uDF3E'}</Text>
-                <Text style={styles.harvestWordText}>
+                <Text style={[styles.harvestWordText, { color: btn.harvestPill.text }]}>
                   {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
                 </Text>
               </View>
@@ -336,7 +378,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
             </Animated.View>
 
-            {/* Group 3: Stats and action buttons */}
+            {/* Group 3: Stats */}
             <Animated.View style={{ opacity: contentOpacity3 }}>
             <View style={[styles.victoryStats, {
               backgroundColor: phaseTheme.modalStatBgColor,
@@ -369,45 +411,83 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             </Animated.View>
 
-            {/* Group 4: Action buttons */}
+            {/* Group 4: Action buttons — 3D candy style */}
             <Animated.View style={{ opacity: contentOpacity4 }}>
             <View style={styles.victoryButtonRow}>
+              {/* Next Level — primary 3D candy button */}
               <TouchableOpacity
-                style={styles.nextLevelButton}
                 onPress={onNextLevel}
+                activeOpacity={0.85}
                 accessibilityLabel="Next level"
                 accessibilityRole="button"
               >
-                <View style={styles.buttonShine} />
-                <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
+                <View style={styles.btn3dWrapper}>
+                  <View style={[styles.btn3dBody, {
+                    backgroundColor: btn.primary.bg,
+                    shadowColor: btn.primary.shadow,
+                  }]}>
+                    <View style={styles.btn3dBevel} />
+                    <View style={styles.btn3dGlossy} />
+                    <Text style={styles.btn3dPrimaryText}>NEXT LEVEL</Text>
+                  </View>
+                  <View style={[styles.btn3dEdge, {
+                    backgroundColor: btn.primary.edge,
+                  }]} />
+                </View>
               </TouchableOpacity>
 
+              {/* Harvest Now — secondary 3D candy button */}
               <TouchableOpacity
-                style={styles.harvestButton}
                 onPress={onGoToPit}
+                activeOpacity={0.85}
                 accessibilityLabel="Go to the pit to harvest words"
                 accessibilityRole="button"
               >
-                <Text style={styles.harvestButtonText}>{'\uD83C\uDF3E'} HARVEST</Text>
+                <View style={styles.btn3dWrapper}>
+                  <View style={[styles.btn3dBody, styles.btn3dBodyNarrow, {
+                    backgroundColor: btn.harvest.bg,
+                    shadowColor: btn.harvest.shadow,
+                  }]}>
+                    <View style={styles.btn3dBevel} />
+                    <View style={styles.btn3dGlossy} />
+                    <Text style={styles.btn3dSecondaryText}>{'\uD83C\uDF3E'} HARVEST NOW</Text>
+                  </View>
+                  <View style={[styles.btn3dEdge, styles.btn3dEdgeNarrow, {
+                    backgroundColor: btn.harvest.edge,
+                  }]} />
+                </View>
               </TouchableOpacity>
             </View>
+
             <View style={styles.victoryButtonRowSecondary}>
+              {/* Share — subtle secondary */}
               <TouchableOpacity
-                style={styles.shareButton}
                 onPress={onShare}
+                activeOpacity={0.8}
                 accessibilityLabel="Share result"
                 accessibilityRole="button"
               >
-                <Text style={styles.shareButtonText}>{'\uD83D\uDCE4'}</Text>
+                <View style={[styles.btnFlat, {
+                  backgroundColor: btn.share.bg,
+                  borderColor: btn.share.edge,
+                }]}>
+                  <Text style={styles.btnFlatShareText}>{'\uD83D\uDCE4'}</Text>
+                </View>
               </TouchableOpacity>
 
+              {/* Home — subtle secondary */}
               <TouchableOpacity
-                style={styles.homeButton}
                 onPress={onReturnHome}
+                activeOpacity={0.8}
                 accessibilityLabel="Return home"
                 accessibilityRole="button"
               >
-                <Text style={styles.homeButtonText}>{'\uD83C\uDFE0'} HOME</Text>
+                <View style={[styles.btnFlat, {
+                  backgroundColor: btn.secondary.bg,
+                  borderColor: btn.secondary.edge,
+                }]}>
+                  <Text style={[styles.btnFlatHomeText, { color: btn.secondary.text }]}>{'\uD83C\uDFE0'} HOME</Text>
+                </View>
               </TouchableOpacity>
             </View>
             </Animated.View>
@@ -443,11 +523,15 @@ const styles = StyleSheet.create({
   },
   victoryModal: {
     backgroundColor: CandyColors.white,
-    borderRadius: 40,
-    padding: 32,
+    borderRadius: 32,
+    paddingTop: 28,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     alignItems: 'center',
     width: '100%',
     maxWidth: 320,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.4,
@@ -467,7 +551,7 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   victoryStar: {
     fontSize: 36,
@@ -483,7 +567,7 @@ const styles = StyleSheet.create({
   victoryTitle: {
     fontSize: 42,
     fontWeight: '900',
-    marginBottom: 8,
+    marginBottom: 6,
     textShadowColor: CandyColors.pink.shadow,
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 0,
@@ -499,17 +583,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: CandyColors.gray[400],
-    marginBottom: 16,
+    marginBottom: 14,
     textAlign: 'center',
   },
   victoryStats: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: CandyColors.gray[50],
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   victoryStatItem: {
     alignItems: 'center',
@@ -531,7 +616,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 18,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: CandyColors.gray[200],
@@ -550,105 +635,130 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[400],
     marginTop: 2,
   },
+
+  // === 3D Candy Button System (matches LetterTile bevel/edge treatment) ===
   victoryButtonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   victoryButtonRowSecondary: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 12,
+    marginBottom: 4,
   },
-  shareButton: {
-    backgroundColor: CandyColors.blue.light,
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+  btn3dWrapper: {
+    alignItems: 'center',
   },
-  shareButtonText: {
-    fontSize: 20,
-  },
-  homeButton: {
-    backgroundColor: CandyColors.gray[200],
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-  },
-  homeButtonText: {
-    color: CandyColors.gray[600],
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  harvestButton: {
-    backgroundColor: CandyColors.green.main,
-    borderRadius: 20,
-    paddingVertical: 18,
+  btn3dBody: {
+    borderRadius: 16,
+    paddingVertical: 14,
     paddingHorizontal: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
     overflow: 'hidden',
-  },
-  harvestButtonText: {
-    color: CandyColors.white,
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  nextLevelButton: {
-    backgroundColor: CandyColors.pink.main,
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 32,
-    overflow: 'hidden',
-    shadowColor: CandyColors.pink.main,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
     elevation: 8,
   },
-  nextLevelButtonText: {
-    color: CandyColors.white,
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 2,
+  btn3dBodyNarrow: {
+    paddingHorizontal: 18,
   },
-  buttonShine: {
+  btn3dBevel: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: '45%',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
+  btn3dGlossy: {
+    position: 'absolute',
+    top: 3,
+    left: 8,
+    right: 8,
+    height: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    borderRadius: 5,
+  },
+  btn3dEdge: {
+    width: '90%',
+    height: 5,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    marginTop: -1,
+  },
+  btn3dEdgeNarrow: {
+    width: '88%',
+  },
+  btn3dPrimaryText: {
+    color: CandyColors.white,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  btn3dSecondaryText: {
+    color: CandyColors.white,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  // Flat secondary buttons (Share, Home)
+  btnFlat: {
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+  },
+  btnFlatShareText: {
+    fontSize: 18,
+  },
+  btnFlatHomeText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  // === Harvest info pill ===
   harvestWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CandyColors.green.light,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginBottom: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 6,
   },
   harvestWordIcon: {
-    fontSize: 24,
+    fontSize: 22,
     marginRight: 8,
   },
   harvestWordText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
-    color: CandyColors.green.dark,
   },
   harvestBonusHint: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 8,
     fontStyle: 'italic',
   },
+
+  // === Other info rows ===
   winStreakContainer: {
     flexDirection: 'row',
     alignItems: 'center',

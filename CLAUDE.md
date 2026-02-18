@@ -57,7 +57,7 @@ npx jest --no-coverage   # Run all tests (840+ tests, 28 suites)
   - New `OfferingPitScreen.tsx` screen (navigated as `currentScreen: 'pit'`) where players offer batches to convert queued amber into spendable amber.
   - `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred).
   - `useGamePersistence.ts` `recordVictory()` enqueues harvest batches, returns `harvestedWords` and `pendingHarvest` in VictoryData.
-  - VictoryModal shows queued amber with phase-aware "harvest" label. Home screen action row has pit button with pending word count badge.
+  - VictoryModal shows queued amber with phase-aware "harvest" label, bonus source hints (challenge/style/perfect solve/streak), and a "Harvest Now" button navigating directly to the pit. Home screen action row has pit button with pending word count badge.
   - Phase-aware narrative text for pit UI in `phaseNarrative.ts` (9 new functions).
   - Cloud save, Reset All Data, and 19+ new tests cover the full harvest lifecycle.
 - **Phase secrecy reinforcement**: The puzzle header now uses an icon-only atmosphere badge (no textual phase labels) to keep progression implicit.
@@ -526,6 +526,8 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
    - **Words Offered** (all phases): Running total of words formed across all puzzles
    - **Completion Coda** (endgame): first final-puzzle/post-revelation wins show a dedicated acknowledgement block in VictoryModal for stronger emotional closure
    - Phase-aware feedback text shifts tone with narrative phase
+   - **Harvest info**: Queued word count with phase-aware verb ("harvested" → "claimed"), bonus source hints (challenge/style/perfect solve/streak shown as italic text)
+   - **Action buttons**: Two-row layout — primary row (Next Level + Harvest Now), secondary row (Share + Home). "Harvest Now" navigates directly to the pit screen via `onGoToPit` callback. Harvest button styled in amber/orange.
 6. If phase changed: `PhaseTransitionOverlay` plays cinematic multi-scene interstitial, then `playPhaseChangeFlash()` does dramatic double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
 8. **Dread Pulse** (Phase 2+): When a valid intermediate move forms a dread word, the screen briefly flashes with a crimson overlay. Phase-scaled opacity (0.10 → 0.18 → 0.25). Uses `isDreadWord()` from `localGenerator.ts`. `handleSlotPress` returns `{ completed: false, formedWord }` for intermediate moves.
@@ -606,8 +608,8 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 1. Player completes a puzzle → `recordVictory()` calls `awardPuzzleAmber(creditToBalance: false)` — amber is computed but NOT added to spendable balance
 2. All reward components (base + milestones + first-completion + streak milestones + variant bonus) are summed into `totalQueuedAmber`
 3. A `HarvestBatch` is enqueued via `enqueueHarvestBatch()` containing the completed words, amber value, difficulty, stars, variant, and phase
-4. VictoryModal shows queued amber as "harvest" (phase-aware label) with a pending summary hint
-5. Player opens the Offering Pit from the Home screen action row → sees pending batches
+4. VictoryModal shows queued amber as "harvest" (phase-aware label), bonus source hints (challenge/style/perfect solve/streak), and a "Harvest Now" button
+5. Player taps "Harvest Now" → navigates directly to pit screen, OR opens the Offering Pit from the Home screen action row → sees pending batches
 6. Player offers individual batches or "Offer All" → `awardBonusAmber(amount, 'word_offering')` credits amber to spendable balance
 7. Home screen pit button shows a badge with pending word count
 
@@ -644,13 +646,13 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - `getPitEmptyMessage(phase)` — Empty state messages
 - `getPitOfferResultMessage(phase, words, amber)` — Result feedback
 - `getPitHomeBadgeLabel(phase)` — Home button label: "Pit" → "The Pit"
-- `getPitHarvestLabel(phase)` — VictoryModal amber label: "Harvest" → "Yield"
+- `getPitHarvestLabel(phase)` — Harvest verb: "harvested" → "claimed" (used in VictoryModal and OfferingPitScreen with word count prefix)
 - `getPitPendingAmberLabel(phase)` — Pending amber description
 
 **Integration points:**
 - `amberCurrency.ts`: `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred)
 - `useGamePersistence.ts`: `recordVictory()` enqueues harvest batch, returns `harvestedWords` and `pendingHarvest` in VictoryData
-- `VictoryModal.tsx`: Shows queued amber with phase-aware "harvest" label + pending summary hint
+- `VictoryModal.tsx`: Shows queued amber with phase-aware "harvest" label, bonus source hints, and "Harvest Now" button navigating to pit screen via `onGoToPit` callback
 - `HomeScreen.tsx`: Pit button in action row with word count badge
 - `SettingsScreen.tsx`: `clearHarvestState()` called on Reset All Data
 - `cloudSave.ts`: `wordshift_word_harvest` in SYNC_KEYS

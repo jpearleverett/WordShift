@@ -207,7 +207,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           <Text style={styles.pitEmoji}>{phase >= 3 ? '\uD83D\uDD73\uFE0F' : '\u2B55'}</Text>
           {pendingBatches.length > 0 && (
             <Text style={[styles.pitCount, { color: phase >= 3 ? '#C04060' : '#D4A0FF' }]}>
-              {pendingWords} {getPitHarvestLabel(phase).toLowerCase()}
+              {pendingWords} {pendingWords === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase)}
             </Text>
           )}
         </Animated.View>
