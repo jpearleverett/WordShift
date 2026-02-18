@@ -352,7 +352,6 @@ const styles = StyleSheet.create({
     left: 0,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    zIndex: -1,
   },
   header: {
     flexDirection: 'row',

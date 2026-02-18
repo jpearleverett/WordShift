@@ -17,7 +17,6 @@ import {
   getRitualEchoFooter,
   getWordsOfferedText,
   getPitHarvestLabel,
-  getPitPendingAmberLabel,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -45,7 +44,6 @@ interface VictoryModalProps {
   earnedStars: number;
   level: number;
   difficulty: string;
-  amberBalance: number;
   phase: DialoguePhase;
   isPlayingDaily: boolean;
   victoryData: VictoryData | null;
@@ -63,6 +61,7 @@ interface VictoryModalProps {
   // Callbacks
   onNextLevel: () => void;
   onReturnHome: () => void;
+  onGoToPit: () => void;
   onShare: () => void;
 }
 
@@ -71,7 +70,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   earnedStars,
   level,
   difficulty,
-  amberBalance,
   phase,
   isPlayingDaily,
   victoryData,
@@ -86,6 +84,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   star3Scale,
   onNextLevel,
   onReturnHome,
+  onGoToPit,
   onShare,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
@@ -169,37 +168,33 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
-            {/* Group 1: Amber, streak, milestone */}
+            {/* Group 1: Harvest, bonuses, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
-            {/* Harvested amber (queued, not yet spendable) */}
-            {victoryData && (
-              <View style={styles.amberEarnedContainer}>
-                <Text style={styles.amberEarnedIcon}>{'\uD83D\uDC8E'}</Text>
-                <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} {getPitHarvestLabel(phase).toLowerCase()}</Text>
-                {victoryData.streakBonus > 0 && (
-                  <Text style={styles.streakBonusText}>
-                    (+{victoryData.streakBonus} streak!)
-                  </Text>
-                )}
-                {victoryData.challengeBonus > 0 && (
-                  <Text style={styles.challengeBonusText}>
-                    (+{victoryData.challengeBonus} challenge!)
-                  </Text>
-                )}
-                {(victoryData.variantBonus ?? 0) > 0 && (
-                  <Text style={styles.variantBonusText}>
-                    (+{victoryData.variantBonus} style{victoryData.variantRepeatDecay && victoryData.variantRepeatDecay < 1 ? ', tapered' : ''})
-                  </Text>
-                )}
+            {/* Harvested words (queued for the pit) */}
+            {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
+              <View style={styles.harvestWordContainer}>
+                <Text style={styles.harvestWordIcon}>{'\uD83C\uDF3E'}</Text>
+                <Text style={styles.harvestWordText}>
+                  {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
+                </Text>
               </View>
             )}
 
-            {/* Pending harvest hint */}
-            {victoryData?.pendingHarvest && victoryData.pendingHarvest.pendingBatches > 0 && (
-              <Text style={[styles.pendingHarvestHint, { color: phaseTheme.modalSecondaryTextColor }]}>
-                {getPitPendingAmberLabel(phase)}: {'\uD83D\uDC8E'} {victoryData.pendingHarvest.pendingAmber}
-              </Text>
-            )}
+            {/* Bonus hint — tell the player their words are worth more without revealing amber */}
+            {victoryData && (() => {
+              const bonuses: string[] = [];
+              if (victoryData.challengeBonus > 0) bonuses.push('challenge');
+              if ((victoryData.variantBonus ?? 0) > 0) bonuses.push('style');
+              if (earnedStars >= 3) bonuses.push('perfect solve');
+              else if (earnedStars >= 2) bonuses.push('great solve');
+              if (victoryData.streakBonus > 0) bonuses.push('streak');
+              if (bonuses.length === 0) return null;
+              return (
+                <Text style={[styles.harvestBonusHint, { color: phaseTheme.modalSecondaryTextColor }]}>
+                  Worth more at harvest: {bonuses.join(' + ')}
+                </Text>
+              );
+            })()}
 
             {/* Streak display */}
             {victoryData && victoryData.currentStreak > 1 && (
@@ -214,7 +209,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <View style={styles.milestoneContainer}>
                 <Text style={styles.milestoneEmoji}>{'\uD83C\uDFC6'}</Text>
                 <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
-                <Text style={styles.milestoneBonus}>+{victoryData.milestoneBonus} Bonus Amber!</Text>
               </View>
             )}
 
@@ -351,11 +345,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 <Text style={[styles.victoryStatValue, { color: phaseTheme.modalTextColor }]}>Lv.{level}</Text>
                 <Text style={[styles.victoryStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
               </View>
-              <View style={[styles.victoryStatDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
-              <View style={styles.victoryStatItem}>
-                <Text style={[styles.victoryStatValue, { color: phaseTheme.modalTextColor }]}>{'\uD83D\uDC8E'} {amberBalance}</Text>
-                <Text style={[styles.victoryStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Total Amber</Text>
-              </View>
             </View>
 
             {/* Cumulative stats */}
@@ -384,6 +373,26 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <Animated.View style={{ opacity: contentOpacity4 }}>
             <View style={styles.victoryButtonRow}>
               <TouchableOpacity
+                style={styles.nextLevelButton}
+                onPress={onNextLevel}
+                accessibilityLabel="Next level"
+                accessibilityRole="button"
+              >
+                <View style={styles.buttonShine} />
+                <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.harvestButton}
+                onPress={onGoToPit}
+                accessibilityLabel="Go to the pit to harvest words"
+                accessibilityRole="button"
+              >
+                <Text style={styles.harvestButtonText}>{'\uD83C\uDF3E'} HARVEST</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.victoryButtonRowSecondary}>
+              <TouchableOpacity
                 style={styles.shareButton}
                 onPress={onShare}
                 accessibilityLabel="Share result"
@@ -399,16 +408,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={styles.homeButtonText}>{'\uD83C\uDFE0'} HOME</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.nextLevelButton}
-                onPress={onNextLevel}
-                accessibilityLabel="Next level"
-                accessibilityRole="button"
-              >
-                <View style={styles.buttonShine} />
-                <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
               </TouchableOpacity>
             </View>
             </Animated.View>
@@ -528,12 +527,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 2,
   },
-  victoryStatDivider: {
-    width: 2,
-    height: 40,
-    backgroundColor: CandyColors.gray[200],
-    borderRadius: 1,
-  },
   cumulativeStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -563,6 +556,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  victoryButtonRowSecondary: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
   shareButton: {
     backgroundColor: CandyColors.blue.light,
     borderRadius: 20,
@@ -582,6 +582,19 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[600],
     fontSize: 16,
     fontWeight: '800',
+  },
+  harvestButton: {
+    backgroundColor: CandyColors.green.main,
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    overflow: 'hidden',
+  },
+  harvestButtonText: {
+    color: CandyColors.white,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   nextLevelButton: {
     backgroundColor: CandyColors.pink.main,
@@ -611,41 +624,30 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-  amberEarnedContainer: {
+  harvestWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CandyColors.yellow.light,
+    backgroundColor: CandyColors.green.light,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
     marginBottom: 8,
   },
-  amberEarnedIcon: {
+  harvestWordIcon: {
     fontSize: 24,
     marginRight: 8,
   },
-  amberEarnedText: {
+  harvestWordText: {
     fontSize: 18,
     fontWeight: '900',
-    color: CandyColors.yellow.shadow,
+    color: CandyColors.green.dark,
   },
-  streakBonusText: {
+  harvestBonusHint: {
     fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.orange.main,
-    marginLeft: 8,
-  },
-  challengeBonusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.pink.main,
-    marginLeft: 8,
-  },
-  variantBonusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.blue.dark,
-    marginLeft: 8,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   winStreakContainer: {
     flexDirection: 'row',
@@ -684,11 +686,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: CandyColors.yellow.dark,
     marginBottom: 2,
-  },
-  milestoneBonus: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: CandyColors.green.dark,
   },
   questCompletedContainer: {
     gap: 6,
@@ -879,13 +876,6 @@ const styles = StyleSheet.create({
   },
   wordsOfferedTextDark: {
     color: 'rgba(180, 100, 130, 0.8)',
-    fontStyle: 'italic',
-  },
-  pendingHarvestHint: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
     fontStyle: 'italic',
   },
 });

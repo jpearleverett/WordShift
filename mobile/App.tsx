@@ -863,6 +863,21 @@ export default function App() {
     });
   }, [puzzleActions, transitionTo, victoryActions]);
 
+  const handleGoToPit = useCallback(() => {
+    hapticLight();
+    puzzlesSinceHomeVisit.current = 0;
+    puzzleActions.setShowConfetti(false);
+    victoryActions.resetVictory();
+    setIsPlayingDaily(false);
+    setShowInterjection(false);
+    setInterjection(null);
+    setRitualEchoWords([]);
+    setCompletionCoda(null);
+    transitionTo('pit', () => {
+      puzzleActions.setGameState(GameState.IDLE);
+    });
+  }, [puzzleActions, transitionTo, victoryActions]);
+
   const handleShare = useCallback(async () => {
     if (!victoryFlow.victoryData) return;
     hapticLight();
@@ -1530,7 +1545,6 @@ export default function App() {
           earnedStars={puzzle.earnedStars}
           level={puzzle.level}
           difficulty={puzzle.difficulty}
-          amberBalance={persistence.amberBalance}
           phase={persistence.currentPhase}
           isPlayingDaily={isPlayingDaily}
           victoryData={victoryFlow.victoryData}
@@ -1545,6 +1559,7 @@ export default function App() {
           star3Scale={victoryFlow.victoryStar3}
           onNextLevel={handleNextLevel}
           onReturnHome={handleReturnHome}
+          onGoToPit={handleGoToPit}
           onShare={handleShare}
         />
 
