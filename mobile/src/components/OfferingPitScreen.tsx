@@ -58,7 +58,7 @@ function getPitBackground(phase: number) {
 
 const PIT_CENTER = {
   x: SCREEN_WIDTH * 0.5,
-  y: SCREEN_HEIGHT * 0.62,
+  y: SCREEN_HEIGHT * 0.72,
 };
 
 const STATUS_BAR_HEIGHT =
@@ -66,7 +66,7 @@ const STATUS_BAR_HEIGHT =
 
 const FLOAT_ZONE = {
   top: STATUS_BAR_HEIGHT + 60,
-  bottom: SCREEN_HEIGHT * 0.48,
+  bottom: SCREEN_HEIGHT * 0.55,
   left: 10,
   right: SCREEN_WIDTH - 10,
 };
@@ -1193,7 +1193,7 @@ const styles = StyleSheet.create({
   },
   resultToast: {
     position: 'absolute',
-    top: SCREEN_HEIGHT * 0.42,
+    top: SCREEN_HEIGHT * 0.60,
     alignSelf: 'center',
     paddingHorizontal: 20,
     paddingVertical: 10,
