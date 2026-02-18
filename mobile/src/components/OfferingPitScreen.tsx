@@ -136,8 +136,10 @@ interface FlyingWord {
   baseY: number;
   driftAmplitude: number;
   driftPeriod: number;
+  driftPhaseOffset: number; // 0-1 random phase shift for sine wave
   bobAmplitude: number;
   bobPeriod: number;
+  bobPhaseOffset: number; // 0-1 random phase shift for sine wave
   isDevoured: boolean;
   floatLoopX: Animated.CompositeAnimation | null;
   floatLoopY: Animated.CompositeAnimation | null;
@@ -248,6 +250,14 @@ const tileStyles = StyleSheet.create({
 // FloatingWordChip — word as a row of mini candy tiles
 // ---------------------------------------------------------------------------
 
+// Compute 5 sine-wave sample points with a phase offset for smooth looped drift
+function sineOutputRange(base: number, amplitude: number, phaseOffset: number): number[] {
+  const TWO_PI = 2 * Math.PI;
+  return [0, 0.25, 0.5, 0.75, 1].map(t =>
+    base + amplitude * Math.sin(TWO_PI * (t + phaseOffset))
+  );
+}
+
 const FloatingWordChip = React.memo(({
   fw,
   onTap,
@@ -260,27 +270,26 @@ const FloatingWordChip = React.memo(({
     outputRange: ['0deg', '360deg'],
   });
 
-  // Derive smooth sinusoidal position from linear progress values
+  // Derive smooth sinusoidal position from linear progress + phase offset
+  // sin(2π(t + φ)) where t goes 0→1 in a loop and φ is the random phase offset
+  // At t=0 and t=1, sin(2π(0+φ)) === sin(2π(1+φ)), so the loop wraps perfectly
+  const driftXRange = useMemo(
+    () => sineOutputRange(fw.baseX, fw.driftAmplitude, fw.driftPhaseOffset),
+    [fw.baseX, fw.driftAmplitude, fw.driftPhaseOffset]
+  );
+  const driftYRange = useMemo(
+    () => sineOutputRange(fw.baseY, -fw.bobAmplitude, fw.bobPhaseOffset),
+    [fw.baseY, fw.bobAmplitude, fw.bobPhaseOffset]
+  );
+
   const driftX = fw.driftProgress.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: [
-      fw.baseX,
-      fw.baseX + fw.driftAmplitude,
-      fw.baseX,
-      fw.baseX - fw.driftAmplitude,
-      fw.baseX,
-    ],
+    outputRange: driftXRange,
   });
 
   const driftY = fw.bobProgress.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: [
-      fw.baseY,
-      fw.baseY - fw.bobAmplitude,
-      fw.baseY,
-      fw.baseY + fw.bobAmplitude,
-      fw.baseY,
-    ],
+    outputRange: driftYRange,
   });
 
   // Use devour position when actively spiraling, otherwise interpolated drift
@@ -400,6 +409,8 @@ interface OfferingPitScreenProps {
   amberBalance: number;
   onClose: () => void;
   onAmberChange?: (newBalance: number) => void;
+  onOpenStats?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
@@ -407,6 +418,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   amberBalance,
   onClose,
   onAmberChange,
+  onOpenStats,
+  onOpenSettings,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const reducedMotion = getSettingsSync()?.reducedMotion ?? false;
@@ -473,8 +486,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           id,
           word,
           batchId: batch.id,
-          driftProgress: new Animated.Value(Math.random()), // random start phase
-          bobProgress: new Animated.Value(Math.random()),
+          driftProgress: new Animated.Value(0), // always start at 0 — phase offset creates variety
+          bobProgress: new Animated.Value(0),
           opacity: new Animated.Value(0),
           scale: new Animated.Value(0.3),
           rotation: new Animated.Value(0),
@@ -485,8 +498,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           baseY,
           driftAmplitude: 12 + Math.random() * 20,
           driftPeriod: 4000 + Math.random() * 4000,
+          driftPhaseOffset: Math.random(), // random 0-1 shifts the sine wave start
           bobAmplitude: 6 + Math.random() * 8,
           bobPeriod: 3000 + Math.random() * 3000,
+          bobPhaseOffset: Math.random(),
           isDevoured: false,
           floatLoopX: null,
           floatLoopY: null,
@@ -699,6 +714,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         spawnAmberRise(result.amberAwarded);
         hapticMedium();
         showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
+        // Refresh harvest state so pending amber/count updates in UI
+        const freshState = await getHarvestState();
+        if (mountedRef.current) setHarvestState(freshState);
       }
     } catch { /* batch may already be offered */ }
   }, [phase, onAmberChange, spawnAmberRise, showResultToast]);
@@ -716,17 +734,31 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     tryFinalizeBatch(fw.batchId);
   }, [flashPitGlow, spawnImpactBurst, tryFinalizeBatch]);
 
+  // ---- Compute approximate current position from progress + phase offset ----
+  const getCurrentPos = useCallback((fw: FlyingWord): { x: number; y: number } => {
+    const TWO_PI = 2 * Math.PI;
+    const driftT = (fw.driftProgress as any).__getValue?.() ?? 0;
+    const bobT = (fw.bobProgress as any).__getValue?.() ?? 0;
+    return {
+      x: fw.baseX + fw.driftAmplitude * Math.sin(TWO_PI * (driftT + fw.driftPhaseOffset)),
+      y: fw.baseY + -fw.bobAmplitude * Math.sin(TWO_PI * (bobT + fw.bobPhaseOffset)),
+    };
+  }, []);
+
   // ---- Devour a single word ----
   const devourWord = useCallback((fw: FlyingWord) => {
     if (fw.isDevoured || isOffering) return;
     fw.isDevoured = true;
     hapticLight();
 
+    // Snapshot current visual position before stopping loops
+    const currentPos = getCurrentPos(fw);
+
     // Stop float loops
     fw.floatLoopX?.stop(); fw.floatLoopX = null;
     fw.floatLoopY?.stop(); fw.floatLoopY = null;
 
-    spawnTrail(fw.baseX, fw.baseY);
+    spawnTrail(currentPos.x, currentPos.y);
 
     if (reducedMotion) {
       fw.opacity.setValue(0);
@@ -737,11 +769,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const duration = getDevourDuration(phase);
 
-    // Snapshot current drift position into devourX/Y, then switch to devour mode
-    // Approximate current pos from progress (we use baseX as fallback — close enough since
-    // the timing naturally continues from current native value)
-    fw.devourX.setValue(fw.baseX);
-    fw.devourY.setValue(fw.baseY);
+    // Start devour from current visual position (not baseX/baseY) for seamless transition
+    fw.devourX.setValue(currentPos.x);
+    fw.devourY.setValue(currentPos.y);
     fw.useDevourPos = true;
     // Force re-render with devour position
     setFlyingWords(prev => [...prev]);
@@ -785,7 +815,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         ]),
       ]),
     ]).start(() => handleWordDevoured(fw));
-  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured]);
+  }, [phase, isOffering, reducedMotion, spawnTrail, handleWordDevoured, getCurrentPos]);
 
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
@@ -796,17 +826,36 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     setIsOffering(true);
     hapticHeavy();
 
+    const totalAmber = harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
+    const totalWordCount = harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
+
+    // Offer all batches atomically first
     const result = await offerAllBatches();
     if (result.amberAwarded > 0) {
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) onAmberChange?.(newBalance);
     }
 
+    // Immediately clear pending state so UI reflects that all batches are offered
+    if (mountedRef.current) {
+      setHarvestState(prev => prev ? { ...prev, pendingBatches: [] } : prev);
+    }
+
     const words = flyingWordsRef.current.filter(w => !w.isDevoured);
     if (words.length === 0) {
-      if (mountedRef.current) { setIsOffering(false); await loadState(); }
+      if (mountedRef.current) {
+        setDisplayBalance(prev => prev + result.amberAwarded);
+        spawnAmberRise(result.amberAwarded);
+        showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
+        setOverflowCount(0);
+        setIsOffering(false);
+      }
       return;
     }
+
+    // Animate balance incrementally as words fly in
+    const amberPerWord = words.length > 0 ? result.amberAwarded / words.length : 0;
+    let amberAccumulated = 0;
 
     const staggerDelay = Math.min(70, 1800 / words.length);
 
@@ -814,18 +863,29 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       fw.isDevoured = true;
       setTimeout(() => {
         if (!mountedRef.current) return;
+
+        // Snapshot current position before stopping loops
+        const currentPos = getCurrentPos(fw);
         fw.floatLoopX?.stop(); fw.floatLoopX = null;
         fw.floatLoopY?.stop(); fw.floatLoopY = null;
 
-        if (i % 3 === 0) spawnTrail(fw.baseX, fw.baseY);
+        if (i % 3 === 0) spawnTrail(currentPos.x, currentPos.y);
         const duration = getDevourDuration(phase);
+
+        // Increment displayed balance as each word flies
+        amberAccumulated += amberPerWord;
+        const incrementNow = Math.round(amberAccumulated);
+        if (incrementNow > 0) {
+          amberAccumulated -= incrementNow;
+          setDisplayBalance(prev => prev + incrementNow);
+        }
 
         if (reducedMotion) {
           fw.opacity.setValue(0); fw.scale.setValue(0); flashPitGlow(); return;
         }
 
-        fw.devourX.setValue(fw.baseX);
-        fw.devourY.setValue(fw.baseY);
+        fw.devourX.setValue(currentPos.x);
+        fw.devourY.setValue(currentPos.y);
         fw.useDevourPos = true;
 
         Animated.parallel([
@@ -846,16 +906,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       if (!mountedRef.current) return;
       const freshState = await getHarvestState();
       if (mountedRef.current) {
-        setDisplayBalance(prev => prev + result.amberAwarded);
+        // Credit any remaining fractional amber
+        const finalBalance = amberBalance + result.amberAwarded;
+        setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
-        showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
+        showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         setHarvestState(freshState);
         setFlyingWords([]);
         setOverflowCount(0);
         setIsOffering(false);
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, reducedMotion, onAmberChange, spawnTrail, spawnAmberRise, spawnImpactBurst, flashPitGlow, showResultToast, loadState]);
+  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, flashPitGlow, showResultToast]);
 
   // ---- Summary stats ----
   const pendingAmber = useMemo(() => {
@@ -913,6 +975,22 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           )}
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => { hapticLight(); onOpenStats?.(); }}
+            accessibilityLabel="View stats"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerIconText}>{'\uD83D\uDCCA'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => { hapticLight(); onOpenSettings?.(); }}
+            accessibilityLabel="Settings"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerIconText}>{'\u2699\uFE0F'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerIconBtn}
             onPress={() => { hapticLight(); onClose(); }}

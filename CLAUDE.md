@@ -197,7 +197,7 @@ mobile/
 │   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper from animals (fade in/out)
 │   │   │   ├── RitualEchoChain.tsx # In-puzzle real-time word chain display (phase-aware styling)
 │   │   │   └── index.ts         # Puzzle component exports
-│   │   ├── OfferingPitScreen.tsx # Offering Pit screen: offer harvested words to convert queued amber
+│   │   ├── OfferingPitScreen.tsx # Offering Pit screen: flying candy-tile words, tap-to-devour spiral into pit, phase-aware effects
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive screen (phase-aware)
 │   │   ├── WordLedger.tsx       # Scrollable ritual word history screen (phase-aware styling)
 │   │   └── home/
@@ -630,13 +630,19 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 
 **Screen** (`OfferingPitScreen.tsx`):
 - Navigated as `currentScreen: 'pit'` in App.tsx
-- Props: phase, amberBalance, onClose, onAmberChange
-- Phase-aware theming: pit visual shifts from purple circle to dark pit emoji
+- Props: phase, amberBalance, onClose, onAmberChange, onOpenStats, onOpenSettings
+- **Interactive flying word system**: Harvested words float as mini candy 3D letter tiles (MiniCandyTile: 22x28px per letter, matching puzzle LetterTile styling — bevel, specular dot, 3D bottom edge) over the phase-aware forest/pit background images
+- **Smooth float animation**: Each word drifts via `Animated.loop` with linear progress (0→1) interpolated through a phase-shifted sine wave (`sin(2π(t + φ))` where φ is random per word). Progress always starts at 0; variety comes from `driftPhaseOffset`/`bobPhaseOffset`. Loop wraps seamlessly because `sin(2π·0+φ) === sin(2π·1+φ)`
+- **Tap-to-devour**: Tapping a word triggers a spiral animation toward the pit center — `getCurrentPos()` reads `__getValue()` from progress Animated.Values to compute current visual position, then spirals via bezier X + cubic-ease-in Y + 6 full spins + scale shrink to 0.05 + delayed fade. Brief pop-up (scale 1→1.2) before spiral begins
+- **Impact effects**: On devour completion — pit glow flash (opacity + scale pulse), radial burst of 8 impact particles from pit center, trail particles follow the word toward pit
+- **Batch completion**: Words track per-batch devour counts; when all words from a batch are devoured, `offerBatch()` is called, amber is credited, harvest state refreshes immediately, and amber rise particles spawn from pit
+- **Harvest All cascade**: Atomic `offerAllBatches()` first, then staggered visual cascade with incremental `displayBalance` updates as each word flies in. Pending badge clears immediately
+- **Home-style header**: Frosted glass amber display (matching HomeScreen), pending amber badge, stats (📊), settings (⚙️), and home (🏠) icon buttons
 - Phase-aware background images: `pitt_day.png` (Phase 0-1), `pitt_dusk.png` (Phase 2), `pitt_night.png` (Phase 3-4) with matching solid fallback colors
-- Animated pit pulse (respects reducedMotion)
-- Summary stats: pending amber, lifetime offered, spendable balance
-- Per-batch cards with difficulty, stars, word chips, individual offer buttons
-- "Offer All" primary CTA
+- Phase-aware devour colors: gold → amber → purple → deep purple → crimson trail/glow/burst
+- Device-tier aware: word count caps (15/30/50), trail particles (2/5), impact particles (4/8), amber particles (3/7)
+- Summary stats bar: pending amber, lifetime offered, spendable balance
+- "Offer All" primary CTA with phase-aware label
 
 **Phase-aware narrative text** (`phaseNarrative.ts`):
 - `getPitScreenTitle(phase)` — "Word Repository" → "The Pit"
@@ -648,6 +654,8 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - `getPitHomeBadgeLabel(phase)` — Home button label: "Pit" → "The Pit"
 - `getPitHarvestLabel(phase)` — Harvest verb: "harvested" → "claimed" (used in VictoryModal and OfferingPitScreen with word count prefix)
 - `getPitPendingAmberLabel(phase)` — Pending amber description
+- `getPitDevourVerb(phase)` — "offered" → "devoured" (used in devour result messages)
+- `getPitOverflowText(phase, count)` — "+N more" → "+N more await their turn" (overflow indicator when more words than device-tier cap)
 
 **Integration points:**
 - `amberCurrency.ts`: `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred)
