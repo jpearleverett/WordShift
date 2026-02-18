@@ -29,7 +29,7 @@ describe('variant tutorial dialogue coverage', () => {
   });
 
   it('supports all animals for core tutorial variants', () => {
-    const coreVariants: PuzzleVariant[] = ['reverse', 'blind', 'speed', 'chain', 'no_vowel', 'no_consonant'];
+    const coreVariants: PuzzleVariant[] = ['reverse', 'speed', 'chain'];
     for (const animal of animals) {
       for (const variant of coreVariants) {
         const line = getVariantTutorialDialogue(animal, variant, 2);

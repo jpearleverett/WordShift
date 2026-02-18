@@ -113,7 +113,7 @@ npx jest --no-coverage   # Run all tests (840+ tests, 28 suites)
   - **Top-5 random pick**: Scores all available puzzles, picks randomly from top 5 for variety.
   - **Recycling**: Tracks played puzzle IDs in AsyncStorage. When all exhausted, recycles the oldest-played half. All 12 banks have independent played-ID lists.
   - **Graceful fallback**: On bank selection failure, silently falls back to on-device real-time generation.
-  - **Variants covered**: `standard`, `reverse`, `reverse_blind`, `double_shift`, and `double_shift_blind` variants at ALL difficulty levels (EASY, MEDIUM, MEDIUM_PLUS, HARD) use pre-generated banks; other variant combos (blind, speed, chain, no_vowel, no_consonant, etc.) still generate on-device.
+  - **Variants covered**: `standard`, `reverse`, and `double_shift` variants at ALL difficulty levels (EASY, MEDIUM, MEDIUM_PLUS, HARD) use pre-generated banks; other variants (speed, chain) still generate on-device.
   - **Atomic save pattern**: Reverse bank generator uses write-to-tmp → rename → backup recovery to prevent data loss during generation crashes. Incremental save after each puzzle.
 
 ## Tech Stack
@@ -410,31 +410,24 @@ When a letter is selected (picked up), ghost previews show what word would form 
 
 ### Puzzle Variant Modes (`puzzleVariety.ts`)
 
-Variants are now player-selected from the setup menu (not randomly injected). Players can choose any unlocked base variant or combo before starting a puzzle, and a preferred variant is persisted for future runs.
+Variants are now player-selected from the setup menu (not randomly injected). Players can choose any unlocked variant before starting a puzzle, and a preferred variant is persisted for future runs.
 - **Reverse Shift**: Standard rules down to the bottom, then return all the way back up to the first row. Letters shifted during the forward pass stay locked (cumulative locking), so each intermediate row has exactly 2 locked positions during the reverse leg. All reverse puzzles at all difficulties are served from pre-generated banks of 500 validated puzzles each (with `reverseSolution` for hint support during the reverse leg); on-device generation is used as fallback with `requireReverseSolvable` validation, `relaxBoring` to widen the candidate pool, a dedicated `generateReverseChain()` brute-force sampler, and pre-computed adjacency/removal indices for fast lookup (25s internal timeout, 30s wrapper).
-- **Blind Shift**: Unreached rows stay concealed until revealed by progress.
 - **Speed Shift**: 60-second timed run.
 - **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
-- **Double Shift**: Move 2 letters per step instead of 1. All displayed words are 5 letters (W=5 is the only viable word length — needs W-2=3 letter intermediates and W+2=7 letter tempStates, both within the dictionary's 3-7 letter range). Difficulty differentiated purely by row count: EASY=3 rows, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. Each step: pick 2 letters from current word (leaving a valid 3-letter intermediate), drop them into next word (creating a valid 7-letter tempState). All difficulties served from pre-generated banks of 500 puzzles each. 4-phase input cycle: `pick1 → pick2 → drop1 → drop2`. Undo removes both letters. 1.65x amber multiplier (1.85x for double_shift_blind combo). Pre-computed `getDoubleInsertionIndex(wordLength)` maps letter pairs to valid (baseWord, result, positions) tuples for O(1) candidate lookup.
-- **No Vowel / No Consonant**: Restriction variants that lock one letter class.
-- **Combos**: `reverse_blind`, `double_shift_blind`, `blind_no_vowel`, `blind_no_consonant`, `speed_no_vowel`, `speed_no_consonant`.
+- **Double Shift**: Move 2 letters per step instead of 1. All displayed words are 5 letters (W=5 is the only viable word length — needs W-2=3 letter intermediates and W+2=7 letter tempStates, both within the dictionary's 3-7 letter range). Difficulty differentiated purely by row count: EASY=3 rows, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. Each step: pick 2 letters from current word (leaving a valid 3-letter intermediate), drop them into next word (creating a valid 7-letter tempState). All difficulties served from pre-generated banks of 500 puzzles each. 4-phase input cycle: `pick1 → pick2 → drop1 → drop2`. Undo removes both letters. 1.65x amber multiplier. Pre-computed `getDoubleInsertionIndex(wordLength)` maps letter pairs to valid (baseWord, result, positions) tuples for O(1) candidate lookup.
 
 **Variant Unlock Thresholds** (puzzles solved):
 | Variant | Puzzles Required |
 |---------|-----------------|
-| Reverse Shift | 12 |
-| Blind Shift | 22 |
-| No Vowel | 38 |
+| Reverse Shift | 10 |
 | Double Shift | 40 |
 | Speed Shift | 52 |
-| No Consonant | 68 |
 | Chain Shift | 85 |
 
-Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants and combos stay fully hidden until unlocked, so players only see styles they can actually select.
-- **Progressive disclosure**: combo variants are only shown once unlocked; until then, the setup menu shows a generic “more combinations later” message (without showing locked entries).
+Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants stay fully hidden until unlocked, so players only see styles they can actually select.
 - **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
 - **Economy anti-farm**: variant multipliers were rebalanced for selectable play and now taper with repeated back-to-back use of the same variant through `applyVariantAmberBonus()` in `amberCurrency.ts`.
-- **Wired in**: `DifficultyMenu.tsx` renders only unlocked variant cards (selected/active states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), enforces restrictions in input handling, and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
+- **Wired in**: `DifficultyMenu.tsx` renders only unlocked variant cards (selected/active states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
 - **Variant fallback notification**: When variant puzzle generation fails and silently falls back to standard, a phase-aware toast is shown. Phase 0-2: "That puzzle style wasn't available — starting a standard puzzle instead." Phase 3+: "The arrangement could not sustain that pattern."
 
 ## App Architecture
@@ -446,7 +439,7 @@ Game logic is extracted into six custom hooks:
 **`usePuzzleGame()`** (`src/hooks/usePuzzleGame.ts`):
 - All puzzle state: rows, selected letter, game state, hints, validation, gameMode, currentPhase
 - `initGame(words, hint?, solution?, wordLength?, reverseSolution?)` - Load pre-generated puzzle
-- `startNewGame(difficulty?, mode?, variant?)` - Start a new puzzle: serves curated early puzzles → tries pre-generated bank (all difficulties for standard/reverse/reverse_blind variants) → falls back to on-device generation. Uses the selected/preferred variant (or explicit override)
+- `startNewGame(difficulty?, mode?, variant?)` - Start a new puzzle: serves curated early puzzles → tries pre-generated bank (all difficulties for standard/reverse variants) → falls back to on-device generation. Uses the selected/preferred variant (or explicit override)
 - `setSelectedVariant(variant)` - Update preferred variant and persist it for subsequent runs
 - `handleLetterPress(letter, rowIndex)` - Pick a letter; uses `getLockedLetterMessage(phase)` for locked letter feedback
 - `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode; intermediate moves return `{ completed: false, formedWord }` for dread word detection; uses `getInvalidWordMessage(word, phase)` for invalid word feedback
@@ -906,8 +899,8 @@ Serves pre-validated puzzles for all difficulties instead of always generating o
 - **Bank word novelty**: Long-term graduated penalties for words seen recently in bank selections (50-puzzle strong, 150-puzzle moderate windows), beyond the 15-puzzle general word history cooldown.
 - **Selection**: Scores all unplayed puzzles, picks randomly from top 5.
 - **Recycling**: Tracks played puzzle IDs per bank via AsyncStorage (12 independent played-ID lists). When all exhausted, recycles the oldest-played half.
-- **Variant routing**: Standard EASY/MEDIUM/MEDIUM_PLUS/HARD → respective `PUZZLE_BANK_*` standard banks. Reverse/reverse_blind at each difficulty → respective `PUZZLE_BANK_REVERSE_*` banks. Double_shift/double_shift_blind at each difficulty → respective `PUZZLE_BANK_DOUBLE_SHIFT_*` banks. Other variant combos (blind, speed, chain, no_vowel, no_consonant, etc.) → real-time generation.
-- **Integration**: `usePuzzleGame.ts` `startNewGame()` checks the bank first for all standard/reverse/reverse_blind/double_shift/double_shift_blind difficulty combos. On failure, silently falls back to on-device generation.
+- **Variant routing**: Standard EASY/MEDIUM/MEDIUM_PLUS/HARD → respective `PUZZLE_BANK_*` standard banks. Reverse at each difficulty → respective `PUZZLE_BANK_REVERSE_*` banks. Double_shift at each difficulty → respective `PUZZLE_BANK_DOUBLE_SHIFT_*` banks. Other variants (speed, chain) → real-time generation.
+- **Integration**: `usePuzzleGame.ts` `startNewGame()` checks the bank first for all standard/reverse/double_shift difficulty combos. On failure, silently falls back to on-device generation.
 
 Key functions:
 - `selectPreGeneratedPuzzle(difficulty, phase, recencyMap, variant)` - Returns `PuzzleConfig` from bank or null if no bank for this combo
@@ -1438,7 +1431,7 @@ Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
 
 ## Known Constraints
 
-- Standard/reverse/reverse_blind/double_shift/double_shift_blind puzzles at ALL difficulties (EASY, MEDIUM, MEDIUM_PLUS, HARD) served from pre-generated banks (500 each, 12 banks total = 6000 puzzles); other variant combos (blind, speed, chain, no_vowel, no_consonant, etc.) generate on-device
+- Standard/reverse/double_shift puzzles at ALL difficulties (EASY, MEDIUM, MEDIUM_PLUS, HARD) served from pre-generated banks (500 each, 12 banks total = 6000 puzzles); other variants (speed, chain) generate on-device
 - On-device puzzle generation has 2.5s timeout to prevent UI blocking (25s for reverse mode)
 - 4s wrapper timeout in App.tsx as fallback (30s for reverse variants)
 - Fallback puzzle pool: 15 pre-validated puzzles across 3 difficulty tiers (5 easy/5 medium/5 hard) used when generation times out; `getRandomFallback(difficulty)` selects randomly

@@ -61,8 +61,6 @@ export interface PuzzleGameState {
   selectedVariant: PuzzleVariant;
   /** Current movement direction ("down" for standard flow, "up" during reverse return leg) */
   moveDirection: 'down' | 'up';
-  /** Rows revealed in blind variants */
-  blindRevealedRows: number[];
   /** Current chain link index for chain variants (1-based) */
   currentChainLink: number;
   /** Total links required for chain variants */
@@ -144,7 +142,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
   const [moveDirection, setMoveDirection] = useState<'down' | 'up'>('down');
-  const [blindRevealedRows, setBlindRevealedRows] = useState<number[]>([]);
   const [currentChainLink, setCurrentChainLink] = useState(1);
   const [chainLength, setChainLength] = useState(1);
   const [chainCompletedWords, setChainCompletedWords] = useState<string[]>([]);
@@ -264,7 +261,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setDoubleShiftPhase(hasVariantModifier(variantToUse, 'double_shift') ? 'pick1' : null);
     setFirstPickedLetter(null);
     setMoveDirection('down');
-    setBlindRevealedRows(hasVariantModifier(variantToUse, 'blind') ? [0] : []);
     if (!options?.preserveVariant) {
       setCurrentVariant(variantToUse);
     }
@@ -412,7 +408,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
 
       // Use pre-generated puzzle bank for standard/reverse variants at all difficulties
-      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'reverse_blind'];
+      const bankVariants: PuzzleVariant[] = ['standard', 'reverse'];
       const shouldUseBank = bankVariants.includes(variant)
         && (variant !== 'standard' || effectiveMode === 'standard');
       if (shouldUseBank) {
@@ -457,9 +453,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       console.log("Local generation failed, using fallback:", localErr);
       // Fallback puzzles don't include solver metadata, so restrictions may be
       // impossible to satisfy. Revert restriction variants to standard fallback.
-      const fallbackVariant = (
-        hasVariantModifier(variant, 'no_vowel') || hasVariantModifier(variant, 'no_consonant')
-      ) ? 'standard' : variant;
+      const fallbackVariant = variant;
       const fallbackWords = getRandomFallback(selectedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
       initGame(
@@ -688,12 +682,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       newRows[activeRowIndex] = { ...sourceRow, words: newSourceLetters };
       newRows[targetRowIndex] = { ...targetRow, words: newTargetLetters };
 
-      if (hasVariantModifier(currentVariant, 'blind')) {
-        setBlindRevealedRows(prev =>
-          prev.includes(targetRowIndex) ? prev : [...prev, targetRowIndex]
-        );
-      }
-
       setRows(newRows);
       // Switch to second letter for dropping
       setSelectedLetter(firstPickedLetter);
@@ -825,12 +813,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           : (l.id === selectedLetter.id),
       })),
     };
-
-    if (hasVariantModifier(currentVariant, 'blind')) {
-      setBlindRevealedRows(prev =>
-        prev.includes(targetRowIndex) ? prev : [...prev, targetRowIndex]
-      );
-    }
 
     setRows(newRows);
     setSelectedLetter(null);
@@ -1126,7 +1108,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
-    setBlindRevealedRows(saved.blindRevealedRows);
     setCurrentChainLink(saved.currentChainLink);
     setChainLength(saved.chainLength);
     setCurrentPhase(saved.currentPhase);
@@ -1170,7 +1151,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentVariant,
     selectedVariant,
     moveDirection,
-    blindRevealedRows,
     currentChainLink,
     chainLength,
     slotPreviews,

@@ -4,15 +4,12 @@
  * Design goals:
  * - Add mechanical variety without overwhelming players.
  * - Introduce variants in a narrative-aware order.
- * - Keep variants combinable in later game phases.
  *
  * Variant progression order:
- * 1) Reverse  -> standard rules + return trip back to first row
- * 2) Blind    -> target words concealed until reached
- * 3) No Vowel -> only consonants can be moved
- * 4) Speed    -> short row count + timer pressure
- * 5) No Consonant -> only vowels can be moved
- * 6) Chain    -> extended linked challenge
+ * 1) Reverse      -> standard rules + return trip back to first row
+ * 2) Speed        -> short row count + timer pressure
+ * 3) Double Shift -> move two letters per step
+ * 4) Chain        -> extended linked challenge
  */
 
 import { Difficulty, PuzzleSolutionStep } from '../types';
@@ -24,24 +21,11 @@ import { isReverseSolvable } from './localGenerator';
 
 export type VariantModifier =
   | 'reverse'
-  | 'blind'
   | 'speed'
   | 'chain'
-  | 'no_vowel'
-  | 'no_consonant'
   | 'double_shift';
 
-export type ComboVariant =
-  | 'reverse_blind'
-  | 'blind_no_vowel'
-  | 'blind_no_consonant'
-  | 'speed_no_vowel'
-  | 'speed_no_consonant';
-
-export type ComboVariantWithDouble =
-  | 'double_shift_blind';
-
-export type PuzzleVariant = 'standard' | VariantModifier | ComboVariant | ComboVariantWithDouble;
+export type PuzzleVariant = 'standard' | VariantModifier;
 
 export interface VariantConfig {
   variant: PuzzleVariant;
@@ -70,13 +54,12 @@ export interface VariantUnlockRequirement {
    * Internal gating depth. Never exposed to players as phase numbers in UI.
    */
   minDepthPhase: number;
-  group: 'base' | 'combo';
 }
 
 export interface VariantSelectorOption {
   variant: PuzzleVariant;
   config: VariantConfig;
-  group: 'core' | 'base' | 'combo';
+  group: 'core' | 'base';
   unlocked: boolean;
   unlockHint: string;
 }
@@ -106,16 +89,6 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     icon: '🔄',
     amberMultiplier: 1.22,
   },
-  blind: {
-    variant: 'blind',
-    title: 'Blind Shift',
-    description: 'Future rows are hidden until you reach them.',
-    darkDescription: 'The next words conceal themselves. Move anyway.',
-    instruction: 'Trust the pattern: upcoming words stay hidden until revealed.',
-    darkInstruction: 'Step into unseen words. They reveal only when touched.',
-    icon: '🫣',
-    amberMultiplier: 1.28,
-  },
   speed: {
     variant: 'speed',
     title: 'Speed Shift',
@@ -140,80 +113,6 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     chainLength: 3,
     rowOverride: 3,
   },
-  no_vowel: {
-    variant: 'no_vowel',
-    title: 'No Vowel Shift',
-    description: 'Vowels are locked. Move consonants only.',
-    darkDescription: 'The vowels fall silent. Shift what remains.',
-    instruction: 'Only consonants may be moved in this variant.',
-    darkInstruction: 'Vowels are forbidden in this rite. Move consonants only.',
-    icon: '🔇',
-    amberMultiplier: 1.2,
-  },
-  no_consonant: {
-    variant: 'no_consonant',
-    title: 'No Consonant Shift',
-    description: 'Consonants are locked. Move vowels only.',
-    darkDescription: 'Only pure vowels may pass through the pattern.',
-    instruction: 'Only vowels may be moved in this variant.',
-    darkInstruction: 'Consonants are sealed. Shift only open vowels.',
-    icon: '🫧',
-    amberMultiplier: 1.2,
-  },
-  reverse_blind: {
-    variant: 'reverse_blind',
-    title: 'Reverse Blind Shift',
-    description: 'Go down and back up while hidden rows reveal gradually.',
-    darkDescription: 'Descend and return through words you cannot fully see.',
-    instruction: 'Reach the bottom, then return to the first row in partial darkness.',
-    darkInstruction: 'Trace the pattern down and up while the words stay veiled.',
-    icon: '🌘',
-    amberMultiplier: 1.5,
-  },
-  blind_no_vowel: {
-    variant: 'blind_no_vowel',
-    title: 'Blind + No Vowel',
-    description: 'Hidden rows and consonant-only movement.',
-    darkDescription: 'Unseen words. Silenced vowels.',
-    instruction: 'Rows are hidden and only consonants may move.',
-    darkInstruction: 'The hidden pattern forbids vowels. Move consonants by faith.',
-    icon: '🌑',
-    amberMultiplier: 1.45,
-  },
-  blind_no_consonant: {
-    variant: 'blind_no_consonant',
-    title: 'Blind + No Consonant',
-    description: 'Hidden rows and vowel-only movement.',
-    darkDescription: 'Unseen words. Sealed consonants.',
-    instruction: 'Rows are hidden and only vowels may move.',
-    darkInstruction: 'The hidden pattern seals consonants. Move vowels only.',
-    icon: '🩸',
-    amberMultiplier: 1.45,
-  },
-  speed_no_vowel: {
-    variant: 'speed_no_vowel',
-    title: 'Speed + No Vowel',
-    description: 'Fast sprint with consonant-only movement.',
-    darkDescription: 'Run fast while vowels are forbidden.',
-    instruction: 'Three-row sprint. Only consonants may move.',
-    darkInstruction: 'Hurry. Vowels are forbidden and time is collapsing.',
-    icon: '⚡',
-    amberMultiplier: 1.52,
-    timeLimit: 60,
-    rowOverride: 3,
-  },
-  speed_no_consonant: {
-    variant: 'speed_no_consonant',
-    title: 'Speed + No Consonant',
-    description: 'Fast sprint with vowel-only movement.',
-    darkDescription: 'Run fast while consonants are sealed.',
-    instruction: 'Three-row sprint. Only vowels may move.',
-    darkInstruction: 'Hurry. Consonants are sealed and time is collapsing.',
-    icon: '⚡',
-    amberMultiplier: 1.52,
-    timeLimit: 60,
-    rowOverride: 3,
-  },
   double_shift: {
     variant: 'double_shift',
     title: 'Double Shift',
@@ -224,52 +123,21 @@ export const VARIANT_CONFIGS: Record<PuzzleVariant, VariantConfig> = {
     icon: '⏫',
     amberMultiplier: 1.65,
   },
-  double_shift_blind: {
-    variant: 'double_shift_blind',
-    title: 'Double Shift + Blind',
-    description: 'Move two letters at once while future rows stay hidden.',
-    darkDescription: 'Two offerings into the unseen.',
-    instruction: 'Pick two letters, then place each into a hidden next word.',
-    darkInstruction: 'Two offerings blind. The pattern does not reveal itself.',
-    icon: '⏫',
-    amberMultiplier: 1.85,
-  },
 };
 
 const VARIANT_MODIFIER_MAP: Record<PuzzleVariant, VariantModifier[]> = {
   standard: [],
   reverse: ['reverse'],
-  blind: ['blind'],
   speed: ['speed'],
   chain: ['chain'],
-  no_vowel: ['no_vowel'],
-  no_consonant: ['no_consonant'],
   double_shift: ['double_shift'],
-  reverse_blind: ['reverse', 'blind'],
-  blind_no_vowel: ['blind', 'no_vowel'],
-  blind_no_consonant: ['blind', 'no_consonant'],
-  speed_no_vowel: ['speed', 'no_vowel'],
-  speed_no_consonant: ['speed', 'no_consonant'],
-  double_shift_blind: ['double_shift', 'blind'],
 };
 
 const BASE_VARIANTS: VariantModifier[] = [
   'reverse',
-  'blind',
-  'no_vowel',
   'speed',
-  'no_consonant',
   'chain',
   'double_shift',
-];
-
-const COMBO_VARIANTS: (ComboVariant | ComboVariantWithDouble)[] = [
-  'reverse_blind',
-  'blind_no_vowel',
-  'blind_no_consonant',
-  'speed_no_vowel',
-  'speed_no_consonant',
-  'double_shift_blind',
 ];
 
 const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
@@ -280,19 +148,10 @@ const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
 };
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
-  reverse: { puzzlesSolved: 10, minDepthPhase: 0, group: 'base' },
-  blind: { puzzlesSolved: 18, minDepthPhase: 0, group: 'base' },
-  no_vowel: { puzzlesSolved: 30, minDepthPhase: 0, group: 'base' },
-  speed: { puzzlesSolved: 52, minDepthPhase: 0, group: 'base' },
-  no_consonant: { puzzlesSolved: 68, minDepthPhase: 0, group: 'base' },
-  chain: { puzzlesSolved: 85, minDepthPhase: 0, group: 'base' },
-  double_shift: { puzzlesSolved: 40, minDepthPhase: 0, group: 'base' },
-  reverse_blind: { puzzlesSolved: 100, minDepthPhase: 2, group: 'combo' },
-  blind_no_vowel: { puzzlesSolved: 110, minDepthPhase: 2, group: 'combo' },
-  blind_no_consonant: { puzzlesSolved: 150, minDepthPhase: 3, group: 'combo' },
-  speed_no_vowel: { puzzlesSolved: 150, minDepthPhase: 3, group: 'combo' },
-  speed_no_consonant: { puzzlesSolved: 190, minDepthPhase: 4, group: 'combo' },
-  double_shift_blind: { puzzlesSolved: 130, minDepthPhase: 2, group: 'combo' },
+  reverse: { puzzlesSolved: 10, minDepthPhase: 0 },
+  speed: { puzzlesSolved: 52, minDepthPhase: 0 },
+  double_shift: { puzzlesSolved: 40, minDepthPhase: 0 },
+  chain: { puzzlesSolved: 85, minDepthPhase: 0 },
 };
 
 export function isPuzzleVariant(value: string): value is PuzzleVariant {
@@ -319,7 +178,7 @@ export function getUnlockedVariants(
   currentPhase: number
 ): PuzzleVariant[] {
   const unlocked: PuzzleVariant[] = ['standard'];
-  for (const variant of [...BASE_VARIANTS, ...COMBO_VARIANTS]) {
+  for (const variant of BASE_VARIANTS) {
     if (isVariantUnlocked(variant, puzzlesSolved, currentPhase)) {
       unlocked.push(variant);
     }
@@ -404,21 +263,6 @@ export function getVariantSelectorOptions(
     });
   }
 
-  for (const variant of COMBO_VARIANTS) {
-    const unlocked = isVariantUnlocked(variant, puzzlesSolved, currentPhase);
-    if (!unlocked) {
-      continue;
-    }
-
-    options.push({
-      variant,
-      config: VARIANT_CONFIGS[variant],
-      group: 'combo',
-      unlocked,
-      unlockHint: getVariantUnlockHint(variant, puzzlesSolved, currentPhase, uiPhase),
-    });
-  }
-
   return options;
 }
 
@@ -428,10 +272,6 @@ export function getVariantSelectorOptions(
 
 function getUnlockedBaseVariants(puzzlesSolved: number, currentPhase: number): PuzzleVariant[] {
   return BASE_VARIANTS.filter(variant => isVariantUnlocked(variant, puzzlesSolved, currentPhase));
-}
-
-function getUnlockedComboVariants(puzzlesSolved: number, currentPhase: number): PuzzleVariant[] {
-  return COMBO_VARIANTS.filter(variant => isVariantUnlocked(variant, puzzlesSolved, currentPhase));
 }
 
 /**
@@ -452,12 +292,8 @@ export function shouldOfferVariant(
   const isVariantPuzzle = puzzlesSolved % 10 === 0 || Math.random() < 0.12;
   if (!isVariantPuzzle) return null;
 
-  const basePool = getUnlockedBaseVariants(puzzlesSolved, currentPhase);
-  if (basePool.length === 0) return null;
-
-  const comboPool = getUnlockedComboVariants(puzzlesSolved, currentPhase);
-  const shouldUseCombo = comboPool.length > 0 && Math.random() < (currentPhase >= 3 ? 0.35 : 0.2);
-  const pool = shouldUseCombo ? comboPool : basePool;
+  const pool = getUnlockedBaseVariants(puzzlesSolved, currentPhase);
+  if (pool.length === 0) return null;
 
   const selected = pool[Math.floor(Math.random() * pool.length)];
   return VARIANT_CONFIGS[selected];
@@ -580,31 +416,17 @@ export function isVowel(letter: string): boolean {
   return VOWELS.has(letter.toUpperCase());
 }
 
-export function isLetterAllowedByVariant(variant: PuzzleVariant, letter: string): boolean {
-  if (hasVariantModifier(variant, 'no_vowel')) return !isVowel(letter);
-  if (hasVariantModifier(variant, 'no_consonant')) return isVowel(letter);
+export function isLetterAllowedByVariant(_variant: PuzzleVariant, _letter: string): boolean {
   return true;
 }
 
-export function getVariantRestrictionError(variant: PuzzleVariant, phase: number): string {
-  if (hasVariantModifier(variant, 'no_vowel')) {
-    return phase >= 3
-      ? 'Vowels are forbidden in this arrangement.'
-      : 'No Vowel Shift: move consonants only.';
-  }
-  if (hasVariantModifier(variant, 'no_consonant')) {
-    return phase >= 3
-      ? 'Consonants are sealed in this arrangement.'
-      : 'No Consonant Shift: move vowels only.';
-  }
+export function getVariantRestrictionError(_variant: PuzzleVariant, _phase: number): string {
   return 'That letter cannot be moved right now.';
 }
 
 /**
  * Check whether a puzzle solution is compatible with variant restrictions.
- * Restriction variants can create impossible puzzles if the moved letters do
- * not match the allowed letter class. We filter those out at generation time.
- * Reverse variants additionally require a solvable return path.
+ * Reverse variants require a solvable return path.
  */
 export function isVariantCompatibleWithSolution(
   variant: PuzzleVariant,
@@ -615,13 +437,6 @@ export function isVariantCompatibleWithSolution(
 
   // Double shift puzzles are always compatible (generated specifically)
   if (hasVariantModifier(variant, 'double_shift')) return true;
-
-  if (hasVariantModifier(variant, 'no_vowel')) {
-    return solution.every(step => !isVowel(step.letterToMove));
-  }
-  if (hasVariantModifier(variant, 'no_consonant')) {
-    return solution.every(step => isVowel(step.letterToMove));
-  }
 
   // Reverse variants: validate that the return path is solvable
   if (hasVariantModifier(variant, 'reverse') && words && words.length >= 2) {

@@ -75,22 +75,22 @@ let dsHardIdToWords: Map<string, string[]> | null = null;
  */
 function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
   // Double shift variants — each difficulty has its own bank (3/4/5/6 rows, all 5-letter words)
-  if (variant === 'double_shift' || variant === 'double_shift_blind') {
+  if (variant === 'double_shift') {
     if (difficulty === 'EASY') return 'ds_easy';
     if (difficulty === 'MEDIUM') return 'ds_medium';
     if (difficulty === 'MEDIUM_PLUS') return 'ds_mp';
     return 'ds_hard';
   }
-  if (difficulty === 'EASY' && (variant === 'reverse' || variant === 'reverse_blind')) {
+  if (difficulty === 'EASY' && variant === 'reverse') {
     return 'reverse_easy';
   }
-  if (difficulty === 'MEDIUM' && (variant === 'reverse' || variant === 'reverse_blind')) {
+  if (difficulty === 'MEDIUM' && variant === 'reverse') {
     return 'reverse_medium';
   }
-  if (difficulty === 'MEDIUM_PLUS' && (variant === 'reverse' || variant === 'reverse_blind')) {
+  if (difficulty === 'MEDIUM_PLUS' && variant === 'reverse') {
     return 'reverse_mp';
   }
-  if (variant === 'reverse' || variant === 'reverse_blind') {
+  if (variant === 'reverse') {
     return 'reverse';
   }
   // Standard variant — route by difficulty
@@ -388,7 +388,7 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
  */
 function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): PreGeneratedPuzzle[] | null {
   // Double shift variants — each difficulty has its own bank (3/4/5/6 rows, all 5-letter words)
-  if (variant === 'double_shift' || variant === 'double_shift_blind') {
+  if (variant === 'double_shift') {
     if (difficulty === 'EASY') {
       return PUZZLE_BANK_DOUBLE_SHIFT_EASY.length > 0 ? PUZZLE_BANK_DOUBLE_SHIFT_EASY : null;
     }
@@ -404,7 +404,7 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
     if (variant === 'standard') {
       return PUZZLE_BANK_HARD.length > 0 ? PUZZLE_BANK_HARD : null;
     }
-    if (variant === 'reverse' || variant === 'reverse_blind') {
+    if (variant === 'reverse') {
       return PUZZLE_BANK_REVERSE_HARD.length > 0 ? PUZZLE_BANK_REVERSE_HARD : null;
     }
   }
@@ -412,7 +412,7 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
     if (variant === 'standard') {
       return PUZZLE_BANK_MEDIUM_PLUS.length > 0 ? PUZZLE_BANK_MEDIUM_PLUS : null;
     }
-    if (variant === 'reverse' || variant === 'reverse_blind') {
+    if (variant === 'reverse') {
       return PUZZLE_BANK_REVERSE_MEDIUM_PLUS.length > 0 ? PUZZLE_BANK_REVERSE_MEDIUM_PLUS : null;
     }
   }
@@ -420,7 +420,7 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
     if (variant === 'standard') {
       return PUZZLE_BANK_MEDIUM.length > 0 ? PUZZLE_BANK_MEDIUM : null;
     }
-    if (variant === 'reverse' || variant === 'reverse_blind') {
+    if (variant === 'reverse') {
       return PUZZLE_BANK_REVERSE_MEDIUM.length > 0 ? PUZZLE_BANK_REVERSE_MEDIUM : null;
     }
   }
@@ -428,7 +428,7 @@ function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): Pr
     if (variant === 'standard') {
       return PUZZLE_BANK_EASY.length > 0 ? PUZZLE_BANK_EASY : null;
     }
-    if (variant === 'reverse' || variant === 'reverse_blind') {
+    if (variant === 'reverse') {
       return PUZZLE_BANK_REVERSE_EASY.length > 0 ? PUZZLE_BANK_REVERSE_EASY : null;
     }
   }

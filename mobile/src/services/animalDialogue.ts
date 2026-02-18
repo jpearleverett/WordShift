@@ -2457,10 +2457,6 @@ const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = 
     light: 'That puzzle had a return path. You carry letters all the way down, then walk them back to the first word.',
     dark: 'The arrangement asked for a full circuit: down to the last row, then back to the first without breaking the chain.',
   },
-  blind: {
-    light: 'In that one, the future rows stay hidden until you reach them. You have to trust the pattern more than your eyes.',
-    dark: 'Those hidden rows are deliberate. The arrangement reveals only what you have earned to see.',
-  },
   speed: {
     light: 'Speed shifts are short and urgent. Fewer rows, faster choices, no overthinking.',
     dark: 'When the pattern rushes you, it is testing devotion under pressure.',
@@ -2469,41 +2465,9 @@ const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = 
     light: 'Chain shifts link three puzzles together. Your final word becomes the next starting word, so every finish matters.',
     dark: 'A chain is an incantation without interruption: each ending must feed the next beginning.',
   },
-  no_vowel: {
-    light: 'No Vowel shifts lock vowels in place. You can move only consonants.',
-    dark: 'In that rite, vowels are forbidden. Only consonants may pass.',
-  },
-  no_consonant: {
-    light: 'No Consonant shifts seal consonants. You can move only vowels.',
-    dark: 'In that rite, consonants are sealed. Only vowels carry the line.',
-  },
-  reverse_blind: {
-    light: 'That one combined a return trip with hidden rows. You solve forward, then return through partial uncertainty.',
-    dark: 'Downward and upward through veiled words. The arrangement favors those who continue without full sight.',
-  },
-  blind_no_vowel: {
-    light: 'Hidden rows and no vowels together: trust the structure and move consonants only.',
-    dark: 'The hidden pattern silenced vowels. You moved by consonant and faith alone.',
-  },
-  blind_no_consonant: {
-    light: 'Hidden rows and no consonants together: trust the structure and move vowels only.',
-    dark: 'The hidden pattern sealed consonants. You carried only vowels through the dark.',
-  },
-  speed_no_vowel: {
-    light: 'Fast sprint plus no vowels. Quick planning, consonants only.',
-    dark: 'Time collapsed while vowels were forbidden. You kept the cadence anyway.',
-  },
-  speed_no_consonant: {
-    light: 'Fast sprint plus no consonants. Quick planning, vowels only.',
-    dark: 'Time collapsed while consonants were sealed. You kept the line anyway.',
-  },
   double_shift: {
     light: 'Double shifts move two letters at once. Pick two from a word, place each into the next. More to juggle, more to explore.',
     dark: 'Two offerings per step. The arrangement demands a heavier hand — two letters wrenched free and placed in a single breath.',
-  },
-  double_shift_blind: {
-    light: 'Double shift with hidden rows: two letters at once into the unknown. Trust the words you cannot see.',
-    dark: 'Two offerings into veiled words. The arrangement swallows double and shows nothing in return.',
   },
 };
 

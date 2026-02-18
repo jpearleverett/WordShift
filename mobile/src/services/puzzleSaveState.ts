@@ -32,7 +32,8 @@ export interface SavedPuzzleState {
   currentVariant: PuzzleVariant;
   selectedVariant: PuzzleVariant;
   moveDirection: 'down' | 'up';
-  blindRevealedRows: number[];
+  /** @deprecated blind mode removed — kept for backwards compatibility with existing saves */
+  blindRevealedRows?: number[];
   currentChainLink: number;
   chainLength: number;
   currentPhase: DialoguePhase;

@@ -148,13 +148,8 @@ describe('Double Shift variant integration', () => {
     expect(VARIANT_CONFIGS.double_shift.title).toBe('Double Shift');
     expect(VARIANT_CONFIGS.double_shift.amberMultiplier).toBeGreaterThan(1);
 
-    // double_shift_blind combo should exist
-    expect(VARIANT_CONFIGS.double_shift_blind).toBeDefined();
-
     // hasVariantModifier should detect double_shift
     expect(hasVariantModifier('double_shift', 'double_shift')).toBe(true);
-    expect(hasVariantModifier('double_shift_blind', 'double_shift')).toBe(true);
-    expect(hasVariantModifier('double_shift_blind', 'blind')).toBe(true);
     expect(hasVariantModifier('standard', 'double_shift')).toBe(false);
 
     // Unlock at 40 puzzles

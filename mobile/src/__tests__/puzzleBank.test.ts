@@ -220,9 +220,6 @@ describe('puzzleBank', () => {
     });
 
     it('returns null for unsupported variants', async () => {
-      const blind = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'blind');
-      expect(blind).toBeNull();
-
       const speed = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'speed');
       expect(speed).toBeNull();
     });
@@ -239,11 +236,6 @@ describe('puzzleBank', () => {
         expect(result!.hint).toBeDefined();
       });
 
-      it('returns a valid PuzzleConfig for HARD reverse_blind (uses reverse bank)', async () => {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse_blind');
-        expect(result).not.toBeNull();
-        expect(result!.words.length).toBe(5);
-      });
 
       it('does not return the same reverse puzzle twice', async () => {
         const first = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
