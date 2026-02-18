@@ -51,10 +51,6 @@ interface RowProps {
   successDropSignal?: number;
   /** Word previews for each slot position (only on target row when letter is selected) */
   slotPreviews?: SlotPreview[];
-  /** Suppress drop slot display (e.g. during double shift pick phases) */
-  suppressDropSlots?: boolean;
-  /** First picked letter in double shift — shown as selected alongside selectedLetter */
-  firstPickedLetter?: Letter | null;
 }
 
 // Phase-aware row color helper
@@ -374,8 +370,6 @@ export const Row: React.FC<RowProps> = memo(({
   invalidDropSignal = 0,
   successDropSignal = 0,
   slotPreviews,
-  suppressDropSlots = false,
-  firstPickedLetter = null,
 }) => {
   const compactTiles = wordLength >= 6;
   const phaseColors = getPhaseRowColors(phase);
@@ -385,7 +379,7 @@ export const Row: React.FC<RowProps> = memo(({
   const isCompleted = moveDirection === 'down'
     ? rowIndex < activeRowIndex
     : rowIndex > activeRowIndex;
-  const showSlots = isTarget && selectedLetter && !isProcessing && !suppressDropSlots;
+  const showSlots = isTarget && selectedLetter && !isProcessing;
 
   // Resonance: check if this row's word belongs to a dread tier relevant to the current phase.
   // Only visible at Phase 1+ — creates the subliminal "these words feel different" effect.
@@ -640,7 +634,7 @@ export const Row: React.FC<RowProps> = memo(({
       <LetterTile
         key={letter.id}
         letter={displayLetter}
-        isSelected={selectedLetter?.id === letter.id || firstPickedLetter?.id === letter.id}
+        isSelected={selectedLetter?.id === letter.id}
         isInteractable={isSource && !isProcessing && !letter.isLocked}
         highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
         onPress={() => onLetterPress(letter, rowIndex)}

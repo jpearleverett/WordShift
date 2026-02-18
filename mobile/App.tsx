@@ -1433,8 +1433,6 @@ export default function App() {
                     ? puzzle.slotPreviews
                     : undefined
                 }
-                suppressDropSlots={puzzle.doubleShiftPhase === 'pick1' || puzzle.doubleShiftPhase === 'pick2'}
-                firstPickedLetter={puzzle.firstPickedLetter}
               />
             ))}
           </ScrollView>
