@@ -222,6 +222,13 @@ export interface HomeWorldProgress {
   streakFreezes?: number;
   // Last time a free streak freeze was granted (ISO date)
   lastFreeStreakFreezeDate?: string;
+  // Pending phase transition: target phase when progress crossed a threshold
+  // but the player hasn't confirmed it in the pit yet. null = no pending transition.
+  pendingPhaseTransition?: DialoguePhase | null;
+  // Normalized progress toward the next phase threshold (0.0 to 1.0).
+  // Cached each time awardPuzzleAmber runs. Used by the pit screen
+  // to drive ward mark illumination without re-deriving thresholds.
+  phaseProgressFraction?: number;
 }
 
 /**

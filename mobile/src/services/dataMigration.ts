@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SCHEMA_VERSION_KEY = 'wordshift_schema_version';
 
 /** Current schema version — increment when adding new migrations */
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 interface Migration {
   version: number;
@@ -100,6 +100,33 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v2: Failed to migrate word history:', error);
+      }
+    },
+  },
+  {
+    version: 3,
+    description: 'Add pendingPhaseTransition and phaseProgressFraction defaults for deferred phase transitions',
+    migrate: async () => {
+      const progressKey = 'wordshift_home_progress';
+      try {
+        const stored = await AsyncStorage.getItem(progressKey);
+        if (stored) {
+          const progress = JSON.parse(stored);
+
+          // Add pendingPhaseTransition if missing
+          if (progress.pendingPhaseTransition === undefined) {
+            progress.pendingPhaseTransition = null;
+          }
+
+          // Add phaseProgressFraction if missing
+          if (progress.phaseProgressFraction === undefined) {
+            progress.phaseProgressFraction = 0;
+          }
+
+          await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
+        }
+      } catch (error) {
+        console.warn('Migration v3: Failed to migrate home progress:', error);
       }
     },
   },

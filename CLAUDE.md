@@ -60,6 +60,17 @@ npx jest --no-coverage   # Run all tests (840+ tests, 28 suites)
   - VictoryModal shows queued amber with phase-aware "harvest" label, bonus source hints (challenge/style/perfect solve/streak), and a "Harvest Now" button navigating directly to the pit. Home screen action row has pit button with pending word count badge.
   - Phase-aware narrative text for pit UI in `phaseNarrative.ts` (9 new functions).
   - Cloud save, Reset All Data, and 19+ new tests cover the full harvest lifecycle.
+- **Deferred phase transitions via Offering Pit ward marks**:
+  - Phase transitions no longer happen instantly on puzzle completion. When `phaseProgress` crosses a threshold, `pendingPhaseTransition` is set instead of bumping `currentPhase` directly.
+  - `HomeWorldProgress` gained `pendingPhaseTransition?: DialoguePhase | null` and `phaseProgressFraction?: number` (0.0-1.0 normalized progress toward next phase).
+  - `awardPuzzleAmber()` return type includes `phaseTransitionPending: boolean`; only signals once per pending (guard: `pendingPhaseTransition == null`).
+  - New functions: `confirmPhaseTransition()`, `getPendingPhaseTransition()`, `getPhaseProgressFraction()` in `amberCurrency.ts`.
+  - `OfferingPitScreen.tsx` renders 7 ward marks along upper pit arc that illuminate as fraction grows. Ward ignition ceremony state machine (igniting → erupting → text → complete) plays when transition is confirmed.
+  - `phaseNarrative.ts` gained `PIT_WARD_COUNT`, `getPitWardHint()`, `getPitTransitionReadyText()`, `getPitTransitionCeremonyText()`, `getWardMarkColors()`, `WardMarkColorSet`, `getVictoryPitHint()`.
+  - `VictoryModal.tsx` shows cryptic pit hint (`phaseTransitionPending` prop) when transition is pending.
+  - `HomeScreen.tsx` pit button pulses gold (`pitPhaseReady` prop) when transition is ready.
+  - `PhaseTransitionOverlay` now fires from pit callback in App.tsx instead of victory flow.
+  - Data migration v3 initializes new fields. `useGamePersistence.ts` VictoryData includes `phaseTransitionPending`.
 - **Phase secrecy reinforcement**: The puzzle header now uses an icon-only atmosphere badge (no textual phase labels) to keep progression implicit.
 - **Mid-session restore fidelity upgraded**:
   - Autosave now persists the full active puzzle snapshot while playing (not just move-count checkpoints).
@@ -466,10 +477,12 @@ Game logic is extracted into six custom hooks:
 - All messages (start, loading, move success, hints) use `phaseNarrative.ts` for phase-aware tone
 
 **`useGamePersistence()`** (`src/hooks/useGamePersistence.ts`):
-- All persistence: amber balance, cumulative stats, phase, streak
-- `recordVictory(difficulty, hintsUsed, invalidAttempts, gameMode?, completedWords?)` - Record win, update stats, returns VictoryData
-- `refreshStats()` - Reload stats, amber balance, AND current phase from storage (called on puzzle screen navigation to sync phase after DEV or external changes)
+- All persistence: amber balance, cumulative stats, phase, streak, pending phase transition state
+- `recordVictory(difficulty, hintsUsed, invalidAttempts, gameMode?, completedWords?)` - Record win, update stats, returns VictoryData (includes `phaseTransitionPending: boolean`, `harvestedWords`, `pendingHarvest`)
+- `refreshStats()` - Reload stats, amber balance, current phase, `phaseProgressFraction`, and `pendingPhaseTransition` from storage
 - `setAmberBalance(balance)` - Direct setter for amber balance
+- `phaseProgressFraction: number` - Normalized 0.0-1.0 progress toward next phase (for pit ward marks)
+- `pendingPhaseTransition: DialoguePhase | null` - Target phase waiting for pit confirmation
 
 **`useVictoryFlow()`** (`src/hooks/useVictoryFlow.ts`):
 - Victory animation state: star pop-in refs, modal scale/opacity, phase flash overlay
@@ -528,7 +541,7 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
    - Phase-aware feedback text shifts tone with narrative phase
    - **Harvest info**: Queued word count with phase-aware verb ("harvested" → "claimed"), bonus source hints (challenge/style/perfect solve/streak shown as italic text)
    - **Action buttons**: Two-row layout — primary row (Next Level + Harvest Now), secondary row (Share + Home). "Harvest Now" navigates directly to the pit screen via `onGoToPit` callback. Harvest button styled in amber/orange.
-6. If phase changed: `PhaseTransitionOverlay` plays cinematic multi-scene interstitial, then `playPhaseChangeFlash()` does dramatic double flicker to black
+6. If phase changed: Phase transition is **deferred** — `pendingPhaseTransition` is set but `currentPhase` stays at old value. VictoryModal shows cryptic pit hint via `getVictoryPitHint()`. `PhaseTransitionOverlay` cinematic is triggered later from the Offering Pit when the player confirms the transition via the ward ignition ceremony, followed by `playPhaseChangeFlash()` double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
 8. **Dread Pulse** (Phase 2+): When a valid intermediate move forms a dread word, the screen briefly flashes with a crimson overlay. Phase-scaled opacity (0.10 → 0.18 → 0.25). Uses `isDreadWord()` from `localGenerator.ts`. `handleSlotPress` returns `{ completed: false, formedWord }` for intermediate moves.
 9. **Animal Whisper** (post-victory): 1.2s after victory, `AnimalWhisper` component shows a ghost-like message from a random unlocked animal. Prefers animals whose trigger words match the puzzle. Phase-aware styling (pink → purple → crimson). Fade in 400ms, hold 3s, fade out 600ms.
@@ -630,7 +643,7 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 
 **Screen** (`OfferingPitScreen.tsx`):
 - Navigated as `currentScreen: 'pit'` in App.tsx
-- Props: phase, amberBalance, onClose, onAmberChange, onOpenStats, onOpenSettings
+- Props: phase, amberBalance, onClose, onAmberChange, onOpenStats, onOpenSettings, phaseProgressFraction, pendingPhaseTransition, onPhaseTransitionConfirmed
 - **Interactive flying word system**: Harvested words float as mini candy 3D letter tiles (MiniCandyTile: 22x28px per letter, matching puzzle LetterTile styling — bevel, specular dot, 3D bottom edge) over the phase-aware forest/pit background images
 - **Smooth float animation**: Each word drifts via `Animated.loop` with linear progress (0→1) interpolated through a phase-shifted sine wave (`sin(2π(t + φ))` where φ is random per word). Progress always starts at 0; variety comes from `driftPhaseOffset`/`bobPhaseOffset`. Loop wraps seamlessly because `sin(2π·0+φ) === sin(2π·1+φ)`
 - **Tap-to-devour**: Tapping a word triggers a spiral animation toward the pit center — `getCurrentPos()` reads `__getValue()` from progress Animated.Values to compute current visual position, then spirals via bezier X + cubic-ease-in Y + 6 full spins + scale shrink to 0.05 + delayed fade. Brief pop-up (scale 1→1.2) before spiral begins
@@ -643,6 +656,10 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - Device-tier aware: word count caps (15/30/50), trail particles (2/5), impact particles (4/8), amber particles (3/7)
 - Summary stats bar: pending amber, lifetime offered, spendable balance
 - "Offer All" primary CTA with phase-aware label
+- **Ward marks**: 7 circles (`PIT_WARD_COUNT`) distributed along upper arc of pit oval. Each ~12px: unlit (barely visible) → lit (solid glow) based on `floor(fraction * 7)`. When pending: all lit and pulsing in unison (2.4s cycle). Phase-aware colors via `getWardMarkColors()`: turquoise (Phase 0) → purple (Phase 1-2) → crimson (Phase 3-4)
+- **Ward hint text**: When `fraction >= 0.3`, `getPitWardHint()` shows cryptic text ("Something stirs below..."). When all wards lit, `getPitTransitionReadyText()` shows larger pulsing ready text
+- **Tap-to-confirm**: Ward ring area wrapped in TouchableOpacity when transition is pending. Tapping triggers ceremony (handles edge case: no pending words)
+- **Ward ignition ceremony**: State machine — `idle → igniting (wards flare left-to-right, 200ms apart) → erupting (shockwaves + heavy haptic) → text (3 ceremony lines fade in/out) → complete (confirmPhaseTransition() + onPhaseTransitionConfirmed callback)`. Also triggered when offering words while transition is pending
 
 **Phase-aware narrative text** (`phaseNarrative.ts`):
 - `getPitScreenTitle(phase)` — "Word Repository" → "The Pit"
@@ -656,12 +673,19 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - `getPitPendingAmberLabel(phase)` — Pending amber description
 - `getPitDevourVerb(phase)` — "offered" → "devoured" (used in devour result messages)
 - `getPitOverflowText(phase, count)` — "+N more" → "+N more await their turn" (overflow indicator when more words than device-tier cap)
+- `getPitWardHint(phase, fraction)` — Cryptic hint when ward progress >= 0.3 (e.g. "Something stirs below...")
+- `getPitTransitionReadyText(targetPhase)` — Text when all wards lit ("The marks glow. Something is ready.")
+- `getPitTransitionCeremonyText(targetPhase)` — 3 text lines for ignition ceremony sequence per phase
+- `getWardMarkColors(phase)` — `{unlit, lit, glow, pendingPulse}` per phase (turquoise → purple → crimson)
+- `getVictoryPitHint(targetPhase)` — Cryptic text for VictoryModal when transition is pending
 
 **Integration points:**
 - `amberCurrency.ts`: `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred)
 - `useGamePersistence.ts`: `recordVictory()` enqueues harvest batch, returns `harvestedWords` and `pendingHarvest` in VictoryData
 - `VictoryModal.tsx`: Shows queued amber with phase-aware "harvest" label, bonus source hints, and "Harvest Now" button navigating to pit screen via `onGoToPit` callback
-- `HomeScreen.tsx`: Pit button in action row with word count badge
+- `HomeScreen.tsx`: Pit button in action row with word count badge; `pitPhaseReady` prop triggers pulsing gold button when phase transition is pending
+- `VictoryModal.tsx`: `phaseTransitionPending` prop shows cryptic pit hint via `getVictoryPitHint()`
+- `App.tsx`: `PhaseTransitionOverlay` cinematic now triggered from pit `onPhaseTransitionConfirmed` callback (not victory flow)
 - `SettingsScreen.tsx`: `clearHarvestState()` called on Reset All Data
 - `cloudSave.ts`: `wordshift_word_harvest` in SYNC_KEYS
 
@@ -1025,7 +1049,7 @@ Tracks recently used words to ensure puzzle diversity:
 
 Manages amber balance, streak, and phase progression:
 
-- `awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate)` - Main entry, returns balance/phase/streak/challenge bonus
+- `awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate)` - Main entry; returns balance/phase/streak/challenge bonus + `phaseTransitionPending`. Phase transitions are deferred (sets `pendingPhaseTransition` instead of bumping `currentPhase`)
 - `calculatePhaseAcceleration(threeStarRate, streak, difficulty, gameMode)` - Weighted phase progress multiplier
 - `updateStreak()` - Grace period of STREAK_RESET_DAYS (2 days)
 - `getStreakInfo()` - Current streak, multiplier, bonus percentage
@@ -1046,6 +1070,9 @@ Manages amber balance, streak, and phase progression:
 - `recordConsumedCoordinatedEvent(theme)` / `getConsumedCoordinatedEvents()` - Track consumed coordinated dialogue events
 - `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` - Track guaranteed first cross-reference for Vanguard animals at each phase
 - `clearProgress()` - Full reset (includes guaranteed cross-ref keys)
+- `confirmPhaseTransition()` — Bumps `currentPhase` from pending, clears `pendingPhaseTransition`, resets `phaseProgressFraction`. Called from pit ceremony
+- `getPendingPhaseTransition()` — Returns pending target phase or null
+- `getPhaseProgressFraction()` — Returns cached 0.0-1.0 fraction toward next phase
 
 ### Phase Transition Events (`phaseEvents.ts`)
 
@@ -1077,6 +1104,7 @@ Schema versioning system for persistent storage:
 - `migrateData()` runs all pending migrations in order
 - `getCurrentSchemaVersion()` / `setSchemaVersion()` for version tracking
 - Add new migrations by adding to the `MIGRATIONS` record and bumping `CURRENT_SCHEMA_VERSION`
+- Current version: 3. Latest migration (v3): Adds `pendingPhaseTransition` and `phaseProgressFraction` defaults to home progress for deferred phase transitions
 
 ### Error Reporting (`errorReporting.ts`)
 

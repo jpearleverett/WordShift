@@ -48,6 +48,8 @@ function getDefaultProgress(): HomeWorldProgress {
     preferredPuzzleVariant: 'standard',
     lastVariantPlayed: 'standard',
     sameVariantStreak: 0,
+    pendingPhaseTransition: null,
+    phaseProgressFraction: 0,
   };
 }
 
@@ -373,6 +375,7 @@ export async function awardPuzzleAmber(
   phaseAcceleration: number;
   streakMilestoneBonus: number;
   streakMilestoneMessage: string | null;
+  phaseTransitionPending: boolean;
 }> {
   const progress = await loadProgress();
 
@@ -497,12 +500,43 @@ export async function awardPuzzleAmber(
   if (newPhase > previousPhase + 1) {
     newPhase = (previousPhase + 1) as DialoguePhase;
   }
-  const phaseChanged = newPhase > previousPhase;
-  progress.currentPhase = newPhase;
+  // Only signal a phase change if this is a NEW transition (no pending one queued yet).
+  // If a pending transition already exists, the player must confirm it in the pit first.
+  const phaseChanged = newPhase > previousPhase && progress.pendingPhaseTransition == null;
 
-  // Mark all animals as having new dialogue when phase changes
+  // DEFERRED PHASE TRANSITION: Don't bump currentPhase directly.
+  // Store as pending — the Offering Pit confirms the transition.
   if (phaseChanged) {
-    // This will be handled by the dialogue service
+    progress.pendingPhaseTransition = newPhase;
+    // currentPhase stays at the old value until confirmPhaseTransition() is called
+  }
+
+  // Always update phaseProgressFraction for pit ward mark visuals
+  if (progress.currentPhase < 4) {
+    const currentThreshold = PHASE_THRESHOLDS[progress.currentPhase];
+    const nextPhaseIdx = (progress.currentPhase + 1) as DialoguePhase;
+    const nextThreshold = PHASE_THRESHOLDS[nextPhaseIdx];
+    const nextMinPuzzles = MIN_PUZZLES_FOR_PHASE[nextPhaseIdx];
+    const currentMinPuzzles = MIN_PUZZLES_FOR_PHASE[progress.currentPhase];
+    const progressRange = nextThreshold - currentThreshold;
+    const puzzleRange = nextMinPuzzles - currentMinPuzzles;
+
+    const weightedFraction = progressRange > 0
+      ? Math.min(1, (effectiveProgress - currentThreshold) / progressRange)
+      : 0;
+    const puzzleFraction = puzzleRange > 0
+      ? Math.min(1, (progress.puzzlesSolved - currentMinPuzzles) / puzzleRange)
+      : 0;
+
+    // Use the lesser of the two (weighted progress vs puzzle exposure gate)
+    progress.phaseProgressFraction = Math.min(weightedFraction, puzzleFraction);
+
+    // Clamp to 1.0 if transition is pending
+    if (progress.pendingPhaseTransition != null) {
+      progress.phaseProgressFraction = 1.0;
+    }
+  } else {
+    progress.phaseProgressFraction = 1.0;
   }
 
   progressCache = progress;
@@ -532,6 +566,7 @@ export async function awardPuzzleAmber(
     phaseAcceleration,
     streakMilestoneBonus,
     streakMilestoneMessage,
+    phaseTransitionPending: phaseChanged,
   };
 }
 
@@ -650,6 +685,49 @@ function calculatePhase(effectiveProgress: number, puzzlesSolved: number): Dialo
 export async function getCurrentPhase(): Promise<DialoguePhase> {
   const progress = await loadProgress();
   return progress.currentPhase;
+}
+
+/**
+ * Confirm a pending phase transition (called from the pit screen).
+ * Bumps currentPhase to the pending value and clears the pending flag.
+ * Returns the new phase and previous phase, or null if no pending transition.
+ */
+export async function confirmPhaseTransition(): Promise<{
+  newPhase: DialoguePhase;
+  previousPhase: DialoguePhase;
+} | null> {
+  const progress = await loadProgress();
+  const pending = progress.pendingPhaseTransition;
+
+  if (pending == null) return null;
+
+  const previousPhase = progress.currentPhase;
+  progress.currentPhase = pending;
+  progress.pendingPhaseTransition = null;
+  progress.phaseProgressFraction = 0; // Reset for next phase
+
+  progressCache = progress;
+  await saveProgress();
+
+  return { newPhase: pending, previousPhase };
+}
+
+/**
+ * Check if there's a pending phase transition.
+ * Returns the target phase or null.
+ */
+export async function getPendingPhaseTransition(): Promise<DialoguePhase | null> {
+  const progress = await loadProgress();
+  return progress.pendingPhaseTransition ?? null;
+}
+
+/**
+ * Get the normalized progress fraction toward the next phase (0.0 to 1.0).
+ * Used by the pit screen to drive ward mark illumination.
+ */
+export async function getPhaseProgressFraction(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.phaseProgressFraction ?? 0;
 }
 
 /**

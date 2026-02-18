@@ -89,6 +89,8 @@ interface HomeScreenProps {
   onboardingStep?: OnboardingStep;
   /** Advance onboarding to next step */
   onAdvanceOnboarding?: (step: OnboardingStep) => Promise<void>;
+  /** Whether a phase transition is pending in the pit */
+  pitPhaseReady?: boolean;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -99,6 +101,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenLedger,
   onOpenGallery,
   onOpenPit,
+  pitPhaseReady,
   onStartDaily,
   onboardingStep,
   onAdvanceOnboarding,
@@ -120,6 +123,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
   const playPulse = useRef(new Animated.Value(0)).current;
+  const pitPulseAnim = useRef(new Animated.Value(0)).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
   // Celebration state
@@ -307,6 +311,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       loop.stop();
     };
   }, [highlightPlayButton, playPulse]);
+
+  // Pit button pulse when phase transition is pending
+  useEffect(() => {
+    if (!pitPhaseReady) {
+      pitPulseAnim.setValue(0);
+      return;
+    }
+    const reducedMotion = getSettingsSync().reducedMotion;
+    if (reducedMotion) {
+      pitPulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pitPulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pitPulseAnim, {
+          toValue: 0,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => { loop.stop(); };
+  }, [pitPhaseReady, pitPulseAnim]);
 
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
@@ -598,22 +631,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
           {onOpenPit && (
-            <TouchableOpacity
-              style={styles.actionRowButton}
-              onPress={() => {
-                hapticLight();
-                onOpenPit();
-              }}
-              accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
-              accessibilityRole="button"
-            >
-              <Text style={styles.actionRowButtonText}>
-                ⭕ {getPitHomeBadgeLabel(progress.currentPhase)}
-                {pendingHarvest && pendingHarvest.pendingBatches > 0 && (
-                  ` (${pendingHarvest.pendingWords})`
-                )}
-              </Text>
-            </TouchableOpacity>
+            <Animated.View style={pitPhaseReady ? {
+              transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+              opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
+            } : undefined}>
+              <TouchableOpacity
+                style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
+                onPress={() => {
+                  hapticLight();
+                  onOpenPit();
+                }}
+                accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pitPhaseReady ? ' - phase transition ready' : ''}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.actionRowButtonText, pitPhaseReady && { color: '#FFD700' }]}>
+                  {pitPhaseReady ? '🔥' : '⭕'} {getPitHomeBadgeLabel(progress.currentPhase)}
+                  {pendingHarvest && pendingHarvest.pendingBatches > 0 && (
+                    ` (${pendingHarvest.pendingWords})`
+                  )}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
           )}
           {isSacrificeAvailable(progress.currentPhase) && (
             <TouchableOpacity
@@ -2007,6 +2045,11 @@ const styles = StyleSheet.create({
   sacrificeButton: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
     borderColor: 'rgba(120, 30, 60, 0.3)',
+  },
+  pitPhaseReadyButton: {
+    backgroundColor: 'rgba(180, 120, 0, 0.3)',
+    borderColor: 'rgba(255, 215, 0, 0.5)',
+    borderWidth: 1.5,
   },
   actionRowButtonText: {
     fontSize: 13,
