@@ -337,6 +337,9 @@ mobile/assets/
     ├── sky_dusk.png            # ✓ Muted dusk sky (Phase 2)
     ├── sky_storm.png           # ✓ Dark, ominous sky (Phase 3)
     ├── sky_shadow.png          # ✓ Near-black with entity silhouette (Phase 4)
+    ├── pitt_day.png            # ✓ Offering Pit background (Phase 0-1)
+    ├── pitt_dusk.png           # ✓ Offering Pit background (Phase 2)
+    ├── pitt_night.png          # ✓ Offering Pit background (Phase 3-4)
     ├── tree_left.png           # Planned: tree on left side of house
     ├── tree_right.png          # Planned: tree on right side of house
     ├── ground.png              # Planned: grass, path, flowers at bottom
@@ -381,6 +384,8 @@ The home screen now uses image assets for:
 - **All 10 room backgrounds** in `RoomView.tsx` - fully wired up
 - **Environment images** in `HouseWorld.tsx`:
   - `sky_day.png` / `sky_dusk.png` / `sky_storm.png` / `sky_shadow.png` - phase-aware sky background (day → dusk → storm → shadow)
+- **Pit background images** in `OfferingPitScreen.tsx`:
+  - `pitt_day.png` / `pitt_dusk.png` / `pitt_night.png` - phase-aware pit backgrounds (day → dusk → night)
 - **Animated emoji sky elements** (clouds, sun/moon, birds, shooting stars, night stars) rendered inside the transform container so they zoom/pan with the scene
 - Trees, fence, and ground emoji have been removed for a cleaner look
 - **Not yet created**: `shadow_figure.png`, `ground.png`, all house structure elements (`house/` folder empty), tree/cloud/bird sprites
@@ -625,6 +630,7 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - Navigated as `currentScreen: 'pit'` in App.tsx
 - Props: phase, amberBalance, onClose, onAmberChange
 - Phase-aware theming: pit visual shifts from purple circle to dark pit emoji
+- Phase-aware background images: `pitt_day.png` (Phase 0-1), `pitt_dusk.png` (Phase 2), `pitt_night.png` (Phase 3-4) with matching solid fallback colors
 - Animated pit pulse (respects reducedMotion)
 - Summary stats: pending amber, lifetime offered, spendable balance
 - Per-batch cards with difficulty, stars, word chips, individual offer buttons
