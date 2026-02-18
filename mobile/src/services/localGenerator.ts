@@ -2552,12 +2552,14 @@ async function findDoubleShiftPath(
     const lastPos = currentTemp.length - 1;
     if (r.letters[1] === 'S' && r.positions[1] === lastPos) score -= 30;
     if (r.letters[0] === 'S' && r.positions[0] === lastPos) score -= 30;
-    // Penalize adjacent removals — moving a letter pair as a block is less interesting
-    // than splitting letters from different parts of the word
+    // Strongly penalize adjacent removals — moving a letter pair as a block is less
+    // interesting than splitting letters from different parts of the word.
+    // The gap between removal positions is the primary quality signal for double shift.
     const posGap = r.positions[1] - r.positions[0];
-    if (posGap === 1) score -= 25; // Adjacent: feels like moving a suffix chunk (ED, LY, ER)
-    else if (posGap >= 3) score += 10; // Well-separated: more strategic, rewarding
-    score += Math.random() * 20;
+    if (posGap === 1) score -= 50; // Adjacent: feels like moving a suffix chunk (ED, LY, ER)
+    else if (posGap === 2) score += 8; // Moderate separation: decent
+    else if (posGap >= 3) score += 25; // Well-separated: strategic, rewarding
+    score += Math.random() * 15;
     return { ...r, score };
   });
 
@@ -2590,11 +2592,13 @@ async function findDoubleShiftPath(
       const mid = t.result.length / 2;
       const avgInsPos = (t.resultPositions[0] + t.resultPositions[1]) / 2;
       score += (mid - Math.abs(avgInsPos - mid)) * 3;
-      // Penalize adjacent insertion positions — letters landing as a block is less interesting
+      // Strongly penalize adjacent insertion positions — letters landing as a block is less
+      // interesting. Separated landings create a more strategic, satisfying puzzle feel.
       const insertGap = Math.abs(t.resultPositions[1] - t.resultPositions[0]);
-      if (insertGap === 1) score -= 20; // Adjacent insertion: chunky, less strategic
-      else if (insertGap >= 3) score += 8; // Well-separated: letters split across the word
-      score += Math.random() * 20;
+      if (insertGap === 1) score -= 40; // Adjacent insertion: chunky, less strategic
+      else if (insertGap === 2) score += 8; // Moderate separation: decent
+      else if (insertGap >= 3) score += 20; // Well-separated: letters split across the word
+      score += Math.random() * 15;
       candidates.push({ ...t, score });
     }
 
@@ -2676,25 +2680,30 @@ function scoreDoubleShiftChain(chain: DoubleShiftPathNode[], recencyMap?: Map<st
 
   // Letter separation bonus (additive) — reward moves where the 2 shifted letters
   // come from / land in non-adjacent positions (more strategic, less suffix-chunky).
-  // Applied as a flat bonus on top of the base score to prioritize separated moves
-  // without reducing the weight of other quality factors.
-  let separatedMoves = 0;
+  // This is a major quality signal for double shift: puzzles where letters are plucked
+  // from and placed into distinct parts of the word feel far more satisfying.
+  let separationScore = 0;
   let totalMoves = 0;
   for (const node of chain) {
     if (node.moveFromPositions) {
       const removalGap = node.moveFromPositions[1] - node.moveFromPositions[0];
-      if (removalGap >= 2) separatedMoves++;
+      if (removalGap >= 3) separationScore += 3;      // Well-separated: full bonus
+      else if (removalGap === 2) separationScore += 1; // Moderate: partial credit
+      // Adjacent (gap=1): no points
       totalMoves++;
     }
     if (node.moveToPositions) {
       const insertGap = Math.abs(node.moveToPositions[1] - node.moveToPositions[0]);
-      if (insertGap >= 2) separatedMoves++;
+      if (insertGap >= 3) separationScore += 3;      // Well-separated: full bonus
+      else if (insertGap === 2) separationScore += 1; // Moderate: partial credit
+      // Adjacent (gap=1): no points
       totalMoves++;
     }
   }
   if (totalMoves > 0) {
-    const separationRate = separatedMoves / totalMoves;
-    totalScore += separationRate * 10; // Up to +10 bonus for fully separated chains
+    // Max possible: totalMoves * 3 points. Normalize to 0-1 and scale.
+    const separationRate = separationScore / (totalMoves * 3);
+    totalScore += separationRate * 20; // Up to +20 bonus for fully separated chains
   }
 
   return Math.round(Math.max(0, Math.min(110, totalScore)));
