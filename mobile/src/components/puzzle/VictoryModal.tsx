@@ -168,7 +168,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
-            {/* Group 1: Amber, streak, milestone */}
+            {/* Group 1: Harvest, bonuses, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
@@ -179,6 +179,22 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </Text>
               </View>
             )}
+
+            {/* Bonus hint — tell the player their words are worth more without revealing amber */}
+            {victoryData && (() => {
+              const bonuses: string[] = [];
+              if (victoryData.challengeBonus > 0) bonuses.push('challenge');
+              if ((victoryData.variantBonus ?? 0) > 0) bonuses.push('style');
+              if (earnedStars >= 3) bonuses.push('perfect solve');
+              else if (earnedStars >= 2) bonuses.push('great solve');
+              if (victoryData.streakBonus > 0) bonuses.push('streak');
+              if (bonuses.length === 0) return null;
+              return (
+                <Text style={[styles.harvestBonusHint, { color: phaseTheme.modalSecondaryTextColor }]}>
+                  Worth more at harvest: {bonuses.join(' + ')}
+                </Text>
+              );
+            })()}
 
             {/* Streak display */}
             {victoryData && victoryData.currentStreak > 1 && (
@@ -625,6 +641,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     color: CandyColors.green.dark,
+  },
+  harvestBonusHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   winStreakContainer: {
     flexDirection: 'row',
