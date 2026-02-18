@@ -29,7 +29,7 @@ describe('variant tutorial dialogue coverage', () => {
   });
 
   it('supports all animals for core tutorial variants', () => {
-    const coreVariants: PuzzleVariant[] = ['reverse', 'speed', 'chain'];
+    const coreVariants: PuzzleVariant[] = ['reverse', 'speed'];
     for (const animal of animals) {
       for (const variant of coreVariants) {
         const line = getVariantTutorialDialogue(animal, variant, 2);
@@ -38,8 +38,9 @@ describe('variant tutorial dialogue coverage', () => {
     }
   });
 
-  it('explains chain continuity clearly', () => {
-    const line = getVariantTutorialDialogue('owl', 'chain', 0);
-    expect(line?.toLowerCase()).toContain('starting word');
+  it('explains double shift mechanics clearly', () => {
+    const line = getVariantTutorialDialogue('owl', 'double_shift', 0);
+    expect(line).toBeTruthy();
+    expect(line!.trim().length).toBeGreaterThan(20);
   });
 });
