@@ -6,14 +6,17 @@ const ONBOARDING_KEY = 'wordshift_onboarding_step';
  * Onboarding steps for the redesigned intro flow.
  *
  * Flow:
- * 1. home_empty     → Player sees empty home, guided to invite Fox
- * 2. fox_invited    → Fox intro dialogue plays on home screen
+ * 1. home_empty      → Player sees empty home, guided to invite Fox
+ * 2. fox_invited     → Fox intro dialogue plays on home screen
  * 3. going_to_puzzle → Fox says "follow me!" — transitioning to puzzle
  * 4. puzzle_tutorial → Guided easy puzzle with Fox tips
  * 5. puzzle_complete → Victory shown, Fox congratulates
- * 6. returning_home  → Transitioning back to home screen
- * 7. unlock_explained → Fox explains amber & unlock system
- * 8. complete        → Player is free
+ * 6. going_to_pit    → Fox introduces word harvesting concept
+ * 7. pit_intro       → Fox explains the Offering Pit on the pit screen
+ * 8. pit_offering    → Auto-offer words, Fox reacts to amber earned
+ * 9. returning_home  → Transitioning back to home screen
+ * 10. unlock_explained → Fox explains amber & unlock system
+ * 11. complete        → Player is free
  */
 export type OnboardingStep =
   | 'not_started'
@@ -22,6 +25,9 @@ export type OnboardingStep =
   | 'going_to_puzzle'
   | 'puzzle_tutorial'
   | 'puzzle_complete'
+  | 'going_to_pit'
+  | 'pit_intro'
+  | 'pit_offering'
   | 'returning_home'
   | 'unlock_explained'
   | 'complete';
@@ -109,9 +115,26 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Perfect. You felt that click, right? That's how we build this place.",
   ],
 
-  // Step 4: Back on home screen — explain unlocks
+  // Step 5.5: Transition to pit — Fox introduces word harvesting
+  going_to_pit: [
+    "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
+  ],
+
+  // Step 6: On pit screen — Fox explains the Offering Pit
+  pit_intro: [
+    "This is where your words end up after a puzzle.\nThey wait here until you offer them.",
+    "When you offer them, they turn into amber 💎 — that's what builds the house.",
+    "Let's try it. I'll offer them for you.",
+  ],
+
+  // Step 7: After auto-offer completes on pit screen
+  pit_offering_complete: [
+    "See? Amber, from the words you formed.\nEvery puzzle feeds the house a little more.",
+  ],
+
+  // Step 8: Back on home screen — explain unlocks and keep playing
   unlock_explained: [
-    "That was exactly it.\nEach solve gives us amber 💎",
+    "Now you know the cycle.\nSolve puzzles, offer words, earn amber 💎",
     "Amber builds rooms, and rooms let us invite more friends in.",
     "Keep playing and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],

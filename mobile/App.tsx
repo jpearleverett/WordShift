@@ -203,6 +203,7 @@ export default function App() {
   const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
   const [onboardingLineIndex, setOnboardingLineIndex] = useState(0);
   const [onboardingReady, setOnboardingReady] = useState(false);
+  const [pitOfferDone, setPitOfferDone] = useState(false);
 
   // Victory animation skip-forward state
   const victoryAnimatingRef = useRef(false);
@@ -320,6 +321,10 @@ export default function App() {
         // Resume onboarding from where they left off
         setOnboardingStepState(step);
         setOnboardingLineIndex(0);
+        // If app restarted during pit onboarding, navigate to pit screen
+        if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
+          setCurrentScreen('pit');
+        }
       }
       setOnboardingReady(true);
     })();
@@ -1018,14 +1023,43 @@ export default function App() {
         if (onboardingLineIndex < lines.length - 1) {
           setOnboardingLineIndex(prev => prev + 1);
         } else {
-          // Navigate back to home for unlock explanation
-          await advanceOnboarding('returning_home');
+          // Navigate to pit for harvest introduction
+          await advanceOnboarding('going_to_pit');
           hapticLight();
           puzzleActions.setShowConfetti(false);
           victoryActions.resetVictory();
           setRitualEchoWords([]);
+          setPitOfferDone(false);
+          setTimeout(async () => {
+            await advanceOnboarding('pit_intro');
+            transitionTo('pit', () => {
+              puzzleActions.setGameState(GameState.IDLE);
+            });
+          }, 300);
+        }
+        break;
+      }
+
+      case 'pit_intro': {
+        const pitLines = ONBOARDING_FOX_LINES.pit_intro;
+        if (onboardingLineIndex < pitLines.length - 1) {
+          setOnboardingLineIndex(prev => prev + 1);
+        } else {
+          // Fox done explaining — advance to offering step (triggers auto-offer in pit)
+          await advanceOnboarding('pit_offering');
+        }
+        break;
+      }
+
+      case 'pit_offering': {
+        const offerLines = ONBOARDING_FOX_LINES.pit_offering_complete;
+        if (onboardingLineIndex < offerLines.length - 1) {
+          setOnboardingLineIndex(prev => prev + 1);
+        } else {
+          // Navigate home for unlock explanation
+          await advanceOnboarding('returning_home');
+          hapticLight();
           transitionTo('home', async () => {
-            puzzleActions.setGameState(GameState.IDLE);
             await advanceOnboarding('unlock_explained');
           });
         }
@@ -1072,11 +1106,19 @@ export default function App() {
     }
   }, [onboardingStep, advanceOnboarding, persistenceActions, puzzleActions, transitionTo]);
 
+  /** Called by OfferingPitScreen when auto-offer completes during onboarding */
+  const handlePitOnboardingOfferComplete = useCallback(() => {
+    setPitOfferDone(true);
+    persistenceActions.refreshStats();
+  }, [persistenceActions]);
+
   /** Get current Fox guide text for the active onboarding step */
   const getOnboardingFoxText = useCallback((): string => {
     const key = onboardingStep === 'puzzle_tutorial'
       ? 'puzzle_tutorial_intro'
-      : onboardingStep;
+      : onboardingStep === 'pit_offering'
+        ? 'pit_offering_complete'
+        : onboardingStep;
     const lines = ONBOARDING_FOX_LINES[key];
     if (!lines || lines.length === 0) return '';
     return lines[Math.min(onboardingLineIndex, lines.length - 1)] || '';
@@ -1094,6 +1136,13 @@ export default function App() {
       case 'puzzle_tutorial':
         return 'Got it!';
       case 'puzzle_complete':
+        return "What's next?";
+      case 'pit_intro': {
+        const pitLines = ONBOARDING_FOX_LINES.pit_intro;
+        if (onboardingLineIndex >= pitLines.length - 1) return 'Offer words!';
+        return 'Next';
+      }
+      case 'pit_offering':
         return "Let's go home!";
       case 'unlock_explained': {
         const lines = ONBOARDING_FOX_LINES.unlock_explained;
@@ -1205,7 +1254,21 @@ export default function App() {
                 // Update notifications with new phase
                 scheduleAllNotifications(newPhase).catch(() => {});
               }}
+              isOnboarding={isOnboarding}
+              onboardingStep={onboardingStep}
+              onOnboardingOfferComplete={handlePitOnboardingOfferComplete}
             />
+            {/* Fox Guide overlay — shown during onboarding on pit screen */}
+            {isOnboarding && (onboardingStep === 'pit_intro' || onboardingStep === 'pit_offering') && (
+              <FoxGuide
+                visible={onboardingStep === 'pit_intro' || (onboardingStep === 'pit_offering' && pitOfferDone)}
+                variant="dialogue"
+                text={getOnboardingFoxText()}
+                buttonText={getOnboardingButtonText()}
+                onContinue={handleOnboardingContinue}
+                position="bottom"
+              />
+            )}
           </Animated.View>
         </View>
       );

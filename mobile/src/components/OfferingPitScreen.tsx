@@ -571,6 +571,12 @@ interface OfferingPitScreenProps {
   pendingPhaseTransition: DialoguePhase | null;
   /** Called after the pit confirms the phase transition */
   onPhaseTransitionConfirmed?: (newPhase: DialoguePhase) => void;
+  /** Whether onboarding is active — suppresses normal interaction */
+  isOnboarding?: boolean;
+  /** Current onboarding step (for auto-offer triggering) */
+  onboardingStep?: string;
+  /** Called after auto-offer completes during onboarding */
+  onOnboardingOfferComplete?: () => void;
 }
 
 export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
@@ -583,6 +589,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   phaseProgressFraction,
   pendingPhaseTransition,
   onPhaseTransitionConfirmed,
+  isOnboarding,
+  onboardingStep,
+  onOnboardingOfferComplete,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const reducedMotion = getSettingsSync()?.reducedMotion ?? false;
@@ -619,6 +628,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // Stable callback ref to avoid re-rendering all chips when devourWord deps change
   const devourWordRef = useRef<(fw: FlyingWord) => void>(() => {});
   const stableDevourWord = useCallback((fw: FlyingWord) => devourWordRef.current(fw), []);
+  const noopDevour = useCallback((_fw: FlyingWord) => {}, []);
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
@@ -1366,6 +1376,38 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
 
+  // ---- Onboarding auto-offer trigger ----
+  const autoOfferTriggered = useRef(false);
+  useEffect(() => {
+    if (onboardingStep !== 'pit_offering') {
+      autoOfferTriggered.current = false;
+      return;
+    }
+    if (autoOfferTriggered.current) return;
+    if (!harvestState || harvestState.pendingBatches.length === 0) {
+      // No pending batches (edge case) — notify immediately
+      onOnboardingOfferComplete?.();
+      return;
+    }
+    autoOfferTriggered.current = true;
+    // Small delay for Fox's button animation to settle
+    const timer = setTimeout(() => {
+      if (mountedRef.current) handleHarvestAllRef.current();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [onboardingStep, harvestState, onOnboardingOfferComplete]);
+
+  // ---- Onboarding: detect auto-offer completion ----
+  const wasOfferingRef = useRef(false);
+  useEffect(() => {
+    if (onboardingStep === 'pit_offering') {
+      if (wasOfferingRef.current && !isOffering) {
+        onOnboardingOfferComplete?.();
+      }
+      wasOfferingRef.current = isOffering;
+    }
+  }, [isOffering, onboardingStep, onOnboardingOfferComplete]);
+
   // ---- Harvest All (with spiral paths) ----
   const handleHarvestAll = useCallback(async () => {
     if (isOffering || !harvestState || harvestState.pendingBatches.length === 0) return;
@@ -1495,6 +1537,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       }
     }, cascadeDuration);
   }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
+
+  // Stable ref for handleHarvestAll (used by onboarding auto-offer effect)
+  const handleHarvestAllRef = useRef(handleHarvestAll);
+  useEffect(() => { handleHarvestAllRef.current = handleHarvestAll; }, [handleHarvestAll]);
 
   // ---- Summary stats ----
   const pendingAmber = useMemo(() => {
@@ -1643,9 +1689,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {impactParticles.map(p => <ImpactParticleView key={p.id} p={p} />)}
       {amberParticles.map(p => <AmberParticleView key={p.id} p={p} />)}
 
-      {/* Floating word chips */}
+      {/* Floating word chips — taps disabled during onboarding (Fox explains first) */}
       {flyingWords.map(fw => (
-        <FloatingWordChip key={fw.id} fw={fw} onTap={stableDevourWord} />
+        <FloatingWordChip key={fw.id} fw={fw} onTap={isOnboarding ? noopDevour : stableDevourWord} />
       ))}
 
       {/* Header — matches HomeScreen frosted glass style */}
@@ -1663,32 +1709,34 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             </View>
           )}
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={() => { hapticLight(); onOpenStats?.(); }}
-            accessibilityLabel="View stats"
-            accessibilityRole="button"
-          >
-            <Text style={styles.headerIconText}>{'\uD83D\uDCCA'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={() => { hapticLight(); onOpenSettings?.(); }}
-            accessibilityLabel="Settings"
-            accessibilityRole="button"
-          >
-            <Text style={styles.headerIconText}>{'\u2699\uFE0F'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={() => { hapticLight(); onClose(); }}
-            accessibilityLabel="Return home"
-            accessibilityRole="button"
-          >
-            <Text style={styles.headerIconText}>{'\uD83C\uDFE0'}</Text>
-          </TouchableOpacity>
-        </View>
+        {!isOnboarding && (
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => { hapticLight(); onOpenStats?.(); }}
+              accessibilityLabel="View stats"
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerIconText}>{'\uD83D\uDCCA'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => { hapticLight(); onOpenSettings?.(); }}
+              accessibilityLabel="Settings"
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerIconText}>{'\u2699\uFE0F'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => { hapticLight(); onClose(); }}
+              accessibilityLabel="Return home"
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerIconText}>{'\uD83C\uDFE0'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Empty state */}
@@ -1709,8 +1757,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </View>
       )}
 
-      {/* Result toast */}
-      {resultMessage && (
+      {/* Result toast — hidden during onboarding to avoid overlapping FoxGuide */}
+      {resultMessage && !isOnboarding && (
         <Animated.View
           style={[styles.resultToast, {
             backgroundColor: phase >= 3 ? 'rgba(139, 26, 58, 0.9)' : 'rgba(100, 60, 180, 0.9)',
@@ -1722,52 +1770,54 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </Animated.View>
       )}
 
-      {/* Bottom panel */}
-      <View style={styles.bottomPanel}>
-        <View style={[styles.summaryRow, {
-          backgroundColor: phase >= 3 ? 'rgba(10, 5, 20, 0.8)' : 'rgba(40, 20, 80, 0.7)',
-        }]}>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
-              {'\uD83D\uDC8E'} {pendingAmber}
-            </Text>
-            <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-              {getPitPendingAmberLabel(phase)}
-            </Text>
+      {/* Bottom panel — hidden during onboarding (FoxGuide occupies this space) */}
+      {!isOnboarding && (
+        <View style={styles.bottomPanel}>
+          <View style={[styles.summaryRow, {
+            backgroundColor: phase >= 3 ? 'rgba(10, 5, 20, 0.8)' : 'rgba(40, 20, 80, 0.7)',
+          }]}>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
+                {'\uD83D\uDC8E'} {pendingAmber}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                {getPitPendingAmberLabel(phase)}
+              </Text>
+            </View>
+            <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>{harvestState.totalWordsOffered}</Text>
+              <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                Lifetime {getPitHarvestLabel(phase)}
+              </Text>
+            </View>
+            <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
+                {'\uD83D\uDC8E'} {displayBalance}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Spendable</Text>
+            </View>
           </View>
-          <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>{harvestState.totalWordsOffered}</Text>
-            <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-              Lifetime {getPitHarvestLabel(phase)}
-            </Text>
-          </View>
-          <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
-              {'\uD83D\uDC8E'} {displayBalance}
-            </Text>
-            <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Spendable</Text>
-          </View>
-        </View>
 
-        {pendingWordCount > 0 && (
-          <TouchableOpacity
-            style={[styles.harvestAllButton, {
-              backgroundColor: phase >= 3 ? '#8B1A3A' : CandyColors.pink.main,
-              opacity: isOffering ? 0.5 : 1,
-            }]}
-            onPress={handleHarvestAll}
-            disabled={isOffering}
-            accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${pendingAmber} amber from ${pendingWordCount} words`}
-            accessibilityRole="button"
-          >
-            <Text style={styles.harvestAllText}>
-              {getPitOfferAllLabel(phase)} ({'\uD83D\uDC8E'} {pendingAmber})
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+          {pendingWordCount > 0 && (
+            <TouchableOpacity
+              style={[styles.harvestAllButton, {
+                backgroundColor: phase >= 3 ? '#8B1A3A' : CandyColors.pink.main,
+                opacity: isOffering ? 0.5 : 1,
+              }]}
+              onPress={handleHarvestAll}
+              disabled={isOffering}
+              accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${pendingAmber} amber from ${pendingWordCount} words`}
+              accessibilityRole="button"
+            >
+              <Text style={styles.harvestAllText}>
+                {getPitOfferAllLabel(phase)} ({'\uD83D\uDC8E'} {pendingAmber})
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 };
