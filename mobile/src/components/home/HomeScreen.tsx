@@ -23,8 +23,6 @@ import {
   markIntroSeen,
   markHouseCompleted,
   spendAmber,
-  devAddAmber,
-  devAddPuzzles,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
 } from '../../services/amberCurrency';
@@ -51,7 +49,6 @@ import {
 import {
   loadDialogueSessions,
   updatePuzzleCount,
-  clearAllSessions,
 } from '../../services/dialogueSession';
 
 import { useDialogueFlow } from '../../hooks/useDialogueFlow';
@@ -311,15 +308,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
   }, [highlightPlayButton, playPulse]);
 
-  // DEV: Add amber, advance puzzles, clear dialogue cooldowns
-  const handleDevButton = async () => {
-    const newBalance = await devAddAmber(5000);
-    await devAddPuzzles(30);
-    await clearAllSessions();
-    await loadAllData();
-    onAmberChange?.(newBalance);
-  };
-
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
     if (!introAnimal || !progress) return;
@@ -443,7 +431,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
-      {/* Header — simplified during onboarding */}
+      {/* Header — single row, simplified during onboarding */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View
@@ -529,19 +517,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </View>
       </View>
-
-      {/* DEV button for testing (hidden during onboarding) */}
-      {__DEV__ && !isOnboarding && (
-        <TouchableOpacity
-          style={styles.devButton}
-          onPress={() => {
-            hapticLight();
-            handleDevButton();
-          }}
-        >
-          <Text style={styles.devButtonText}>DEV</Text>
-        </TouchableOpacity>
-      )}
 
       {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
       {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
@@ -1407,6 +1382,9 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     flexShrink: 0,
   },
   amberContainer: {
@@ -1439,7 +1417,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     gap: 2,
-    marginTop: 6,
   },
   streakAtRiskBadge: {
     backgroundColor: 'rgba(255,60,60,0.20)',
@@ -1522,22 +1499,6 @@ const styles = StyleSheet.create({
   wordsOfferedHomeTextDark: {
     color: 'rgba(180, 100, 130, 0.8)',
     fontStyle: 'italic',
-  },
-
-  devButton: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 70 : 110,
-    right: 10,
-    backgroundColor: 'rgba(255, 0, 0, 0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    zIndex: 1000,
-  },
-  devButtonText: {
-    color: CandyColors.white,
-    fontSize: 10,
-    fontWeight: '900',
   },
 
   // Unlock progress bar
@@ -2034,21 +1995,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   actionRowButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   sacrificeButton: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
     borderColor: 'rgba(120, 30, 60, 0.3)',
   },
   actionRowButtonText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.9)',
   },
 
   // Sacrifice modal

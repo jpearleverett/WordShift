@@ -371,11 +371,12 @@ export const Row: React.FC<RowProps> = memo(({
   successDropSignal = 0,
   slotPreviews,
 }) => {
-  const compactTiles = wordLength >= 6;
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
   const isSource = rowIndex === activeRowIndex;
   const isTarget = rowIndex === targetRowIndex;
+  // Drop rows compact at 6+ (need room for insertion slots); pick rows compact at 7+
+  const compactTiles = isTarget ? wordLength >= 6 : wordLength >= 7;
   const isCompleted = moveDirection === 'down'
     ? rowIndex < activeRowIndex
     : rowIndex > activeRowIndex;
