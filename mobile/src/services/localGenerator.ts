@@ -2671,8 +2671,10 @@ function scoreDoubleShiftChain(chain: DoubleShiftPathNode[], recencyMap?: Map<st
  * - Insert those 2 letters into a (W-2)-letter base → W-letter result (forming a (W+2)-letter tempState in the target)
  *
  * Currently supports W=5 only (uses WORDS_3, WORDS_5, WORDS_7).
+ * W=5 is the only viable word length: W-2=3 and W+2=7 must both exist
+ * in the dictionary (which covers 3-7 letters).
  *
- * @param difficulty Controls row count: EASY=3, MEDIUM=4, MEDIUM_PLUS/HARD=4
+ * @param difficulty Controls row count: EASY=3, MEDIUM=4, MEDIUM_PLUS=5, HARD=6
  * @param overrides Optional word length and row count overrides
  * @returns PuzzleConfig with isDoubleShift=true
  */
@@ -2684,7 +2686,8 @@ export async function generateDoubleShiftPuzzle(
   const targetRows = overrides?.targetRows ?? (
     difficulty === 'EASY' ? 3 :
     difficulty === 'MEDIUM' ? 4 :
-    4 // MEDIUM_PLUS and HARD
+    difficulty === 'MEDIUM_PLUS' ? 5 :
+    6 // HARD
   );
 
   const recencyMap = await getWordHistoryWithRecency();

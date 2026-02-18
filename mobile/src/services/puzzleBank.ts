@@ -10,6 +10,8 @@ import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
 import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
 import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy';
 import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM } from '../data/puzzleBankDoubleShiftMedium';
+import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS } from '../data/puzzleBankDoubleShiftMediumPlus';
+import { PUZZLE_BANK_DOUBLE_SHIFT_HARD } from '../data/puzzleBankDoubleShiftHard';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
@@ -24,6 +26,8 @@ const USED_STD_MEDIUM_PUZZLES_KEY = 'wordshift_played_std_medium_puzzle_ids';
 const USED_STD_EASY_PUZZLES_KEY = 'wordshift_played_std_easy_puzzle_ids';
 const USED_DS_EASY_PUZZLES_KEY = 'wordshift_played_ds_easy_puzzle_ids';
 const USED_DS_MEDIUM_PUZZLES_KEY = 'wordshift_played_ds_medium_puzzle_ids';
+const USED_DS_MP_PUZZLES_KEY = 'wordshift_played_ds_mp_puzzle_ids';
+const USED_DS_HARD_PUZZLES_KEY = 'wordshift_played_ds_hard_puzzle_ids';
 const MAX_USED_TRACKED = 500;
 
 // Bank word novelty scoring thresholds (in bank-puzzle-selections ago)
@@ -48,6 +52,8 @@ let usedStdMediumPuzzleIds: string[] | null = null;
 let usedStdEasyPuzzleIds: string[] | null = null;
 let usedDsEasyPuzzleIds: string[] | null = null;
 let usedDsMediumPuzzleIds: string[] | null = null;
+let usedDsMPPuzzleIds: string[] | null = null;
+let usedDsHardPuzzleIds: string[] | null = null;
 
 // Lazy-initialized ID→allWords lookup maps (built once from static bank data)
 let standardIdToWords: Map<string, string[]> | null = null;
@@ -60,16 +66,20 @@ let stdMediumIdToWords: Map<string, string[]> | null = null;
 let stdEasyIdToWords: Map<string, string[]> | null = null;
 let dsEasyIdToWords: Map<string, string[]> | null = null;
 let dsMediumIdToWords: Map<string, string[]> | null = null;
+let dsMPIdToWords: Map<string, string[]> | null = null;
+let dsHardIdToWords: Map<string, string[]> | null = null;
 
 /**
  * Derive a "bank key" from difficulty + variant to route to the correct
  * storage, cache, and bank data. Returns a discriminator string.
  */
 function getBankKey(difficulty: Difficulty, variant: PuzzleVariant): string {
-  // Double shift variants — EASY uses its own bank, MEDIUM/MEDIUM_PLUS/HARD share one bank
+  // Double shift variants — each difficulty has its own bank (3/4/5/6 rows, all 5-letter words)
   if (variant === 'double_shift' || variant === 'double_shift_blind') {
     if (difficulty === 'EASY') return 'ds_easy';
-    return 'ds_medium'; // MEDIUM, MEDIUM_PLUS, HARD all use 4 rows of 5-letter words
+    if (difficulty === 'MEDIUM') return 'ds_medium';
+    if (difficulty === 'MEDIUM_PLUS') return 'ds_mp';
+    return 'ds_hard';
   }
   if (difficulty === 'EASY' && (variant === 'reverse' || variant === 'reverse_blind')) {
     return 'reverse_easy';
@@ -110,6 +120,20 @@ function getStorageConfig(bankKey: string): {
       key: USED_DS_MEDIUM_PUZZLES_KEY,
       getCache: () => usedDsMediumPuzzleIds,
       setCache: (val) => { usedDsMediumPuzzleIds = val; },
+    };
+  }
+  if (bankKey === 'ds_mp') {
+    return {
+      key: USED_DS_MP_PUZZLES_KEY,
+      getCache: () => usedDsMPPuzzleIds,
+      setCache: (val) => { usedDsMPPuzzleIds = val; },
+    };
+  }
+  if (bankKey === 'ds_hard') {
+    return {
+      key: USED_DS_HARD_PUZZLES_KEY,
+      getCache: () => usedDsHardPuzzleIds,
+      setCache: (val) => { usedDsHardPuzzleIds = val; },
     };
   }
   if (bankKey === 'reverse_easy') {
@@ -190,6 +214,24 @@ function getIdToWordsMap(bankKey: string): Map<string, string[]> {
       }
     }
     return dsMediumIdToWords;
+  }
+  if (bankKey === 'ds_mp') {
+    if (!dsMPIdToWords) {
+      dsMPIdToWords = new Map();
+      for (const p of PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS) {
+        dsMPIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return dsMPIdToWords;
+  }
+  if (bankKey === 'ds_hard') {
+    if (!dsHardIdToWords) {
+      dsHardIdToWords = new Map();
+      for (const p of PUZZLE_BANK_DOUBLE_SHIFT_HARD) {
+        dsHardIdToWords.set(p.id, p.allWords);
+      }
+    }
+    return dsHardIdToWords;
   }
   if (bankKey === 'reverse_easy') {
     if (!reverseEasyIdToWords) {
@@ -345,12 +387,18 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
  * Returns null if no bank exists for this combination.
  */
 function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): PreGeneratedPuzzle[] | null {
-  // Double shift variants — EASY has its own bank, all others share the MEDIUM bank
+  // Double shift variants — each difficulty has its own bank (3/4/5/6 rows, all 5-letter words)
   if (variant === 'double_shift' || variant === 'double_shift_blind') {
     if (difficulty === 'EASY') {
       return PUZZLE_BANK_DOUBLE_SHIFT_EASY.length > 0 ? PUZZLE_BANK_DOUBLE_SHIFT_EASY : null;
     }
-    return PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM.length > 0 ? PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM : null;
+    if (difficulty === 'MEDIUM') {
+      return PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM.length > 0 ? PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM : null;
+    }
+    if (difficulty === 'MEDIUM_PLUS') {
+      return PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS.length > 0 ? PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS : null;
+    }
+    return PUZZLE_BANK_DOUBLE_SHIFT_HARD.length > 0 ? PUZZLE_BANK_DOUBLE_SHIFT_HARD : null;
   }
   if (difficulty === 'HARD') {
     if (variant === 'standard') {
@@ -575,6 +623,8 @@ export async function clearPlayedPuzzles(): Promise<void> {
   usedStdEasyPuzzleIds = [];
   usedDsEasyPuzzleIds = [];
   usedDsMediumPuzzleIds = [];
+  usedDsMPPuzzleIds = [];
+  usedDsHardPuzzleIds = [];
   try {
     await AsyncStorage.removeItem(USED_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_REVERSE_PUZZLES_KEY);
@@ -586,6 +636,8 @@ export async function clearPlayedPuzzles(): Promise<void> {
     await AsyncStorage.removeItem(USED_STD_EASY_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_DS_EASY_PUZZLES_KEY);
     await AsyncStorage.removeItem(USED_DS_MEDIUM_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_DS_MP_PUZZLES_KEY);
+    await AsyncStorage.removeItem(USED_DS_HARD_PUZZLES_KEY);
   } catch {
     // Non-critical
   }

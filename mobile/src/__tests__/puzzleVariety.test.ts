@@ -151,7 +151,7 @@ describe('puzzleVariety', () => {
           const overrides = getVariantOverrides(variant, difficulty);
           if (overrides.targetRows !== undefined) {
             expect(overrides.targetRows).toBeGreaterThanOrEqual(3);
-            expect(overrides.targetRows).toBeLessThanOrEqual(5);
+            expect(overrides.targetRows).toBeLessThanOrEqual(6); // HARD double_shift uses 6 rows
           }
           if (overrides.wordLength !== undefined) {
             expect(overrides.wordLength).toBeGreaterThanOrEqual(4);
