@@ -1997,12 +1997,12 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   actionRowButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   sacrificeButton: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',

@@ -17,7 +17,6 @@ import {
   getRitualEchoFooter,
   getWordsOfferedText,
   getPitHarvestLabel,
-  getPitPendingAmberLabel,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
@@ -45,7 +44,6 @@ interface VictoryModalProps {
   earnedStars: number;
   level: number;
   difficulty: string;
-  amberBalance: number;
   phase: DialoguePhase;
   isPlayingDaily: boolean;
   victoryData: VictoryData | null;
@@ -71,7 +69,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   earnedStars,
   level,
   difficulty,
-  amberBalance,
   phase,
   isPlayingDaily,
   victoryData,
@@ -171,34 +168,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Group 1: Amber, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
-            {/* Harvested amber (queued, not yet spendable) */}
-            {victoryData && (
-              <View style={styles.amberEarnedContainer}>
-                <Text style={styles.amberEarnedIcon}>{'\uD83D\uDC8E'}</Text>
-                <Text style={styles.amberEarnedText}>+{victoryData.amberEarned} {getPitHarvestLabel(phase).toLowerCase()}</Text>
-                {victoryData.streakBonus > 0 && (
-                  <Text style={styles.streakBonusText}>
-                    (+{victoryData.streakBonus} streak!)
-                  </Text>
-                )}
-                {victoryData.challengeBonus > 0 && (
-                  <Text style={styles.challengeBonusText}>
-                    (+{victoryData.challengeBonus} challenge!)
-                  </Text>
-                )}
-                {(victoryData.variantBonus ?? 0) > 0 && (
-                  <Text style={styles.variantBonusText}>
-                    (+{victoryData.variantBonus} style{victoryData.variantRepeatDecay && victoryData.variantRepeatDecay < 1 ? ', tapered' : ''})
-                  </Text>
-                )}
+            {/* Harvested words (queued for the pit) */}
+            {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
+              <View style={styles.harvestWordContainer}>
+                <Text style={styles.harvestWordIcon}>{'\uD83C\uDF3E'}</Text>
+                <Text style={styles.harvestWordText}>
+                  {victoryData.harvestedWords.length} {victoryData.harvestedWords.length === 1 ? 'word' : 'words'} {getPitHarvestLabel(phase).toLowerCase()}
+                </Text>
               </View>
-            )}
-
-            {/* Pending harvest hint */}
-            {victoryData?.pendingHarvest && victoryData.pendingHarvest.pendingBatches > 0 && (
-              <Text style={[styles.pendingHarvestHint, { color: phaseTheme.modalSecondaryTextColor }]}>
-                {getPitPendingAmberLabel(phase)}: {'\uD83D\uDC8E'} {victoryData.pendingHarvest.pendingAmber}
-              </Text>
             )}
 
             {/* Streak display */}
@@ -214,7 +191,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <View style={styles.milestoneContainer}>
                 <Text style={styles.milestoneEmoji}>{'\uD83C\uDFC6'}</Text>
                 <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
-                <Text style={styles.milestoneBonus}>+{victoryData.milestoneBonus} Bonus Amber!</Text>
               </View>
             )}
 
@@ -350,11 +326,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <View style={styles.victoryStatItem}>
                 <Text style={[styles.victoryStatValue, { color: phaseTheme.modalTextColor }]}>Lv.{level}</Text>
                 <Text style={[styles.victoryStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
-              </View>
-              <View style={[styles.victoryStatDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
-              <View style={styles.victoryStatItem}>
-                <Text style={[styles.victoryStatValue, { color: phaseTheme.modalTextColor }]}>{'\uD83D\uDC8E'} {amberBalance}</Text>
-                <Text style={[styles.victoryStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Total Amber</Text>
               </View>
             </View>
 
@@ -528,12 +499,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginTop: 2,
   },
-  victoryStatDivider: {
-    width: 2,
-    height: 40,
-    backgroundColor: CandyColors.gray[200],
-    borderRadius: 1,
-  },
   cumulativeStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -611,41 +576,23 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-  amberEarnedContainer: {
+  harvestWordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CandyColors.yellow.light,
+    backgroundColor: CandyColors.green.light,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
     marginBottom: 8,
   },
-  amberEarnedIcon: {
+  harvestWordIcon: {
     fontSize: 24,
     marginRight: 8,
   },
-  amberEarnedText: {
+  harvestWordText: {
     fontSize: 18,
     fontWeight: '900',
-    color: CandyColors.yellow.shadow,
-  },
-  streakBonusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.orange.main,
-    marginLeft: 8,
-  },
-  challengeBonusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.pink.main,
-    marginLeft: 8,
-  },
-  variantBonusText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: CandyColors.blue.dark,
-    marginLeft: 8,
+    color: CandyColors.green.dark,
   },
   winStreakContainer: {
     flexDirection: 'row',
@@ -684,11 +631,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: CandyColors.yellow.dark,
     marginBottom: 2,
-  },
-  milestoneBonus: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: CandyColors.green.dark,
   },
   questCompletedContainer: {
     gap: 6,
@@ -879,13 +821,6 @@ const styles = StyleSheet.create({
   },
   wordsOfferedTextDark: {
     color: 'rgba(180, 100, 130, 0.8)',
-    fontStyle: 'italic',
-  },
-  pendingHarvestHint: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
     fontStyle: 'italic',
   },
 });

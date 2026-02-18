@@ -1530,7 +1530,6 @@ export default function App() {
           earnedStars={puzzle.earnedStars}
           level={puzzle.level}
           difficulty={puzzle.difficulty}
-          amberBalance={persistence.amberBalance}
           phase={persistence.currentPhase}
           isPlayingDaily={isPlayingDaily}
           victoryData={victoryFlow.victoryData}
