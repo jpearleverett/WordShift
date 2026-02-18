@@ -453,51 +453,31 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
-    // Double shift: during drop phases, ignore letter presses
-    if (isDoubleShift && (doubleShiftPhase === 'drop1' || doubleShiftPhase === 'drop2')) {
-      return;
-    }
-
     if (isDoubleShift) {
       if (!isLetterAllowedByVariant(currentVariant, letter.char)) {
         shakeError(getVariantRestrictionError(currentVariant, currentPhase));
         return;
       }
 
-      if (doubleShiftPhase === 'pick1') {
-        // First letter selection — pick and go straight to drop1
+      if (doubleShiftPhase === 'pick1' || doubleShiftPhase === 'drop1') {
+        // First letter selection — freely tap between letters, deselect, etc.
         if (selectedLetter?.id === letter.id) {
           setSelectedLetter(null); // Deselect
+          setDoubleShiftPhase('pick1');
         } else {
           setSelectedLetter(letter);
           setDoubleShiftPhase('drop1');
           setError(null);
         }
-      } else if (doubleShiftPhase === 'pick2') {
-        // Second letter selection (source row already has N-1 letters from drop1)
+      } else if (doubleShiftPhase === 'pick2' || doubleShiftPhase === 'drop2') {
+        // Second letter selection — freely switch between letters, deselect, etc.
+        // No validation on tap — only validated when actually dropped
         if (selectedLetter?.id === letter.id) {
           setSelectedLetter(null); // Deselect
+          setDoubleShiftPhase('pick2');
           return;
         }
 
-        // Validate that removing this second letter leaves a valid source word
-        const sourceRow = rows[activeRowIndex];
-        const remaining = sourceRow.words
-          .filter(l => l.id !== letter.id)
-          .map(l => l.char)
-          .join('');
-        const isStartRow = activeRowIndex === 0;
-        const expectedLen = isStartRow ? currentWordLength - 2 : currentWordLength;
-        if (remaining.length !== expectedLen) {
-          shakeError(`Need ${expectedLen} letters remaining!`);
-          return;
-        }
-        if (!validWordsCache.current.has(remaining)) {
-          shakeError(getInvalidWordMessage(remaining, currentPhase));
-          return;
-        }
-
-        // Valid — select and transition to drop2
         setSelectedLetter(letter);
         setDoubleShiftPhase('drop2');
         setError(null);
@@ -677,27 +657,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isSourceValid) {
       shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
-      // For double shift drop2, undo the first drop too
+      // For double shift drop2, go back to pick2 (let player try different letter/slot)
       if (isDoubleShift && doubleShiftPhase === 'drop2') {
-        // Undo the drop1 delta from history
-        setHistory(prev => prev.slice(0, -1));
-        // Restore the first letter from history
-        const drop1Delta = history[history.length - 1];
-        if (drop1Delta) {
-          setRows(prevRows => {
-            const restored = [...prevRows];
-            const tRow = restored[drop1Delta.targetRowIndex];
-            const sRow = restored[drop1Delta.sourceRowIndex];
-            const newTarget = tRow.words.filter(l => l.id !== drop1Delta.movedLetterId);
-            const restoredLetter: Letter = { id: drop1Delta.movedLetterId, char: drop1Delta.movedLetterChar, isLocked: false };
-            const newSource = [...sRow.words];
-            newSource.splice(drop1Delta.sourceLetterIndex, 0, restoredLetter);
-            restored[drop1Delta.targetRowIndex] = { ...tRow, words: newTarget };
-            restored[drop1Delta.sourceRowIndex] = { ...sRow, words: newSource };
-            return restored;
-          });
-        }
-        setDoubleShiftPhase('pick1');
+        setDoubleShiftPhase('pick2');
         setSelectedLetter(null);
       }
       setIsProcessing(false);
@@ -708,25 +670,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isTargetValid) {
       shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
-      // For double shift drop2, undo the first drop too
+      // For double shift drop2, go back to pick2 (let player try different letter/slot)
       if (isDoubleShift && doubleShiftPhase === 'drop2') {
-        setHistory(prev => prev.slice(0, -1));
-        const drop1Delta = history[history.length - 1];
-        if (drop1Delta) {
-          setRows(prevRows => {
-            const restored = [...prevRows];
-            const tRow = restored[drop1Delta.targetRowIndex];
-            const sRow = restored[drop1Delta.sourceRowIndex];
-            const newTarget = tRow.words.filter(l => l.id !== drop1Delta.movedLetterId);
-            const restoredLetter: Letter = { id: drop1Delta.movedLetterId, char: drop1Delta.movedLetterChar, isLocked: false };
-            const newSource = [...sRow.words];
-            newSource.splice(drop1Delta.sourceLetterIndex, 0, restoredLetter);
-            restored[drop1Delta.targetRowIndex] = { ...tRow, words: newTarget };
-            restored[drop1Delta.sourceRowIndex] = { ...sRow, words: newSource };
-            return restored;
-          });
-        }
-        setDoubleShiftPhase('pick1');
+        setDoubleShiftPhase('pick2');
         setSelectedLetter(null);
       }
       setIsProcessing(false);
@@ -886,38 +832,50 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
-    // Double shift: undo both letters of a completed step (2 deltas)
-    const undoCount = isDoubleShift ? Math.min(2, history.length) : 1;
+    // Standard undo: always undo 1 delta at a time.
+    // For double shift completed steps, the second undo press will reverse the other drop.
+    const delta = history[history.length - 1];
 
     setRows(prevRows => {
       const newRows = [...prevRows];
-      for (let i = 0; i < undoCount; i++) {
-        const delta = history[history.length - 1 - i];
-        const targetRow = newRows[delta.targetRowIndex];
-        const sourceRow = newRows[delta.sourceRowIndex];
-        const newTargetLetters = targetRow.words.filter(l => l.id !== delta.movedLetterId);
-        const restoredLetter: Letter = { id: delta.movedLetterId, char: delta.movedLetterChar, isLocked: false };
-        const newSourceLetters = [...sourceRow.words];
-        newSourceLetters.splice(delta.sourceLetterIndex, 0, restoredLetter);
-        newRows[delta.targetRowIndex] = { ...targetRow, words: newTargetLetters };
-        newRows[delta.sourceRowIndex] = { ...sourceRow, words: newSourceLetters };
-      }
+      const targetRow = newRows[delta.targetRowIndex];
+      const sourceRow = newRows[delta.sourceRowIndex];
+      const newTargetLetters = targetRow.words.filter(l => l.id !== delta.movedLetterId);
+      const restoredLetter: Letter = { id: delta.movedLetterId, char: delta.movedLetterChar, isLocked: false };
+      const newSourceLetters = [...sourceRow.words];
+      newSourceLetters.splice(delta.sourceLetterIndex, 0, restoredLetter);
+      newRows[delta.targetRowIndex] = { ...targetRow, words: newTargetLetters };
+      newRows[delta.sourceRowIndex] = { ...sourceRow, words: newSourceLetters };
       return newRows;
     });
 
-    const oldestDelta = history[history.length - undoCount];
-    setActiveRowIndex(oldestDelta.activeRowIndexBefore);
-    if (oldestDelta.moveDirectionBefore) {
-      setMoveDirection(oldestDelta.moveDirectionBefore);
+    setActiveRowIndex(delta.activeRowIndexBefore);
+    if (delta.moveDirectionBefore) {
+      setMoveDirection(delta.moveDirectionBefore);
     }
-    setHistory(prev => prev.slice(0, -undoCount));
+    setHistory(prev => prev.slice(0, -1));
     setGameState(GameState.PLAYING);
     setSelectedLetter(null);
     setError(null);
     setMessage("Let's try again!");
 
+    // After undoing one delta of a double shift completed step, we're now mid-step
+    // (the first drop is still in place). Set to pick2 so player can pick the second letter again.
     if (isDoubleShift) {
-      setDoubleShiftPhase('pick1');
+      // Check if the previous delta (now the last in history) is the first drop of the same step
+      // i.e. same activeRowIndexBefore — meaning there's still a first drop to potentially undo
+      const remainingHistory = history.slice(0, -1);
+      if (remainingHistory.length > 0) {
+        const prevDelta = remainingHistory[remainingHistory.length - 1];
+        if (prevDelta.activeRowIndexBefore === delta.activeRowIndexBefore) {
+          // The previous delta is the first drop — we're now mid-step
+          setDoubleShiftPhase('pick2');
+        } else {
+          setDoubleShiftPhase('pick1');
+        }
+      } else {
+        setDoubleShiftPhase('pick1');
+      }
     }
 
     if (gameMode === 'challenge') {

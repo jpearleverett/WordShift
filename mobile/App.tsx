@@ -1422,7 +1422,7 @@ export default function App() {
                 onSlotPress={handleSlotPress}
                 isProcessing={puzzle.isProcessing}
                 phase={persistence.currentPhase}
-                wordLength={puzzle.currentWordLength}
+                wordLength={Math.max(puzzle.currentWordLength, row.words.length)}
                 concealLetters={false}
                 guidanceActive={onboardingStep === 'puzzle_tutorial'}
                 guidedLetterId={tutorialGuidance?.sourceLetterId || null}
