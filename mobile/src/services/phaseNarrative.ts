@@ -1114,8 +1114,8 @@ export function getPitOfferResultMessage(
 }
 
 const PIT_HOME_BADGE_LABELS: Record<DialoguePhase, string> = {
-  0: 'Repository',
-  1: 'Repository',
+  0: 'The Pit',
+  1: 'The Pit',
   2: 'The Below',
   3: 'The Dark',
   4: 'The Pit',
