@@ -61,6 +61,7 @@ interface VictoryModalProps {
   // Callbacks
   onNextLevel: () => void;
   onReturnHome: () => void;
+  onGoToPit: () => void;
   onShare: () => void;
 }
 
@@ -83,6 +84,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   star3Scale,
   onNextLevel,
   onReturnHome,
+  onGoToPit,
   onShare,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
@@ -355,6 +357,26 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <Animated.View style={{ opacity: contentOpacity4 }}>
             <View style={styles.victoryButtonRow}>
               <TouchableOpacity
+                style={styles.nextLevelButton}
+                onPress={onNextLevel}
+                accessibilityLabel="Next level"
+                accessibilityRole="button"
+              >
+                <View style={styles.buttonShine} />
+                <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.harvestButton}
+                onPress={onGoToPit}
+                accessibilityLabel="Go to the pit to harvest words"
+                accessibilityRole="button"
+              >
+                <Text style={styles.harvestButtonText}>{'\uD83C\uDF3E'} HARVEST</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.victoryButtonRowSecondary}>
+              <TouchableOpacity
                 style={styles.shareButton}
                 onPress={onShare}
                 accessibilityLabel="Share result"
@@ -370,16 +392,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={styles.homeButtonText}>{'\uD83C\uDFE0'} HOME</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.nextLevelButton}
-                onPress={onNextLevel}
-                accessibilityLabel="Next level"
-                accessibilityRole="button"
-              >
-                <View style={styles.buttonShine} />
-                <Text style={styles.nextLevelButtonText}>NEXT LEVEL</Text>
               </TouchableOpacity>
             </View>
             </Animated.View>
@@ -528,6 +540,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  victoryButtonRowSecondary: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
   shareButton: {
     backgroundColor: CandyColors.blue.light,
     borderRadius: 20,
@@ -547,6 +566,19 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[600],
     fontSize: 16,
     fontWeight: '800',
+  },
+  harvestButton: {
+    backgroundColor: CandyColors.green.main,
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    overflow: 'hidden',
+  },
+  harvestButtonText: {
+    color: CandyColors.white,
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   nextLevelButton: {
     backgroundColor: CandyColors.pink.main,
