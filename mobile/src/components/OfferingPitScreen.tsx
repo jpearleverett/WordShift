@@ -409,6 +409,8 @@ interface OfferingPitScreenProps {
   amberBalance: number;
   onClose: () => void;
   onAmberChange?: (newBalance: number) => void;
+  onOpenStats?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
@@ -416,6 +418,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   amberBalance,
   onClose,
   onAmberChange,
+  onOpenStats,
+  onOpenSettings,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const reducedMotion = getSettingsSync()?.reducedMotion ?? false;
@@ -971,6 +975,22 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           )}
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => { hapticLight(); onOpenStats?.(); }}
+            accessibilityLabel="View stats"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerIconText}>{'\uD83D\uDCCA'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => { hapticLight(); onOpenSettings?.(); }}
+            accessibilityLabel="Settings"
+            accessibilityRole="button"
+          >
+            <Text style={styles.headerIconText}>{'\u2699\uFE0F'}</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerIconBtn}
             onPress={() => { hapticLight(); onClose(); }}

@@ -1193,6 +1193,8 @@ export default function App() {
               onAmberChange={(newBalance) => {
                 persistenceActions.setAmberBalance(newBalance);
               }}
+              onOpenStats={() => transitionTo('stats')}
+              onOpenSettings={() => transitionTo('settings')}
             />
           </Animated.View>
         </View>
