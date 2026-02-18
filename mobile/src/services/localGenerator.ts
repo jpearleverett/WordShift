@@ -2430,7 +2430,7 @@ export function getDoubleInsertionIndex(wordLength: number): DoubleInsertionInde
 function findDoubleRemovals(
   word: string,
   validSet: Set<string>,
-  excludeLettersReceived?: [string, string]
+  lockedPositions?: Set<number>
 ): Array<{
   letters: [string, string];
   positions: [number, number];
@@ -2444,11 +2444,11 @@ function findDoubleRemovals(
 
   const len = word.length;
   for (let i = 0; i < len - 1; i++) {
-    // Don't give back a letter we just received (avoid ping-pong)
-    if (excludeLettersReceived && word[i] === excludeLettersReceived[0]) continue;
+    // Skip locked positions (letters received from previous row)
+    if (lockedPositions?.has(i)) continue;
 
     for (let j = i + 1; j < len; j++) {
-      if (excludeLettersReceived && word[j] === excludeLettersReceived[1]) continue;
+      if (lockedPositions?.has(j)) continue;
 
       const remainder = word.slice(0, i) + word.slice(i + 1, j) + word.slice(j + 1);
       if (validSet.has(remainder)) {
@@ -2475,6 +2475,8 @@ interface DoubleShiftPathNode {
   tempState: string;
   /** The 2 letters received from the previous row */
   lettersReceived?: [string, string];
+  /** Positions in tempState where received letters were inserted (locked) */
+  receivedPositions?: [number, number];
   /** The 2 letters to give to the next row */
   lettersToGive?: [string, string];
   /** Removal positions in tempState for the 2 letters */
@@ -2529,8 +2531,11 @@ async function findDoubleShiftPath(
   const isStartRow = currentDepth === 1;
   const remainderSet = isStartRow ? dicts.min2 : dicts.base;
 
-  // Find all valid 2-letter removals
-  const removals = findDoubleRemovals(currentTemp, remainderSet, currentNode.lettersReceived);
+  // Find all valid 2-letter removals (excluding locked positions from received letters)
+  const lockedPositions = currentNode.receivedPositions
+    ? new Set(currentNode.receivedPositions)
+    : undefined;
+  const removals = findDoubleRemovals(currentTemp, remainderSet, lockedPositions);
 
   // Score and sort removals
   const scoredRemovals = removals.map(r => {
@@ -2602,6 +2607,7 @@ async function findDoubleShiftPath(
         word: cand.baseWord,
         tempState: cand.result,
         lettersReceived: removal.letters,
+        receivedPositions: cand.resultPositions,
       };
 
       const newChain = [...chain.slice(0, -1), updatedCurrentNode, nextNode];

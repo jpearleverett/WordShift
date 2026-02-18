@@ -701,8 +701,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         ...l,
         // During reverse leg, preserve all existing locks (cumulative locking):
         // every letter that was shifted at any point stays locked.
-        // During forward leg, only the just-moved letter is locked.
-        isLocked: isReverseReturn
+        // During double shift drop2, preserve the first dropped letter's lock.
+        // During standard forward leg, only the just-moved letter is locked.
+        isLocked: (isDoubleShift || isReverseReturn)
           ? (l.isLocked || l.id === selectedLetter.id)
           : (l.id === selectedLetter.id),
       })),
