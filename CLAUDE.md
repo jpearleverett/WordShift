@@ -47,11 +47,18 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (870+ tests, 29 suites)
+npx jest --no-coverage   # Run all tests (897 tests, 32 suites)
 ```
 
 ## Recent Implementation Notes (2026-02)
 
+- **Structural refactoring (2026-02-19)**:
+  - **Constants centralization**: Created `src/constants/gameBalance.ts` (phase thresholds, amber rewards, streak config, puzzle gen timeouts, bank thresholds, variant economy, dread effect intensities) and `src/constants/timing.ts` (19 animation/interaction timing constants extracted from App.tsx). Source files re-export for backward compatibility.
+  - **Puzzle bank registry pattern**: Replaced 12 parallel storage keys, cache variables, ID→words maps, and 4 if-else chains in `puzzleBank.ts` with a single `BANK_REGISTRY` record. Functions are now simple map lookups. ~270 lines reduced.
+  - **Dialogue system split**: Split monolithic `animalDialogue.ts` (2538 lines) into 5 focused submodules under `src/services/dialogue/`: `animalDialogueBase.ts` (core arrays + accessors), `animalDialogueIntro.ts` (intro/catchup/post-revelation), `animalDialogueReactions.ts` (triggers/sacrifices/thresholds), `animalDialogueNarrative.ts` (cross-refs/coordinated/seeds), `animalDialogueVariants.ts`. Original file becomes thin `export * from './dialogue'` re-export shim.
+  - **Phase 5 (Post-Revelation) completion**: Expanded `DialoguePhase` from `0|1|2|3|4` to `0|1|2|3|4|5`. Added Phase 5 entries to all 22+ `Record<DialoguePhase, ...>` records in `phaseNarrative.ts` (tone: "Terrible Peace" — serene resignation, key words: weave/thread/hum/pattern/continues). Added Phase 5 whispers for all 10 animals. Wired `isPostRevelation()` into `useGamePersistence.ts` to report phase as 5. Added Phase 5 dialogue routing in `useDialogueFlow.ts` (cycles through post-revelation lines). Removed orphaned standalone Phase 5 functions in favor of native record entries.
+  - **Configuration validation**: New `src/services/configValidation.ts` with `validateDialogueIntegrity()`, `validatePhaseThresholds()`, `validateAchievements()`, `validateUnlockProgression()`, and `runAllValidations()`. Test suite in `configValidation.test.ts` (5 tests).
+  - **Hook extraction from App.tsx**: Created 4 new hooks ready for integration: `useSpeedTimer.ts` (countdown timer with interval), `useDreadEffects.ts` (crimson pulse overlay + screen shake), `useOnboardingFlow.ts` (11-step state machine), `useVictoryOrchestration.ts` (post-victory cascade: glitch/micro-beat/whisper/interjection).
 - **Offering Pit economy (deferred amber crediting)**:
   - Puzzle completion no longer credits amber directly — amber is queued in harvest batches via `wordHarvest.ts`.
   - New `OfferingPitScreen.tsx` screen (navigated as `currentScreen: 'pit'`) where players offer batches to convert queued amber into spendable amber.
@@ -160,8 +167,12 @@ mobile/
 ├── src/
 │   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
 │   ├── types/
-│   │   └── homeWorld.ts         # Home screen types, config constants, streak/amber types
+│   │   └── homeWorld.ts         # Home screen types, config constants, streak/amber types. DialoguePhase = 0|1|2|3|4|5
 │   ├── constants.ts             # Word lists by length (3-7 letters), COMMON_WORDS set, fallback puzzle pools
+│   ├── constants/               # Centralized game balance and timing constants
+│   │   ├── gameBalance.ts       # Phase thresholds, amber rewards, streak config, puzzle gen timeouts, bank thresholds, variant economy, dread effects
+│   │   ├── timing.ts            # Animation/interaction timing: victory, whisper, interjection, dread pulse, screen shake, onboarding, autosave, speed timer
+│   │   └── index.ts             # Barrel re-export
 │   ├── dictionary.ts            # 11500+ word dictionary for validation (3-7 letter words)
 │   ├── data/
 │   │   ├── puzzleBankTypes.ts   # PreGeneratedPuzzle interface (id, words, solution, reverseSolution, dreadTier, etc.)
@@ -179,10 +190,14 @@ mobile/
 │   │   └── puzzleBankDoubleShiftHard.ts # 500 pre-generated HARD double-shift puzzles (6 rows, auto-generated)
 │   ├── hooks/
 │   │   ├── usePuzzleGame.ts     # All puzzle game state and actions (extracted from App.tsx)
-│   │   ├── useGamePersistence.ts # Persistence: amber, stats, phases (extracted from App.tsx)
+│   │   ├── useGamePersistence.ts # Persistence: amber, stats, phases (extracted from App.tsx). Reports phase 5 when post-revelation
 │   │   ├── useVictoryFlow.ts    # Victory animation choreography (stars, modal, phase flash)
+│   │   ├── useVictoryOrchestration.ts # Post-victory effect cascade: glitch text, micro-beats, whispers, interjections, home nudges
+│   │   ├── useSpeedTimer.ts     # Speed-variant countdown timer with interval and onTimeUp callback
+│   │   ├── useDreadEffects.ts   # Dread pulse overlay + screen shake animations (phase-scaled, reducedMotion-aware)
+│   │   ├── useOnboardingFlow.ts # Multi-screen onboarding state machine (11 steps), Fox dialogue, pit intro
 │   │   ├── useAchievementQueue.ts # Achievement checking + toast queue processing
-│   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging
+│   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging. Phase 5 post-revelation routing
 │   │   └── useUnlockFlow.ts     # Home unlock flow: in-world room/animal prompts, purchases, modal state
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
@@ -224,17 +239,25 @@ mobile/
 │   │   └── colors.ts            # CandyColors palette, tile colors, PhaseTheme system
 │   └── services/
 │       ├── localGenerator.ts    # Puzzle generation with DFS, pre-computed adjacency/removal indices, quality scoring, phase-tiered dread words, reverse-first chain generator, reverse-solvable validation, resonance tier export
-│       ├── puzzleBank.ts        # Pre-generated puzzle bank selection: phase-aware scoring, word freshness, recycling, played-ID tracking
+│       ├── puzzleBank.ts        # Pre-generated puzzle bank selection: registry pattern, phase-aware scoring, word freshness, recycling, played-ID tracking
 │       ├── wordHistory.ts       # Word cooldown tracking for puzzle diversity
 │       ├── starRating.ts        # Star rating system + cumulative stats + noHintPuzzleCount
 │       ├── amberCurrency.ts     # Amber economy, streak (grace period), phase progression
-│       ├── animalDialogue.ts    # 560+ dialogue lines (Stephen King literary voice), cross-animal refs, catch-up, tutorial callbacks, coordinated events, narrative seeds, word threshold dialogues, sacrifice reactions
+│       ├── animalDialogue.ts    # Re-export shim → dialogue/ submodules
+│       ├── dialogue/            # Split dialogue system (was monolithic animalDialogue.ts)
+│       │   ├── animalDialogueBase.ts      # 10 animal dialogue arrays (560+ lines), ANIMAL_INFO, accessors
+│       │   ├── animalDialogueIntro.ts     # INTRO_DIALOGUES, CATCHUP_INTRO_DIALOGUES, POST_REVELATION_DIALOGUES
+│       │   ├── animalDialogueReactions.ts # TRIGGER_WORD_REACTIONS, SACRIFICE_REACTIONS, WORD_THRESHOLD_DIALOGUES
+│       │   ├── animalDialogueNarrative.ts # CROSS_ANIMAL_REFERENCES, COORDINATED_EVENTS, NARRATIVE_SEEDS, TUTORIAL_CALLBACK_DIALOGUES
+│       │   ├── animalDialogueVariants.ts  # VARIANT_TUTORIAL_LINES + accessor
+│       │   └── index.ts                   # Barrel re-export of all submodules
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions and unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG for determinism
 │       ├── phaseNarrative.ts    # Phase-aware text: victory, moves, hints, loading, rules, animal whispers, interjections, micro-events, victory glitch seeds
 │       ├── phaseEvents.ts       # Phase transition narrative events (cinematic interstitials with particle configs and scene effects)
-│       ├── achievements.ts      # 33 achievements across 6 categories
+│       ├── configValidation.ts   # Configuration data validation: dialogue counts, phase thresholds, achievements, unlock progression
+│       ├── achievements.ts      # 34 achievements across 5 categories
 │       ├── shareResults.ts      # Enhanced Wordle-style sharing with word chains, animal whispers
 │       ├── weeklyQuests.ts      # Weekly quest system: 4 rotating quests, amber rewards, phase-aware descriptions
 │       ├── puzzleVariety.ts     # Puzzle variant configs, unlock requirements, selector options, restrictions, and combo metadata
@@ -253,13 +276,14 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (870+ tests, 29 suites)
+├── src/__tests__/               # Test suites (897 tests, 32 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
 │   ├── animalDialogueVariants.test.ts # Variant tutorial dialogue coverage across variants/animals/phases
 │   ├── amberCurrency.test.ts
 │   ├── cloudSave.test.ts        # Cloud save infrastructure: providers, sync, collect/restore
+│   ├── configValidation.test.ts # Configuration integrity: dialogues, thresholds, achievements, unlock progression
 │   ├── components.test.ts       # Component data contracts, phase theme, rules modal
 │   ├── dailyChallenge.test.ts
 │   ├── dataMigration.test.ts
@@ -1227,7 +1251,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 870+ tests, 29 suites
+cd mobile && npx jest --no-coverage  # 897 tests, 32 suites
 ```
 
 **Test patterns:**
@@ -1237,7 +1261,7 @@ cd mobile && npx jest --no-coverage  # 870+ tests, 29 suites
 - Puzzle generator tests mock `amberCurrency.getCurrentPhase` + all `wordHistory` functions
 - Hook tests (`usePuzzleGame`, `useGamePersistence`) use manual React mock with stateStore Map + index rewind pattern
 - `jest.fn(async () => ...)` infers 0 args — add typed optional params `(_d?: any, _s?: any)` for TS
-- `DialoguePhase` is `0 | 1 | 2 | 3 | 4` literal type — mock return values need `as number` or `as any` cast
+- `DialoguePhase` is `0 | 1 | 2 | 3 | 4 | 5` literal type — mock return values need `as number` or `as any` cast
 - Component tests use `jest.mock('react-native', ...)` with stub exports since test env is Node (no renderer); test data contracts and service integrations rather than rendering
 - Performance monitor tests mock `requestAnimationFrame`, `cancelAnimationFrame`, and `performance.now` globally
 

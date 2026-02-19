@@ -1,0 +1,332 @@
+/**
+ * Centralized game balance constants for WordShift.
+ *
+ * ALL numeric tuning values that affect game economy, progression,
+ * puzzle generation, and narrative pacing live here. When a designer
+ * wants to tweak "how many puzzles until Phase 2?", "how much amber
+ * for a streak freeze?", or "how long before a word can repeat?",
+ * this is the single file to edit.
+ *
+ * DO NOT put UI layout values, color palettes, or animation curves
+ * here — those belong in theme/ or component-level constants.
+ */
+
+import { Difficulty } from '../types';
+import { DialoguePhase } from '../types/homeWorld';
+
+// ============================================================================
+// PHASE PROGRESSION
+// ============================================================================
+
+/** Puzzle thresholds for phase transitions (weighted progress values). */
+export const PHASE_THRESHOLDS = [0, 25, 75, 150, 250];
+
+/**
+ * Minimum real puzzles the player must have completed before a phase
+ * can activate — prevents narrative acceleration from skipping content.
+ */
+export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
+  0: 0,
+  1: 20,
+  2: 65,
+  3: 135,
+  4: 225,
+  5: 300, // Post-revelation — after house completion + final puzzle
+};
+
+// ============================================================================
+// AMBER ECONOMY
+// ============================================================================
+
+/** Base amber reward per difficulty level. */
+export const AMBER_REWARDS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+  EASY: 8,
+  MEDIUM: 10,
+  MEDIUM_PLUS: 15,
+  HARD: 20,
+};
+
+/**
+ * One-time bonus amber for first completion of each difficulty level.
+ * Creates small windfall moments that feel exciting and incentivize
+ * trying harder difficulties.
+ */
+export const FIRST_COMPLETION_BONUS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+  EASY: 10,
+  MEDIUM: 20,
+  MEDIUM_PLUS: 30,
+  HARD: 50,
+};
+
+/** Challenge mode amber multiplier (applied on top of base + star bonuses). */
+export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
+
+// ============================================================================
+// STREAK
+// ============================================================================
+
+/** Minimum streak length to start receiving streak bonuses. */
+export const MIN_STREAK_FOR_BONUS = 2;
+
+/** Bonus percentage per streak day (e.g., 0.10 = 10% per day). */
+export const BONUS_PER_STREAK = 0.10;
+
+/** Maximum streak bonus percentage (1.0 = 100% cap = double rewards). */
+export const MAX_BONUS_PERCENTAGE = 1.0;
+
+/** Days of inactivity before streak resets (grace period). */
+export const STREAK_RESET_DAYS = 2;
+
+/** Amber cost to purchase a streak freeze. */
+export const STREAK_FREEZE_COST = 50;
+
+/** Days between free streak freeze grants. */
+export const FREE_FREEZE_INTERVAL_DAYS = 14;
+
+/** Streak milestones that award one-time amber bonuses when crossed. */
+export const STREAK_MILESTONES: {
+  streak: number;
+  amber: number;
+  message: string;
+  darkMessage?: string;
+}[] = [
+  { streak: 3, amber: 15, message: 'Three-day streak!' },
+  { streak: 7, amber: 30, message: 'One-week streak!', darkMessage: 'Seven days. The pattern notices.' },
+  { streak: 14, amber: 50, message: 'Two-week streak!', darkMessage: 'Fourteen days without breaking the chain.' },
+  { streak: 21, amber: 65, message: 'Three-week streak!', darkMessage: 'Twenty-one days. It recognizes your rhythm.' },
+  { streak: 30, amber: 100, message: 'Thirty-day streak!', darkMessage: 'Thirty days. The arrangement is grateful.' },
+];
+
+// ============================================================================
+// NARRATIVE ACCELERATION
+// ============================================================================
+
+/**
+ * Narrative acceleration configuration.
+ * Engaged players progress through phases faster based on performance.
+ * An engaged player can reach Phase 4 in ~120-150 puzzles instead of 250.
+ */
+export const NARRATIVE_ACCELERATION = {
+  // Three-star rate threshold: above this, puzzles count more toward phase progress
+  THREE_STAR_RATE_THRESHOLD: 0.5,
+  THREE_STAR_MULTIPLIER: 1.5,
+  // Streak threshold: long streaks accelerate phase progression
+  STREAK_THRESHOLD: 7,
+  STREAK_MULTIPLIER: 1.25,
+  // Difficulty-based: harder puzzles accelerate, easy stays neutral
+  HARD_MULTIPLIER: 1.5,
+  MEDIUM_PLUS_MULTIPLIER: 1.25,
+  MEDIUM_MULTIPLIER: 1.0,
+  EASY_MULTIPLIER: 1.0,
+  // Challenge mode: completing in challenge mode counts double
+  CHALLENGE_MULTIPLIER: 2.0,
+};
+
+// ============================================================================
+// CHALLENGE MODE
+// ============================================================================
+
+/**
+ * Challenge mode configuration.
+ * Optional harder mode for experienced players with better rewards.
+ */
+export const CHALLENGE_MODE_CONFIG = {
+  // Legacy constant — prefer getMaxUndos(difficulty) for challenge mode
+  MAX_UNDOS: 1,
+  /** Get max undos for challenge mode, scaled by difficulty */
+  getMaxUndos: (difficulty: Difficulty): number => {
+    switch (difficulty) {
+      case 'EASY': return 2;
+      case 'MEDIUM': return 2;
+      case 'MEDIUM_PLUS': return 1;
+      case 'HARD': return 1;
+    }
+  },
+  // Amber reward multiplier for challenge completions
+  AMBER_MULTIPLIER: 1.5,
+  // No hints allowed in challenge mode
+  HINTS_ALLOWED: false,
+};
+
+// ============================================================================
+// VARIANT ECONOMY
+// ============================================================================
+
+/** Consecutive-use decay for variant amber bonuses (anti-farming). */
+export const VARIANT_REPEAT_DECAY = {
+  firstTwo: 1.0,
+  third: 0.85,
+  fourth: 0.7,
+  fifthPlus: 0.55,
+} as const;
+
+/** Weekly variant usage decay thresholds. */
+export const WEEKLY_VARIANT_DECAY_THRESHOLDS = [
+  { maxUses: 3, multiplier: 1.0 },
+  { maxUses: 6, multiplier: 0.85 },
+  { maxUses: 10, multiplier: 0.65 },
+] as const;
+
+/** Default weekly variant decay multiplier (11+ uses). */
+export const WEEKLY_VARIANT_DECAY_DEFAULT = 0.45;
+
+// ============================================================================
+// PUZZLE GENERATION
+// ============================================================================
+
+/** Standard forward DFS generation timeout (ms). */
+export const STANDARD_GENERATION_TIMEOUT = 2500;
+
+/** Reverse-first chain generator timeout (ms). */
+export const REVERSE_GENERATION_TIMEOUT = 25000;
+
+/** Minimum quality score for standard puzzles to be accepted. */
+export const STANDARD_MIN_ACCEPTABLE_SCORE = 45;
+
+/** Minimum quality score for reverse puzzles to be accepted. */
+export const REVERSE_MIN_ACCEPTABLE_SCORE = 30;
+
+/** Double shift puzzle generation timeout (ms). */
+export const DOUBLE_SHIFT_GENERATION_TIMEOUT = 5000;
+
+/** Minimum quality score for double shift puzzles. */
+export const DOUBLE_SHIFT_MIN_ACCEPTABLE_SCORE = 30;
+
+// ============================================================================
+// WORD HISTORY
+// ============================================================================
+
+/** Puzzles before a word can reappear (hard exclusion). */
+export const WORD_HARD_COOLDOWN = 15;
+
+/** Puzzles before freshness penalty fully decays. */
+export const WORD_SOFT_COOLDOWN = 40;
+
+/** Maximum number of puzzle groups tracked in word history. */
+export const WORD_MAX_HISTORY_SIZE = 100;
+
+// ============================================================================
+// PUZZLE BANK
+// ============================================================================
+
+/** Bank-specific word novelty: strong penalty window (bank selections ago). */
+export const BANK_RECENT_THRESHOLD = 50;
+
+/** Bank-specific word novelty: moderate penalty window (bank selections ago). */
+export const BANK_MEDIUM_THRESHOLD = 150;
+
+/** Per-word penalty when seen within BANK_RECENT_THRESHOLD. */
+export const BANK_RECENT_PENALTY = -12;
+
+/** Per-word penalty when seen within BANK_MEDIUM_THRESHOLD. */
+export const BANK_MEDIUM_PENALTY = -6;
+
+/** Bonus when ALL words in a puzzle are novel to the bank. */
+export const BANK_NOVEL_BONUS_FULL = 15;
+
+/** Bonus when 3+ words in a puzzle are novel to the bank. */
+export const BANK_NOVEL_BONUS_MOST = 8;
+
+/** Bonus when 1-2 words in a puzzle are novel to the bank. */
+export const BANK_NOVEL_BONUS_SOME = 3;
+
+/** Maximum played puzzle IDs tracked per bank. */
+export const MAX_USED_TRACKED = 500;
+
+// ============================================================================
+// DAILY CHALLENGE
+// ============================================================================
+
+/** Minimum puzzles solved before daily challenge is unlocked. */
+export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 20;
+
+// ============================================================================
+// WEEKLY QUESTS
+// ============================================================================
+
+/** Phase-based reward multiplier for quest rewards. */
+export const PHASE_REWARD_MULTIPLIERS: Record<number, number> = {
+  0: 1.0,
+  1: 1.0,
+  2: 1.25,
+  3: 1.5,
+  4: 2.0,
+};
+
+// ============================================================================
+// SPEED TIMER
+// ============================================================================
+
+/** Difficulty-aware time limits for speed variant puzzles (seconds). */
+export const SPEED_TIME_LIMITS: Record<string, number> = {
+  EASY: 65,
+  MEDIUM: 60,
+  MEDIUM_PLUS: 54,
+  HARD: 48,
+};
+
+/** Default time limit for speed variant when difficulty is unknown. */
+export const SPEED_DEFAULT_TIME = 60;
+
+// ============================================================================
+// MILESTONE BONUSES
+// ============================================================================
+
+/**
+ * Milestone bonuses - reward players at key puzzle counts.
+ * Keeps progression feeling rewarding during longer gameplay.
+ * Phase-aware messages shift tone with the narrative.
+ */
+export const MILESTONE_BONUSES: {
+  puzzles: number;
+  amber: number;
+  message: string;
+  darkMessage?: string;
+  dreadMessage?: string;
+}[] = [
+  { puzzles: 10, amber: 25, message: 'First steps!' },
+  { puzzles: 15, amber: 15, message: 'Warming up!' },
+  { puzzles: 25, amber: 50, message: 'Getting the hang of it!', darkMessage: 'The words are beginning to listen.' },
+  { puzzles: 50, amber: 75, message: 'Puzzle enthusiast!', darkMessage: 'The pattern takes shape.' },
+  { puzzles: 75, amber: 100, message: 'Word wizard!', darkMessage: 'The words know your touch now.', dreadMessage: 'Seventy-five incantations spoken.' },
+  { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
+  { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
+  { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
+  { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },
+  { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The house trembles.', dreadMessage: 'The ritual deepens. Two hundred incantations.' },
+  { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'The arrangement nears completion.', dreadMessage: 'Two hundred fifty offerings. Something stirs.' },
+  { puzzles: 300, amber: 400, message: 'Master puzzler!', darkMessage: 'Three hundred words spoken into the void.', dreadMessage: 'The void has heard enough. The void responds.' },
+  { puzzles: 350, amber: 500, message: 'The journey continues...', darkMessage: 'The journey never ends. It only transforms.', dreadMessage: 'Three hundred fifty incantations. The pattern is nearly complete.' },
+];
+
+// ============================================================================
+// DIALOGUE SESSIONS
+// ============================================================================
+
+/**
+ * Default dialogue session constants (puzzle-based pacing).
+ * Phase-aware overrides are in getDialoguesPerSession / getPuzzlesBetweenSessions
+ * functions in homeWorld.ts.
+ */
+export const DIALOGUE_SESSION_DEFAULTS = {
+  DIALOGUES_PER_SESSION: 5,
+  PUZZLES_BETWEEN_SESSIONS: 4,
+  GRACE_PERIOD_SESSIONS: 2,
+};
+
+// ============================================================================
+// DREAD EFFECTS
+// ============================================================================
+
+/** Maximum dread pulse opacity by phase (Phase 2+). */
+export const DREAD_PULSE_OPACITY: Record<number, number> = {
+  2: 0.10,
+  3: 0.18,
+  4: 0.25,
+};
+
+/** Screen shake intensity (px) by phase (Phase 3+). */
+export const SCREEN_SHAKE_INTENSITY: Record<number, number> = {
+  3: 2,
+  4: 4,
+};

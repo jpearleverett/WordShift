@@ -1,5 +1,5 @@
 
-import { DICTIONARY_WORDS } from './dictionary';
+import { DICTIONARY_WORDS } from '../dictionary';
 
 // All unique words from dictionary (filtered to 3-7 letters)
 const ALL_UNIQUE_WORDS = DICTIONARY_WORDS;

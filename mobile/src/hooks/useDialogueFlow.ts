@@ -12,6 +12,8 @@ import {
   getWordThresholdDialogue,
   getTotalDialogueCount,
   getSacrificeReaction,
+  getPostRevelationDialogue,
+  getPostRevelationDialogueCount,
 } from '../services/animalDialogue';
 import { getSacrificeCount } from '../services/sacrifice';
 import {
@@ -194,6 +196,25 @@ export function useDialogueFlow({
     // Otherwise show regular dialogue
     if (!selectedAnimal || !progress) return '';
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
+
+    // Phase 5 (post-revelation): when regular dialogues are exhausted, cycle through
+    // the 5 post-revelation lines per animal with modular indexing
+    if (animalPhase === 5) {
+      const regularDialogue = getCurrentDialogue(
+        selectedAnimal.type,
+        selectedAnimal.currentDialogueIndex,
+        4 // Use Phase 4 dialogues as base (post-revelation dialogues are separate)
+      );
+      if (!regularDialogue) {
+        // Regular dialogues exhausted — use post-revelation dialogues
+        const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
+        const postRevIndex = (selectedAnimal.currentDialogueIndex - totalRegular) % getPostRevelationDialogueCount(selectedAnimal.type);
+        const postRevDialogue = getPostRevelationDialogue(selectedAnimal.type, postRevIndex);
+        return postRevDialogue || 'The pattern holds.';
+      }
+      return regularDialogue.text;
+    }
+
     const dialogue = getCurrentDialogue(
       selectedAnimal.type,
       selectedAnimal.currentDialogueIndex,
@@ -209,6 +230,10 @@ export function useDialogueFlow({
     // Otherwise check regular dialogue
     if (!selectedAnimal || !progress) return false;
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
+
+    // Phase 5: post-revelation dialogues always cycle (never truly exhausted)
+    if (animalPhase === 5) return true;
+
     return hasMoreDialogues(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase);
   };
 
