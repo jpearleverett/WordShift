@@ -20,6 +20,7 @@ import {
   getVictoryPitHint,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
+import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 
 export interface VictoryData {
   earnedStars: number;
@@ -66,6 +67,12 @@ interface VictoryModalProps {
   onReturnHome: () => void;
   onGoToPit: () => void;
   onShare: () => void;
+  // Onboarding mode
+  isOnboarding?: boolean;
+  onOnboardingContinue?: () => void;
+  // Bonus breakdown data
+  variant?: string;
+  gameMode?: string;
 }
 
 // Phase-aware 3D button colors — matches LetterTile's phase palette
@@ -127,6 +134,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onReturnHome,
   onGoToPit,
   onShare,
+  isOnboarding,
+  onOnboardingContinue,
+  variant,
+  gameMode,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const btn = getButtonTheme(phase);
@@ -225,22 +236,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </Text>
               </View>
             )}
-
-            {/* Bonus hint — tell the player their words are worth more without revealing amber */}
-            {victoryData && (() => {
-              const bonuses: string[] = [];
-              if (victoryData.challengeBonus > 0) bonuses.push('challenge');
-              if ((victoryData.variantBonus ?? 0) > 0) bonuses.push('style');
-              if (earnedStars >= 3) bonuses.push('perfect solve');
-              else if (earnedStars >= 2) bonuses.push('great solve');
-              if (victoryData.streakBonus > 0) bonuses.push('streak');
-              if (bonuses.length === 0) return null;
-              return (
-                <Text style={[styles.harvestBonusHint, { color: phaseTheme.modalSecondaryTextColor }]}>
-                  Worth more at harvest: {bonuses.join(' + ')}
-                </Text>
-              );
-            })()}
 
             {/* Streak display */}
             {victoryData && victoryData.currentStreak > 1 && (
@@ -382,14 +377,55 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
             </Animated.View>
 
-            {/* Group 3: Stats */}
+            {/* Group 3: Bonus breakdown + cumulative stats */}
             <Animated.View style={{ opacity: contentOpacity3 }}>
             <View style={[styles.victoryStats, {
               backgroundColor: phaseTheme.modalStatBgColor,
             }]}>
-              <View style={styles.victoryStatItem}>
-                <Text style={[styles.victoryStatValue, { color: phaseTheme.modalTextColor }]}>Lv.{level}</Text>
-                <Text style={[styles.victoryStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
+              {/* Itemized bonus breakdown */}
+              <View style={styles.bonusBreakdown}>
+                <View style={styles.bonusRow}>
+                  <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
+                  <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>Base</Text>
+                </View>
+                {earnedStars >= 3 && (
+                  <View style={styles.bonusRow}>
+                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>3{'\u2605'} Perfect</Text>
+                    <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+50%</Text>
+                  </View>
+                )}
+                {earnedStars === 2 && (
+                  <View style={styles.bonusRow}>
+                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>2{'\u2605'} Great</Text>
+                    <Text style={[styles.bonusValue, { color: '#C0C0C0' }]}>+25%</Text>
+                  </View>
+                )}
+                {gameMode === 'challenge' && (
+                  <View style={styles.bonusRow}>
+                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
+                    <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>1.5x</Text>
+                  </View>
+                )}
+                {variant && variant !== 'standard' && VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS] && (
+                  <View style={styles.bonusRow}>
+                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                      {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS].title}
+                    </Text>
+                    <Text style={[styles.bonusValue, { color: '#B088D0' }]}>
+                      {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS].amberMultiplier}x
+                    </Text>
+                  </View>
+                )}
+                {victoryData && victoryData.streakBonus > 0 && victoryData.currentStreak > 1 && (
+                  <View style={styles.bonusRow}>
+                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                      {'\uD83D\uDD25'} {victoryData.currentStreak}-day Streak
+                    </Text>
+                    <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>
+                      +{Math.min((victoryData.currentStreak - 1) * 10, 100)}%
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -417,6 +453,31 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Group 4: Action buttons — 3D candy style */}
             <Animated.View style={{ opacity: contentOpacity4 }}>
+            {isOnboarding ? (
+            <View style={styles.victoryButtonRow}>
+              {/* Onboarding: single "Continue" button */}
+              <TouchableOpacity
+                onPress={onOnboardingContinue}
+                activeOpacity={0.85}
+                accessibilityLabel="Continue"
+                accessibilityRole="button"
+              >
+                <View style={styles.btn3dWrapper}>
+                  <View style={[styles.btn3dBody, {
+                    backgroundColor: btn.primary.bg,
+                    shadowColor: btn.primary.shadow,
+                  }]}>
+                    <View style={styles.btn3dBevel} />
+                    <View style={styles.btn3dGlossy} />
+                    <Text style={styles.btn3dPrimaryText}>CONTINUE</Text>
+                  </View>
+                  <View style={[styles.btn3dEdge, {
+                    backgroundColor: btn.primary.edge,
+                  }]} />
+                </View>
+              </TouchableOpacity>
+            </View>
+            ) : (
             <View style={styles.victoryButtonRow}>
               {/* Next Level — primary 3D candy button */}
               <TouchableOpacity
@@ -501,6 +562,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
+            )}
             </Animated.View>
           </Animated.View>
         </ScrollView>
@@ -598,30 +660,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   victoryStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'stretch',
     backgroundColor: CandyColors.gray[50],
     borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     marginBottom: 20,
   },
-  victoryStatItem: {
+  bonusBreakdown: {
+    gap: 4,
+  },
+  bonusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingVertical: 3,
+    paddingHorizontal: 4,
   },
-  victoryStatValue: {
-    fontSize: 28,
-    fontWeight: '900',
+  bonusLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: CandyColors.gray[500],
+  },
+  bonusValue: {
+    fontSize: 13,
+    fontWeight: '800',
     color: CandyColors.purple.main,
-  },
-  victoryStatLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: CandyColors.gray[400],
-    letterSpacing: 1,
-    marginTop: 2,
   },
   cumulativeStats: {
     flexDirection: 'row',

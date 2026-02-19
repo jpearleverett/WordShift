@@ -468,13 +468,13 @@ Variants are now player-selected from the setup menu (not randomly injected). Pl
 - **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
 - **Double Shift**: Move 2 letters per step instead of 1. All displayed words are 5 letters (W=5 is the only viable word length — needs W-2=3 letter intermediates and W+2=7 letter tempStates, both within the dictionary's 3-7 letter range). Difficulty differentiated purely by row count: EASY=3 rows, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. Each step: pick a letter from current word, drop it into next word, pick the second letter from current word, drop it into next word. Both shifted letters stay locked in their target row and cannot be picked in later steps. All difficulties served from pre-generated banks of 500 puzzles each; the generator enforces position-based locking constraints (via `receivedPositions` on `DoubleShiftPathNode`) so generated solutions never require picking a locked letter. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. During both drop phases, players can freely tap different letters in the source row to switch selection and preview drop slot options before committing. Source word validation is deferred to the actual drop (not on letter tap). Undo reverses one drop at a time (not both at once). Rows with 6-7 letters use compact tile mode to prevent overflow. 1.65x amber multiplier. Pre-computed `getDoubleInsertionIndex(wordLength)` maps letter pairs to valid (baseWord, result, positions) tuples for O(1) candidate lookup.
 
-**Variant Unlock Thresholds** (puzzles solved):
-| Variant | Puzzles Required |
-|---------|-----------------|
-| Reverse Shift | 10 |
-| Double Shift | 40 |
-| Speed Shift | 52 |
-| Chain Shift | 85 |
+**Variant Unlock Thresholds** (puzzles solved — currently all set to 0 for testing):
+| Variant | Puzzles Required | Original |
+|---------|-----------------|----------|
+| Reverse Shift | 0 | 10 |
+| Double Shift | 0 | 40 |
+| Speed Shift | 0 | 52 |
+| Chain Shift | 85 | 85 |
 
 Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants stay fully hidden until unlocked, so players only see styles they can actually select.
 - **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
@@ -543,7 +543,7 @@ Game logic is extracted into six custom hooks:
 
 State-based routing in `App.tsx`:
 - `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`
-- Screen transitions use `Animated.timing` fade (150ms out, 200ms in)
+- Screen transitions use `Animated.timing` fade (150ms out, `requestAnimationFrame` wait, 200ms in) — the rAF wait ensures React renders the new screen before fade-in starts, preventing jitter
 - Transitions instant when `reducedMotion` setting is enabled
 - `transitionTo(screen, callback?)` handles all navigation
 - **Phase sync on puzzle entry**: `handlePlayPuzzle` and `handleStartDaily` call `persistenceActions.refreshStats()` before transitioning, ensuring the puzzle screen always has the latest phase for correct visual theming
@@ -564,8 +564,9 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
    - **Words Offered** (all phases): Running total of words formed across all puzzles
    - **Completion Coda** (endgame): first final-puzzle/post-revelation wins show a dedicated acknowledgement block in VictoryModal for stronger emotional closure
    - Phase-aware feedback text shifts tone with narrative phase
-   - **Harvest info**: Queued word count with phase-aware verb ("harvested" → "claimed"), bonus source hints (challenge/style/perfect solve/streak shown as italic text)
-   - **Action buttons**: Two-row layout — primary row (Next Level + Harvest Now), secondary row (Share + Home). "Harvest Now" navigates directly to the pit screen via `onGoToPit` callback. Harvest button styled in amber/orange.
+   - **Harvest info**: Queued word count with phase-aware verb ("harvested" → "claimed")
+   - **Bonus breakdown**: Group 3 stat box shows itemized multiplier sources instead of level number — difficulty (always), 3★/2★ bonus, challenge mode, variant type + multiplier, streak percentage. Each line shows label + value.
+   - **Action buttons**: Two-row layout — primary row (Next Level + Harvest Now), secondary row (Share + Home). "Harvest Now" navigates directly to the pit screen via `onGoToPit` callback. Harvest button styled in amber/orange. During onboarding, only a "CONTINUE" button is shown (no Harvest/Share/Home).
 6. If phase changed: Phase transition is **deferred** — `pendingPhaseTransition` is set but `currentPhase` stays at old value. VictoryModal shows cryptic pit hint via `getVictoryPitHint()`. `PhaseTransitionOverlay` cinematic is triggered later from the Offering Pit when the player confirms the transition via the ward ignition ceremony, followed by `playPhaseChangeFlash()` double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
 8. **Dread Pulse** (Phase 2+): When a valid intermediate move forms a dread word, the screen briefly flashes with a crimson overlay. Phase-scaled opacity (0.10 → 0.18 → 0.25). Uses `isDreadWord()` from `localGenerator.ts`. `handleSlotPress` returns `{ completed: false, formedWord }` for intermediate moves.
@@ -674,7 +675,7 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - **Tap-to-devour**: Tapping a word triggers a spiral animation toward the pit center — `getCurrentPos()` reads `__getValue()` from progress Animated.Values to compute current visual position, then spirals via bezier X + cubic-ease-in Y + 6 full spins + scale shrink to 0.05 + delayed fade. Brief pop-up (scale 1→1.2) before spiral begins
 - **Impact effects**: On devour completion — pit glow flash (opacity + scale pulse), radial burst of 8 impact particles from pit center, trail particles follow the word toward pit
 - **Batch completion**: Words track per-batch devour counts; when all words from a batch are devoured, `offerBatch()` is called, amber is credited, harvest state refreshes immediately, and amber rise particles spawn from pit
-- **Harvest All cascade**: Atomic `offerAllBatches()` first, then staggered visual cascade with incremental `displayBalance` updates as each word flies in. Pending badge clears immediately
+- **Harvest All cascade**: Atomic `offerAllBatches()` first, then staggered visual cascade with incremental `displayBalance` updates as each word flies in. Pending amber badge and Offer All button decrement in real-time during cascade via `pendingAmberOffset` tracking (not cleared immediately)
 - **Home-style header**: Frosted glass amber display (matching HomeScreen), pending amber badge, stats (📊), settings (⚙️), and home (🏠) icon buttons
 - Phase-aware background images: `pitt_day.png` (Phase 0-1), `pitt_dusk.png` (Phase 2), `pitt_night.png` (Phase 3-4) with matching solid fallback colors
 - Phase-aware devour colors: gold → amber → purple → deep purple → crimson trail/glow/burst
@@ -746,7 +747,7 @@ Each animal filters the cult narrative through their personality:
 - **Rabbit (Thyme)**: Anxious but devoted. "I'm scared, but... this is what we prepared for, right?"
 - **Red Panda (Bamboo)**: Zen certainty. "The pattern completes. Breathe. Accept."
 
-**Dialogue Style**: All 560+ dialogues written in Stephen King's literary voice — each animal has a fully distinct personality with natural pronoun usage, flowing sentences, and earned emotional weight. No clipped or robotic dialogue. Each phase transition feels organic and the descent from candy-cute warmth to cosmic horror is gradual and earned.
+**Dialogue Style**: All 560+ dialogues are written with distinct character voices — each animal has a fully realized personality with natural pronoun usage, flowing sentences, and earned emotional weight. No clipped or robotic dialogue. Each phase transition feels organic and the descent from candy-cute warmth to cosmic horror is gradual and earned.
 
 **Dialogue Count**: 56 dialogues per animal (560 total) + 5 post-revelation per animal (50 total)
 - Phase 0: 12 dialogues (happy, friendly)
@@ -1173,10 +1174,10 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 | `fox_invited` | Home | Fox intro dialogue via FoxGuide (4 lines). Fox introduces himself and the world. |
 | `going_to_puzzle` | Transition | Fox says "Follow me!" — screen transitions to puzzle. |
 | `puzzle_tutorial` | Puzzle | Real EASY puzzle with contextual Fox tips. The exact letter to pick and target slot are highlighted, and tutorial input is guided to prevent early dead-ends. UI simplified: no difficulty selector, no NEW button, no home button. |
-| `puzzle_complete` | Puzzle | Victory plays, Fox congratulates. "What's next?" button. |
-| `going_to_pit` | Transition | Fox introduces word harvesting concept — "Those words you just formed? They're worth something." |
+| `puzzle_complete` | Puzzle | Victory modal shown first with "CONTINUE" button (player taps to advance). Then Fox congratulates with 2 dialogue lines requiring tap-to-continue. Final "Let's go!" navigates to pit. |
+| `going_to_pit` | Transition | Transition to pit screen. |
 | `pit_intro` | Pit | Fox explains the Offering Pit via FoxGuide overlay (3 lines). Floating tutorial words are visible but taps disabled. Header nav buttons and bottom panel hidden. |
-| `pit_offering` | Pit | Auto-offers all pending harvest batches (full spiral cascade animation). FoxGuide hides during cascade, reappears with completion line after amber is credited. |
+| `pit_offering` | Pit | Player manually taps floating words to offer them (spiral animation plays per word). FoxGuide reappears with completion line after all words are offered. |
 | `returning_home` | Transition | Screen transitions back to home. |
 | `unlock_explained` | Home | Fox explains the cycle: puzzles → words → amber → rooms (3 lines). Unlock progress bar visible. |
 | `complete` | Home | Onboarding done. All UI elements appear. Player is free. |
