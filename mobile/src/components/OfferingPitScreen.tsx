@@ -608,6 +608,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [isOffering, setIsOffering] = useState(false);
   const [displayBalance, setDisplayBalance] = useState(amberBalance);
   const [overflowCount, setOverflowCount] = useState(0);
+  // Tracks amber visually consumed during harvest-all cascade (for decrementing pending display)
+  const [pendingAmberOffset, setPendingAmberOffset] = useState(0);
 
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
@@ -1376,37 +1378,22 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
 
-  // ---- Onboarding auto-offer trigger ----
-  const autoOfferTriggered = useRef(false);
+  // ---- Onboarding: detect when player has manually offered all words ----
+  const onboardingHadPending = useRef(false);
   useEffect(() => {
     if (onboardingStep !== 'pit_offering') {
-      autoOfferTriggered.current = false;
+      onboardingHadPending.current = false;
       return;
     }
-    if (autoOfferTriggered.current) return;
-    if (!harvestState || harvestState.pendingBatches.length === 0) {
-      // No pending batches (edge case) — notify immediately
+    // Track that we had pending batches at the start
+    if (harvestState && harvestState.pendingBatches.length > 0) {
+      onboardingHadPending.current = true;
+    }
+    // Once player has devoured all pending batches, notify completion
+    if (onboardingHadPending.current && harvestState && harvestState.pendingBatches.length === 0) {
       onOnboardingOfferComplete?.();
-      return;
     }
-    autoOfferTriggered.current = true;
-    // Small delay for Fox's button animation to settle
-    const timer = setTimeout(() => {
-      if (mountedRef.current) handleHarvestAllRef.current();
-    }, 400);
-    return () => clearTimeout(timer);
   }, [onboardingStep, harvestState, onOnboardingOfferComplete]);
-
-  // ---- Onboarding: detect auto-offer completion ----
-  const wasOfferingRef = useRef(false);
-  useEffect(() => {
-    if (onboardingStep === 'pit_offering') {
-      if (wasOfferingRef.current && !isOffering) {
-        onOnboardingOfferComplete?.();
-      }
-      wasOfferingRef.current = isOffering;
-    }
-  }, [isOffering, onboardingStep, onOnboardingOfferComplete]);
 
   // ---- Harvest All (with spiral paths) ----
   const handleHarvestAll = useCallback(async () => {
@@ -1424,10 +1411,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       if (mountedRef.current) onAmberChange?.(newBalance);
     }
 
-    // Immediately clear pending state so UI reflects that all batches are offered
-    if (mountedRef.current) {
-      setHarvestState(prev => prev ? { ...prev, pendingBatches: [] } : prev);
-    }
+    // Reset pending amber offset for visual countdown during cascade
+    setPendingAmberOffset(0);
 
     const words = flyingWordsRef.current.filter(w => !w.isDevoured);
     if (words.length === 0) {
@@ -1435,6 +1420,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setDisplayBalance(prev => prev + result.amberAwarded);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
+        const freshState = await getHarvestState();
+        setHarvestState(freshState);
         setOverflowCount(0);
         setIsOffering(false);
         // Trigger ceremony if pending
@@ -1464,12 +1451,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         if (i % 3 === 0) spawnTrail(currentPos.x, currentPos.y);
         const duration = getDevourDuration(phase);
 
-        // Increment displayed balance as each word flies
+        // Increment displayed balance and decrement visual pending amber as each word flies
         amberAccumulated += amberPerWord;
         const incrementNow = Math.round(amberAccumulated);
         if (incrementNow > 0) {
           amberAccumulated -= incrementNow;
           setDisplayBalance(prev => prev + incrementNow);
+          setPendingAmberOffset(prev => prev + incrementNow);
         }
 
         if (reducedMotion) {
@@ -1529,6 +1517,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setHarvestState(freshState);
         setFlyingWords([]);
         setOverflowCount(0);
+        setPendingAmberOffset(0);
         setIsOffering(false);
         // Trigger ceremony if pending
         if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
@@ -1689,9 +1678,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {impactParticles.map(p => <ImpactParticleView key={p.id} p={p} />)}
       {amberParticles.map(p => <AmberParticleView key={p.id} p={p} />)}
 
-      {/* Floating word chips — taps disabled during onboarding (Fox explains first) */}
+      {/* Floating word chips — taps disabled during onboarding except during pit_offering step */}
       {flyingWords.map(fw => (
-        <FloatingWordChip key={fw.id} fw={fw} onTap={isOnboarding ? noopDevour : stableDevourWord} />
+        <FloatingWordChip key={fw.id} fw={fw} onTap={isOnboarding && onboardingStep !== 'pit_offering' ? noopDevour : stableDevourWord} />
       ))}
 
       {/* Header — matches HomeScreen frosted glass style */}
@@ -1703,9 +1692,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               <Text style={styles.amberCount}>{displayBalance}</Text>
             </View>
           </View>
-          {pendingAmber > 0 && (
+          {pendingAmber - pendingAmberOffset > 0 && (
             <View style={styles.pendingBadge}>
-              <Text style={styles.pendingBadgeText}>+{pendingAmber}</Text>
+              <Text style={styles.pendingBadgeText}>+{pendingAmber - pendingAmberOffset}</Text>
             </View>
           )}
         </View>
@@ -1778,7 +1767,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           }]}>
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
-                {'\uD83D\uDC8E'} {pendingAmber}
+                {'\uD83D\uDC8E'} {Math.max(0, pendingAmber - pendingAmberOffset)}
               </Text>
               <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                 {getPitPendingAmberLabel(phase)}
@@ -1800,7 +1789,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             </View>
           </View>
 
-          {pendingWordCount > 0 && (
+          {pendingWordCount > 0 && pendingAmber - pendingAmberOffset > 0 && (
             <TouchableOpacity
               style={[styles.harvestAllButton, {
                 backgroundColor: phase >= 3 ? '#8B1A3A' : CandyColors.pink.main,
@@ -1808,11 +1797,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               }]}
               onPress={handleHarvestAll}
               disabled={isOffering}
-              accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${pendingAmber} amber from ${pendingWordCount} words`}
+              accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${Math.max(0, pendingAmber - pendingAmberOffset)} amber from ${pendingWordCount} words`}
               accessibilityRole="button"
             >
               <Text style={styles.harvestAllText}>
-                {getPitOfferAllLabel(phase)} ({'\uD83D\uDC8E'} {pendingAmber})
+                {getPitOfferAllLabel(phase)} ({'\uD83D\uDC8E'} {Math.max(0, pendingAmber - pendingAmberOffset)})
               </Text>
             </TouchableOpacity>
           )}

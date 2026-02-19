@@ -113,6 +113,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   ],
   puzzle_tutorial_complete: [
     "Perfect. You felt that click, right? That's how we build this place.",
+    "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
   ],
 
   // Step 5.5: Transition to pit — Fox introduces word harvesting
@@ -124,7 +125,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   pit_intro: [
     "This is where your words end up after a puzzle.\nThey wait here until you offer them.",
     "When you offer them, they turn into amber 💎 — that's what builds the house.",
-    "Let's try it. I'll offer them for you.",
+    "Let's try it. Tap the floating words to offer them to the house.",
   ],
 
   // Step 7: After auto-offer completes on pit screen

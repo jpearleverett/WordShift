@@ -345,11 +345,14 @@ export default function App() {
     }).start(() => {
       setCurrentScreen(screen);
       callback?.();
-      Animated.timing(screenFade, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+      // Wait one frame for React to render the new screen before fading in
+      requestAnimationFrame(() => {
+        Animated.timing(screenFade, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      });
     });
   }, [screenFade]);
 
@@ -685,10 +688,8 @@ export default function App() {
       markPendingChanges().catch(() => {});
       uploadToCloud().catch(() => {});
 
-      // During onboarding, advance to puzzle_complete step
-      if (onboardingStep === 'puzzle_tutorial') {
-        setTimeout(() => advanceOnboarding('puzzle_complete'), 1000);
-      }
+      // During onboarding, victory modal is shown with a "Continue" button
+      // that the player taps to advance to puzzle_complete step (no auto-advance).
 
       // Trigger animal whisper after a delay (skip during onboarding to keep focus on FoxGuide)
       if (!isOnboarding) setTimeout(async () => {
@@ -848,6 +849,12 @@ export default function App() {
     setCompletionCoda(null);
     puzzleActions.handleNextLevel();
   }, [puzzleActions, victoryActions]);
+
+  // During onboarding, "Continue" on victory modal advances to puzzle_complete step
+  const handleOnboardingVictoryContinue = useCallback(async () => {
+    hapticLight();
+    await advanceOnboarding('puzzle_complete');
+  }, [advanceOnboarding]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
@@ -1615,9 +1622,9 @@ export default function App() {
           />
         )}
 
-        {/* Victory Modal — extracted component (hidden during onboarding so FoxGuide is visible) */}
+        {/* Victory Modal — shown during onboarding puzzle_tutorial (hidden during puzzle_complete when FoxGuide takes over) */}
         <VictoryModal
-          visible={puzzle.gameState === GameState.WON && !(isOnboarding && (onboardingStep === 'puzzle_tutorial' || onboardingStep === 'puzzle_complete'))}
+          visible={puzzle.gameState === GameState.WON && !(isOnboarding && onboardingStep === 'puzzle_complete')}
           earnedStars={puzzle.earnedStars}
           level={puzzle.level}
           difficulty={puzzle.difficulty}
@@ -1638,6 +1645,10 @@ export default function App() {
           onReturnHome={handleReturnHome}
           onGoToPit={handleGoToPit}
           onShare={handleShare}
+          isOnboarding={isOnboarding && onboardingStep === 'puzzle_tutorial'}
+          onOnboardingContinue={handleOnboardingVictoryContinue}
+          variant={puzzle.currentVariant}
+          gameMode={puzzle.gameMode}
         />
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
@@ -1688,8 +1699,8 @@ export default function App() {
           pointerEvents="none"
         />
 
-        {/* Fox Guide overlay — shown during onboarding on puzzle screen */}
-        {isOnboarding && (onboardingStep === 'puzzle_tutorial' || onboardingStep === 'puzzle_complete') && (
+        {/* Fox Guide overlay — shown during onboarding on puzzle screen (hidden when victory modal is showing) */}
+        {isOnboarding && (onboardingStep === 'puzzle_tutorial' || onboardingStep === 'puzzle_complete') && !(onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.WON) && (
           <FoxGuide
             visible={true}
             variant="dialogue"
@@ -1714,7 +1725,9 @@ export default function App() {
             }
             buttonText={
               onboardingStep === 'puzzle_complete'
-                ? "Let's go home!"
+                ? (onboardingLineIndex < ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1
+                    ? "Next"
+                    : "Let's go!")
                 : undefined
             }
             onContinue={
