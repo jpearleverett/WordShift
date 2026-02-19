@@ -133,6 +133,9 @@ export default function App() {
   // Home nudge — track consecutive puzzles without visiting home
   const puzzlesSinceHomeVisit = useRef(0);
 
+  // Guard: pit-resume useEffect should only fire on initial mount
+  const pitResumeCheckedRef = useRef(false);
+
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
 
@@ -264,14 +267,17 @@ export default function App() {
     uploadToCloud().catch(() => {});
   }, []);
 
-  // Resume pit screen if onboarding was interrupted during pit flow
+  // Resume pit screen if onboarding was interrupted during pit flow (initial mount only)
   useEffect(() => {
-    if (onboardingFlow.onboardingReady && (
-      onboardingFlow.onboardingStep === 'going_to_pit' ||
-      onboardingFlow.onboardingStep === 'pit_intro' ||
-      onboardingFlow.onboardingStep === 'pit_offering'
-    )) {
-      setCurrentScreen('pit');
+    if (onboardingFlow.onboardingReady && !pitResumeCheckedRef.current) {
+      pitResumeCheckedRef.current = true;
+      if (
+        onboardingFlow.onboardingStep === 'going_to_pit' ||
+        onboardingFlow.onboardingStep === 'pit_intro' ||
+        onboardingFlow.onboardingStep === 'pit_offering'
+      ) {
+        setCurrentScreen('pit');
+      }
     }
   }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
 
@@ -715,11 +721,20 @@ export default function App() {
     puzzleActions.handleNextLevel();
   }, [puzzleActions, victoryActions, orchestrationActions]);
 
-  // During onboarding, "Continue" on victory modal advances to puzzle_complete step
+  // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
-    await onboardingActions.advanceOnboarding('puzzle_complete');
-  }, [onboardingActions]);
+    // Clean up victory state
+    puzzleActions.setShowConfetti(false);
+    victoryActions.resetVictory();
+    orchestrationActions.resetOrchestration();
+    setRitualEchoWords([]);
+    // Navigate directly to pit (skip puzzle_complete and going_to_pit steps)
+    await onboardingActions.advanceOnboarding('pit_intro');
+    transitionTo('pit', () => {
+      puzzleActions.setGameState(GameState.IDLE);
+    });
+  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();

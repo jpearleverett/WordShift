@@ -1255,9 +1255,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         hapticMedium();
         showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
         // Refresh harvest state so pending amber/count updates in UI
+        // Spread to create new reference — harvestCache is mutated in-place by offerBatch,
+        // so getHarvestState returns the same object; React skips re-render without a new ref.
         const freshState = await getHarvestState();
         if (mountedRef.current) {
-          setHarvestState(freshState);
+          setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
           // Trigger phase transition ceremony if pending
           if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
             // Small delay so the batch completion message shows first
@@ -1421,7 +1423,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         const freshState = await getHarvestState();
-        setHarvestState(freshState);
+        setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setOverflowCount(0);
         setIsOffering(false);
         // Trigger ceremony if pending
@@ -1514,7 +1516,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
-        setHarvestState(freshState);
+        setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setFlyingWords([]);
         setOverflowCount(0);
         setPendingAmberOffset(0);
