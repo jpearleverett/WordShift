@@ -171,6 +171,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
 
   // Step 6: On pit screen — Fox explains the Offering Pit
   pit_intro: [
+    "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
     "This is where your words end up after a puzzle.\nThey wait here until you offer them.",
     "When you offer them, they turn into amber 💎 — that's what builds the house.",
     "Let's try it. Tap the floating words to offer them to the house.",
