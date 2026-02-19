@@ -39,6 +39,8 @@ export interface SavedPuzzleState {
   isPlayingDaily: boolean;
   /** Date for daily challenge saves (YYYY-MM-DD). Null for standard puzzles. */
   dailyDate?: string | null;
+  /** Absolute timestamp (ms) when the speed timer expires. Null for non-speed variants. */
+  speedTimerExpireAt?: number | null;
   savedAt: number;
 }
 

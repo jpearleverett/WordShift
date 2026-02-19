@@ -291,9 +291,21 @@ export function getVariantDescription(config: VariantConfig, phase: number): str
 
 /**
  * Get the first-instruction text for a variant.
+ * For speed variants, the row count is injected dynamically based on difficulty.
  */
-export function getVariantInstruction(config: VariantConfig, phase: number): string {
-  return phase >= 3 ? config.darkInstruction : config.instruction;
+export function getVariantInstruction(config: VariantConfig, phase: number, difficulty?: Difficulty): string {
+  // Dark instruction doesn't mention row count, return as-is
+  if (phase >= 3) return config.darkInstruction;
+
+  // For speed variant with known difficulty, compute the actual row count
+  if (difficulty && config.variant === 'speed') {
+    const overrides = getVariantOverrides('speed', difficulty);
+    const rows = overrides.targetRows ?? 3;
+    const rowWord = rows === 3 ? 'Three' : rows === 4 ? 'Four' : rows === 5 ? 'Five' : `${rows}`;
+    return `${rowWord}-row sprint. Move quickly and commit.`;
+  }
+
+  return config.instruction;
 }
 
 /**

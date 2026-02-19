@@ -555,7 +555,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
         <View
           style={styles.unlockProgressContainer}
-          accessibilityLabel={`Next unlock: ${unlockFlow.nextUnlock.name}. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
+          accessibilityLabel={`Next unlock. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
           accessibilityRole="progressbar"
           accessibilityValue={{
             min: 0,
@@ -565,7 +565,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <View style={styles.unlockProgressInner}>
             <Text style={styles.unlockProgressLabel}>
-              {unlockFlow.nextUnlock.type === 'character' ? '🐾' : '🏠'} {unlockFlow.nextUnlock.name}
+              Next Unlock
             </Text>
             <View style={styles.unlockProgressBarBg}>
               <View
@@ -588,31 +588,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* Words Offered Counter — tappable to open the Word Ledger (hidden during onboarding) */}
-      {!isOnboarding && (progress.totalWordsFormed || 0) > 0 && (
-        <TouchableOpacity
-          style={[
-            styles.wordsOfferedHomeContainer,
-            progress.currentPhase >= 3 && styles.wordsOfferedHomeContainerDark,
-          ]}
-          onPress={() => {
-            hapticLight();
-            onOpenLedger?.();
-          }}
-          activeOpacity={0.7}
-          accessibilityLabel="Open word ledger"
-          accessibilityRole="button"
-        >
-          <Text style={[
-            styles.wordsOfferedHomeText,
-            progress.currentPhase >= 3 && styles.wordsOfferedHomeTextDark,
-          ]}>
-            {getWordsOfferedText(progress.totalWordsFormed || 0, progress.currentPhase)}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Action Row — Gallery + Sacrifice (hidden during onboarding) */}
+      {/* Action Row — Gallery + Pit (hidden during onboarding) */}
       {!isOnboarding && (
         <View style={styles.actionRow}>
           {onOpenGallery && (

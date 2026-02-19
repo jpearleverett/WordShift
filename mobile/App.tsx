@@ -158,6 +158,9 @@ export default function App() {
           lastFormedWord: puzzle.lastFormedWord,
           isPlayingDaily,
           dailyDate: isPlayingDaily ? getTodayString() : null,
+          speedTimerExpireAt: speedTimeRemaining != null
+            ? Date.now() + speedTimeRemaining * 1000
+            : null,
           savedAt: Date.now(),
         }).catch(() => {});
       }, 120);
@@ -250,12 +253,16 @@ export default function App() {
     const limit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
       ?? getVariantTimeLimit(puzzle.currentVariant)
       ?? 60;
-    setSpeedTimeRemaining(limit);
+    // Use restored time if available (from autosave), otherwise full limit
+    const initialRemaining = restoredSpeedTimeRef.current ?? limit;
+    restoredSpeedTimeRef.current = null; // consume the restored value
+
+    setSpeedTimeRemaining(initialRemaining);
     const startedAt = Date.now();
 
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      const remaining = Math.max(0, limit - elapsed);
+      const remaining = Math.max(0, initialRemaining - elapsed);
       setSpeedTimeRemaining(remaining);
 
       if (remaining <= 0) {
@@ -284,6 +291,8 @@ export default function App() {
 
   // Speed variant countdown
   const [speedTimeRemaining, setSpeedTimeRemaining] = useState<number | null>(null);
+  // Restored speed timer value (consumed once by the timer useEffect)
+  const restoredSpeedTimeRef = useRef<number | null>(null);
 
   // Dread pulse state (flashes on dread word formation)
   const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
@@ -443,6 +452,11 @@ export default function App() {
       );
       if (saved && saved.gameState === 'PLAYING' && (!saved.isPlayingDaily || canRestoreDaily)) {
         puzzleActions.restorePuzzleState(saved);
+        // Restore speed timer from saved expiry timestamp
+        if (saved.speedTimerExpireAt != null) {
+          const remaining = Math.max(0, Math.floor((saved.speedTimerExpireAt - Date.now()) / 1000));
+          restoredSpeedTimeRef.current = remaining;
+        }
         setIsPlayingDaily(Boolean(saved.isPlayingDaily && canRestoreDaily));
         logEvent({
           type: 'puzzle_restored',
@@ -477,6 +491,11 @@ export default function App() {
 
       if (canRestoreDaily && saved) {
         puzzleActions.restorePuzzleState(saved);
+        // Restore speed timer from saved expiry timestamp
+        if (saved.speedTimerExpireAt != null) {
+          const remaining = Math.max(0, Math.floor((saved.speedTimerExpireAt - Date.now()) / 1000));
+          restoredSpeedTimeRef.current = remaining;
+        }
         setIsPlayingDaily(true);
         logEvent({ type: 'puzzle_restored', data: { difficulty: saved.difficulty, isDaily: true } });
         return;
@@ -866,9 +885,8 @@ export default function App() {
     setInterjection(null);
     setRitualEchoWords([]);
     setCompletionCoda(null);
-    transitionTo('home', () => {
-      puzzleActions.setGameState(GameState.IDLE);
-    });
+    puzzleActions.clearBoard();
+    transitionTo('home');
   }, [puzzleActions, transitionTo, victoryActions]);
 
   const handleGoToPit = useCallback(() => {
@@ -881,9 +899,8 @@ export default function App() {
     setInterjection(null);
     setRitualEchoWords([]);
     setCompletionCoda(null);
-    transitionTo('pit', () => {
-      puzzleActions.setGameState(GameState.IDLE);
-    });
+    puzzleActions.clearBoard();
+    transitionTo('pit');
   }, [puzzleActions, transitionTo, victoryActions]);
 
   const handleShare = useCallback(async () => {
@@ -1439,14 +1456,6 @@ export default function App() {
                 )}
               </View>
             )}
-            {speedTimeRemaining !== null && (
-              <View style={[
-                styles.speedBadge,
-                speedTimeRemaining <= 10 && styles.speedBadgeUrgent,
-              ]}>
-                <Text style={styles.speedBadgeText}>⏱ {speedTimeRemaining}s</Text>
-              </View>
-            )}
             {puzzle.currentVariant !== 'standard' && (
               <View style={[
                 styles.variantBadge,
@@ -1502,6 +1511,21 @@ export default function App() {
         <View style={styles.toastContainer}>
           <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} />
         </View>
+
+        {/* Speed Timer — prominent display */}
+        {speedTimeRemaining !== null && (
+          <View style={[
+            styles.speedTimerContainer,
+            speedTimeRemaining <= 10 && styles.speedTimerUrgent,
+          ]}>
+            <Text style={[
+              styles.speedTimerText,
+              speedTimeRemaining <= 10 && styles.speedTimerTextUrgent,
+            ]}>
+              {'\u23F1'} {speedTimeRemaining}s
+            </Text>
+          </View>
+        )}
 
         {/* Game Area */}
         <View style={styles.gameArea}>
@@ -2030,20 +2054,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.8)',
   },
-  speedBadge: {
+  speedTimerContainer: {
+    alignSelf: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginBottom: 6,
+    marginTop: 2,
   },
-  speedBadgeUrgent: {
-    backgroundColor: 'rgba(210, 40, 70, 0.78)',
+  speedTimerUrgent: {
+    backgroundColor: 'rgba(210, 40, 70, 0.85)',
   },
-  speedBadgeText: {
-    fontSize: 9,
+  speedTimerText: {
+    fontSize: 28,
     fontWeight: '900',
     color: CandyColors.white,
-    letterSpacing: 0.3,
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  speedTimerTextUrgent: {
+    color: '#FFE0E0',
   },
   variantBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.16)',

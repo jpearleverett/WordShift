@@ -1780,13 +1780,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 Lifetime {getPitHarvestLabel(phase)}
               </Text>
             </View>
-            <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
-                {'\uD83D\uDC8E'} {displayBalance}
-              </Text>
-              <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Spendable</Text>
-            </View>
           </View>
 
           {pendingWordCount > 0 && pendingAmber - pendingAmberOffset > 0 && (

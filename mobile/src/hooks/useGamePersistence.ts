@@ -44,6 +44,8 @@ export interface VictoryData {
   totalWordsFormed: number;
   /** Ritual energy of this puzzle */
   ritualEnergy: number;
+  /** Bonus amber from first completion of this difficulty (one-time) */
+  firstCompletionBonus: number;
   /** Bonus amber from puzzle variant mode */
   variantBonus: number;
   /** Puzzle variant used */
@@ -160,6 +162,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseAcceleration: 1.0,
         totalWordsFormed: 0,
         ritualEnergy: 0,
+        firstCompletionBonus: 0,
         variantBonus: 0,
         variant: 'standard',
         streakMilestoneBonus: 0,
@@ -317,6 +320,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseAcceleration: amberResult.phaseAcceleration,
         totalWordsFormed,
         ritualEnergy,
+        firstCompletionBonus: amberResult.firstCompletionBonus,
         variantBonus,
         variant,
         variantAppliedMultiplier,
@@ -345,6 +349,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseAcceleration: 1.0,
         totalWordsFormed: 0,
         ritualEnergy: 0,
+        firstCompletionBonus: 0,
         variantBonus: 0,
         variant: 'standard',
         variantAppliedMultiplier: 1.0,
