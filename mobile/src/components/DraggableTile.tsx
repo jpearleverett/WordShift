@@ -1,0 +1,202 @@
+import React, { useRef, useCallback } from 'react';
+import { Animated, PanResponder, StyleSheet, View } from 'react-native';
+import { getSettingsSync } from '../services/settings';
+import { hapticSelection } from '../services/haptics';
+
+interface DraggableTileProps {
+  /** The rendered child (LetterTile wrapped in its container) */
+  children: React.ReactNode;
+  /** Called when drag starts (selects the letter, same as tap) */
+  onDragStart: () => void;
+  /** Called when drag ends over a valid area — receives finger position */
+  onDragEnd: (position: { x: number; y: number }) => void;
+  /** Called on simple tap (no drag gesture activated) */
+  onTap: () => void;
+  /** Whether this tile can be interacted with */
+  enabled: boolean;
+  /** Phase for styling the drag shadow */
+  phase?: number;
+}
+
+const DRAG_THRESHOLD = 10;
+
+/**
+ * Wraps a LetterTile child with drag-and-drop capability.
+ *
+ * On short press: fires `onTap` (existing letter selection behavior).
+ * On drag beyond threshold: shows a floating copy following the finger,
+ * dims the source tile, and fires `onDragEnd` with the finger's final position.
+ *
+ * The parent (Row/App) is responsible for hit-testing the drop position
+ * against slot rects and triggering the appropriate slot press.
+ */
+export function DraggableTile({
+  children,
+  onDragStart,
+  onDragEnd,
+  onTap,
+  enabled,
+  phase = 0,
+}: DraggableTileProps) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const isDragging = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const dragActivated = useRef(false);
+  const sourceOpacity = useRef(new Animated.Value(1)).current;
+  const floatingOpacity = useRef(new Animated.Value(0)).current;
+  const floatingScale = useRef(new Animated.Value(1)).current;
+
+  const settings = getSettingsSync();
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => enabled,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        if (!enabled) return false;
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
+      },
+      onPanResponderGrant: (evt) => {
+        startPos.current = {
+          x: evt.nativeEvent.pageX,
+          y: evt.nativeEvent.pageY,
+        };
+        isDragging.current = true;
+        dragActivated.current = false;
+        translateX.setValue(0);
+        translateY.setValue(0);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (!isDragging.current) return;
+        const { dx, dy } = gestureState;
+
+        // Activate drag after threshold
+        if (!dragActivated.current && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+          dragActivated.current = true;
+          onDragStart();
+          hapticSelection();
+
+          // Show floating tile, dim source
+          floatingOpacity.setValue(1);
+          sourceOpacity.setValue(0.3);
+          if (!settings.reducedMotion) {
+            Animated.spring(floatingScale, {
+              toValue: 1.1,
+              friction: 8,
+              tension: 200,
+              useNativeDriver: true,
+            }).start();
+          }
+        }
+
+        if (dragActivated.current) {
+          translateX.setValue(dx);
+          translateY.setValue(dy);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        isDragging.current = false;
+
+        if (dragActivated.current) {
+          // Drag was active — fire drop callback with finger position
+          const dropX = startPos.current.x + gestureState.dx;
+          const dropY = startPos.current.y + gestureState.dy;
+
+          if (!settings.reducedMotion) {
+            // Quick scale-down snap animation
+            Animated.parallel([
+              Animated.spring(floatingScale, {
+                toValue: 0.8,
+                friction: 10,
+                tension: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(floatingOpacity, {
+                toValue: 0,
+                duration: 150,
+                useNativeDriver: true,
+              }),
+            ]).start(() => {
+              // Reset after animation
+              translateX.setValue(0);
+              translateY.setValue(0);
+              floatingScale.setValue(1);
+              sourceOpacity.setValue(1);
+            });
+          } else {
+            translateX.setValue(0);
+            translateY.setValue(0);
+            floatingOpacity.setValue(0);
+            floatingScale.setValue(1);
+            sourceOpacity.setValue(1);
+          }
+
+          onDragEnd({ x: dropX, y: dropY });
+        } else {
+          // No drag — treat as tap
+          sourceOpacity.setValue(1);
+          floatingOpacity.setValue(0);
+          onTap();
+        }
+
+        dragActivated.current = false;
+      },
+      onPanResponderTerminate: () => {
+        isDragging.current = false;
+        dragActivated.current = false;
+        translateX.setValue(0);
+        translateY.setValue(0);
+        floatingOpacity.setValue(0);
+        floatingScale.setValue(1);
+        sourceOpacity.setValue(1);
+      },
+    })
+  ).current;
+
+  const shadowColor = phase >= 3 ? '#8030508C' : '#FFD70050';
+
+  return (
+    <View style={styles.wrapper}>
+      {/* Source tile (dims during drag) */}
+      <Animated.View style={{ opacity: sourceOpacity }} {...panResponder.panHandlers}>
+        {children}
+      </Animated.View>
+
+      {/* Floating drag tile (follows finger) */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.floatingTile,
+          {
+            opacity: floatingOpacity,
+            transform: [
+              { translateX },
+              { translateY },
+              { scale: floatingScale },
+            ],
+            shadowColor,
+          },
+        ]}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrapper: {
+    position: 'relative',
+  },
+  floatingTile: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 100,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+});

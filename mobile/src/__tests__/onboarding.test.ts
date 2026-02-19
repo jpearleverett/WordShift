@@ -6,6 +6,10 @@ import {
   isOnboardingComplete,
   resetOnboarding,
   ONBOARDING_FOX_LINES,
+  TOOLTIP_FEATURES,
+  TOOLTIP_TEXT,
+  getNextTooltipFeature,
+  markTooltipSeen,
 } from '../services/onboarding';
 
 // Mock AsyncStorage
@@ -136,6 +140,64 @@ describe('onboarding', () => {
       for (const step of pitSteps) {
         expect(typeof step).toBe('string');
       }
+    });
+  });
+
+  // ==========================================================================
+  // Post-Onboarding Feature Tooltips (Feature 7)
+  // ==========================================================================
+
+  describe('feature tooltips', () => {
+    test('TOOLTIP_FEATURES has stats, gallery, pit in order', () => {
+      expect(TOOLTIP_FEATURES).toEqual(['stats', 'gallery', 'pit']);
+    });
+
+    test('TOOLTIP_TEXT has descriptions for all tooltip features', () => {
+      for (const feature of TOOLTIP_FEATURES) {
+        expect(typeof TOOLTIP_TEXT[feature]).toBe('string');
+        expect(TOOLTIP_TEXT[feature].length).toBeGreaterThan(0);
+      }
+    });
+
+    test('getNextTooltipFeature returns stats first when none seen', async () => {
+      const feature = await getNextTooltipFeature();
+      expect(feature).toBe('stats');
+    });
+
+    test('getNextTooltipFeature returns gallery after stats is seen', async () => {
+      await markTooltipSeen('stats');
+      const feature = await getNextTooltipFeature();
+      expect(feature).toBe('gallery');
+    });
+
+    test('getNextTooltipFeature returns pit after stats and gallery seen', async () => {
+      await markTooltipSeen('stats');
+      await markTooltipSeen('gallery');
+      const feature = await getNextTooltipFeature();
+      expect(feature).toBe('pit');
+    });
+
+    test('getNextTooltipFeature returns null when all seen', async () => {
+      await markTooltipSeen('stats');
+      await markTooltipSeen('gallery');
+      await markTooltipSeen('pit');
+      const feature = await getNextTooltipFeature();
+      expect(feature).toBeNull();
+    });
+
+    test('markTooltipSeen is idempotent', async () => {
+      await markTooltipSeen('stats');
+      await markTooltipSeen('stats');
+      const feature = await getNextTooltipFeature();
+      expect(feature).toBe('gallery');
+    });
+
+    test('resetOnboarding clears tooltip seen state', async () => {
+      await markTooltipSeen('stats');
+      await markTooltipSeen('gallery');
+      await resetOnboarding();
+      const feature = await getNextTooltipFeature();
+      expect(feature).toBe('stats');
     });
   });
 });

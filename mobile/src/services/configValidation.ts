@@ -52,7 +52,7 @@ const EXPECTED_DIALOGUE_COUNTS_BY_PHASE: Record<number, number> = {
   4: 10,
 };
 const EXPECTED_TOTAL_DIALOGUES_PER_ANIMAL = 56;
-const EXPECTED_POST_REVELATION_PER_ANIMAL = 5;
+const EXPECTED_POST_REVELATION_PER_ANIMAL = 10;
 
 // ---------------------------------------------------------------------------
 // 1. Dialogue integrity
@@ -60,7 +60,7 @@ const EXPECTED_POST_REVELATION_PER_ANIMAL = 5;
 
 /**
  * Validate that every animal has the correct dialogue counts across phases
- * and that POST_REVELATION_DIALOGUES has 5 entries per animal.
+ * and that POST_REVELATION_DIALOGUES has 10 entries per animal.
  */
 export function validateDialogueIntegrity(): ValidationResult {
   const errors: string[] = [];

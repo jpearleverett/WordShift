@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (897 tests, 32 suites)
+npx jest --no-coverage   # Run all tests (932 tests, 32 suites)
 ```
 
 ## Recent Implementation Notes (2026-02)
@@ -59,6 +59,16 @@ npx jest --no-coverage   # Run all tests (897 tests, 32 suites)
   - **Phase 5 (Post-Revelation) completion**: Expanded `DialoguePhase` from `0|1|2|3|4` to `0|1|2|3|4|5`. Added Phase 5 entries to all 22+ `Record<DialoguePhase, ...>` records in `phaseNarrative.ts` (tone: "Terrible Peace" — serene resignation, key words: weave/thread/hum/pattern/continues). Added Phase 5 whispers for all 10 animals. Wired `isPostRevelation()` into `useGamePersistence.ts` to report phase as 5. Added Phase 5 dialogue routing in `useDialogueFlow.ts` (cycles through post-revelation lines). Removed orphaned standalone Phase 5 functions in favor of native record entries.
   - **Configuration validation**: New `src/services/configValidation.ts` with `validateDialogueIntegrity()`, `validatePhaseThresholds()`, `validateAchievements()`, `validateUnlockProgression()`, and `runAllValidations()`. Test suite in `configValidation.test.ts` (5 tests).
   - **Hook extraction from App.tsx**: Created 4 new hooks ready for integration: `useSpeedTimer.ts` (countdown timer with interval), `useDreadEffects.ts` (crimson pulse overlay + screen shake), `useOnboardingFlow.ts` (11-step state machine), `useVictoryOrchestration.ts` (post-victory cascade: glitch/micro-beat/whisper/interjection).
+- **Quality & fun assessment enhancements (2026-02-19)**:
+  - **App.tsx decomposition**: Integrated 4 pre-built hooks (`useSpeedTimer`, `useDreadEffects`, `useVictoryOrchestration`, `useOnboardingFlow`) into App.tsx. Extracted `useAutosave` hook (`src/hooks/useAutosave.ts`) for debounced mid-session save. Extracted StyleSheet to `src/styles/appStyles.ts` (~400 lines). App.tsx reduced from ~2,205 to ~1,408 lines.
+  - **WCAG contrast audit (Phase 3-5)**: Fixed 9 color values across Phases 3-5 in `colors.ts` to meet 4.5:1 AA minimum. Phase 3: modalTextColor `#C0A8D8`, modalSecondaryTextColor `#A090B8`, victoryTitleColor `#A888C8`. Phase 4: `#C098D8`, `#A080B8`, `#A078C8`. Phase 5: `#B8A0D0`, `#9888B0`, `#A898C8`.
+  - **Phase 5 dialogue expansion**: Expanded `POST_REVELATION_DIALOGUES` from 5→10 lines per animal (50 new lines). Expanded Phase 5 move messages 7→10 and Phase 5 whispers 3→5 per animal (20 new). Each animal's voice maintained: Fox/fireside oracle, Pangolin/chef, Owl/lorekeeper, etc. Updated `configValidation.ts` expected count 5→10.
+  - **Harvest overflow warning**: `enqueueHarvestBatch()` now returns `{ overflow: boolean }`. `getHarvestOverflowMessage(phase)` in `phaseNarrative.ts` provides phase-aware text (Phase 0-1 friendly, Phase 2 ominous, Phase 3+ dark). `VictoryData.harvestOverflow` flag wired through `useGamePersistence.ts`. App.tsx shows toast on overflow.
+  - **Mandatory pit phase transition**: When `phaseTransitionPending` is true, VictoryModal hides Next Level/Share/Home buttons — only the pit CTA remains. Phase-aware mandatory text via `getPitMandatoryText(phase)` and `getPitMandatoryCTA(phase)` in `phaseNarrative.ts`. Forces player to visit the pit to see the phase transition ceremony.
+  - **Challenge Mode Fox intro**: Fox introduces Challenge Mode after 15 puzzles via `getChallengeIntroLines(phase)` (3 lines, phase-aware tone). Has-seen tracking via `hasSeenChallengeIntro()` / `markChallengeIntroSeen()` in `amberCurrency.ts`. Wired into HomeScreen.tsx as `challenge_intro` context in the intro dialogue system.
+  - **Post-onboarding feature tooltips**: New `FeatureTooltip.tsx` component (phase-aware bubble with arrow, fade-in animation, tap-to-dismiss). Tooltip tracking in `onboarding.ts`: `getNextTooltipFeature()`, `markTooltipSeen()`, `TOOLTIP_FEATURES` (stats/gallery/pit). Shows one tooltip per home visit after onboarding completes. Reset via `resetOnboarding()`.
+  - **Animated slot previews**: Slot preview labels in `Row.tsx` now animate with fade+scale (opacity 0→1, scale 0.85→1.0, `Easing.out(Easing.back(1.5))` overshoot). Preview text size increased 10→11px (8→9px compact), container width 56→60px. Valid words get `fontWeight: '800'`. Respects `reducedMotion`.
+  - **Drag-and-drop letter tiles**: New `DraggableTile.tsx` wrapper using PanResponder with 10px drag threshold. On drag: dims source tile (opacity 0.3), floating copy follows finger, phase-aware shadow (golden Phase 0-2, crimson Phase 3+). On drop: triggers slot press via preview lookup, scale-down animation. On tap (below threshold): falls through to normal selection. Haptic feedback on drag start. Wired into `Row.tsx` for source row letters and `App.tsx` via `handleLetterDragDrop` callback.
 - **Offering Pit economy (deferred amber crediting)**:
   - Puzzle completion no longer credits amber directly — amber is queued in harvest batches via `wordHarvest.ts`.
   - New `OfferingPitScreen.tsx` screen (navigated as `currentScreen: 'pit'`) where players offer batches to convert queued amber into spendable amber.
@@ -199,10 +209,12 @@ mobile/
 │   │   ├── useOnboardingFlow.ts # Multi-screen onboarding state machine (11 steps), Fox dialogue, pit intro
 │   │   ├── useAchievementQueue.ts # Achievement checking + toast queue processing
 │   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging. Phase 5 post-revelation routing
-│   │   └── useUnlockFlow.ts     # Home unlock flow: in-world room/animal prompts, purchases, modal state
+│   │   ├── useUnlockFlow.ts     # Home unlock flow: in-world room/animal prompts, purchases, modal state
+│   │   └── useAutosave.ts      # Debounced mid-session puzzle state autosave to AsyncStorage
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails, resonant word glow (compact mode for 6+ letters)
+│   │   ├── DraggableTile.tsx   # PanResponder drag wrapper for LetterTile (drag-and-drop letter interaction)
 │   │   ├── AnimatedBackground.tsx  # Phase-aware floating particles + native-driver pulse
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial for phase changes
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst for valid moves
@@ -235,9 +247,12 @@ mobile/
 │   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
 │   │       ├── AmberSparkle.tsx # Animated sparkle particles floating upward
 │   │       ├── CelebrationConfetti.tsx # 30-piece confetti burst on unlock celebration
+│   │       ├── FeatureTooltip.tsx # Post-onboarding floating tooltip (phase-aware, tap-to-dismiss)
 │   │       └── index.ts         # Home component exports
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette, tile colors, PhaseTheme system
+│   ├── styles/
+│   │   └── appStyles.ts         # Extracted App.tsx StyleSheet (~400 lines)
 │   └── services/
 │       ├── localGenerator.ts    # Puzzle generation with DFS, pre-computed adjacency/removal indices, quality scoring, phase-tiered dread words, reverse-first chain generator, reverse-solvable validation, resonance tier export
 │       ├── puzzleBank.ts        # Pre-generated puzzle bank selection: registry pattern, phase-aware scoring, word freshness, recycling, played-ID tracking
@@ -277,7 +292,7 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (897 tests, 32 suites)
+├── src/__tests__/               # Test suites (932 tests, 32 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -751,11 +766,11 @@ Each animal filters the cult narrative through their personality:
 
 **Dialogue Style**: All 560+ dialogues are written with distinct character voices — each animal has a fully realized personality with natural pronoun usage, flowing sentences, and earned emotional weight. No clipped or robotic dialogue. Each phase transition feels organic and the descent from candy-cute warmth to cosmic horror is gradual and earned.
 
-**Dialogue Count**: 56 dialogues per animal (560 total) + 5 post-revelation per animal (50 total)
+**Dialogue Count**: 56 dialogues per animal (560 total) + 10 post-revelation per animal (100 total)
 - Phase 0: 12 dialogues (happy, friendly)
 - Phase 1: 14 dialogues (curious + expanded variety: letters/words, house changes, community, personality)
 - Phases 2-4: 10 dialogues each (progressively darker, culminating in cult revelation)
-- Phase 5: 5 dialogues each (terrible peace — the aftermath)
+- Phase 5: 10 dialogues each (terrible peace — the aftermath)
 
 ### Per-Animal Phase Awareness (Cult Hierarchy)
 
@@ -1254,7 +1269,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 897 tests, 32 suites
+cd mobile && npx jest --no-coverage  # 932 tests, 32 suites
 ```
 
 **Test patterns:**

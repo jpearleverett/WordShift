@@ -18,6 +18,8 @@ import {
   getWordsOfferedText,
   getPitHarvestLabel,
   getVictoryPitHint,
+  getPitMandatoryText,
+  getPitMandatoryCTA,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
@@ -472,12 +474,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   </View>
                 </View>
 
-                {/* Collect Now — below amber totals */}
+                {/* Collect Now / Mandatory Pit CTA — below amber totals */}
                 {!isOnboarding && (
+                  <>
+                  {phaseTransitionPending && (
+                    <Text style={[styles.pitMandatoryText, { color: btn.harvestPill.text }]}>
+                      {getPitMandatoryText(phase as DialoguePhase)}
+                    </Text>
+                  )}
                   <TouchableOpacity
                     onPress={onGoToPit}
                     activeOpacity={0.85}
-                    accessibilityLabel="Collect amber in the pit"
+                    accessibilityLabel={phaseTransitionPending ? 'Visit the pit to continue' : 'Collect amber in the pit'}
                     accessibilityRole="button"
                     style={{ marginTop: 8 }}
                   >
@@ -488,13 +496,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       }]}>
                         <View style={styles.btn3dBevel} />
                         <View style={styles.btn3dGlossy} />
-                        <Text style={styles.btn3dPrimaryText}>{'\uD83C\uDF3E'} COLLECT NOW</Text>
+                        <Text style={styles.btn3dPrimaryText}>
+                          {phaseTransitionPending
+                            ? getPitMandatoryCTA(phase as DialoguePhase)
+                            : `${'\uD83C\uDF3E'} COLLECT NOW`}
+                        </Text>
                       </View>
                       <View style={[styles.btn3dEdge, {
                         backgroundColor: btn.harvest.edge,
                       }]} />
                     </View>
                   </TouchableOpacity>
+                  </>
                 )}
                 </>
               );
@@ -528,6 +541,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
+            ) : phaseTransitionPending ? (
+            // Phase transition pending: pit CTA is the only action
+            null
             ) : (
             <>
             <View style={styles.victoryButtonRow}>
@@ -552,13 +568,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   }]} />
                 </View>
               </TouchableOpacity>
-
-              {/* Phase transition pit hint — shown when a transition is pending */}
-              {phaseTransitionPending && victoryData?.newPhase != null && (
-                <Text style={[styles.pitHintText, { color: btn.harvestPill.text }]}>
-                  {getVictoryPitHint(victoryData.newPhase as DialoguePhase) ?? ''}
-                </Text>
-              )}
             </View>
 
             <View style={styles.victoryButtonRowSecondary}>
@@ -835,6 +844,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 6,
     paddingHorizontal: 12,
+  },
+
+  // Mandatory pit text (shown when phase transition pending)
+  pitMandatoryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 2,
+    paddingHorizontal: 16,
   },
 
   // Flat secondary buttons (Share, Home)

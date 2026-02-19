@@ -195,7 +195,7 @@ jest.mock('../services/weeklyQuests', () => ({
 }));
 
 // --- Mock wordHarvest ---
-const mockEnqueueHarvestBatch = jest.fn(async (_batch?: any) => {});
+const mockEnqueueHarvestBatch = jest.fn(async (_batch?: any) => ({ overflow: false }));
 const mockGenerateBatchId = jest.fn(() => 'hb_test_123');
 const mockGetPendingHarvestSummary = jest.fn(async () => ({
   pendingAmber: 15,
@@ -526,6 +526,19 @@ describe('useGamePersistence', () => {
           variant: 'standard',
         })
       );
+    });
+
+    test('returns harvestOverflow: false when no overflow', async () => {
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0);
+      expect(result.harvestOverflow).toBe(false);
+    });
+
+    test('returns harvestOverflow: true when enqueue reports overflow', async () => {
+      mockEnqueueHarvestBatch.mockResolvedValueOnce({ overflow: true });
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0);
+      expect(result.harvestOverflow).toBe(true);
     });
   });
 
