@@ -1,4 +1,47 @@
 import { Difficulty } from '../types';
+import {
+  PHASE_THRESHOLDS as _PHASE_THRESHOLDS,
+  AMBER_REWARDS as _AMBER_REWARDS,
+  FIRST_COMPLETION_BONUS as _FIRST_COMPLETION_BONUS,
+  MILESTONE_BONUSES as _MILESTONE_BONUSES,
+  NARRATIVE_ACCELERATION as _NARRATIVE_ACCELERATION,
+  CHALLENGE_MODE_CONFIG as _CHALLENGE_MODE_CONFIG,
+  MIN_STREAK_FOR_BONUS,
+  BONUS_PER_STREAK,
+  MAX_BONUS_PERCENTAGE,
+  STREAK_RESET_DAYS,
+  DIALOGUE_SESSION_DEFAULTS,
+} from '../constants/gameBalance';
+
+// Re-export centralized constants for backward compatibility.
+// All tuning values now live in constants/gameBalance.ts.
+export const PHASE_THRESHOLDS = _PHASE_THRESHOLDS;
+export const AMBER_REWARDS: AmberReward = _AMBER_REWARDS;
+export const FIRST_COMPLETION_BONUS: AmberReward = _FIRST_COMPLETION_BONUS;
+export const MILESTONE_BONUSES = _MILESTONE_BONUSES;
+export const NARRATIVE_ACCELERATION = _NARRATIVE_ACCELERATION;
+export const CHALLENGE_MODE_CONFIG = _CHALLENGE_MODE_CONFIG;
+
+/**
+ * Streak bonus configuration (assembled from centralized constants).
+ * Higher streaks = more bonus amber.
+ */
+export const STREAK_BONUSES = {
+  MIN_STREAK_FOR_BONUS,
+  BONUS_PER_STREAK,
+  MAX_BONUS_PERCENTAGE,
+  STREAK_RESET_DAYS,
+};
+
+/**
+ * Dialogue session constants (assembled from centralized defaults).
+ * Pacing designed for 10-15 hour total gameplay.
+ */
+export const DIALOGUE_SESSION_CONFIG = {
+  DIALOGUES_PER_SESSION: DIALOGUE_SESSION_DEFAULTS.DIALOGUES_PER_SESSION,
+  PUZZLES_BETWEEN_SESSIONS: DIALOGUE_SESSION_DEFAULTS.PUZZLES_BETWEEN_SESSIONS,
+  GRACE_PERIOD_SESSIONS: DIALOGUE_SESSION_DEFAULTS.GRACE_PERIOD_SESSIONS,
+};
 
 // Home World Types - Animal house with existential journey
 
@@ -21,14 +64,12 @@ export type AnimalType =
 /**
  * Dialogue phase representing the existential journey
  * 0 = Happy/light → 4 = Complete philosophical crisis
- * 5 = Post-revelation terrible peace (hidden phase after final revelation)
+ * 5 = Post-revelation terrible peace (after final revelation)
  */
-export type DialoguePhase = 0 | 1 | 2 | 3 | 4;
+export type DialoguePhase = 0 | 1 | 2 | 3 | 4 | 5;
 
-/**
- * Extended phase type that includes post-revelation Phase 5
- */
-export type ExtendedPhase = 0 | 1 | 2 | 3 | 4 | 5;
+/** @deprecated Use DialoguePhase directly — it now includes Phase 5 */
+export type ExtendedPhase = DialoguePhase;
 
 /**
  * Animal awareness tiers - not all animals realize the truth at the same time
@@ -59,7 +100,7 @@ export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalTyp
   let offset = 0;
   if (tier === 'vanguard') offset = 1;
   if (tier === 'lagging') offset = -1;
-  const effective = Math.max(0, Math.min(4, globalPhase + offset));
+  const effective = Math.max(0, Math.min(5, globalPhase + offset));
   return effective as DialoguePhase;
 }
 
@@ -296,18 +337,6 @@ export interface DialogueSession {
   sessionsCompleted?: number;         // Total sessions completed (for grace period tracking)
 }
 
-/**
- * Dialogue session constants (puzzle-based)
- * Pacing designed for 10-15 hour total gameplay
- */
-export const DIALOGUE_SESSION_CONFIG = {
-  // Number of dialogues allowed per session before cooldown
-  DIALOGUES_PER_SESSION: 5,
-  // Number of puzzles required before next session is available
-  PUZZLES_BETWEEN_SESSIONS: 4,
-  // Number of sessions before cooldown kicks in for newly unlocked animals (grace period)
-  GRACE_PERIOD_SESSIONS: 2,
-};
 
 /**
  * Phase-aware session limits - at higher phases, animals have more to reveal
@@ -322,6 +351,8 @@ export function getDialoguesPerSession(phase: DialoguePhase): number {
       return 5;  // Moderate conversations as things darken
     case 4:
       return 6;  // The cult reveals itself in measured doses
+    case 5:
+      return 4;  // Shorter peaceful sessions — serene post-revelation
     default:
       return 5;
   }
@@ -343,6 +374,8 @@ export function getPuzzlesBetweenSessions(phase: DialoguePhase): number {
     case 3:
     case 4:
       return 5;  // Deliberate pacing — each revelation needs space
+    case 5:
+      return 3;  // Relaxed pacing — peaceful sessions
     default:
       return 4;
   }
@@ -358,59 +391,11 @@ export const PHASE_DESCRIPTIONS: Record<DialoguePhase, { title: string; mood: st
   2: { title: 'Deeper Questions', mood: 'What does it all mean?' },
   3: { title: 'Growing Shadows', mood: 'Something feels different...' },
   4: { title: 'The Horizon', mood: 'Change is coming...' },
+  5: { title: 'Terrible Peace', mood: 'The pattern holds. Everything is quiet.' },
 };
 
-/**
- * Puzzle thresholds for phase transitions
- * Extended for 10-15 hour gameplay (targeting ~300-350 total puzzles)
- */
-export const PHASE_THRESHOLDS = [0, 25, 75, 150, 250];
-
-/**
- * Amber rewards by difficulty
- */
-export const AMBER_REWARDS: AmberReward = {
-  EASY: 8,
-  MEDIUM: 10,
-  MEDIUM_PLUS: 15,
-  HARD: 20,
-};
-
-/**
- * One-time bonus amber for first completion of each difficulty level.
- * Creates small windfall moments that feel exciting and incentivize
- * trying harder difficulties.
- */
-export const FIRST_COMPLETION_BONUS: AmberReward = {
-  EASY: 10,
-  MEDIUM: 20,
-  MEDIUM_PLUS: 30,
-  HARD: 50,
-};
-
-/**
- * Milestone bonuses - reward players at key puzzle counts
- * Keeps progression feeling rewarding during longer gameplay
- */
-/**
- * Phase-aware milestone messages - tone shifts with the narrative
- * Each milestone has messages for different phase ranges
- */
-export const MILESTONE_BONUSES: { puzzles: number; amber: number; message: string; darkMessage?: string; dreadMessage?: string }[] = [
-  { puzzles: 10, amber: 25, message: 'First steps!' },
-  { puzzles: 15, amber: 15, message: 'Warming up!' },
-  { puzzles: 25, amber: 50, message: 'Getting the hang of it!', darkMessage: 'The words are beginning to listen.' },
-  { puzzles: 50, amber: 75, message: 'Puzzle enthusiast!', darkMessage: 'The pattern takes shape.' },
-  { puzzles: 75, amber: 100, message: 'Word wizard!', darkMessage: 'The words know your touch now.', dreadMessage: 'Seventy-five incantations spoken.' },
-  { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
-  { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
-  { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
-  { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },
-  { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The house trembles.', dreadMessage: 'The ritual deepens. Two hundred incantations.' },
-  { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'The arrangement nears completion.', dreadMessage: 'Two hundred fifty offerings. Something stirs.' },
-  { puzzles: 300, amber: 400, message: 'Master puzzler!', darkMessage: 'Three hundred words spoken into the void.', dreadMessage: 'The void has heard enough. The void responds.' },
-  { puzzles: 350, amber: 500, message: 'The journey continues...', darkMessage: 'The journey never ends. It only transforms.', dreadMessage: 'Three hundred fifty incantations. The pattern is nearly complete.' },
-];
+// PHASE_THRESHOLDS, AMBER_REWARDS, FIRST_COMPLETION_BONUS, MILESTONE_BONUSES
+// are now imported from constants/gameBalance.ts and re-exported at the top of this file.
 
 /**
  * Get the phase-appropriate milestone message
@@ -443,20 +428,8 @@ export function getNextMilestone(puzzleCount: number): { puzzles: number; amber:
   return next ? { puzzles: next.puzzles, amber: next.amber } : null;
 }
 
-/**
- * Streak bonus configuration
- * Higher streaks = more bonus amber
- */
-export const STREAK_BONUSES = {
-  // Minimum streak to start getting bonuses
-  MIN_STREAK_FOR_BONUS: 2,
-  // Bonus per streak day (e.g., 10% per day for faster progression)
-  BONUS_PER_STREAK: 0.10,
-  // Maximum bonus percentage (e.g., 100% cap = double rewards at 10+ day streak)
-  MAX_BONUS_PERCENTAGE: 1.0,
-  // Days of inactivity before streak resets
-  STREAK_RESET_DAYS: 2,
-};
+// STREAK_BONUSES is now assembled from individual constants imported from
+// constants/gameBalance.ts and re-exported at the top of this file.
 
 /**
  * Calculate streak bonus multiplier
@@ -474,46 +447,9 @@ export function calculateStreakMultiplier(streak: number): number {
   return 1 + bonusPercentage;
 }
 
-/**
- * Narrative acceleration configuration
- * Engaged players progress through phases faster based on performance
- * An engaged player can reach Phase 4 in ~120-150 puzzles instead of 250
- */
-export const NARRATIVE_ACCELERATION = {
-  // Three-star rate threshold: above this, puzzles count more toward phase progress
-  THREE_STAR_RATE_THRESHOLD: 0.5,
-  THREE_STAR_MULTIPLIER: 1.5,
-  // Streak threshold: long streaks accelerate phase progression
-  STREAK_THRESHOLD: 7,
-  STREAK_MULTIPLIER: 1.25,
-  // Difficulty-based: harder puzzles accelerate, easy stays neutral
-  HARD_MULTIPLIER: 1.5,
-  MEDIUM_PLUS_MULTIPLIER: 1.25,
-  MEDIUM_MULTIPLIER: 1.0,
-  EASY_MULTIPLIER: 1.0,
-  // Challenge mode: completing in challenge mode counts double
-  CHALLENGE_MULTIPLIER: 2.0,
-};
+// NARRATIVE_ACCELERATION is now imported from constants/gameBalance.ts
+// and re-exported at the top of this file.
 
-/**
- * Challenge mode configuration
- * Optional harder mode for experienced players with better rewards
- */
-export const CHALLENGE_MODE_CONFIG = {
-  // Legacy constant — prefer getMaxUndos(difficulty) for challenge mode
-  MAX_UNDOS: 1,
-  /** Get max undos for challenge mode, scaled by difficulty */
-  getMaxUndos: (difficulty: Difficulty): number => {
-    switch (difficulty) {
-      case 'EASY': return 2;
-      case 'MEDIUM': return 2;
-      case 'MEDIUM_PLUS': return 1;
-      case 'HARD': return 1;
-    }
-  },
-  // Amber reward multiplier for challenge completions
-  AMBER_MULTIPLIER: 1.5,
-  // No hints allowed in challenge mode
-  HINTS_ALLOWED: false,
-};
+// CHALLENGE_MODE_CONFIG is now imported from constants/gameBalance.ts
+// and re-exported at the top of this file.
 

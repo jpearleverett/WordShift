@@ -61,6 +61,7 @@ const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   2: 65,
   3: 135,
   4: 225,
+  5: 300,
 };
 
 // Variant reward anti-farm decay by consecutive repeats of the same style.

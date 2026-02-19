@@ -37,6 +37,10 @@ export function createMockAsyncStorage() {
         keyValuePairs.forEach(([key, value]) => { store[key] = value; });
         return Promise.resolve();
       }),
+      multiRemove: jest.fn((keys: string[]) => {
+        keys.forEach(key => { delete store[key]; });
+        return Promise.resolve();
+      }),
       getAllKeys: jest.fn(() => Promise.resolve(Object.keys(store))),
     },
   };

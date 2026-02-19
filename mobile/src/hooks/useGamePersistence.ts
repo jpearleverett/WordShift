@@ -17,6 +17,7 @@ import {
   applyVariantAmberBonus,
   getPhaseProgressFraction,
   getPendingPhaseTransition,
+  isPostRevelation,
 } from '../services/amberCurrency';
 import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSession';
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
@@ -103,10 +104,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       getCurrentPhase(),
       getPhaseProgressFraction(),
       getPendingPhaseTransition(),
-    ]).then(([stats, balance, phase, fraction, pending]) => {
+      isPostRevelation(),
+    ]).then(([stats, balance, phase, fraction, pending, postRev]) => {
       setCumulativeStats(stats);
       setAmberBalance(balance);
-      setCurrentPhase(phase);
+      setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
       setPhaseProgressFraction(fraction);
       setPendingPhaseTransition(pending);
     }).catch(err => {
@@ -115,16 +117,17 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   }, []);
 
   const refreshStats = useCallback(async () => {
-    const [stats, balance, phase, fraction, pending] = await Promise.all([
+    const [stats, balance, phase, fraction, pending, postRev] = await Promise.all([
       getCumulativeStats(),
       getAmberBalance(),
       getCurrentPhase(),
       getPhaseProgressFraction(),
       getPendingPhaseTransition(),
+      isPostRevelation(),
     ]);
     setCumulativeStats(stats);
     setAmberBalance(balance);
-    setCurrentPhase(phase);
+    setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
     setPhaseProgressFraction(fraction);
     setPendingPhaseTransition(pending);
   }, []);

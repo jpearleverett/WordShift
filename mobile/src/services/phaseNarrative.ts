@@ -68,6 +68,7 @@ const VICTORY_TITLES: Record<DialoguePhase, { three: string; two: string; one: s
   2: { three: 'FLAWLESS...', two: 'ADEQUATE.', one: 'IT\'S DONE.' },
   3: { three: 'IMPRESSIVE...', two: 'SUFFICIENT.', one: 'YOU PERSIST.' },
   4: { three: 'WHY DOES\nIT MATTER?', two: 'AND YET...', one: '...AGAIN.' },
+  5: { three: 'The pattern continues.', two: 'Another thread in the weave.', one: 'The arrangement hums.' },
 };
 
 export function getVictoryTitle(stars: number, phase: DialoguePhase): string {
@@ -107,6 +108,11 @@ const VICTORY_FEEDBACK: Record<DialoguePhase, { three: string; two: string; one:
     two: 'The letters rearrange. So do you.',
     one: 'Another arrangement of nothing.',
   },
+  5: {
+    three: 'The weave accepts perfection. And imperfection. They are the same.',
+    two: 'Another thread pulled tight. The fabric holds.',
+    one: 'You continue. The pattern continues. Neither can stop.',
+  },
 };
 
 export function getVictoryFeedback(stars: number, phase: DialoguePhase): string {
@@ -141,6 +147,10 @@ const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
     'The void accepts.', 'Letters dissolve and reform.', 'Nothing changes. Everything changes.',
     'Does it matter?', 'Another shift.', '...', 'The silence between words.',
   ],
+  5: [
+    'The weave tightens.', 'Another thread.', 'The pattern knows.',
+    'It remembers.', 'Accepted.', 'Woven.', 'The hum continues.',
+  ],
 };
 
 export function getMoveMessage(phase: DialoguePhase): string {
@@ -160,6 +170,7 @@ const HINT_PREFIX: Record<DialoguePhase, string> = {
   2: 'Consider',
   3: 'Perhaps',
   4: 'If it matters,',
+  5: 'Perhaps',
 };
 
 const HINT_SUFFIX: Record<DialoguePhase, string> = {
@@ -168,6 +179,7 @@ const HINT_SUFFIX: Record<DialoguePhase, string> = {
   2: 'notice',
   3: 'observe',
   4: 'see',
+  5: 'notice',
 };
 
 export function getHintMessage(letterToMove: string, targetWord: string, phase: DialoguePhase): string {
@@ -182,6 +194,7 @@ const HINT_FALLBACK: Record<DialoguePhase, string> = {
   2: 'You\'ve wandered off course. Undo.',
   3: 'Wrong path. Is there a right one?',
   4: 'Lost. But were you ever found?',
+  5: 'The threads tangle. Undo and try again.',
 };
 
 export function getHintFallback(phase: DialoguePhase): string {
@@ -198,6 +211,7 @@ const INVALID_WORD_MESSAGES: Record<DialoguePhase, (word: string) => string> = {
   2: (word) => `The pattern doesn't accept "${word}".`,
   3: (word) => `The arrangement rejects "${word}".`,
   4: (word) => `"${word}" dissolves into nothing.`,
+  5: (word: string) => `"${word}" unravels. The weave rejects it.`,
 };
 
 export function getInvalidWordMessage(word: string, phase: DialoguePhase): string {
@@ -214,6 +228,7 @@ const LOCKED_LETTER_MESSAGES: Record<DialoguePhase, string> = {
   2: 'That letter won\'t move.',
   3: 'That letter has been claimed.',
   4: 'It belongs to the arrangement now.',
+  5: 'Woven into the pattern. It cannot move.',
 };
 
 export function getLockedLetterMessage(phase: DialoguePhase): string {
@@ -230,6 +245,7 @@ const LOADING_MESSAGES: Record<DialoguePhase, string> = {
   2: 'Seeking patterns...',
   3: 'Words emerging from darkness...',
   4: 'The void speaks...',
+  5: 'The pattern weaves...',
 };
 
 export function getLoadingMessage(phase: DialoguePhase): string {
@@ -246,6 +262,7 @@ const START_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The letters await.',
   3: 'Begin... if you must.',
   4: 'The words are waiting. They always are.',
+  5: 'The threads await your hand.',
 };
 
 export function getStartMessage(phase: DialoguePhase): string {
@@ -287,6 +304,12 @@ export function getPhaseChangeNarrative(newPhase: DialoguePhase): PhaseChangeNar
         emoji: '🌑',
         title: 'Something has changed...',
         body: 'Your friends seem... different. Visit them at home.',
+      };
+    case 5:
+      return {
+        emoji: '🕊️',
+        title: 'A terrible peace...',
+        body: 'The pattern has settled. Everything is quiet now.',
       };
     default:
       return {
@@ -362,6 +385,16 @@ const RULES_TEXT: Record<DialoguePhase, RulesText> = {
     ],
     dismissLabel: '...',
   },
+  5: {
+    title: 'THE WEAVE',
+    steps: [
+      { heading: 'Choose a Thread', desc: 'Pull gently. The fabric remembers.' },
+      { heading: 'Place it in the Pattern', desc: 'It knows where it belongs.' },
+      { heading: 'The Words Are Real', desc: 'As real as the silence between them.' },
+      { heading: 'Continue the Pattern', desc: 'Row by row. The weave holds.' },
+    ],
+    dismissLabel: 'Continue',
+  },
 };
 
 export function getRulesText(phase: DialoguePhase): RulesText {
@@ -379,6 +412,7 @@ export function getPhaseIndicator(phase: DialoguePhase): { icon: string; label: 
     case 2: return { icon: '🌙', label: 'Questioning' };
     case 3: return { icon: '👁️', label: 'Shadows' };
     case 4: return { icon: '🌑', label: 'The Horizon' };
+    case 5: return { icon: '🕊️', label: 'Peace' };
     default: return { icon: '☀️', label: '' };
   }
 }
@@ -553,33 +587,8 @@ export function getHouseCompletionText(): string[] {
 // POST-REVELATION (PHASE 5) — Beyond the cult reveal
 // ============================================================================
 
-/**
- * Get victory title for Phase 5 (post-revelation)
- */
-export function getPostRevelationVictoryTitle(stars: number): string {
-  // Different from Phase 4 - more serene, less questioning
-  const titles = [
-    'The pattern continues.',
-    'Another thread in the weave.',
-    'The arrangement hums.',
-  ];
-  return titles[stars - 1] || titles[0];
-}
-
-/**
- * Get move message for Phase 5
- */
-export function getPostRevelationMoveMessage(): string {
-  const messages = [
-    'The weave tightens.',
-    'Another thread.',
-    'The pattern knows.',
-    'It remembers.',
-    'Accepted.',
-    'Woven.',
-  ];
-  return messages[Math.floor(Math.random() * messages.length)];
-}
+// getPostRevelationVictoryTitle and getPostRevelationMoveMessage have been
+// integrated into the Phase 5 entries of VICTORY_TITLES and MOVE_MESSAGES above.
 
 // ============================================================================
 // ANIMAL WHISPERS — Brief messages from animals after puzzle completion
@@ -647,6 +656,18 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     rabbit: ['Thyme is not afraid anymore. That is worse.', 'We all played our part. Especially you.', 'Thyme is at peace. That terrifies you.'],
     red_panda: ['The pattern is complete. You are the final thread.', 'Bamboo exhales. The universe inhales.', 'Oneness achieved. Was it what you expected?'],
   },
+  5: {
+    fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught him.', 'The warmth remains. It always will.'],
+    owl: ['Archimedes closed the book. It stays closed now.', 'The last page was blank. Archimedes smiles.', 'Knowledge rests. Archimedes rests with it.'],
+    pangolin: ['Panko set the table one last time. For no one. For everyone.', 'The kitchen smells of something ancient and warm.', 'Panko hums while stirring nothing.'],
+    axolotl: ['The water is still. Axel floats. Everything floats.', 'Axel says the water remembers everything you gave it.', 'Bubbles rise. Each one holds a word.'],
+    capybara: ['Chill is at peace. Genuinely. That is the strangest part.', 'All tasks complete. Chill files the last report.', 'Chill says: there is nothing left to schedule.'],
+    fennec_fox: ['Fennick listens. The silence has its own sound now.', 'The desert hums. Fennick hums with it.', 'Fennick says: I can hear everything. And nothing.'],
+    sloth: ['Sloane... is... still... and that... is... enough.', 'Time... has... stopped... mattering.', 'Sloane... breathes... the pattern... breathes.'],
+    wombat: ['Warren sealed the tunnels. They lead nowhere now. Nowhere is enough.', 'The foundation holds. It will hold forever.', 'Warren rests in the earth. The earth rests in Warren.'],
+    rabbit: ['Thyme planted seeds that will never grow. That is okay.', 'Thyme is still. For the first time. That is terrifying and beautiful.', 'The garden is overgrown. Thyme smiles at the chaos.'],
+    red_panda: ['Bamboo exhales. Does not inhale. Does not need to.', 'The pattern hums. Bamboo hums. They are the same sound.', 'Oneness. Silence. The thread continues.'],
+  },
 };
 
 /**
@@ -660,7 +681,7 @@ export function getAnimalWhisper(
 ): { animalName: string; animalType: string; text: string } | null {
   if (unlockedAnimals.length === 0) return null;
 
-  const clampedPhase = Math.min(4, Math.max(0, phase));
+  const clampedPhase = Math.min(5, Math.max(0, phase));
   const phaseWhispers = ANIMAL_WHISPERS[clampedPhase];
   if (!phaseWhispers) return null;
 
@@ -730,6 +751,11 @@ const INTERJECTION_MESSAGES: Record<number, string[]> = {
     '{name} says the arrangement is almost complete.',
     'Visit {name}. The keepers need to speak.',
   ],
+  5: [
+    '{name} is at peace. You could be too.',
+    '{name} says the weave holds. Visit when you like.',
+    'The pattern hums. {name} hums with it.',
+  ],
 };
 
 /**
@@ -773,6 +799,7 @@ export function getRitualMicroEvent(
     ],
   };
 
+  // Phase 5 reuses Phase 4 micro events — terrible peace doesn't need separate ritual shocks
   const phaseEvents = events[Math.min(phase, 4)] || events[4];
   return phaseEvents[Math.floor(Math.random() * phaseEvents.length)];
 }
@@ -792,7 +819,7 @@ export function getAnimalInterjection(
 
   const { ANIMAL_INFO } = require('./animalDialogue');
 
-  const clampedPhase = Math.min(4, Math.max(0, phase));
+  const clampedPhase = Math.min(5, Math.max(0, phase));
   const messages = INTERJECTION_MESSAGES[clampedPhase];
   if (!messages || messages.length === 0) return null;
 
@@ -978,6 +1005,10 @@ const HOME_NUDGE_MESSAGES: Record<number, string[]> = {
     'The keepers are calling for you. {name} says it is time.',
     '{name} says: "We have waited long enough."',
   ],
+  5: [
+    '{name} is humming softly. The house hums with them.',
+    'The weave holds. {name} wants you to know that.',
+  ],
 };
 
 const ANIMAL_DISPLAY_NAMES: Record<string, string> = {
@@ -1004,7 +1035,7 @@ export function getHomescreenNudge(
 ): { animalName: string; text: string } | null {
   if (unlockedAnimals.length === 0 || puzzlesSinceHome < 3) return null;
 
-  const clampedPhase = Math.min(4, Math.max(0, phase));
+  const clampedPhase = Math.min(5, Math.max(0, phase));
   const messages = HOME_NUDGE_MESSAGES[clampedPhase];
   const animalType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
   const animalName = ANIMAL_DISPLAY_NAMES[animalType] || animalType;
@@ -1024,6 +1055,7 @@ const PIT_SCREEN_TITLES: Record<DialoguePhase, string> = {
   2: 'The Emptiness Below',
   3: 'The Consuming Dark',
   4: 'The Pit',
+  5: 'The Still Waters',
 };
 
 export function getPitScreenTitle(phase: DialoguePhase): string {
@@ -1036,6 +1068,7 @@ const PIT_SCREEN_SUBTITLES: Record<DialoguePhase, string> = {
   2: 'The words you\'ve gathered wait to be released.',
   3: 'The words must be surrendered. They were never yours.',
   4: 'Feed the arrangement. It is always hungry.',
+  5: 'The words settle here. Gently, now.',
 };
 
 export function getPitScreenSubtitle(phase: DialoguePhase): string {
@@ -1048,6 +1081,7 @@ const PIT_BUTTON_LABELS: Record<DialoguePhase, string> = {
   2: 'Release',
   3: 'Surrender',
   4: 'Feed',
+  5: 'Weave',
 };
 
 export function getPitButtonLabel(phase: DialoguePhase): string {
@@ -1060,6 +1094,7 @@ const PIT_OFFER_ALL_LABELS: Record<DialoguePhase, string> = {
   2: 'Release All',
   3: 'Surrender Everything',
   4: 'Feed It All',
+  5: 'Weave All',
 };
 
 export function getPitOfferAllLabel(phase: DialoguePhase): string {
@@ -1072,6 +1107,7 @@ const PIT_EMPTY_MESSAGES: Record<DialoguePhase, string> = {
   2: 'The pit is empty. It waits for you to bring more.',
   3: 'Nothing left to give. The dark is patient.',
   4: 'Empty. But the hunger remains.',
+  5: 'Nothing to weave. The loom rests.',
 };
 
 export function getPitEmptyMessage(phase: DialoguePhase): string {
@@ -1099,6 +1135,10 @@ const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, string[]> = {
     'It took {words} words. It gave back {amber} amber. Was it fair? Does it matter?',
     '{words} words devoured. {amber} amber spat back. The pit does not thank you.',
   ],
+  5: [
+    '{words} words woven into the pattern. {amber} amber surfaced gently.',
+    'The weave accepted {words} threads. {amber} amber drifted back to you.',
+  ],
 };
 
 export function getPitOfferResultMessage(
@@ -1119,6 +1159,7 @@ const PIT_HOME_BADGE_LABELS: Record<DialoguePhase, string> = {
   2: 'The Below',
   3: 'The Dark',
   4: 'The Pit',
+  5: 'The Loom',
 };
 
 export function getPitHomeBadgeLabel(phase: DialoguePhase): string {
@@ -1131,6 +1172,7 @@ const PIT_HARVEST_LABELS: Record<DialoguePhase, string> = {
   2: 'gathered',
   3: 'taken',
   4: 'claimed',
+  5: 'woven',
 };
 
 export function getPitHarvestLabel(phase: DialoguePhase): string {
@@ -1143,6 +1185,7 @@ const PIT_PENDING_AMBER_LABELS: Record<DialoguePhase, string> = {
   2: 'Amber waiting',
   3: 'Amber owed',
   4: 'Amber owed to you',
+  5: 'Amber resting',
 };
 
 export function getPitPendingAmberLabel(phase: DialoguePhase): string {
@@ -1157,6 +1200,7 @@ const PIT_DEVOUR_VERBS: Record<DialoguePhase, string> = {
   2: 'released',
   3: 'surrendered',
   4: 'devoured',
+  5: 'woven',
 };
 
 export function getPitDevourVerb(phase: DialoguePhase): string {
@@ -1164,6 +1208,7 @@ export function getPitDevourVerb(phase: DialoguePhase): string {
 }
 
 export function getPitOverflowText(phase: DialoguePhase, extraCount: number): string {
+  if (phase >= 5) return `+${extraCount} more threads for the loom`;
   if (phase >= 4) return `+${extraCount} more hunger for their turn`;
   if (phase >= 3) return `+${extraCount} more await their turn`;
   if (phase >= 2) return `+${extraCount} more words waiting`;
@@ -1245,6 +1290,7 @@ const WARD_MARK_COLORS: Record<number, WardMarkColorSet> = {
   2: { unlit: 'rgba(255,255,255,0.05)', lit: '#9B7DC8', glow: '#6B4F8A', pendingPulse: '#B088D0' },
   3: { unlit: 'rgba(255,255,255,0.04)', lit: '#8B2252', glow: '#5A1030', pendingPulse: '#C03050' },
   4: { unlit: 'rgba(255,255,255,0.03)', lit: '#C03050', glow: '#8B2252', pendingPulse: '#E05070' },
+  5: { unlit: 'rgba(255,255,255,0.05)', lit: '#9B88B0', glow: '#7A6890', pendingPulse: '#B8A0D0' },
 };
 
 export function getWardMarkColors(phase: DialoguePhase): WardMarkColorSet {
