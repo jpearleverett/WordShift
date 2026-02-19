@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef } from 'react';
 import { Animated, PanResponder, StyleSheet, View } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
@@ -29,6 +29,9 @@ const DRAG_THRESHOLD = 10;
  *
  * The parent (Row/App) is responsible for hit-testing the drop position
  * against slot rects and triggering the appropriate slot press.
+ *
+ * Uses refs for all callback props to avoid stale closures in PanResponder
+ * (PanResponder is created once in a ref and never recreated).
  */
 export function DraggableTile({
   children,
@@ -47,13 +50,22 @@ export function DraggableTile({
   const floatingOpacity = useRef(new Animated.Value(0)).current;
   const floatingScale = useRef(new Animated.Value(1)).current;
 
-  const settings = getSettingsSync();
+  // Refs for callback props — PanResponder is created once and captures the
+  // initial closure. Without refs, callbacks would be stale after re-renders.
+  const onDragStartRef = useRef(onDragStart);
+  const onDragEndRef = useRef(onDragEnd);
+  const onTapRef = useRef(onTap);
+  const enabledRef = useRef(enabled);
+  onDragStartRef.current = onDragStart;
+  onDragEndRef.current = onDragEnd;
+  onTapRef.current = onTap;
+  enabledRef.current = enabled;
 
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => enabled,
+      onStartShouldSetPanResponder: () => enabledRef.current,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        if (!enabled) return false;
+        if (!enabledRef.current) return false;
         const { dx, dy } = gestureState;
         return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
       },
@@ -74,12 +86,13 @@ export function DraggableTile({
         // Activate drag after threshold
         if (!dragActivated.current && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
           dragActivated.current = true;
-          onDragStart();
+          onDragStartRef.current();
           hapticSelection();
 
           // Show floating tile, dim source
           floatingOpacity.setValue(1);
           sourceOpacity.setValue(0.3);
+          const settings = getSettingsSync();
           if (!settings.reducedMotion) {
             Animated.spring(floatingScale, {
               toValue: 1.1,
@@ -103,6 +116,7 @@ export function DraggableTile({
           const dropX = startPos.current.x + gestureState.dx;
           const dropY = startPos.current.y + gestureState.dy;
 
+          const settings = getSettingsSync();
           if (!settings.reducedMotion) {
             // Quick scale-down snap animation
             Animated.parallel([
@@ -132,12 +146,12 @@ export function DraggableTile({
             sourceOpacity.setValue(1);
           }
 
-          onDragEnd({ x: dropX, y: dropY });
+          onDragEndRef.current({ x: dropX, y: dropY });
         } else {
           // No drag — treat as tap
           sourceOpacity.setValue(1);
           floatingOpacity.setValue(0);
-          onTap();
+          onTapRef.current();
         }
 
         dragActivated.current = false;

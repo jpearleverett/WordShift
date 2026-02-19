@@ -722,6 +722,8 @@ export const Row: React.FC<RowProps> = memo(({
     <Animated.View
       style={[
         styles.rowWrapper,
+        // Source row with drag needs higher zIndex so floating tile renders above subsequent rows
+        isSource && !!onLetterDragDrop && { zIndex: 10 },
         {
           transform: [
             { scale: Animated.multiply(scaleAnim, successBounceScale) },
@@ -771,7 +773,7 @@ export const Row: React.FC<RowProps> = memo(({
         )}
 
         {/* Content area */}
-        <View style={[styles.contentWrapper, showSlots && styles.contentWrapperArc]}>
+        <View style={[styles.contentWrapper, showSlots && styles.contentWrapperArc, isSource && !!onLetterDragDrop && styles.contentWrapperDraggable]}>
           {showSlots ? (
             // Arc layout for DROP row - letters overflow container
             <View style={styles.arcRow}>
@@ -823,6 +825,9 @@ const styles = StyleSheet.create({
   },
   contentWrapperArc: {
     overflow: 'visible', // Allow letters to pop OUT of container
+  },
+  contentWrapperDraggable: {
+    overflow: 'visible', // Allow floating drag tile to escape container bounds
   },
   lettersContainer: {
     flexDirection: 'row',

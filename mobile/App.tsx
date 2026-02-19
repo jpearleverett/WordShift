@@ -684,19 +684,31 @@ export default function App() {
 
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
-  const handleLetterDragDrop = useCallback((_letter: any, _rowIndex: number, position: { x: number; y: number }) => {
-    if (!puzzle.slotPreviews || puzzle.slotPreviews.length === 0) return;
+  // Uses refs + setTimeout to ensure React has processed the letter selection state
+  // update from onDragStart before we read the computed slot previews.
+  const slotPreviewsRef = useRef(puzzle.slotPreviews);
+  const handleSlotPressRef = useRef(handleSlotPress);
+  slotPreviewsRef.current = puzzle.slotPreviews;
+  handleSlotPressRef.current = handleSlotPress;
 
-    // Find the first valid slot preview (prefer valid words)
-    const validSlotIndex = puzzle.slotPreviews.findIndex((p: any) => p && p.isValid);
-    if (validSlotIndex >= 0) {
-      handleSlotPress(validSlotIndex, position);
-      return;
-    }
-    // No valid slot — pick the middle slot as fallback to trigger the invalid feedback
-    const midSlot = Math.floor(puzzle.slotPreviews.length / 2);
-    handleSlotPress(midSlot, position);
-  }, [puzzle.slotPreviews, handleSlotPress]);
+  const handleLetterDragDrop = useCallback((_letter: any, _rowIndex: number, position: { x: number; y: number }) => {
+    // Defer to next tick so React processes the letter selection from onDragStart
+    setTimeout(() => {
+      const previews = slotPreviewsRef.current;
+      const onSlotPress = handleSlotPressRef.current;
+      if (!previews || previews.length === 0) return;
+
+      // Find the first valid slot preview (prefer valid words)
+      const validSlotIndex = previews.findIndex((p: any) => p && p.isValid);
+      if (validSlotIndex >= 0) {
+        onSlotPress(validSlotIndex, position);
+        return;
+      }
+      // No valid slot — pick the middle slot as fallback to trigger the invalid feedback
+      const midSlot = Math.floor(previews.length / 2);
+      onSlotPress(midSlot, position);
+    }, 0);
+  }, []);
 
   const handleUndo = useCallback(() => {
     hapticLight();
