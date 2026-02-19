@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (840+ tests, 28 suites)
+npx jest --no-coverage   # Run all tests (870+ tests, 29 suites)
 ```
 
 ## Recent Implementation Notes (2026-02)
@@ -253,7 +253,7 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (840+ tests, 28 suites)
+├── src/__tests__/               # Test suites (870+ tests, 29 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -270,6 +270,7 @@ mobile/
 │   ├── integration.test.ts      # End-to-end: victory flow, phase transitions, economy, achievements
 │   ├── localGenerator.test.ts
 │   ├── notifications.test.ts    # Notification prefs, phase-aware messages
+│   ├── onboarding.test.ts       # Onboarding steps, pit intro flow, Fox dialogue lines
 │   ├── performanceMonitor.test.ts # Frame monitoring, render timing, generation metrics
 │   ├── phaseNarrative.test.ts
 │   ├── puzzleVariety.test.ts    # Puzzle variant modes, overrides, amber multipliers
@@ -643,7 +644,7 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 
 **Screen** (`OfferingPitScreen.tsx`):
 - Navigated as `currentScreen: 'pit'` in App.tsx
-- Props: phase, amberBalance, onClose, onAmberChange, onOpenStats, onOpenSettings, phaseProgressFraction, pendingPhaseTransition, onPhaseTransitionConfirmed
+- Props: phase, amberBalance, onClose, onAmberChange, onOpenStats, onOpenSettings, phaseProgressFraction, pendingPhaseTransition, onPhaseTransitionConfirmed, isOnboarding?, onboardingStep?, onOnboardingOfferComplete?
 - **Interactive flying word system**: Harvested words float as mini candy 3D letter tiles (MiniCandyTile: 22x28px per letter, matching puzzle LetterTile styling — bevel, specular dot, 3D bottom edge) over the phase-aware forest/pit background images
 - **Smooth float animation**: Each word drifts via `Animated.loop` with linear progress (0→1) interpolated through a phase-shifted sine wave (`sin(2π(t + φ))` where φ is random per word). Progress always starts at 0; variety comes from `driftPhaseOffset`/`bobPhaseOffset`. Loop wraps seamlessly because `sin(2π·0+φ) === sin(2π·1+φ)`
 - **Tap-to-devour**: Tapping a word triggers a spiral animation toward the pit center — `getCurrentPos()` reads `__getValue()` from progress Animated.Values to compute current visual position, then spirals via bezier X + cubic-ease-in Y + 6 full spins + scale shrink to 0.05 + delayed fade. Brief pop-up (scale 1→1.2) before spiral begins
@@ -1148,15 +1149,18 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 | `fox_invited` | Home | Fox intro dialogue via FoxGuide (4 lines). Fox introduces himself and the world. |
 | `going_to_puzzle` | Transition | Fox says "Follow me!" — screen transitions to puzzle. |
 | `puzzle_tutorial` | Puzzle | Real EASY puzzle with contextual Fox tips. The exact letter to pick and target slot are highlighted, and tutorial input is guided to prevent early dead-ends. UI simplified: no difficulty selector, no NEW button, no home button. |
-| `puzzle_complete` | Puzzle | Victory plays, Fox congratulates. "Let's go home!" button. |
+| `puzzle_complete` | Puzzle | Victory plays, Fox congratulates. "What's next?" button. |
+| `going_to_pit` | Transition | Fox introduces word harvesting concept — "Those words you just formed? They're worth something." |
+| `pit_intro` | Pit | Fox explains the Offering Pit via FoxGuide overlay (3 lines). Floating tutorial words are visible but taps disabled. Header nav buttons and bottom panel hidden. |
+| `pit_offering` | Pit | Auto-offers all pending harvest batches (full spiral cascade animation). FoxGuide hides during cascade, reappears with completion line after amber is credited. |
 | `returning_home` | Transition | Screen transitions back to home. |
-| `unlock_explained` | Home | Fox explains amber & unlock system (3 lines). Unlock progress bar visible. |
+| `unlock_explained` | Home | Fox explains the cycle: puzzles → words → amber → rooms (3 lines). Unlock progress bar visible. |
 | `complete` | Home | Onboarding done. All UI elements appear. Player is free. |
 
 ### Architecture
 
 **State Machine** (`services/onboarding.ts`):
-- `OnboardingStep` type with 8 steps + `not_started`
+- `OnboardingStep` type with 11 steps + `not_started`
 - `getOnboardingStep()` / `setOnboardingStep()` — AsyncStorage persistence with in-memory cache
 - `isOnboardingComplete()` / `resetOnboarding()` — Query and reset helpers
 - `ONBOARDING_FOX_LINES` — Fox dialogue text for each step (keyed by step name)
@@ -1173,9 +1177,9 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - On mount: checks legacy `wordshift_tutorial_completed` for backward compat, then reads `wordshift_onboarding_step`
 - `handleOnboardingContinue()` — advances through dialogue lines and transitions between screens
 - `handleSkipOnboarding()` — marks onboarding + tutorial as complete
-- FoxGuide rendered on both home screen (home_empty, fox_invited, unlock_explained) and puzzle screen (puzzle_tutorial, puzzle_complete)
+- FoxGuide rendered on home screen (home_empty, fox_invited, unlock_explained), puzzle screen (puzzle_tutorial, puzzle_complete), and pit screen (pit_intro, pit_offering)
 - `tutorialGuidance` derives the exact source letter/target slot from solution steps and drives guided highlights + input guardrails during `puzzle_tutorial`
-- During onboarding: hides difficulty selector, stats row, NEW button, home button on puzzle screen; hides PLAY, settings, stats, daily challenge on home screen
+- During onboarding: hides difficulty selector, stats row, NEW button, home button on puzzle screen; hides PLAY, settings, stats, daily challenge on home screen; hides pit header nav buttons, bottom panel, and result toast on pit screen; disables floating word taps on pit screen
 
 **HomeScreen Integration**:
 - Accepts `onboardingStep` and `onAdvanceOnboarding` props
@@ -1188,10 +1192,12 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - "We've been waiting for someone like you."
 - "Every puzzle you solve helps us build the house."
 - "The others are going to love you. There's so much more to discover... together."
+- "They wait here until you offer them." (pit intro — "waiting to be offered" gains ritual weight later)
+- "Every puzzle feeds the house a little more." (pit offering complete — "feeds" is warm now, dark later)
 
 **Backward Compatibility**: Existing players who completed the old `Tutorial` overlay are detected via the `wordshift_tutorial_completed` AsyncStorage flag and skip onboarding automatically. The old `Tutorial` component is deprecated but preserved; its utility functions (`hasTutorialCompleted`, `markTutorialCompleted`, `resetTutorial`) are still used. `resetOnboarding()` is called alongside `resetTutorial()` in Settings > Reset All Data.
 
-**Persistence**: `wordshift_onboarding_step` in AsyncStorage. If the app closes mid-onboarding, it resumes from the last saved step.
+**Persistence**: `wordshift_onboarding_step` in AsyncStorage. If the app closes mid-onboarding, it resumes from the last saved step. Init effect detects pit onboarding steps (`going_to_pit`, `pit_intro`, `pit_offering`) and sets `currentScreen = 'pit'` for correct resume.
 
 ## Coding Conventions
 
@@ -1221,7 +1227,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 800+ tests, 27 suites
+cd mobile && npx jest --no-coverage  # 870+ tests, 29 suites
 ```
 
 **Test patterns:**
