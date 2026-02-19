@@ -478,6 +478,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </TouchableOpacity>
             </View>
             ) : (
+            <>
             <View style={styles.victoryButtonRow}>
               {/* Next Level — primary 3D candy button */}
               <TouchableOpacity
@@ -562,6 +563,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
+            </>
             )}
             </Animated.View>
           </Animated.View>
