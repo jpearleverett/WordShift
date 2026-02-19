@@ -150,6 +150,7 @@ const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
   5: [
     'The weave tightens.', 'Another thread.', 'The pattern knows.',
     'It remembers.', 'Accepted.', 'Woven.', 'The hum continues.',
+    'Settled.', 'The thread holds.', 'Part of the whole.',
   ],
 };
 
@@ -657,16 +658,16 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     red_panda: ['The pattern is complete. You are the final thread.', 'Bamboo exhales. The universe inhales.', 'Oneness achieved. Was it what you expected?'],
   },
   5: {
-    fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught him.', 'The warmth remains. It always will.'],
-    owl: ['Archimedes closed the book. It stays closed now.', 'The last page was blank. Archimedes smiles.', 'Knowledge rests. Archimedes rests with it.'],
-    pangolin: ['Panko set the table one last time. For no one. For everyone.', 'The kitchen smells of something ancient and warm.', 'Panko hums while stirring nothing.'],
-    axolotl: ['The water is still. Axel floats. Everything floats.', 'Axel says the water remembers everything you gave it.', 'Bubbles rise. Each one holds a word.'],
-    capybara: ['Chill is at peace. Genuinely. That is the strangest part.', 'All tasks complete. Chill files the last report.', 'Chill says: there is nothing left to schedule.'],
-    fennec_fox: ['Fennick listens. The silence has its own sound now.', 'The desert hums. Fennick hums with it.', 'Fennick says: I can hear everything. And nothing.'],
-    sloth: ['Sloane... is... still... and that... is... enough.', 'Time... has... stopped... mattering.', 'Sloane... breathes... the pattern... breathes.'],
-    wombat: ['Warren sealed the tunnels. They lead nowhere now. Nowhere is enough.', 'The foundation holds. It will hold forever.', 'Warren rests in the earth. The earth rests in Warren.'],
-    rabbit: ['Thyme planted seeds that will never grow. That is okay.', 'Thyme is still. For the first time. That is terrifying and beautiful.', 'The garden is overgrown. Thyme smiles at the chaos.'],
-    red_panda: ['Bamboo exhales. Does not inhale. Does not need to.', 'The pattern hums. Bamboo hums. They are the same sound.', 'Oneness. Silence. The thread continues.'],
+    fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught him.', 'The warmth remains. It always will.', 'Ember says the smoke writes your name now.', 'The den smells of cedar and something finished.'],
+    owl: ['Archimedes closed the book. It stays closed now.', 'The last page was blank. Archimedes smiles.', 'Knowledge rests. Archimedes rests with it.', 'The study is quiet. Archimedes says quiet is a kind of answer.', 'Archimedes found one last footnote. It just says: thank you.'],
+    pangolin: ['Panko set the table one last time. For no one. For everyone.', 'The kitchen smells of something ancient and warm.', 'Panko hums while stirring nothing.', 'Panko says the oven stays warm by itself now.', 'The last recipe has no ingredients. Just warmth.'],
+    axolotl: ['The water is still. Axel floats. Everything floats.', 'Axel says the water remembers everything you gave it.', 'Bubbles rise. Each one holds a word.', 'Axel regenerated something new. He can not name it yet.', 'The tank glows faintly. Axel says it has always glowed.'],
+    capybara: ['Chill is at peace. Genuinely. That is the strangest part.', 'All tasks complete. Chill files the last report.', 'Chill says: there is nothing left to schedule.', 'Chill closed the laptop. The screen still glows.', 'The spreadsheet balanced itself. Chill just watched.'],
+    fennec_fox: ['Fennick listens. The silence has its own sound now.', 'The desert hums. Fennick hums with it.', 'Fennick says: I can hear everything. And nothing.', 'Fennick tilts his ears toward something only he can hear.', 'The desert wind carries a melody. Fennick says it is yours.'],
+    sloth: ['Sloane... is... still... and that... is... enough.', 'Time... has... stopped... mattering.', 'Sloane... breathes... the pattern... breathes.', 'Gerald... and Gerald... say hello.', 'Sloane... smiles. The branches... smile... back.'],
+    wombat: ['Warren sealed the tunnels. They lead nowhere now. Nowhere is enough.', 'The foundation holds. It will hold forever.', 'Warren rests in the earth. The earth rests in Warren.', 'Warren says the soil hums a low note. A contented note.', 'The deepest tunnel is warm. Warren sleeps there now.'],
+    rabbit: ['Thyme planted seeds that will never grow. That is okay.', 'Thyme is still. For the first time. That is terrifying and beautiful.', 'The garden is overgrown. Thyme smiles at the chaos.', 'Thyme brewed one final cup. It steeps forever.', 'The flowers lean toward Thyme. They know her heartbeat.'],
+    red_panda: ['Bamboo exhales. Does not inhale. Does not need to.', 'The pattern hums. Bamboo hums. They are the same sound.', 'Oneness. Silence. The thread continues.', 'Bamboo meditates with open eyes. Everything is the center.', 'The attic touches the sky. Bamboo touches the attic. You touch Bamboo.'],
   },
 };
 
@@ -1215,6 +1216,18 @@ export function getPitOverflowText(phase: DialoguePhase, extraCount: number): st
   return `+${extraCount} more`;
 }
 
+// --- Harvest overflow warning ---
+
+/**
+ * Phase-aware message shown when pending harvest batches hit the 200 cap
+ * and oldest batches are trimmed.
+ */
+export function getHarvestOverflowMessage(phase: DialoguePhase): string {
+  if (phase >= 3) return 'The pit overflows. Feed it.';
+  if (phase >= 2) return 'The harvest overflows. The pit waits.';
+  return 'Your harvest is full! Visit the Pit to make room for new words.';
+}
+
 // ============================================================================
 // PIT PHASE TRANSITION — Ward marks and transition ceremony
 // ============================================================================
@@ -1307,4 +1320,46 @@ const VICTORY_PIT_HINTS: Record<number, string> = {
 
 export function getVictoryPitHint(targetPhase: DialoguePhase): string | null {
   return VICTORY_PIT_HINTS[targetPhase] ?? null;
+}
+
+/**
+ * Fox's one-time intro lines when Challenge Mode becomes available (after 15 puzzles).
+ */
+export function getChallengeIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 3) {
+    return [
+      'The patterns grow more complex. There are harder paths, if you dare.',
+      'Challenge Mode strips away your safety — no hints, limited undos. But the amber flows thicker.',
+      'Look for it in the puzzle setup. The arrangement rewards those who commit fully.',
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      "You've grown stronger with the letters, friend. Curious about a harder path?",
+      'Challenge Mode removes hints and limits your undos — but rewards you with 50% more amber.',
+      'Look for it in the puzzle setup menu when you want to test yourself.',
+    ];
+  }
+  return [
+    "You're getting really good at this! Want to push yourself?",
+    'Challenge Mode removes hints and limits your undos — but rewards you with 50% more amber.',
+    'Look for it in the puzzle setup menu when you\'re feeling bold.',
+  ];
+}
+
+/**
+ * Explanatory text shown when the pit visit is mandatory (phase transition pending).
+ */
+export function getPitMandatoryText(phase: DialoguePhase): string {
+  if (phase >= 3) return 'The wards glow. The pit will not wait.';
+  if (phase >= 2) return 'Something stirs beneath. Your words are needed.';
+  return 'Something is stirring. Offer your words to continue.';
+}
+
+/**
+ * CTA button label when pit visit is mandatory.
+ */
+export function getPitMandatoryCTA(phase: DialoguePhase): string {
+  if (phase >= 3) return 'The pit demands your presence';
+  return 'Visit the Pit';
 }

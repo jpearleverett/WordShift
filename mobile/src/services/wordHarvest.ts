@@ -91,11 +91,11 @@ async function saveHarvestState(): Promise<void> {
  * Enqueue a harvest batch from a completed puzzle.
  * Words are normalized to uppercase and deduplicated within the batch.
  */
-export async function enqueueHarvestBatch(batch: HarvestBatch): Promise<void> {
+export async function enqueueHarvestBatch(batch: HarvestBatch): Promise<{ overflow: boolean }> {
   const state = await loadHarvestState();
 
   // Deduplicate by ID
-  if (state.pendingBatches.some(b => b.id === batch.id)) return;
+  if (state.pendingBatches.some(b => b.id === batch.id)) return { overflow: false };
 
   // Normalize words
   const normalizedBatch: HarvestBatch = {
@@ -106,12 +106,15 @@ export async function enqueueHarvestBatch(batch: HarvestBatch): Promise<void> {
   state.pendingBatches.push(normalizedBatch);
 
   // Trim oldest if over cap
+  let overflow = false;
   if (state.pendingBatches.length > MAX_PENDING_BATCHES) {
+    overflow = true;
     state.pendingBatches = state.pendingBatches.slice(-MAX_PENDING_BATCHES);
   }
 
   harvestCache = state;
   await saveHarvestState();
+  return { overflow };
 }
 
 /**

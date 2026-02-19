@@ -843,6 +843,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(PROGRESS_STORAGE_KEY);
     await AsyncStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
     await AsyncStorage.removeItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
@@ -1291,6 +1292,28 @@ export async function hasSeenDailyChallengeIntro(): Promise<boolean> {
 export async function markDailyChallengeIntroSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(DAILY_CHALLENGE_INTRO_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Track whether Fox's one-time Challenge Mode intro has been shown (after 15 puzzles).
+ */
+const CHALLENGE_INTRO_SEEN_KEY = 'wordshift_challenge_intro_seen';
+
+export async function hasSeenChallengeIntro(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(CHALLENGE_INTRO_SEEN_KEY);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markChallengeIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CHALLENGE_INTRO_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

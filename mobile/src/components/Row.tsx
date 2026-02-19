@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
+import { DraggableTile } from './DraggableTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
@@ -51,6 +52,8 @@ interface RowProps {
   successDropSignal?: number;
   /** Word previews for each slot position (only on target row when letter is selected) */
   slotPreviews?: SlotPreview[];
+  /** Called when a letter tile is dragged and dropped — receives the letter, row, and drop position */
+  onLetterDragDrop?: (letter: Letter, rowIndex: number, position: { x: number; y: number }) => void;
 }
 
 // Phase-aware row color helper
@@ -138,6 +141,8 @@ const Slot: React.FC<{
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const catchBounceAnim = useRef(new Animated.Value(1)).current;
+  const previewOpacity = useRef(new Animated.Value(0)).current;
+  const previewScale = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
     if (settings.reducedMotion) {
@@ -220,6 +225,35 @@ const Slot: React.FC<{
       }).start();
     }
   }, [triggerCatch]);
+
+  // Animate preview appearance
+  useEffect(() => {
+    if (preview) {
+      if (settings.reducedMotion) {
+        previewOpacity.setValue(1);
+        previewScale.setValue(1);
+        return;
+      }
+      previewOpacity.setValue(0);
+      previewScale.setValue(0.85);
+      Animated.parallel([
+        Animated.timing(previewOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(previewScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 180,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      previewOpacity.setValue(0);
+      previewScale.setValue(0.85);
+    }
+  }, [preview?.word]);
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],
@@ -332,20 +366,24 @@ const Slot: React.FC<{
           )}
         </View>
 
-        {/* Word preview label */}
+        {/* Word preview label — animated fade + scale */}
         {preview && (
-          <View style={styles.slotPreviewContainer}>
+          <Animated.View style={[styles.slotPreviewContainer, {
+            opacity: previewOpacity,
+            transform: [{ scale: previewScale }],
+          }]}>
             <Text
               style={[
                 styles.slotPreviewText,
                 compact && styles.slotPreviewTextCompact,
                 preview.isValid ? styles.slotPreviewValid : styles.slotPreviewInvalid,
+                preview.isValid && styles.slotPreviewValidBold,
               ]}
               numberOfLines={1}
             >
               {preview.word}
             </Text>
-          </View>
+          </Animated.View>
         )}
       </Animated.View>
     </TouchableOpacity>
@@ -370,6 +408,7 @@ export const Row: React.FC<RowProps> = memo(({
   invalidDropSignal = 0,
   successDropSignal = 0,
   slotPreviews,
+  onLetterDragDrop,
 }) => {
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
@@ -631,20 +670,38 @@ export const Row: React.FC<RowProps> = memo(({
       const displayLetter = (concealLetters && !isSource)
         ? { ...letter, char: '•' }
         : letter;
-      return (
-      <LetterTile
-        key={letter.id}
-        letter={displayLetter}
-        isSelected={selectedLetter?.id === letter.id}
-        isInteractable={isSource && !isProcessing && !letter.isLocked}
-        highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
-        onPress={() => onLetterPress(letter, rowIndex)}
-        phase={phase}
-        compact={compactTiles}
-        isResonant={isRowResonant}
-        isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
-      />
+      const canDrag = isSource && !isProcessing && !letter.isLocked && !!onLetterDragDrop;
+      const tile = (
+        <LetterTile
+          key={canDrag ? undefined : letter.id}
+          letter={displayLetter}
+          isSelected={selectedLetter?.id === letter.id}
+          isInteractable={isSource && !isProcessing && !letter.isLocked}
+          highlight={letter.isLocked ? 'locked' : isSource ? 'source' : 'default'}
+          onPress={canDrag ? undefined : () => onLetterPress(letter, rowIndex)}
+          phase={phase}
+          compact={compactTiles}
+          isResonant={isRowResonant}
+          isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
+        />
       );
+
+      if (canDrag) {
+        return (
+          <DraggableTile
+            key={letter.id}
+            enabled={!isProcessing}
+            onDragStart={() => onLetterPress(letter, rowIndex)}
+            onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
+            onTap={() => onLetterPress(letter, rowIndex)}
+            phase={phase}
+          >
+            {tile}
+          </DraggableTile>
+        );
+      }
+
+      return tile;
     });
   };
 
@@ -1058,20 +1115,23 @@ const styles = StyleSheet.create({
     bottom: -16,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 56,
+    width: 60,
   },
   slotPreviewText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   slotPreviewTextCompact: {
-    fontSize: 8,
+    fontSize: 9,
   },
   slotPreviewValid: {
     color: CandyColors.green.main,
     opacity: 0.85,
+  },
+  slotPreviewValidBold: {
+    fontWeight: '800',
   },
   slotPreviewInvalid: {
     color: CandyColors.red.light,

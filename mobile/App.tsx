@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   StatusBar,
   Dimensions,
-  Platform,
   Animated,
   Pressable,
 } from 'react-native';
@@ -24,18 +23,16 @@ import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
 import { useVictoryFlow } from './src/hooks/useVictoryFlow';
 import { useAchievementQueue } from './src/hooks/useAchievementQueue';
+import { useSpeedTimer } from './src/hooks/useSpeedTimer';
+import { useDreadEffects } from './src/hooks/useDreadEffects';
+import { useVictoryOrchestration } from './src/hooks/useVictoryOrchestration';
+import { useOnboardingFlow } from './src/hooks/useOnboardingFlow';
+import { useAutosave } from './src/hooks/useAutosave';
 import { logEvent } from './src/services/eventLogger';
-// Feature imports
-import { hasTutorialCompleted, markTutorialCompleted } from './src/components/Tutorial';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
-import {
-  OnboardingStep,
-  getOnboardingStep,
-  setOnboardingStep,
-  ONBOARDING_FOX_LINES,
-} from './src/services/onboarding';
-import { markTutorialSeedsPlanted, awardBonusAmber } from './src/services/amberCurrency';
+import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
+import { awardBonusAmber } from './src/services/amberCurrency';
 import { checkDailyStreakMilestone, getDailyStatus } from './src/services/dailyChallenge';
 import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
@@ -50,23 +47,19 @@ import {
   getPhaseIndicator,
   getLoadingMessage,
   getRitualMicroEvent,
-  getVictoryGlitch,
-  checkNarrativeMicroBeat,
-  NarrativeMicroBeat,
+  getHarvestOverflowMessage,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
-import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation, getFullProgress } from './src/services/amberCurrency';
+import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
-import { getAnimalWhisper, getAnimalInterjection, getHomescreenNudge } from './src/services/phaseNarrative';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
-import { recordWhisper } from './src/services/whisperGallery';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
-import { savePuzzleState, loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
+import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import {
   hasVariantModifier,
   getVariantTimeLimit,
@@ -76,6 +69,7 @@ import {
   PuzzleVariant,
   VARIANT_CONFIGS,
 } from './src/services/puzzleVariety';
+import { appStyles as styles } from './src/styles/appStyles';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit';
@@ -123,90 +117,15 @@ export default function App() {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
 
-  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auto-save puzzle state during active play (debounced to reduce write churn).
-  useEffect(() => {
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
-
-    if (puzzle.gameState === GameState.PLAYING && currentScreen === 'puzzle') {
-      autosaveTimerRef.current = setTimeout(() => {
-        savePuzzleState({
-          rows: puzzle.rows,
-          activeRowIndex: puzzle.activeRowIndex,
-          selectedLetter: puzzle.selectedLetter,
-          gameState: puzzle.gameState,
-          message: puzzle.message,
-          history: puzzle.history,
-          invalidAttempts: puzzle.invalidAttempts,
-          hintsUsed: puzzle.hintsUsed,
-          undosRemaining: puzzle.undosRemaining,
-          difficulty: puzzle.difficulty,
-          currentWordLength: puzzle.currentWordLength,
-          hint: puzzle.hint,
-          solution: puzzle.solution,
-          reverseSolution: puzzle.reverseSolution,
-          gameMode: puzzle.gameMode,
-          currentVariant: puzzle.currentVariant,
-          selectedVariant: puzzle.selectedVariant,
-          moveDirection: puzzle.moveDirection,
-          blindRevealedRows: [],
-          currentPhase: puzzle.currentPhase,
-          lastFormedWord: puzzle.lastFormedWord,
-          isPlayingDaily,
-          dailyDate: isPlayingDaily ? getTodayString() : null,
-          speedTimerExpireAt: speedTimeRemaining != null
-            ? Date.now() + speedTimeRemaining * 1000
-            : null,
-          savedAt: Date.now(),
-        }).catch(() => {});
-      }, 120);
-    }
-
-    return () => {
-      if (autosaveTimerRef.current) {
-        clearTimeout(autosaveTimerRef.current);
-        autosaveTimerRef.current = null;
-      }
-    };
-  }, [
-    currentScreen,
-    isPlayingDaily,
-    puzzle.rows,
-    puzzle.activeRowIndex,
-    puzzle.selectedLetter,
-    puzzle.gameState,
-    puzzle.message,
-    puzzle.history,
-    puzzle.invalidAttempts,
-    puzzle.hintsUsed,
-    puzzle.undosRemaining,
-    puzzle.difficulty,
-    puzzle.currentWordLength,
-    puzzle.hint,
-    puzzle.solution,
-    puzzle.gameMode,
-    puzzle.currentVariant,
-    puzzle.selectedVariant,
-    puzzle.moveDirection,
-    puzzle.currentPhase,
-    puzzle.lastFormedWord,
-  ]);
-
   // StarBurst effect state for valid moves
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
     active: false, x: 0, y: 0,
   });
   const [invalidDropSignal, setInvalidDropSignal] = useState(0);
 
-  // Onboarding state (replaces old tutorial overlay)
-  const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
-  const [onboardingLineIndex, setOnboardingLineIndex] = useState(0);
-  const [onboardingReady, setOnboardingReady] = useState(false);
-  const [pitOfferDone, setPitOfferDone] = useState(false);
+  // In-progress ritual echo chain — words formed during current puzzle
+  const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
+  const clearRitualEchoWords = useCallback(() => setRitualEchoWords([]), []);
 
   // Victory animation skip-forward state
   const victoryAnimatingRef = useRef(false);
@@ -217,127 +136,11 @@ export default function App() {
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
 
-  // Animal whisper state (shown after puzzle completion)
-  const [whisper, setWhisper] = useState<{ animalName: string; text: string } | null>(null);
-  const [showWhisper, setShowWhisper] = useState(false);
-
-  // Animal interjection state (brief message pulling player to home screen)
-  const [interjection, setInterjection] = useState<{ animalName: string; text: string } | null>(null);
-  const [showInterjection, setShowInterjection] = useState(false);
-
-  // Victory glitch state (brief flash text during Phase 0 victories)
-  const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
-  const [showVictoryGlitch, setShowVictoryGlitch] = useState(false);
-  const [completionCoda, setCompletionCoda] = useState<{ title: string; text: string } | null>(null);
-
-  // Narrative micro-beat state (subtle surprise moments at specific puzzle milestones)
-  const [microBeat, setMicroBeat] = useState<NarrativeMicroBeat | null>(null);
-  const [showMicroBeat, setShowMicroBeat] = useState(false);
-
-  // Auto-dismiss interjection after 4 seconds
-  useEffect(() => {
-    if (showInterjection) {
-      const timeout = setTimeout(() => setShowInterjection(false), 4000);
-      return () => clearTimeout(timeout);
-    }
-  }, [showInterjection]);
-
-  // Speed variants: run countdown while puzzle is active.
-  useEffect(() => {
-    const isSpeedVariant = hasVariantModifier(puzzle.currentVariant, 'speed');
-    if (!isSpeedVariant || puzzle.gameState !== GameState.PLAYING) {
-      setSpeedTimeRemaining(null);
-      return;
-    }
-
-    const limit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
-      ?? getVariantTimeLimit(puzzle.currentVariant)
-      ?? 60;
-    // Use restored time if available (from autosave), otherwise full limit
-    const initialRemaining = restoredSpeedTimeRef.current ?? limit;
-    restoredSpeedTimeRef.current = null; // consume the restored value
-
-    setSpeedTimeRemaining(initialRemaining);
-    const startedAt = Date.now();
-
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      const remaining = Math.max(0, initialRemaining - elapsed);
-      setSpeedTimeRemaining(remaining);
-
-      if (remaining <= 0) {
-        clearInterval(interval);
-        setPuzzleGameState(GameState.GAME_OVER);
-        setPuzzleMessage(
-          persistence.currentPhase >= 3
-            ? 'Time collapsed. The arrangement closed this path.'
-            : 'Time is up! Start a new puzzle and try again.'
-        );
-      }
-    }, 250);
-
-    return () => clearInterval(interval);
-  }, [
-    puzzle.currentVariant,
-    puzzle.gameState,
-    puzzle.level,
-    persistence.currentPhase,
-    setPuzzleGameState,
-    setPuzzleMessage,
-  ]);
-
-  // In-progress ritual echo chain — words formed during current puzzle
-  const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
-
-  // Speed variant countdown
-  const [speedTimeRemaining, setSpeedTimeRemaining] = useState<number | null>(null);
-  // Restored speed timer value (consumed once by the timer useEffect)
+  // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
-
-  // Dread pulse state (flashes on dread word formation)
-  const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
-
-  // Screen shake for dread words at Phase 3+
-  const screenShakeRef = useRef(new Animated.Value(0)).current;
 
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
-
-  // Initialize on mount — check onboarding state
-  useEffect(() => {
-    initAudio();
-    startFrameMonitoring();
-
-    // Schedule notifications on app launch (non-blocking)
-    scheduleAllNotifications(0).catch(() => {});
-    uploadToCloud().catch(() => {});
-
-    (async () => {
-      // Check legacy tutorial flag first for backward compat
-      const tutorialDone = await hasTutorialCompleted();
-      const step = await getOnboardingStep();
-
-      if (tutorialDone && step === 'not_started') {
-        // Existing player who completed old tutorial — skip onboarding
-        await setOnboardingStep('complete');
-        setOnboardingStepState('complete');
-      } else if (step === 'not_started') {
-        // Fresh install — start onboarding
-        await setOnboardingStep('home_empty');
-        setOnboardingStepState('home_empty');
-        setOnboardingLineIndex(0);
-      } else {
-        // Resume onboarding from where they left off
-        setOnboardingStepState(step);
-        setOnboardingLineIndex(0);
-        // If app restarted during pit onboarding, navigate to pit screen
-        if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
-          setCurrentScreen('pit');
-        }
-      }
-      setOnboardingReady(true);
-    })();
-  }, []);
 
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
@@ -365,19 +168,116 @@ export default function App() {
     });
   }, [screenFade]);
 
-  // Onboarding helpers (declared early so other callbacks can reference them)
-  const isOnboarding = onboardingStep !== 'complete';
+  // ========================================================================
+  // Extracted hooks
+  // ========================================================================
 
-  /** Advance onboarding to next step */
-  const advanceOnboarding = useCallback(async (step: OnboardingStep) => {
-    await setOnboardingStep(step);
-    setOnboardingStepState(step);
-    setOnboardingLineIndex(0);
+  // Speed timer for speed-variant puzzles
+  const onSpeedTimeUp = useCallback(() => {
+    setPuzzleGameState(GameState.GAME_OVER);
+    setPuzzleMessage(
+      persistence.currentPhase >= 3
+        ? 'Time collapsed. The arrangement closed this path.'
+        : 'Time is up! Start a new puzzle and try again.'
+    );
+  }, [setPuzzleGameState, setPuzzleMessage, persistence.currentPhase]);
+
+  const [speedTimer, speedTimerActions] = useSpeedTimer(onSpeedTimeUp);
+  const { startSpeedTimer, stopSpeedTimer } = speedTimerActions;
+
+  // Start/stop speed timer based on game state
+  useEffect(() => {
+    const isSpeedVariant = hasVariantModifier(puzzle.currentVariant, 'speed');
+    if (!isSpeedVariant || puzzle.gameState !== GameState.PLAYING) {
+      stopSpeedTimer();
+      return;
+    }
+    const limit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
+      ?? getVariantTimeLimit(puzzle.currentVariant)
+      ?? 60;
+    const initialRemaining = restoredSpeedTimeRef.current ?? limit;
+    restoredSpeedTimeRef.current = null;
+    startSpeedTimer(initialRemaining);
+  }, [
+    puzzle.currentVariant,
+    puzzle.gameState,
+    puzzle.level,
+    puzzle.difficulty,
+    startSpeedTimer,
+    stopSpeedTimer,
+  ]);
+
+  // Dread pulse overlay + screen shake
+  const [dreadEffects, dreadActions] = useDreadEffects();
+
+  // Post-victory orchestration: whisper, interjection, glitch, micro-beat
+  const [orchestration, orchestrationActions] = useVictoryOrchestration();
+
+  // Onboarding flow state machine
+  const onboardingCallbacks = useMemo(() => ({
+    transitionTo: transitionTo as (screen: string, callback?: () => void) => void,
+    startNewGame: puzzleActions.startNewGame as (difficulty: string) => void,
+    setGameState: puzzleActions.setGameState as (state: string) => void,
+    setShowConfetti: puzzleActions.setShowConfetti,
+    refreshStats: persistenceActions.refreshStats,
+    resetVictory: victoryActions.resetVictory,
+  }), [transitionTo, puzzleActions.startNewGame, puzzleActions.setGameState, puzzleActions.setShowConfetti, persistenceActions.refreshStats, victoryActions.resetVictory]);
+
+  const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks, clearRitualEchoWords);
+
+  // Auto-save puzzle state during active play
+  useAutosave({
+    currentScreen,
+    isPlayingDaily,
+    rows: puzzle.rows,
+    activeRowIndex: puzzle.activeRowIndex,
+    selectedLetter: puzzle.selectedLetter,
+    gameState: puzzle.gameState,
+    message: puzzle.message,
+    history: puzzle.history,
+    invalidAttempts: puzzle.invalidAttempts,
+    hintsUsed: puzzle.hintsUsed,
+    undosRemaining: puzzle.undosRemaining,
+    difficulty: puzzle.difficulty,
+    currentWordLength: puzzle.currentWordLength,
+    hint: puzzle.hint,
+    solution: puzzle.solution,
+    reverseSolution: puzzle.reverseSolution,
+    gameMode: puzzle.gameMode,
+    currentVariant: puzzle.currentVariant,
+    selectedVariant: puzzle.selectedVariant,
+    moveDirection: puzzle.moveDirection,
+    currentPhase: puzzle.currentPhase,
+    lastFormedWord: puzzle.lastFormedWord,
+    speedTimeRemaining: speedTimer.speedTimeRemaining,
+  });
+
+  // ========================================================================
+  // Initialization
+  // ========================================================================
+
+  // App-level initialization (non-onboarding)
+  useEffect(() => {
+    initAudio();
+    startFrameMonitoring();
+    scheduleAllNotifications(0).catch(() => {});
+    uploadToCloud().catch(() => {});
   }, []);
+
+  // Resume pit screen if onboarding was interrupted during pit flow
+  useEffect(() => {
+    if (onboardingFlow.onboardingReady && (
+      onboardingFlow.onboardingStep === 'going_to_pit' ||
+      onboardingFlow.onboardingStep === 'pit_intro' ||
+      onboardingFlow.onboardingStep === 'pit_offering'
+    )) {
+      setCurrentScreen('pit');
+    }
+  }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
 
   // Onboarding tutorial guidance: exact source letter + target slot from solver steps.
   const tutorialGuidance = useMemo(() => {
-    if (onboardingStep !== 'puzzle_tutorial') return null;
+    if (onboardingFlow.onboardingStep !== 'puzzle_tutorial') return null;
     if (puzzle.gameState !== GameState.PLAYING) return null;
     if (!puzzle.solution || puzzle.solution.length === 0) return null;
 
@@ -426,13 +326,17 @@ export default function App() {
       letterToMove: relevantStep.letterToMove,
     };
   }, [
-    onboardingStep,
+    onboardingFlow.onboardingStep,
     puzzle.gameState,
     puzzle.solution,
     puzzle.moveDirection,
     puzzle.activeRowIndex,
     puzzle.rows,
   ]);
+
+  // ========================================================================
+  // Navigation & puzzle lifecycle handlers
+  // ========================================================================
 
   // Start puzzle when navigating to puzzle screen
   const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
@@ -442,7 +346,7 @@ export default function App() {
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
     setRitualEchoWords([]);
-    setCompletionCoda(null);
+    orchestrationActions.setCompletionCoda(null);
     transitionTo('puzzle', async () => {
       // Check for saved in-progress puzzle
       const saved = await loadPuzzleState();
@@ -469,7 +373,7 @@ export default function App() {
         logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
       }
     });
-  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions]);
+  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions]);
 
   // Start daily challenge — uses seeded generation for deterministic puzzles
   const handleStartDaily = useCallback(async (difficulty: Difficulty) => {
@@ -478,7 +382,7 @@ export default function App() {
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     setRitualEchoWords([]);
-    setCompletionCoda(null);
+    orchestrationActions.setCompletionCoda(null);
     transitionTo('puzzle', async () => {
       const saved = await loadPuzzleState();
       const today = getTodayString();
@@ -513,7 +417,7 @@ export default function App() {
       }
       logEvent({ type: 'puzzle_started', data: { difficulty, isDaily: true } });
     });
-  }, [puzzleActions, transitionTo]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions]);
 
   // Return to home screen
   const handleGoHome = useCallback(() => {
@@ -535,7 +439,7 @@ export default function App() {
 
     // Onboarding tutorial: keep drops focused on the guided slot.
     if (
-      onboardingStep === 'puzzle_tutorial' &&
+      onboardingFlow.onboardingStep === 'puzzle_tutorial' &&
       puzzle.gameState === GameState.PLAYING &&
       puzzle.selectedLetter &&
       tutorialGuidance?.targetSlotIndex !== null &&
@@ -616,6 +520,13 @@ export default function App() {
         }, 800);
       }
 
+      // Show harvest overflow warning if pending batches hit the cap
+      if (victory.harvestOverflow) {
+        setTimeout(() => {
+          puzzleActions.setMessage(getHarvestOverflowMessage(persistence.currentPhase as any));
+        }, 1500);
+      }
+
       puzzleActions.setEarnedStars(victory.earnedStars);
       victoryActions.setVictoryData(victory);
 
@@ -638,19 +549,16 @@ export default function App() {
       // Phase transitions are now DEFERRED to the Offering Pit.
       // When phaseTransitionPending is true, the phase change will be confirmed
       // in the pit screen with a ward mark ceremony. Don't play the overlay here.
-      // (The pit callback will trigger the overlay after the ceremony completes.)
 
       // Check for endgame triggers (final puzzle + post-revelation)
-      // Only when NOT already showing a phase transition
       if (!victory.phaseChanged && persistence.currentPhase >= 4) {
         try {
           const houseComplete = await isHouseCompleted();
           if (houseComplete) {
             const finalDone = await isFinalPuzzleCompleted();
             if (!finalDone) {
-              // First puzzle after house completion at Phase 4 = the "final puzzle"
               await markFinalPuzzleCompleted();
-              setCompletionCoda({
+              orchestrationActions.setCompletionCoda({
                 title: 'THE HOUSE STANDS COMPLETE',
                 text: persistence.currentPhase >= 3
                   ? 'You finished what was being built. There is no pretending now.'
@@ -660,9 +568,8 @@ export default function App() {
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
-                // First puzzle after final puzzle = post-revelation (Phase 5)
                 await markPostRevelation();
-                setCompletionCoda({
+                orchestrationActions.setCompletionCoda({
                   title: 'THE PATTERN REMEMBERS YOU',
                   text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
                 });
@@ -678,27 +585,14 @@ export default function App() {
       // Check achievements after brief delay to not block victory display
       setTimeout(() => achievementActions.checkForAchievements(victory), 500);
 
-      // Victory glitch — brief flash text at Phase 0 (~8% chance, guaranteed first puzzle)
-      const glitchText = getVictoryGlitch(persistence.currentPhase, victory.cumulativeStats?.totalPuzzlesCompleted ?? 1);
-      if (glitchText) {
-        setTimeout(() => {
-          setVictoryGlitch(glitchText);
-          setShowVictoryGlitch(true);
-          setTimeout(() => setShowVictoryGlitch(false), 500);
-        }, 300);
-      }
-
-      // Narrative micro-beat — surprise moments at specific puzzle milestones
-      checkNarrativeMicroBeat(victory.cumulativeStats?.totalPuzzlesCompleted ?? 0).then(beat => {
-        if (beat) {
-          const delay = beat.type === 'glitch_title' ? 600 : 1800;
-          setTimeout(() => {
-            setMicroBeat(beat);
-            setShowMicroBeat(true);
-            setTimeout(() => setShowMicroBeat(false), beat.durationMs);
-          }, delay);
-        }
-      }).catch(() => {});
+      // Post-victory orchestration: glitch, micro-beat, whisper, interjection
+      orchestrationActions.processVictory({
+        phase: persistence.currentPhase,
+        totalPuzzlesCompleted: victory.cumulativeStats?.totalPuzzlesCompleted ?? 1,
+        completedWords: result.completedWords,
+        isOnboarding: onboardingFlow.isOnboarding,
+        puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
+      });
 
       // Re-schedule notifications after puzzle completion
       scheduleAllNotifications(persistence.currentPhase).catch(() => {});
@@ -706,70 +600,6 @@ export default function App() {
       // Mark cloud save as having pending changes
       markPendingChanges().catch(() => {});
       uploadToCloud().catch(() => {});
-
-      // During onboarding, victory modal is shown with a "Continue" button
-      // that the player taps to advance to puzzle_complete step (no auto-advance).
-
-      // Trigger animal whisper after a delay (skip during onboarding to keep focus on FoxGuide)
-      if (!isOnboarding) setTimeout(async () => {
-        try {
-          const fullProgress = await getFullProgress();
-          const whisperData = getAnimalWhisper(
-            persistence.currentPhase,
-            fullProgress.unlockedAnimals || [],
-            result.completedWords
-          );
-          if (whisperData) {
-            setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
-            setShowWhisper(true);
-            // Record whisper in gallery
-            recordWhisper({
-              animalType: whisperData.animalType || 'unknown',
-              animalName: whisperData.animalName,
-              text: whisperData.text,
-              phase: persistence.currentPhase,
-              type: 'whisper',
-            }).catch(() => {});
-          }
-        } catch {
-          // Whispers are non-critical
-        }
-      }, 1200);
-
-      // Trigger animal interjection or home nudge after a longer delay (skip during onboarding)
-      if (!isOnboarding) setTimeout(async () => {
-        if (showWhisper) return; // Don't stack with whisper
-        try {
-          const fullProgress = await getFullProgress();
-
-          // Home nudge takes priority after 3+ puzzles without visiting home
-          if (puzzlesSinceHomeVisit.current >= 3) {
-            const nudge = getHomescreenNudge(
-              persistence.currentPhase,
-              fullProgress.unlockedAnimals || [],
-              puzzlesSinceHomeVisit.current
-            );
-            if (nudge) {
-              setInterjection(nudge);
-              setShowInterjection(true);
-              return;
-            }
-          }
-
-          // Standard random interjection
-          const interj = getAnimalInterjection(
-            persistence.currentPhase,
-            fullProgress.unlockedAnimals || [],
-            fullProgress.puzzlesSolved || 0
-          );
-          if (interj) {
-            setInterjection(interj);
-            setShowInterjection(true);
-          }
-        } catch {
-          // Interjections are non-critical
-        }
-      }, 2500);
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -795,7 +625,7 @@ export default function App() {
 
       // Dread word visual feedback — subtle dark pulse when a dread word is formed
       if (persistence.currentPhase >= 2 && result.formedWord && isDreadWord(result.formedWord)) {
-        triggerDreadPulse(persistence.currentPhase);
+        dreadActions.triggerDreadPulse(persistence.currentPhase);
       }
     }
   }, [
@@ -808,14 +638,16 @@ export default function App() {
     victoryFlow.isProcessingVictory,
     victoryActions,
     achievementActions,
-    onboardingStep,
-    advanceOnboarding,
+    onboardingFlow.onboardingStep,
+    onboardingFlow.isOnboarding,
+    orchestrationActions,
+    dreadActions,
     tutorialGuidance,
   ]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
     if (
-      onboardingStep === 'puzzle_tutorial' &&
+      onboardingFlow.onboardingStep === 'puzzle_tutorial' &&
       puzzle.gameState === GameState.PLAYING &&
       puzzle.selectedLetter &&
       letter.id !== puzzle.selectedLetter.id
@@ -827,7 +659,7 @@ export default function App() {
     }
 
     if (
-      onboardingStep === 'puzzle_tutorial' &&
+      onboardingFlow.onboardingStep === 'puzzle_tutorial' &&
       puzzle.gameState === GameState.PLAYING &&
       !puzzle.selectedLetter &&
       tutorialGuidance?.sourceLetterId &&
@@ -842,7 +674,23 @@ export default function App() {
     hapticLight();
     soundTap();
     puzzleActions.handleLetterPress(letter, rowIndex);
-  }, [puzzleActions, onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
+  }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
+
+  // Drag-and-drop: when a letter is dragged onto the target row area, find the
+  // closest valid slot and press it. The letter was already selected via onDragStart.
+  const handleLetterDragDrop = useCallback((_letter: any, _rowIndex: number, position: { x: number; y: number }) => {
+    if (!puzzle.slotPreviews || puzzle.slotPreviews.length === 0) return;
+
+    // Find the first valid slot preview (prefer valid words)
+    const validSlotIndex = puzzle.slotPreviews.findIndex((p: any) => p && p.isValid);
+    if (validSlotIndex >= 0) {
+      handleSlotPress(validSlotIndex, position);
+      return;
+    }
+    // No valid slot — pick the middle slot as fallback to trigger the invalid feedback
+    const midSlot = Math.floor(puzzle.slotPreviews.length / 2);
+    handleSlotPress(midSlot, position);
+  }, [puzzle.slotPreviews, handleSlotPress]);
 
   const handleUndo = useCallback(() => {
     hapticLight();
@@ -862,18 +710,16 @@ export default function App() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);
-    setShowInterjection(false);
-    setInterjection(null);
+    orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
-    setCompletionCoda(null);
     puzzleActions.handleNextLevel();
-  }, [puzzleActions, victoryActions]);
+  }, [puzzleActions, victoryActions, orchestrationActions]);
 
   // During onboarding, "Continue" on victory modal advances to puzzle_complete step
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
-    await advanceOnboarding('puzzle_complete');
-  }, [advanceOnboarding]);
+    await onboardingActions.advanceOnboarding('puzzle_complete');
+  }, [onboardingActions]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
@@ -881,13 +727,11 @@ export default function App() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);
-    setShowInterjection(false);
-    setInterjection(null);
+    orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
-    setCompletionCoda(null);
     puzzleActions.clearBoard();
     transitionTo('home');
-  }, [puzzleActions, transitionTo, victoryActions]);
+  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions]);
 
   const handleGoToPit = useCallback(() => {
     hapticLight();
@@ -895,13 +739,11 @@ export default function App() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);
-    setShowInterjection(false);
-    setInterjection(null);
+    orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
-    setCompletionCoda(null);
     puzzleActions.clearBoard();
     transitionTo('pit');
-  }, [puzzleActions, transitionTo, victoryActions]);
+  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions]);
 
   const handleShare = useCallback(async () => {
     if (!victoryFlow.victoryData) return;
@@ -917,11 +759,11 @@ export default function App() {
       dailyDate: isPlayingDaily ? getTodayString() : undefined,
       moveCount,
       wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
-      animalWhisper: whisper?.text,
+      animalWhisper: orchestration.whisper?.text,
       phase: persistence.currentPhase,
       incantationName: puzzle.lastIncantationName || undefined,
     });
-  }, [victoryFlow.victoryData, puzzle, isPlayingDaily, whisper, persistence.currentPhase]);
+  }, [victoryFlow.victoryData, puzzle, isPlayingDaily, orchestration.whisper, persistence.currentPhase]);
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (victoryAnimatingRef.current && victoryFlow.victoryData) {
@@ -933,9 +775,9 @@ export default function App() {
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
     setRitualEchoWords([]);
-    setCompletionCoda(null);
+    orchestrationActions.setCompletionCoda(null);
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
-  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant]);
+  }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions]);
 
   const handleSelectVariant = useCallback((variant: PuzzleVariant) => {
     if (!isVariantUnlocked(variant, puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
@@ -944,7 +786,7 @@ export default function App() {
     hapticSelection();
     soundTap();
     setRitualEchoWords([]);
-    setCompletionCoda(null);
+    orchestrationActions.setCompletionCoda(null);
     puzzleActions.setSelectedVariant(variant);
     puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
   }, [
@@ -953,233 +795,23 @@ export default function App() {
     puzzle.gameMode,
     puzzlesSolvedForVariantUnlocks,
     persistence.currentPhase,
+    orchestrationActions,
   ]);
-
-  // Trigger dread pulse when a dread word is formed during a puzzle
-  const triggerDreadPulse = useCallback((phase: number) => {
-    // Haptic feedback on dread words
-    if (phase >= 3) {
-      hapticMedium();
-    } else if (phase >= 2) {
-      hapticLight();
-    }
-
-    if (getSettingsSync().reducedMotion) return;
-    const maxOpacity = phase >= 4 ? 0.25 : phase >= 3 ? 0.18 : 0.10;
-    Animated.sequence([
-      Animated.timing(dreadPulseOpacity, {
-        toValue: maxOpacity,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(dreadPulseOpacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Screen shake on dread words at Phase 3+
-    if (phase >= 3) {
-      const intensity = phase >= 4 ? 4 : 2;
-      Animated.sequence([
-        Animated.timing(screenShakeRef, { toValue: intensity, duration: 50, useNativeDriver: true }),
-        Animated.timing(screenShakeRef, { toValue: -intensity, duration: 50, useNativeDriver: true }),
-        Animated.timing(screenShakeRef, { toValue: intensity * 0.5, duration: 50, useNativeDriver: true }),
-        Animated.timing(screenShakeRef, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [dreadPulseOpacity, screenShakeRef]);
 
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
     setRitualEchoWords([]);
-    setCompletionCoda(null);
+    orchestrationActions.setCompletionCoda(null);
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
     puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant]);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions]);
 
   // ========================================================================
-  // Onboarding flow helpers (continued)
+  // Render
   // ========================================================================
-
-  /** Handle "Continue" tap on the FoxGuide during onboarding */
-  const handleOnboardingContinue = useCallback(async () => {
-    switch (onboardingStep) {
-      case 'home_empty':
-        // This is handled by HomeScreen — tapping the den triggers fox_invited
-        break;
-
-      case 'fox_invited': {
-        const lines = ONBOARDING_FOX_LINES.fox_invited;
-        if (onboardingLineIndex < lines.length - 1) {
-          setOnboardingLineIndex(prev => prev + 1);
-        } else {
-          // Fox intro done — go to puzzle
-          await advanceOnboarding('going_to_puzzle');
-          // Small delay then navigate to puzzle
-          setTimeout(async () => {
-            await advanceOnboarding('puzzle_tutorial');
-            persistenceActions.refreshStats();
-            setRitualEchoWords([]);
-            transitionTo('puzzle', () => {
-              puzzleActions.startNewGame('EASY');
-              logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
-            });
-          }, 300);
-        }
-        break;
-      }
-
-      case 'puzzle_tutorial': {
-        // Contextual guidance — handled by puzzle screen interactions
-        // This handles the intro line before the player starts
-        const lines = ONBOARDING_FOX_LINES.puzzle_tutorial_intro;
-        if (onboardingLineIndex < lines.length - 1) {
-          setOnboardingLineIndex(prev => prev + 1);
-        }
-        // After intro, guide is hidden until player makes moves
-        break;
-      }
-
-      case 'puzzle_complete': {
-        const lines = ONBOARDING_FOX_LINES.puzzle_tutorial_complete;
-        if (onboardingLineIndex < lines.length - 1) {
-          setOnboardingLineIndex(prev => prev + 1);
-        } else {
-          // Navigate to pit for harvest introduction
-          await advanceOnboarding('going_to_pit');
-          hapticLight();
-          puzzleActions.setShowConfetti(false);
-          victoryActions.resetVictory();
-          setRitualEchoWords([]);
-          setPitOfferDone(false);
-          setTimeout(async () => {
-            await advanceOnboarding('pit_intro');
-            transitionTo('pit', () => {
-              puzzleActions.setGameState(GameState.IDLE);
-            });
-          }, 300);
-        }
-        break;
-      }
-
-      case 'pit_intro': {
-        const pitLines = ONBOARDING_FOX_LINES.pit_intro;
-        if (onboardingLineIndex < pitLines.length - 1) {
-          setOnboardingLineIndex(prev => prev + 1);
-        } else {
-          // Fox done explaining — advance to offering step (triggers auto-offer in pit)
-          await advanceOnboarding('pit_offering');
-        }
-        break;
-      }
-
-      case 'pit_offering': {
-        const offerLines = ONBOARDING_FOX_LINES.pit_offering_complete;
-        if (onboardingLineIndex < offerLines.length - 1) {
-          setOnboardingLineIndex(prev => prev + 1);
-        } else {
-          // Navigate home for unlock explanation
-          await advanceOnboarding('returning_home');
-          hapticLight();
-          transitionTo('home', async () => {
-            await advanceOnboarding('unlock_explained');
-          });
-        }
-        break;
-      }
-
-      case 'unlock_explained': {
-        const lines = ONBOARDING_FOX_LINES.unlock_explained;
-        if (onboardingLineIndex < lines.length - 1) {
-          setOnboardingLineIndex(prev => prev + 1);
-        } else {
-          // Onboarding complete!
-          await markTutorialCompleted();
-          await markTutorialSeedsPlanted().catch(() => {});
-          await advanceOnboarding('complete');
-        }
-        break;
-      }
-
-      default:
-        break;
-    }
-  }, [onboardingStep, onboardingLineIndex, advanceOnboarding, transitionTo, puzzleActions, persistenceActions, victoryActions, hapticLight]);
-
-  /** Skip onboarding — during pre-puzzle steps, skip to tutorial puzzle; otherwise complete entirely */
-  const handleSkipOnboarding = useCallback(async () => {
-    if (onboardingStep === 'fox_invited' || onboardingStep === 'home_empty') {
-      // Skip dialogue but continue to tutorial puzzle
-      await advanceOnboarding('going_to_puzzle');
-      setTimeout(async () => {
-        await advanceOnboarding('puzzle_tutorial');
-        persistenceActions.refreshStats();
-        setRitualEchoWords([]);
-        transitionTo('puzzle', () => {
-          puzzleActions.startNewGame('EASY');
-          logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
-        });
-      }, 300);
-    } else {
-      // During/after puzzle: complete onboarding entirely
-      await markTutorialCompleted();
-      await markTutorialSeedsPlanted().catch(() => {});
-      await advanceOnboarding('complete');
-    }
-  }, [onboardingStep, advanceOnboarding, persistenceActions, puzzleActions, transitionTo]);
-
-  /** Called by OfferingPitScreen when auto-offer completes during onboarding */
-  const handlePitOnboardingOfferComplete = useCallback(() => {
-    setPitOfferDone(true);
-    persistenceActions.refreshStats();
-  }, [persistenceActions]);
-
-  /** Get current Fox guide text for the active onboarding step */
-  const getOnboardingFoxText = useCallback((): string => {
-    const key = onboardingStep === 'puzzle_tutorial'
-      ? 'puzzle_tutorial_intro'
-      : onboardingStep === 'pit_offering'
-        ? 'pit_offering_complete'
-        : onboardingStep;
-    const lines = ONBOARDING_FOX_LINES[key];
-    if (!lines || lines.length === 0) return '';
-    return lines[Math.min(onboardingLineIndex, lines.length - 1)] || '';
-  }, [onboardingStep, onboardingLineIndex]);
-
-  /** Get the Fox guide button text for the current step */
-  const getOnboardingButtonText = useCallback((): string => {
-    switch (onboardingStep) {
-      case 'fox_invited': {
-        const lines = ONBOARDING_FOX_LINES.fox_invited;
-        if (onboardingLineIndex === 0) return 'Nice to meet you!';
-        if (onboardingLineIndex >= lines.length - 1) return "Let's go!";
-        return 'Next';
-      }
-      case 'puzzle_tutorial':
-        return 'Got it!';
-      case 'puzzle_complete':
-        return "What's next?";
-      case 'pit_intro': {
-        const pitLines = ONBOARDING_FOX_LINES.pit_intro;
-        if (onboardingLineIndex >= pitLines.length - 1) return 'Offer words!';
-        return 'Next';
-      }
-      case 'pit_offering':
-        return "Let's go home!";
-      case 'unlock_explained': {
-        const lines = ONBOARDING_FOX_LINES.unlock_explained;
-        if (onboardingLineIndex >= lines.length - 1) return "Let's play!";
-        return 'Next';
-      }
-      default:
-        return 'Continue';
-    }
-  }, [onboardingStep, onboardingLineIndex]);
 
   // Show loading while onboarding state is being determined
-  if (!onboardingReady) {
+  if (!onboardingFlow.onboardingReady) {
     return (
       <View style={styles.initialLoadingContainer}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -1278,18 +910,18 @@ export default function App() {
                 // Update notifications with new phase
                 scheduleAllNotifications(newPhase).catch(() => {});
               }}
-              isOnboarding={isOnboarding}
-              onboardingStep={onboardingStep}
-              onOnboardingOfferComplete={handlePitOnboardingOfferComplete}
+              isOnboarding={onboardingFlow.isOnboarding}
+              onboardingStep={onboardingFlow.onboardingStep}
+              onOnboardingOfferComplete={onboardingActions.handlePitOnboardingOfferComplete}
             />
             {/* Fox Guide overlay — shown during onboarding on pit screen */}
-            {isOnboarding && (onboardingStep === 'pit_intro' || onboardingStep === 'pit_offering') && (
+            {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering') && (
               <FoxGuide
-                visible={onboardingStep === 'pit_intro' || (onboardingStep === 'pit_offering' && pitOfferDone)}
+                visible={onboardingFlow.onboardingStep === 'pit_intro' || (onboardingFlow.onboardingStep === 'pit_offering' && onboardingFlow.pitOfferDone)}
                 variant="dialogue"
-                text={getOnboardingFoxText()}
-                buttonText={getOnboardingButtonText()}
-                onContinue={handleOnboardingContinue}
+                text={onboardingActions.getOnboardingFoxText()}
+                buttonText={onboardingActions.getOnboardingButtonText()}
+                onContinue={onboardingActions.handleOnboardingContinue}
                 position="bottom"
               />
             )}
@@ -1316,8 +948,8 @@ export default function App() {
                 onOpenGallery={() => transitionTo('gallery')}
                 onOpenPit={() => transitionTo('pit')}
                 onStartDaily={handleStartDaily}
-                onboardingStep={onboardingStep}
-                onAdvanceOnboarding={advanceOnboarding}
+                onboardingStep={onboardingFlow.onboardingStep}
+                onAdvanceOnboarding={onboardingActions.advanceOnboarding}
                 pitPhaseReady={persistence.pendingPhaseTransition != null}
               />
               {/* Achievement toast overlay */}
@@ -1327,20 +959,20 @@ export default function App() {
                 phase={persistence.currentPhase}
               />
               {/* Fox Guide overlay — shown during onboarding on home screen */}
-              {isOnboarding && currentScreen === 'home' && (
-                (onboardingStep === 'home_empty' ||
-                 onboardingStep === 'fox_invited' ||
-                 onboardingStep === 'unlock_explained') && (
+              {onboardingFlow.isOnboarding && currentScreen === 'home' && (
+                (onboardingFlow.onboardingStep === 'home_empty' ||
+                 onboardingFlow.onboardingStep === 'fox_invited' ||
+                 onboardingFlow.onboardingStep === 'unlock_explained') && (
                   <FoxGuide
                     visible={true}
                     variant="dialogue"
-                    text={getOnboardingFoxText()}
-                    buttonText={getOnboardingButtonText()}
-                    onContinue={onboardingStep === 'home_empty' ? undefined : handleOnboardingContinue}
-                    showSkip={onboardingStep !== 'unlock_explained'}
-                    onSkip={handleSkipOnboarding}
-                    position={onboardingStep === 'home_empty' ? 'middle' : 'bottom'}
-                    anchorStyle={onboardingStep === 'home_empty'
+                    text={onboardingActions.getOnboardingFoxText()}
+                    buttonText={onboardingActions.getOnboardingButtonText()}
+                    onContinue={onboardingFlow.onboardingStep === 'home_empty' ? undefined : onboardingActions.handleOnboardingContinue}
+                    showSkip={onboardingFlow.onboardingStep !== 'unlock_explained'}
+                    onSkip={onboardingActions.handleSkipOnboarding}
+                    position={onboardingFlow.onboardingStep === 'home_empty' ? 'middle' : 'bottom'}
+                    anchorStyle={onboardingFlow.onboardingStep === 'home_empty'
                       ? {
                           top: Math.min(SCREEN_HEIGHT * 0.56, 430),
                           left: 12,
@@ -1363,7 +995,7 @@ export default function App() {
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
       <View style={styles.screenBackground}>
-      <Animated.View style={[styles.container, { opacity: screenFade, transform: [{ translateX: screenShakeRef }] }]}>
+      <Animated.View style={[styles.container, { opacity: screenFade, transform: [{ translateX: dreadEffects.screenShakeRef }] }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* Animated Background — darkens with narrative phase */}
@@ -1391,7 +1023,7 @@ export default function App() {
         {/* Header */}
         <View style={styles.header}>
           {/* Hide home button during onboarding tutorial */}
-          {!isOnboarding ? (
+          {!onboardingFlow.isOnboarding ? (
             <TouchableOpacity
               style={styles.headerHomeButton}
               onPress={handleGoHome}
@@ -1441,7 +1073,7 @@ export default function App() {
         </View>
 
         {/* Stats Row — hidden during onboarding to reduce clutter */}
-        {isOnboarding ? null : (
+        {onboardingFlow.isOnboarding ? null : (
         <View style={styles.statsRow}>
           <View style={styles.leftStatsGroup}>
             <LevelDisplay level={puzzle.level} />
@@ -1513,16 +1145,16 @@ export default function App() {
         </View>
 
         {/* Speed Timer — prominent display */}
-        {speedTimeRemaining !== null && (
+        {speedTimer.speedTimeRemaining !== null && (
           <View style={[
             styles.speedTimerContainer,
-            speedTimeRemaining <= 10 && styles.speedTimerUrgent,
+            speedTimer.speedTimeRemaining <= 10 && styles.speedTimerUrgent,
           ]}>
             <Text style={[
               styles.speedTimerText,
-              speedTimeRemaining <= 10 && styles.speedTimerTextUrgent,
+              speedTimer.speedTimeRemaining <= 10 && styles.speedTimerTextUrgent,
             ]}>
-              {'\u23F1'} {speedTimeRemaining}s
+              {'\u23F1'} {speedTimer.speedTimeRemaining}s
             </Text>
           </View>
         )}
@@ -1566,10 +1198,11 @@ export default function App() {
                 phase={persistence.currentPhase}
                 wordLength={row.words.length}
                 concealLetters={false}
-                guidanceActive={onboardingStep === 'puzzle_tutorial'}
+                guidanceActive={onboardingFlow.onboardingStep === 'puzzle_tutorial'}
                 guidedLetterId={tutorialGuidance?.sourceLetterId || null}
                 guidedSlotIndex={tutorialGuidance?.targetSlotIndex ?? null}
                 invalidDropSignal={invalidDropSignal}
+                onLetterDragDrop={handleLetterDragDrop}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews
@@ -1611,7 +1244,7 @@ export default function App() {
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
           />
-          {!isOnboarding && (
+          {!onboardingFlow.isOnboarding && (
           <ActionButton
             icon="🔄"
             label="NEW"
@@ -1648,7 +1281,7 @@ export default function App() {
 
         {/* Victory Modal — shown during onboarding puzzle_tutorial (hidden during puzzle_complete when FoxGuide takes over) */}
         <VictoryModal
-          visible={puzzle.gameState === GameState.WON && !(isOnboarding && onboardingStep === 'puzzle_complete')}
+          visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete')}
           earnedStars={puzzle.earnedStars}
           level={puzzle.level}
           difficulty={puzzle.difficulty}
@@ -1656,7 +1289,7 @@ export default function App() {
           phaseTransitionPending={persistence.pendingPhaseTransition != null}
           isPlayingDaily={isPlayingDaily}
           victoryData={victoryFlow.victoryData}
-          completionCoda={completionCoda}
+          completionCoda={orchestration.completionCoda}
           cumulativeStats={persistence.cumulativeStats}
           completedWords={puzzle.lastCompletedWords}
           incantationName={puzzle.lastIncantationName}
@@ -1669,69 +1302,69 @@ export default function App() {
           onReturnHome={handleReturnHome}
           onGoToPit={handleGoToPit}
           onShare={handleShare}
-          isOnboarding={isOnboarding && onboardingStep === 'puzzle_tutorial'}
+          isOnboarding={onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_tutorial'}
           onOnboardingContinue={handleOnboardingVictoryContinue}
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}
         />
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
-        {showVictoryGlitch && victoryGlitch && (
+        {orchestration.showVictoryGlitch && orchestration.victoryGlitch && (
           <View style={styles.victoryGlitchOverlay} pointerEvents="none">
-            <Text style={styles.victoryGlitchText}>{victoryGlitch}</Text>
+            <Text style={styles.victoryGlitchText}>{orchestration.victoryGlitch}</Text>
           </View>
         )}
 
         {/* Narrative Micro-Beat — surprise moments at puzzle milestones */}
-        {showMicroBeat && microBeat && (
+        {orchestration.showMicroBeat && orchestration.microBeat && (
           <View style={[
             styles.victoryGlitchOverlay,
-            microBeat.type === 'ambient_whisper' && styles.microBeatWhisperOverlay,
+            orchestration.microBeat.type === 'ambient_whisper' && styles.microBeatWhisperOverlay,
           ]} pointerEvents="none">
             <Text style={[
-              microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
+              orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
             ]}>
-              {microBeat.type === 'glitch_title' ? microBeat.glitchTitle : microBeat.text}
+              {orchestration.microBeat.type === 'glitch_title' ? orchestration.microBeat.glitchTitle : orchestration.microBeat.text}
             </Text>
           </View>
         )}
 
         {/* Animal Whisper — ghost-like message from an animal after puzzle completion */}
         <AnimalWhisper
-          visible={showWhisper}
-          animalName={whisper?.animalName || ''}
-          whisperText={whisper?.text || ''}
+          visible={orchestration.showWhisper}
+          animalName={orchestration.whisper?.animalName || ''}
+          whisperText={orchestration.whisper?.text || ''}
           phase={persistence.currentPhase}
-          onComplete={() => setShowWhisper(false)}
+          onComplete={orchestrationActions.dismissWhisper}
         />
 
         {/* Animal Interjection — brief message pulling player to home screen */}
-        {showInterjection && interjection && !showWhisper && (
+        {orchestration.showInterjection && orchestration.interjection && !orchestration.showWhisper && (
           <View style={styles.interjectionContainer}>
             <Text style={[
               styles.interjectionText,
               persistence.currentPhase >= 3 && styles.interjectionTextDark,
             ]}>
-              {interjection.text}
+              {orchestration.interjection.text}
             </Text>
           </View>
         )}
 
         {/* Dread Pulse — subtle dark flash when a dread word is formed */}
         <Animated.View
-          style={[styles.dreadPulseOverlay, { opacity: dreadPulseOpacity }]}
+          style={[styles.dreadPulseOverlay, { opacity: dreadEffects.dreadPulseOpacity }]}
           pointerEvents="none"
         />
 
         {/* Fox Guide overlay — shown during onboarding on puzzle screen (hidden when victory modal is showing) */}
-        {isOnboarding && (onboardingStep === 'puzzle_tutorial' || onboardingStep === 'puzzle_complete') && !(onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.WON) && (
+        {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_tutorial' || onboardingFlow.onboardingStep === 'puzzle_complete') && !(onboardingFlow.onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.WON) && (
           <FoxGuide
             visible={true}
             variant="dialogue"
             text={
-              onboardingStep === 'puzzle_complete'
+              onboardingFlow.onboardingStep === 'puzzle_complete'
                 ? ONBOARDING_FOX_LINES.puzzle_tutorial_complete[
-                    Math.min(onboardingLineIndex, ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1)
+                    Math.min(onboardingFlow.onboardingLineIndex, ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1)
                   ]
                 : puzzle.gameState === GameState.PLAYING && puzzle.selectedLetter
                   ? (
@@ -1748,20 +1381,20 @@ export default function App() {
                     : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
             }
             buttonText={
-              onboardingStep === 'puzzle_complete'
-                ? (onboardingLineIndex < ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1
+              onboardingFlow.onboardingStep === 'puzzle_complete'
+                ? (onboardingFlow.onboardingLineIndex < ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1
                     ? "Next"
                     : "Let's go!")
                 : undefined
             }
             onContinue={
-              onboardingStep === 'puzzle_complete'
-                ? handleOnboardingContinue
+              onboardingFlow.onboardingStep === 'puzzle_complete'
+                ? onboardingActions.handleOnboardingContinue
                 : undefined
             }
             position="bottom"
             anchorStyle={
-              onboardingStep === 'puzzle_complete'
+              onboardingFlow.onboardingStep === 'puzzle_complete'
                 ? {
                     // Center the completion dialogue on screen
                     top: Math.min(Math.max(SCREEN_HEIGHT * 0.35, 280), 380),
@@ -1798,408 +1431,3 @@ export default function App() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  initialLoadingContainer: {
-    flex: 1,
-    backgroundColor: '#1A1A2E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  initialLoadingCard: {
-    minWidth: 220,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-  },
-  initialLoadingTitle: {
-    marginTop: 14,
-    fontSize: 22,
-    fontWeight: '900',
-    color: CandyColors.white,
-    letterSpacing: 1.2,
-  },
-  initialLoadingSubtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.75)',
-    letterSpacing: 0.4,
-  },
-  screenBackground: {
-    flex: 1,
-    backgroundColor: '#1A1A2E',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: CandyColors.purple.main,
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
-    paddingBottom: 8,
-    zIndex: 100,
-  },
-  headerHomeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  headerHomeText: {
-    fontSize: 20,
-  },
-  headerTitleArea: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  dailyBadge: {
-    backgroundColor: CandyColors.yellow.main,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  dailyBadgeText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: CandyColors.gray[800],
-    letterSpacing: 2,
-  },
-  helpButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  helpButtonShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  helpButtonText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: CandyColors.white,
-  },
-
-  // Stats Row
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    zIndex: 100,
-  },
-  difficultyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  difficultyButtonShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  difficultyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-  difficultyDotEasy: {
-    backgroundColor: CandyColors.green.main,
-  },
-  difficultyDotMedium: {
-    backgroundColor: CandyColors.yellow.main,
-  },
-  difficultyDotMediumPlus: {
-    backgroundColor: CandyColors.orange.main,
-  },
-  difficultyDotHard: {
-    backgroundColor: CandyColors.red.main,
-  },
-  difficultyText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: CandyColors.white,
-    marginRight: 6,
-  },
-  difficultyArrow: {
-    fontSize: 8,
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-
-  // Toast
-  toastContainer: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    zIndex: 50,
-  },
-
-  // Game area
-  gameArea: {
-    flex: 1,
-    paddingHorizontal: 8,
-    justifyContent: 'flex-start',
-    paddingTop: 10,
-  },
-  rowsContainer: {
-    paddingVertical: 16,
-    paddingBottom: 40,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-    borderRadius: 24,
-  },
-  loadingBox: {
-    backgroundColor: CandyColors.white,
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: '700',
-    color: CandyColors.purple.main,
-  },
-  loadingGlyph: {
-    marginTop: 8,
-    fontSize: 18,
-    color: CandyColors.purple.main,
-    opacity: 0.8,
-  },
-  loadingHint: {
-    marginTop: 6,
-    fontSize: 11,
-    color: CandyColors.gray[500],
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-
-  // Controls
-  controls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 30,
-    gap: 20,
-  },
-
-  // Challenge mode styles
-  leftStatsGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  challengeBadge: {
-    backgroundColor: CandyColors.red.main,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  challengeBadgeText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: CandyColors.white,
-    letterSpacing: 1,
-  },
-  challengeUndoText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  speedTimerContainer: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    paddingHorizontal: 28,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginBottom: 6,
-    marginTop: 2,
-  },
-  speedTimerUrgent: {
-    backgroundColor: 'rgba(210, 40, 70, 0.85)',
-  },
-  speedTimerText: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: CandyColors.white,
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  speedTimerTextUrgent: {
-    color: '#FFE0E0',
-  },
-  variantBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.16)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    maxWidth: 180,
-  },
-  variantBadgeDark: {
-    backgroundColor: 'rgba(35, 18, 45, 0.75)',
-    borderWidth: 1,
-    borderColor: 'rgba(130, 70, 120, 0.35)',
-  },
-  variantBadgeIcon: {
-    fontSize: 10,
-  },
-  variantBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.85)',
-    letterSpacing: 0.2,
-    flexShrink: 1,
-  },
-  variantBadgeTextDark: {
-    color: 'rgba(220, 170, 200, 0.95)',
-  },
-
-  // Phase indicator badge
-  phaseBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 10,
-    marginTop: 4,
-    gap: 4,
-  },
-  phaseBadgeDark: {
-    backgroundColor: 'rgba(60, 30, 80, 0.4)',
-  },
-  phaseBadgeVoid: {
-    backgroundColor: 'rgba(20, 10, 30, 0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(120, 40, 80, 0.4)',
-  },
-  phaseBadgeIcon: {
-    fontSize: 12,
-  },
-  phaseBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.8)',
-    letterSpacing: 1,
-  },
-  phaseBadgeTextDark: {
-    color: 'rgba(200, 180, 220, 0.9)',
-  },
-
-  // Phase change dramatic flash overlay
-  phaseFlashOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000000',
-    zIndex: 999,
-  },
-  dreadPulseOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(100, 0, 30, 1)',
-    zIndex: 998,
-  },
-  victoryGlitchOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-  },
-  victoryGlitchText: {
-    color: '#FF0040',
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 4,
-    textShadowColor: '#FF0040',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
-  },
-  microBeatWhisperOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
-  microBeatWhisperText: {
-    color: 'rgba(200, 180, 220, 0.9)',
-    fontSize: 18,
-    fontWeight: '500',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    letterSpacing: 1,
-    textShadowColor: 'rgba(150, 100, 200, 0.4)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
-  interjectionContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 20,
-    right: 20,
-    alignItems: 'center',
-    zIndex: 500,
-  },
-  interjectionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    backgroundColor: 'rgba(100, 60, 140, 0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  interjectionTextDark: {
-    color: 'rgba(200, 160, 180, 0.9)',
-    backgroundColor: 'rgba(30, 15, 40, 0.7)',
-  },
-});

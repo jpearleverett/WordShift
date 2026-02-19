@@ -136,6 +136,27 @@ describe('wordHarvest', () => {
       expect(state.pendingBatches[0].id).toBe('batch_1');
       expect(state.pendingBatches[199].id).toBe('batch_200');
     });
+
+    it('returns { overflow: false } when under the cap', async () => {
+      const result = await enqueueHarvestBatch(makeBatch({ id: 'b1' }));
+      expect(result).toEqual({ overflow: false });
+    });
+
+    it('returns { overflow: false } for duplicate batch IDs', async () => {
+      await enqueueHarvestBatch(makeBatch({ id: 'dup' }));
+      const result = await enqueueHarvestBatch(makeBatch({ id: 'dup' }));
+      expect(result).toEqual({ overflow: false });
+    });
+
+    it('returns { overflow: true } when the 200 cap is exceeded', async () => {
+      // Fill to exactly 200
+      for (let i = 0; i < 200; i++) {
+        await enqueueHarvestBatch(makeBatch({ id: `fill_${i}` }));
+      }
+      // The 201st triggers overflow
+      const result = await enqueueHarvestBatch(makeBatch({ id: 'overflow_trigger' }));
+      expect(result).toEqual({ overflow: true });
+    });
   });
 
   // ===========================================================================

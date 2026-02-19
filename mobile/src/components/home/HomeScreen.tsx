@@ -25,9 +25,12 @@ import {
   spendAmber,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
+  hasSeenChallengeIntro,
+  markChallengeIntroSeen,
 } from '../../services/amberCurrency';
 import {
   getDailyChallengeIntroLines,
+  getChallengeIntroLines,
   getHouseCompletionText,
   getWordsOfferedText,
 } from '../../services/phaseNarrative';
@@ -53,6 +56,8 @@ import {
 
 import { useDialogueFlow } from '../../hooks/useDialogueFlow';
 import { useUnlockFlow } from '../../hooks/useUnlockFlow';
+import { FeatureTooltip } from './FeatureTooltip';
+import { getNextTooltipFeature, markTooltipSeen, TOOLTIP_TEXT, TooltipFeature } from '../../services/onboarding';
 
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
@@ -118,7 +123,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro'>('animal_intro');
+
+  // Feature tooltip state
+  const [activeTooltip, setActiveTooltip] = useState<TooltipFeature | null>(null);
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -247,6 +255,58 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
   ]);
 
+  // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if ((progress.puzzlesSolved || 0) < 15) return;
+
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenChallengeIntro();
+      if (seen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getChallengeIntroLines(progress.currentPhase));
+      setIntroContext('challenge_intro');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // Post-onboarding feature tooltip (show one per home visit)
+  useEffect(() => {
+    if (isOnboarding || !onboardingStep || onboardingStep !== 'complete') return;
+    if (showIntroDialogue || introOverrideLines) return;
+
+    let cancelled = false;
+    (async () => {
+      const feature = await getNextTooltipFeature();
+      if (!cancelled && feature) {
+        setActiveTooltip(feature);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOnboarding, onboardingStep, showIntroDialogue, introOverrideLines]);
+
+  const handleDismissTooltip = useCallback(async () => {
+    if (activeTooltip) {
+      await markTooltipSeen(activeTooltip);
+      setActiveTooltip(null);
+    }
+  }, [activeTooltip]);
+
   // Talking animation for intro dialogue
   const [introIsTalking, setIntroIsTalking] = useState(false);
   useEffect(() => {
@@ -359,6 +419,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // Intro complete - mark as seen and close
       if (introContext === 'daily_unlock') {
         await markDailyChallengeIntroSeen();
+      } else if (introContext === 'challenge_intro') {
+        await markChallengeIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -376,6 +438,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // Mark intros as seen even if closed early so the player isn't forced repeatedly.
       if (introContext === 'daily_unlock') {
         await markDailyChallengeIntroSeen();
+      } else if (introContext === 'challenge_intro') {
+        await markChallengeIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -645,6 +709,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
         </View>
+      )}
+
+      {/* Feature Tooltip — shown one per home visit after onboarding */}
+      {activeTooltip && (
+        <FeatureTooltip
+          text={TOOLTIP_TEXT[activeTooltip]}
+          position={
+            activeTooltip === 'stats'
+              ? { top: 52, right: 60 }
+              : activeTooltip === 'gallery'
+                ? { bottom: 85, left: 20 }
+                : { bottom: 85, right: 20 }
+          }
+          arrowDirection={activeTooltip === 'stats' ? 'up' : 'down'}
+          onDismiss={handleDismissTooltip}
+          phase={progress?.currentPhase ?? 0}
+        />
       )}
 
       {/* Celebration Confetti */}

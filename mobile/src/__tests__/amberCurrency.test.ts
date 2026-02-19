@@ -26,6 +26,8 @@ import {
   STREAK_FREEZE_AMBER_COST,
   checkStreakMilestone,
   STREAK_MILESTONES,
+  hasSeenChallengeIntro,
+  markChallengeIntroSeen,
 } from '../services/amberCurrency';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -521,5 +523,27 @@ describe('checkStreakMilestone', () => {
     const result = checkStreakMilestone(21, 20, 2 as any);
     expect(result).not.toBeNull();
     expect(result!.message).toBe('Twenty-one days. It recognizes your rhythm.');
+  });
+});
+
+// ============================================================================
+// Challenge Mode Intro Tracking (Feature 3)
+// ============================================================================
+
+describe('challenge intro tracking', () => {
+  test('hasSeenChallengeIntro returns false initially', async () => {
+    expect(await hasSeenChallengeIntro()).toBe(false);
+  });
+
+  test('markChallengeIntroSeen persists the flag', async () => {
+    await markChallengeIntroSeen();
+    expect(await hasSeenChallengeIntro()).toBe(true);
+  });
+
+  test('clearProgress resets challenge intro flag', async () => {
+    await markChallengeIntroSeen();
+    expect(await hasSeenChallengeIntro()).toBe(true);
+    await clearProgress();
+    expect(await hasSeenChallengeIntro()).toBe(false);
   });
 });

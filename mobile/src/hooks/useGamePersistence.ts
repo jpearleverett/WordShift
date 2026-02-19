@@ -66,6 +66,8 @@ export interface VictoryData {
   pendingHarvest?: HarvestSummary;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
+  /** True when pending harvest batches hit the 200 cap and oldest were trimmed */
+  harvestOverflow: boolean;
 }
 
 export interface PersistenceState {
@@ -168,6 +170,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
         phaseTransitionPending: false,
+        harvestOverflow: false,
       };
     }
 
@@ -211,7 +214,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const harvestedWords = completedWords.length > 0
         ? [...new Set(completedWords.map(w => w.toUpperCase()))]
         : [];
-      await enqueueHarvestBatch({
+      const harvestResult = await enqueueHarvestBatch({
         id: generateBatchId(),
         words: harvestedWords,
         amberValue: totalQueuedAmber,
@@ -331,6 +334,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         harvestedWords,
         pendingHarvest,
         phaseTransitionPending: amberResult.phaseTransitionPending,
+        harvestOverflow: harvestResult.overflow,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -357,6 +361,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
         phaseTransitionPending: false,
+        harvestOverflow: false,
       };
     } finally {
       recordInProgress.current = false;

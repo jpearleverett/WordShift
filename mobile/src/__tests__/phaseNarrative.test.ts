@@ -14,6 +14,10 @@ import {
   checkNarrativeMicroBeat,
   resetMicroBeats,
   getHomescreenNudge,
+  getHarvestOverflowMessage,
+  getChallengeIntroLines,
+  getPitMandatoryText,
+  getPitMandatoryCTA,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -595,5 +599,153 @@ describe('getHomescreenNudge', () => {
         expect(result.animalName).toBe('Ember');
       }
     }
+  });
+});
+
+// ============================================================================
+// Harvest Overflow Warning (Feature 6)
+// ============================================================================
+
+describe('getHarvestOverflowMessage', () => {
+  test('returns a non-empty string for all phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const msg = getHarvestOverflowMessage(phase);
+      expect(typeof msg).toBe('string');
+      expect(msg.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('phase 0-1 is friendly and mentions the Pit', () => {
+    expect(getHarvestOverflowMessage(0)).toContain('Pit');
+    expect(getHarvestOverflowMessage(1)).toContain('Pit');
+  });
+
+  test('phase 2 references the harvest overflowing', () => {
+    expect(getHarvestOverflowMessage(2)).toContain('overflows');
+  });
+
+  test('phase 3+ is dark and imperative', () => {
+    expect(getHarvestOverflowMessage(3)).toContain('Feed it');
+    expect(getHarvestOverflowMessage(4)).toContain('Feed it');
+  });
+
+  test('different phase ranges produce different messages', () => {
+    const p0 = getHarvestOverflowMessage(0);
+    const p2 = getHarvestOverflowMessage(2);
+    const p3 = getHarvestOverflowMessage(3);
+    expect(p0).not.toBe(p2);
+    expect(p2).not.toBe(p3);
+    expect(p0).not.toBe(p3);
+  });
+});
+
+// ============================================================================
+// Challenge Mode Fox Intro (Feature 3)
+// ============================================================================
+
+describe('getChallengeIntroLines', () => {
+  test('returns exactly 3 lines for all phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const lines = getChallengeIntroLines(phase);
+      expect(Array.isArray(lines)).toBe(true);
+      expect(lines).toHaveLength(3);
+    }
+  });
+
+  test('all lines are non-empty strings', () => {
+    for (const phase of [0, 1, 2, 3, 4] as const) {
+      const lines = getChallengeIntroLines(phase);
+      for (const line of lines) {
+        expect(typeof line).toBe('string');
+        expect(line.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('phase 0-1 mentions 50% more amber', () => {
+    const lines = getChallengeIntroLines(0);
+    const joined = lines.join(' ');
+    expect(joined).toContain('50%');
+    expect(joined).toContain('amber');
+  });
+
+  test('phase 2 uses curious tone', () => {
+    const lines = getChallengeIntroLines(2);
+    const joined = lines.join(' ');
+    expect(joined).toContain('harder path');
+  });
+
+  test('phase 3+ uses ritual language', () => {
+    const lines = getChallengeIntroLines(3);
+    const joined = lines.join(' ');
+    expect(joined).toContain('arrangement');
+  });
+
+  test('different phase ranges produce different content', () => {
+    const p0 = getChallengeIntroLines(0).join('');
+    const p2 = getChallengeIntroLines(2).join('');
+    const p3 = getChallengeIntroLines(3).join('');
+    expect(p0).not.toBe(p2);
+    expect(p2).not.toBe(p3);
+  });
+});
+
+// ============================================================================
+// Mandatory Pit Phase Transition (Feature 1)
+// ============================================================================
+
+describe('getPitMandatoryText', () => {
+  test('returns a non-empty string for all phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const text = getPitMandatoryText(phase);
+      expect(typeof text).toBe('string');
+      expect(text.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('phase 0-1 mentions stirring and offering words', () => {
+    const text = getPitMandatoryText(0);
+    expect(text).toContain('stirring');
+    expect(text).toContain('Offer');
+  });
+
+  test('phase 2 mentions something stirs beneath', () => {
+    const text = getPitMandatoryText(2);
+    expect(text).toContain('stirs');
+  });
+
+  test('phase 3+ references wards and the pit', () => {
+    const text = getPitMandatoryText(3);
+    expect(text).toContain('wards');
+    expect(text).toContain('pit');
+  });
+
+  test('different phase ranges produce different messages', () => {
+    const p0 = getPitMandatoryText(0);
+    const p2 = getPitMandatoryText(2);
+    const p3 = getPitMandatoryText(3);
+    expect(p0).not.toBe(p2);
+    expect(p2).not.toBe(p3);
+  });
+});
+
+describe('getPitMandatoryCTA', () => {
+  test('returns a non-empty string for all phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const cta = getPitMandatoryCTA(phase);
+      expect(typeof cta).toBe('string');
+      expect(cta.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('phase 0-2 says Visit the Pit', () => {
+    expect(getPitMandatoryCTA(0)).toBe('Visit the Pit');
+    expect(getPitMandatoryCTA(1)).toBe('Visit the Pit');
+    expect(getPitMandatoryCTA(2)).toBe('Visit the Pit');
+  });
+
+  test('phase 3+ is more demanding', () => {
+    expect(getPitMandatoryCTA(3)).toContain('demands');
+    expect(getPitMandatoryCTA(4)).toContain('demands');
   });
 });

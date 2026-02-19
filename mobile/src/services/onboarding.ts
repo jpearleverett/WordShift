@@ -74,7 +74,55 @@ export async function resetOnboarding(): Promise<void> {
   cachedStep = null;
   try {
     await AsyncStorage.removeItem(ONBOARDING_KEY);
+    await AsyncStorage.removeItem(TOOLTIPS_SEEN_KEY);
   } catch {}
+}
+
+// ============================================================================
+// POST-ONBOARDING FEATURE TOOLTIPS
+// ============================================================================
+
+const TOOLTIPS_SEEN_KEY = 'wordshift_tooltips_seen';
+
+export const TOOLTIP_FEATURES = ['stats', 'gallery', 'pit'] as const;
+export type TooltipFeature = typeof TOOLTIP_FEATURES[number];
+
+export const TOOLTIP_TEXT: Record<TooltipFeature, string> = {
+  stats: 'Track your progress and achievements',
+  gallery: 'Browse collected whispers and dialogue',
+  pit: 'Offer harvested words to earn amber',
+};
+
+/**
+ * Returns the next unseen tooltip feature, or null if all have been seen.
+ */
+export async function getNextTooltipFeature(): Promise<TooltipFeature | null> {
+  try {
+    const raw = await AsyncStorage.getItem(TOOLTIPS_SEEN_KEY);
+    const seen: string[] = raw ? JSON.parse(raw) : [];
+    for (const feature of TOOLTIP_FEATURES) {
+      if (!seen.includes(feature)) return feature;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mark a tooltip feature as seen.
+ */
+export async function markTooltipSeen(feature: TooltipFeature): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(TOOLTIPS_SEEN_KEY);
+    const seen: string[] = raw ? JSON.parse(raw) : [];
+    if (!seen.includes(feature)) {
+      seen.push(feature);
+      await AsyncStorage.setItem(TOOLTIPS_SEEN_KEY, JSON.stringify(seen));
+    }
+  } catch {
+    // Non-critical
+  }
 }
 
 /**
