@@ -103,6 +103,7 @@ export interface PuzzleGameActions {
   setCurrentPhase: (phase: DialoguePhase) => void;
   setSelectedVariant: (variant: PuzzleVariant) => void;
   restorePuzzleState: (saved: SavedPuzzleState) => void;
+  clearBoard: () => void;
 }
 
 export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
@@ -388,7 +389,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             await recordPuzzleWords(bankPuzzle.words);
             if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
-              setMessage(getVariantInstruction(config, currentPhase));
+              setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
             } else {
               setMessage(getStartMessage(currentPhase));
             }
@@ -413,7 +414,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, puzzle.reverseSolution);
       if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
-        setMessage(getVariantInstruction(config, currentPhase));
+        setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
       }
     } catch (localErr) {
       console.log("Local generation failed, using fallback:", localErr);
@@ -431,7 +432,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
       if (fallbackVariant !== 'standard') {
         const config = VARIANT_CONFIGS[fallbackVariant];
-        setMessage(getVariantInstruction(config, currentPhase));
+        setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
       } else if (variant !== 'standard') {
         // Variant was dropped during fallback — notify the player
         setMessage(
@@ -962,6 +963,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setEarnedStars(0);
   }, []);
 
+  const clearBoard = useCallback(() => {
+    setRows([]);
+    setActiveRowIndex(0);
+    setSelectedLetter(null);
+    setGameState(GameState.IDLE);
+    setMessage('');
+    setError(null);
+    setHistory([]);
+    setLastCompletedWords([]);
+    setLastIncantationName(null);
+    setLastFormedWord(null);
+    setDoubleShiftPhase(null);
+  }, []);
+
   const state: PuzzleGameState = {
     rows,
     activeRowIndex,
@@ -1014,6 +1029,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentPhase,
     setSelectedVariant,
     restorePuzzleState,
+    clearBoard,
   };
 
   return [state, actions];

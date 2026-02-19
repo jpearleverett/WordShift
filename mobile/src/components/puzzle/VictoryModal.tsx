@@ -21,6 +21,7 @@ import {
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
+import { AMBER_REWARDS } from '../../constants/gameBalance';
 
 export interface VictoryData {
   earnedStars: number;
@@ -29,6 +30,9 @@ export interface VictoryData {
   challengeBonus: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
+  firstCompletionBonus?: number;
+  streakMilestoneBonus?: number;
+  streakMilestoneMessage?: string | null;
   currentStreak: number;
   phaseChanged: boolean;
   newPhase: number;
@@ -377,77 +381,124 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
             </Animated.View>
 
-            {/* Group 3: Bonus breakdown + cumulative stats */}
+            {/* Group 3: Amber breakdown + Collect Now */}
             <Animated.View style={{ opacity: contentOpacity3 }}>
-            <View style={[styles.victoryStats, {
-              backgroundColor: phaseTheme.modalStatBgColor,
-            }]}>
-              {/* Itemized bonus breakdown */}
-              <View style={styles.bonusBreakdown}>
-                <View style={styles.bonusRow}>
-                  <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
-                  <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>Base</Text>
-                </View>
-                {earnedStars >= 3 && (
-                  <View style={styles.bonusRow}>
-                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>3{'\u2605'} Perfect</Text>
-                    <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+50%</Text>
-                  </View>
-                )}
-                {earnedStars === 2 && (
-                  <View style={styles.bonusRow}>
-                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>2{'\u2605'} Great</Text>
-                    <Text style={[styles.bonusValue, { color: '#C0C0C0' }]}>+25%</Text>
-                  </View>
-                )}
-                {gameMode === 'challenge' && (
-                  <View style={styles.bonusRow}>
-                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
-                    <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>1.5x</Text>
-                  </View>
-                )}
-                {variant && variant !== 'standard' && VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS] && (
-                  <View style={styles.bonusRow}>
-                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                      {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS].title}
-                    </Text>
-                    <Text style={[styles.bonusValue, { color: '#B088D0' }]}>
-                      {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS].amberMultiplier}x
-                    </Text>
-                  </View>
-                )}
-                {victoryData && victoryData.streakBonus > 0 && victoryData.currentStreak > 1 && (
-                  <View style={styles.bonusRow}>
-                    <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                      {'\uD83D\uDD25'} {victoryData.currentStreak}-day Streak
-                    </Text>
-                    <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>
-                      +{Math.min((victoryData.currentStreak - 1) * 10, 100)}%
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </View>
+            {victoryData && (() => {
+              const baseAmber = AMBER_REWARDS[difficulty as keyof typeof AMBER_REWARDS] || 0;
+              const starBonus = earnedStars >= 3
+                ? Math.floor(baseAmber * 0.5)
+                : earnedStars === 2
+                ? Math.floor(baseAmber * 0.25)
+                : 0;
+              const challengeBonusAmber = victoryData.challengeBonus ?? 0;
+              const variantBonusAmber = victoryData.variantBonus ?? 0;
+              const streakBonusAmber = victoryData.streakBonus ?? 0;
+              const firstCompBonus = victoryData.firstCompletionBonus ?? 0;
+              const milestoneAmber = victoryData.milestoneBonus ?? 0;
+              const streakMilestoneAmber = victoryData.streakMilestoneBonus ?? 0;
+              const totalAmber = victoryData.amberEarned ?? 0;
 
-            {/* Cumulative stats */}
-            {cumulativeStats && (
-              <View style={[styles.cumulativeStats, {
-                borderTopColor: phaseTheme.modalDividerColor,
-              }]}>
-                <View style={styles.cumulativeStatItem}>
-                  <Text style={[styles.cumulativeStatValue, { color: phaseTheme.modalTextColor }]}>{cumulativeStats.totalStars}</Text>
-                  <Text style={[styles.cumulativeStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Total Stars</Text>
+              return (
+                <>
+                <View style={[styles.victoryStats, {
+                  backgroundColor: phaseTheme.modalStatBgColor,
+                }]}>
+                  <View style={styles.bonusBreakdown}>
+                    <View style={styles.bonusRow}>
+                      <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
+                      <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>{'\uD83D\uDC8E'} {baseAmber}</Text>
+                    </View>
+                    {starBonus > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {earnedStars >= 3 ? '3\u2605 Perfect' : '2\u2605 Great'}
+                        </Text>
+                        <Text style={[styles.bonusValue, { color: earnedStars >= 3 ? '#FFD700' : '#C0C0C0' }]}>+{starBonus}</Text>
+                      </View>
+                    )}
+                    {challengeBonusAmber > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
+                        <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>+{challengeBonusAmber}</Text>
+                      </View>
+                    )}
+                    {variantBonusAmber > 0 && variant && variant !== 'standard' && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS]?.title || 'Variant'}
+                        </Text>
+                        <Text style={[styles.bonusValue, { color: '#B088D0' }]}>+{variantBonusAmber}</Text>
+                      </View>
+                    )}
+                    {streakBonusAmber > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {'\uD83D\uDD25'} {victoryData.currentStreak}-day Streak
+                        </Text>
+                        <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakBonusAmber}</Text>
+                      </View>
+                    )}
+                    {firstCompBonus > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          First {difficulty} Clear
+                        </Text>
+                        <Text style={[styles.bonusValue, { color: '#50C878' }]}>+{firstCompBonus}</Text>
+                      </View>
+                    )}
+                    {milestoneAmber > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {'\uD83C\uDFC6'} Milestone
+                        </Text>
+                        <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+{milestoneAmber}</Text>
+                      </View>
+                    )}
+                    {streakMilestoneAmber > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {'\uD83D\uDD25'} Streak Milestone
+                        </Text>
+                        <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakMilestoneAmber}</Text>
+                      </View>
+                    )}
+                    <View style={[styles.bonusDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
+                    <View style={styles.bonusRow}>
+                      <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>Total</Text>
+                      <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 15, fontWeight: '900' }]}>
+                        {'\uD83D\uDC8E'} {totalAmber}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.cumulativeStatItem}>
-                  <Text style={[styles.cumulativeStatValue, { color: phaseTheme.modalTextColor }]}>{cumulativeStats.threeStarCount}</Text>
-                  <Text style={[styles.cumulativeStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Perfect</Text>
-                </View>
-                <View style={styles.cumulativeStatItem}>
-                  <Text style={[styles.cumulativeStatValue, { color: phaseTheme.modalTextColor }]}>{cumulativeStats.totalPuzzlesCompleted}</Text>
-                  <Text style={[styles.cumulativeStatLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Puzzles</Text>
-                </View>
-              </View>
-            )}
+
+                {/* Collect Now — below amber totals */}
+                {!isOnboarding && (
+                  <TouchableOpacity
+                    onPress={onGoToPit}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Collect amber in the pit"
+                    accessibilityRole="button"
+                    style={{ marginTop: 8 }}
+                  >
+                    <View style={styles.btn3dWrapper}>
+                      <View style={[styles.btn3dBody, {
+                        backgroundColor: btn.harvest.bg,
+                        shadowColor: btn.harvest.shadow,
+                      }]}>
+                        <View style={styles.btn3dBevel} />
+                        <View style={styles.btn3dGlossy} />
+                        <Text style={styles.btn3dPrimaryText}>{'\uD83C\uDF3E'} COLLECT NOW</Text>
+                      </View>
+                      <View style={[styles.btn3dEdge, {
+                        backgroundColor: btn.harvest.edge,
+                      }]} />
+                    </View>
+                  </TouchableOpacity>
+                )}
+                </>
+              );
+            })()}
 
             </Animated.View>
 
@@ -508,28 +559,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   {getVictoryPitHint(victoryData.newPhase as DialoguePhase) ?? ''}
                 </Text>
               )}
-
-              {/* Harvest Now — secondary 3D candy button */}
-              <TouchableOpacity
-                onPress={onGoToPit}
-                activeOpacity={0.85}
-                accessibilityLabel="Go to the pit to harvest words"
-                accessibilityRole="button"
-              >
-                <View style={styles.btn3dWrapper}>
-                  <View style={[styles.btn3dBody, styles.btn3dBodyNarrow, {
-                    backgroundColor: btn.harvest.bg,
-                    shadowColor: btn.harvest.shadow,
-                  }]}>
-                    <View style={styles.btn3dBevel} />
-                    <View style={styles.btn3dGlossy} />
-                    <Text style={styles.btn3dSecondaryText}>{'\uD83C\uDF3E'} HARVEST NOW</Text>
-                  </View>
-                  <View style={[styles.btn3dEdge, styles.btn3dEdgeNarrow, {
-                    backgroundColor: btn.harvest.edge,
-                  }]} />
-                </View>
-              </TouchableOpacity>
             </View>
 
             <View style={styles.victoryButtonRowSecondary}>
@@ -688,6 +717,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: CandyColors.purple.main,
+  },
+  bonusDivider: {
+    height: 1,
+    marginVertical: 6,
   },
   cumulativeStats: {
     flexDirection: 'row',
