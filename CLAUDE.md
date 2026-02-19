@@ -63,8 +63,8 @@ npx jest --no-coverage   # Run all tests (897 tests, 32 suites)
   - Puzzle completion no longer credits amber directly — amber is queued in harvest batches via `wordHarvest.ts`.
   - New `OfferingPitScreen.tsx` screen (navigated as `currentScreen: 'pit'`) where players offer batches to convert queued amber into spendable amber.
   - `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred).
-  - `useGamePersistence.ts` `recordVictory()` enqueues harvest batches, returns `harvestedWords` and `pendingHarvest` in VictoryData.
-  - VictoryModal shows queued amber with phase-aware "harvest" label, bonus source hints (challenge/style/perfect solve/streak), and a "Harvest Now" button navigating directly to the pit. Home screen action row has pit button with pending word count badge.
+  - `useGamePersistence.ts` `recordVictory()` enqueues harvest batches, returns `harvestedWords`, `pendingHarvest`, and `firstCompletionBonus` in VictoryData.
+  - VictoryModal shows itemized amber breakdown with concrete values per bonus source and a "Collect Now" button navigating directly to the pit. Home screen action row has Gallery and Pit buttons (pit has pending word count badge).
   - Phase-aware narrative text for pit UI in `phaseNarrative.ts` (9 new functions).
   - Cloud save, Reset All Data, and 19+ new tests cover the full harvest lifecycle.
 - **Deferred phase transitions via Offering Pit ward marks**:
@@ -83,6 +83,7 @@ npx jest --no-coverage   # Run all tests (897 tests, 32 suites)
   - Autosave now persists the full active puzzle snapshot while playing (not just move-count checkpoints).
   - `selectedLetter` is restored when valid, so players can return exactly where they left off.
   - Daily saves store `dailyDate` and can resume same-day daily runs.
+  - Speed timer saves `speedTimerExpireAt` (absolute timestamp) so time continues to elapse while the player is away; on restore, remaining seconds are recomputed from the current time.
 - **Weekly quest wiring completed**:
   - `recordVictory(...)` now passes `isDaily` through to quest progress updates.
   - Animal conversations now record weekly unique animal visits via `recordAnimalVisit(...)` for `visit_animals` quests.
@@ -464,7 +465,7 @@ When a letter is selected (picked up), ghost previews show what word would form 
 
 Variants are now player-selected from the setup menu (not randomly injected). Players can choose any unlocked variant before starting a puzzle, and a preferred variant is persisted for future runs.
 - **Reverse Shift**: Standard rules down to the bottom, then return all the way back up to the first row. Letters shifted during the forward pass stay locked (cumulative locking), so each intermediate row has exactly 2 locked positions during the reverse leg. All reverse puzzles at all difficulties are served from pre-generated banks of 500 validated puzzles each (with `reverseSolution` for hint support during the reverse leg); on-device generation is used as fallback with `requireReverseSolvable` validation, `relaxBoring` to widen the candidate pool, a dedicated `generateReverseChain()` brute-force sampler, and pre-computed adjacency/removal indices for fast lookup (25s internal timeout, 30s wrapper).
-- **Speed Shift**: 60-second timed run.
+- **Speed Shift**: Timed run with difficulty-aware timers. Timer displayed as a large prominent countdown (28px, centered) between the stats row and puzzle area, with red background + pulse when ≤10 seconds remaining. `getVariantInstruction(config, phase, difficulty?)` generates accurate instruction text (e.g., "Four-row sprint" for HARD). Speed timer state persists across navigation via `speedTimerExpireAt` in autosave — real time elapses while the player is away.
 - **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
 - **Double Shift**: Move 2 letters per step instead of 1. All displayed words are 5 letters (W=5 is the only viable word length — needs W-2=3 letter intermediates and W+2=7 letter tempStates, both within the dictionary's 3-7 letter range). Difficulty differentiated purely by row count: EASY=3 rows, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. Each step: pick a letter from current word, drop it into next word, pick the second letter from current word, drop it into next word. Both shifted letters stay locked in their target row and cannot be picked in later steps. All difficulties served from pre-generated banks of 500 puzzles each; the generator enforces position-based locking constraints (via `receivedPositions` on `DoubleShiftPathNode`) so generated solutions never require picking a locked letter. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. During both drop phases, players can freely tap different letters in the source row to switch selection and preview drop slot options before committing. Source word validation is deferred to the actual drop (not on letter tap). Undo reverses one drop at a time (not both at once). Rows with 6-7 letters use compact tile mode to prevent overflow. 1.65x amber multiplier. Pre-computed `getDoubleInsertionIndex(wordLength)` maps letter pairs to valid (baseWord, result, positions) tuples for O(1) candidate lookup.
 
@@ -498,12 +499,13 @@ Game logic is extracted into six custom hooks:
 - `slotPreviews` - Computed via `useMemo`: when a letter is selected, previews what word each slot insertion would form (valid/invalid)
 - `handleHint()` - Show phase-aware hint (blocked in challenge mode); uses `reverseSolution` when `moveDirection === 'up'` for correct reverse-leg hints
 - `handleUndo()` - Undo last move (limited to 1 in challenge mode); uses MoveDelta pattern (lightweight deltas instead of deep clones)
+- `clearBoard()` - Reset all puzzle state (rows, activeRowIndex, selectedLetter, gameState, message, history, etc.) to idle. Called by `handleReturnHome` and `handleGoToPit` so returning via Play shows a fresh puzzle instead of the previously solved one
 - `setCurrentPhase(phase)` - Sync narrative phase from persistence layer
 - All messages (start, loading, move success, hints) use `phaseNarrative.ts` for phase-aware tone
 
 **`useGamePersistence()`** (`src/hooks/useGamePersistence.ts`):
 - All persistence: amber balance, cumulative stats, phase, streak, pending phase transition state
-- `recordVictory(difficulty, hintsUsed, invalidAttempts, gameMode?, completedWords?)` - Record win, update stats, returns VictoryData (includes `phaseTransitionPending: boolean`, `harvestedWords`, `pendingHarvest`)
+- `recordVictory(difficulty, hintsUsed, invalidAttempts, gameMode?, completedWords?)` - Record win, update stats, returns VictoryData (includes `phaseTransitionPending: boolean`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus: number`)
 - `refreshStats()` - Reload stats, amber balance, current phase, `phaseProgressFraction`, and `pendingPhaseTransition` from storage
 - `setAmberBalance(balance)` - Direct setter for amber balance
 - `phaseProgressFraction: number` - Normalized 0.0-1.0 progress toward next phase (for pit ward marks)
@@ -565,8 +567,8 @@ Managed by `useVictoryFlow()` hook. When puzzle completes (`handleSlotPress` ret
    - **Completion Coda** (endgame): first final-puzzle/post-revelation wins show a dedicated acknowledgement block in VictoryModal for stronger emotional closure
    - Phase-aware feedback text shifts tone with narrative phase
    - **Harvest info**: Queued word count with phase-aware verb ("harvested" → "claimed")
-   - **Bonus breakdown**: Group 3 stat box shows itemized multiplier sources instead of level number — difficulty (always), 3★/2★ bonus, challenge mode, variant type + multiplier, streak percentage. Each line shows label + value.
-   - **Action buttons**: Two-row layout — primary row (Next Level + Harvest Now), secondary row (Share + Home). "Harvest Now" navigates directly to the pit screen via `onGoToPit` callback. Harvest button styled in amber/orange. During onboarding, only a "CONTINUE" button is shown (no Harvest/Share/Home).
+   - **Amber breakdown**: Itemized amber-value rows showing concrete amounts — base amber for difficulty (always), star bonus (+50%/+25%), challenge bonus, variant bonus, streak bonus, first completion bonus, milestone bonus, streak milestone bonus. Divider line, then bold total. "Collect Now" button directly below the amber box navigates to pit via `onGoToPit`.
+   - **Action buttons**: Primary row has Next Level only. Secondary row has Share + Home. During onboarding, only a "CONTINUE" button is shown (no Collect Now/Share/Home).
 6. If phase changed: Phase transition is **deferred** — `pendingPhaseTransition` is set but `currentPhase` stays at old value. VictoryModal shows cryptic pit hint via `getVictoryPitHint()`. `PhaseTransitionOverlay` cinematic is triggered later from the Offering Pit when the player confirms the transition via the ward ignition ceremony, followed by `playPhaseChangeFlash()` double flicker to black
 7. StarBurst particle effect plays on each valid intermediate move
 8. **Dread Pulse** (Phase 2+): When a valid intermediate move forms a dread word, the screen briefly flashes with a crimson overlay. Phase-scaled opacity (0.10 → 0.18 → 0.25). Uses `isDreadWord()` from `localGenerator.ts`. `handleSlotPress` returns `{ completed: false, formedWord }` for intermediate moves.
@@ -680,7 +682,7 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - Phase-aware background images: `pitt_day.png` (Phase 0-1), `pitt_dusk.png` (Phase 2), `pitt_night.png` (Phase 3-4) with matching solid fallback colors
 - Phase-aware devour colors: gold → amber → purple → deep purple → crimson trail/glow/burst
 - Device-tier aware: word count caps (15/30/50), trail particles (2/5), impact particles (4/8), amber particles (3/7)
-- Summary stats bar: pending amber, lifetime offered, spendable balance
+- Summary stats bar: pending amber and lifetime offered
 - "Offer All" primary CTA with phase-aware label
 - **Ward marks**: 7 circles (`PIT_WARD_COUNT`) distributed along upper arc of pit oval. Each ~12px: unlit (barely visible) → lit (solid glow) based on `floor(fraction * 7)`. When pending: all lit and pulsing in unison (2.4s cycle). Phase-aware colors via `getWardMarkColors()`: turquoise (Phase 0) → purple (Phase 1-2) → crimson (Phase 3-4)
 - **Ward hint text**: When `fraction >= 0.3`, `getPitWardHint()` shows cryptic text ("Something stirs below..."). When all wards lit, `getPitTransitionReadyText()` shows larger pulsing ready text
@@ -707,9 +709,9 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 
 **Integration points:**
 - `amberCurrency.ts`: `awardPuzzleAmber()` and `applyVariantAmberBonus()` accept `creditToBalance` param (default `false` = deferred)
-- `useGamePersistence.ts`: `recordVictory()` enqueues harvest batch, returns `harvestedWords` and `pendingHarvest` in VictoryData
-- `VictoryModal.tsx`: Shows queued amber with phase-aware "harvest" label, bonus source hints, and "Harvest Now" button navigating to pit screen via `onGoToPit` callback
-- `HomeScreen.tsx`: Pit button in action row with word count badge; `pitPhaseReady` prop triggers pulsing gold button when phase transition is pending
+- `useGamePersistence.ts`: `recordVictory()` enqueues harvest batch, returns `harvestedWords`, `pendingHarvest`, and `firstCompletionBonus` in VictoryData
+- `VictoryModal.tsx`: Shows itemized amber breakdown (base, star, challenge, variant, streak, first completion, milestone amounts) with total and "Collect Now" button navigating to pit screen via `onGoToPit` callback
+- `HomeScreen.tsx`: Action row has Gallery and Pit buttons (no Words Offered counter); pit has word count badge; `pitPhaseReady` prop triggers pulsing gold button when phase transition is pending
 - `VictoryModal.tsx`: `phaseTransitionPending` prop shows cryptic pit hint via `getVictoryPitHint()`
 - `App.tsx`: `PhaseTransitionOverlay` cinematic now triggered from pit `onPhaseTransitionConfirmed` callback (not victory flow)
 - `SettingsScreen.tsx`: `clearHarvestState()` called on Reset All Data
@@ -822,7 +824,7 @@ The house is built from the ground up, one room at a time. What begins as "build
 5. **Owl (Archimedes)** - 100 amber to invite
 6. ...continues alternating rooms (escalating: 50-475 amber) and animals (flat: 100 amber each)
 
-**Unlock Progress Bar**: Home screen shows amber progress toward next unlock with a visual bar.
+**Unlock Progress Bar**: Home screen shows amber progress toward next unlock with a visual bar. Label shows generic "Next Unlock" (not the specific animal/room name).
 
 ### Phase-Aware Room Descriptions
 
@@ -838,7 +840,7 @@ The core system that makes puzzles feel like rituals, not just gates:
 
 **Named Incantations**: At Phase 2+, each puzzle chain gets a name. Phase 2: innocent ("The HEAT Dance", "A FLAME's Journey"). Phase 3: shadowy ("The HEAT's Shadow", "COLD Emerges"). Phase 4: ritual ("Offering: VOID to DOOM", "Incantation of DARK"). Generated by `getIncantationName()` in `phaseNarrative.ts` (also in `localGenerator.ts`) using deterministic hashing. Displayed in VictoryModal below the ritual echo chain.
 
-**Words Offered Counter**: VictoryModal AND home screen show a running count of total words formed. Phase-aware text from `getWordsOfferedText()` — Phase 0: "Words shifted: 847" → Phase 4: "847 words offered to the arrangement". Home screen counter is tappable, opens the Word Ledger.
+**Words Offered Counter**: VictoryModal shows a running count of total words formed. Phase-aware text from `getWordsOfferedText()` — Phase 0: "Words shifted: 847" → Phase 4: "847 words offered to the arrangement". The Word Ledger is accessible from the VictoryModal counter tap.
 
 **Ritual Energy**: Puzzles with darker words contribute more to phase progression. `calculateRitualEnergy()` in `localGenerator.ts` scores dread word presence (0-10 scale). Each ritual energy point adds 0.1 to `phaseProgress`. Accumulated in `ritualEnergy` field on progress.
 
