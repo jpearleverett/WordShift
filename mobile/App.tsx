@@ -58,7 +58,7 @@ import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
-import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
+import { estimateSlotIndex } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
@@ -734,14 +734,15 @@ export default function App() {
       const onSlotPress = handleSlotPressRef.current;
       if (!previews || previews.length === 0) return;
 
-      // Estimate which slot the user dropped over based on X position
+      // Estimate which slot the user dropped over based on X position.
+      // Use that exact slot — if it's not valid, let handleSlotPress show
+      // invalid feedback rather than silently jumping to a distant valid slot.
       const targetWordLength = previews.length - 1;
       const estimated = estimateSlotIndex(position.x, previews.length, targetWordLength);
-      const validSlot = findClosestValidSlot(estimated, previews);
 
       // Mark as drag-drop for haptic/effect escalation in handleSlotPress
       isDragDropRef.current = true;
-      onSlotPress(validSlot ?? estimated, position);
+      onSlotPress(estimated, position);
     }, 0);
   }, []);
 
