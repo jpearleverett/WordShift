@@ -1188,6 +1188,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               }).start();
               setCeremonyStatus('complete');
               onPhaseTransitionConfirmed?.(result.newPhase);
+            } else if (mountedRef.current) {
+              // Recovery: fade out overlay and reset to idle so user can retry
+              Animated.timing(ceremonyOverlayOpacity, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+              }).start();
+              setCeremonyStatus('idle');
             }
           }, delay + 400);
           ceremonyTimers.current.push(completeTimer);
