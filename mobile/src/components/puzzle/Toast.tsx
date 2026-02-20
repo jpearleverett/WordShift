@@ -11,12 +11,19 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
   const slideAnim = useRef(new Animated.Value(-20)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
+    // Stop any in-flight animations from a previous message before starting new ones
+    enterAnimRef.current?.stop();
+    shakeAnimRef.current?.stop();
+
     slideAnim.setValue(-20);
     opacityAnim.setValue(0);
+    shakeAnim.setValue(0);
 
-    Animated.parallel([
+    const enterAnim = Animated.parallel([
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 5,
@@ -28,17 +35,26 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
         duration: 200,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]);
+    enterAnimRef.current = enterAnim;
+    enterAnim.start(() => { enterAnimRef.current = null; });
 
     if (isError) {
-      Animated.sequence([
+      const shakeSeq = Animated.sequence([
         Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
         Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]).start();
+      ]);
+      shakeAnimRef.current = shakeSeq;
+      shakeSeq.start(() => { shakeAnimRef.current = null; });
     }
+
+    return () => {
+      enterAnimRef.current?.stop();
+      shakeAnimRef.current?.stop();
+    };
   }, [message, isError]);
 
   return (

@@ -61,7 +61,7 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
     particle.opacity.setValue(0);
     particle.scale.setValue(0.3 + Math.random() * 0.5);
 
-    Animated.parallel([
+    const anim = Animated.parallel([
       // Float up
       Animated.timing(particle.y, {
         toValue: -50,
@@ -101,7 +101,9 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
         easing: Easing.linear,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]);
+    anim.start();
+    return () => anim.stop();
   }, []);
 
   const rotate = particle.rotation.interpolate({

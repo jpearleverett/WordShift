@@ -177,6 +177,7 @@ const STAR_BURST_COLORS: Record<number, { bg: string; shadow: string }> = {
   2: { bg: '#B088D0', shadow: '#8B5FB0' },
   3: { bg: '#9050B0', shadow: '#6A2080' },
   4: { bg: '#C03050', shadow: '#901030' },
+  5: { bg: '#7B6B8A', shadow: '#5A4B6A' },  // Ghostly mauve (Phase 5: terrible peace)
 };
 
 interface StarBurstProps {

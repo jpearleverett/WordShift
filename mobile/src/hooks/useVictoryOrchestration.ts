@@ -187,6 +187,7 @@ export function useVictoryOrchestration(): [
     // ------ Narrative micro-beat (one-time surprises at milestone counts) ------
     checkNarrativeMicroBeat(totalPuzzlesCompleted)
       .then(beat => {
+        if (gen !== generationRef.current) return;
         if (beat) {
           const delay = beat.type === 'glitch_title'
             ? MICRO_BEAT_GLITCH_DELAY_MS

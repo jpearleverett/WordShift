@@ -36,11 +36,15 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
   const victoryModalOpacity = useRef(new Animated.Value(0)).current;
   const phaseFlashOpacity = useRef(new Animated.Value(0)).current;
   const hapticTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /** Ref to the running victory sequence animation (so skipToEnd can stop it). */
+  const runningAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Cleanup haptic timeouts on unmount
+  // Cleanup haptic timeouts and running animations on unmount
   useEffect(() => {
     return () => {
       hapticTimeouts.current.forEach(clearTimeout);
+      runningAnimRef.current?.stop();
+      runningAnimRef.current = null;
     };
   }, []);
 
@@ -79,13 +83,16 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       );
     }
 
-    Animated.sequence([
+    runningAnimRef.current?.stop();
+    const sequence = Animated.sequence([
       Animated.stagger(200, starAnims),
       Animated.parallel([
         Animated.spring(victoryModalScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
         Animated.timing(victoryModalOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
       ]),
-    ]).start();
+    ]);
+    runningAnimRef.current = sequence;
+    sequence.start(() => { runningAnimRef.current = null; });
 
     // Haptic rhythm synced to star stagger: tap-tap-tap-THUD
     hapticTimeouts.current.forEach(clearTimeout);
@@ -111,6 +118,10 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
   }, [phaseFlashOpacity]);
 
   const skipToEnd = useCallback((stars: number) => {
+    // Stop the running victory sequence to prevent in-flight callbacks
+    // from overwriting the final values we're about to set.
+    runningAnimRef.current?.stop();
+    runningAnimRef.current = null;
     victoryStar1.setValue(stars >= 1 ? 1 : 0);
     victoryStar2.setValue(stars >= 2 ? 1 : 0);
     victoryStar3.setValue(stars >= 3 ? 1 : 0);
