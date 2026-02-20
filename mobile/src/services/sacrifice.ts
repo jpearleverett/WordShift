@@ -55,7 +55,6 @@ const SACRIFICE_RESPONSES = [
 ];
 
 const SACRIFICE_MILESTONES: Record<number, string> = {
-  1: 'Your first offering. The arrangement noticed.',
   5: 'Five times now. The pattern thanks you. If patterns could thank.',
   10: 'Ten offerings. The house is warmer. Why is the house warmer?',
   25: 'Twenty-five voluntary offerings. The keepers speak of your devotion.',

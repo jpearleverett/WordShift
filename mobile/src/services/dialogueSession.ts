@@ -152,7 +152,7 @@ export function isOnCooldown(animalId: string): boolean {
   const session = sessionsCache.get(animalId);
   if (!session || session.puzzlesAtSessionEnd === null) return false;
   // Grace period: skip cooldown for newly unlocked animals' first sessions
-  const inGracePeriod = (session.sessionsCompleted ?? 0) <= DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
+  const inGracePeriod = (session.sessionsCompleted ?? 0) < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
   if (inGracePeriod) return false;
   return getCooldownRemaining(session) > 0;
 }
