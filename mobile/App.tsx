@@ -693,6 +693,7 @@ export default function App() {
     puzzle.selectedLetter,
     puzzle.gameState,
     persistenceActions,
+    persistence.currentPhase,
     isPlayingDaily,
     victoryFlow.isProcessingVictory,
     victoryActions,

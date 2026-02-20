@@ -52,6 +52,11 @@ npx jest --no-coverage   # Run all tests (948 tests, 33 suites)
 
 ## Recent Implementation Notes (2026-02)
 
+- **Bug audit and fixes — third pass (2026-02-20)**:
+  - **Reset All Data incomplete (HIGH)**: Added 6 missing clear calls to `SettingsScreen.tsx` reset handler: `clearSacrificeState()`, `clearWeeklyQuests()`, `clearWhisperGallery()`, `clearChoiceState()`, `resetMicroBeats()`, `resetNotificationPrefs()`. Previously, sacrifice history, weekly quest progress, whisper gallery entries, dialogue choices, micro-beat flags, and notification prefs survived a full reset.
+  - **SleepingZs animation cleanup leak (MEDIUM)**: Added animation refs and `useEffect` cleanup to `SleepingZs` component in `AnimalSprite.tsx`. Three infinite recursive animation loops (one per Z) were never stopped on unmount, causing memory leaks when animals went off cooldown.
+  - **useOnboardingFlow init mountedRef guard (LOW)**: Added `mountedRef.current` checks before all setState calls in the async initialization effect in `useOnboardingFlow.ts`, preventing state updates on unmounted components during the initial AsyncStorage reads.
+  - **handleSlotPress stale phase closure (LOW)**: Added `persistence.currentPhase` to the `handleSlotPress` useCallback dependency array in `App.tsx`. Previously captured a stale phase value used in 7 locations (dread pulse threshold, ritual micro-event, harvest overflow message, endgame checks, victory orchestration, notifications, dread word detection).
 - **Bug audit and fixes — second pass (2026-02-20)**:
   - **Double shift autosave/restore (MEDIUM)**: `SavedPuzzleState` and `AutosaveDeps` now include `doubleShiftPhase`. `restorePuzzleState` restores the double shift input cycle phase, falling back to `'pick1'` for double shift puzzles with no saved phase. App.tsx passes `doubleShiftPhase` to the autosave hook. Without this fix, mid-step double shift puzzles lost their input cycle on app restart.
   - **Double shift drop2 slot preview accuracy (MEDIUM)**: `slotPreviews` useMemo in `usePuzzleGame.ts` now checks source word validity in addition to target word during `drop2` phase. Previously, previews showed green (valid) for slots where the target word was valid but the source word (after removing both letters) was invalid, causing misleading feedback.

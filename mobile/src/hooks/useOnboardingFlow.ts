@@ -127,14 +127,17 @@ export function useOnboardingFlow(
     (async () => {
       const tutorialDone = await hasTutorialCompleted();
       const step = await getOnboardingStep();
+      if (!mountedRef.current) return;
 
       if (tutorialDone && step === 'not_started') {
         // Existing player who completed old tutorial — skip onboarding
         await setOnboardingStep('complete');
+        if (!mountedRef.current) return;
         setOnboardingStepState('complete');
       } else if (step === 'not_started') {
         // Fresh install — start onboarding
         await setOnboardingStep('home_empty');
+        if (!mountedRef.current) return;
         setOnboardingStepState('home_empty');
         setOnboardingLineIndex(0);
       } else {
