@@ -132,7 +132,7 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
 
   // Session is active - check if max dialogues reached (phase-aware limit)
   const maxDialogues = getEffectiveMaxDialogues();
-  if (session.dialoguesInSession >= maxDialogues) {
+  if ((session.dialoguesInSession ?? 0) >= maxDialogues) {
     await startCooldown(animalId);
     return {
       available: false,

@@ -132,6 +132,9 @@ export function useVictoryOrchestration(): [
 
   // Track pending timeouts so we can cancel them on reset/unmount.
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Generation counter — incremented on each processVictory and resetOrchestration
+  // so that in-flight async callbacks can detect they belong to a stale cycle.
+  const generationRef = useRef(0);
 
   const addTimeout = useCallback((fn: () => void, ms: number) => {
     const id = setTimeout(fn, ms);
@@ -169,6 +172,8 @@ export function useVictoryOrchestration(): [
       puzzlesSinceHomeVisit,
     } = params;
 
+    const gen = ++generationRef.current;
+
     // ------ Victory glitch (Phase 0, ~8%, guaranteed on first puzzle) ------
     const glitchText = getVictoryGlitch(phase, totalPuzzlesCompleted);
     if (glitchText) {
@@ -199,7 +204,9 @@ export function useVictoryOrchestration(): [
     if (!onboarding) {
       addTimeout(async () => {
         try {
+          if (gen !== generationRef.current) return;
           const fullProgress = await getFullProgress();
+          if (gen !== generationRef.current) return;
           const whisperData = getAnimalWhisper(
             phase,
             fullProgress.unlockedAnimals || [],
@@ -230,7 +237,9 @@ export function useVictoryOrchestration(): [
         // Note: we rely on the showWhisper state being set by now
         // (whisper fires at 1200ms, interjection at 2500ms)
         try {
+          if (gen !== generationRef.current) return;
           const fullProgress = await getFullProgress();
+          if (gen !== generationRef.current) return;
 
           // Home nudge takes priority after 3+ puzzles without visiting home
           if (puzzlesSinceHomeVisit >= 3) {
@@ -267,6 +276,7 @@ export function useVictoryOrchestration(): [
   // resetOrchestration
   // ---------------------------------------------------------------
   const resetOrchestration = useCallback(() => {
+    generationRef.current++;
     clearAllTimeouts();
     setWhisper(null);
     setShowWhisper(false);

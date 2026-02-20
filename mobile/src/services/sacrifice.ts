@@ -89,7 +89,17 @@ export async function loadSacrificeState(): Promise<SacrificeState> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
-      sacrificeCache = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      if (
+        parsed &&
+        typeof parsed.totalAmberSacrificed === 'number' &&
+        typeof parsed.sacrificeCount === 'number' &&
+        Array.isArray(parsed.sacrificeHistory)
+      ) {
+        sacrificeCache = parsed;
+      } else {
+        sacrificeCache = getDefaultState();
+      }
       return sacrificeCache!;
     }
   } catch {}

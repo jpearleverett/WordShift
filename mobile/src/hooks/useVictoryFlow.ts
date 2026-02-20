@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { Animated } from 'react-native';
 import { VictoryData } from './useGamePersistence';
 import { getSettingsSync } from '../services/settings';
@@ -35,6 +35,14 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
   const victoryModalScale = useRef(new Animated.Value(0.8)).current;
   const victoryModalOpacity = useRef(new Animated.Value(0)).current;
   const phaseFlashOpacity = useRef(new Animated.Value(0)).current;
+  const hapticTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Cleanup haptic timeouts on unmount
+  useEffect(() => {
+    return () => {
+      hapticTimeouts.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const playVictorySequence = useCallback((stars: number) => {
     const reducedMotion = getSettingsSync().reducedMotion;
@@ -80,10 +88,12 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     ]).start();
 
     // Haptic rhythm synced to star stagger: tap-tap-tap-THUD
-    if (stars >= 1) setTimeout(() => hapticLight(), 100);
-    if (stars >= 2) setTimeout(() => hapticLight(), 300);
-    if (stars >= 3) setTimeout(() => hapticLight(), 500);
-    setTimeout(() => hapticHeavy(), 100 + stars * 200 + 150);
+    hapticTimeouts.current.forEach(clearTimeout);
+    hapticTimeouts.current = [];
+    if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 100));
+    if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 300));
+    if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 500));
+    hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), 100 + stars * 200 + 150));
   }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
 
   const playPhaseChangeFlash = useCallback(() => {
