@@ -132,6 +132,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const amberPulse = useRef(new Animated.Value(1)).current;
   const playPulse = useRef(new Animated.Value(0)).current;
   const pitPulseAnim = useRef(new Animated.Value(0)).current;
+  const introDialogueSlide = useRef(new Animated.Value(0)).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
   // Celebration state
@@ -319,6 +320,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setIntroIsTalking(false);
     }
   }, [showIntroDialogue]);
+
+  // Slide animation for intro dialogue (matches normal dialogue)
+  useEffect(() => {
+    if (showIntroDialogue) {
+      introDialogueSlide.setValue(0);
+      const settings = getSettingsSync();
+      if (settings.reducedMotion) {
+        introDialogueSlide.setValue(1);
+      } else {
+        Animated.spring(introDialogueSlide, {
+          toValue: 1,
+          friction: 8,
+          tension: 65,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+  }, [showIntroDialogue, introDialogueSlide]);
 
   // Animate amber when it changes
   useEffect(() => {
@@ -1167,100 +1186,96 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         visible={showIntroDialogue}
         transparent
         statusBarTranslucent
-        animationType="fade"
+        animationType="none"
         onRequestClose={handleCloseIntroDialogue}
       >
-        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
-          <View
+        <TouchableOpacity
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
+          activeOpacity={1}
+          onPress={handleCloseIntroDialogue}
+          accessibilityLabel="Close intro dialogue"
+          accessibilityRole="button"
+        >
+          <Animated.View
             style={[
-              styles.introDialogueModal,
+              styles.dialogueModal,
               {
                 backgroundColor: dt.modalBg,
                 borderColor: dt.modalBorder,
                 shadowColor: dt.modalShadowColor,
+                transform: [
+                  {
+                    translateY: introDialogueSlide.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [300, 0],
+                    }),
+                  },
+                ],
+                opacity: introDialogueSlide,
               },
             ]}
             onStartShouldSetResponder={() => true}
           >
-            {/* Top accent bar */}
-            <View style={[styles.introAccentLine, { backgroundColor: dt.accentLine }]} />
+            {/* Decorative accent line at top of modal */}
+            <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
 
             {introAnimal && (
-              <>
-                {/* Animal portrait */}
-                <View style={[
-                  styles.introPortraitContainer,
-                  {
-                    backgroundColor: dt.portraitRingBg,
-                    borderColor: dt.portraitRingBorder,
-                    shadowColor: dt.accentLine,
-                  },
-                ]}>
+              <View style={styles.dialogueRow}>
+                {/* Sprite column - 30% width, zoomed in to fill */}
+                <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
                   {CHARACTER_SPRITES[introAnimal.type] ? (
                     <Image
                       source={
                         progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed
                           ? CHARACTER_SPRITES[introAnimal.type]!.robed!
-                          : CHARACTER_SPRITES[introAnimal.type]?.talk || CHARACTER_SPRITES[introAnimal.type]!.idle
+                          : introIsTalking && CHARACTER_SPRITES[introAnimal.type]?.talk
+                            ? CHARACTER_SPRITES[introAnimal.type]!.talk!
+                            : CHARACTER_SPRITES[introAnimal.type]!.idle
                       }
-                      style={styles.introPortraitSprite}
-                      resizeMode="contain"
+                      style={styles.dialogueSpriteImage}
+                      resizeMode="cover"
                       accessibilityLabel={`${introAnimal.name} portrait`}
                     />
                   ) : (
-                    <Text style={styles.introPortraitEmoji}>
+                    <Text style={styles.dialogueSpriteEmoji}>
                       {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
                     </Text>
                   )}
                 </View>
 
-                <Text style={[styles.introAnimalName, { color: dt.nameColor }]}>
-                  {introAnimal.name}
-                </Text>
-                <Text style={[styles.introAnimalTitle, { color: dt.subtitleColor }]}>
-                  {ANIMAL_INFO[introAnimal.type]?.description}
-                </Text>
-
-                {/* Dialogue text */}
-                <View style={[
-                  styles.introDialogueBubble,
-                  {
-                    backgroundColor: dt.bubbleBg,
-                    borderColor: dt.bubbleBorder,
-                  },
-                ]}>
-                  <Text style={[styles.introDialogueText, { color: dt.textColor }]}>
-                    {getCurrentIntroText()}
+                {/* Text column - 70% width */}
+                <View style={styles.dialogueTextCol}>
+                  <Text style={[styles.dialogueAnimalName, { color: dt.nameColor }]}>
+                    {introAnimal.name}
                   </Text>
-                </View>
+                  {/* Decorative separator under name */}
+                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
 
-                {/* Progress and continue */}
-                <View style={styles.introDialogueFooter}>
-                  <Text style={[styles.introDialogueProgress, { color: dt.progressColor }]}>
-                    {getIntroProgress()}
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.introContinueButton,
-                      {
-                        backgroundColor: dt.secondaryButtonBg,
-                        shadowColor: dt.secondaryButtonBg,
-                      },
-                    ]}
-                    onPress={handleAdvanceIntroDialogue}
-                    accessibilityLabel={hasMoreIntroDialogues() ? 'Continue intro' : 'Welcome and close'}
-                    accessibilityRole="button"
-                  >
-                    <View style={styles.dialogueButtonShine} />
-                    <Text style={[styles.introContinueButtonText, { color: dt.secondaryButtonText }]}>
-                      {hasMoreIntroDialogues() ? 'Continue' : 'Welcome!'}
+                  <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+                    <Text style={[styles.dialogueText, { color: dt.textColor }]}>{getCurrentIntroText()}</Text>
+                  </View>
+
+                  <View style={styles.dialogueFooter}>
+                    <Text style={[styles.introProgressInline, { color: dt.progressColor }]}>
+                      {getIntroProgress()}
                     </Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
+                      onPress={handleAdvanceIntroDialogue}
+                      accessibilityLabel={hasMoreIntroDialogues() ? 'Continue intro' : 'Welcome and close'}
+                      accessibilityRole="button"
+                    >
+                      <View style={styles.dialogueButtonShine} />
+                      <Text style={styles.continueButtonText}>
+                        {hasMoreIntroDialogues() ? 'Next' : 'Welcome!'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </>
+              </View>
             )}
-          </View>
-        </View>
+          </Animated.View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Sacrifice Modal (Phase 4+) */}
@@ -1717,6 +1732,7 @@ const styles = StyleSheet.create({
   dialogueFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   dialogueButtonShine: {
     position: 'absolute',
@@ -1964,102 +1980,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Intro dialogue modal styles
-  introDialogueModal: {
-    borderRadius: 30,
-    padding: 30,
-    marginHorizontal: 20,
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 12,
-    maxWidth: 380,
-    width: '90%',
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  introAccentLine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-  },
-  introPortraitContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    marginTop: 6,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-    borderWidth: 2,
-  },
-  introPortraitEmoji: {
-    fontSize: 50,
-  },
-  introPortraitSprite: {
-    width: 80,
-    height: 80,
-  },
-  introAnimalName: {
-    fontSize: 28,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  introAnimalTitle: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  introDialogueBubble: {
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    width: '100%',
-    borderWidth: 1,
-  },
-  introDialogueText: {
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: 'center',
-    letterSpacing: 0.1,
-  },
-  introDialogueFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  introDialogueProgress: {
-    fontSize: 14,
+  // Intro dialogue progress text (inline in footer)
+  introProgressInline: {
+    fontSize: 13,
     fontWeight: '600',
-  },
-  introContinueButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  introContinueButtonText: {
-    fontSize: 16,
-    fontWeight: '800',
+    marginRight: 12,
   },
 
   // Dialogue choice buttons (Phase 3)
