@@ -42,5 +42,11 @@ export const SPEED_TIMER_INTERVAL_MS = 250;
 export const MICRO_BEAT_GLITCH_DELAY_MS = 600;
 export const MICRO_BEAT_WHISPER_DELAY_MS = 1800;
 
+// === DROP IMPACT ===
+export const DROP_IMPACT_POP_MS = 50;
+export const DROP_IMPACT_COLLAPSE_MS = 150;
+export const DROP_SHAKE_KEYFRAME_MS = 40;
+export const DROP_SHAKE_INTENSITY = 2;
+
 // === ENDGAME ===
 export const ENDGAME_EVENT_DELAY_MS = 1500;

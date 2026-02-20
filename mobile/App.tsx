@@ -42,7 +42,7 @@ import { recordDailyCompletion, getTodayString, generateDailyPuzzle } from './sr
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
-import { hapticLight, hapticMedium, hapticSuccess, hapticError, hapticSelection } from './src/services/haptics';
+import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticError, hapticSelection } from './src/services/haptics';
 import {
   getPhaseIndicator,
   getLoadingMessage,
@@ -58,6 +58,8 @@ import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import {
@@ -122,6 +124,10 @@ export default function App() {
     active: false, x: 0, y: 0,
   });
   const [invalidDropSignal, setInvalidDropSignal] = useState(0);
+  const [successDropSignal, setSuccessDropSignal] = useState(0);
+
+  // Track whether the current slot press originated from a drag-drop (for haptic/effect escalation)
+  const isDragDropRef = useRef(false);
 
   // In-progress ritual echo chain — words formed during current puzzle
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
@@ -440,8 +446,8 @@ export default function App() {
     feedbackOrigin?: { x: number; y: number }
   ) => {
     // Block interaction during victory processing
-    if (victoryFlow.isProcessingVictory) return;
-    if (puzzle.gameState === GameState.GAME_OVER) return;
+    if (victoryFlow.isProcessingVictory) { isDragDropRef.current = false; return; }
+    if (puzzle.gameState === GameState.GAME_OVER) { isDragDropRef.current = false; return; }
 
     // Onboarding tutorial: keep drops focused on the guided slot.
     if (
@@ -456,12 +462,14 @@ export default function App() {
       soundInvalidMove();
       setInvalidDropSignal(prev => prev + 1);
       puzzleActions.setMessage('Drop it into the glowing slot.');
+      isDragDropRef.current = false;
       return;
     }
 
     const result = await puzzleActions.handleSlotPress(targetIndex);
 
     if (result?.completed) {
+      isDragDropRef.current = false;
       // Clear mid-puzzle save on completion
       clearPuzzleState().catch(() => {});
 
@@ -611,18 +619,45 @@ export default function App() {
       hapticError();
       soundInvalidMove();
       setInvalidDropSignal(prev => prev + 1);
+      isDragDropRef.current = false;
     } else if (result === null) {
       // No action
+      isDragDropRef.current = false;
     } else {
       // Valid intermediate move — trigger star burst celebration
-      hapticMedium();
+      const wasDragDrop = isDragDropRef.current;
+      isDragDropRef.current = false;
+
+      // Escalated haptics for drag-drop: heavy thud vs medium tap
+      if (wasDragDrop) {
+        hapticHeavy();
+      } else {
+        hapticMedium();
+      }
       soundValidMove();
+
       setStarBurst({
         active: true,
         x: feedbackOrigin?.x ?? SCREEN_WIDTH / 2,
         y: feedbackOrigin?.y ?? SCREEN_HEIGHT * 0.4,
       });
       setTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
+
+      // Drag-drop bonus effects: target row bounce + screen micro-shake
+      if (wasDragDrop) {
+        setSuccessDropSignal(prev => prev + 1);
+
+        // Light screen micro-shake via existing dread shake infrastructure
+        const settings = getSettingsSync();
+        if (!settings.reducedMotion) {
+          Animated.sequence([
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: -DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY * 0.5, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: 0, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+          ]).start();
+        }
+      }
 
       // Track formed word for in-puzzle ritual echo chain
       if (result.formedWord) {
@@ -648,6 +683,7 @@ export default function App() {
     onboardingFlow.isOnboarding,
     orchestrationActions,
     dreadActions,
+    dreadEffects,
     tutorialGuidance,
   ]);
 
@@ -698,15 +734,14 @@ export default function App() {
       const onSlotPress = handleSlotPressRef.current;
       if (!previews || previews.length === 0) return;
 
-      // Find the first valid slot preview (prefer valid words)
-      const validSlotIndex = previews.findIndex((p: any) => p && p.isValid);
-      if (validSlotIndex >= 0) {
-        onSlotPress(validSlotIndex, position);
-        return;
-      }
-      // No valid slot — pick the middle slot as fallback to trigger the invalid feedback
-      const midSlot = Math.floor(previews.length / 2);
-      onSlotPress(midSlot, position);
+      // Estimate which slot the user dropped over based on X position
+      const targetWordLength = previews.length - 1;
+      const estimated = estimateSlotIndex(position.x, previews.length, targetWordLength);
+      const validSlot = findClosestValidSlot(estimated, previews);
+
+      // Mark as drag-drop for haptic/effect escalation in handleSlotPress
+      isDragDropRef.current = true;
+      onSlotPress(validSlot ?? estimated, position);
     }, 0);
   }, []);
 
@@ -1229,6 +1264,7 @@ export default function App() {
                 guidedLetterId={tutorialGuidance?.sourceLetterId || null}
                 guidedSlotIndex={tutorialGuidance?.targetSlotIndex ?? null}
                 invalidDropSignal={invalidDropSignal}
+                successDropSignal={successDropSignal}
                 onLetterDragDrop={handleLetterDragDrop}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
