@@ -95,6 +95,8 @@ export default function App() {
 
   const puzzlesSolvedForVariantUnlocks = persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const variantSelectorOptions = useMemo(() => {
+    // uiPhase intentionally matches currentPhase — we use the confirmed phase
+    // for text tone stability rather than the pending transition target
     return getVariantSelectorOptions(
       puzzlesSolvedForVariantUnlocks,
       persistence.currentPhase,
@@ -537,7 +539,7 @@ export default function App() {
       // Show harvest overflow warning if pending batches hit the cap
       if (victory.harvestOverflow) {
         setTimeout(() => {
-          puzzleActions.setMessage(getHarvestOverflowMessage(persistence.currentPhase as any));
+          puzzleActions.setMessage(getHarvestOverflowMessage(persistence.currentPhase));
         }, 1500);
       }
 

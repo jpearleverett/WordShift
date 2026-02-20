@@ -81,6 +81,8 @@ const CinematicParticle: React.FC<{
       translateMain.stopAnimation();
       wobble.stopAnimation();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: particles are
+  // created fresh per transition event and destroyed when the overlay closes.
   }, []);
 
   const isVertical = config.direction === 'rise' || config.direction === 'fall';

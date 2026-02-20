@@ -208,7 +208,10 @@ export function useDialogueFlow({
       if (!regularDialogue) {
         // Regular dialogues exhausted — use post-revelation dialogues
         const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
-        const postRevIndex = (selectedAnimal.currentDialogueIndex - totalRegular) % getPostRevelationDialogueCount(selectedAnimal.type);
+        const prCount = getPostRevelationDialogueCount(selectedAnimal.type);
+        const postRevIndex = prCount > 0
+          ? (selectedAnimal.currentDialogueIndex - totalRegular) % prCount
+          : 0;
         const postRevDialogue = getPostRevelationDialogue(selectedAnimal.type, postRevIndex);
         return postRevDialogue || 'The pattern holds.';
       }
