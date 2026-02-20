@@ -632,9 +632,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const stableDevourWord = useCallback((fw: FlyingWord) => devourWordRef.current(fw), []);
   const noopDevour = useCallback((_fw: FlyingWord) => {}, []);
 
+  const harvestStateRef = useRef(harvestState);
+
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
   useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
+  useEffect(() => { harvestStateRef.current = harvestState; }, [harvestState]);
 
   // ---- Ward mark ceremony state machine ----
   type CeremonyStatus = 'idle' | 'igniting' | 'erupting' | 'text' | 'complete';
@@ -1260,6 +1263,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         const freshState = await getHarvestState();
         if (mountedRef.current) {
           setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
+          // Reset offset since pendingAmber useMemo recomputes from fresh state
+          setPendingAmberOffset(0);
           // Trigger phase transition ceremony if pending
           if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
             // Small delay so the batch completion message shows first
@@ -1281,6 +1286,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
     devouredPerBatch.current.get(fw.batchId)!.add(fw.id);
     setFlyingWords(prev => prev.filter(w => w.id !== fw.id));
+
+    // Decrement displayed pending amber per word devoured
+    const currentState = harvestStateRef.current;
+    if (currentState) {
+      const batch = currentState.pendingBatches.find(b => b.id === fw.batchId);
+      if (batch && batch.words.length > 0) {
+        const perWordAmber = Math.round(batch.amberValue / batch.words.length);
+        setPendingAmberOffset(prev => prev + perWordAmber);
+      }
+    }
+
     tryFinalizeBatch(fw.batchId);
   }, [flashPitSurge, spawnImpactBurst, spawnShockwave, tryFinalizeBatch]);
 

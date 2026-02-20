@@ -471,44 +471,34 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         {'\uD83D\uDC8E'} {totalAmber}
                       </Text>
                     </View>
-                  </View>
-                </View>
-
-                {/* Collect Now / Mandatory Pit CTA — below amber totals */}
-                {!isOnboarding && (
-                  <>
-                  {phaseTransitionPending && (
-                    <Text style={[styles.pitMandatoryText, { color: btn.harvestPill.text }]}>
-                      {getPitMandatoryText(phase as DialoguePhase)}
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    onPress={onGoToPit}
-                    activeOpacity={0.85}
-                    accessibilityLabel={phaseTransitionPending ? 'Visit the pit to continue' : 'Collect amber in the pit'}
-                    accessibilityRole="button"
-                    style={{ marginTop: 8 }}
-                  >
-                    <View style={styles.btn3dWrapper}>
-                      <View style={[styles.btn3dBody, {
-                        backgroundColor: btn.harvest.bg,
-                        shadowColor: btn.harvest.shadow,
-                      }]}>
-                        <View style={styles.btn3dBevel} />
-                        <View style={styles.btn3dGlossy} />
-                        <Text style={styles.btn3dPrimaryText}>
+                    {/* Collect Now — compact pill inside amber stats box */}
+                    {!isOnboarding && (
+                      <>
+                      {phaseTransitionPending && (
+                        <Text style={[styles.pitMandatoryText, { color: btn.harvestPill.text }]}>
+                          {getPitMandatoryText(phase as DialoguePhase)}
+                        </Text>
+                      )}
+                      <TouchableOpacity
+                        onPress={onGoToPit}
+                        activeOpacity={0.8}
+                        accessibilityLabel={phaseTransitionPending ? 'Visit the pit to continue' : 'Collect amber in the pit'}
+                        accessibilityRole="button"
+                        style={[styles.collectNowPill, {
+                          backgroundColor: btn.harvestPill.bg,
+                          borderColor: btn.harvestPill.border,
+                        }]}
+                      >
+                        <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
                           {phaseTransitionPending
                             ? getPitMandatoryCTA(phase as DialoguePhase)
-                            : `${'\uD83C\uDF3E'} COLLECT NOW`}
+                            : `${'\uD83C\uDF3E'} Collect Now  \u203A`}
                         </Text>
-                      </View>
-                      <View style={[styles.btn3dEdge, {
-                        backgroundColor: btn.harvest.edge,
-                      }]} />
-                    </View>
-                  </TouchableOpacity>
-                  </>
-                )}
+                      </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
                 </>
               );
             })()}
@@ -546,58 +536,60 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             null
             ) : (
             <>
-            <View style={styles.victoryButtonRow}>
-              {/* Next Level — primary 3D candy button */}
-              <TouchableOpacity
-                onPress={onNextLevel}
-                activeOpacity={0.85}
-                accessibilityLabel="Next level"
-                accessibilityRole="button"
-              >
-                <View style={styles.btn3dWrapper}>
-                  <View style={[styles.btn3dBody, {
-                    backgroundColor: btn.primary.bg,
-                    shadowColor: btn.primary.shadow,
-                  }]}>
-                    <View style={styles.btn3dBevel} />
-                    <View style={styles.btn3dGlossy} />
-                    <Text style={styles.btn3dPrimaryText}>NEXT LEVEL</Text>
-                  </View>
-                  <View style={[styles.btn3dEdge, {
-                    backgroundColor: btn.primary.edge,
-                  }]} />
+            {/* Next Level — full-width primary 3D candy button */}
+            <TouchableOpacity
+              onPress={onNextLevel}
+              activeOpacity={0.85}
+              accessibilityLabel="Next level"
+              accessibilityRole="button"
+              style={{ width: '100%' }}
+            >
+              <View style={[styles.btn3dWrapper, { width: '100%' }]}>
+                <View style={[styles.btn3dBody, {
+                  backgroundColor: btn.primary.bg,
+                  shadowColor: btn.primary.shadow,
+                  width: '100%',
+                }]}>
+                  <View style={styles.btn3dBevel} />
+                  <View style={styles.btn3dGlossy} />
+                  <Text style={styles.btn3dPrimaryText}>NEXT LEVEL</Text>
                 </View>
-              </TouchableOpacity>
-            </View>
+                <View style={[styles.btn3dEdge, {
+                  backgroundColor: btn.primary.edge,
+                }]} />
+              </View>
+            </TouchableOpacity>
 
             <View style={styles.victoryButtonRowSecondary}>
-              {/* Share — subtle secondary */}
+              {/* Share — uniform secondary */}
               <TouchableOpacity
                 onPress={onShare}
                 activeOpacity={0.8}
                 accessibilityLabel="Share result"
                 accessibilityRole="button"
+                style={{ flex: 1 }}
               >
                 <View style={[styles.btnFlat, {
                   backgroundColor: btn.share.bg,
                   borderColor: btn.share.edge,
                 }]}>
-                  <Text style={styles.btnFlatShareText}>{'\uD83D\uDCE4'}</Text>
+                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>{'\uD83D\uDCE4'} Share</Text>
                 </View>
               </TouchableOpacity>
 
-              {/* Home — subtle secondary */}
+              {/* Home — uniform secondary */}
               <TouchableOpacity
                 onPress={onReturnHome}
                 activeOpacity={0.8}
                 accessibilityLabel="Return home"
                 accessibilityRole="button"
+                style={{ flex: 1 }}
               >
                 <View style={[styles.btnFlat, {
                   backgroundColor: btn.secondary.bg,
                   borderColor: btn.secondary.edge,
                 }]}>
-                  <Text style={[styles.btnFlatHomeText, { color: btn.secondary.text }]}>{'\uD83C\uDFE0'} HOME</Text>
+                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>{'\uD83C\uDFE0'} Home</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -863,13 +855,26 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 18,
     borderWidth: 1,
+    alignItems: 'center',
   },
-  btnFlatShareText: {
-    fontSize: 18,
-  },
-  btnFlatHomeText: {
+  btnFlatUniform: {
     fontSize: 14,
+    fontWeight: '700',
+  },
+
+  // Collect Now pill (inside amber stats box)
+  collectNowPill: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  collectNowText: {
+    fontSize: 13,
     fontWeight: '800',
+    textAlign: 'center',
   },
 
   // === Harvest info pill ===
