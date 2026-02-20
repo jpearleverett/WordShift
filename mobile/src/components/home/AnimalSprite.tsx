@@ -219,6 +219,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
   const [isMoving, setIsMoving] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  const [spriteLoadFailed, setSpriteLoadFailed] = useState(false);
 
   // Breathing animation (subtle scale pulse)
   useEffect(() => {
@@ -563,7 +564,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           />
 
           {/* Animal body */}
-          {CHARACTER_SPRITES[animal.type] ? (
+          {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
             <Image
               source={
                 currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
@@ -572,6 +573,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               }
               style={styles.spriteImage}
               resizeMode="contain"
+              onError={() => setSpriteLoadFailed(true)}
             />
           ) : (
             <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>

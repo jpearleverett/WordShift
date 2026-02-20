@@ -121,12 +121,15 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         },
       ]}
     >
-      {/* Room background image */}
-      <Image
-        source={ROOM_BACKGROUNDS[room.theme]}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      />
+      {/* Room background image (falls back to backgroundColor on load failure) */}
+      {ROOM_BACKGROUNDS[room.theme] && (
+        <Image
+          source={ROOM_BACKGROUNDS[room.theme]}
+          style={styles.backgroundImage}
+          resizeMode="cover"
+          onError={() => {/* Falls back to themeColors.bg */}}
+        />
+      )}
 
       {/* Room frame */}
       <View style={[styles.frame, { borderColor: themeColors.accent }]} />
