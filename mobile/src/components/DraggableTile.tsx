@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
+import { Animated, InteractionManager, PanResponder, Easing, StyleSheet, View } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
 import { DROP_IMPACT_POP_MS, DROP_IMPACT_COLLAPSE_MS } from '../constants/timing';
@@ -87,8 +87,13 @@ export function DraggableTile({
         // Activate drag after threshold
         if (!dragActivated.current && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
           dragActivated.current = true;
-          onDragStartRef.current();
+          // Haptic first for instant feedback; defer the state update
+          // (letter selection + slot preview computation) off the gesture
+          // thread to avoid a re-render hitch mid-drag.
           hapticSelection();
+          InteractionManager.runAfterInteractions(() => {
+            onDragStartRef.current();
+          });
 
           // Show floating tile, dim source
           floatingOpacity.setValue(1);
