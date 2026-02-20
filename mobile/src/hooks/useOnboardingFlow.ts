@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   OnboardingStep,
   getOnboardingStep,
@@ -102,6 +102,24 @@ export function useOnboardingFlow(
 
   const isOnboarding = onboardingStep !== 'complete';
 
+  // Guards for async-in-setTimeout cleanup
+  const mountedRef = useRef(true);
+  const pendingTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const addTimeout = useCallback((fn: () => void, ms: number) => {
+    const id = setTimeout(fn, ms);
+    pendingTimeouts.current.push(id);
+    return id;
+  }, []);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      pendingTimeouts.current.forEach(clearTimeout);
+    };
+  }, []);
+
   // ------------------------------------------------------------------
   // Initialization — read persisted step on mount
   // ------------------------------------------------------------------
@@ -142,8 +160,10 @@ export function useOnboardingFlow(
   // ------------------------------------------------------------------
   const navigateToPuzzleTutorial = useCallback(async () => {
     await advanceOnboarding('going_to_puzzle');
-    setTimeout(async () => {
+    addTimeout(async () => {
+      if (!mountedRef.current) return;
       await advanceOnboarding('puzzle_tutorial');
+      if (!mountedRef.current) return;
       callbacks.refreshStats();
       clearRitualEchoWords();
       callbacks.transitionTo('puzzle', () => {
@@ -151,7 +171,7 @@ export function useOnboardingFlow(
         logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
       });
     }, ONBOARDING_TRANSITION_DELAY_MS);
-  }, [advanceOnboarding, callbacks, clearRitualEchoWords]);
+  }, [advanceOnboarding, callbacks, clearRitualEchoWords, addTimeout]);
 
   // ------------------------------------------------------------------
   // handleOnboardingContinue — main FoxGuide "Next" handler
@@ -192,8 +212,10 @@ export function useOnboardingFlow(
           callbacks.resetVictory();
           clearRitualEchoWords();
           setPitOfferDone(false);
-          setTimeout(async () => {
+          addTimeout(async () => {
+            if (!mountedRef.current) return;
             await advanceOnboarding('pit_intro');
+            if (!mountedRef.current) return;
             callbacks.transitionTo('pit', () => {
               callbacks.setGameState('IDLE');
             });
@@ -248,6 +270,7 @@ export function useOnboardingFlow(
     navigateToPuzzleTutorial,
     callbacks,
     clearRitualEchoWords,
+    addTimeout,
   ]);
 
   // ------------------------------------------------------------------

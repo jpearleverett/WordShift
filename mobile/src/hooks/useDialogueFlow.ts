@@ -198,24 +198,29 @@ export function useDialogueFlow({
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
 
     // Phase 5 (post-revelation): when regular dialogues are exhausted, cycle through
-    // the 5 post-revelation lines per animal with modular indexing
+    // the 10 post-revelation lines per animal with modular indexing.
+    // Note: getCurrentDialogue clamps out-of-bounds indices instead of returning null,
+    // so we must compare the index directly against the total count.
     if (animalPhase === 5) {
-      const regularDialogue = getCurrentDialogue(
-        selectedAnimal.type,
-        selectedAnimal.currentDialogueIndex,
-        4 // Use Phase 4 dialogues as base (post-revelation dialogues are separate)
-      );
-      if (!regularDialogue) {
+      const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
+      if (selectedAnimal.currentDialogueIndex >= totalRegular) {
         // Regular dialogues exhausted — use post-revelation dialogues
-        const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
         const prCount = getPostRevelationDialogueCount(selectedAnimal.type);
+        // Safe modulo that handles negative values in JS: ((x % n) + n) % n
+        const rawIndex = selectedAnimal.currentDialogueIndex - totalRegular;
         const postRevIndex = prCount > 0
-          ? (selectedAnimal.currentDialogueIndex - totalRegular) % prCount
+          ? ((rawIndex % prCount) + prCount) % prCount
           : 0;
         const postRevDialogue = getPostRevelationDialogue(selectedAnimal.type, postRevIndex);
         return postRevDialogue || 'The pattern holds.';
       }
-      return regularDialogue.text;
+      // Still within regular Phase 4 dialogues
+      const regularDialogue = getCurrentDialogue(
+        selectedAnimal.type,
+        selectedAnimal.currentDialogueIndex,
+        4
+      );
+      return regularDialogue?.text || 'The pattern holds.';
     }
 
     const dialogue = getCurrentDialogue(

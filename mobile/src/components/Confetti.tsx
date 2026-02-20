@@ -149,9 +149,10 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
       // Scale confetti density with ritual energy
       const energyBonus = ritualEnergy >= 7 ? Math.floor(baseCount * 0.4) : ritualEnergy >= 4 ? Math.floor(baseCount * 0.2) : 0;
       setPieces(generateConfetti(baseCount + energyBonus, theme.confettiColors));
+      // Max animation time: up to 500ms delay + 3500ms fall = 4000ms
       const timeout = setTimeout(() => {
         onComplete?.();
-      }, 3500);
+      }, 4200);
       return () => clearTimeout(timeout);
     } else {
       setPieces([]);

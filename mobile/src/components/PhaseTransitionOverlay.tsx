@@ -123,6 +123,10 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     hasSkipped.current = true;
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
+    // Stop any in-flight animations from the current scene
+    sceneOpacity.stopAnimation();
+    sceneTranslateY.stopAnimation();
+    overlayOpacity.stopAnimation();
     overlayOpacity.setValue(0);
     onComplete();
   };

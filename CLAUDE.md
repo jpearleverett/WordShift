@@ -52,6 +52,15 @@ npx jest --no-coverage   # Run all tests (948 tests, 33 suites)
 
 ## Recent Implementation Notes (2026-02)
 
+- **Bug audit and fixes (2026-02-20)**:
+  - **Phase 5 dialogue routing fix (HIGH)**: `useDialogueFlow.ts` Phase 5 post-revelation dialogues were unreachable because `getCurrentDialogue()` clamps out-of-bounds indices instead of returning null. Fixed by comparing `currentDialogueIndex` against `getTotalDialogueCount()` to detect exhausted regular dialogues and route to `getPostRevelationDialogue()` with safe modulo cycling.
+  - **useOnboardingFlow timeout cleanup (MEDIUM)**: Added `mountedRef` guard and `pendingTimeouts` tracking ref so async callbacks inside `setTimeout` don't update state after unmount. Cleanup `useEffect` clears all pending timeouts.
+  - **useVictoryFlow haptic timeout cleanup (LOW)**: Haptic `setTimeout` calls in `playVictorySequence` now tracked via `hapticTimeouts` ref with cleanup on unmount.
+  - **useVictoryOrchestration stale async guard (MEDIUM)**: Added `generationRef` counter incremented on each `processVictory` and `resetOrchestration` call. Async callbacks (whisper/interjection) check generation before updating state, preventing stale writes after reset.
+  - **Confetti completion timing (LOW)**: `onComplete` timeout increased from 3500ms to 4200ms to account for max animation time (500ms delay + 3500ms fall).
+  - **PhaseTransitionOverlay skip animation cleanup (LOW)**: `handleSkip` now calls `stopAnimation()` on `sceneOpacity`, `sceneTranslateY`, and `overlayOpacity` before setting values, preventing in-flight `.start()` callbacks from firing after skip.
+  - **dialogueSession nullish guard (LOW)**: `session.dialoguesInSession` comparison uses `?? 0` to handle potential undefined from deserialized storage.
+  - **sacrifice.ts deserialization validation (LOW)**: `loadSacrificeState()` validates parsed JSON has correct shape (number fields, array history) before caching; falls back to default state on invalid data.
 - **Structural refactoring (2026-02-19)**:
   - **Constants centralization**: Created `src/constants/gameBalance.ts` (phase thresholds, amber rewards, streak config, puzzle gen timeouts, bank thresholds, variant economy, dread effect intensities) and `src/constants/timing.ts` (19 animation/interaction timing constants extracted from App.tsx). Source files re-export for backward compatibility.
   - **Puzzle bank registry pattern**: Replaced 12 parallel storage keys, cache variables, ID→words maps, and 4 if-else chains in `puzzleBank.ts` with a single `BANK_REGISTRY` record. Functions are now simple map lookups. ~270 lines reduced.
