@@ -24,6 +24,12 @@ import { resetOnboarding } from '../services/onboarding';
 import { hapticLight } from '../services/haptics';
 import { clearPuzzleState } from '../services/puzzleSaveState';
 import { clearHarvestState } from '../services/wordHarvest';
+import { clearSacrificeState } from '../services/sacrifice';
+import { clearWeeklyQuests } from '../services/weeklyQuests';
+import { clearWhisperGallery } from '../services/whisperGallery';
+import { clearChoiceState } from '../services/dialogueChoices';
+import { resetMicroBeats } from '../services/phaseNarrative';
+import { resetNotificationPrefs } from '../services/notifications';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -65,6 +71,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               resetSettings(),
               clearPuzzleState(),
               clearHarvestState(),
+              clearSacrificeState(),
+              clearWeeklyQuests(),
+              clearWhisperGallery(),
+              clearChoiceState(),
+              resetMicroBeats(),
+              resetNotificationPrefs(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);

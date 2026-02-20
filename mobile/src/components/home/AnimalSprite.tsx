@@ -91,6 +91,10 @@ const SleepingZs: React.FC = () => {
   const z2Opacity = useRef(new Animated.Value(0)).current;
   const z3Opacity = useRef(new Animated.Value(0)).current;
 
+  const animRef1 = useRef<Animated.CompositeAnimation | null>(null);
+  const animRef2 = useRef<Animated.CompositeAnimation | null>(null);
+  const animRef3 = useRef<Animated.CompositeAnimation | null>(null);
+
   useEffect(() => {
     if (getSettingsSync().reducedMotion) {
       z1Opacity.setValue(1);
@@ -99,11 +103,16 @@ const SleepingZs: React.FC = () => {
       return;
     }
 
-    const animateZ = (y: Animated.Value, opacity: Animated.Value, delay: number) => {
+    const animateZ = (
+      y: Animated.Value,
+      opacity: Animated.Value,
+      delay: number,
+      animRef: React.MutableRefObject<Animated.CompositeAnimation | null>,
+    ) => {
       const animate = () => {
         y.setValue(0);
         opacity.setValue(0);
-        Animated.parallel([
+        const anim = Animated.parallel([
           Animated.timing(y, {
             toValue: -25,
             duration: 2000,
@@ -124,14 +133,22 @@ const SleepingZs: React.FC = () => {
               useNativeDriver: true,
             }),
           ]),
-        ]).start(() => animate());
+        ]);
+        animRef.current = anim;
+        anim.start(() => animate());
       };
       animate();
     };
 
-    animateZ(z1Y, z1Opacity, 0);
-    animateZ(z2Y, z2Opacity, 600);
-    animateZ(z3Y, z3Opacity, 1200);
+    animateZ(z1Y, z1Opacity, 0, animRef1);
+    animateZ(z2Y, z2Opacity, 600, animRef2);
+    animateZ(z3Y, z3Opacity, 1200, animRef3);
+
+    return () => {
+      animRef1.current?.stop();
+      animRef2.current?.stop();
+      animRef3.current?.stop();
+    };
   }, []);
 
   return (
