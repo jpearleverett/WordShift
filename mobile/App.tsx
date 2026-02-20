@@ -119,7 +119,7 @@ export default function App() {
   // Sync narrative phase from persistence into puzzle hook
   useEffect(() => {
     puzzleActions.setCurrentPhase(persistence.currentPhase);
-  }, [persistence.currentPhase]);
+  }, [persistence.currentPhase, puzzleActions.setCurrentPhase]);
 
   // StarBurst effect state for valid moves
   const [starBurst, setStarBurst] = useState<{ active: boolean; x: number; y: number }>({
@@ -137,6 +137,21 @@ export default function App() {
 
   // Victory animation skip-forward state
   const victoryAnimatingRef = useRef(false);
+
+  // Track victory-flow setTimeout IDs so they can be cleared on navigation/unmount
+  const victoryTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const addVictoryTimeout = useCallback((fn: () => void, ms: number) => {
+    const id = setTimeout(fn, ms);
+    victoryTimeoutsRef.current.push(id);
+    return id;
+  }, []);
+  const clearVictoryTimeouts = useCallback(() => {
+    victoryTimeoutsRef.current.forEach(clearTimeout);
+    victoryTimeoutsRef.current = [];
+  }, []);
+  useEffect(() => {
+    return () => clearVictoryTimeouts();
+  }, [clearVictoryTimeouts]);
 
   // Home nudge — track consecutive puzzles without visiting home
   const puzzlesSinceHomeVisit = useRef(0);
@@ -508,7 +523,7 @@ export default function App() {
         );
         if (dailyMilestone) {
           await awardBonusAmber(dailyMilestone.amber, 'daily_streak_milestone');
-          setTimeout(() => {
+          addVictoryTimeout(() => {
             puzzleActions.setMessage(`${dailyMilestone.message} (+${dailyMilestone.amber} amber)`);
           }, 1200);
         }
@@ -531,14 +546,14 @@ export default function App() {
 
       // Show streak milestone toast if threshold was just crossed
       if (victory.streakMilestoneMessage) {
-        setTimeout(() => {
+        addVictoryTimeout(() => {
           puzzleActions.setMessage(`${victory.streakMilestoneMessage} (+${victory.streakMilestoneBonus} amber)`);
         }, 800);
       }
 
       // Show harvest overflow warning if pending batches hit the cap
       if (victory.harvestOverflow) {
-        setTimeout(() => {
+        addVictoryTimeout(() => {
           puzzleActions.setMessage(getHarvestOverflowMessage(persistence.currentPhase));
         }, 1500);
       }
@@ -560,7 +575,7 @@ export default function App() {
       // Play choreographed victory sequence (with skip-forward window)
       victoryAnimatingRef.current = true;
       victoryActions.playVictorySequence(victory.earnedStars);
-      setTimeout(() => { victoryAnimatingRef.current = false; }, 1200);
+      addVictoryTimeout(() => { victoryAnimatingRef.current = false; }, 1200);
 
       // Phase transitions are now DEFERRED to the Offering Pit.
       // When phaseTransitionPending is true, the phase change will be confirmed
@@ -580,7 +595,7 @@ export default function App() {
                   ? 'You finished what was being built. There is no pretending now.'
                   : 'You completed the house and reached the final path.',
               });
-              setTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+              addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
@@ -589,7 +604,7 @@ export default function App() {
                   title: 'THE PATTERN REMEMBERS YOU',
                   text: 'You saw it through to the end. The arrangement is complete, and your words remain in every wall.',
                 });
-                setTimeout(() => setPhaseTransitionEvent(POST_REVELATION_EVENT), 1500);
+                addVictoryTimeout(() => setPhaseTransitionEvent(POST_REVELATION_EVENT), 1500);
               }
             }
           }
@@ -599,7 +614,7 @@ export default function App() {
       }
 
       // Check achievements after brief delay to not block victory display
-      setTimeout(() => achievementActions.checkForAchievements(victory), 500);
+      addVictoryTimeout(() => achievementActions.checkForAchievements(victory), 500);
 
       // Post-victory orchestration: glitch, micro-beat, whisper, interjection
       orchestrationActions.processVictory({
@@ -643,7 +658,7 @@ export default function App() {
         x: feedbackOrigin?.x ?? SCREEN_WIDTH / 2,
         y: feedbackOrigin?.y ?? SCREEN_HEIGHT * 0.4,
       });
-      setTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
+      addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
 
       // Drag-drop bonus effects: target row bounce + screen micro-shake
       if (wasDragDrop) {
@@ -687,6 +702,7 @@ export default function App() {
     dreadActions,
     dreadEffects,
     tutorialGuidance,
+    addVictoryTimeout,
   ]);
 
   const handleLetterPress = useCallback((letter: any, rowIndex: number) => {
@@ -762,6 +778,7 @@ export default function App() {
 
   const handleNextLevel = useCallback(() => {
     hapticLight();
+    clearVictoryTimeouts();
     clearPuzzleState().catch(() => {});
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
@@ -769,11 +786,12 @@ export default function App() {
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
     puzzleActions.handleNextLevel();
-  }, [puzzleActions, victoryActions, orchestrationActions]);
+  }, [puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
   // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
+    clearVictoryTimeouts();
     // Clean up victory state
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
@@ -784,10 +802,11 @@ export default function App() {
     transitionTo('pit', () => {
       puzzleActions.setGameState(GameState.IDLE);
     });
-  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo]);
+  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
+    clearVictoryTimeouts();
     puzzlesSinceHomeVisit.current = 0;
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
@@ -796,10 +815,11 @@ export default function App() {
     setRitualEchoWords([]);
     puzzleActions.clearBoard();
     transitionTo('home');
-  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions]);
+  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
   const handleGoToPit = useCallback(() => {
     hapticLight();
+    clearVictoryTimeouts();
     puzzlesSinceHomeVisit.current = 0;
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
@@ -808,7 +828,7 @@ export default function App() {
     setRitualEchoWords([]);
     puzzleActions.clearBoard();
     transitionTo('pit');
-  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions]);
+  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
   const handleShare = useCallback(async () => {
     if (!victoryFlow.victoryData) return;
