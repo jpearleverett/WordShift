@@ -360,8 +360,11 @@ export function useDialogueFlow({
     if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.currentPhase >= 4) {
       try {
         const currentCount = await getSacrificeCount();
-        const lastSeen = lastSeenSacrificeCount.current[animal.type] || 0;
-        if (currentCount > lastSeen) {
+        if (lastSeenSacrificeCount.current[animal.type] === undefined) {
+          // First access for this animal since mount — establish baseline without triggering.
+          // This prevents stale reactions from old sacrifices after app restart.
+          lastSeenSacrificeCount.current[animal.type] = currentCount;
+        } else if (currentCount > lastSeenSacrificeCount.current[animal.type]) {
           const reaction = getSacrificeReaction(animal.type, currentCount, progress.currentPhase);
           if (reaction) {
             pages.push(reaction);

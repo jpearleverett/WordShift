@@ -275,6 +275,7 @@ export default function App() {
     moveDirection: puzzle.moveDirection,
     currentPhase: puzzle.currentPhase,
     lastFormedWord: puzzle.lastFormedWord,
+    doubleShiftPhase: puzzle.doubleShiftPhase,
     speedTimeRemaining: speedTimer.speedTimeRemaining,
   });
 
