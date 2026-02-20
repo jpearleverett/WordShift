@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
-import { Animated, PanResponder, StyleSheet, View } from 'react-native';
+import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
+import { DROP_IMPACT_POP_MS, DROP_IMPACT_COLLAPSE_MS } from '../constants/timing';
 
 interface DraggableTileProps {
   /** The rendered child (LetterTile wrapped in its container) */
@@ -118,19 +119,29 @@ export function DraggableTile({
 
           const settings = getSettingsSync();
           if (!settings.reducedMotion) {
-            // Quick scale-down snap animation
-            Animated.parallel([
-              Animated.spring(floatingScale, {
-                toValue: 0.8,
-                friction: 10,
-                tension: 300,
+            // Pop-then-collapse: brief scale-up "impact" → shrink to nothing
+            Animated.sequence([
+              // Pop: quick scale burst
+              Animated.timing(floatingScale, {
+                toValue: 1.15,
+                duration: DROP_IMPACT_POP_MS,
+                easing: Easing.out(Easing.quad),
                 useNativeDriver: true,
               }),
-              Animated.timing(floatingOpacity, {
-                toValue: 0,
-                duration: 150,
-                useNativeDriver: true,
-              }),
+              // Collapse: shrink to zero + fade
+              Animated.parallel([
+                Animated.timing(floatingScale, {
+                  toValue: 0,
+                  duration: DROP_IMPACT_COLLAPSE_MS,
+                  easing: Easing.in(Easing.quad),
+                  useNativeDriver: true,
+                }),
+                Animated.timing(floatingOpacity, {
+                  toValue: 0,
+                  duration: DROP_IMPACT_COLLAPSE_MS,
+                  useNativeDriver: true,
+                }),
+              ]),
             ]).start(() => {
               // Reset after animation
               translateX.setValue(0);

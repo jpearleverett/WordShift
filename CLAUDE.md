@@ -47,7 +47,7 @@ cd mobile
 npm install          # Install dependencies
 npx expo start       # Start dev server (scan QR with Expo Go)
 npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (932 tests, 32 suites)
+npx jest --no-coverage   # Run all tests (948 tests, 33 suites)
 ```
 
 ## Recent Implementation Notes (2026-02)
@@ -68,7 +68,13 @@ npx jest --no-coverage   # Run all tests (932 tests, 32 suites)
   - **Challenge Mode Fox intro**: Fox introduces Challenge Mode after 15 puzzles via `getChallengeIntroLines(phase)` (3 lines, phase-aware tone). Has-seen tracking via `hasSeenChallengeIntro()` / `markChallengeIntroSeen()` in `amberCurrency.ts`. Wired into HomeScreen.tsx as `challenge_intro` context in the intro dialogue system.
   - **Post-onboarding feature tooltips**: New `FeatureTooltip.tsx` component (phase-aware bubble with arrow, fade-in animation, tap-to-dismiss). Tooltip tracking in `onboarding.ts`: `getNextTooltipFeature()`, `markTooltipSeen()`, `TOOLTIP_FEATURES` (stats/gallery/pit). Shows one tooltip per home visit after onboarding completes. Reset via `resetOnboarding()`.
   - **Animated slot previews**: Slot preview labels in `Row.tsx` now animate with fade+scale (opacity 0→1, scale 0.85→1.0, `Easing.out(Easing.back(1.5))` overshoot). Preview text size increased 10→11px (8→9px compact), container width 56→60px. Valid words get `fontWeight: '800'`. Respects `reducedMotion`.
-  - **Drag-and-drop letter tiles**: New `DraggableTile.tsx` wrapper using PanResponder with 10px drag threshold. On drag: dims source tile (opacity 0.3), floating copy follows finger, phase-aware shadow (golden Phase 0-2, crimson Phase 3+). On drop: triggers slot press via preview lookup, scale-down animation. On tap (below threshold): falls through to normal selection. Haptic feedback on drag start. Wired into `Row.tsx` for source row letters and `App.tsx` via `handleLetterDragDrop` callback.
+  - **Drag-and-drop letter tiles**: New `DraggableTile.tsx` wrapper using PanResponder with 10px drag threshold. On drag: dims source tile (opacity 0.3), floating copy follows finger, phase-aware shadow (golden Phase 0-2, crimson Phase 3+). On drop: pop-then-collapse animation (scale 1.15 burst → shrink to 0 + fade), triggers positional slot estimation via `slotEstimation.ts`. On tap (below threshold): falls through to normal selection. Haptic feedback on drag start. Wired into `Row.tsx` for source row letters and `App.tsx` via `handleLetterDragDrop` callback. Uses refs for all callback props to avoid PanResponder stale closures.
+  - **Drag-and-drop polish (tap-then-drag, positional accuracy, impact effects)**:
+    - **Tap-then-drag fix**: `Row.tsx` `onDragStart` guards against deselecting an already-selected letter (was causing slot previews to vanish).
+    - **Positional drop estimation**: New `src/services/slotEstimation.ts` with `estimateSlotIndex(dropX, slotCount, targetWordLength)` (mirrors arc layout geometry from Row.tsx/LetterTile.tsx to map screen X → slot index) and `findClosestValidSlot(targetIndex, previews)` (outward search with left bias). `handleLetterDragDrop` in App.tsx now uses position-based estimation instead of first-valid-slot.
+    - **Drop impact effects**: Drag-drops trigger escalated feedback vs taps — `hapticHeavy()` (vs `hapticMedium`), `successDropSignal` increments to trigger Row.tsx's pre-built `successBounceScale` spring (1.08→1.0), and a 4-keyframe screen micro-shake (2px intensity, 40ms keyframes) via the existing `dreadEffects.screenShakeRef`. `isDragDropRef` flag distinguishes drag-drops from taps in `handleSlotPress`.
+    - **Pop-then-collapse animation**: DraggableTile release animation upgraded from scale-to-0.8+fade to scale→1.15 (50ms pop) → 0 (150ms collapse+fade). Uses `DROP_IMPACT_POP_MS` and `DROP_IMPACT_COLLAPSE_MS` from timing constants.
+    - **16 new tests** in `dragDrop.test.ts` covering slot estimation edge cases (far left/right, center, compact mode, various word lengths) and closest-valid-slot search (direct hit, left bias, boundaries, no valid slots).
 - **Offering Pit economy (deferred amber crediting)**:
   - Puzzle completion no longer credits amber directly — amber is queued in harvest batches via `wordHarvest.ts`.
   - New `OfferingPitScreen.tsx` screen (navigated as `currentScreen: 'pit'`) where players offer batches to convert queued amber into spendable amber.
@@ -182,7 +188,7 @@ mobile/
 │   ├── constants.ts             # Word lists by length (3-7 letters), COMMON_WORDS set, fallback puzzle pools
 │   ├── constants/               # Centralized game balance and timing constants
 │   │   ├── gameBalance.ts       # Phase thresholds, amber rewards, streak config, puzzle gen timeouts, bank thresholds, variant economy, dread effects
-│   │   ├── timing.ts            # Animation/interaction timing: victory, whisper, interjection, dread pulse, screen shake, onboarding, autosave, speed timer
+│   │   ├── timing.ts            # Animation/interaction timing: victory, whisper, interjection, dread pulse, screen shake, onboarding, autosave, speed timer, drop impact
 │   │   └── index.ts             # Barrel re-export
 │   ├── dictionary.ts            # 11500+ word dictionary for validation (3-7 letter words)
 │   ├── data/
@@ -291,8 +297,9 @@ mobile/
 │       ├── onboarding.ts        # Multi-screen onboarding state machine with AsyncStorage persistence
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
+│       ├── slotEstimation.ts     # Drag-and-drop slot position estimation: arc layout geometry → slot index mapping
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (932 tests, 32 suites)
+├── src/__tests__/               # Test suites (948 tests, 33 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -323,6 +330,7 @@ mobile/
 │   ├── weeklyQuests.test.ts     # Weekly quest generation, progress, rewards
 │   ├── whisperGallery.test.ts   # Whisper recording, dedup, gallery stats
 │   ├── wordHarvest.test.ts       # Offering Pit: enqueue, offer, summary, economy parity
+│   ├── dragDrop.test.ts          # Drag-and-drop slot estimation: position→index mapping, closest valid slot search
 │   └── wordHistory.test.ts
 ├── scripts/
 │   ├── generatePuzzleBankEasy.test.ts  # Generator script for standard EASY puzzle bank (500 puzzles)
@@ -1269,7 +1277,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 932 tests, 32 suites
+cd mobile && npx jest --no-coverage  # 948 tests, 33 suites
 ```
 
 **Test patterns:**

@@ -691,7 +691,11 @@ export const Row: React.FC<RowProps> = memo(({
           <DraggableTile
             key={letter.id}
             enabled={!isProcessing}
-            onDragStart={() => onLetterPress(letter, rowIndex)}
+            onDragStart={() => {
+              if (!selectedLetter || selectedLetter.id !== letter.id) {
+                onLetterPress(letter, rowIndex);
+              }
+            }}
             onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
             onTap={() => onLetterPress(letter, rowIndex)}
             phase={phase}
