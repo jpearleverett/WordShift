@@ -376,8 +376,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // Use pre-generated puzzle bank for standard/reverse variants at all difficulties
-      const bankVariants: PuzzleVariant[] = ['standard', 'reverse'];
+      // Use pre-generated puzzle bank for standard/reverse/double_shift variants at all difficulties
+      const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift'];
       const shouldUseBank = bankVariants.includes(variant)
         && (variant !== 'standard' || effectiveMode === 'standard');
       if (shouldUseBank) {
@@ -420,7 +420,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       console.log("Local generation failed, using fallback:", localErr);
       // Fallback puzzles don't include solver metadata, so restrictions may be
       // impossible to satisfy. Revert restriction variants to standard fallback.
-      const fallbackVariant = variant;
+      const fallbackVariant = 'standard' as PuzzleVariant;
       const fallbackWords = getRandomFallback(selectedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
       initGame(

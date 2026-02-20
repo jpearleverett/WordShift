@@ -434,6 +434,7 @@ export const Row: React.FC<RowProps> = memo(({
   const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
   const invalidShakeX = useRef(new Animated.Value(0)).current;
   const successBounceScale = useRef(new Animated.Value(1)).current;
+  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     // Animate row transitions
@@ -454,7 +455,7 @@ export const Row: React.FC<RowProps> = memo(({
 
       // Glow pulse for active row (skip on low-end devices)
       if (!shouldSimplifyAnimations()) {
-        const rowGlowLoop = Animated.loop(
+        glowLoopRef.current = Animated.loop(
           Animated.sequence([
             Animated.timing(glowAnim, {
               toValue: 1,
@@ -470,7 +471,7 @@ export const Row: React.FC<RowProps> = memo(({
             }),
           ])
         );
-        rowGlowLoop.start();
+        glowLoopRef.current.start();
       }
     } else if (isTarget) {
       const guidedTarget = guidanceActive;
@@ -521,6 +522,8 @@ export const Row: React.FC<RowProps> = memo(({
     }
 
     return () => {
+      glowLoopRef.current?.stop();
+      glowLoopRef.current = null;
       glowAnim.stopAnimation();
     };
   }, [isSource, isTarget, isCompleted, guidanceActive]);

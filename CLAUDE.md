@@ -811,7 +811,7 @@ When Fox is first tapped at Phase 4, a one-time tutorial callback dialogue is sh
 Animals have conversation sessions with puzzle-based cooldowns to pace interactions:
 
 **Session Parameters** (in `dialogueSession.ts` and `types/homeWorld.ts`):
-- Max dialogues per session: Phase-aware via `getDialoguesPerSession(phase)` — Phase 0-1: 4, Phase 2-3: 5, Phase 4: 6
+- Max dialogues per session: Phase-aware via `getDialoguesPerSession(phase)` — Phase 0-1: 3, Phase 2-3: 5, Phase 4: 6, Phase 5: 4
 - Cooldown: Phase-aware via `getPuzzlesBetweenSessions(phase)` — Phase 0: 2 puzzles, Phase 1: 3 puzzles, Phase 2: 4 puzzles, Phase 3-4: 5 puzzles
 - **Grace period**: First 1 session after unlock has no cooldown (`GRACE_PERIOD_SESSIONS`). Wired into `checkDialogueAvailability`, `isOnCooldown`, and `getSessionStatus` in `dialogueSession.ts`.
 - Dialogue progress persists (animals remember where they left off)
@@ -1588,9 +1588,9 @@ Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
 
 ### Home Screen - Adjusting dialogue sessions
 Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
-- `getDialoguesPerSession(phase)` - Phase-aware max dialogues: Phase 0-1=4, Phase 2-3=5, Phase 4=6
+- `getDialoguesPerSession(phase)` - Phase-aware max dialogues: Phase 0-1=3, Phase 2-3=5, Phase 4=6, Phase 5=4
 - `getPuzzlesBetweenSessions(phase)` - Phase-aware cooldown: Phase 0=2, Phase 1=3, Phase 2=4, Phase 3-4=5 puzzles
-- `GRACE_PERIOD_SESSIONS` - Sessions before cooldown kicks in for new animals (default: 1)
+- `GRACE_PERIOD_SESSIONS` - Sessions before cooldown kicks in for new animals (default: 2)
 
 ### Home Screen - Adjusting streak grace period
 Edit `STREAK_BONUSES.STREAK_RESET_DAYS` in `types/homeWorld.ts`:
