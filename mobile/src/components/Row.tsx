@@ -224,7 +224,7 @@ const Slot: React.FC<{
         useNativeDriver: true,
       }).start();
     }
-  }, [triggerCatch]);
+  }, [triggerCatch, settings.reducedMotion]);
 
   // Animate preview appearance
   useEffect(() => {
@@ -253,7 +253,7 @@ const Slot: React.FC<{
       previewOpacity.setValue(0);
       previewScale.setValue(0.85);
     }
-  }, [preview?.word]);
+  }, [preview?.word, preview?.isValid]);
 
   const pulseScale = pulseAnim.interpolate({
     inputRange: [0, 1],

@@ -495,7 +495,7 @@ export async function awardPuzzleAmber(
 
   // Check for phase transition using weighted phase progress
   const previousPhase = progress.currentPhase;
-  const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
+  const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
   let newPhase = calculatePhase(effectiveProgress, progress.puzzlesSolved);
   // Prevent phase skipping — only advance one phase at a time
   if (newPhase > previousPhase + 1) {
@@ -1402,7 +1402,7 @@ export async function devAddPuzzles(amount: number): Promise<{ puzzles: number; 
   progress.phaseProgress = (progress.phaseProgress || 0) + amount;
 
   // Update phase based on effective progress
-  const effectiveProgress = progress.phaseProgress || progress.puzzlesSolved;
+  const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
   const newPhase = calculatePhase(effectiveProgress, progress.puzzlesSolved);
   progress.currentPhase = newPhase;
 

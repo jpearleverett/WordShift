@@ -109,7 +109,7 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
   // Check if on cooldown (waiting for puzzles)
   if (session.puzzlesAtSessionEnd !== null) {
     // Grace period: skip cooldown for newly unlocked animals' first sessions
-    const inGracePeriod = (session.sessionsCompleted ?? 0) <= DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
+    const inGracePeriod = (session.sessionsCompleted ?? 0) < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
 
     const remaining = getCooldownRemaining(session);
 
@@ -243,7 +243,7 @@ export function getSessionStatus(animalId: string): {
 
   // Check if on cooldown
   if (session.puzzlesAtSessionEnd !== null) {
-    const inGracePeriod = (session.sessionsCompleted ?? 0) <= DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
+    const inGracePeriod = (session.sessionsCompleted ?? 0) < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
     const remaining = getCooldownRemaining(session);
     if (remaining <= 0 || inGracePeriod) {
       return { status: 'available' };

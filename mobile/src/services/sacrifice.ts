@@ -126,15 +126,15 @@ export async function performSacrifice(
 
   await saveSacrificeState(state);
 
+  // First sacrifice gets special message
+  if (state.sacrificeCount === 1) {
+    return { message: SACRIFICE_RESPONSES[0], isMilestone: false };
+  }
+
   // Check for milestone
   const milestoneMessage = SACRIFICE_MILESTONES[state.sacrificeCount];
   if (milestoneMessage) {
     return { message: milestoneMessage, isMilestone: true };
-  }
-
-  // First sacrifice gets special message
-  if (state.sacrificeCount === 1) {
-    return { message: SACRIFICE_RESPONSES[0], isMilestone: false };
   }
 
   // Random response

@@ -34,6 +34,12 @@ export type OnboardingStep =
 
 let cachedStep: OnboardingStep | null = null;
 
+const VALID_STEPS: Set<string> = new Set([
+  'not_started', 'home_empty', 'fox_invited', 'going_to_puzzle',
+  'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',
+  'pit_offering', 'returning_home', 'unlock_explained', 'complete',
+]);
+
 /**
  * Get the current onboarding step from storage.
  */
@@ -41,7 +47,9 @@ export async function getOnboardingStep(): Promise<OnboardingStep> {
   if (cachedStep !== null) return cachedStep;
   try {
     const val = await AsyncStorage.getItem(ONBOARDING_KEY);
-    const step = (val as OnboardingStep) || 'not_started';
+    const step: OnboardingStep = (val && VALID_STEPS.has(val))
+      ? (val as OnboardingStep)
+      : 'not_started';
     cachedStep = step;
     return step;
   } catch {

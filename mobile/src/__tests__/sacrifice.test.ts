@@ -113,10 +113,10 @@ describe('sacrifice', () => {
       expect(state.sacrificeHistory[0].timestamp).toBeGreaterThan(0);
     });
 
-    it('returns milestone message for first sacrifice', async () => {
+    it('returns special message for first sacrifice', async () => {
       const result = await performSacrifice(5, 4);
-      expect(result.isMilestone).toBe(true);
-      expect(result.message).toContain('first');
+      expect(result.isMilestone).toBe(false);
+      expect(result.message).toContain('arrangement');
     });
 
     it('returns milestone message at sacrifice count 5', async () => {

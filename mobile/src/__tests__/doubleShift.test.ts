@@ -152,8 +152,9 @@ describe('Double Shift variant integration', () => {
     expect(hasVariantModifier('double_shift', 'double_shift')).toBe(true);
     expect(hasVariantModifier('standard', 'double_shift')).toBe(false);
 
-    // All variant thresholds currently set to 0 for testing
-    expect(isVariantUnlocked('double_shift', 0, 0)).toBe(true);
+    // Double shift unlocks at 40 puzzles
+    expect(isVariantUnlocked('double_shift', 0, 0)).toBe(false);
+    expect(isVariantUnlocked('double_shift', 40, 0)).toBe(true);
   });
 
   test('getVariantOverrides forces wordLength=5 for double_shift', () => {

@@ -153,20 +153,20 @@ describe('puzzleVariety', () => {
 
     it('exposes unlock requirements and unlocked checks', () => {
       expect(getVariantUnlockRequirement('standard')).toBeNull();
-      // All variant thresholds currently set to 0 for testing
-      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(0);
-      expect(isVariantUnlocked('reverse', 0, 0)).toBe(true);
+      // Reverse unlocks at 10 puzzles
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(10);
+      expect(isVariantUnlocked('reverse', 0, 0)).toBe(false);
+      expect(isVariantUnlocked('reverse', 10, 0)).toBe(true);
     });
 
     it('returns unlocked variants list with standard first', () => {
-      // All variants unlocked from start (thresholds set to 0 for testing)
+      // With 0 puzzles, only standard is unlocked
       const early = getUnlockedVariants(0, 0);
       expect(early).toContain('standard');
-      expect(early).toContain('reverse');
-      expect(early).toContain('speed');
-      expect(early).toContain('double_shift');
+      expect(early).not.toContain('reverse');
 
-      const mid = getUnlockedVariants(90, 0);
+      // With 100 puzzles, all variants are unlocked (reverse=10, double_shift=40, speed=52)
+      const mid = getUnlockedVariants(100, 0);
       expect(mid).toContain('standard');
       expect(mid).toContain('reverse');
       expect(mid).toContain('speed');
@@ -174,8 +174,8 @@ describe('puzzleVariety', () => {
     });
 
     it('builds selector options with only unlocked variants', () => {
-      // All variants unlocked from start (thresholds set to 0 for testing)
-      const options = getVariantSelectorOptions(50, 0, 0);
+      // With 100 puzzles, all variants are unlocked
+      const options = getVariantSelectorOptions(100, 0, 0);
       expect(options.every(o => o.unlocked)).toBe(true);
       expect(options.map(o => o.variant)).toContain('standard');
       expect(options.map(o => o.variant)).toContain('reverse');

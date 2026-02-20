@@ -154,7 +154,7 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
     } else {
       setPieces([]);
     }
-  }, [active]);
+  }, [active, onComplete, phase, ritualEnergy]);
 
   if (!active || pieces.length === 0) return null;
 

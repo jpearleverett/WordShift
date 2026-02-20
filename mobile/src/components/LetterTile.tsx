@@ -151,7 +151,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       glowAnim.stopAnimation();
       shineAnim.stopAnimation();
     };
-  }, [isInteractable, isSelected]);
+  }, [isInteractable, isSelected, settings.reducedMotion]);
 
   // Selected bounce animation (phase-aware: bouncy at Phase 0, heavy/ritualistic at Phase 4)
   useEffect(() => {
@@ -323,7 +323,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       }
       resonanceAnim.stopAnimation();
     };
-  }, [isResonant, phase]);
+  }, [isResonant, phase, settings.reducedMotion]);
 
   // Tutorial guidance pulse for the exact recommended tile.
   useEffect(() => {

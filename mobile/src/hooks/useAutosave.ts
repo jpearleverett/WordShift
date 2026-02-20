@@ -102,6 +102,7 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.currentWordLength,
     deps.hint,
     deps.solution,
+    deps.reverseSolution,
     deps.gameMode,
     deps.currentVariant,
     deps.selectedVariant,
