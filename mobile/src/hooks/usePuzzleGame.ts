@@ -430,10 +430,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         fallbackWordLen,
         fallbackVariant
       );
-      if (fallbackVariant !== 'standard') {
-        const config = VARIANT_CONFIGS[fallbackVariant];
-        setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
-      } else if (variant !== 'standard') {
+      if (variant !== 'standard') {
         // Variant was dropped during fallback — notify the player
         setMessage(
           currentPhase >= 3

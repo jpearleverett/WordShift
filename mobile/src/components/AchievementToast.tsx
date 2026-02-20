@@ -75,15 +75,15 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
     >
       <View style={[
         styles.inner,
-        phase >= 3 && phase < 4 && { backgroundColor: '#2E2345', borderColor: '#7A6A5A' },
-        phase >= 4 && { backgroundColor: '#1A1225', borderColor: '#5A4A3A' },
+        phase >= 3 && phase < 4 && { backgroundColor: '#2E2345', borderColor: '#6A4A8A' },
+        phase >= 4 && { backgroundColor: '#1A1225', borderColor: '#5A2A3A' },
       ]}>
         <Text style={styles.icon}>{achievement.icon}</Text>
         <View style={styles.textContainer}>
           <Text style={[
             styles.label,
-            phase >= 3 && phase < 4 && { color: '#9A8A7A' },
-            phase >= 4 && { color: '#7A6A5A' },
+            phase >= 3 && phase < 4 && { color: '#A888C8' },
+            phase >= 4 && { color: '#A078C8' },
           ]}>Achievement Unlocked!</Text>
           <Text style={styles.title}>{achievement.title}</Text>
         </View>

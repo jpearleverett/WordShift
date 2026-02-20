@@ -56,7 +56,7 @@ npx jest --no-coverage   # Run all tests (948 tests, 33 suites)
   - **Constants centralization**: Created `src/constants/gameBalance.ts` (phase thresholds, amber rewards, streak config, puzzle gen timeouts, bank thresholds, variant economy, dread effect intensities) and `src/constants/timing.ts` (19 animation/interaction timing constants extracted from App.tsx). Source files re-export for backward compatibility.
   - **Puzzle bank registry pattern**: Replaced 12 parallel storage keys, cache variables, ID→words maps, and 4 if-else chains in `puzzleBank.ts` with a single `BANK_REGISTRY` record. Functions are now simple map lookups. ~270 lines reduced.
   - **Dialogue system split**: Split monolithic `animalDialogue.ts` (2538 lines) into 5 focused submodules under `src/services/dialogue/`: `animalDialogueBase.ts` (core arrays + accessors), `animalDialogueIntro.ts` (intro/catchup/post-revelation), `animalDialogueReactions.ts` (triggers/sacrifices/thresholds), `animalDialogueNarrative.ts` (cross-refs/coordinated/seeds), `animalDialogueVariants.ts`. Original file becomes thin `export * from './dialogue'` re-export shim.
-  - **Phase 5 (Post-Revelation) completion**: Expanded `DialoguePhase` from `0|1|2|3|4` to `0|1|2|3|4|5`. Added Phase 5 entries to all 22+ `Record<DialoguePhase, ...>` records in `phaseNarrative.ts` (tone: "Terrible Peace" — serene resignation, key words: weave/thread/hum/pattern/continues). Added Phase 5 whispers for all 10 animals. Wired `isPostRevelation()` into `useGamePersistence.ts` to report phase as 5. Added Phase 5 dialogue routing in `useDialogueFlow.ts` (cycles through post-revelation lines). Removed orphaned standalone Phase 5 functions in favor of native record entries.
+  - **Phase 5 (Post-Revelation) completion**: Expanded `DialoguePhase` from `0|1|2|3|4` to `0|1|2|3|4|5`. Added Phase 5 entries to all 22+ `Record<DialoguePhase, ...>` records in `phaseNarrative.ts` (tone: "Terrible Peace" — serene resignation, key words: weave/thread/hum/pattern/continues). Added Phase 5 whispers for all 10 animals. Wired `isPostRevelation()` into `useGamePersistence.ts` to report phase as 5. Added Phase 5 dialogue routing in `useDialogueFlow.ts` (cycles through post-revelation lines with zero-guarded modulo to prevent NaN when dialogue count is zero). Removed orphaned standalone Phase 5 functions in favor of native record entries.
   - **Configuration validation**: New `src/services/configValidation.ts` with `validateDialogueIntegrity()`, `validatePhaseThresholds()`, `validateAchievements()`, `validateUnlockProgression()`, and `runAllValidations()`. Test suite in `configValidation.test.ts` (5 tests).
   - **Hook extraction from App.tsx**: Created 4 new hooks ready for integration: `useSpeedTimer.ts` (countdown timer with interval), `useDreadEffects.ts` (crimson pulse overlay + screen shake), `useOnboardingFlow.ts` (11-step state machine), `useVictoryOrchestration.ts` (post-victory cascade: glitch/micro-beat/whisper/interjection).
 - **Quality & fun assessment enhancements (2026-02-19)**:
@@ -891,7 +891,7 @@ The core system that makes puzzles feel like rituals, not just gates:
 
 **The Final Puzzle**: After house completion + Phase 4, the next puzzle completed triggers `FINAL_PUZZLE_EVENT` (cinematic overlay in App.tsx). Marks `finalPuzzleCompleted` on progress via `markFinalPuzzleCompleted()`.
 
-**Post-Revelation (Phase 5)**: After the final puzzle, the next puzzle triggers `POST_REVELATION_EVENT` and marks `postRevelation` on progress via `markPostRevelation()`. Post-revelation content: special victory text (`getPostRevelationVictoryTitle`, `getPostRevelationMoveMessage` in `phaseNarrative.ts`), 5 new dialogues per animal (`POST_REVELATION_DIALOGUES` / `getPostRevelationDialogue()` in `animalDialogue.ts`).
+**Post-Revelation (Phase 5)**: After the final puzzle, the next puzzle triggers `POST_REVELATION_EVENT` and marks `postRevelation` on progress via `markPostRevelation()`. Post-revelation content: special victory text (`getPostRevelationVictoryTitle`, `getPostRevelationMoveMessage` in `phaseNarrative.ts`), 10 new dialogues per animal (`POST_REVELATION_DIALOGUES` / `getPostRevelationDialogue()` in `animalDialogue.ts`).
 
 ### Phase-Aware Milestone Messages
 
@@ -1259,7 +1259,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - Import colors from `CandyColors` in `src/theme/colors.ts`; use `getPhaseTheme(phase)` for phase-aware colors
 - All player-facing text must go through `phaseNarrative.ts` — never hardcode victory/move/hint strings
 - Use `Animated` API for smooth animations; choreograph multi-step animations with `Animated.sequence` + `Animated.stagger`
-- **Animation loops**: Store `Animated.loop()` return value in a ref, call `.stop()` in useEffect cleanup to prevent accumulation
+- **Animation cleanup**: Store `Animated.loop()`, `Animated.sequence()`, and `Animated.parallel()` return values, call `.stop()` in useEffect cleanup to prevent leaks on unmount (e.g., `Confetti.tsx` ConfettiPieceComponent and StarBurst)
 - **Native driver preferred**: Use `useNativeDriver: true` for all animations; if you need to animate backgroundColor, use an opacity overlay on a static-colored view instead
 - **Device tier gating**: Use `shouldSimplifyAnimations()` from `deviceTier.ts` to skip decorative animations on low-end devices; use `getMaxParticleCount()`/`getMaxConfettiCount()` for particle limits
 - **React.memo**: Applied to expensive pure components (e.g., `Row`) to prevent unnecessary re-renders
@@ -1287,7 +1287,7 @@ cd mobile && npx jest --no-coverage  # 948 tests, 33 suites
 - Puzzle generator tests mock `amberCurrency.getCurrentPhase` + all `wordHistory` functions
 - Hook tests (`usePuzzleGame`, `useGamePersistence`) use manual React mock with stateStore Map + index rewind pattern
 - `jest.fn(async () => ...)` infers 0 args — add typed optional params `(_d?: any, _s?: any)` for TS
-- `DialoguePhase` is `0 | 1 | 2 | 3 | 4 | 5` literal type — mock return values need `as number` or `as any` cast
+- `DialoguePhase` is `0 | 1 | 2 | 3 | 4 | 5` literal type — mock return values need `as number` cast (prefer `as number` over `as any` to preserve type safety)
 - Component tests use `jest.mock('react-native', ...)` with stub exports since test env is Node (no renderer); test data contracts and service integrations rather than rendering
 - Performance monitor tests mock `requestAnimationFrame`, `cancelAnimationFrame`, and `performance.now` globally
 
@@ -1422,6 +1422,7 @@ Phase transition events now include visual effect configs:
 - Phase 2: vignette close + falling particles
 - Phase 3: flash + shake + rising particles
 - Phase 4: heavy shake + crimson particles + full vignette
+- `CinematicParticle` uses a mount-only `useEffect` (eslint-disable comment documents the intentional empty deps — particles are created fresh per transition and destroyed on overlay close)
 
 ### Enhanced Shadow Figure (`HouseWorld.tsx`)
 

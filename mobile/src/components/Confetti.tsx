@@ -44,7 +44,7 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
     const wobbleAmount = 30 + Math.random() * 50;
     const fallDuration = 2000 + Math.random() * 1500;
 
-    Animated.sequence([
+    const anim = Animated.sequence([
       Animated.delay(piece.delay),
       Animated.parallel([
         // Pop in
@@ -89,7 +89,9 @@ const ConfettiPieceComponent: React.FC<{ piece: ConfettiPiece }> = ({ piece }) =
           }),
         ]),
       ]),
-    ]).start();
+    ]);
+    anim.start();
+    return () => anim.stop();
   }, []);
 
   const spin = rotate.interpolate({
@@ -196,6 +198,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
 
   useEffect(() => {
     if (active) {
+      const runningAnims: Animated.CompositeAnimation[] = [];
       stars.forEach((star, i) => {
         star.scale.setValue(0);
         star.translateX.setValue(0);
@@ -204,7 +207,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
 
         const distance = 40 + Math.random() * 30;
 
-        Animated.parallel([
+        const anim = Animated.parallel([
           Animated.sequence([
             Animated.spring(star.scale, {
               toValue: 1,
@@ -238,8 +241,11 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
               useNativeDriver: true,
             }),
           ]),
-        ]).start();
+        ]);
+        anim.start();
+        runningAnims.push(anim);
       });
+      return () => runningAnims.forEach(a => a.stop());
     }
   }, [active]);
 
