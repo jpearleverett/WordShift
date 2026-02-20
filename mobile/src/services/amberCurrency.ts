@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
+import { getWeekId } from './weeklyQuests';
 import {
   HomeWorldProgress,
   AmberTransaction,
@@ -1367,17 +1368,6 @@ function getWeeklyVariantDecay(variantUsageThisWeek: number): number {
   if (variantUsageThisWeek <= 6) return 0.85;
   if (variantUsageThisWeek <= 10) return 0.65;
   return 0.45;
-}
-
-/**
- * Get the current ISO week identifier (e.g., "2026-W07").
- */
-function getWeekId(): string {
-  const now = new Date();
-  const jan1 = new Date(now.getFullYear(), 0, 1);
-  const dayOfYear = Math.ceil((now.getTime() - jan1.getTime()) / (1000 * 60 * 60 * 24));
-  const weekNumber = Math.ceil((dayOfYear + jan1.getDay()) / 7);
-  return `${now.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
 }
 
 /**

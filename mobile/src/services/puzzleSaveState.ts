@@ -36,6 +36,8 @@ export interface SavedPuzzleState {
   blindRevealedRows?: number[];
   currentPhase: DialoguePhase;
   lastFormedWord: string | null;
+  /** Double shift input cycle phase (null for non-double-shift puzzles). */
+  doubleShiftPhase?: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
   isPlayingDaily: boolean;
   /** Date for daily challenge saves (YYYY-MM-DD). Null for standard puzzles. */
   dailyDate?: string | null;

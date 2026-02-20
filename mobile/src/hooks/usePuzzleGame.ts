@@ -520,7 +520,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     let relevantStep: PuzzleSolutionStep | undefined;
 
-    if (isReverseLeg && activeSolution) {
+    const isDoubleShiftHint = hasVariantModifier(currentVariant, 'double_shift');
+    // During double shift pick2/drop2, the source row has already had one letter removed
+    // by drop1, so the current source word won't match the solution step's sourceWord.
+    // Fall back to matching by stepIndex only (unique per row in double shift).
+    const doubleShiftMidStep = isDoubleShiftHint &&
+      (doubleShiftPhase === 'pick2' || doubleShiftPhase === 'drop2');
+
+    if (doubleShiftMidStep && activeSolution) {
+      relevantStep = activeSolution.find(s => s.stepIndex === activeRowIndex);
+    } else if (isReverseLeg && activeSolution) {
       // During reverse: stepIndex = how many reverse steps completed so far
       const reverseStepIndex = (rows.length - 1) - activeRowIndex;
       relevantStep = activeSolution.find(s =>
@@ -538,7 +547,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
-      if (relevantStep.lettersToMove) {
+      if (relevantStep.lettersToMove && doubleShiftMidStep) {
+        // Double shift mid-step: only show the second letter (first was already placed)
+        setMessage(
+          getHintMessage(relevantStep.lettersToMove[1], relevantStep.targetWord, currentPhase)
+        );
+      } else if (relevantStep.lettersToMove) {
         // Double shift hint: show both letters
         setMessage(
           getHintMessage(
@@ -555,7 +569,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     } else {
       setMessage(getHintFallback(currentPhase));
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase]);
 
   const handleSlotPress = useCallback(async (targetIndex: number): Promise<{
     completed: boolean;
@@ -790,11 +804,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     currentVariant,
     currentPhase,
     gameMode,
-    generatePuzzleForVariant,
-    difficulty,
-    applyBoard,
     doubleShiftPhase,
-    history,
   ]);
 
   const handleUndo = useCallback(() => {
@@ -917,6 +927,19 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (isDoubleShift && doubleShiftPhase === 'drop1') {
         // During drop1, show intermediate words (no validation — they're W+1 intermediates)
         previews.push({ word: newWord, isValid: true });
+      } else if (isDoubleShift && doubleShiftPhase === 'drop2') {
+        // During drop2, both source and target must be valid words.
+        // Source validity is the same for all slots (doesn't depend on drop position),
+        // so compute once outside the loop would be ideal, but for clarity we AND here.
+        const sourceWordAfterBothRemovals = rows[activeRowIndex].words
+          .filter(l => l.id !== selectedLetter.id)
+          .map(l => l.char)
+          .join('');
+        const isSourceValid = validWordsCache.current.has(sourceWordAfterBothRemovals);
+        previews.push({
+          word: newWord,
+          isValid: isSourceValid && validWordsCache.current.has(newWord),
+        });
       } else {
         previews.push({
           word: newWord,
@@ -951,6 +974,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMoveDirection(saved.moveDirection);
     setCurrentPhase(saved.currentPhase);
     setLastFormedWord(saved.lastFormedWord);
+    setDoubleShiftPhase(
+      (saved.doubleShiftPhase as typeof doubleShiftPhase)
+        ?? (hasVariantModifier(saved.currentVariant, 'double_shift') ? 'pick1' : null)
+    );
     // Reset UI-only state
     setError(null);
     setIsProcessing(false);

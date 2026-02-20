@@ -179,7 +179,9 @@ export function DraggableTile({
     })
   ).current;
 
-  const shadowColor = phase >= 3 ? '#8030508C' : '#FFD70050';
+  const shadowColor = phase >= 5 ? '#7B6B8A80'   // ghostly mauve (terrible peace)
+    : phase >= 3 ? '#8030508C'                    // crimson (cult/dread)
+    : '#FFD70050';                                // golden (bright days)
 
   return (
     <View style={styles.wrapper}>

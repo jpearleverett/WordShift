@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Animal, Room, Unlockable, HomeWorldProgress } from '../types/homeWorld';
 import {
   ANIMALS,
@@ -62,6 +62,14 @@ export function useUnlockFlow({
     available: boolean;
     reason?: string;
   } | null>(null);
+  const introTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup intro timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
+    };
+  }, []);
 
   // Refresh unlock data using freshly-loaded rooms/animals (avoids stale state)
   const refreshUnlockData = useCallback(async (freshRooms: Room[], freshAnimals: Animal[]) => {
@@ -129,7 +137,9 @@ export function useUnlockFlow({
       if (unlock.type === 'character' && !options?.suppressIntro) {
         const animal = ANIMALS.find(a => a.id === unlock.targetId);
         if (animal) {
-          setTimeout(() => {
+          if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
+          introTimeoutRef.current = setTimeout(() => {
+            introTimeoutRef.current = null;
             setIntroAnimal(animal as unknown as Animal);
             setIntroDialogueIndex(0);
             setShowIntroDialogue(true);

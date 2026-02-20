@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Animated } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium } from '../services/haptics';
@@ -41,6 +41,16 @@ export interface DreadEffectsActions {
 export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
   const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
   const screenShakeRef = useRef(new Animated.Value(0)).current;
+  const pulseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Cleanup running animations on unmount
+  useEffect(() => {
+    return () => {
+      pulseAnimRef.current?.stop();
+      shakeAnimRef.current?.stop();
+    };
+  }, []);
 
   const triggerDreadPulse = useCallback((phase: number) => {
     // Haptic feedback scaled by phase intensity.
@@ -52,9 +62,13 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
 
     if (getSettingsSync().reducedMotion) return;
 
+    // Stop any in-flight animations before starting new ones.
+    pulseAnimRef.current?.stop();
+    shakeAnimRef.current?.stop();
+
     // Crimson overlay pulse.
     const maxOpacity = DREAD_PULSE_OPACITY[phase] ?? (phase >= 4 ? 0.25 : 0.10);
-    Animated.sequence([
+    pulseAnimRef.current = Animated.sequence([
       Animated.timing(dreadPulseOpacity, {
         toValue: maxOpacity,
         duration: DREAD_PULSE_FADE_IN_MS,
@@ -65,12 +79,13 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
         duration: DREAD_PULSE_FADE_OUT_MS,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]);
+    pulseAnimRef.current.start(() => { pulseAnimRef.current = null; });
 
     // Horizontal screen shake at Phase 3+.
     if (phase >= 3) {
       const intensity = SCREEN_SHAKE_INTENSITY[phase] ?? (phase >= 4 ? 4 : 2);
-      Animated.sequence([
+      shakeAnimRef.current = Animated.sequence([
         Animated.timing(screenShakeRef, {
           toValue: intensity,
           duration: SCREEN_SHAKE_KEYFRAME_MS,
@@ -91,7 +106,8 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
           duration: SCREEN_SHAKE_KEYFRAME_MS,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+      shakeAnimRef.current.start(() => { shakeAnimRef.current = null; });
     }
   }, [dreadPulseOpacity, screenShakeRef]);
 

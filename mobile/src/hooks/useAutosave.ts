@@ -27,6 +27,7 @@ export interface AutosaveDeps {
   moveDirection: string;
   currentPhase: number;
   lastFormedWord: string | null;
+  doubleShiftPhase: string | null;
   speedTimeRemaining: number | null;
 }
 
@@ -69,6 +70,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           blindRevealedRows: [],
           currentPhase: deps.currentPhase,
           lastFormedWord: deps.lastFormedWord,
+          doubleShiftPhase: deps.doubleShiftPhase as any,
           isPlayingDaily: deps.isPlayingDaily,
           dailyDate: deps.isPlayingDaily ? getTodayString() : null,
           speedTimerExpireAt: deps.speedTimeRemaining != null
@@ -109,6 +111,7 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.moveDirection,
     deps.currentPhase,
     deps.lastFormedWord,
+    deps.doubleShiftPhase,
     deps.speedTimeRemaining,
   ]);
 }
