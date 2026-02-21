@@ -378,8 +378,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
       // Use pre-generated puzzle bank for standard/reverse/double_shift variants at all difficulties
       const bankVariants: PuzzleVariant[] = ['standard', 'reverse', 'double_shift'];
-      const shouldUseBank = bankVariants.includes(variant)
-        && (variant !== 'standard' || effectiveMode === 'standard');
+      const shouldUseBank = bankVariants.includes(variant);
       if (shouldUseBank) {
         try {
           const recencyMap = await getWordHistoryWithRecency();

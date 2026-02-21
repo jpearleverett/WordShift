@@ -564,7 +564,7 @@ Game logic is extracted into six custom hooks:
 **`usePuzzleGame()`** (`src/hooks/usePuzzleGame.ts`):
 - All puzzle state: rows, selected letter, game state, hints, validation, gameMode, currentPhase
 - `initGame(words, hint?, solution?, wordLength?, reverseSolution?)` - Load pre-generated puzzle
-- `startNewGame(difficulty?, mode?, variant?)` - Start a new puzzle: serves curated early puzzles → tries pre-generated bank (all difficulties for standard/reverse variants) → falls back to on-device generation. Uses the selected/preferred variant (or explicit override)
+- `startNewGame(difficulty?, mode?, variant?)` - Start a new puzzle: serves curated early puzzles → tries pre-generated bank (all difficulties for standard/reverse/double_shift variants, including challenge mode) → falls back to on-device generation. Uses the selected/preferred variant (or explicit override)
 - `setSelectedVariant(variant)` - Update preferred variant and persist it for subsequent runs
 - `handleLetterPress(letter, rowIndex)` - Pick a letter; uses `getLockedLetterMessage(phase)` for locked letter feedback
 - `handleSlotPress(targetIndex)` - Drop letter into slot, returns completion data + gameMode; intermediate moves return `{ completed: false, formedWord }` for dread word detection; uses `getInvalidWordMessage(word, phase)` for invalid word feedback
@@ -1115,7 +1115,7 @@ Serves pre-validated puzzles for all difficulties instead of always generating o
 - **Selection**: Scores all unplayed puzzles, picks randomly from top 5.
 - **Recycling**: Tracks played puzzle IDs per bank via AsyncStorage (12 independent played-ID lists). When all exhausted, recycles the oldest-played half.
 - **Variant routing**: Standard EASY/MEDIUM/MEDIUM_PLUS/HARD → respective `PUZZLE_BANK_*` standard banks. Reverse at each difficulty → respective `PUZZLE_BANK_REVERSE_*` banks. Double_shift at each difficulty → respective `PUZZLE_BANK_DOUBLE_SHIFT_*` banks. Other variants (speed, chain) → real-time generation.
-- **Integration**: `usePuzzleGame.ts` `startNewGame()` checks the bank first for all standard/reverse/double_shift difficulty combos. On failure, silently falls back to on-device generation.
+- **Integration**: `usePuzzleGame.ts` `startNewGame()` checks the bank first for all standard/reverse/double_shift difficulty combos (including challenge mode — challenge mode only changes undo limits and hint availability, not puzzle structure). On failure, silently falls back to on-device generation.
 
 Key functions:
 - `selectPreGeneratedPuzzle(difficulty, phase, recencyMap, variant)` - Returns `PuzzleConfig` from bank or null if no bank for this combo
