@@ -52,6 +52,10 @@ npx jest --no-coverage   # Run all tests (948 tests, 33 suites)
 
 ## Recent Implementation Notes (2026-02)
 
+- **Screen transitions & pit glow polish (2026-02-21)**:
+  - **Janky screen transitions (HIGH)**: `transitionTo` in App.tsx faded screen content opacity to 0, revealing a static dark `#1A1A2E` `screenBackground` — causing a visible black flash between screens with different background colors (sky blue home, purple puzzle, dark pit). Replaced with an opaque overlay transition: a solid overlay fades IN (120ms) to cover the old screen, the screen swaps underneath while hidden, then the overlay fades OUT (180ms) to reveal the new screen. Removed `screenFade` ref and all `opacity: screenFade` bindings from screen wrappers. Added `transitionOverlay` Animated.Value rendered as `StyleSheet.absoluteFill` above screen content in the root return.
+  - **FeatureTooltip flash on navigation (MEDIUM)**: The "Track your progress and achievements" tooltip (`FeatureTooltip.tsx`) rendered at `zIndex: 1000` with `StyleSheet.absoluteFill` inside the home screen's fade container. During transitions FROM the home screen, the tooltip was briefly visible against the dark background. Fixed by adding `setActiveTooltip(null)` before every navigation callback in HomeScreen.tsx (stats, settings, play, gallery, pit, daily challenge).
+  - **Pit glow visual upgrade (MEDIUM)**: The offering pit glow was two flat `Animated.View` ovals with a single solid `backgroundColor` — no gradient, depth, or visual interest. Replaced with a 4-layer concentric glow system: outer halo (40% opacity), middle glow (70%), inner glow (100%), and dark core (250%, capped) for depth illusion, plus a subtle 1px rim ring at the pit edge. Each layer uses its own opacity interpolation from `pitBreathProgress`. Added `core` color field to `DEVOUR_COLORS` record (phase-aware dark center colors). Surge impact scale increased from 1.2→1.3 with a 40ms hold at peak for more dramatic devour feedback. Old `pitGlow` style removed in favor of inline positioned layers.
 - **Bug audit and fixes — fifth pass (2026-02-21)**:
   - **App.tsx drop-shake animation overlap (MEDIUM)**: The drag-drop screen micro-shake `Animated.sequence()` was created and started without storing the return value in a ref. If a second drag-drop triggered before the 4-keyframe shake completed, overlapping animations ran on the same `screenShakeRef`, causing jittery glitches. Added `dropShakeAnimRef` to store the sequence; `.stop()` is called before starting a new one.
   - **OfferingPitScreen floating word pop-in timeout leak (MEDIUM)**: The staggered `setTimeout` calls spawning pop-in animations for floating words were never tracked for cleanup. On fast unmount (navigating away mid-pop-in), callbacks fired after unmount running animations on freed values. Added `popInTimeoutsRef` to track all pop-in timeout IDs with cleanup in the useEffect return.
@@ -613,9 +617,10 @@ Game logic is extracted into six custom hooks:
 
 State-based routing in `App.tsx`:
 - `currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`
-- Screen transitions use `Animated.timing` fade (150ms out, `requestAnimationFrame` wait, 200ms in) — the rAF wait ensures React renders the new screen before fade-in starts, preventing jitter
+- Screen transitions use an opaque overlay pattern: a solid `#1A1A2E` overlay fades IN (120ms) covering the old screen, the screen swaps underneath while hidden, then the overlay fades OUT (180ms) to reveal the new screen. Overlay rendered as `StyleSheet.absoluteFill` with `pointerEvents="none"` in the root return. Screen content stays at full opacity throughout (no content-opacity fade)
 - Transitions instant when `reducedMotion` setting is enabled
 - `transitionTo(screen, callback?)` handles all navigation
+- HomeScreen dismisses `activeTooltip` (FeatureTooltip) before all navigation callbacks to prevent tooltip flash during transitions
 - **Phase sync on puzzle entry**: `handlePlayPuzzle` and `handleStartDaily` call `persistenceActions.refreshStats()` before transitioning, ensuring the puzzle screen always has the latest phase for correct visual theming
 
 ### Victory Flow
@@ -748,7 +753,8 @@ Puzzle completion no longer credits amber directly to the spendable balance. Ins
 - **Harvest All cascade**: Atomic `offerAllBatches()` first, then staggered visual cascade with incremental `displayBalance` updates as each word flies in. Pending amber badge and Offer All button decrement in real-time during cascade via `pendingAmberOffset` tracking (not cleared immediately)
 - **Home-style header**: Frosted glass amber display (matching HomeScreen), pending amber badge, stats (📊), settings (⚙️), and home (🏠) icon buttons
 - Phase-aware background images: `pitt_day.png` (Phase 0-1), `pitt_dusk.png` (Phase 2), `pitt_night.png` (Phase 3-4) with matching solid fallback colors
-- Phase-aware devour colors: gold → amber → purple → deep purple → crimson trail/glow/burst
+- Phase-aware devour colors: gold → amber → purple → deep purple → crimson trail/glow/burst. Each phase also has a `core` color for the pit depth illusion
+- **Multi-layered pit glow**: 4 concentric animated ovals (outer halo 40% opacity, middle glow 70%, inner glow 100%, dark core 250% capped) create a natural radial gradient effect with depth. Per-layer opacity interpolations from `pitBreathProgress`. Subtle 1px rim ring at pit edge. Surge impact scale 1.3× with 40ms hold at peak
 - Device-tier aware: word count caps (15/30/50), trail particles (2/5), impact particles (4/8), amber particles (3/7)
 - Summary stats bar: pending amber and lifetime offered
 - "Offer All" primary CTA with phase-aware label

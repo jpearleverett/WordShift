@@ -121,13 +121,17 @@ function getMaxRimParticles(): number {
   }
 }
 
-const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: number; burst: string }> = {
-  0: { trail: '#FFD700', glow: '#FFD700', glowOpacity: 0.35, burst: '#FFE680' },
-  1: { trail: '#F0C050', glow: '#F0C050', glowOpacity: 0.30, burst: '#F5D88A' },
-  2: { trail: '#B088D0', glow: '#9060C0', glowOpacity: 0.25, burst: '#C8A8E8' },
-  3: { trail: '#5A2080', glow: '#3A1060', glowOpacity: 0.20, burst: '#7040A0' },
-  4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070' },
+const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: number; burst: string; core: string }> = {
+  0: { trail: '#FFD700', glow: '#FFD700', glowOpacity: 0.35, burst: '#FFE680', core: '#1A1500' },
+  1: { trail: '#F0C050', glow: '#F0C050', glowOpacity: 0.30, burst: '#F5D88A', core: '#1A1500' },
+  2: { trail: '#B088D0', glow: '#9060C0', glowOpacity: 0.25, burst: '#C8A8E8', core: '#0E0520' },
+  3: { trail: '#5A2080', glow: '#3A1060', glowOpacity: 0.20, burst: '#7040A0', core: '#08020F' },
+  4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070', core: '#1A0510' },
 };
+
+// Multi-layered concentric glow — creates depth and natural radial falloff
+const PIT_GLOW_BASE_WIDTH = SCREEN_WIDTH * 0.7;
+const PIT_GLOW_BASE_HEIGHT = 90;
 
 // Colors that match the pit rim glow baked into each background image
 const RIM_PARTICLE_COLORS: Record<number, string> = {
@@ -779,9 +783,22 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
   const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
 
-  const breathOpacity = pitBreathProgress.interpolate({
+  // Per-layer opacity interpolations for concentric glow (outer→inner: 0.4x, 0.7x, 1.0x, 2.5x of base)
+  const breathOpacityOuter = pitBreathProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [breathOpacityRange[0] * 0.4, breathOpacityRange[1] * 0.4],
+  });
+  const breathOpacityMiddle = pitBreathProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [breathOpacityRange[0] * 0.7, breathOpacityRange[1] * 0.7],
+  });
+  const breathOpacityInner = pitBreathProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [breathOpacityRange[0], breathOpacityRange[1]],
+  });
+  const breathOpacityCore = pitBreathProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [Math.min(breathOpacityRange[0] * 2.5, 0.7), Math.min(breathOpacityRange[1] * 2.5, 0.85)],
   });
   const breathScale = pitBreathProgress.interpolate({
     inputRange: [0, 1],
@@ -992,10 +1009,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     Animated.parallel([
       Animated.sequence([
         Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity, duration: 120, useNativeDriver: true }),
+        Animated.delay(40),
         Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
       ]),
       Animated.sequence([
-        Animated.spring(pitSurgeScale, { toValue: 1.2, friction: 4, tension: 200, useNativeDriver: true }),
+        Animated.spring(pitSurgeScale, { toValue: 1.3, friction: 4, tension: 200, useNativeDriver: true }),
         Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
       ]),
     ]).start();
@@ -1579,7 +1597,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     return harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
   }, [harvestState]);
 
-  const glowColor = (DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0]).glow;
+  const phaseColors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
+  const glowColor = phaseColors.glow;
+  const coreColor = phaseColors.core;
 
   if (!harvestState) return null;
 
@@ -1588,24 +1608,112 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Ambient breathing glow — continuously pulses to make pit feel alive */}
+      {/* Layered breathing glow — outer halo (faintest, largest) */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.pitGlow, {
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - PIT_GLOW_BASE_WIDTH * 0.45,
+          top: PIT_CENTER.y - PIT_GLOW_BASE_HEIGHT * 0.55,
+          width: PIT_GLOW_BASE_WIDTH * 0.9,
+          height: PIT_GLOW_BASE_HEIGHT * 1.1,
+          borderRadius: PIT_GLOW_BASE_HEIGHT * 0.55,
           backgroundColor: glowColor,
-          opacity: breathOpacity,
+          opacity: breathOpacityOuter,
           transform: [{ scale: breathScale }],
-        }]}
+        }}
+      />
+      {/* Middle glow */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - PIT_GLOW_BASE_WIDTH * 0.32,
+          top: PIT_CENTER.y - PIT_GLOW_BASE_HEIGHT * 0.45,
+          width: PIT_GLOW_BASE_WIDTH * 0.64,
+          height: PIT_GLOW_BASE_HEIGHT * 0.9,
+          borderRadius: PIT_GLOW_BASE_HEIGHT * 0.45,
+          backgroundColor: glowColor,
+          opacity: breathOpacityMiddle,
+          transform: [{ scale: breathScale }],
+        }}
+      />
+      {/* Inner glow — brightest, smallest */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - PIT_GLOW_BASE_WIDTH * 0.2,
+          top: PIT_CENTER.y - PIT_GLOW_BASE_HEIGHT * 0.35,
+          width: PIT_GLOW_BASE_WIDTH * 0.4,
+          height: PIT_GLOW_BASE_HEIGHT * 0.7,
+          borderRadius: PIT_GLOW_BASE_HEIGHT * 0.35,
+          backgroundColor: glowColor,
+          opacity: breathOpacityInner,
+          transform: [{ scale: breathScale }],
+        }}
+      />
+      {/* Dark pit core — creates depth illusion */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - PIT_GLOW_BASE_WIDTH * 0.14,
+          top: PIT_CENTER.y - PIT_GLOW_BASE_HEIGHT * 0.25,
+          width: PIT_GLOW_BASE_WIDTH * 0.28,
+          height: PIT_GLOW_BASE_HEIGHT * 0.5,
+          borderRadius: PIT_GLOW_BASE_HEIGHT * 0.25,
+          backgroundColor: coreColor,
+          opacity: breathOpacityCore,
+          transform: [{ scale: breathScale }],
+        }}
+      />
+      {/* Pit rim ring — subtle edge definition */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - PIT_OVAL.radiusX,
+          top: PIT_CENTER.y - PIT_OVAL.radiusY,
+          width: PIT_OVAL.radiusX * 2,
+          height: PIT_OVAL.radiusY * 2,
+          borderRadius: PIT_OVAL.radiusX,
+          borderWidth: 1,
+          borderColor: glowColor + '25',
+        }}
       />
 
-      {/* Pit surge glow — flashes on devour impact / inhale */}
+      {/* Pit surge glow layers — flash on devour impact / inhale */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.pitGlow, {
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - PIT_GLOW_BASE_WIDTH * 0.45,
+          top: PIT_CENTER.y - PIT_GLOW_BASE_HEIGHT * 0.55,
+          width: PIT_GLOW_BASE_WIDTH * 0.9,
+          height: PIT_GLOW_BASE_HEIGHT * 1.1,
+          borderRadius: PIT_GLOW_BASE_HEIGHT * 0.55,
+          backgroundColor: glowColor,
+          opacity: pitSurgeOpacity.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 0.5],
+          }),
+          transform: [{ scale: pitSurgeScale }],
+        }}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - PIT_GLOW_BASE_WIDTH * 0.2,
+          top: PIT_CENTER.y - PIT_GLOW_BASE_HEIGHT * 0.35,
+          width: PIT_GLOW_BASE_WIDTH * 0.4,
+          height: PIT_GLOW_BASE_HEIGHT * 0.7,
+          borderRadius: PIT_GLOW_BASE_HEIGHT * 0.35,
           backgroundColor: glowColor,
           opacity: pitSurgeOpacity,
           transform: [{ scale: pitSurgeScale }],
-        }]}
+        }}
       />
 
       {/* Ambient rim particles — embers rising from pit edge */}
@@ -1914,15 +2022,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerIconText: { fontSize: 16 },
-  // ---- Pit glow ----
-  pitGlow: {
-    position: 'absolute',
-    top: PIT_CENTER.y - 45,
-    left: PIT_CENTER.x - SCREEN_WIDTH * 0.35,
-    width: SCREEN_WIDTH * 0.7,
-    height: 90,
-    borderRadius: 45,
-  },
+  // ---- Pit glow (old single-oval style removed — now uses inline multi-layered glow) ----
   // ---- Content overlays ----
   emptyContainer: {
     position: 'absolute',
