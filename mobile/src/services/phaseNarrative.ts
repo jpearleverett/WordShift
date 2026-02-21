@@ -31,14 +31,15 @@ export function getVictoryGlitch(phase: number, puzzlesSolved: number): string |
   if (phase !== 0) return null;
   // First victory always gets a brief glitch
   if (puzzlesSolved === 1) return VICTORY_GLITCH_TEXTS[0];
-  // ~3% chance on subsequent Phase 0 victories (subtle, not bug-like)
-  if (Math.random() < 0.03) {
+  // ~8% chance on subsequent Phase 0 victories — enough for ~2 glitches
+  // across 25 puzzles, creating subliminal unease that pays off later
+  if (Math.random() < 0.08) {
     return VICTORY_GLITCH_TEXTS[Math.floor(Math.random() * VICTORY_GLITCH_TEXTS.length)];
   }
   return null;
 }
 
-/** Rare "wrong" move messages that slip into Phase 0 (~5% chance) */
+/** Rare "wrong" move messages that slip into Phase 0 (~7% chance) */
 const PHASE_0_SEED_MESSAGES = [
   'The letters remember.',
   'Something shifted.',
@@ -48,10 +49,10 @@ const PHASE_0_SEED_MESSAGES = [
 
 /**
  * Get a move message with rare Phase 0 darkness seeds mixed in.
- * At Phase 0, there's a ~5% chance of a seed message replacing the normal one.
+ * At Phase 0, there's a ~7% chance of a seed message replacing the normal one.
  */
 function getPhase0MoveMessageWithSeed(): string {
-  if (Math.random() < 0.05) {
+  if (Math.random() < 0.07) {
     return PHASE_0_SEED_MESSAGES[Math.floor(Math.random() * PHASE_0_SEED_MESSAGES.length)];
   }
   const messages = MOVE_MESSAGES[0];
@@ -722,6 +723,91 @@ export function getAnimalWhisper(
   };
 }
 
+/**
+ * Generate a personalized Phase 5 whisper that references the player's
+ * actual word history. Creates a sense that the game remembers everything
+ * the player has done. Falls back to standard whisper pool if no words
+ * are available.
+ */
+export function getPersonalizedPhase5Whisper(
+  unlockedAnimals: string[],
+  ritualWords?: string[],
+): { animalName: string; animalType: string; text: string } | null {
+  if (unlockedAnimals.length === 0 || !ritualWords || ritualWords.length === 0) {
+    return getAnimalWhisper(5, unlockedAnimals);
+  }
+
+  const ANIMAL_NAMES: Record<string, string> = {
+    fox: 'Ember', owl: 'Archimedes', pangolin: 'Panko', axolotl: 'Axel',
+    capybara: 'Chill', fennec_fox: 'Fennick', sloth: 'Sloane',
+    wombat: 'Warren', rabbit: 'Thyme', red_panda: 'Bamboo',
+  };
+
+  // Pick a random word from the player's history
+  const word = ritualWords[Math.floor(Math.random() * ritualWords.length)].toUpperCase();
+  const selectedType = unlockedAnimals[Math.floor(Math.random() * unlockedAnimals.length)];
+  const name = ANIMAL_NAMES[selectedType] || selectedType;
+
+  const templates: Record<string, string[]> = {
+    fox: [
+      `${name} whispers: "The fire still remembers ${word}."`,
+      `${name} traces ${word} in the ashes. It glows briefly.`,
+    ],
+    owl: [
+      `${name} found ${word} written in the margins of every book.`,
+      `${name} says ${word} was the answer all along.`,
+    ],
+    pangolin: [
+      `${name} says ${word} was always part of the recipe.`,
+      `${name} stirs the pot. ${word} rises in the steam.`,
+    ],
+    axolotl: [
+      `${name} sees ${word} written on the surface of the water.`,
+      `${name} says the bubbles still spell ${word}.`,
+    ],
+    capybara: [
+      `${name} filed ${word} under "things that matter." It is the only entry.`,
+      `${name} says ${word} balanced the final equation.`,
+    ],
+    fennec_fox: [
+      `${name} can still hear ${word} echoing across the sand.`,
+      `${name} tilts an ear. "${word}," the wind says.`,
+    ],
+    sloth: [
+      `${name}... still... thinks... about... ${word}.`,
+      `${word}... echoes... slowly... through... ${name}'s... dreams.`,
+    ],
+    wombat: [
+      `${name} says ${word} is carved into the deepest tunnel wall.`,
+      `${name} found ${word} in the foundation. It was always there.`,
+    ],
+    rabbit: [
+      `${name} planted ${word} in the garden. Something grew.`,
+      `${name} says ${word} blooms every morning now.`,
+    ],
+    red_panda: [
+      `${name} breathes in ${word}. Breathes out silence.`,
+      `${word} is the thread. ${name} is the loom. You are the weaver.`,
+    ],
+  };
+
+  const animalTemplates = templates[selectedType];
+  if (!animalTemplates || animalTemplates.length === 0) {
+    return getAnimalWhisper(5, unlockedAnimals);
+  }
+
+  // 40% chance of personalized whisper at Phase 5, otherwise standard pool
+  if (Math.random() < 0.4) {
+    return {
+      animalName: name,
+      animalType: selectedType,
+      text: animalTemplates[Math.floor(Math.random() * animalTemplates.length)],
+    };
+  }
+
+  return getAnimalWhisper(5, unlockedAnimals);
+}
+
 // ============================================================================
 // ANIMAL INTERJECTIONS — Brief messages pulling the player to the home screen
 // ============================================================================
@@ -894,6 +980,17 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'The words you\'ve formed... they remember each other.',
     durationMs: 3000,
+  },
+  70: {
+    type: 'ambient_whisper',
+    text: 'The rooms are quieter now. Not empty — listening.',
+    durationMs: 3000,
+  },
+  74: {
+    type: 'glitch_title',
+    glitchTitle: 'IT BEGINS',
+    text: 'PERFECT!',
+    durationMs: 300,
   },
   80: {
     type: 'glitch_title',
@@ -1251,10 +1348,10 @@ export function getPitWardHint(currentPhase: DialoguePhase, fraction: number): s
 
 /** Text shown when transition is ready (all wards lit, pending confirmation) */
 const PIT_TRANSITION_READY_TEXT: Record<number, string> = {
-  1: 'The marks glow. Something is ready.',
-  2: 'The circle is complete. Offer your words.',
-  3: 'The dark waits at the threshold. Feed it.',
-  4: 'The arrangement trembles. One more offering.',
+  1: 'The marks glow. Tap them.',
+  2: 'The circle is complete. Touch the marks.',
+  3: 'The dark waits. Tap the marks to open the way.',
+  4: 'The arrangement trembles. Touch the circle.',
 };
 
 export function getPitTransitionReadyText(targetPhase: DialoguePhase): string {

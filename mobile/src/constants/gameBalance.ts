@@ -19,7 +19,7 @@ import { DialoguePhase } from '../types/homeWorld';
 // ============================================================================
 
 /** Puzzle thresholds for phase transitions (weighted progress values). */
-export const PHASE_THRESHOLDS = [0, 25, 75, 150, 250];
+export const PHASE_THRESHOLDS = [0, 25, 75, 150, 235];
 
 /**
  * Minimum real puzzles the player must have completed before a phase
@@ -30,7 +30,7 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   1: 20,
   2: 65,
   3: 135,
-  4: 225,
+  4: 210,
   5: 300, // Post-revelation — after house completion + final puzzle
 };
 
@@ -327,6 +327,7 @@ export const DREAD_PULSE_OPACITY: Record<number, number> = {
 
 /** Screen shake intensity (px) by phase (Phase 3+). */
 export const SCREEN_SHAKE_INTENSITY: Record<number, number> = {
+  2: 1,
   3: 2,
   4: 4,
 };

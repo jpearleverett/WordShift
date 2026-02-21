@@ -407,7 +407,7 @@ export function useDialogueFlow({
         }
       }
 
-      const crossRefChance = animalPhase <= 1 ? 0.10
+      const crossRefChance = animalPhase <= 1 ? 0.20
         : animalPhase === 2 ? 0.25
         : animalPhase === 3 ? 0.45
         : 0.60;

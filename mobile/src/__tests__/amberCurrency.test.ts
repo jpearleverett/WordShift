@@ -210,8 +210,8 @@ describe('getCurrentPhase', () => {
     expect(phase).toBe(2);
   });
 
-  test('transitions to phase 4 after 250 puzzles', async () => {
-    await devAddPuzzles(250);
+  test('transitions to phase 4 after 235 puzzles', async () => {
+    await devAddPuzzles(235);
     const phase = await getCurrentPhase();
     expect(phase).toBe(4);
   });
@@ -224,7 +224,7 @@ describe('getPuzzlesUntilNextPhase', () => {
   });
 
   test('returns null at max phase', async () => {
-    await devAddPuzzles(250);
+    await devAddPuzzles(235);
     const remaining = await getPuzzlesUntilNextPhase();
     expect(remaining).toBeNull();
   });
@@ -264,10 +264,10 @@ describe('getPuzzlesUntilNextPhase', () => {
     expect(await getPuzzlesUntilNextPhase()).toBe(75); // 150 - 75
 
     await devAddPuzzles(75); // Now at phase 3 (150 total)
-    // Phase 3 -> 4: threshold is 250
-    expect(await getPuzzlesUntilNextPhase()).toBe(100); // 250 - 150
+    // Phase 3 -> 4: threshold is 235
+    expect(await getPuzzlesUntilNextPhase()).toBe(85); // 235 - 150
 
-    await devAddPuzzles(100); // Now at phase 4 (250 total)
+    await devAddPuzzles(85); // Now at phase 4 (235 total)
     expect(await getPuzzlesUntilNextPhase()).toBeNull();
   });
 });
