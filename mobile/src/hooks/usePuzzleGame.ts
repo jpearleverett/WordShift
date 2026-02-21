@@ -810,15 +810,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameState !== GameState.PLAYING) return;
     if (history.length === 0) return;
 
-    // Challenge mode: limited undos
-    if (gameMode === 'challenge' && undosRemaining <= 0) {
-      shakeError("No undos remaining in Challenge Mode!");
-      return;
-    }
-
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
-    // Double shift: if we're mid-step (pick2 or drop2), undo the first drop and go back to pick1
+    // Double shift mid-step undo: always allowed even in challenge mode (not a committed move)
     if (isDoubleShift && (doubleShiftPhase === 'pick2' || doubleShiftPhase === 'drop2')) {
       const delta = history[history.length - 1];
       setRows(prevRows => {
@@ -837,6 +831,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setDoubleShiftPhase('pick1');
       setSelectedLetter(null);
       setError(null);
+      return;
+    }
+
+    // Challenge mode: limited undos (only applies to committed moves, not mid-step)
+    if (gameMode === 'challenge' && undosRemaining <= 0) {
+      shakeError("No undos remaining in Challenge Mode!");
       return;
     }
 

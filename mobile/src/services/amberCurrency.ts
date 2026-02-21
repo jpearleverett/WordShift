@@ -569,7 +569,7 @@ export async function awardPuzzleAmber(
     phaseAcceleration,
     streakMilestoneBonus,
     streakMilestoneMessage,
-    phaseTransitionPending: phaseChanged,
+    phaseTransitionPending: phaseChanged || progress.pendingPhaseTransition != null,
   };
 }
 
@@ -915,8 +915,8 @@ export async function recordRitualWords(
 
   // Apply ritual energy as bonus to phase progress
   // Each point of ritual energy adds 0.1 to phase progress
-  if (ritualEnergy > 0 && progress.phaseProgress !== undefined) {
-    progress.phaseProgress += ritualEnergy * 0.1;
+  if (ritualEnergy > 0) {
+    progress.phaseProgress = (progress.phaseProgress ?? 0) + ritualEnergy * 0.1;
   }
 
   progressCache = progress;
