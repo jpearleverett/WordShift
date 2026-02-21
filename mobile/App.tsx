@@ -130,6 +130,8 @@ export default function App() {
 
   // Track whether the current slot press originated from a drag-drop (for haptic/effect escalation)
   const isDragDropRef = useRef(false);
+  // Store drop-shake animation so it can be stopped if a new one starts before it finishes
+  const dropShakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // In-progress ritual echo chain — words formed during current puzzle
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
@@ -668,12 +670,15 @@ export default function App() {
         // Light screen micro-shake via existing dread shake infrastructure
         const settings = getSettingsSync();
         if (!settings.reducedMotion) {
-          Animated.sequence([
+          dropShakeAnimRef.current?.stop();
+          const shakeAnim = Animated.sequence([
             Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
             Animated.timing(dreadEffects.screenShakeRef, { toValue: -DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
             Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY * 0.5, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
             Animated.timing(dreadEffects.screenShakeRef, { toValue: 0, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
-          ]).start();
+          ]);
+          dropShakeAnimRef.current = shakeAnim;
+          shakeAnim.start(() => { dropShakeAnimRef.current = null; });
         }
       }
 
