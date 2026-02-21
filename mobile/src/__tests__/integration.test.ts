@@ -129,8 +129,8 @@ describe('Victory Flow Integration', () => {
     expect(result.newPhase).toBe(3);
     await confirmPhaseTransition();
 
-    // Phase 3 -> 4 at 250 puzzles
-    await devAddPuzzles(99); // 150 + 99 = 249
+    // Phase 3 -> 4 at 235 puzzles
+    await devAddPuzzles(84); // 150 + 84 = 234
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(4);
@@ -197,12 +197,12 @@ describe('Phase Boundaries', () => {
     expect(result.phaseChanged).toBe(true);
   });
 
-  test('at exactly 250 puzzles, phase transitions from 3 to 4', async () => {
-    await devAddPuzzles(249);
+  test('at exactly 235 puzzles, phase transitions from 3 to 4', async () => {
+    await devAddPuzzles(234);
     expect(await getCurrentPhase()).toBe(3);
 
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(250);
+    expect(result.puzzlesSolved).toBe(235);
     expect(result.newPhase).toBe(4);
     expect(result.phaseChanged).toBe(true);
   });

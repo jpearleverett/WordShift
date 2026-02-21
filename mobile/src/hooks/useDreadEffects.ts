@@ -82,8 +82,8 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
     ]);
     pulseAnimRef.current.start(() => { pulseAnimRef.current = null; });
 
-    // Horizontal screen shake at Phase 3+.
-    if (phase >= 3) {
+    // Horizontal screen shake at Phase 2+ (subtle at Phase 2, stronger at Phase 3-4).
+    if (phase >= 2) {
       const intensity = SCREEN_SHAKE_INTENSITY[phase] ?? (phase >= 4 ? 4 : 2);
       shakeAnimRef.current = Animated.sequence([
         Animated.timing(screenShakeRef, {

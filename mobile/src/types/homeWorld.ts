@@ -198,6 +198,7 @@ export interface Unlockable {
   targetId: string; // Animal ID or Room ID
   name: string;
   description: string;
+  minPuzzles?: number; // Minimum puzzles completed before this unlock becomes available
 }
 
 /**

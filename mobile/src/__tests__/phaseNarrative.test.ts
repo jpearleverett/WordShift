@@ -547,8 +547,8 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
-  test('all 10 micro-beat thresholds fire independently', async () => {
-    const thresholds = [35, 40, 50, 55, 65, 80, 90, 100, 110, 130];
+  test('all 12 micro-beat thresholds fire independently', async () => {
+    const thresholds = [35, 40, 50, 55, 65, 70, 74, 80, 90, 100, 110, 130];
     for (const t of thresholds) {
       const beat = await checkNarrativeMicroBeat(t);
       expect(beat).not.toBeNull();

@@ -504,6 +504,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'jungle_room',
     name: 'Jungle Hammock',
     description: 'A verdant retreat for slow contemplation',
+    minPuzzles: 55,
   },
 
   // 9. Invite Sloane the Sloth
@@ -528,6 +529,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'desert_room',
     name: 'Desert Camp',
     description: 'Sandy silence under watchful stars',
+    minPuzzles: 75,
   },
 
   // 11. Invite Fennick the Fennec Fox
@@ -556,6 +558,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'office',
     name: 'Chill Office',
     description: 'Where productivity meets existential doubt',
+    minPuzzles: 95,
   },
 
   // 13. Invite Chill the Capybara
@@ -580,6 +583,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'burrow',
     name: 'Underground Burrow',
     description: 'Below everything, something stirs',
+    minPuzzles: 115,
   },
 
   // 15. Invite Warren the Wombat
@@ -608,6 +612,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'garden',
     name: 'Garden Patio',
     description: 'Where endings bloom like flowers',
+    minPuzzles: 140,
   },
 
   // 17. Invite Thyme the Rabbit
@@ -632,6 +637,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'bamboo_attic',
     name: 'Bamboo Attic',
     description: 'The highest place, closest to the sky',
+    minPuzzles: 170,
   },
 
   // 19. Invite Bamboo the Red Panda (FINAL UNLOCK)
@@ -733,6 +739,14 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
         reason: `Must unlock ${prev.name} first`,
       };
     }
+  }
+
+  // Check puzzle-count gate (prevents house speed-running)
+  if (unlock.minPuzzles !== undefined && progress.puzzlesSolved < unlock.minPuzzles) {
+    return {
+      available: false,
+      reason: `Complete ${unlock.minPuzzles} puzzles first (${progress.puzzlesSolved} so far)`,
+    };
   }
 
   // For character unlocks, check if the room exists

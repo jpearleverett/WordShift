@@ -766,6 +766,25 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     return null;
   }, [phase, phaseProgressFraction, pendingPhaseTransition, ceremonyStatus]);
 
+  // ---- Auto-trigger ceremony when entering pit with pending transition and no harvest ----
+  const autoTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (
+      pendingPhaseTransition != null &&
+      ceremonyStatus === 'idle' &&
+      harvestState &&
+      harvestState.pendingBatches.length === 0 &&
+      !autoTriggeredRef.current &&
+      !isOnboarding
+    ) {
+      autoTriggeredRef.current = true;
+      const timer = setTimeout(() => {
+        if (mountedRef.current) startCeremony();
+      }, 1200); // Longer delay so player sees the pit before ceremony
+      return () => clearTimeout(timer);
+    }
+  }, [pendingPhaseTransition, ceremonyStatus, harvestState, isOnboarding, startCeremony]);
+
   // ---- Ambient breathing glow loop ----
   useEffect(() => {
     if (reducedMotion) {
