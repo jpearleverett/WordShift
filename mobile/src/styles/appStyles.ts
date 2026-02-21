@@ -1,5 +1,30 @@
 import { StyleSheet, Platform, StatusBar } from 'react-native';
-import { CandyColors } from '../theme/colors';
+import { CandyColors, getPhaseTheme } from '../theme/colors';
+
+/**
+ * Returns the dominant background color for a given screen at a given phase.
+ * Used by the transition overlay to match the destination screen's color,
+ * preventing dark-bar flashes during the fade-out reveal.
+ */
+export function getScreenBackgroundColor(screen: string, phase: number): string {
+  switch (screen) {
+    case 'home':
+      return { 0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830' }[phase] ?? '#6fb7df';
+    case 'puzzle':
+      return getPhaseTheme(phase as any).bgPrimary;
+    case 'settings':
+    case 'stats':
+      return CandyColors.purple.main;
+    case 'pit':
+      return { 0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a' }[phase] ?? '#6fb7df';
+    case 'ledger':
+      return phase <= 1 ? CandyColors.purple.main : phase === 2 ? '#3A3060' : phase === 3 ? '#1A1530' : '#0F0818';
+    case 'gallery':
+      return phase >= 3 ? '#0A0A14' : '#1A1030';
+    default:
+      return '#1A1A2E';
+  }
+}
 
 export const appStyles = StyleSheet.create({
   initialLoadingContainer: {
@@ -31,10 +56,6 @@ export const appStyles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.75)',
     letterSpacing: 0.4,
-  },
-  screenBackground: {
-    flex: 1,
-    backgroundColor: '#1A1A2E',
   },
   container: {
     flex: 1,

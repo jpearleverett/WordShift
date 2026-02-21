@@ -71,7 +71,7 @@ import {
   PuzzleVariant,
   VARIANT_CONFIGS,
 } from './src/services/puzzleVariety';
-import { appStyles as styles } from './src/styles/appStyles';
+import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit';
@@ -169,11 +169,17 @@ export default function App() {
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
+  // Dynamic background colors for smooth transitions — match overlay/root to destination screen
+  const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
+  const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
 
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) {
+      const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
+      setTransitionOverlayColor(destColor);
+      setRootBgColor(destColor);
       setCurrentScreen(screen);
       callback?.();
       return;
@@ -184,11 +190,16 @@ export default function App() {
       duration: 120,
       useNativeDriver: true,
     }).start(() => {
+      // While fully opaque: swap colors to match destination screen
+      const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
+      setTransitionOverlayColor(destColor);
+      setRootBgColor(destColor);
+
       setCurrentScreen(screen);
       callback?.();
       // Wait one frame for React to render the new screen before revealing
       requestAnimationFrame(() => {
-        // Fade overlay OUT (reveals new screen)
+        // Fade overlay OUT — now blends through destination-matching color
         Animated.timing(transitionOverlay, {
           toValue: 0,
           duration: 180,
@@ -196,7 +207,12 @@ export default function App() {
         }).start();
       });
     });
-  }, [transitionOverlay]);
+  }, [transitionOverlay, persistence.currentPhase]);
+
+  // Keep root background in sync with current screen + phase (handles phase changes without transitions)
+  useEffect(() => {
+    setRootBgColor(getScreenBackgroundColor(currentScreen, persistence.currentPhase));
+  }, [currentScreen, persistence.currentPhase]);
 
   // ========================================================================
   // Extracted hooks
@@ -922,104 +938,94 @@ export default function App() {
   const renderScreen = () => {
     if (currentScreen === 'settings') {
       return (
-        <View style={styles.screenBackground}>
-          <View style={{ flex: 1 }}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-            <SettingsScreen onClose={() => transitionTo('home')} />
-          </View>
+        <View style={{ flex: 1 }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <SettingsScreen onClose={() => transitionTo('home')} />
         </View>
       );
     }
 
     if (currentScreen === 'ledger') {
       return (
-        <View style={styles.screenBackground}>
-          <View style={{ flex: 1 }}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-            <WordLedger
-              phase={persistence.currentPhase}
-              onClose={() => transitionTo('home')}
-            />
-          </View>
+        <View style={{ flex: 1 }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <WordLedger
+            phase={persistence.currentPhase}
+            onClose={() => transitionTo('home')}
+          />
         </View>
       );
     }
 
     if (currentScreen === 'gallery') {
       return (
-        <View style={styles.screenBackground}>
-          <View style={{ flex: 1 }}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-            <WhisperGalleryScreen
-              phase={persistence.currentPhase}
-              onClose={() => transitionTo('home')}
-            />
-          </View>
+        <View style={{ flex: 1 }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <WhisperGalleryScreen
+            phase={persistence.currentPhase}
+            onClose={() => transitionTo('home')}
+          />
         </View>
       );
     }
 
     if (currentScreen === 'stats') {
       return (
-        <View style={styles.screenBackground}>
-          <View style={{ flex: 1 }}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-            <StatsScreen
-              onClose={() => transitionTo('home')}
-              puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
-              currentPhase={persistence.currentPhase}
-              amberBalance={persistence.amberBalance}
-              phase={persistence.currentPhase}
-            />
-          </View>
+        <View style={{ flex: 1 }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <StatsScreen
+            onClose={() => transitionTo('home')}
+            puzzlesSolved={persistence.cumulativeStats?.totalPuzzlesCompleted || 0}
+            currentPhase={persistence.currentPhase}
+            amberBalance={persistence.amberBalance}
+            phase={persistence.currentPhase}
+          />
         </View>
       );
     }
 
     if (currentScreen === 'pit') {
       return (
-        <View style={styles.screenBackground}>
-          <View style={{ flex: 1 }}>
-            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-            <OfferingPitScreen
-              phase={persistence.currentPhase}
-              amberBalance={persistence.amberBalance}
-              onClose={() => transitionTo('home')}
-              onAmberChange={(newBalance) => {
-                persistenceActions.setAmberBalance(newBalance);
-              }}
-              onOpenStats={() => transitionTo('stats')}
-              onOpenSettings={() => transitionTo('settings')}
-              phaseProgressFraction={persistence.phaseProgressFraction}
-              pendingPhaseTransition={persistence.pendingPhaseTransition}
-              onPhaseTransitionConfirmed={(newPhase) => {
-                // Refresh all persistence state to pick up the new currentPhase
-                persistenceActions.refreshStats();
-                // Play the full PhaseTransitionOverlay cinematic
-                const event = getPhaseTransitionEvent(newPhase as any);
-                if (event) {
-                  setPhaseTransitionEvent(event);
-                }
-                victoryActions.playPhaseChangeFlash();
-                // Update notifications with new phase
-                scheduleAllNotifications(newPhase).catch(() => {});
-              }}
-              isOnboarding={onboardingFlow.isOnboarding}
-              onboardingStep={onboardingFlow.onboardingStep}
-              onOnboardingOfferComplete={onboardingActions.handlePitOnboardingOfferComplete}
+        <View style={{ flex: 1 }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <OfferingPitScreen
+            phase={persistence.currentPhase}
+            amberBalance={persistence.amberBalance}
+            onClose={() => transitionTo('home')}
+            onAmberChange={(newBalance) => {
+              persistenceActions.setAmberBalance(newBalance);
+            }}
+            onOpenStats={() => transitionTo('stats')}
+            onOpenSettings={() => transitionTo('settings')}
+            phaseProgressFraction={persistence.phaseProgressFraction}
+            pendingPhaseTransition={persistence.pendingPhaseTransition}
+            onPhaseTransitionConfirmed={(newPhase) => {
+              // Refresh all persistence state to pick up the new currentPhase
+              persistenceActions.refreshStats();
+              // Play the full PhaseTransitionOverlay cinematic
+              const event = getPhaseTransitionEvent(newPhase as any);
+              if (event) {
+                setPhaseTransitionEvent(event);
+              }
+              victoryActions.playPhaseChangeFlash();
+              // Update notifications with new phase
+              scheduleAllNotifications(newPhase).catch(() => {});
+            }}
+            isOnboarding={onboardingFlow.isOnboarding}
+            onboardingStep={onboardingFlow.onboardingStep}
+            onOnboardingOfferComplete={onboardingActions.handlePitOnboardingOfferComplete}
+          />
+          {/* Fox Guide overlay — shown during onboarding on pit screen */}
+          {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering') && (
+            <FoxGuide
+              visible={onboardingFlow.onboardingStep === 'pit_intro' || (onboardingFlow.onboardingStep === 'pit_offering' && onboardingFlow.pitOfferDone)}
+              variant="dialogue"
+              text={onboardingActions.getOnboardingFoxText()}
+              buttonText={onboardingActions.getOnboardingButtonText()}
+              onContinue={onboardingActions.handleOnboardingContinue}
+              position="bottom"
             />
-            {/* Fox Guide overlay — shown during onboarding on pit screen */}
-            {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering') && (
-              <FoxGuide
-                visible={onboardingFlow.onboardingStep === 'pit_intro' || (onboardingFlow.onboardingStep === 'pit_offering' && onboardingFlow.pitOfferDone)}
-                variant="dialogue"
-                text={onboardingActions.getOnboardingFoxText()}
-                buttonText={onboardingActions.getOnboardingButtonText()}
-                onContinue={onboardingActions.handleOnboardingContinue}
-                position="bottom"
-              />
-            )}
-          </View>
+          )}
         </View>
       );
     }
@@ -1030,53 +1036,51 @@ export default function App() {
           fallbackMessage="Something went wrong with the home screen. Tap to try again."
           onReset={() => setCurrentScreen('home')}
         >
-          <View style={styles.screenBackground}>
-            <View style={{ flex: 1 }}>
-              <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-              <HomeScreen
-                onPlayPuzzle={handlePlayPuzzle}
-                onAmberChange={persistenceActions.setAmberBalance}
-                onOpenSettings={() => transitionTo('settings')}
-                onOpenStats={() => transitionTo('stats')}
-                onOpenLedger={() => transitionTo('ledger')}
-                onOpenGallery={() => transitionTo('gallery')}
-                onOpenPit={() => transitionTo('pit')}
-                onStartDaily={handleStartDaily}
-                onboardingStep={onboardingFlow.onboardingStep}
-                onAdvanceOnboarding={onboardingActions.advanceOnboarding}
-                pitPhaseReady={persistence.pendingPhaseTransition != null}
-              />
-              {/* Achievement toast overlay */}
-              <AchievementToast
-                achievement={achievementState.currentAchievement}
-                onDismiss={achievementActions.dismissAchievement}
-                phase={persistence.currentPhase}
-              />
-              {/* Fox Guide overlay — shown during onboarding on home screen */}
-              {onboardingFlow.isOnboarding && currentScreen === 'home' && (
-                (onboardingFlow.onboardingStep === 'home_empty' ||
-                 onboardingFlow.onboardingStep === 'fox_invited' ||
-                 onboardingFlow.onboardingStep === 'unlock_explained') && (
-                  <FoxGuide
-                    visible={true}
-                    variant="dialogue"
-                    text={onboardingActions.getOnboardingFoxText()}
-                    buttonText={onboardingActions.getOnboardingButtonText()}
-                    onContinue={onboardingFlow.onboardingStep === 'home_empty' ? undefined : onboardingActions.handleOnboardingContinue}
-                    showSkip={onboardingFlow.onboardingStep !== 'unlock_explained'}
-                    onSkip={onboardingActions.handleSkipOnboarding}
-                    position={onboardingFlow.onboardingStep === 'home_empty' ? 'middle' : 'bottom'}
-                    anchorStyle={onboardingFlow.onboardingStep === 'home_empty'
-                      ? {
-                          top: Math.min(SCREEN_HEIGHT * 0.56, 430),
-                          left: 12,
-                          right: 12,
-                        }
-                      : undefined}
-                  />
-                )
-              )}
-            </View>
+          <View style={{ flex: 1 }}>
+            <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+            <HomeScreen
+              onPlayPuzzle={handlePlayPuzzle}
+              onAmberChange={persistenceActions.setAmberBalance}
+              onOpenSettings={() => transitionTo('settings')}
+              onOpenStats={() => transitionTo('stats')}
+              onOpenLedger={() => transitionTo('ledger')}
+              onOpenGallery={() => transitionTo('gallery')}
+              onOpenPit={() => transitionTo('pit')}
+              onStartDaily={handleStartDaily}
+              onboardingStep={onboardingFlow.onboardingStep}
+              onAdvanceOnboarding={onboardingActions.advanceOnboarding}
+              pitPhaseReady={persistence.pendingPhaseTransition != null}
+            />
+            {/* Achievement toast overlay */}
+            <AchievementToast
+              achievement={achievementState.currentAchievement}
+              onDismiss={achievementActions.dismissAchievement}
+              phase={persistence.currentPhase}
+            />
+            {/* Fox Guide overlay — shown during onboarding on home screen */}
+            {onboardingFlow.isOnboarding && currentScreen === 'home' && (
+              (onboardingFlow.onboardingStep === 'home_empty' ||
+               onboardingFlow.onboardingStep === 'fox_invited' ||
+               onboardingFlow.onboardingStep === 'unlock_explained') && (
+                <FoxGuide
+                  visible={true}
+                  variant="dialogue"
+                  text={onboardingActions.getOnboardingFoxText()}
+                  buttonText={onboardingActions.getOnboardingButtonText()}
+                  onContinue={onboardingFlow.onboardingStep === 'home_empty' ? undefined : onboardingActions.handleOnboardingContinue}
+                  showSkip={onboardingFlow.onboardingStep !== 'unlock_explained'}
+                  onSkip={onboardingActions.handleSkipOnboarding}
+                  position={onboardingFlow.onboardingStep === 'home_empty' ? 'middle' : 'bottom'}
+                  anchorStyle={onboardingFlow.onboardingStep === 'home_empty'
+                    ? {
+                        top: Math.min(SCREEN_HEIGHT * 0.56, 430),
+                        left: 12,
+                        right: 12,
+                      }
+                    : undefined}
+                />
+              )
+            )}
           </View>
         </ErrorBoundary>
       );
@@ -1088,7 +1092,6 @@ export default function App() {
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
-      <View style={styles.screenBackground}>
       <Animated.View style={[styles.container, { transform: [{ translateX: dreadEffects.screenShakeRef }] }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
@@ -1509,20 +1512,19 @@ export default function App() {
           />
         )}
       </Animated.View>
-      </View>
       </ErrorBoundary>
     );
   };
 
   // Render screen with global overlays on top
   return (
-    <View style={{ flex: 1, backgroundColor: '#1A1A2E' }}>
+    <View style={{ flex: 1, backgroundColor: rootBgColor }}>
       {renderScreen()}
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
-          backgroundColor: '#1A1A2E',
+          backgroundColor: transitionOverlayColor,
           opacity: transitionOverlay,
         }]}
       />
