@@ -30,6 +30,9 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 }) => {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ref to always call the latest onComplete, avoiding stale closure capture
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     if (!visible) {
@@ -48,7 +51,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
       opacityAnim.setValue(1);
       timerRef.current = setTimeout(() => {
         opacityAnim.setValue(0);
-        onComplete();
+        onCompleteRef.current();
       }, HOLD_DURATION);
     } else {
       // Fade in -> hold -> fade out -> onComplete
@@ -63,7 +66,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
             duration: FADE_OUT_DURATION,
             useNativeDriver: true,
           }).start(() => {
-            onComplete();
+            onCompleteRef.current();
           });
         }, HOLD_DURATION);
       });

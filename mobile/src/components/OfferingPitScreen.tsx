@@ -669,6 +669,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const ceremonyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const popInTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const amberRiseTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const trailTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Ward mark pulse animation (for pending state)
   const wardPulseProgress = useRef(new Animated.Value(0)).current;
@@ -750,6 +751,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       ceremonyTimers.current.forEach(clearTimeout);
       popInTimeoutsRef.current.forEach(clearTimeout);
       amberRiseTimeoutsRef.current.forEach(clearTimeout);
+      trailTimeoutsRef.current.forEach(clearTimeout);
     };
   }, []);
 
@@ -1100,7 +1102,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       };
       newParticles.push(p);
       const delay = i * 50;
-      setTimeout(() => {
+      const tid = setTimeout(() => {
         Animated.parallel([
           Animated.timing(p.x, { toValue: PIT_CENTER.x + (Math.random() - 0.5) * 30, duration: duration * 0.75, easing: Easing.in(Easing.quad), useNativeDriver: true }),
           Animated.timing(p.y, { toValue: PIT_CENTER.y + (Math.random() - 0.5) * 20, duration: duration * 0.75, easing: Easing.in(Easing.quad), useNativeDriver: true }),
@@ -1108,6 +1110,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.5, delay: duration * 0.3, useNativeDriver: true }),
         ]).start(() => { if (mountedRef.current) setTrailParticles(prev => prev.filter(tp => tp.id !== p.id)); });
       }, delay);
+      trailTimeoutsRef.current.push(tid);
     }
     setTrailParticles(prev => [...prev, ...newParticles]);
   }, [phase, reducedMotion]);
