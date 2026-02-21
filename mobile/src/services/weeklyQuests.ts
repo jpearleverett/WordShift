@@ -167,13 +167,22 @@ function generateQuests(weekId: string, phase: number): Quest[] {
 
   // Pick 4 quests, avoiding duplicate types
   const selected: QuestTemplate[] = [];
-  const usedTypes = new Set<QuestType>();
   for (const template of shuffled) {
     if (selected.length >= 4) break;
     // Allow at most 2 of the same type
     const typeCount = selected.filter(s => s.type === template.type).length;
     if (typeCount >= 2) continue;
     selected.push(template);
+  }
+
+  // Fill remaining slots if we didn't reach 4 (can happen with small filtered pools)
+  if (selected.length < 4) {
+    for (const template of shuffled) {
+      if (selected.length >= 4) break;
+      if (!selected.includes(template)) {
+        selected.push(template);
+      }
+    }
   }
 
   // Always include a daily challenge quest if not already selected
