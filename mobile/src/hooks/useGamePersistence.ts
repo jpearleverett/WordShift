@@ -166,7 +166,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy: 0,
         firstCompletionBonus: 0,
         variantBonus: 0,
-        variant: 'standard',
+        variant,
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
         phaseTransitionPending: false,
@@ -183,6 +183,12 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       // creditToBalance=false: amber is queued in a harvest batch, not credited yet
       const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false);
+
+      // Phase 5 (post-revelation) is set via markPostRevelation(), not phase progression.
+      // calculatePhase() maxes at 4, so amberResult.newPhase can't exceed 4. If the player
+      // is post-revelation, preserve phase 5 to avoid regressing the UI and dialogue phase.
+      const postRev = await isPostRevelation();
+      const effectivePhase: DialoguePhase = postRev ? 5 as DialoguePhase : amberResult.newPhase;
 
       // Apply variant bonus with anti-farm decay and persistence.
       // creditToBalance=false: variant bonus also queued, not credited.
@@ -223,7 +229,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         gameMode,
         stars,
         variant,
-        phaseAtHarvest: amberResult.newPhase,
+        phaseAtHarvest: effectivePhase,
       });
 
       const pendingHarvest = await getPendingHarvestSummary();
@@ -233,14 +239,14 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       // When phase transition is pending, keep current phase at old value.
       // The pit screen will call confirmPhaseTransition() to advance it.
       if (!amberResult.phaseTransitionPending) {
-        updateSessionPhase(amberResult.newPhase);
-        setCurrentPhase(amberResult.newPhase);
+        updateSessionPhase(effectivePhase);
+        setCurrentPhase(effectivePhase);
       }
       // Balance stays as-is (no credit); refresh from storage to stay in sync
       setAmberBalance(amberResult.newBalance);
       // Update pending phase transition state for pit screen
       if (amberResult.phaseTransitionPending) {
-        setPendingPhaseTransition(amberResult.newPhase);
+        setPendingPhaseTransition(effectivePhase);
         setPhaseProgressFraction(1.0);
       }
 
@@ -248,7 +254,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       let totalWordsFormed = 0;
       let ritualEnergy = 0;
       if (completedWords.length > 0) {
-        ritualEnergy = calculateRitualEnergy(completedWords, amberResult.newPhase);
+        ritualEnergy = calculateRitualEnergy(completedWords, effectivePhase);
         const triggerWords = extractTriggerWords(completedWords);
         const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
@@ -262,7 +268,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       // Queue variant tutorials for any variants that just became unlocked.
       const newlyUnlocked = getNewlyUnlockedVariants(
         amberResult.puzzlesSolved,
-        amberResult.newPhase
+        effectivePhase
       );
       for (const unlockedVariant of newlyUnlocked) {
         recordVariantEncounter(unlockedVariant).catch(() => {});
@@ -280,7 +286,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           amberEarned: totalQueuedAmber,
           challengeBonus: amberResult.challengeBonus,
           puzzlesSolved: amberResult.puzzlesSolved,
-          phase: amberResult.newPhase,
+          phase: effectivePhase,
           phaseChanged: amberResult.phaseChanged,
           phaseAcceleration: amberResult.phaseAcceleration,
           ritualEnergy,
@@ -302,7 +308,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           isChallenge: gameMode === 'challenge',
           amberEarned: totalQueuedAmber,
           currentStreak: amberResult.currentStreak,
-        }, amberResult.newPhase);
+        }, effectivePhase);
         questsCompleted = completedQuests.map(q => q.title);
       } catch (_) {
         // Quest progress update is non-critical
@@ -313,7 +319,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         amberEarned: totalQueuedAmber,
         amberBalance: amberResult.newBalance,
         phaseChanged: amberResult.phaseChanged,
-        newPhase: amberResult.newPhase,
+        newPhase: effectivePhase,
         streakBonus: amberResult.streakBonus,
         challengeBonus: amberResult.challengeBonus,
         currentStreak: amberResult.currentStreak,
@@ -355,7 +361,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy: 0,
         firstCompletionBonus: 0,
         variantBonus: 0,
-        variant: 'standard',
+        variant,
         variantAppliedMultiplier: 1.0,
         variantRepeatDecay: 1.0,
         streakMilestoneBonus: 0,
