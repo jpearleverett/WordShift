@@ -1516,7 +1516,7 @@ export default function App() {
 
   // Render screen with global overlays on top
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#1A1A2E' }}>
       {renderScreen()}
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
