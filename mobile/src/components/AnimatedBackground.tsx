@@ -236,7 +236,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
       pulseLoop.stop();
       pulseOpacity.stopAnimation();
     };
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>
