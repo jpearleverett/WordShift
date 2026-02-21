@@ -167,8 +167,8 @@ export default function App() {
   // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
 
-  // Screen transition animation
-  const screenFade = useRef(new Animated.Value(1)).current;
+  // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
+  const transitionOverlay = useRef(new Animated.Value(0)).current;
 
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
@@ -178,23 +178,25 @@ export default function App() {
       callback?.();
       return;
     }
-    Animated.timing(screenFade, {
-      toValue: 0,
-      duration: 150,
+    // Fade overlay IN (covers old screen)
+    Animated.timing(transitionOverlay, {
+      toValue: 1,
+      duration: 120,
       useNativeDriver: true,
     }).start(() => {
       setCurrentScreen(screen);
       callback?.();
-      // Wait one frame for React to render the new screen before fading in
+      // Wait one frame for React to render the new screen before revealing
       requestAnimationFrame(() => {
-        Animated.timing(screenFade, {
-          toValue: 1,
-          duration: 200,
+        // Fade overlay OUT (reveals new screen)
+        Animated.timing(transitionOverlay, {
+          toValue: 0,
+          duration: 180,
           useNativeDriver: true,
         }).start();
       });
     });
-  }, [screenFade]);
+  }, [transitionOverlay]);
 
   // ========================================================================
   // Extracted hooks
@@ -921,10 +923,10 @@ export default function App() {
     if (currentScreen === 'settings') {
       return (
         <View style={styles.screenBackground}>
-          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+          <View style={{ flex: 1 }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <SettingsScreen onClose={() => transitionTo('home')} />
-          </Animated.View>
+          </View>
         </View>
       );
     }
@@ -932,13 +934,13 @@ export default function App() {
     if (currentScreen === 'ledger') {
       return (
         <View style={styles.screenBackground}>
-          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+          <View style={{ flex: 1 }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <WordLedger
               phase={persistence.currentPhase}
               onClose={() => transitionTo('home')}
             />
-          </Animated.View>
+          </View>
         </View>
       );
     }
@@ -946,13 +948,13 @@ export default function App() {
     if (currentScreen === 'gallery') {
       return (
         <View style={styles.screenBackground}>
-          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+          <View style={{ flex: 1 }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <WhisperGalleryScreen
               phase={persistence.currentPhase}
               onClose={() => transitionTo('home')}
             />
-          </Animated.View>
+          </View>
         </View>
       );
     }
@@ -960,7 +962,7 @@ export default function App() {
     if (currentScreen === 'stats') {
       return (
         <View style={styles.screenBackground}>
-          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+          <View style={{ flex: 1 }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <StatsScreen
               onClose={() => transitionTo('home')}
@@ -969,7 +971,7 @@ export default function App() {
               amberBalance={persistence.amberBalance}
               phase={persistence.currentPhase}
             />
-          </Animated.View>
+          </View>
         </View>
       );
     }
@@ -977,7 +979,7 @@ export default function App() {
     if (currentScreen === 'pit') {
       return (
         <View style={styles.screenBackground}>
-          <Animated.View style={{ flex: 1, opacity: screenFade }}>
+          <View style={{ flex: 1 }}>
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <OfferingPitScreen
               phase={persistence.currentPhase}
@@ -1017,7 +1019,7 @@ export default function App() {
                 position="bottom"
               />
             )}
-          </Animated.View>
+          </View>
         </View>
       );
     }
@@ -1029,7 +1031,7 @@ export default function App() {
           onReset={() => setCurrentScreen('home')}
         >
           <View style={styles.screenBackground}>
-            <Animated.View style={{ flex: 1, opacity: screenFade }}>
+            <View style={{ flex: 1 }}>
               <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
               <HomeScreen
                 onPlayPuzzle={handlePlayPuzzle}
@@ -1074,7 +1076,7 @@ export default function App() {
                   />
                 )
               )}
-            </Animated.View>
+            </View>
           </View>
         </ErrorBoundary>
       );
@@ -1087,7 +1089,7 @@ export default function App() {
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
       <View style={styles.screenBackground}>
-      <Animated.View style={[styles.container, { opacity: screenFade, transform: [{ translateX: dreadEffects.screenShakeRef }] }]}>
+      <Animated.View style={[styles.container, { transform: [{ translateX: dreadEffects.screenShakeRef }] }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* Animated Background — darkens with narrative phase */}
@@ -1512,10 +1514,18 @@ export default function App() {
     );
   };
 
-  // Render screen with global phase transition overlay on top
+  // Render screen with global overlays on top
   return (
     <View style={{ flex: 1 }}>
       {renderScreen()}
+      {/* Screen transition overlay — solid cover that fades in/out during navigation */}
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, {
+          backgroundColor: '#1A1A2E',
+          opacity: transitionOverlay,
+        }]}
+      />
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
         event={phaseTransitionEvent}

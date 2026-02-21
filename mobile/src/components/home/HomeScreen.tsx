@@ -577,13 +577,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <View style={styles.headerRight}>
           {!isOnboarding && onStartDaily && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
-            <DailyChallengeCard onStartDaily={onStartDaily} phase={progress.currentPhase} />
+            <DailyChallengeCard onStartDaily={(d) => { setActiveTooltip(null); onStartDaily!(d); }} phase={progress.currentPhase} />
           )}
           {!isOnboarding && (
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => {
                 hapticLight();
+                setActiveTooltip(null);
                 onOpenStats?.();
               }}
               accessibilityLabel="View stats"
@@ -597,6 +598,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               style={styles.headerIconBtn}
               onPress={() => {
                 hapticLight();
+                setActiveTooltip(null);
                 onOpenSettings?.();
               }}
               accessibilityLabel="Settings"
@@ -621,6 +623,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onPress={() => {
                 hapticSelection();
                 setHighlightPlayButton(false);
+                setActiveTooltip(null);
                 onPlayPuzzle();
               }}
               bounceScale={0.9}
@@ -679,6 +682,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               style={styles.actionRowButton}
               onPress={() => {
                 hapticLight();
+                setActiveTooltip(null);
                 onOpenGallery?.();
               }}
               accessibilityLabel="Whisper Gallery"
@@ -698,6 +702,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
                 onPress={() => {
                   hapticLight();
+                  setActiveTooltip(null);
                   onOpenPit();
                 }}
                 accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pitPhaseReady ? ' - phase transition ready' : ''}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
