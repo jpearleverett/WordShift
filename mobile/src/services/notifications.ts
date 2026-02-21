@@ -60,6 +60,10 @@ const DAILY_REMINDER_MESSAGES: Record<number, string[]> = {
     'The arrangement requires your attention.',
     'The void has prepared today\'s incantation.',
   ],
+  5: [
+    'The daily puzzle is here. The pattern continues.',
+    'Another day, another arrangement. Breathe.',
+  ],
 };
 
 const REENGAGEMENT_MESSAGES: Record<number, string[]> = {
@@ -83,6 +87,10 @@ const REENGAGEMENT_MESSAGES: Record<number, string[]> = {
   4: [
     'The keepers await your return. The pattern is incomplete.',
     'The arrangement cannot continue without you.',
+  ],
+  5: [
+    'The house is quiet. The pattern waits, unhurried.',
+    'Your friends are at peace. They\'ll be here when you return.',
   ],
 };
 
@@ -214,7 +222,7 @@ export function getNotificationMessage(
   type: 'daily' | 'reengagement',
   phase: number
 ): string {
-  const clampedPhase = Math.min(4, Math.max(0, phase));
+  const clampedPhase = Math.min(5, Math.max(0, phase));
   const messages = type === 'daily'
     ? DAILY_REMINDER_MESSAGES[clampedPhase]
     : REENGAGEMENT_MESSAGES[clampedPhase];

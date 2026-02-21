@@ -193,6 +193,7 @@ export function useVictoryOrchestration(): [
             ? MICRO_BEAT_GLITCH_DELAY_MS
             : MICRO_BEAT_WHISPER_DELAY_MS;
           addTimeout(() => {
+            if (gen !== generationRef.current) return;
             setMicroBeat(beat);
             setShowMicroBeat(true);
             addTimeout(() => setShowMicroBeat(false), beat.durationMs);
