@@ -363,7 +363,8 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       }
       guidePulseAnim.stopAnimation();
     };
-  }, [isGuided, settings.reducedMotion, guidePulseAnim]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- guidePulseAnim is a stable ref
+  }, [isGuided, settings.reducedMotion]);
 
   // Particle trail for selected tiles
   useEffect(() => {

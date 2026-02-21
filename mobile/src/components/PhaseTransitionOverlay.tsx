@@ -210,7 +210,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       } else {
         Animated.timing(overlayOpacity, {
           toValue: 0,
-          duration: 500,
+          duration: 500 * timeScale,
           useNativeDriver: true,
         }).start(() => onComplete());
       }

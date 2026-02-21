@@ -645,6 +645,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [ceremonyIgniteStep, setCeremonyIgniteStep] = useState(-1);
   const [ceremonyTextIndex, setCeremonyTextIndex] = useState(-1);
   const ceremonyTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const popInTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const amberRiseTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Ward mark pulse animation (for pending state)
   const wardPulseProgress = useRef(new Animated.Value(0)).current;
@@ -720,10 +722,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const startCeremonyRef = useRef<() => void>(() => {});
   const startCeremony = useCallback(() => startCeremonyRef.current(), []);
 
-  // Clean up ceremony timers on unmount
+  // Clean up all tracked timers on unmount
   useEffect(() => {
     return () => {
       ceremonyTimers.current.forEach(clearTimeout);
+      popInTimeoutsRef.current.forEach(clearTimeout);
+      amberRiseTimeoutsRef.current.forEach(clearTimeout);
     };
   }, []);
 
@@ -917,9 +921,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     setFlyingWords(allWords);
 
     // Staggered pop-in
+    popInTimeoutsRef.current.forEach(clearTimeout);
+    popInTimeoutsRef.current = [];
     allWords.forEach((fw, i) => {
       const delay = reducedMotion ? 0 : i * 50;
-      setTimeout(() => {
+      const tid = setTimeout(() => {
         if (!mountedRef.current) return;
         if (reducedMotion) {
           fw.opacity.setValue(1);
@@ -933,9 +939,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           if (mountedRef.current) startFloatLoop(fw);
         });
       }, delay);
+      popInTimeoutsRef.current.push(tid);
     });
 
     return () => {
+      popInTimeoutsRef.current.forEach(clearTimeout);
+      popInTimeoutsRef.current = [];
       allWords.forEach(fw => {
         fw.floatLoopX?.stop();
         fw.floatLoopY?.stop();
@@ -1143,8 +1152,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         hapticHeavy();
         flashPitSurge();
         spawnShockwave();
-        setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 150);
-        setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 300);
+        const sw1 = setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 150);
+        const sw2 = setTimeout(() => { if (mountedRef.current) spawnShockwave(); }, 300);
+        ceremonyTimers.current.push(sw1, sw2);
 
         // After eruption -> ceremony text
         const textTimer = setTimeout(() => {
@@ -1221,7 +1231,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       };
       newParticles.push(p);
       const delay = i * 80;
-      setTimeout(() => {
+      const tid = setTimeout(() => {
         Animated.parallel([
           Animated.timing(p.y, { toValue: PIT_CENTER.y - 200 - Math.random() * 100, duration: 1200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
           Animated.timing(p.x, { toValue: PIT_CENTER.x - 6 + (Math.random() - 0.5) * 80, duration: 1200, useNativeDriver: true }),
@@ -1233,6 +1243,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           Animated.spring(p.scale, { toValue: 1.0 + Math.random() * 0.4, friction: 4, useNativeDriver: true }),
         ]).start(() => { if (mountedRef.current) setAmberParticles(prev => prev.filter(ap => ap.id !== p.id)); });
       }, delay);
+      amberRiseTimeoutsRef.current.push(tid);
     }
     setAmberParticles(prev => [...prev, ...newParticles]);
   }, [reducedMotion]);

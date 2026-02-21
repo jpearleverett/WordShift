@@ -21,6 +21,7 @@ const PROGRESS_STORAGE_KEY = 'wordshift_home_progress';
 const TRANSACTIONS_STORAGE_KEY = 'wordshift_amber_transactions';
 const DAILY_CHALLENGE_INTRO_SEEN_KEY = 'wordshift_daily_challenge_intro_seen';
 const FOX_PLAY_NUDGE_SEEN_KEY = 'wordshift_fox_play_nudge_seen';
+const CHALLENGE_INTRO_SEEN_KEY = 'wordshift_challenge_intro_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -1301,8 +1302,6 @@ export async function markDailyChallengeIntroSeen(): Promise<void> {
 /**
  * Track whether Fox's one-time Challenge Mode intro has been shown (after 15 puzzles).
  */
-const CHALLENGE_INTRO_SEEN_KEY = 'wordshift_challenge_intro_seen';
-
 export async function hasSeenChallengeIntro(): Promise<boolean> {
   try {
     const value = await AsyncStorage.getItem(CHALLENGE_INTRO_SEEN_KEY);
