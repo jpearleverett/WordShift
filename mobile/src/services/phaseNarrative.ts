@@ -955,6 +955,11 @@ export interface NarrativeMicroBeat {
  * - Puzzle 130: The letters have agency — player complicity deepens
  */
 const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
+  30: {
+    type: 'ambient_whisper',
+    text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
+    durationMs: 3000,
+  },
   35: {
     type: 'glitch_title',
     glitchTitle: 'WE REMEMBER',
@@ -1076,6 +1081,234 @@ export async function resetMicroBeats(): Promise<void> {
   } catch {
     // Silently fail — non-critical
   }
+}
+
+// ============================================================================
+// HOME AMBIENT LINES — atmospheric text when all animals are on cooldown
+// Fills the "dead home" problem: rotates each home visit, phase-aware tone.
+// ============================================================================
+
+const HOME_AMBIENT_LINES: Record<DialoguePhase, string[]> = {
+  0: [
+    'The fireplace crackles softly.',
+    'Sunlight pools on the wooden floor.',
+    'A gentle breeze drifts through the house.',
+    'The rooms smell of fresh wood and warm bread.',
+    'Everything feels cozy. Everything feels right.',
+    'Birds sing outside. The house listens.',
+    'Dust motes float in the afternoon light.',
+    'The house hums with quiet contentment.',
+  ],
+  1: [
+    'The house feels a little bigger today.',
+    'The floorboards creak, though no one is walking.',
+    'Shadows in the corners seem deeper than before.',
+    'Something about the light has shifted.',
+    'The walls are warm to the touch.',
+    'You hear a faint hum. From where?',
+    'The rooms seem to lean toward each other.',
+    'The air smells like old paper and something sweet.',
+  ],
+  2: [
+    'The walls seem closer today.',
+    'A draft moves through rooms with no windows open.',
+    'The house remembers every word you\'ve ever formed.',
+    'The stairs groan even when no one climbs them.',
+    'Every room feels like it\'s listening.',
+    'The light never quite reaches the corners anymore.',
+    'You feel watched. But fondly. Is that worse?',
+    'The furniture has rearranged itself. Slightly.',
+  ],
+  3: [
+    'The house holds its breath.',
+    'Something stirs beneath the foundation.',
+    'The walls pulse. Once. Then stillness.',
+    'Every shadow is exactly where it should be.',
+    'The house is heavier now. Fuller. Almost complete.',
+    'The air tastes of copper and old stone.',
+    'You stand still. The house stands with you.',
+    'It is patient. It has always been patient.',
+  ],
+  4: [
+    'The house breathes.',
+    'The arrangement hums through the walls.',
+    'Every board, every nail serves the pattern.',
+    'The keepers rest in their chambers. Waiting.',
+    'Crimson light pulses behind the wallpaper.',
+    'The house does not need you. It wants you.',
+    'You feel the pattern in the floor beneath your feet.',
+    'Something vast and tender watches from above.',
+  ],
+  5: [
+    'The house is at peace.',
+    'The pattern holds. Everything is quiet.',
+    'A gentle warmth permeates every room.',
+    'The keepers sleep. Or something like sleep.',
+    'The weave continues. Thread by thread.',
+    'Nothing moves. Nothing needs to.',
+    'The light is neither bright nor dark. It simply is.',
+    'You belong here. You always did.',
+  ],
+};
+
+let lastAmbientIndex = -1;
+
+/**
+ * Get a random ambient line for the home screen.
+ * Avoids repeating the same line consecutively.
+ */
+export function getHomeAmbientLine(phase: DialoguePhase): string {
+  const lines = HOME_AMBIENT_LINES[phase] ?? HOME_AMBIENT_LINES[0];
+  let idx = Math.floor(Math.random() * lines.length);
+  if (idx === lastAmbientIndex && lines.length > 1) {
+    idx = (idx + 1) % lines.length;
+  }
+  lastAmbientIndex = idx;
+  return lines[idx];
+}
+
+// ============================================================================
+// HOME SCREEN GOAL SUGGESTIONS — contextual next-action hints
+// ============================================================================
+
+export interface GoalSuggestion {
+  text: string;
+  action: 'daily' | 'play' | 'none';
+}
+
+const DAILY_SUGGESTIONS: Record<DialoguePhase, string[]> = {
+  0: ['Your daily puzzle is waiting!', 'Today\'s challenge is ready.'],
+  1: ['A daily puzzle awaits your attention.', 'The daily challenge has arrived.'],
+  2: ['The daily arrangement awaits.', 'Today\'s challenge waits in silence.'],
+  3: ['The daily incantation is prepared.', 'Today\'s words are chosen.'],
+  4: ['The daily offering is ready.', 'The arrangement requires today\'s words.'],
+  5: ['The daily thread awaits weaving.', 'Today\'s pattern is ready.'],
+};
+
+const DIFFICULTY_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
+  0: {
+    MEDIUM: 'Ready for a bigger challenge? Try Medium!',
+    MEDIUM_PLUS: 'Five-letter words await in Medium+!',
+    HARD: 'Think you can handle Hard mode?',
+  },
+  1: {
+    MEDIUM: 'The words grow more interesting at Medium.',
+    MEDIUM_PLUS: 'Five-letter arrangements await in Medium+.',
+    HARD: 'Hard mode... the letters call to you.',
+  },
+  2: {
+    MEDIUM: 'Medium difficulty reveals deeper patterns.',
+    MEDIUM_PLUS: 'The arrangement deepens at Medium+.',
+    HARD: 'Hard mode. The words want to test you.',
+  },
+  3: {
+    MEDIUM: 'Medium difficulty feeds the pattern faster.',
+    MEDIUM_PLUS: 'Medium+ incantations carry more weight.',
+    HARD: 'Hard mode. The arrangement demands it.',
+  },
+  4: {
+    MEDIUM: 'Medium offerings sustain the pattern.',
+    MEDIUM_PLUS: 'Medium+ words burn brighter in the pit.',
+    HARD: 'Hard mode. The arrangement is hungry.',
+  },
+  5: {
+    MEDIUM: 'Medium threads add to the weave.',
+    MEDIUM_PLUS: 'Medium+ patterns strengthen the tapestry.',
+    HARD: 'Hard mode. The weave always needs more.',
+  },
+};
+
+const VARIANT_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
+  0: {
+    reverse: 'New puzzle style unlocked: Reverse Shift!',
+    double_shift: 'New style unlocked: Double Shift!',
+    speed: 'New style unlocked: Speed Shift!',
+  },
+  1: {
+    reverse: 'Reverse Shift is available — try going backward.',
+    double_shift: 'Double Shift unlocked — move two letters at once.',
+    speed: 'Speed Shift is ready — race the clock.',
+  },
+  2: {
+    reverse: 'Reverse Shift... the words can be undone.',
+    double_shift: 'Double Shift — twice the letters, twice the weight.',
+    speed: 'Speed Shift. The clock ticks.',
+  },
+  3: {
+    reverse: 'Reverse the incantation. If you dare.',
+    double_shift: 'Double Shift. Two letters bound together.',
+    speed: 'Speed Shift. The arrangement does not wait.',
+  },
+  4: {
+    reverse: 'Reverse the offering. See what returns.',
+    double_shift: 'Double Shift. The pattern demands more.',
+    speed: 'Speed Shift. Feed the void faster.',
+  },
+  5: {
+    reverse: 'Reverse the thread. The weave holds.',
+    double_shift: 'Double Shift. Two threads at once.',
+    speed: 'Speed Shift. Time flows differently here.',
+  },
+};
+
+const QUEST_SUGGESTIONS: Record<DialoguePhase, string[]> = {
+  0: ['Check your weekly quests for bonus amber!', 'Weekly quests can earn extra amber.'],
+  1: ['Weekly quests offer additional amber.', 'Your quests await progress.'],
+  2: ['The weekly tasks remember your progress.', 'Quests carry weight this week.'],
+  3: ['The weekly offerings are not yet complete.', 'Your quests await fulfillment.'],
+  4: ['The weekly rituals are incomplete.', 'The arrangement tracks your weekly progress.'],
+  5: ['The weekly threads continue.', 'Weekly patterns await completion.'],
+};
+
+/**
+ * Get a contextual goal suggestion for the home screen.
+ * Returns the highest-priority actionable suggestion, or null if none apply.
+ *
+ * @param phase - Current narrative phase
+ * @param dailyAvailable - Daily challenge unlocked AND not completed today
+ * @param untriedDifficulties - Difficulty levels never completed (e.g., ['MEDIUM_PLUS', 'HARD'])
+ * @param newVariant - Most recently unlocked variant not yet tried, or null
+ * @param hasActiveQuests - Whether there are incomplete weekly quests
+ */
+export function getGoalSuggestion(
+  phase: DialoguePhase,
+  dailyAvailable: boolean,
+  untriedDifficulties: string[],
+  newVariant: string | null,
+  hasActiveQuests: boolean,
+): GoalSuggestion | null {
+  // Priority 1: Uncompleted daily challenge
+  if (dailyAvailable) {
+    const lines = DAILY_SUGGESTIONS[phase] ?? DAILY_SUGGESTIONS[0];
+    return { text: lines[Math.floor(Math.random() * lines.length)], action: 'daily' };
+  }
+
+  // Priority 2: Untried difficulty
+  if (untriedDifficulties.length > 0) {
+    // Suggest the easiest untried difficulty first
+    const order = ['MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+    const next = order.find(d => untriedDifficulties.includes(d));
+    if (next) {
+      const phaseTexts = DIFFICULTY_SUGGESTIONS[phase] ?? DIFFICULTY_SUGGESTIONS[0];
+      const text = phaseTexts[next];
+      if (text) return { text, action: 'play' };
+    }
+  }
+
+  // Priority 3: Newly unlocked variant
+  if (newVariant) {
+    const phaseTexts = VARIANT_SUGGESTIONS[phase] ?? VARIANT_SUGGESTIONS[0];
+    const text = phaseTexts[newVariant];
+    if (text) return { text, action: 'play' };
+  }
+
+  // Priority 4: Active weekly quests
+  if (hasActiveQuests) {
+    const lines = QUEST_SUGGESTIONS[phase] ?? QUEST_SUGGESTIONS[0];
+    return { text: lines[Math.floor(Math.random() * lines.length)], action: 'none' };
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -1417,6 +1650,33 @@ const VICTORY_PIT_HINTS: Record<number, string> = {
 
 export function getVictoryPitHint(targetPhase: DialoguePhase): string | null {
   return VICTORY_PIT_HINTS[targetPhase] ?? null;
+}
+
+/**
+ * Fox's one-time nudge lines when a phase transition is pending at the pit.
+ * Shown once per pending transition to guide the player to the pit.
+ */
+const FOX_PIT_NUDGE_LINES: Record<number, string[]> = {
+  1: [
+    'Something is ready in the pit.',
+    'The marks are glowing. You should go see.',
+  ],
+  2: [
+    'The pit has changed. Can you feel it?',
+    'Go to the pit. The marks are waiting.',
+  ],
+  3: [
+    'The dark stirs below. The pit is calling.',
+    'The marks burn. They need you there.',
+  ],
+  4: [
+    'The final circle trembles. Go to the pit.',
+    'Everything has led to this. The pit awaits.',
+  ],
+};
+
+export function getFoxPitNudgeLines(targetPhase: DialoguePhase): string[] {
+  return FOX_PIT_NUDGE_LINES[targetPhase] ?? FOX_PIT_NUDGE_LINES[1];
 }
 
 /**

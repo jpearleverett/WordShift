@@ -17,7 +17,7 @@ import {
 import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
-import { isOnCooldown } from '../../services/dialogueSession';
+import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
 
 // Environment assets
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
@@ -629,6 +629,7 @@ interface HouseWorldProps {
   ritualWords?: string[];
   nextUnlock?: Unlockable | null;
   amberBalance?: number;
+  purchasedUpgrades?: Record<string, number>;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
@@ -640,6 +641,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   ritualWords = [],
   nextUnlock = null,
   amberBalance = 0,
+  purchasedUpgrades = {},
 }) => {
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
@@ -1053,6 +1055,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             onRoomPress={onRoomPress}
                             currentPhase={currentPhase}
                             isAnimalOnCooldown={roomAnimal ? isOnCooldown(roomAnimal.id) : false}
+                            cooldownPuzzlesLeft={roomAnimal ? getSessionStatus(roomAnimal.id).puzzlesRemaining : undefined}
+                            isRoomUpgraded={room.id in purchasedUpgrades}
                             ritualWords={ritualWords}
                             unlockCost={roomUnlockCost}
                             amberBalance={amberBalance}

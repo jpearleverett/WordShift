@@ -30,7 +30,7 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   1: 20,
   2: 65,
   3: 135,
-  4: 210,
+  4: 225,
   5: 300, // Post-revelation — after house completion + final puzzle
 };
 

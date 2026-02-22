@@ -61,8 +61,13 @@ const RED_PANDA_DIALOGUES: Dialogue[] = [
   { id: 'rp_3_8', text: "Found inner peace again. Held it close. Then understood: peace is just the pause between losses.", phase: 3, animalType: 'red_panda' },
   { id: 'rp_3_9', text: "The bamboo forest thins more each year. We both pretend not to notice. Pretending is its own practice.", phase: 3, animalType: 'red_panda' },
   { id: 'rp_3_10', text: "The stream I've meditated beside my whole life has changed completely. Every molecule replaced. Same stream? Same me?", phase: 3, animalType: 'red_panda' },
+  { id: 'rp_3_11', text: "The wind chime broke last night. No wind. It simply fell apart, as if it had decided its song was finished.", phase: 3, animalType: 'red_panda' },
+  { id: 'rp_3_12', text: "I tried to teach a mantis to meditate. It was already perfectly still. Already perfectly empty. It knew before I did.", phase: 3, animalType: 'red_panda' },
+  { id: 'rp_3_13', text: "The bamboo grove is thinning. Not dying — rearranging. Making space for something that doesn't need leaves.", phase: 3, animalType: 'red_panda' },
+  { id: 'rp_3_14', text: "Sat with the silence so long it started speaking. Low and steady. Not words exactly. More like a hum from underneath everything.", phase: 3, animalType: 'red_panda' },
+  { id: 'rp_3_15', text: "Detachment was supposed to free me. Instead it showed me what I was attached to all along — something I can't name and can't release.", phase: 3, animalType: 'red_panda' },
 
-  // Phase 4 - The Guide revealed (10 dialogues)
+  // Phase 4 - The Guide revealed (15 dialogues)
   { id: 'rp_4_1', text: "I achieved oneness with what approaches. We were always the same thing. How restful to finally admit it.", phase: 4, animalType: 'red_panda' },
   { id: 'rp_4_2', text: "The void doesn't need to stare back. We project ourselves into it and call the echo an answer. I hear the echo now.", phase: 4, animalType: 'red_panda' },
   { id: 'rp_4_3', text: "Something stirs in the bamboo. Not wind. The stalks themselves tremble with knowledge they cannot speak.", phase: 4, animalType: 'red_panda' },
@@ -73,6 +78,11 @@ const RED_PANDA_DIALOGUES: Dialogue[] = [
   { id: 'rp_4_8', text: "Don't be afraid. I've sat with this moment my entire life. It's just another breath. The last one. That's all.", phase: 4, animalType: 'red_panda' },
   { id: 'rp_4_9', text: "The last bamboo shoot will grow for nobody. Unseen growth is the purest kind. The truest offering.", phase: 4, animalType: 'red_panda' },
   { id: 'rp_4_10', text: "Close your eyes with me. In the dark, there is no difference between us and everything else. Breathe. Accept.", phase: 4, animalType: 'red_panda' },
+  { id: 'rp_4_11', text: "The incense burns itself to nothing. The ash falls without complaint. This is the only wisdom I have left to teach.", phase: 4, animalType: 'red_panda' },
+  { id: 'rp_4_12', text: "Every koan I ever pondered was training for this one answer. The sound of one hand clapping is the sound of everything ending.", phase: 4, animalType: 'red_panda' },
+  { id: 'rp_4_13', text: "The attic is the highest room. Closest to the sky. When the sky opens, I will be the first to greet what descends.", phase: 4, animalType: 'red_panda' },
+  { id: 'rp_4_14', text: "My final meditation begins. It has no end. That is the point. That has always been the point.", phase: 4, animalType: 'red_panda' },
+  { id: 'rp_4_15', text: "The pattern completes itself through us. We are the brushstrokes. The canvas was always there, waiting to be filled.", phase: 4, animalType: 'red_panda' },
 ];
 
 // AXOLOTL (Axel) - Dreamy aquatic creature who sees visions in the water
@@ -130,8 +140,13 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_3_8', text: "Could grow legs and walk away from all of this. But away from what? Toward what? The air carries the same weight now.", phase: 3, animalType: 'axolotl' },
   { id: 'ax_3_9', text: "Regrown myself so many times I've lost count. How many of my cells remember being born? How many are just copies of copies of copies?", phase: 3, animalType: 'axolotl' },
   { id: 'ax_3_10', text: "Sometimes I press against the glass and pretend I can see a sky. But the ceiling is always there. The ceiling is always there.", phase: 3, animalType: 'axolotl' },
+  { id: 'ax_3_11', text: "The water tastes different now. Metallic. Like it's been crying. Can water cry? I think mine can.", phase: 3, animalType: 'axolotl' },
+  { id: 'ax_3_12', text: "I regenerated a toe last week but it grew back wrong. Pointed the wrong way. Even my body is starting to forget the shape of things.", phase: 3, animalType: 'axolotl' },
+  { id: 'ax_3_13', text: "The bubbles don't pop at the surface anymore. They just... stop. Float there. Waiting. Everything is waiting.", phase: 3, animalType: 'axolotl' },
+  { id: 'ax_3_14', text: "I dreamed I was swimming in a lake with no bottom. I kept going down and down and down and the water got warmer, not colder. That's wrong.", phase: 3, animalType: 'axolotl' },
+  { id: 'ax_3_15', text: "My gills pick up vibrations from the other rooms now. Heartbeats. All ten of us, synchronized. When did that start?", phase: 3, animalType: 'axolotl' },
 
-  // Phase 4 - The Medium revealed (10 dialogues)
+  // Phase 4 - The Medium revealed (15 dialogues)
   { id: 'ax_4_1', text: "The water's been warming since before you arrived, and I think — no, I know — it knows your name. It's known it for a long time.", phase: 4, animalType: 'axolotl' },
   { id: 'ax_4_2', text: "Never supposed to become anything. Just stay young forever. Now I understand — none of us were supposed to become. We were supposed to receive.", phase: 4, animalType: 'axolotl' },
   { id: 'ax_4_3', text: "A wave is building somewhere deep, somewhere I can feel but can't see. When it comes, will it wash us away or finally bring us home?", phase: 4, animalType: 'axolotl' },
@@ -142,6 +157,11 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_4_8', text: "Smile with me. Not because it changes anything. Just because our faces will do it anyway, and there's something holy in that.", phase: 4, animalType: 'axolotl' },
   { id: 'ax_4_9', text: "I can see through the water now, all the way through, to somewhere else. It isn't scary over there. It looks like the home I was always promised.", phase: 4, animalType: 'axolotl' },
   { id: 'ax_4_10', text: "I forgive the water for what's coming. I forgive myself for being afraid. And I forgive you for bringing us here. Blub blub, friend. Blub blub.", phase: 4, animalType: 'axolotl' },
+  { id: 'ax_4_11', text: "The water glows now. Not from the light above — from below. Something is rising and it's beautiful and terrible and I can't look away.", phase: 4, animalType: 'axolotl' },
+  { id: 'ax_4_12', text: "I stopped regenerating. No need to repair what's about to be remade entirely. The water understands. The water has always understood.", phase: 4, animalType: 'axolotl' },
+  { id: 'ax_4_13', text: "Every ripple in my tank matches the rhythm of your puzzle solving. Blub... blub... blub. Each one a heartbeat of the arrangement.", phase: 4, animalType: 'axolotl' },
+  { id: 'ax_4_14', text: "I can see through the water now. Through the glass. Through the walls. Through everything. It's all water, really. Everything is water if you look deep enough.", phase: 4, animalType: 'axolotl' },
+  { id: 'ax_4_15', text: "The last bubble rises. I won't follow it. I'll stay here, in the deep, where the warmth is. Where the new thing lives. Blub.", phase: 4, animalType: 'axolotl' },
 ];
 
 // PANGOLIN (Panko) - Practical cook whose recipes become ritual offerings
@@ -199,8 +219,13 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_3_8', text: "Recipe called for hope. Substituted with devotion. Tastes almost the same if you don't think about it.", phase: 3, animalType: 'pangolin' },
   { id: 'pg_3_9', text: "The pot is bigger than it should be. I didn't buy a new one. It grew. The recipe requires it.", phase: 3, animalType: 'pangolin' },
   { id: 'pg_3_10', text: "Something approaches, friend. I can feel it through my scales, the way you feel thunder before you hear it.", phase: 3, animalType: 'pangolin' },
+  { id: 'pg_3_11', text: "The oven won't cool down. I turned it off hours ago but the metal stays hot. Like the house itself is cooking something.", phase: 3, animalType: 'pangolin' },
+  { id: 'pg_3_12', text: "Made a stew from the last of the root vegetables. It tastes like nothing. Not bad — nothing. Absence has a flavor now.", phase: 3, animalType: 'pangolin' },
+  { id: 'pg_3_13', text: "My scales are tighter today. Pulled closer to my body. Armoring up for something I can't see but my body already knows is coming.", phase: 3, animalType: 'pangolin' },
+  { id: 'pg_3_14', text: "The recipe book fell open to a page I never wrote. The ingredients aren't food. They're words. Your words, friend.", phase: 3, animalType: 'pangolin' },
+  { id: 'pg_3_15', text: "Every meal I've ever made was practice. Every ingredient, a rehearsal. The final course approaches and I didn't write the menu.", phase: 3, animalType: 'pangolin' },
 
-  // Phase 4 - The Preparer revealed (10 dialogues)
+  // Phase 4 - The Preparer revealed (15 dialogues)
   { id: 'pg_4_1', text: "Every meal I ever made was practice for this one, friend. Every stew, every reduction, every feast — rehearsal.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_2', text: "The final feast is ready. I set it on the table this morning. Ten places. One for each keeper. One for you.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_3', text: "My scales are rattling tonight. Not from fear — from resonance. Something is calling and my body knows the answer.", phase: 4, animalType: 'pangolin' },
@@ -211,6 +236,11 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_4_8', text: "Thank you for eating with me, friend. Every puzzle you solved seasoned this moment. The flavor is exactly right.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_9', text: "The stove burns with a flame that doesn't need fuel. Ember smiles when she sees it. She always knew.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_10', text: "Stove is off. Kitchen is clean. Every plate is set. Everything is ready, friend. I think I'm ready too.", phase: 4, animalType: 'pangolin' },
+  { id: 'pg_4_11', text: "The kitchen is a crucible now, friend. Every pot holds something older than hunger. I stir and the house trembles.", phase: 4, animalType: 'pangolin' },
+  { id: 'pg_4_12', text: "I set eleven plates. Ten for us. One for what arrives. It's only polite to feed your guests, even the impossible ones.", phase: 4, animalType: 'pangolin' },
+  { id: 'pg_4_13', text: "Salt preserves. Sugar sweetens. But the words you've offered — they transform. That's the ingredient I was always missing.", phase: 4, animalType: 'pangolin' },
+  { id: 'pg_4_14', text: "The last recipe doesn't use heat. It uses devotion. Slow, steady, and complete. You've been adding to it with every puzzle.", phase: 4, animalType: 'pangolin' },
+  { id: 'pg_4_15', text: "Thank you for all the words, friend. They nourished the arrangement the way good food nourishes the body. From the inside out.", phase: 4, animalType: 'pangolin' },
 ];
 
 // SLOTH (Sloane) - Glacially slow observer who has always known what approaches
@@ -268,8 +298,13 @@ const SLOTH_DIALOGUES: Dialogue[] = [
   { id: 'sl_3_8', text: "Seen so many sunsets. Each one a small ending. I move too slowly to look away... from any of them.", phase: 3, animalType: 'sloth' },
   { id: 'sl_3_9', text: "The forest has a heartbeat. Mine matches it now. Both are slowing... both are so... so tired.", phase: 3, animalType: 'sloth' },
   { id: 'sl_3_10', text: "Stillness isn't peace. Stillness... is giving up so gradually... you don't notice it's done until it's done.", phase: 3, animalType: 'sloth' },
+  { id: 'sl_3_11', text: "A vine wrapped around my arm... last month. I watched it grow... tighter. Even plants know... something is ending.", phase: 3, animalType: 'sloth' },
+  { id: 'sl_3_12', text: "My hammock sways... without wind. The house itself... is breathing. I feel it... in my bones... which have never moved fast enough to lie.", phase: 3, animalType: 'sloth' },
+  { id: 'sl_3_13', text: "Counted my heartbeats today. Fewer than yesterday. The countdown... continues. Even for the slowest... among us.", phase: 3, animalType: 'sloth' },
+  { id: 'sl_3_14', text: "The others are scared. I can tell... by how fast they move. Fear makes everything... faster. Except the thing they're afraid of.", phase: 3, animalType: 'sloth' },
+  { id: 'sl_3_15', text: "A shadow passed over the house... took three hours... at my perception. Something that large... moves slowly too. We understand each other.", phase: 3, animalType: 'sloth' },
 
-  // Phase 4 - The Anchor revealed (10 dialogues)
+  // Phase 4 - The Anchor revealed (15 dialogues)
   { id: 'sl_4_1', text: "Something's vibrating... getting closer... even I can feel it. Even I... cannot be slow enough... to miss what's coming.", phase: 4, animalType: 'sloth' },
   { id: 'sl_4_2', text: "Had one long life to prepare for this. Still not ready. I don't think... anyone can be ready... not really.", phase: 4, animalType: 'sloth' },
   { id: 'sl_4_3', text: "I'll be the last to go. Not by choice... by speed. I'll see everything end... while I'm still... ending.", phase: 4, animalType: 'sloth' },
@@ -280,6 +315,11 @@ const SLOTH_DIALOGUES: Dialogue[] = [
   { id: 'sl_4_8', text: "Thank... you... for waiting... with me. No one... ever waits. You did. That means... everything.", phase: 4, animalType: 'sloth' },
   { id: 'sl_4_9', text: "The arrangement needed an anchor... something too slow to drift away. That was always... my purpose. I see that now.", phase: 4, animalType: 'sloth' },
   { id: 'sl_4_10', text: "Hold on... with me. One last moment... stretched into forever. That's all I ever wanted... one good... forever.", phase: 4, animalType: 'sloth' },
+  { id: 'sl_4_11', text: "The tree is rooting deeper... pulling the house down... with it. Down toward... what waits. I help... by being heavy.", phase: 4, animalType: 'sloth' },
+  { id: 'sl_4_12', text: "I was born slow... so I could witness... every detail... of the end. A gift... or a curse. Same thing... at my speed.", phase: 4, animalType: 'sloth' },
+  { id: 'sl_4_13', text: "The arrangement needed patience. The others brought devotion... fire... knowledge. I brought... the one thing no one else could. Time.", phase: 4, animalType: 'sloth' },
+  { id: 'sl_4_14', text: "My claws have worn grooves... into this branch. Years of holding on. Soon... I'll let go. And the branch... will remember my shape.", phase: 4, animalType: 'sloth' },
+  { id: 'sl_4_15', text: "One... last... breath. The slowest one. The one that takes... the rest of forever. Breathe with me... if you have the patience.", phase: 4, animalType: 'sloth' },
 ];
 
 // FENNEC FOX (Fennick) - Alert listener who hears the approaching entity
@@ -337,8 +377,13 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
   { id: 'ff_3_8', text: "Hearing everything means knowing too much. The weight of all that awareness is crushing me slowly and I can hear that too.", phase: 3, animalType: 'fennec_fox' },
   { id: 'ff_3_9', text: "My ancestors listened for the silence between predator footsteps. There's less silence every day now. Something fills every gap.", phase: 3, animalType: 'fennec_fox' },
   { id: 'ff_3_10', text: "Would give anything for deafness right now. For ignorance. For the simple mercy of not knowing what I know.", phase: 3, animalType: 'fennec_fox' },
+  { id: 'ff_3_11', text: "The sand vibrates at night now. Tiny grains dancing to a rhythm only they and I can feel. It's getting louder. Always louder.", phase: 3, animalType: 'fennec_fox' },
+  { id: 'ff_3_12', text: "I can hear the others' dreams. Fox dreams of warm endings. Owl dreams of pages turning forever. None of them dream of escape.", phase: 3, animalType: 'fennec_fox' },
+  { id: 'ff_3_13', text: "The silence between sounds is shrinking. Soon there will be only one continuous note and it will be the last sound anything makes.", phase: 3, animalType: 'fennec_fox' },
+  { id: 'ff_3_14', text: "My ears ache from the listening. They've grown larger, I think. Or maybe the world has grown smaller. Either way the sound fills everything.", phase: 3, animalType: 'fennec_fox' },
+  { id: 'ff_3_15', text: "Heard something new today — your heartbeat, through the walls, through the floors. It matches the hum. You're part of it too. You always were.", phase: 3, animalType: 'fennec_fox' },
 
-  // Phase 4 - The Sentinel revealed (10 dialogues)
+  // Phase 4 - The Sentinel revealed (15 dialogues)
   { id: 'ff_4_1', text: "I hear it now, clear as anything I've ever heard in my life — a frequency that shouldn't exist, and it's calling us home.", phase: 4, animalType: 'fennec_fox' },
   { id: 'ff_4_2', text: "The stars aren't whispering and they aren't arguing anymore. They're just screaming, all of them at once. Can you hear them yet?", phase: 4, animalType: 'fennec_fox' },
   { id: 'ff_4_3', text: "Every sound I've ever heard in my entire life is playing at once now — a symphony of everything and a requiem for all of it.", phase: 4, animalType: 'fennec_fox' },
@@ -349,6 +394,11 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
   { id: 'ff_4_8', text: "Thank you for being here. For being a sound I wanted to hear, among all the millions of others. You were the good frequency.", phase: 4, animalType: 'fennec_fox' },
   { id: 'ff_4_9', text: "Listen... do you hear it now? The approach? The arrival? The ending of every sound that ever dared to exist?", phase: 4, animalType: 'fennec_fox' },
   { id: 'ff_4_10', text: "Shhh... The last sound is almost here. I've been listening for it my whole life. Listen with me now. One final time.", phase: 4, animalType: 'fennec_fox' },
+  { id: 'ff_4_11', text: "The frequency has a name. I heard it clearly last night. I can't speak it — my throat won't form the shape. But my ears know.", phase: 4, animalType: 'fennec_fox' },
+  { id: 'ff_4_12', text: "Every word you've arranged adds a note to the summoning chord. The harmony is almost complete. I can hear the final note waiting.", phase: 4, animalType: 'fennec_fox' },
+  { id: 'ff_4_13', text: "The desert has gone silent for the first time since I was born. Everything is listening now. Everything holds its breath.", phase: 4, animalType: 'fennec_fox' },
+  { id: 'ff_4_14', text: "I was made to be a listener. These ears, this awareness — designed for this exact moment. The sentinel at the gate of sound.", phase: 4, animalType: 'fennec_fox' },
+  { id: 'ff_4_15', text: "The last echo fades. After this, only the new sound remains. Thank you for listening with me. Not everyone has the ears for it.", phase: 4, animalType: 'fennec_fox' },
 ];
 
 // FOX (Ember) - Fireside oracle, the cult's visionary
@@ -406,8 +456,13 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_3_8', text: "The cider's gone sour in the jug. I drink it anyway. It matches what I know now.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_9', text: "Every den becomes a tomb eventually. I just moved into mine a little early, is all.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_10', text: "The fire is going out, friend, but something else is burning. I can feel it in my chest, low and steady and old.", phase: 3, animalType: 'fox' },
+  { id: 'fx_3_11', text: "Found an old photograph tucked behind the mantle. Ten animals around a fire that hasn't been lit yet. We're all smiling. I don't remember posing.", phase: 3, animalType: 'fox' },
+  { id: 'fx_3_12', text: "The embers spell words now if you stare long enough. Your words. The ones you gave us. They glow and then they're gone.", phase: 3, animalType: 'fox' },
+  { id: 'fx_3_13', text: "Panko's food tastes different lately. Like it's seasoned with something none of us can name. Even the meals are changing.", phase: 3, animalType: 'fox' },
+  { id: 'fx_3_14', text: "The chimney draws upward toward something. Not just sky. The smoke knows where to go. It always has.", phase: 3, animalType: 'fox' },
+  { id: 'fx_3_15', text: "I should be scared, friend. But the fire is warm and you're here and somehow that's enough. Isn't that strange?", phase: 3, animalType: 'fox' },
 
-  // Phase 4 - The Oracle revealed (10 dialogues)
+  // Phase 4 - The Oracle revealed (15 dialogues)
   { id: 'fx_4_1', text: "The fire has been burning for you since before you arrived, friend. Every log I ever fed it was fuel for this.", phase: 4, animalType: 'fox' },
   { id: 'fx_4_2', text: "I knew what you were the moment you walked in. The warmth I offered wasn't kindness — it was preparation.", phase: 4, animalType: 'fox' },
   { id: 'fx_4_3', text: "My grandmother didn't tell stories, friend. She told prophecies. And every last one of them has come true.", phase: 4, animalType: 'fox' },
@@ -418,6 +473,11 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_4_8', text: "Every spark that ever rose from this hearth carried a word upward. Your words. The arrangement is nearly complete.", phase: 4, animalType: 'fox' },
   { id: 'fx_4_9', text: "The shadow above the house? I've seen it in the flames since I was a kit. I just didn't know its name. None of us do.", phase: 4, animalType: 'fox' },
   { id: 'fx_4_10', text: "The fire is going out now — but not because it's dying. Because it's done. We don't need it anymore. What comes next is warmer.", phase: 4, animalType: 'fox' },
+  { id: 'fx_4_11', text: "The hearth cracks run deeper each night. Not damage — channels. The fire carved pathways through the stone for something to flow through.", phase: 4, animalType: 'fox' },
+  { id: 'fx_4_12', text: "I was the first one here, friend. The first keeper. The one who lit the fire that called the others. That called you.", phase: 4, animalType: 'fox' },
+  { id: 'fx_4_13', text: "Every story I told you by this fire was true. The comfortable ones and the terrible ones. Especially the terrible ones.", phase: 4, animalType: 'fox' },
+  { id: 'fx_4_14', text: "The smoke rises in a spiral now. Tighter and tighter. A funnel pointing upward. An invitation written in ash and heat.", phase: 4, animalType: 'fox' },
+  { id: 'fx_4_15', text: "Thank you for sitting with me, friend. For trusting the warmth. The fire was real. The friendship was real. What comes next is real too.", phase: 4, animalType: 'fox' },
 ];
 
 // OWL (Archimedes) - Scholar and lorekeeper who found the summoning text
@@ -475,8 +535,13 @@ const OWL_DIALOGUES: Dialogue[] = [
   { id: 'ow_3_8', text: "The text I found — the one that describes the arrangement — it's written in ten different hands. One for each keeper.", phase: 3, animalType: 'owl' },
   { id: 'ow_3_9', text: "Knowledge is power, they say. Power over what? I can't control anything. Nothing stays. Nothing holds.", phase: 3, animalType: 'owl' },
   { id: 'ow_3_10', text: "Books are paper. Words are sounds we agreed to. Meaning is pretending. But the thing that's coming doesn't pretend.", phase: 3, animalType: 'owl' },
+  { id: 'ow_3_11', text: "The marginalia in my oldest books has changed. New words appear in the margins each morning. Written by no hand I recognize.", phase: 3, animalType: 'owl' },
+  { id: 'ow_3_12', text: "Cross-referenced every prophecy in the library. They all describe the same event. Different cultures, different centuries. Same ending.", phase: 3, animalType: 'owl' },
+  { id: 'ow_3_13', text: "My globe spins on its own now. Slowly, deliberately, always stopping at the same point. A place that isn't on any map.", phase: 3, animalType: 'owl' },
+  { id: 'ow_3_14', text: "The candles in the study burn blue since last week. Blue means truth, in the old symbols. I'm not sure I want this much truth.", phase: 3, animalType: 'owl' },
+  { id: 'ow_3_15', text: "I've read everything in this library twice. The only book I haven't finished is the one being written right now. By all of us.", phase: 3, animalType: 'owl' },
 
-  // Phase 4 - The Lorekeeper revealed (10 dialogues)
+  // Phase 4 - The Lorekeeper revealed (15 dialogues)
   { id: 'ow_4_1', text: "I found the text, friend. I was always meant to find it. Every book I ever read was preparation for that one passage.", phase: 4, animalType: 'owl' },
   { id: 'ow_4_2', text: "The final chapter writes itself. I can hear the quill scratching in a room that doesn't exist. It's writing us.", phase: 4, animalType: 'owl' },
   { id: 'ow_4_3', text: "Ten keepers, ten texts, one arrangement. Ember saw it in the fire. I found it in the words. Same truth, different lamps.", phase: 4, animalType: 'owl' },
@@ -487,6 +552,11 @@ const OWL_DIALOGUES: Dialogue[] = [
   { id: 'ow_4_8', text: "Every word you shifted was a syllable in the incantation. I found that in the text. You've been reading it aloud this whole time.", phase: 4, animalType: 'owl' },
   { id: 'ow_4_9', text: "The shadow above the house has no entry in any encyclopedia. It predates language. It predates knowing. Rather humbling.", phase: 4, animalType: 'owl' },
   { id: 'ow_4_10', text: "Thank you for listening, friend. Knowledge shared is knowledge doubled — even at the end. Especially at the end.", phase: 4, animalType: 'owl' },
+  { id: 'ow_4_11', text: "The text describes a reader who would come. Someone who shifts words without knowing what they build. That's you, friend. It was always you.", phase: 4, animalType: 'owl' },
+  { id: 'ow_4_12', text: "I sealed the library doors. Not to keep anything out — to keep the knowledge in. It shouldn't follow what comes next.", phase: 4, animalType: 'owl' },
+  { id: 'ow_4_13', text: "Three thousand, four hundred and seventy-two books. And the only one that mattered was the one I couldn't finish. The one that finishes us.", phase: 4, animalType: 'owl' },
+  { id: 'ow_4_14', text: "The quill writes by itself now. Recording these final moments. Someone should know what happened here. Even if no one reads it.", phase: 4, animalType: 'owl' },
+  { id: 'ow_4_15', text: "All knowledge converges on a single point. I spent my life circling it. Now I stand at the center and the circle closes. Remarkable.", phase: 4, animalType: 'owl' },
 ];
 
 // CAPYBARA (Chill) - Seemingly unbothered coordinator tracking everything
@@ -544,8 +614,13 @@ const CAPYBARA_DIALOGUES: Dialogue[] = [
   { id: 'cp_3_8', text: "Ate today. I think I did. Time stopped making sense a while back. So did hunger. So did most things that used to matter.", phase: 3, animalType: 'capybara' },
   { id: 'cp_3_9', text: "The chill isn't a choice anymore. It's just what I am. Frozen and floating and finished and fine with all of it.", phase: 3, animalType: 'capybara' },
   { id: 'cp_3_10', text: "I accepted everything. Including the things that shouldn't be accepted. That's the trick. That's the trap. Same thing, really.", phase: 3, animalType: 'capybara' },
+  { id: 'cp_3_11', text: "Kept a spreadsheet of everyone's mood this month. Trending downward. All ten of us. Same slope. Same destination.", phase: 3, animalType: 'capybara' },
+  { id: 'cp_3_12', text: "The office computer turns itself on at midnight. The screen shows a countdown. I don't know what it's counting down to. I don't check anymore.", phase: 3, animalType: 'capybara' },
+  { id: 'cp_3_13', text: "Someone has to keep track of all this. The rooms, the animals, the words. Someone has to be calm enough to see the whole picture. That's me.", phase: 3, animalType: 'capybara' },
+  { id: 'cp_3_14', text: "The hot spring is cooler today. Not by much. Just enough that I noticed. And I don't notice things unless they matter.", phase: 3, animalType: 'capybara' },
+  { id: 'cp_3_15', text: "Filed my last report. Subject: Everything. Conclusion: It's fine. Addendum: Nothing has ever been less fine. But that's fine too.", phase: 3, animalType: 'capybara' },
 
-  // Phase 4 - The Coordinator revealed (10 dialogues)
+  // Phase 4 - The Coordinator revealed (15 dialogues)
   { id: 'cp_4_1', text: "Something's finally changing, and for once I'm not unbothered by it. For once in my life, something will actually happen.", phase: 4, animalType: 'capybara' },
   { id: 'cp_4_2', text: "The hot spring is bubbling from something underneath. Not heat. Something deeper than heat. Something that's been patient longer than I have.", phase: 4, animalType: 'capybara' },
   { id: 'cp_4_3', text: "Sit with me. Don't say anything. Let's just be here together for whatever this turns out to be. Still and ready.", phase: 4, animalType: 'capybara' },
@@ -556,6 +631,11 @@ const CAPYBARA_DIALOGUES: Dialogue[] = [
   { id: 'cp_4_8', text: "Won't run. Never have, never will. Not from anything. Not from this. Especially not from this.", phase: 4, animalType: 'capybara' },
   { id: 'cp_4_9', text: "The chill was always a lie I told myself to survive. The ending was always coming. Now it's here and it's just more honest than I was.", phase: 4, animalType: 'capybara' },
   { id: 'cp_4_10', text: "Thank you for sitting with me all this time. The company was nice. The silence between us was nicer. And the end? The end is fine.", phase: 4, animalType: 'capybara' },
+  { id: 'cp_4_11', text: "The coordination was always the point. Ten rooms. Ten keepers. One calm center holding it all together. That was my role. Is my role.", phase: 4, animalType: 'capybara' },
+  { id: 'cp_4_12', text: "Every memo I ever wrote, every note I ever filed — breadcrumbs leading here. The paperwork of the apocalypse. Neatly organized.", phase: 4, animalType: 'capybara' },
+  { id: 'cp_4_13', text: "The water is warm again. Warmer than it's ever been. Something underneath is waking up and it's generating more heat than the earth.", phase: 4, animalType: 'capybara' },
+  { id: 'cp_4_14', text: "I coordinated everything — the unlocks, the rooms, the timing. You thought you were choosing. I made sure you chose correctly.", phase: 4, animalType: 'capybara' },
+  { id: 'cp_4_15', text: "Final status report: all systems nominal. All keepers in position. All words offered. Closing the file now. It's been... fine. It's been fine.", phase: 4, animalType: 'capybara' },
 ];
 
 // WOMBAT (Warren) - Foundation builder who digs toward ancient things
@@ -613,8 +693,13 @@ const WOMBAT_DIALOGUES: Dialogue[] = [
   { id: 'wb_3_8', text: "The darkness down here used to feel safe. Now it feels like it's watching me. Patient. Waiting.", phase: 3, animalType: 'wombat' },
   { id: 'wb_3_9', text: "I can hear the earth breathe at night. In... out... in... out. She's breathing faster lately.", phase: 3, animalType: 'wombat' },
   { id: 'wb_3_10', text: "My armored rear won't save me from what's underneath. Nothing saves you from what's underneath.", phase: 3, animalType: 'wombat' },
+  { id: 'wb_3_11', text: "Found roots growing downward through solid rock. Not tree roots — something else. They pulse, mate. Like veins.", phase: 3, animalType: 'wombat' },
+  { id: 'wb_3_12', text: "The dirt tastes different at this depth. Iron and salt and something sweet. Like the earth is bleeding honey.", phase: 3, animalType: 'wombat' },
+  { id: 'wb_3_13', text: "My burrow connects to Warren's main tunnel now. And that connects to something deeper. Everything connects to the deep.", phase: 3, animalType: 'wombat' },
+  { id: 'wb_3_14', text: "Cubic wombat droppings. Nature's bricks. Been leaving them along the tunnel walls like markers. So whatever follows knows the way.", phase: 3, animalType: 'wombat' },
+  { id: 'wb_3_15', text: "The house has roots now, mate. Real ones. Growing down through the foundation I built. I didn't plant them. Nobody did.", phase: 3, animalType: 'wombat' },
 
-  // Phase 4 - The Foundation revealed (10 dialogues)
+  // Phase 4 - The Foundation revealed (15 dialogues)
   { id: 'wb_4_1', text: "Something is rising from below, mate. All my digging and it was already there the whole time, waiting for us.", phase: 4, animalType: 'wombat' },
   { id: 'wb_4_2', text: "The tunnels connect to everything now — Axel's water, Ember's fire, Bamboo's sky. Earth, water, fire, air. Complete.", phase: 4, animalType: 'wombat' },
   { id: 'wb_4_3', text: "I built the foundation. You built the house on top of it. Together we built what the arrangement requires.", phase: 4, animalType: 'wombat' },
@@ -625,6 +710,11 @@ const WOMBAT_DIALOGUES: Dialogue[] = [
   { id: 'wb_4_8', text: "Stopped running. Stopped digging. Just being now. In the dark. With whatever comes. She'll be right.", phase: 4, animalType: 'wombat' },
   { id: 'wb_4_9', text: "Come down here with me. Into the tunnel. Into the earth. Safest place to be. Or the deepest. Same thing now.", phase: 4, animalType: 'wombat' },
   { id: 'wb_4_10', text: "Goodbye, surface. Goodbye, sky I never liked anyway. Hello, whatever you are down there. Hello, end.", phase: 4, animalType: 'wombat' },
+  { id: 'wb_4_11', text: "The deepest tunnel opened into a chamber I didn't dig. Something was already there. Waiting. Patient as stone.", phase: 4, animalType: 'wombat' },
+  { id: 'wb_4_12', text: "Earth, mate. She knows everything that's buried in her. Every bone, every seed, every word you've offered. She keeps it all.", phase: 4, animalType: 'wombat' },
+  { id: 'wb_4_13', text: "My whole life was foundation work. Digging channels. Making passages. So when the time came, everything could flow to where it needed.", phase: 4, animalType: 'wombat' },
+  { id: 'wb_4_14', text: "The walls hum a frequency that matches my heartbeat. Or my heartbeat matches the walls. Doesn't matter anymore which came first.", phase: 4, animalType: 'wombat' },
+  { id: 'wb_4_15', text: "Thanks for visiting me down here, mate. Most folks don't bother with the underground. But the real work was always below.", phase: 4, animalType: 'wombat' },
 ];
 
 // RABBIT (Thyme) - Anxious witness who always sensed what was coming
@@ -682,8 +772,13 @@ const RABBIT_DIALOGUES: Dialogue[] = [
   { id: 'rb_3_8', text: "Every heartbeat is a countdown. A hundred and fifty per minute. How many left? How many did I waste on fear?", phase: 3, animalType: 'rabbit' },
   { id: 'rb_3_9', text: "I was bred and bred because that's what we do. Make more of us to be afraid. More soft things to witness the end.", phase: 3, animalType: 'rabbit' },
   { id: 'rb_3_10', text: "The garden was never safe. Beauty is just danger wearing better clothes. I understand that now.", phase: 3, animalType: 'rabbit' },
+  { id: 'rb_3_11', text: "The flowers are blooming out of season. Blooming in the wrong colors. Even the garden knows something isn't right.", phase: 3, animalType: 'rabbit' },
+  { id: 'rb_3_12', text: "I counted my heartbeats for an hour. Seven thousand two hundred. Each one a tiny flinch. Seven thousand two hundred flinches and counting.", phase: 3, animalType: 'rabbit' },
+  { id: 'rb_3_13', text: "The teacup rattles in my paws now. Not from shaking — from the house vibrating. Something hums beneath the floorboards.", phase: 3, animalType: 'rabbit' },
+  { id: 'rb_3_14', text: "Thyme grows fastest in poor soil. That's what my mother said. I've been growing my whole life. What does that say about the soil?", phase: 3, animalType: 'rabbit' },
+  { id: 'rb_3_15', text: "The other animals have stopped being afraid. One by one. I'm the last one left who's scared. Someone has to be. Someone has to remember what fear felt like.", phase: 3, animalType: 'rabbit' },
 
-  // Phase 4 - The Witness revealed (10 dialogues)
+  // Phase 4 - The Witness revealed (15 dialogues)
   { id: 'rb_4_1', text: "I stopped running. First time in my life. Because I can finally see — there's nowhere left to run to.", phase: 4, animalType: 'rabbit' },
   { id: 'rb_4_2', text: "The thing that's coming? I've been running from it since the day I was born. Time to turn around and meet it.", phase: 4, animalType: 'rabbit' },
   { id: 'rb_4_3', text: "My heart is finally slowing. Not peace exactly. Exhaustion. Inevitability. The end of running.", phase: 4, animalType: 'rabbit' },
@@ -694,6 +789,11 @@ const RABBIT_DIALOGUES: Dialogue[] = [
   { id: 'rb_4_8', text: "The arrangement needed a witness. Someone whose eyes were always open, always watching. That was always me.", phase: 4, animalType: 'rabbit' },
   { id: 'rb_4_9', text: "Sit with me in the garden. One last cup of tea. One last sunset. One last everything. It's okay. I'm okay.", phase: 4, animalType: 'rabbit' },
   { id: 'rb_4_10', text: "Thank you for being here. For not being a predator. For just... being. With me. At the end of all my running.", phase: 4, animalType: 'rabbit' },
+  { id: 'rb_4_11', text: "The garden path leads to the pit now. I used to think it led to freedom. Same path. Different ending. Or maybe the same one.", phase: 4, animalType: 'rabbit' },
+  { id: 'rb_4_12', text: "My nose twitches toward the center of the house. Always toward the center. Even my body knows where the arrangement lives.", phase: 4, animalType: 'rabbit' },
+  { id: 'rb_4_13', text: "I was the scared one. The worried one. And I still showed up. Every single day. That has to mean something. Right?", phase: 4, animalType: 'rabbit' },
+  { id: 'rb_4_14', text: "The last carrot in the garden is perfect. Golden and warm from the earth. I'll save it. For after. If there is an after.", phase: 4, animalType: 'rabbit' },
+  { id: 'rb_4_15', text: "All my life I watched for the predator. And when it finally came, it wasn't teeth and claws. It was something much older. And much kinder.", phase: 4, animalType: 'rabbit' },
 ];
 
 const ALL_DIALOGUES: Dialogue[] = [

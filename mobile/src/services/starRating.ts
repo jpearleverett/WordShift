@@ -17,6 +17,12 @@ export interface PuzzleAttemptStats {
 /**
  * Cumulative stats across all sessions
  */
+/** Personal best record for a specific difficulty level. */
+export interface PersonalBest {
+  fewestHints: number;
+  fewestInvalidAttempts: number;
+}
+
 export interface CumulativeStats {
   totalPuzzlesCompleted: number;
   totalStars: number;
@@ -33,6 +39,10 @@ export interface CumulativeStats {
       completed: number;
       stars: number;
     };
+  };
+  /** Personal best records per difficulty (fewest hints, fewest invalid attempts) */
+  personalBests?: {
+    [K in Difficulty]?: PersonalBest;
   };
   lastUpdated: number;
 }
@@ -110,6 +120,10 @@ export async function loadStats(): Promise<CumulativeStats> {
       if (parsed.byDifficulty && !parsed.byDifficulty.MEDIUM_PLUS) {
         parsed.byDifficulty.MEDIUM_PLUS = { completed: 0, stars: 0 };
       }
+      // Backward compat: add personalBests if missing from old data
+      if (!parsed.personalBests) {
+        parsed.personalBests = {};
+      }
       statsCache = parsed;
       return statsCache!;
     }
@@ -157,6 +171,19 @@ export async function recordPuzzleCompletion(
     // Update per-difficulty stats
     statsCache!.byDifficulty[difficulty].completed += 1;
     statsCache!.byDifficulty[difficulty].stars += starsEarned;
+
+    // Update personal bests
+    if (!statsCache!.personalBests) statsCache!.personalBests = {};
+    const prev = statsCache!.personalBests[difficulty];
+    if (!prev) {
+      statsCache!.personalBests[difficulty] = {
+        fewestHints: hintsUsed,
+        fewestInvalidAttempts: invalidAttempts,
+      };
+    } else {
+      if (hintsUsed < prev.fewestHints) prev.fewestHints = hintsUsed;
+      if (invalidAttempts < prev.fewestInvalidAttempts) prev.fewestInvalidAttempts = invalidAttempts;
+    }
 
     statsCache!.lastUpdated = Date.now();
 

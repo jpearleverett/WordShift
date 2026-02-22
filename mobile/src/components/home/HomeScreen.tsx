@@ -17,7 +17,7 @@ import {
 import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
-import { CandyColors, getDialogueTheme } from '../../theme/colors';
+import { CandyColors, getDialogueTheme, getPhaseTheme } from '../../theme/colors';
 import {
   getFullProgress,
   markIntroSeen,
@@ -27,6 +27,8 @@ import {
   markDailyChallengeIntroSeen,
   hasSeenChallengeIntro,
   markChallengeIntroSeen,
+  hasSeenPitNudge,
+  markPitNudgeSeen,
 } from '../../services/amberCurrency';
 import {
   getDailyChallengeIntroLines,
@@ -65,7 +67,8 @@ import { AmberSparkle } from './AmberSparkle';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
-import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
+import { isDailyChallengeUnlocked, isDailyCompleted } from '../../services/dailyChallenge';
+import { getUnlockedVariants } from '../../services/puzzleVariety';
 import {
   isSacrificeAvailable,
   getSacrificeAmounts,
@@ -73,10 +76,11 @@ import {
   performSacrifice,
 } from '../../services/sacrifice';
 import { getGalleryTitle } from '../../services/whisperGallery';
-import { updateQuestProgress } from '../../services/weeklyQuests';
+import { updateQuestProgress, loadWeeklyQuests } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
-import { getPitHomeBadgeLabel } from '../../services/phaseNarrative';
+import { getPitHomeBadgeLabel, getHomeAmbientLine, getGoalSuggestion, GoalSuggestion, getFoxPitNudgeLines } from '../../services/phaseNarrative';
+import { getPurchasedUpgrades } from '../../services/roomUpgrades';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -123,7 +127,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
 
   // Feature tooltip state
   const [activeTooltip, setActiveTooltip] = useState<TooltipFeature | null>(null);
@@ -148,6 +152,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Pending harvest summary for pit badge
   const [pendingHarvest, setPendingHarvest] = useState<HarvestSummary | null>(null);
+
+  // Ambient home line (atmospheric text when idle)
+  const [ambientLine, setAmbientLine] = useState<string | null>(null);
+
+  // Goal suggestion (contextual next-action hint)
+  const [goalSuggestion, setGoalSuggestion] = useState<GoalSuggestion | null>(null);
+
+  // Room upgrades
+  const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -203,6 +216,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // Load pending harvest for pit badge
     const harvestSummary = await getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
+
+    // Load room upgrades
+    const upgrades = await getPurchasedUpgrades();
+    setPurchasedUpgrades(upgrades);
   }, [unlockFlow.refreshUnlockData]);
 
   // Keep the ref in sync
@@ -286,6 +303,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
   ]);
 
+  // Pit transition Fox nudge (one-time per pending transition)
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!pitPhaseReady) return;
+
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenPitNudge();
+      if (seen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      // Determine which phase transition is pending (currentPhase + 1)
+      const targetPhase = Math.min(4, progress.currentPhase + 1) as 1 | 2 | 3 | 4;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getFoxPitNudgeLines(targetPhase));
+      setIntroContext('pit_nudge');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    pitPhaseReady,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
   // Post-onboarding feature tooltip (show one per home visit)
   useEffect(() => {
     if (isOnboarding || !onboardingStep || onboardingStep !== 'complete') return;
@@ -300,6 +350,65 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     })();
     return () => { cancelled = true; };
   }, [isOnboarding, onboardingStep, showIntroDialogue, introOverrideLines]);
+
+  // Ambient home line — atmospheric text when no dialogue/tooltip is active
+  useEffect(() => {
+    if (isOnboarding || !progress) return;
+    if (showIntroDialogue || dialogueFlow.showDialogue || activeTooltip) {
+      setAmbientLine(null);
+      return;
+    }
+    setAmbientLine(getHomeAmbientLine(progress.currentPhase));
+  }, [
+    isOnboarding,
+    progress?.currentPhase,
+    showIntroDialogue,
+    dialogueFlow.showDialogue,
+    activeTooltip,
+  ]);
+
+  // Goal suggestion — contextual next-action hint below ambient line
+  useEffect(() => {
+    if (isOnboarding || !progress) {
+      setGoalSuggestion(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const phase = progress.currentPhase;
+      const puzzles = progress.puzzlesSolved ?? 0;
+
+      // Check daily availability
+      const dailyUnlocked = isDailyChallengeUnlocked(puzzles, phase as number);
+      const dailyDone = dailyUnlocked ? await isDailyCompleted() : true;
+      const dailyAvailable = dailyUnlocked && !dailyDone;
+
+      // Check untried difficulties
+      const completed = progress.completedDifficulties ?? [];
+      const allDiffs = ['MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+      const untried = allDiffs.filter(d => !completed.includes(d));
+
+      // Check unlocked variants for any not yet tried
+      const unlocked = getUnlockedVariants(puzzles, phase as number);
+      const preferred = progress.preferredPuzzleVariant;
+      const nonStandard = unlocked.filter(v => v !== 'standard');
+      // Suggest the first variant the player hasn't selected yet
+      const newVariant = nonStandard.length > 0 && !preferred
+        ? nonStandard[0]
+        : null;
+
+      // Check weekly quests
+      let hasActiveQuests = false;
+      try {
+        const questState = await loadWeeklyQuests(phase as number);
+        hasActiveQuests = questState.quests.some(q => !q.completed);
+      } catch { /* ignore */ }
+
+      if (cancelled) return;
+      setGoalSuggestion(getGoalSuggestion(phase, dailyAvailable, untried, newVariant, hasActiveQuests));
+    })();
+    return () => { cancelled = true; };
+  }, [isOnboarding, progress?.currentPhase, progress?.puzzlesSolved, progress?.completedDifficulties]);
 
   const handleDismissTooltip = useCallback(async () => {
     if (activeTooltip) {
@@ -440,6 +549,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markDailyChallengeIntroSeen();
       } else if (introContext === 'challenge_intro') {
         await markChallengeIntroSeen();
+      } else if (introContext === 'pit_nudge') {
+        await markPitNudgeSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -459,6 +570,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markDailyChallengeIntroSeen();
       } else if (introContext === 'challenge_intro') {
         await markChallengeIntroSeen();
+      } else if (introContext === 'pit_nudge') {
+        await markPitNudgeSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -735,6 +848,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
+      {/* Ambient home line — atmospheric text when idle */}
+      {ambientLine && !isOnboarding && (
+        <View style={styles.ambientLineContainer}>
+          <Text
+            style={[
+              styles.ambientLineText,
+              { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
+            ]}
+          >
+            {ambientLine}
+          </Text>
+        </View>
+      )}
+
+      {/* Goal suggestion — contextual next-action hint */}
+      {goalSuggestion && !isOnboarding && !activeTooltip && (
+        <TouchableOpacity
+          style={styles.goalSuggestionContainer}
+          onPress={() => {
+            if (goalSuggestion.action === 'daily' && onStartDaily) {
+              setActiveTooltip(null);
+              onStartDaily('HARD' as Difficulty);
+            } else if (goalSuggestion.action === 'play') {
+              setActiveTooltip(null);
+              onPlayPuzzle();
+            }
+          }}
+          activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
+        >
+          <Text
+            style={[
+              styles.goalSuggestionText,
+              { color: getPhaseTheme(progress.currentPhase).modalTextColor },
+            ]}
+          >
+            {goalSuggestion.text}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Feature Tooltip — shown one per home visit after onboarding */}
       {activeTooltip && (
         <FeatureTooltip
@@ -767,6 +920,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         ritualWords={progress.ritualWords}
         nextUnlock={unlockFlow.nextUnlock}
         amberBalance={progress.amber}
+        purchasedUpgrades={purchasedUpgrades}
       />
 
       {/* Cooldown Message Toast */}
@@ -2042,6 +2196,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.9)',
+  },
+
+  // Ambient home line
+  ambientLineContainer: {
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+    marginBottom: 2,
+    zIndex: 10,
+  },
+  ambientLineText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    opacity: 0.7,
+  },
+  goalSuggestionContainer: {
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginBottom: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 10,
+    zIndex: 10,
+  },
+  goalSuggestionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+    opacity: 0.85,
   },
 
   // Sacrifice modal

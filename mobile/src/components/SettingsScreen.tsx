@@ -30,6 +30,7 @@ import { clearWhisperGallery } from '../services/whisperGallery';
 import { clearChoiceState } from '../services/dialogueChoices';
 import { resetMicroBeats } from '../services/phaseNarrative';
 import { resetNotificationPrefs } from '../services/notifications';
+import { clearRoomUpgrades } from '../services/roomUpgrades';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -77,6 +78,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               clearChoiceState(),
               resetMicroBeats(),
               resetNotificationPrefs(),
+              clearRoomUpgrades(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);
