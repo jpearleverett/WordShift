@@ -158,6 +158,36 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               />
             </View>
 
+            {/* Personal bests */}
+            {stats.personalBests && Object.keys(stats.personalBests).length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>PERSONAL BESTS</Text>
+                <View style={[styles.card, phaseCardStyle]}>
+                  {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map((diff, i) => {
+                    const pb = stats.personalBests?.[diff];
+                    if (!pb) return null;
+                    const label = diff === 'MEDIUM_PLUS' ? 'MED+' : diff;
+                    return (
+                      <React.Fragment key={diff}>
+                        {i > 0 && stats.personalBests?.[(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[])[i - 1]] && (
+                          <View style={styles.rowDivider} />
+                        )}
+                        <View style={styles.journeyRow}>
+                          <Text style={styles.journeyLabel}>{label}</Text>
+                          <Text style={styles.journeyValue}>
+                            {pb.fewestHints === 0 ? '✨ ' : `${pb.fewestHints}h `}
+                            {pb.fewestInvalidAttempts === 0 ? '✨' : `${pb.fewestInvalidAttempts}m`}
+                          </Text>
+                        </View>
+                      </React.Fragment>
+                    );
+                  })}
+                  <View style={styles.rowDivider} />
+                  <Text style={styles.personalBestLegend}>h = hints · m = mistakes · ✨ = perfect</Text>
+                </View>
+              </>
+            )}
+
             {/* Journey progress */}
             <Text style={styles.sectionTitle}>YOUR JOURNEY</Text>
             <View style={[styles.card, phaseCardStyle]}>
@@ -511,6 +541,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: CandyColors.purple.main,
+  },
+  personalBestLegend: {
+    fontSize: 10,
+    color: CandyColors.gray[400],
+    textAlign: 'center',
+    paddingTop: 6,
+    paddingBottom: 2,
   },
 
   // Achievement rows

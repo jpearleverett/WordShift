@@ -16,12 +16,17 @@ import {
   NARRATIVE_ACCELERATION,
   CHALLENGE_MODE_CONFIG,
 } from '../types/homeWorld';
+import {
+  MIN_PUZZLES_FOR_PHASE,
+  VARIANT_REPEAT_DECAY as _VARIANT_REPEAT_DECAY,
+} from '../constants/gameBalance';
 
 const PROGRESS_STORAGE_KEY = 'wordshift_home_progress';
 const TRANSACTIONS_STORAGE_KEY = 'wordshift_amber_transactions';
 const DAILY_CHALLENGE_INTRO_SEEN_KEY = 'wordshift_daily_challenge_intro_seen';
 const FOX_PLAY_NUDGE_SEEN_KEY = 'wordshift_fox_play_nudge_seen';
 const CHALLENGE_INTRO_SEEN_KEY = 'wordshift_challenge_intro_seen';
+const PIT_NUDGE_SEEN_KEY = 'wordshift_pit_nudge_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -55,24 +60,10 @@ function getDefaultProgress(): HomeWorldProgress {
   };
 }
 
-// Narrative pacing guardrails: weighted progress can accelerate, but each phase
-// still requires a minimum amount of real puzzle exposure.
-const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
-  0: 0,
-  1: 20,
-  2: 65,
-  3: 135,
-  4: 225,
-  5: 300,
-};
+// MIN_PUZZLES_FOR_PHASE imported from constants/gameBalance.ts (single source of truth).
 
-// Variant reward anti-farm decay by consecutive repeats of the same style.
-const VARIANT_REPEAT_DECAY = {
-  firstTwo: 1.0,
-  third: 0.85,
-  fourth: 0.7,
-  fifthPlus: 0.55,
-} as const;
+// Variant reward anti-farm decay — re-exported from constants/gameBalance.ts.
+const VARIANT_REPEAT_DECAY = _VARIANT_REPEAT_DECAY;
 
 /**
  * Get today's date as ISO string (YYYY-MM-DD)
@@ -712,6 +703,9 @@ export async function confirmPhaseTransition(): Promise<{
   progressCache = progress;
   await saveProgress();
 
+  // Reset pit nudge so the next pending transition can show a new one
+  await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY).catch(() => {});
+
   return { newPhase: pending, previousPhase };
 }
 
@@ -847,6 +841,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
+    await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -1334,6 +1329,35 @@ export async function hasSeenFoxPlayNudge(): Promise<boolean> {
 export async function markFoxPlayNudgeSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(FOX_PLAY_NUDGE_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Track whether the one-time Fox pit nudge has been shown for the current pending transition.
+ * Resets each time a phase transition is confirmed (new pending transition = new nudge).
+ */
+export async function hasSeenPitNudge(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(PIT_NUDGE_SEEN_KEY);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markPitNudgeSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PIT_NUDGE_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+export async function resetPitNudge(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
   } catch {
     // Non-critical
   }

@@ -181,6 +181,7 @@ interface AnimalSpriteProps {
   onPress: (animal: Animal) => void;
   currentPhase: DialoguePhase;
   isOnCooldown?: boolean;
+  cooldownPuzzlesLeft?: number;
 }
 
 // Animation speeds by animal type (slower = more movement time)
@@ -218,6 +219,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   onPress,
   currentPhase,
   isOnCooldown = false,
+  cooldownPuzzlesLeft,
 }) => {
   const posX = useRef(new Animated.Value(animal.position.x)).current;
   const posY = useRef(new Animated.Value(animal.position.y)).current;
@@ -644,6 +646,21 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               <Text style={styles.cooldownIndicator}>💤</Text>
             )}
           </View>
+
+          {/* Cooldown puzzles remaining indicator */}
+          {isOnCooldown && cooldownPuzzlesLeft != null && cooldownPuzzlesLeft > 0 && (
+            <View style={[
+              styles.cooldownCountBadge,
+              currentPhase >= 3 && styles.cooldownCountBadgeDark,
+            ]}>
+              <Text style={[
+                styles.cooldownCountText,
+                currentPhase >= 3 && styles.cooldownCountTextDark,
+              ]}>
+                {cooldownPuzzlesLeft === 1 ? '1 puzzle' : `${cooldownPuzzlesLeft} puzzles`}
+              </Text>
+            </View>
+          )}
         </Animated.View>
       </TouchableOpacity>
     </Animated.View>
@@ -742,6 +759,25 @@ const styles = StyleSheet.create({
   },
   nameTextDark: {
     color: CandyColors.gray[300],
+  },
+  cooldownCountBadge: {
+    marginTop: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 6,
+  },
+  cooldownCountBadgeDark: {
+    backgroundColor: 'rgba(60, 30, 80, 0.7)',
+  },
+  cooldownCountText: {
+    color: CandyColors.gray[300],
+    fontSize: 8,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  cooldownCountTextDark: {
+    color: CandyColors.gray[400],
   },
   emotionBubble: {
     position: 'absolute',

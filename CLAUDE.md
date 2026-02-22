@@ -551,13 +551,13 @@ Variants are now player-selected from the setup menu (not randomly injected). Pl
 - **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
 - **Double Shift**: Move 2 letters per step instead of 1. All displayed words are 5 letters (W=5 is the only viable word length — needs W-2=3 letter intermediates and W+2=7 letter tempStates, both within the dictionary's 3-7 letter range). Difficulty differentiated purely by row count: EASY=3 rows, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. Each step: pick a letter from current word, drop it into next word, pick the second letter from current word, drop it into next word. Both shifted letters stay locked in their target row and cannot be picked in later steps. All difficulties served from pre-generated banks of 500 puzzles each; the generator enforces position-based locking constraints (via `receivedPositions` on `DoubleShiftPathNode`) so generated solutions never require picking a locked letter. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. During both drop phases, players can freely tap different letters in the source row to switch selection and preview drop slot options before committing. Source word validation is deferred to the actual drop (not on letter tap). Undo reverses one drop at a time (not both at once). Rows with 6-7 letters use compact tile mode to prevent overflow. 1.65x amber multiplier. Pre-computed `getDoubleInsertionIndex(wordLength)` maps letter pairs to valid (baseWord, result, positions) tuples for O(1) candidate lookup.
 
-**Variant Unlock Thresholds** (puzzles solved — currently all set to 0 for testing):
-| Variant | Puzzles Required | Original |
-|---------|-----------------|----------|
-| Reverse Shift | 0 | 10 |
-| Double Shift | 0 | 40 |
-| Speed Shift | 0 | 52 |
-| Chain Shift | 85 | 85 |
+**Variant Unlock Thresholds** (puzzles solved):
+| Variant | Puzzles Required |
+|---------|-----------------|
+| Reverse Shift | 10 |
+| Double Shift | 40 |
+| Speed Shift | 52 |
+| Chain Shift | 85 (planned, not yet implemented) |
 
 Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants stay fully hidden until unlocked, so players only see styles they can actually select.
 - **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
@@ -833,12 +833,13 @@ Each animal filters the cult narrative through their personality:
 - **Rabbit (Thyme)**: Anxious but devoted. "I'm scared, but... this is what we prepared for, right?"
 - **Red Panda (Bamboo)**: Zen certainty. "The pattern completes. Breathe. Accept."
 
-**Dialogue Style**: All 560+ dialogues are written with distinct character voices — each animal has a fully realized personality with natural pronoun usage, flowing sentences, and earned emotional weight. No clipped or robotic dialogue. Each phase transition feels organic and the descent from candy-cute warmth to cosmic horror is gradual and earned.
+**Dialogue Style**: All 660+ dialogues are written with distinct character voices — each animal has a fully realized personality with natural pronoun usage, flowing sentences, and earned emotional weight. No clipped or robotic dialogue. Each phase transition feels organic and the descent from candy-cute warmth to cosmic horror is gradual and earned.
 
-**Dialogue Count**: 56 dialogues per animal (560 total) + 10 post-revelation per animal (100 total)
+**Dialogue Count**: 66 dialogues per animal (660 total) + 10 post-revelation per animal (100 total)
 - Phase 0: 12 dialogues (happy, friendly)
 - Phase 1: 14 dialogues (curious + expanded variety: letters/words, house changes, community, personality)
-- Phases 2-4: 10 dialogues each (progressively darker, culminating in cult revelation)
+- Phase 2: 10 dialogues (questioning existence, isolation)
+- Phases 3-4: 15 dialogues each (progressively darker, culminating in cult revelation)
 - Phase 5: 10 dialogues each (terrible peace — the aftermath)
 
 ### Per-Animal Phase Awareness (Cult Hierarchy)
@@ -1645,8 +1646,9 @@ Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
 - EASY: 8, MEDIUM: 10, MEDIUM_PLUS: 15, HARD: 20
 
 ### Home Screen - Adjusting dialogue phases
-Edit `PHASE_THRESHOLDS` in `types/homeWorld.ts`:
-- Default: [0, 25, 75, 150, 250] puzzles for phases 0-4
+Edit `PHASE_THRESHOLDS` in `constants/gameBalance.ts` (re-exported via `types/homeWorld.ts`):
+- Default: [0, 25, 75, 150, 235] weighted progress for phases 0-4
+- `MIN_PUZZLES_FOR_PHASE` in `constants/gameBalance.ts` sets minimum real puzzles per phase: [0, 20, 65, 135, 225, 300]
 
 ### Home Screen - Adjusting dialogue sessions
 Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:

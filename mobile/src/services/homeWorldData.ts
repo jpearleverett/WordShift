@@ -446,7 +446,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   {
     id: 'unlock_study',
     type: 'room',
-    cost: 100,
+    cost: 75,  // Reduced from 100 to compress 2-animal window (Fox+Pangolin only) from ~15 to ~10 puzzles
     isUnlocked: false,
     order: 4,
     targetId: 'study',

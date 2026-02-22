@@ -51,6 +51,8 @@ interface RoomViewProps {
   onRoomPress: (room: Room) => void;
   currentPhase: DialoguePhase;
   isAnimalOnCooldown?: boolean;
+  cooldownPuzzlesLeft?: number;
+  isRoomUpgraded?: boolean;
   ritualWords?: string[];
   unlockCost?: number | null;
   amberBalance?: number;
@@ -66,6 +68,8 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   onRoomPress,
   currentPhase,
   isAnimalOnCooldown = false,
+  cooldownPuzzlesLeft,
+  isRoomUpgraded = false,
   ritualWords = [],
   unlockCost = null,
   amberBalance = 0,
@@ -137,6 +141,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
       {/* Room name plate */}
       <View style={styles.namePlate}>
         <Text style={styles.roomName}>{room.name}</Text>
+        {isRoomUpgraded && <Text style={styles.upgradeBadge}>✦</Text>}
       </View>
 
       {/* Animal if present and unlocked */}
@@ -148,6 +153,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           onPress={onAnimalPress}
           currentPhase={currentPhase}
           isOnCooldown={isAnimalOnCooldown}
+          cooldownPuzzlesLeft={cooldownPuzzlesLeft}
         />
       )}
 
@@ -260,6 +266,11 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  upgradeBadge: {
+    fontSize: 8,
+    color: '#FFD700',
+    marginLeft: 3,
   },
   lockedRoom: {
     backgroundColor: CandyColors.gray[700],
