@@ -655,10 +655,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const noopDevour = useCallback((_fw: FlyingWord) => {}, []);
 
   const harvestStateRef = useRef(harvestState);
+  const amberBalanceRef = useRef(amberBalance);
 
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
   useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
+  useEffect(() => { amberBalanceRef.current = amberBalance; }, [amberBalance]);
   useEffect(() => { harvestStateRef.current = harvestState; }, [harvestState]);
 
   // ---- Ward mark ceremony state machine ----
@@ -1633,9 +1635,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       if (!mountedRef.current) return;
       const freshState = await getHarvestState();
       if (mountedRef.current) {
-        // Credit any remaining fractional amber
-        const finalBalance = amberBalance + result.amberAwarded;
-        setDisplayBalance(finalBalance);
+        // Sync display to latest prop value (use ref to avoid stale closure)
+        setDisplayBalance(amberBalanceRef.current);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
@@ -1901,10 +1902,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {/* Header — matches HomeScreen frosted glass style */}
       <View style={[styles.header, { paddingTop: STATUS_BAR_HEIGHT }]}>
         <View style={styles.headerLeft}>
-          <View style={styles.amberContainer} accessibilityLabel={`${displayBalance} amber`}>
+          <View style={styles.amberContainer} accessibilityLabel={`${Math.max(0, displayBalance)} amber`}>
             <View style={styles.amberInner}>
               <Text style={styles.amberEmoji}>{'\uD83D\uDC8E'}</Text>
-              <Text style={styles.amberCount}>{displayBalance}</Text>
+              <Text style={styles.amberCount}>{Math.max(0, displayBalance)}</Text>
             </View>
           </View>
           {pendingAmber - pendingAmberOffset > 0 && (
