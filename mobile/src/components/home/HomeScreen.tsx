@@ -351,10 +351,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => { cancelled = true; };
   }, [isOnboarding, onboardingStep, showIntroDialogue, introOverrideLines]);
 
-  // Ambient home line — atmospheric text when no dialogue/tooltip is active
+  // Ambient home line — atmospheric text when no dialogue is active
+  // Note: tooltip overlay (absoluteFill + zIndex 1000) visually covers this when active,
+  // so we keep ambientLine in the layout at all times to prevent layout shifts on dismiss.
   useEffect(() => {
     if (isOnboarding || !progress) return;
-    if (showIntroDialogue || dialogueFlow.showDialogue || activeTooltip) {
+    if (showIntroDialogue || dialogueFlow.showDialogue) {
       setAmbientLine(null);
       return;
     }
@@ -364,7 +366,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     progress?.currentPhase,
     showIntroDialogue,
     dialogueFlow.showDialogue,
-    activeTooltip,
   ]);
 
   // Goal suggestion — contextual next-action hint below ambient line
@@ -862,8 +863,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* Goal suggestion — contextual next-action hint */}
-      {goalSuggestion && !isOnboarding && !activeTooltip && (
+      {/* Goal suggestion — contextual next-action hint.
+          Tooltip overlay (absoluteFill + zIndex 1000) visually covers this when active;
+          keeping it in the layout prevents shift on tooltip dismiss during navigation. */}
+      {goalSuggestion && !isOnboarding && (
         <TouchableOpacity
           style={styles.goalSuggestionContainer}
           onPress={() => {
@@ -894,7 +897,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           text={TOOLTIP_TEXT[activeTooltip]}
           position={
             activeTooltip === 'stats'
-              ? { top: 52, right: 60 }
+              ? { top: 95, right: 60 }
               : activeTooltip === 'gallery'
                 ? { bottom: 85, left: 20 }
                 : { bottom: 85, right: 20 }
