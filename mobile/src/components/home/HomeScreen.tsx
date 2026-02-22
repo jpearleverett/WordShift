@@ -58,8 +58,6 @@ import {
 
 import { useDialogueFlow } from '../../hooks/useDialogueFlow';
 import { useUnlockFlow } from '../../hooks/useUnlockFlow';
-import { FeatureTooltip } from './FeatureTooltip';
-import { getNextTooltipFeature, markTooltipSeen, TOOLTIP_TEXT, TooltipFeature } from '../../services/onboarding';
 
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
@@ -129,9 +127,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
   const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
 
-  // Feature tooltip state
-  const [activeTooltip, setActiveTooltip] = useState<TooltipFeature | null>(null);
-
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
   const playPulse = useRef(new Animated.Value(0)).current;
@@ -155,9 +150,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Ambient home line (atmospheric text when idle)
   const [ambientLine, setAmbientLine] = useState<string | null>(null);
+  const ambientOpacity = useRef(new Animated.Value(0)).current;
+  const ambientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ambientAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Goal suggestion (contextual next-action hint)
   const [goalSuggestion, setGoalSuggestion] = useState<GoalSuggestion | null>(null);
+  const goalOpacity = useRef(new Animated.Value(0)).current;
+  const goalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const goalAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
@@ -336,42 +337,63 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
   ]);
 
-  // Post-onboarding feature tooltip (show one per home visit)
-  useEffect(() => {
-    if (isOnboarding || !onboardingStep || onboardingStep !== 'complete') return;
-    if (showIntroDialogue || introOverrideLines) return;
-
-    let cancelled = false;
-    (async () => {
-      const feature = await getNextTooltipFeature();
-      if (!cancelled && feature) {
-        setActiveTooltip(feature);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [isOnboarding, onboardingStep, showIntroDialogue, introOverrideLines]);
-
   // Ambient home line — atmospheric text when no dialogue is active
-  // Note: tooltip overlay (absoluteFill + zIndex 1000) visually covers this when active,
-  // so we keep ambientLine in the layout at all times to prevent layout shifts on dismiss.
+  // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
   useEffect(() => {
     if (isOnboarding || !progress) return;
     if (showIntroDialogue || dialogueFlow.showDialogue) {
       setAmbientLine(null);
+      ambientOpacity.setValue(0);
+      if (ambientAnimRef.current) { ambientAnimRef.current.stop(); ambientAnimRef.current = null; }
+      if (ambientTimerRef.current) { clearTimeout(ambientTimerRef.current); ambientTimerRef.current = null; }
       return;
     }
-    setAmbientLine(getHomeAmbientLine(progress.currentPhase));
+
+    const line = getHomeAmbientLine(progress.currentPhase);
+    setAmbientLine(line);
+
+    const { reducedMotion } = getSettingsSync();
+    if (reducedMotion) {
+      ambientOpacity.setValue(1);
+      ambientTimerRef.current = setTimeout(() => {
+        ambientOpacity.setValue(0);
+        setAmbientLine(null);
+      }, 5000);
+    } else {
+      ambientOpacity.setValue(0);
+      const fadeIn = Animated.timing(ambientOpacity, { toValue: 1, duration: 600, useNativeDriver: true });
+      ambientAnimRef.current = fadeIn;
+      fadeIn.start(() => {
+        ambientAnimRef.current = null;
+        ambientTimerRef.current = setTimeout(() => {
+          const fadeOut = Animated.timing(ambientOpacity, { toValue: 0, duration: 800, useNativeDriver: true });
+          ambientAnimRef.current = fadeOut;
+          fadeOut.start(() => {
+            ambientAnimRef.current = null;
+            setAmbientLine(null);
+          });
+        }, 5000);
+      });
+    }
+
+    return () => {
+      if (ambientAnimRef.current) { ambientAnimRef.current.stop(); ambientAnimRef.current = null; }
+      if (ambientTimerRef.current) { clearTimeout(ambientTimerRef.current); ambientTimerRef.current = null; }
+    };
   }, [
     isOnboarding,
     progress?.currentPhase,
     showIntroDialogue,
     dialogueFlow.showDialogue,
+    ambientOpacity,
   ]);
 
   // Goal suggestion — contextual next-action hint below ambient line
+  // Appears after a short delay (staggered from ambient line), then auto-dismisses with fade.
   useEffect(() => {
     if (isOnboarding || !progress) {
       setGoalSuggestion(null);
+      goalOpacity.setValue(0);
       return;
     }
     let cancelled = false;
@@ -393,7 +415,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const unlocked = getUnlockedVariants(puzzles, phase as number);
       const preferred = progress.preferredPuzzleVariant;
       const nonStandard = unlocked.filter(v => v !== 'standard');
-      // Suggest the first variant the player hasn't selected yet
       const newVariant = nonStandard.length > 0 && !preferred
         ? nonStandard[0]
         : null;
@@ -406,17 +427,51 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       } catch { /* ignore */ }
 
       if (cancelled) return;
-      setGoalSuggestion(getGoalSuggestion(phase, dailyAvailable, untried, newVariant, hasActiveQuests));
-    })();
-    return () => { cancelled = true; };
-  }, [isOnboarding, progress?.currentPhase, progress?.puzzlesSolved, progress?.completedDifficulties]);
+      const suggestion = getGoalSuggestion(phase, dailyAvailable, untried, newVariant, hasActiveQuests);
+      setGoalSuggestion(suggestion);
 
-  const handleDismissTooltip = useCallback(async () => {
-    if (activeTooltip) {
-      await markTooltipSeen(activeTooltip);
-      setActiveTooltip(null);
-    }
-  }, [activeTooltip]);
+      if (!suggestion) return;
+
+      const { reducedMotion } = getSettingsSync();
+      const appearDelay = 2000; // 2s stagger after ambient line
+
+      if (reducedMotion) {
+        goalTimerRef.current = setTimeout(() => {
+          if (cancelled) return;
+          goalOpacity.setValue(1);
+          goalTimerRef.current = setTimeout(() => {
+            if (cancelled) return;
+            goalOpacity.setValue(0);
+            setGoalSuggestion(null);
+          }, 6000);
+        }, appearDelay);
+      } else {
+        goalTimerRef.current = setTimeout(() => {
+          if (cancelled) return;
+          goalOpacity.setValue(0);
+          const fadeIn = Animated.timing(goalOpacity, { toValue: 1, duration: 400, useNativeDriver: true });
+          goalAnimRef.current = fadeIn;
+          fadeIn.start(() => {
+            goalAnimRef.current = null;
+            goalTimerRef.current = setTimeout(() => {
+              if (cancelled) return;
+              const fadeOut = Animated.timing(goalOpacity, { toValue: 0, duration: 600, useNativeDriver: true });
+              goalAnimRef.current = fadeOut;
+              fadeOut.start(() => {
+                goalAnimRef.current = null;
+                setGoalSuggestion(null);
+              });
+            }, 6000);
+          });
+        }, appearDelay);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (goalAnimRef.current) { goalAnimRef.current.stop(); goalAnimRef.current = null; }
+      if (goalTimerRef.current) { clearTimeout(goalTimerRef.current); goalTimerRef.current = null; }
+    };
+  }, [isOnboarding, progress?.currentPhase, progress?.puzzlesSolved, progress?.completedDifficulties, goalOpacity]);
 
   // Talking animation for intro dialogue
   const [introIsTalking, setIntroIsTalking] = useState(false);
@@ -691,14 +746,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <View style={styles.headerRight}>
           {!isOnboarding && onStartDaily && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
-            <DailyChallengeCard onStartDaily={(d) => { setActiveTooltip(null); onStartDaily!(d); }} phase={progress.currentPhase} />
+            <DailyChallengeCard onStartDaily={(d) => { onStartDaily!(d); }} phase={progress.currentPhase} />
           )}
           {!isOnboarding && (
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => {
                 hapticLight();
-                setActiveTooltip(null);
                 onOpenStats?.();
               }}
               accessibilityLabel="View stats"
@@ -712,7 +766,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               style={styles.headerIconBtn}
               onPress={() => {
                 hapticLight();
-                setActiveTooltip(null);
                 onOpenSettings?.();
               }}
               accessibilityLabel="Settings"
@@ -737,7 +790,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onPress={() => {
                 hapticSelection();
                 setHighlightPlayButton(false);
-                setActiveTooltip(null);
                 onPlayPuzzle();
               }}
               bounceScale={0.9}
@@ -796,7 +848,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               style={styles.actionRowButton}
               onPress={() => {
                 hapticLight();
-                setActiveTooltip(null);
                 onOpenGallery?.();
               }}
               accessibilityLabel="Whisper Gallery"
@@ -816,7 +867,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
                 onPress={() => {
                   hapticLight();
-                  setActiveTooltip(null);
                   onOpenPit();
                 }}
                 accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pitPhaseReady ? ' - phase transition ready' : ''}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
@@ -849,9 +899,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* Ambient home line — atmospheric text when idle */}
+      {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
       {ambientLine && !isOnboarding && (
-        <View style={styles.ambientLineContainer}>
+        <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
           <Text
             style={[
               styles.ambientLineText,
@@ -860,52 +910,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {ambientLine}
           </Text>
-        </View>
+        </Animated.View>
       )}
 
-      {/* Goal suggestion — contextual next-action hint.
-          Tooltip overlay (absoluteFill + zIndex 1000) visually covers this when active;
-          keeping it in the layout prevents shift on tooltip dismiss during navigation. */}
+      {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
       {goalSuggestion && !isOnboarding && (
-        <TouchableOpacity
-          style={styles.goalSuggestionContainer}
-          onPress={() => {
-            if (goalSuggestion.action === 'daily' && onStartDaily) {
-              setActiveTooltip(null);
-              onStartDaily('HARD' as Difficulty);
-            } else if (goalSuggestion.action === 'play') {
-              setActiveTooltip(null);
-              onPlayPuzzle();
-            }
-          }}
-          activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
-        >
-          <Text
-            style={[
-              styles.goalSuggestionText,
-              { color: getPhaseTheme(progress.currentPhase).modalTextColor },
-            ]}
+        <Animated.View style={{ opacity: goalOpacity }}>
+          <TouchableOpacity
+            style={styles.goalSuggestionContainer}
+            onPress={() => {
+              if (goalSuggestion.action === 'daily' && onStartDaily) {
+                onStartDaily('HARD' as Difficulty);
+              } else if (goalSuggestion.action === 'play') {
+                onPlayPuzzle();
+              }
+            }}
+            activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
           >
-            {goalSuggestion.text}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Feature Tooltip — shown one per home visit after onboarding */}
-      {activeTooltip && (
-        <FeatureTooltip
-          text={TOOLTIP_TEXT[activeTooltip]}
-          position={
-            activeTooltip === 'stats'
-              ? { top: 95, right: 60 }
-              : activeTooltip === 'gallery'
-                ? { bottom: 85, left: 20 }
-                : { bottom: 85, right: 20 }
-          }
-          arrowDirection={activeTooltip === 'stats' ? 'up' : 'down'}
-          onDismiss={handleDismissTooltip}
-          phase={progress?.currentPhase ?? 0}
-        />
+            <Text
+              style={[
+                styles.goalSuggestionText,
+                { color: getPhaseTheme(progress.currentPhase).modalTextColor },
+              ]}
+            >
+              {goalSuggestion.text}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
       )}
 
       {/* Celebration Confetti */}
@@ -2204,17 +2235,18 @@ const styles = StyleSheet.create({
   // Ambient home line
   ambientLineContainer: {
     alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     marginBottom: 2,
     zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.20)',
+    borderRadius: 10,
   },
   ambientLineText: {
     fontSize: 12,
     fontStyle: 'italic',
     textAlign: 'center',
     letterSpacing: 0.3,
-    opacity: 0.7,
   },
   goalSuggestionContainer: {
     alignSelf: 'center',
