@@ -44,11 +44,18 @@ A word puzzle game where players shift letters between words to form valid Engli
 
 ```bash
 cd mobile
-npm install          # Install dependencies
-npx expo start       # Start dev server (scan QR with Expo Go)
-npx expo start --clear  # Clear cache and start
-npx jest --no-coverage   # Run all tests (948 tests, 33 suites)
+npx expo start           # Start dev server (scan QR with Expo Go)
+npx expo start --clear   # Clear cache and start
 ```
+
+## Testing
+
+- **Run all tests**: `cd mobile && npm test -- --no-coverage`
+- **Run a single test file**: `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
+- **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
+- Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
+- Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
+- The full suite has 948 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Recent Implementation Notes (2026-02)
 
