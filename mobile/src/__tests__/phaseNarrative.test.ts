@@ -441,6 +441,13 @@ describe('checkNarrativeMicroBeat', () => {
     expect(await checkNarrativeMicroBeat(99)).toBeNull();
   });
 
+  test('returns a beat at puzzle 12', async () => {
+    const beat = await checkNarrativeMicroBeat(12);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
   test('returns a beat at puzzle 35', async () => {
     const beat = await checkNarrativeMicroBeat(35);
     expect(beat).not.toBeNull();
@@ -518,6 +525,13 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
+  test('returns a beat at puzzle 60', async () => {
+    const beat = await checkNarrativeMicroBeat(60);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
   test('returns a glitch_title beat at puzzle 80', async () => {
     const beat = await checkNarrativeMicroBeat(80);
     expect(beat).not.toBeNull();
@@ -547,8 +561,8 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
-  test('all 12 micro-beat thresholds fire independently', async () => {
-    const thresholds = [35, 40, 50, 55, 65, 70, 74, 80, 90, 100, 110, 130];
+  test('all micro-beat thresholds fire independently', async () => {
+    const thresholds = [12, 18, 24, 28, 30, 35, 40, 45, 50, 55, 60, 65, 70, 74, 80, 90, 100, 110, 130];
     for (const t of thresholds) {
       const beat = await checkNarrativeMicroBeat(t);
       expect(beat).not.toBeNull();

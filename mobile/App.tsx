@@ -62,6 +62,8 @@ import { estimateSlotIndex } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
+import { installGlobalErrorHandler } from './src/services/errorReporting';
+import { claimRewardedAmber, getRewardedAmberClaimsRemaining } from './src/services/monetization';
 import {
   hasVariantModifier,
   getVariantTimeLimit,
@@ -83,6 +85,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
   // Daily challenge state
   const [isPlayingDaily, setIsPlayingDaily] = useState(false);
+  const [rewardedAmberRemaining, setRewardedAmberRemaining] = useState(0);
 
   // Custom hooks - game logic & persistence separated from UI
   const [puzzle, puzzleActions] = usePuzzleGame();
@@ -307,9 +310,39 @@ export default function App() {
   useEffect(() => {
     initAudio();
     startFrameMonitoring();
+    installGlobalErrorHandler();
     scheduleAllNotifications(0).catch(() => {});
     uploadToCloud().catch(() => {});
+    getRewardedAmberClaimsRemaining().then(setRewardedAmberRemaining).catch(() => {});
   }, []);
+
+  // Lightweight screen analytics for retention funnels.
+  useEffect(() => {
+    logEvent({
+      type: 'screen_view',
+      data: {
+        screen: currentScreen,
+        phase: persistence.currentPhase,
+        isOnboarding: onboardingFlow.isOnboarding,
+      },
+    });
+  }, [currentScreen, persistence.currentPhase, onboardingFlow.isOnboarding]);
+
+  // Track onboarding state transitions for funnel diagnostics.
+  useEffect(() => {
+    if (!onboardingFlow.onboardingReady) return;
+    logEvent({
+      type: 'onboarding_step_changed',
+      data: {
+        step: onboardingFlow.onboardingStep,
+        lineIndex: onboardingFlow.onboardingLineIndex,
+      },
+    });
+  }, [
+    onboardingFlow.onboardingReady,
+    onboardingFlow.onboardingStep,
+    onboardingFlow.onboardingLineIndex,
+  ]);
 
   // Resume pit screen if onboarding was interrupted during pit flow (initial mount only)
   useEffect(() => {
@@ -652,6 +685,7 @@ export default function App() {
       // Mark cloud save as having pending changes
       markPendingChanges().catch(() => {});
       uploadToCloud().catch(() => {});
+      getRewardedAmberClaimsRemaining().then(setRewardedAmberRemaining).catch(() => {});
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -861,6 +895,25 @@ export default function App() {
     puzzleActions.clearBoard();
     transitionTo('pit');
   }, [puzzleActions, transitionTo, victoryActions, orchestrationActions, clearVictoryTimeouts]);
+
+  const handleClaimRewardedAmber = useCallback(async () => {
+    if (onboardingFlow.isOnboarding) return;
+    const result = await claimRewardedAmber(persistence.currentPhase);
+    setRewardedAmberRemaining(result.remainingClaims);
+    if (result.success) {
+      hapticSuccess();
+      await persistenceActions.refreshStats();
+      puzzleActions.setMessage(result.message);
+    } else {
+      hapticError();
+      puzzleActions.setMessage(result.message);
+    }
+  }, [
+    onboardingFlow.isOnboarding,
+    persistence.currentPhase,
+    persistenceActions,
+    puzzleActions,
+  ]);
 
   const handleShare = useCallback(async () => {
     if (!victoryFlow.victoryData) return;
@@ -1409,6 +1462,8 @@ export default function App() {
           onReturnHome={handleReturnHome}
           onGoToPit={handleGoToPit}
           onShare={handleShare}
+          onClaimRewardedAmber={handleClaimRewardedAmber}
+          rewardedAmberRemaining={rewardedAmberRemaining}
           isOnboarding={onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_tutorial'}
           onOnboardingContinue={handleOnboardingVictoryContinue}
           variant={puzzle.currentVariant}

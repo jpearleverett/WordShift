@@ -153,10 +153,10 @@ describe('puzzleVariety', () => {
 
     it('exposes unlock requirements and unlocked checks', () => {
       expect(getVariantUnlockRequirement('standard')).toBeNull();
-      // Reverse unlocks at 10 puzzles
-      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(10);
+      // Reverse unlocks at 8 puzzles
+      expect(getVariantUnlockRequirement('reverse')?.puzzlesSolved).toBe(8);
       expect(isVariantUnlocked('reverse', 0, 0)).toBe(false);
-      expect(isVariantUnlocked('reverse', 10, 0)).toBe(true);
+      expect(isVariantUnlocked('reverse', 8, 0)).toBe(true);
     });
 
     it('returns unlocked variants list with standard first', () => {
@@ -165,7 +165,7 @@ describe('puzzleVariety', () => {
       expect(early).toContain('standard');
       expect(early).not.toContain('reverse');
 
-      // With 100 puzzles, all variants are unlocked (reverse=10, double_shift=40, speed=52)
+      // With 100 puzzles, all variants are unlocked (reverse=8, speed=25, double_shift=35)
       const mid = getUnlockedVariants(100, 0);
       expect(mid).toContain('standard');
       expect(mid).toContain('reverse');

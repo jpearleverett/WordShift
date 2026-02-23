@@ -1,4 +1,11 @@
-import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents } from '../services/eventLogger';
+import {
+  logEvent,
+  getEvents,
+  getEventSummary,
+  getRecentEvents,
+  getFunnelSummary,
+  clearEvents,
+} from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 beforeEach(async () => {
@@ -96,6 +103,31 @@ describe('getEventSummary', () => {
     const summary = await getEventSummary();
     expect(summary['puzzle_completed']).toBe(2);
     expect(summary['puzzle_started']).toBe(1);
+  });
+});
+
+describe('getFunnelSummary', () => {
+  test('computes quick funnel diagnostics', async () => {
+    logEvent({ type: 'puzzle_started' });
+    logEvent({ type: 'puzzle_completed' });
+    logEvent({ type: 'screen_view', data: { screen: 'home' } });
+    logEvent({ type: 'variant_unlocked', data: { variant: 'reverse' } });
+    logEvent({ type: 'room_upgrade_purchased', data: { roomId: 'cozy_den' } });
+    logEvent({ type: 'rewarded_bonus_claimed', data: { amount: 8 } });
+    logEvent({ type: 'cloud_sync', data: { success: true } });
+    jest.advanceTimersByTime(6000);
+    await Promise.resolve();
+
+    const funnel = await getFunnelSummary();
+    expect(funnel.puzzleStarts).toBe(1);
+    expect(funnel.puzzleCompletes).toBe(1);
+    expect(funnel.completionRate).toBe(1);
+    expect(funnel.screensViewed).toBe(1);
+    expect(funnel.variantUnlocks).toBe(1);
+    expect(funnel.roomUpgradesPurchased).toBe(1);
+    expect(funnel.rewardedBonusesClaimed).toBe(1);
+    expect(funnel.cloudSyncAttempts).toBe(1);
+    expect(funnel.appErrors).toBe(0);
   });
 });
 

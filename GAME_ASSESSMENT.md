@@ -43,7 +43,6 @@ The variant system (Reverse, Double Shift, Speed, Chain) is ambitious and well-d
 - **Reverse Shift** is genuinely novel — cumulative locking during the return trip creates constraint propagation that feels like a different game. The dedicated `generateReverseChain()` brute-force sampler with pre-computed removal indices is serious engineering for a puzzle variant
 - **Double Shift** (move 2 letters per step) adds combinatorial complexity without changing the core feel. The 4-phase input cycle (`pick1 → drop1 → pick2 → drop2`) is well-handled
 - **Speed Shift** adds the urgency the base game lacks, but locking it behind 52 puzzles means the ~70% of players who churn before puzzle 20 will never experience it
-- **Chain Shift** is listed but not yet implemented — a notable gap
 
 **Unlock thresholds are too conservative.** Reverse at 10 puzzles is fine. Double Shift at 40, Speed at 52, Chain at 85 — by the time players reach these, they've either committed to the game or left. Consider: most casual mobile games surface their second mode by session 3.
 

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logEvent } from './eventLogger';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -7,8 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * (Firebase, Supabase, custom server) is abstracted behind a CloudProvider
  * interface so it can be swapped later.
  *
- * Current state: Uses a NoOpProvider that logs operations but doesn't
- * actually sync. When a real backend is connected, swap the provider.
+ * Default state: Uses a LocalMirrorProvider that stores cloud snapshots
+ * in AsyncStorage so upload/download flows are fully functional in dev
+ * and soft-launch builds. Swap the provider for a real backend later.
  *
  * Save data includes: amber, stats, phase, unlocks, achievements,
  * dialogue progress, quest progress, cosmetics, and sacrifice state.
@@ -69,40 +71,79 @@ const SYNC_KEYS = [
   'wordshift_notification_prefs',
   'wordshift_in_progress_puzzle',
   'wordshift_word_harvest',
+  'wordshift_monetization_state',
 ];
 
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';
+const LOCAL_MIRROR_KEY = 'wordshift_cloud_mirror_save';
 const CURRENT_SAVE_VERSION = 1;
 
 // ============================================================================
-// No-Op Provider (placeholder until real backend is connected)
+// Local Mirror Provider (default)
+// ============================================================================
+
+class LocalMirrorProvider implements CloudProvider {
+  async upload(data: CloudSaveData): Promise<boolean> {
+    try {
+      await AsyncStorage.setItem(LOCAL_MIRROR_KEY, JSON.stringify(data));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async download(): Promise<CloudSaveData | null> {
+    try {
+      const raw = await AsyncStorage.getItem(LOCAL_MIRROR_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as CloudSaveData;
+      if (
+        !parsed ||
+        typeof parsed.timestamp !== 'number' ||
+        typeof parsed.version !== 'number' ||
+        typeof parsed.deviceId !== 'string' ||
+        typeof parsed.data !== 'object'
+      ) {
+        return null;
+      }
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  async hasNewerSave(localTimestamp: number): Promise<boolean> {
+    const cloudData = await this.download();
+    if (!cloudData) return false;
+    return cloudData.timestamp > localTimestamp;
+  }
+
+  getName(): string {
+    return 'Local Backup';
+  }
+
+  async isReady(): Promise<boolean> {
+    return true;
+  }
+}
+
+// ============================================================================
+// No-Op Provider (explicit fallback when cloud is disabled)
 // ============================================================================
 
 class NoOpProvider implements CloudProvider {
-  async upload(_data: CloudSaveData): Promise<boolean> {
-    console.log('[CloudSave] NoOp upload — no backend configured');
-    return false;
-  }
-  async download(): Promise<CloudSaveData | null> {
-    console.log('[CloudSave] NoOp download — no backend configured');
-    return null;
-  }
-  async hasNewerSave(_localTimestamp: number): Promise<boolean> {
-    return false;
-  }
-  getName(): string {
-    return 'Not Connected';
-  }
-  async isReady(): Promise<boolean> {
-    return false;
-  }
+  async upload(_data: CloudSaveData): Promise<boolean> { return false; }
+  async download(): Promise<CloudSaveData | null> { return null; }
+  async hasNewerSave(_localTimestamp: number): Promise<boolean> { return false; }
+  getName(): string { return 'Not Connected'; }
+  async isReady(): Promise<boolean> { return false; }
 }
 
 // ============================================================================
 // Cloud Save Manager
 // ============================================================================
 
-let provider: CloudProvider = new NoOpProvider();
+let provider: CloudProvider = new LocalMirrorProvider();
 let syncStatusCache: SyncStatus | null = null;
 
 /**
@@ -266,6 +307,15 @@ async function updateSyncStatus(success: boolean): Promise<void> {
   try {
     await AsyncStorage.setItem(SYNC_STATUS_KEY, JSON.stringify(status));
   } catch {}
+  logEvent({
+    type: 'cloud_sync',
+    data: {
+      success,
+      provider: status.provider,
+      pendingChanges: status.pendingChanges,
+      timestamp: status.lastSyncTimestamp,
+    },
+  }, { immediate: true });
 }
 
 /**

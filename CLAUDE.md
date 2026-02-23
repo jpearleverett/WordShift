@@ -555,19 +555,17 @@ When a letter is selected (picked up), ghost previews show what word would form 
 Variants are now player-selected from the setup menu (not randomly injected). Players can choose any unlocked variant before starting a puzzle, and a preferred variant is persisted for future runs.
 - **Reverse Shift**: Standard rules down to the bottom, then return all the way back up to the first row. Letters shifted during the forward pass stay locked (cumulative locking), so each intermediate row has exactly 2 locked positions during the reverse leg. All reverse puzzles at all difficulties are served from pre-generated banks of 500 validated puzzles each (with `reverseSolution` for hint support during the reverse leg); on-device generation is used as fallback with `requireReverseSolvable` validation, `relaxBoring` to widen the candidate pool, a dedicated `generateReverseChain()` brute-force sampler, and pre-computed adjacency/removal indices for fast lookup (25s internal timeout, 30s wrapper).
 - **Speed Shift**: Timed run with difficulty-aware timers. Timer displayed as a large prominent countdown (28px, centered) between the stats row and puzzle area, with red background + pulse when ≤10 seconds remaining. `getVariantInstruction(config, phase, difficulty?)` generates accurate instruction text (e.g., "Four-row sprint" for HARD). Speed timer state persists across navigation via `speedTimerExpireAt` in autosave — real time elapses while the player is away.
-- **Chain Shift**: 3 linked puzzles where each final word becomes the next starting word.
 - **Double Shift**: Move 2 letters per step instead of 1. All displayed words are 5 letters (W=5 is the only viable word length — needs W-2=3 letter intermediates and W+2=7 letter tempStates, both within the dictionary's 3-7 letter range). Difficulty differentiated purely by row count: EASY=3 rows, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. Each step: pick a letter from current word, drop it into next word, pick the second letter from current word, drop it into next word. Both shifted letters stay locked in their target row and cannot be picked in later steps. All difficulties served from pre-generated banks of 500 puzzles each; the generator enforces position-based locking constraints (via `receivedPositions` on `DoubleShiftPathNode`) so generated solutions never require picking a locked letter. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. During both drop phases, players can freely tap different letters in the source row to switch selection and preview drop slot options before committing. Source word validation is deferred to the actual drop (not on letter tap). Undo reverses one drop at a time (not both at once). Rows with 6-7 letters use compact tile mode to prevent overflow. 1.65x amber multiplier. Pre-computed `getDoubleInsertionIndex(wordLength)` maps letter pairs to valid (baseWord, result, positions) tuples for O(1) candidate lookup.
 
 **Variant Unlock Thresholds** (puzzles solved):
 | Variant | Puzzles Required |
 |---------|-----------------|
-| Reverse Shift | 10 |
-| Double Shift | 40 |
-| Speed Shift | 52 |
-| Chain Shift | 85 (planned, not yet implemented) |
+| Reverse Shift | 8 |
+| Speed Shift | 25 |
+| Double Shift | 35 |
 
 Variant descriptions/instructions shift tone at Phase 3+ (dark descriptions). Locked variants stay fully hidden until unlocked, so players only see styles they can actually select.
-- **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s); chain variants scale up on higher difficulty (`targetRows` and `chainLength` increase at higher tiers).
+- **Difficulty pressure scaling**: speed variants use difficulty-aware timers (EASY 65s, MEDIUM 60s, MEDIUM_PLUS 54s, HARD 48s).
 - **Economy anti-farm**: variant multipliers were rebalanced for selectable play and now taper with repeated back-to-back use of the same variant through `applyVariantAmberBonus()` in `amberCurrency.ts`.
 - **Wired in**: `DifficultyMenu.tsx` renders only unlocked variant cards (selected/active states). `usePuzzleGame.ts` uses selected variant in `startNewGame(...)`, persists preference via `amberCurrency` (`getPreferredPuzzleVariant` / `setPreferredPuzzleVariant`), and returns active `variant` in completion data. `useGamePersistence.ts` applies variant bonus via `applyVariantAmberBonus(...)` (persisted, anti-farm decay).
 - **Variant fallback notification**: When variant puzzle generation fails and silently falls back to standard, a phase-aware toast is shown. Phase 0-2: "That puzzle style wasn't available — starting a standard puzzle instead." Phase 3+: "The arrangement could not sustain that pattern."

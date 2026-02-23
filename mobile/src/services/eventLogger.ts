@@ -10,6 +10,12 @@ export type EventType =
   | 'puzzle_completed'
   | 'puzzle_generation_failed'
   | 'puzzle_started'
+  | 'screen_view'
+  | 'onboarding_step_changed'
+  | 'variant_unlocked'
+  | 'room_upgrade_purchased'
+  | 'rewarded_bonus_claimed'
+  | 'cloud_sync'
   | 'unlock_purchased'
   | 'dialogue_started'
   | 'dialogue_completed'
@@ -37,13 +43,18 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
  * Log a game event. Events are buffered in memory and periodically
  * flushed to AsyncStorage.
  */
-export function logEvent(event: GameEvent): void {
+export function logEvent(event: GameEvent, options?: { immediate?: boolean }): void {
   const storedEvent: StoredEvent = {
     ...event,
     timestamp: event.timestamp ?? Date.now(),
   };
 
   eventBuffer.push(storedEvent);
+
+  if (options?.immediate) {
+    flushEvents().catch(() => {});
+    return;
+  }
 
   // Debounce flush — write at most every 5 seconds
   if (!flushTimer) {
@@ -110,6 +121,39 @@ export async function getEventSummary(): Promise<Record<string, number>> {
   }
 
   return summary;
+}
+
+/**
+ * Lightweight funnel summary for quick retention diagnostics.
+ * Useful for local QA and pre-analytics soft-launch checks.
+ */
+export async function getFunnelSummary(): Promise<{
+  puzzleStarts: number;
+  puzzleCompletes: number;
+  completionRate: number;
+  screensViewed: number;
+  onboardingStepChanges: number;
+  variantUnlocks: number;
+  roomUpgradesPurchased: number;
+  rewardedBonusesClaimed: number;
+  cloudSyncAttempts: number;
+  appErrors: number;
+}> {
+  const summary = await getEventSummary();
+  const puzzleStarts = summary.puzzle_started || 0;
+  const puzzleCompletes = summary.puzzle_completed || 0;
+  return {
+    puzzleStarts,
+    puzzleCompletes,
+    completionRate: puzzleStarts > 0 ? puzzleCompletes / puzzleStarts : 0,
+    screensViewed: summary.screen_view || 0,
+    onboardingStepChanges: summary.onboarding_step_changed || 0,
+    variantUnlocks: summary.variant_unlocked || 0,
+    roomUpgradesPurchased: summary.room_upgrade_purchased || 0,
+    rewardedBonusesClaimed: summary.rewarded_bonus_claimed || 0,
+    cloudSyncAttempts: summary.cloud_sync || 0,
+    appErrors: summary.app_error || 0,
+  };
 }
 
 /**

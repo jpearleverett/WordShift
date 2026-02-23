@@ -41,6 +41,7 @@ export interface VictoryData {
   totalWordsFormed?: number;
   ritualEnergy?: number;
   variantBonus?: number;
+  patronBonus?: number;
   variantRepeatDecay?: number;
   questsCompleted?: string[];
   harvestedWords?: string[];
@@ -73,6 +74,8 @@ interface VictoryModalProps {
   onReturnHome: () => void;
   onGoToPit: () => void;
   onShare: () => void;
+  onClaimRewardedAmber?: () => void;
+  rewardedAmberRemaining?: number;
   // Onboarding mode
   isOnboarding?: boolean;
   onOnboardingContinue?: () => void;
@@ -140,6 +143,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onReturnHome,
   onGoToPit,
   onShare,
+  onClaimRewardedAmber,
+  rewardedAmberRemaining = 0,
   isOnboarding,
   onOnboardingContinue,
   variant,
@@ -394,6 +399,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 : 0;
               const challengeBonusAmber = victoryData.challengeBonus ?? 0;
               const variantBonusAmber = victoryData.variantBonus ?? 0;
+              const patronBonusAmber = victoryData.patronBonus ?? 0;
               const streakBonusAmber = victoryData.streakBonus ?? 0;
               const firstCompBonus = victoryData.firstCompletionBonus ?? 0;
               const milestoneAmber = victoryData.milestoneBonus ?? 0;
@@ -430,6 +436,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS]?.title || 'Variant'}
                         </Text>
                         <Text style={[styles.bonusValue, { color: '#B088D0' }]}>+{variantBonusAmber}</Text>
+                      </View>
+                    )}
+                    {patronBonusAmber > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          Patron's Key
+                        </Text>
+                        <Text style={[styles.bonusValue, { color: '#FFD166' }]}>+{patronBonusAmber}</Text>
                       </View>
                     )}
                     {streakBonusAmber > 0 && (
@@ -495,6 +509,22 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             : `${'\uD83C\uDF3E'} Collect Now  \u203A`}
                         </Text>
                       </TouchableOpacity>
+                      {rewardedAmberRemaining > 0 && onClaimRewardedAmber && (
+                        <TouchableOpacity
+                          onPress={onClaimRewardedAmber}
+                          activeOpacity={0.8}
+                          accessibilityLabel={`Claim bonus amber, ${rewardedAmberRemaining} claims left today`}
+                          accessibilityRole="button"
+                          style={[styles.collectNowPill, styles.rewardedAmberPill, {
+                            backgroundColor: phaseTheme.modalStatBgColor,
+                            borderColor: btn.harvestPill.border,
+                          }]}
+                        >
+                          <Text style={[styles.collectNowText, { color: phaseTheme.modalTextColor }]}>
+                            {`📺 +8 Bonus Amber (${rewardedAmberRemaining} left)`}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                       </>
                     )}
                   </View>
@@ -870,6 +900,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     alignSelf: 'center',
+  },
+  rewardedAmberPill: {
+    marginTop: 6,
   },
   collectNowText: {
     fontSize: 13,

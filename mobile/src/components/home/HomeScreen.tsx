@@ -78,8 +78,15 @@ import { updateQuestProgress, loadWeeklyQuests } from '../../services/weeklyQues
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getPitHomeBadgeLabel, getHomeAmbientLine, getGoalSuggestion, GoalSuggestion, getFoxPitNudgeLines } from '../../services/phaseNarrative';
-import { getPurchasedUpgrades } from '../../services/roomUpgrades';
+import {
+  areUpgradesAvailable,
+  getRoomUpgrade,
+  getUpgradeDescription,
+  getPurchasedUpgrades,
+  purchaseRoomUpgrade,
+} from '../../services/roomUpgrades';
 import { hapticLight, hapticSelection } from '../../services/haptics';
+import { logEvent } from '../../services/eventLogger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -162,6 +169,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeStatusMessage, setUpgradeStatusMessage] = useState<string | null>(null);
+
+  const upgradeEntries = useMemo(() => {
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => ({ room, upgrade: getRoomUpgrade(room.id) }))
+      .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => Boolean(entry.upgrade));
+  }, [rooms]);
+
+  const pendingUpgradeCount = useMemo(() => (
+    upgradeEntries.filter(entry => !(entry.room.id in purchasedUpgrades)).length
+  ), [upgradeEntries, purchasedUpgrades]);
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -696,6 +716,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return diffDays >= 1;
   }, [progress?.currentStreak, progress?.lastPlayDate]);
 
+  const handlePurchaseRoomUpgrade = useCallback(async (roomId: string) => {
+    if (!progress) return;
+
+    const upgrade = getRoomUpgrade(roomId);
+    const room = rooms.find(r => r.id === roomId);
+    if (!upgrade || !room) return;
+
+    if (roomId in purchasedUpgrades) {
+      setUpgradeStatusMessage(`${room.name} is already upgraded.`);
+      return;
+    }
+
+    const spendResult = await spendAmber(upgrade.cost, `room_upgrade_${roomId}`);
+    if (!spendResult.success) {
+      setUpgradeStatusMessage(`Need ${upgrade.cost} amber to upgrade ${room.name}.`);
+      return;
+    }
+
+    const purchased = await purchaseRoomUpgrade(roomId);
+    if (!purchased) {
+      setUpgradeStatusMessage(`Couldn't apply that upgrade right now.`);
+      return;
+    }
+
+    const updated = await getPurchasedUpgrades();
+    setPurchasedUpgrades(updated);
+    setProgress(prev => prev ? { ...prev, amber: spendResult.newBalance } : prev);
+    onAmberChange?.(spendResult.newBalance);
+
+    logEvent({
+      type: 'room_upgrade_purchased',
+      data: {
+        roomId,
+        roomName: room.name,
+        upgradeName: upgrade.name,
+        cost: upgrade.cost,
+        phase: progress.currentPhase,
+      },
+    });
+
+    setUpgradeStatusMessage(`${room.name} now bears the ${upgrade.name}.`);
+  }, [progress, rooms, purchasedUpgrades, onAmberChange]);
+
   if (!progress || rooms.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -883,6 +946,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
               </TouchableOpacity>
             </Animated.View>
+          )}
+          {areUpgradesAvailable(progress.currentPhase) && upgradeEntries.length > 0 && (
+            <TouchableOpacity
+              style={[styles.actionRowButton, styles.upgradeButton]}
+              onPress={() => {
+                hapticLight();
+                setUpgradeStatusMessage(null);
+                setShowUpgradeModal(true);
+              }}
+              accessibilityLabel={`Open room upgrades${pendingUpgradeCount > 0 ? `, ${pendingUpgradeCount} available` : ''}`}
+              accessibilityRole="button"
+            >
+              <Text style={styles.actionRowButtonText}>
+                ✨ Upgrades{pendingUpgradeCount > 0 ? ` (${pendingUpgradeCount})` : ''}
+              </Text>
+            </TouchableOpacity>
           )}
           {isSacrificeAvailable(progress.currentPhase) && (
             <TouchableOpacity
@@ -1472,6 +1551,95 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
           </Animated.View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* Room Upgrades Modal (Phase 2+) */}
+      <Modal
+        visible={showUpgradeModal}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setShowUpgradeModal(false)}
+      >
+        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
+          <View
+            style={[
+              styles.upgradeModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.upgradeTitle, { color: dt.nameColor }]}>✨ Room Upgrades</Text>
+            <Text style={[styles.upgradeSubtitle, { color: dt.subtitleColor }]}>
+              Your Amber: 💎 {progress.amber}
+            </Text>
+
+            <ScrollView style={styles.upgradeList} contentContainerStyle={styles.upgradeListContent}>
+              {upgradeEntries.map(({ room, upgrade }) => {
+                const owned = room.id in purchasedUpgrades;
+                return (
+                  <View
+                    key={room.id}
+                    style={[styles.upgradeItem, { borderColor: dt.bubbleBorder, backgroundColor: dt.bubbleBg }]}
+                  >
+                    <View style={styles.upgradeItemBody}>
+                      <Text style={[styles.upgradeItemName, { color: dt.textColor }]}>
+                        {room.name} — {upgrade.name}
+                      </Text>
+                      <Text style={[styles.upgradeItemDescription, { color: dt.subtitleColor }]}>
+                        {getUpgradeDescription(room.id, progress.currentPhase)}
+                      </Text>
+                    </View>
+                    {owned ? (
+                      <View style={styles.upgradeOwnedBadge}>
+                        <Text style={styles.upgradeOwnedText}>Owned</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[
+                          styles.upgradeBuyButton,
+                          progress.amber < upgrade.cost && styles.buyButtonDisabled,
+                        ]}
+                        disabled={progress.amber < upgrade.cost}
+                        onPress={() => handlePurchaseRoomUpgrade(room.id)}
+                        accessibilityLabel={`Upgrade ${room.name} for ${upgrade.cost} amber`}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.buyButtonText}>
+                          {progress.amber >= upgrade.cost ? `💎 ${upgrade.cost}` : 'Need More'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+              {upgradeEntries.length === 0 && (
+                <Text style={[styles.upgradeEmptyText, { color: dt.subtitleColor }]}>
+                  Upgrade options appear as more rooms open.
+                </Text>
+              )}
+            </ScrollView>
+
+            {upgradeStatusMessage && (
+              <Text style={[styles.upgradeStatusText, { color: dt.textColor }]}>
+                {upgradeStatusMessage}
+              </Text>
+            )}
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowUpgradeModal(false)}
+              accessibilityLabel="Close room upgrades"
+              accessibilityRole="button"
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       {/* Sacrifice Modal (Phase 4+) */}
@@ -2203,7 +2371,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Action row (Gallery + Pit + Sacrifice)
+  // Action row (Gallery + Pit + Upgrades + Sacrifice)
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -2223,6 +2391,10 @@ const styles = StyleSheet.create({
   sacrificeButton: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
     borderColor: 'rgba(120, 30, 60, 0.3)',
+  },
+  upgradeButton: {
+    backgroundColor: 'rgba(60, 90, 40, 0.25)',
+    borderColor: 'rgba(180, 240, 150, 0.35)',
   },
   pitPhaseReadyButton: {
     backgroundColor: 'rgba(180, 120, 0, 0.3)',
@@ -2266,6 +2438,92 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.2,
     opacity: 0.85,
+  },
+
+  // Room upgrades modal
+  upgradeModal: {
+    borderRadius: 30,
+    padding: 24,
+    marginHorizontal: 20,
+    alignItems: 'stretch',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
+    maxWidth: 420,
+    width: '92%',
+    borderWidth: 1,
+    maxHeight: SCREEN_HEIGHT * 0.78,
+  },
+  upgradeTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  upgradeSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  upgradeList: {
+    maxHeight: SCREEN_HEIGHT * 0.42,
+  },
+  upgradeListContent: {
+    gap: 10,
+    paddingBottom: 4,
+  },
+  upgradeItem: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  upgradeItemBody: {
+    flex: 1,
+  },
+  upgradeItemName: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  upgradeItemDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  upgradeBuyButton: {
+    backgroundColor: CandyColors.green.main,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  upgradeOwnedBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(80, 200, 120, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(80, 200, 120, 0.5)',
+  },
+  upgradeOwnedText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#50C878',
+  },
+  upgradeStatusText: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+    fontStyle: 'italic',
+  },
+  upgradeEmptyText: {
+    textAlign: 'center',
+    fontSize: 13,
+    fontStyle: 'italic',
+    paddingVertical: 10,
   },
 
   // Sacrifice modal

@@ -943,10 +943,16 @@ export interface NarrativeMicroBeat {
  * Micro-beats keyed by exact puzzle count. Each fires exactly once.
  * These are subtle moments of wrongness during the long Phase 1-2 corridor:
  *
+ * - Puzzle 12: A subtle wrongness creeps into the home atmosphere
+ * - Puzzle 18: The animals feel unusually synchronized for a moment
+ * - Puzzle 24: The arrangement language appears before overt darkness
+ * - Puzzle 28: The house starts to feel observant
  * - Puzzle 35: Victory title briefly shows wrong text then corrects itself
  * - Puzzle 40: The house is alive — first environmental foreshadowing
+ * - Puzzle 45: A second atmospheric nudge inside the retention corridor
  * - Puzzle 50: A whisper appears unbidden on the home screen
  * - Puzzle 55: Word-specific foreshadowing — some words leave marks
+ * - Puzzle 60: The player’s role is hinted at more directly
  * - Puzzle 65: The victory feedback text contains an anomaly
  * - Puzzle 80: Second glitch title — they're listening
  * - Puzzle 90: The animals are coordinating — collective awareness
@@ -955,6 +961,26 @@ export interface NarrativeMicroBeat {
  * - Puzzle 130: The letters have agency — player complicity deepens
  */
 const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
+  12: {
+    type: 'ambient_whisper',
+    text: 'For a second, it felt like the rooms leaned in.',
+    durationMs: 2600,
+  },
+  18: {
+    type: 'ambient_whisper',
+    text: 'You caught two voices speaking at once. The words matched.',
+    durationMs: 2800,
+  },
+  24: {
+    type: 'ambient_whisper',
+    text: 'Not every pattern is accidental. Some are invited.',
+    durationMs: 2900,
+  },
+  28: {
+    type: 'ambient_whisper',
+    text: 'The house is quiet in a way that feels attentive.',
+    durationMs: 2800,
+  },
   30: {
     type: 'ambient_whisper',
     text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
@@ -971,6 +997,11 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The house settles at night. You can almost hear it breathing.',
     durationMs: 3000,
   },
+  45: {
+    type: 'ambient_whisper',
+    text: 'Even when the puzzle ends, the arrangement does not.',
+    durationMs: 3000,
+  },
   50: {
     type: 'ambient_whisper',
     text: 'The light is changing. Have you noticed?',
@@ -980,6 +1011,11 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'Some words leave marks where others don\'t. Have you noticed which ones?',
     durationMs: 3000,
+  },
+  60: {
+    type: 'ambient_whisper',
+    text: 'You place the letters. The house keeps what you place.',
+    durationMs: 3200,
   },
   65: {
     type: 'ambient_whisper',

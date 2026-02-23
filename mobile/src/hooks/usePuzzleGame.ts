@@ -19,6 +19,7 @@ import {
   VARIANT_CONFIGS,
   PuzzleVariant,
 } from '../services/puzzleVariety';
+import { logEvent } from '../services/eventLogger';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -359,6 +360,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     }
     setCurrentVariant(variant);
 
+    const logPuzzleStart = (
+      source: 'curated' | 'bank' | 'generated' | 'fallback',
+      activeVariant: PuzzleVariant
+    ) => {
+      logEvent({
+        type: 'puzzle_started',
+        data: {
+          source,
+          difficulty: selectedDifficulty,
+          gameMode: effectiveMode,
+          variant: activeVariant,
+          phase: currentPhase,
+        },
+      });
+    };
+
     try {
       // Serve curated early-game puzzles for the first few solves
       // These are hand-picked to showcase interesting letter moves
@@ -373,6 +390,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         const curated = CURATED_EARLY_PUZZLES[puzzlesSolved];
         initGame(curated.words, undefined, curated.solution, curated.words[0].length, 'standard');
         setMessage(getStartMessage(currentPhase));
+        logPuzzleStart('curated', 'standard');
         return;
       }
 
@@ -392,6 +410,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             } else {
               setMessage(getStartMessage(currentPhase));
             }
+            logPuzzleStart('bank', variant);
             return;
           }
         } catch (bankErr) {
@@ -415,6 +434,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         const config = VARIANT_CONFIGS[activeVariant];
         setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
       }
+      logPuzzleStart('generated', activeVariant);
     } catch (localErr) {
       console.log("Local generation failed, using fallback:", localErr);
       // Fallback puzzles don't include solver metadata, so restrictions may be
@@ -437,6 +457,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             : 'That puzzle style wasn\'t available \u2014 starting a standard puzzle instead.'
         );
       }
+      logPuzzleStart('fallback', fallbackVariant);
     }
   }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant]);
 
@@ -501,6 +522,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // Challenge mode: no hints allowed
     if (gameMode === 'challenge') {
       shakeError("No hints in Challenge Mode!");
+      return;
+    }
+
+    // Phase 5 mechanical shift: direct hints no longer reveal solution letters.
+    if (currentPhase >= 5) {
+      setMessage(getHintFallback(currentPhase));
       return;
     }
 

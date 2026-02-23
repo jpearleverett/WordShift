@@ -200,7 +200,7 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
  */
 function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): PreGeneratedPuzzle[] | null {
   // Only standard, reverse, and double_shift variants have pre-generated banks.
-  // Speed and chain variants generate on-device in real-time.
+  // Speed variants generate on-device in real-time.
   if (variant !== 'standard' && variant !== 'reverse' && variant !== 'double_shift') return null;
 
   const bankKey = getBankKey(difficulty, variant);

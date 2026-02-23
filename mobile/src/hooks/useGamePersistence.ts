@@ -25,6 +25,7 @@ import { GameEvent, logEvent } from '../services/eventLogger';
 import { updateQuestProgress } from '../services/weeklyQuests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
 import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, HarvestSummary } from '../services/wordHarvest';
+import { getPatronAmberDripBonus } from '../services/monetization';
 
 export interface VictoryData {
   earnedStars: number;
@@ -48,6 +49,8 @@ export interface VictoryData {
   firstCompletionBonus: number;
   /** Bonus amber from puzzle variant mode */
   variantBonus: number;
+  /** Flat Patron's Key drip (+2) queued to pit */
+  patronBonus: number;
   /** Puzzle variant used */
   variant: PuzzleVariant;
   /** Effective multiplier after anti-farm decay */
@@ -166,6 +169,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy: 0,
         firstCompletionBonus: 0,
         variantBonus: 0,
+        patronBonus: 0,
         variant,
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
@@ -210,11 +214,15 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         amberResult.amount += variantBonus;
       }
 
+      // Patron's Key drip bonus (+2 flat) is queued with puzzle rewards.
+      const patronBonus = await getPatronAmberDripBonus();
+
       // Compute total queued amber (puzzle + milestones + first-completion + streak milestone + variant)
       const totalQueuedAmber = amberResult.amount
         + amberResult.milestoneBonus
         + amberResult.firstCompletionBonus
-        + amberResult.streakMilestoneBonus;
+        + amberResult.streakMilestoneBonus
+        + patronBonus;
 
       // Enqueue harvest batch with all completed words and computed amber value
       const harvestedWords = completedWords.length > 0
@@ -272,6 +280,14 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       );
       for (const unlockedVariant of newlyUnlocked) {
         recordVariantEncounter(unlockedVariant).catch(() => {});
+        logEvent({
+          type: 'variant_unlocked',
+          data: {
+            variant: unlockedVariant,
+            puzzlesSolved: amberResult.puzzlesSolved,
+            phase: effectivePhase,
+          },
+        });
       }
 
       logEvent({
@@ -292,6 +308,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           ritualEnergy,
           variant,
           variantBonus,
+          patronBonus,
           variantAppliedMultiplier,
           variantRepeatDecay,
         },
@@ -331,6 +348,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy,
         firstCompletionBonus: amberResult.firstCompletionBonus,
         variantBonus,
+        patronBonus,
         variant,
         variantAppliedMultiplier,
         variantRepeatDecay,
@@ -361,6 +379,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy: 0,
         firstCompletionBonus: 0,
         variantBonus: 0,
+        patronBonus: 0,
         variant,
         variantAppliedMultiplier: 1.0,
         variantRepeatDecay: 1.0,

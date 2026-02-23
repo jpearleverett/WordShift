@@ -31,6 +31,8 @@ import { clearChoiceState } from '../services/dialogueChoices';
 import { resetMicroBeats } from '../services/phaseNarrative';
 import { resetNotificationPrefs } from '../services/notifications';
 import { clearRoomUpgrades } from '../services/roomUpgrades';
+import { clearSyncStatus, getSyncStatus } from '../services/cloudSave';
+import { clearMonetizationState, getMonetizationState, setPatronKeyOwned } from '../services/monetization';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -38,9 +40,25 @@ interface SettingsScreenProps {
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<GameSettings | null>(null);
+  const [patronKeyOwned, setPatronKeyState] = useState(false);
+  const [rewardedClaimsRemaining, setRewardedClaimsRemaining] = useState(0);
+  const [syncProvider, setSyncProvider] = useState('Not Connected');
+  const [syncPending, setSyncPending] = useState(false);
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState(0);
 
   useEffect(() => {
-    getSettings().then(setSettings);
+    Promise.all([
+      getSettings(),
+      getMonetizationState(),
+      getSyncStatus(),
+    ]).then(([loadedSettings, monetizationState, syncStatus]) => {
+      setSettings(loadedSettings);
+      setPatronKeyState(monetizationState.patronKeyOwned);
+      setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
+      setSyncProvider(syncStatus.provider);
+      setSyncPending(syncStatus.pendingChanges);
+      setLastSyncTimestamp(syncStatus.lastSyncTimestamp);
+    });
   }, []);
 
   const handleToggle = async (key: keyof GameSettings, value: boolean) => {
@@ -79,14 +97,33 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               resetMicroBeats(),
               resetNotificationPrefs(),
               clearRoomUpgrades(),
+              clearMonetizationState(),
+              clearSyncStatus(),
             ]);
-            const fresh = await getSettings();
-            setSettings(fresh);
+            const [freshSettings, monetizationState, syncStatus] = await Promise.all([
+              getSettings(),
+              getMonetizationState(),
+              getSyncStatus(),
+            ]);
+            setSettings(freshSettings);
+            setPatronKeyState(monetizationState.patronKeyOwned);
+            setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
+            setSyncProvider(syncStatus.provider);
+            setSyncPending(syncStatus.pendingChanges);
+            setLastSyncTimestamp(syncStatus.lastSyncTimestamp);
             Alert.alert('Done', 'All data has been reset.');
           },
         },
       ]
     );
+  };
+
+  const handleTogglePatronKey = async () => {
+    hapticLight();
+    await setPatronKeyOwned(!patronKeyOwned);
+    const monetizationState = await getMonetizationState();
+    setPatronKeyState(monetizationState.patronKeyOwned);
+    setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
   };
 
   if (!settings) return null;
@@ -166,6 +203,54 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               Clears statistics, achievements, and daily challenge history
             </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Supporter / Monetization */}
+        <Text style={styles.sectionTitle}>SUPPORTER</Text>
+        <View style={styles.section}>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Patron's Key</Text>
+            <Text style={styles.aboutValue}>{patronKeyOwned ? 'Owned' : 'Not owned'}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Bonus amber claims left</Text>
+            <Text style={styles.aboutValue}>{rewardedClaimsRemaining}/{3}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.patronButton, patronKeyOwned && styles.patronButtonActive]}
+            onPress={handleTogglePatronKey}
+            accessibilityLabel={patronKeyOwned ? 'Disable Patron key' : 'Enable Patron key'}
+            accessibilityRole="button"
+          >
+            <Text style={styles.patronButtonText}>
+              {patronKeyOwned ? 'Disable Patron Key' : 'Enable Patron Key'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.helperText}>
+            Temporary manual entitlement toggle until IAP wiring is connected.
+          </Text>
+        </View>
+
+        {/* Sync diagnostics */}
+        <Text style={styles.sectionTitle}>SYNC</Text>
+        <View style={styles.section}>
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Provider</Text>
+            <Text style={styles.aboutValue}>{syncProvider}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Pending changes</Text>
+            <Text style={styles.aboutValue}>{syncPending ? 'Yes' : 'No'}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Last sync</Text>
+            <Text style={styles.aboutValue}>
+              {lastSyncTimestamp > 0 ? new Date(lastSyncTimestamp).toLocaleString() : 'Never'}
+            </Text>
+          </View>
         </View>
 
         {/* About */}
@@ -289,6 +374,29 @@ const styles = StyleSheet.create({
   aboutValue: {
     fontSize: 14,
     color: CandyColors.gray[400],
+  },
+  patronButton: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 4,
+    backgroundColor: CandyColors.purple.main,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  patronButtonActive: {
+    backgroundColor: CandyColors.green.main,
+  },
+  patronButtonText: {
+    color: CandyColors.white,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  helperText: {
+    fontSize: 11,
+    color: CandyColors.gray[400],
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
   bottomSpacer: {
     height: 60,

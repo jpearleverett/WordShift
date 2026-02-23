@@ -70,7 +70,6 @@ The first 3 puzzles are hand-curated (`CURATED_EARLY_PUZZLES`) to guarantee a co
 
 **Speed variant is under-differentiated.** The timed mode simply adds a countdown to the standard mechanic. It does not change the puzzle structure, add new rules, or create unique pressure moments. Compare to how Tetris Effect's modes fundamentally alter the game feel.
 
-**Chain variant is unimplemented.** The variant system lists chain mode at 85 puzzles unlock but it does not exist in the code. This is a gap in the late-game variant offering.
 
 ### 1.4 Verdict
 
@@ -236,7 +235,6 @@ The transition from genuine warmth to existential dread to serene acceptance is 
 - **Audio is entirely absent.** The audio service (audio.ts) is placeholder infrastructure with no actual sound files. For a game this focused on atmosphere and tonal shifts, this is a significant gap. The difference between "cheerful chimes" and "droning, dissonant ambience" as described in the design document would dramatically amplify the horror transition. This is the single largest content gap.
 - **Shadow figure asset is planned but not created.** The `shadow_figure.png` silhouette that should loom above the house at Phase 4 does not exist. The `ShadowPresence` component in HouseWorld.tsx provides a coded stand-in (dark shape with animated breathing and crimson eye dots), which is functional but lacks the visual impact of a proper asset.
 - **House structure assets are absent.** The `house/` directory (roof, frame, foundation, chimney) is empty. The house is rendered with styled Views rather than authored imagery.
-- **Chain variant is unimplemented.** Listed in the variant system but no generation code exists.
 
 ### 4.4 Verdict
 
@@ -327,7 +325,6 @@ The puzzle variant unlock schedule creates meaningful mechanical novelty at regu
 - Puzzle 10: Reverse Shift (return trip with cumulative locking)
 - Puzzle 40: Double Shift (move 2 letters per step)
 - Puzzle 52: Speed Shift (timed runs)
-- Puzzle 85: Chain Shift (planned, unimplemented)
 
 The amber multipliers (1.22x reverse, 1.34x speed, 1.65x double shift) with anti-farm weekly decay create natural experimentation incentives without allowing exploitation.
 
@@ -449,7 +446,7 @@ The technical foundation is solid and demonstrates mature engineering practices.
 
 5. **Create the shadow_figure.png asset.** The Phase 4 sky without the looming entity loses significant impact. The ShadowPresence code stand-in works but a proper authored silhouette would elevate the moment.
 
-6. **Implement the chain variant.** The gap at puzzle 85 (where chain would unlock) leaves late-game players without a new mechanical carrot. The other three variants are well-executed; chain would complete the offering.
+6. **Keep variant roadmap focused.** Continue deepening the three shipped variants (reverse, speed, double-shift) with polish and unlock ceremony moments.
 
 ### 9.3 Medium Priority (Post-launch improvements)
 
@@ -471,7 +468,7 @@ WordShift is that rare game where the systems, content, and narrative vision are
 
 ### What Doesn't
 
-The game has no sound. It has no monetization. It has no analytics. It has no cloud save. The 40-80 puzzle retention valley is unresolved. The chain variant is missing. These are not design failures — they are implementation gaps. The design document describes a complete product; the codebase implements about 85% of it. The missing 15% is heavily concentrated in the infrastructure and business layers.
+The game has no sound. It has no monetization. It has no analytics. It has no cloud save. The 40-80 puzzle retention valley is unresolved. These are not design failures — they are implementation gaps. The design document describes a complete product; the codebase implements about 85% of it. The missing 15% is heavily concentrated in the infrastructure and business layers.
 
 ### Recommendation
 
