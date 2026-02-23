@@ -363,12 +363,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       ambientOpacity.setValue(0);
       const fadeIn = Animated.timing(ambientOpacity, { toValue: 1, duration: 600, useNativeDriver: true });
       ambientAnimRef.current = fadeIn;
-      fadeIn.start(() => {
+      fadeIn.start(({ finished }) => {
+        if (!finished) return; // Animation was stopped by cleanup — don't start orphaned timer
         ambientAnimRef.current = null;
         ambientTimerRef.current = setTimeout(() => {
           const fadeOut = Animated.timing(ambientOpacity, { toValue: 0, duration: 800, useNativeDriver: true });
           ambientAnimRef.current = fadeOut;
-          fadeOut.start(() => {
+          fadeOut.start(({ finished: fadeOutFinished }) => {
+            if (!fadeOutFinished) return; // Animation was stopped by cleanup
             ambientAnimRef.current = null;
             setAmbientLine(null);
           });
@@ -385,7 +387,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     progress?.currentPhase,
     showIntroDialogue,
     dialogueFlow.showDialogue,
-    ambientOpacity,
   ]);
 
   // Goal suggestion — contextual next-action hint below ambient line
@@ -451,13 +452,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           goalOpacity.setValue(0);
           const fadeIn = Animated.timing(goalOpacity, { toValue: 1, duration: 400, useNativeDriver: true });
           goalAnimRef.current = fadeIn;
-          fadeIn.start(() => {
+          fadeIn.start(({ finished }) => {
+            if (!finished || cancelled) return;
             goalAnimRef.current = null;
             goalTimerRef.current = setTimeout(() => {
               if (cancelled) return;
               const fadeOut = Animated.timing(goalOpacity, { toValue: 0, duration: 600, useNativeDriver: true });
               goalAnimRef.current = fadeOut;
-              fadeOut.start(() => {
+              fadeOut.start(({ finished: fadeOutFinished }) => {
+                if (!fadeOutFinished || cancelled) return;
                 goalAnimRef.current = null;
                 setGoalSuggestion(null);
               });
@@ -471,7 +474,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       if (goalAnimRef.current) { goalAnimRef.current.stop(); goalAnimRef.current = null; }
       if (goalTimerRef.current) { clearTimeout(goalTimerRef.current); goalTimerRef.current = null; }
     };
-  }, [isOnboarding, progress?.currentPhase, progress?.puzzlesSolved, progress?.completedDifficulties, goalOpacity]);
+  }, [isOnboarding, progress?.currentPhase, progress?.puzzlesSolved, progress?.completedDifficulties]);
 
   // Talking animation for intro dialogue
   const [introIsTalking, setIntroIsTalking] = useState(false);

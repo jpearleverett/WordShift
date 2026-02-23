@@ -653,7 +653,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const baseTranslateY = useRef(0);
 
   // Track container height for proper initial positioning
-  const [containerHeight, setContainerHeight] = useState(SCREEN_HEIGHT);
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const onContainerLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
     const { height } = event.nativeEvent.layout;
     if (height > 0) {
@@ -823,7 +823,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
     const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
     // How much the house overflows above the visible viewport
-    const overflow = Math.max(0, totalContentHeight - containerHeight);
+    const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
       min: 0,  // Don't allow panning below the house (prevents empty space below foundation)
       max: Math.max(0, overflow + 50),  // Allow panning up to see the roof + small padding
@@ -856,6 +856,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // extends above when the house is taller than the viewport. A positive
   // translateY shifts the view down, bringing the roof into view.
   useEffect(() => {
+    if (containerHeight === null) return;
     const connectorHeight = Math.max(0, numRows - 1) * 10;
     const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
     const overflow = Math.max(0, totalContentHeight - containerHeight);
@@ -884,6 +885,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             style={[
               styles.transformContainer,
               {
+                opacity: containerHeight === null ? 0 : 1,
                 transform: [
                   { translateY },
                 ],
