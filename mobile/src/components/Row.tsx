@@ -54,6 +54,8 @@ interface RowProps {
   slotPreviews?: SlotPreview[];
   /** Called when a letter tile is dragged and dropped — receives the letter, row, and drop position */
   onLetterDragDrop?: (letter: Letter, rowIndex: number, position: { x: number; y: number }) => void;
+  /** Called when drag activation state changes — used to disable parent ScrollView during drag */
+  onDragActiveChange?: (active: boolean) => void;
 }
 
 // Phase-aware row color helper
@@ -409,6 +411,7 @@ export const Row: React.FC<RowProps> = memo(({
   successDropSignal = 0,
   slotPreviews,
   onLetterDragDrop,
+  onDragActiveChange,
 }) => {
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
@@ -702,6 +705,7 @@ export const Row: React.FC<RowProps> = memo(({
             onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
             onTap={() => onLetterPress(letter, rowIndex)}
             phase={phase}
+            onDragActiveChange={onDragActiveChange}
           >
             {tile}
           </DraggableTile>
