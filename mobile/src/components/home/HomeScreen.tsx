@@ -23,6 +23,7 @@ import {
   markIntroSeen,
   markHouseCompleted,
   spendAmber,
+  awardBonusAmber,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
   hasSeenChallengeIntro,
@@ -736,6 +737,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     const purchased = await purchaseRoomUpgrade(roomId);
     if (!purchased) {
+      // Safety: refund amber if persistence race/failure blocks applying the upgrade.
+      await awardBonusAmber(upgrade.cost, 'room_upgrade_refund');
+      await loadAllDataRef.current();
       setUpgradeStatusMessage(`Couldn't apply that upgrade right now.`);
       return;
     }
