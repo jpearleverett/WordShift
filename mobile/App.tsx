@@ -820,7 +820,9 @@ export default function App() {
     puzzleActions.handleNextLevel();
   }, [puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
-  // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
+  // During onboarding, "Continue" on victory modal cleans up and navigates appropriately.
+  // After guided tutorial: start the unguided second puzzle.
+  // After unguided puzzle: navigate to pit.
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
     clearVictoryTimeouts();
@@ -829,12 +831,20 @@ export default function App() {
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
-    // Navigate directly to pit (skip puzzle_complete and going_to_pit steps)
-    await onboardingActions.advanceOnboarding('pit_intro');
-    transitionTo('pit', () => {
-      puzzleActions.setGameState(GameState.IDLE);
-    });
-  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
+
+    if (onboardingFlow.onboardingStep === 'puzzle_tutorial') {
+      // After guided tutorial: advance to unguided second puzzle
+      await onboardingActions.advanceOnboarding('puzzle_tutorial_free');
+      puzzleActions.clearBoard();
+      puzzleActions.startNewGame('EASY');
+    } else {
+      // After unguided puzzle (or puzzle_tutorial_free): navigate to pit
+      await onboardingActions.advanceOnboarding('pit_intro');
+      transitionTo('pit', () => {
+        puzzleActions.setGameState(GameState.IDLE);
+      });
+    }
+  }, [onboardingFlow.onboardingStep, onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
@@ -1409,7 +1419,7 @@ export default function App() {
           onReturnHome={handleReturnHome}
           onGoToPit={handleGoToPit}
           onShare={handleShare}
-          isOnboarding={onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_tutorial'}
+          isOnboarding={onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_tutorial' || onboardingFlow.onboardingStep === 'puzzle_tutorial_free')}
           onOnboardingContinue={handleOnboardingVictoryContinue}
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}
@@ -1464,7 +1474,7 @@ export default function App() {
         />
 
         {/* Fox Guide overlay — shown during onboarding on puzzle screen (hidden when victory modal is showing) */}
-        {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_tutorial' || onboardingFlow.onboardingStep === 'puzzle_complete') && !(onboardingFlow.onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.WON) && (
+        {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_tutorial' || onboardingFlow.onboardingStep === 'puzzle_tutorial_free' || onboardingFlow.onboardingStep === 'puzzle_complete') && !((onboardingFlow.onboardingStep === 'puzzle_tutorial' || onboardingFlow.onboardingStep === 'puzzle_tutorial_free') && puzzle.gameState === GameState.WON) && (
           <FoxGuide
             visible={true}
             variant="dialogue"
@@ -1473,19 +1483,23 @@ export default function App() {
                 ? ONBOARDING_FOX_LINES.puzzle_tutorial_complete[
                     Math.min(onboardingFlow.onboardingLineIndex, ONBOARDING_FOX_LINES.puzzle_tutorial_complete.length - 1)
                   ]
-                : puzzle.gameState === GameState.PLAYING && puzzle.selectedLetter
-                  ? (
-                    tutorialGuidance?.targetSlotIndex !== null && tutorialGuidance?.targetSlotIndex !== undefined
-                      ? `Now drop "${tutorialGuidance.letterToMove}" into the glowing slot below.`
-                      : ONBOARDING_FOX_LINES.puzzle_tutorial_drop[0]
-                  )
-                  : puzzle.gameState === GameState.PLAYING
+                : onboardingFlow.onboardingStep === 'puzzle_tutorial_free'
+                  ? (puzzle.gameState === GameState.PLAYING
+                      ? ONBOARDING_FOX_LINES.puzzle_tutorial_free_intro[0]
+                      : ONBOARDING_FOX_LINES.puzzle_tutorial_free_intro[0])
+                  : puzzle.gameState === GameState.PLAYING && puzzle.selectedLetter
                     ? (
-                      tutorialGuidance?.letterToMove
-                        ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
-                        : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
+                      tutorialGuidance?.targetSlotIndex !== null && tutorialGuidance?.targetSlotIndex !== undefined
+                        ? `Now drop "${tutorialGuidance.letterToMove}" into the glowing slot below.`
+                        : ONBOARDING_FOX_LINES.puzzle_tutorial_drop[0]
                     )
-                    : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
+                    : puzzle.gameState === GameState.PLAYING
+                      ? (
+                        tutorialGuidance?.letterToMove
+                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
+                          : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
+                      )
+                      : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
             }
             buttonText={
               onboardingFlow.onboardingStep === 'puzzle_complete'

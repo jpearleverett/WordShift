@@ -27,6 +27,8 @@ const DAILY_CHALLENGE_INTRO_SEEN_KEY = 'wordshift_daily_challenge_intro_seen';
 const FOX_PLAY_NUDGE_SEEN_KEY = 'wordshift_fox_play_nudge_seen';
 const CHALLENGE_INTRO_SEEN_KEY = 'wordshift_challenge_intro_seen';
 const PIT_NUDGE_SEEN_KEY = 'wordshift_pit_nudge_seen';
+const VARIANT_UNLOCK_SEEN_PREFIX = 'wordshift_variant_unlock_seen_';
+const DIFFICULTY_NUDGE_SEEN_KEY = 'wordshift_difficulty_nudge_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -842,6 +844,10 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
     await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
+    await AsyncStorage.removeItem(DIFFICULTY_NUDGE_SEEN_KEY);
+    for (const variant of ['reverse', 'double_shift', 'speed']) {
+      await AsyncStorage.removeItem(VARIANT_UNLOCK_SEEN_PREFIX + variant);
+    }
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -1358,6 +1364,48 @@ export async function markPitNudgeSeen(): Promise<void> {
 export async function resetPitNudge(): Promise<void> {
   try {
     await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Track whether Fox's one-time variant unlock fanfare has been shown for a specific variant.
+ * Each variant has its own flag so each unlock gets its own Fox dialogue.
+ */
+export async function hasSeenVariantUnlock(variant: string): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(VARIANT_UNLOCK_SEEN_PREFIX + variant);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markVariantUnlockSeen(variant: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(VARIANT_UNLOCK_SEEN_PREFIX + variant, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Track whether the one-time difficulty nudge has been shown
+ * (Fox suggests MEDIUM after player completes 5 EASY puzzles without trying MEDIUM).
+ */
+export async function hasSeenDifficultyNudge(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(DIFFICULTY_NUDGE_SEEN_KEY);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markDifficultyNudgeSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(DIFFICULTY_NUDGE_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

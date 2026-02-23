@@ -672,6 +672,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const popInTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const amberRiseTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const trailTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const cascadeTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const cascadeSkippedRef = useRef(false);
 
   // Ward mark pulse animation (for pending state)
   const wardPulseProgress = useRef(new Animated.Value(0)).current;
@@ -754,6 +756,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       popInTimeoutsRef.current.forEach(clearTimeout);
       amberRiseTimeoutsRef.current.forEach(clearTimeout);
       trailTimeoutsRef.current.forEach(clearTimeout);
+      cascadeTimeoutsRef.current.forEach(clearTimeout);
     };
   }, []);
 
@@ -1521,17 +1524,72 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
   }, [onboardingStep, harvestState, onOnboardingOfferComplete]);
 
+  // ---- Finalize cascade — shared by both natural completion and skip ----
+  const finalizeCascade = useCallback(async (totalWordCount: number, totalAmberAwarded: number) => {
+    cascadeTimeoutsRef.current.forEach(clearTimeout);
+    cascadeTimeoutsRef.current = [];
+    if (!mountedRef.current) return;
+    const freshState = await getHarvestState();
+    if (!mountedRef.current) return;
+    setDisplayBalance(amberBalanceRef.current);
+    spawnAmberRise(totalAmberAwarded);
+    showResultToast(getPitOfferResultMessage(phase, totalWordCount, totalAmberAwarded));
+    setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
+    setFlyingWords([]);
+    setOverflowCount(0);
+    setPendingAmberOffset(0);
+    setIsOffering(false);
+    cascadeSkippedRef.current = false;
+    // Trigger ceremony if pending
+    if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
+      setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
+    }
+  }, [phase, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
+
+  // ---- Skip cascade — immediately finalize when user taps Skip ----
+  const cascadeTotalWordCountRef = useRef(0);
+  const cascadeTotalAmberRef = useRef(0);
+
+  const skipCascade = useCallback(() => {
+    if (!isOffering || cascadeSkippedRef.current) return;
+    cascadeSkippedRef.current = true;
+
+    // Stop all pending stagger timeouts
+    cascadeTimeoutsRef.current.forEach(clearTimeout);
+    cascadeTimeoutsRef.current = [];
+
+    // Stop all in-flight word animations and hide them
+    flyingWordsRef.current.forEach(fw => {
+      fw.floatLoopX?.stop(); fw.floatLoopX = null;
+      fw.floatLoopY?.stop(); fw.floatLoopY = null;
+      fw.devourProgress.stopAnimation();
+      fw.scale.stopAnimation();
+      fw.rotation.stopAnimation();
+      fw.opacity.stopAnimation();
+      fw.opacity.setValue(0);
+      fw.scale.setValue(0);
+    });
+
+    flashPitSurge();
+    finalizeCascade(cascadeTotalWordCountRef.current, cascadeTotalAmberRef.current);
+  }, [isOffering, flashPitSurge, finalizeCascade]);
+
   // ---- Harvest All (with spiral paths) ----
   const handleHarvestAll = useCallback(async () => {
     if (isOffering || !harvestState || harvestState.pendingBatches.length === 0) return;
     setIsOffering(true);
+    cascadeSkippedRef.current = false;
+    cascadeTimeoutsRef.current = [];
     hapticHeavy();
 
     const totalAmber = harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
     const totalWordCount = harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
+    cascadeTotalWordCountRef.current = totalWordCount;
+    cascadeTotalAmberRef.current = 0;
 
     // Offer all batches atomically first
     const result = await offerAllBatches();
+    cascadeTotalAmberRef.current = result.amberAwarded;
     if (result.amberAwarded > 0) {
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) onAmberChange?.(newBalance);
@@ -1558,6 +1616,18 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       return;
     }
 
+    // reducedMotion: skip cascade entirely — instant offer with brief flash
+    if (reducedMotion) {
+      words.forEach(fw => {
+        fw.isDevoured = true;
+        fw.opacity.setValue(0);
+        fw.scale.setValue(0);
+      });
+      flashPitSurge();
+      finalizeCascade(totalWordCount, result.amberAwarded);
+      return;
+    }
+
     // Animate balance incrementally as words fly in
     const amberPerWord = words.length > 0 ? result.amberAwarded / words.length : 0;
     let amberAccumulated = 0;
@@ -1566,8 +1636,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     words.forEach((fw, i) => {
       fw.isDevoured = true;
-      setTimeout(() => {
-        if (!mountedRef.current) return;
+      const tid = setTimeout(() => {
+        if (!mountedRef.current || cascadeSkippedRef.current) return;
 
         // Snapshot current position before stopping loops
         const currentPos = getCurrentPos(fw);
@@ -1584,10 +1654,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           amberAccumulated -= incrementNow;
           setDisplayBalance(prev => prev + incrementNow);
           setPendingAmberOffset(prev => prev + incrementNow);
-        }
-
-        if (reducedMotion) {
-          fw.opacity.setValue(0); fw.scale.setValue(0); flashPitSurge(); return;
         }
 
         // Compute spiral path for this word (slight randomization)
@@ -1622,35 +1688,22 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             Animated.timing(fw.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
           ]),
         ]).start(() => {
-          if (mountedRef.current) {
+          if (mountedRef.current && !cascadeSkippedRef.current) {
             flashPitSurge();
             if (i % 4 === 0) { spawnImpactBurst(); spawnShockwave(); }
           }
         });
       }, i * staggerDelay);
+      cascadeTimeoutsRef.current.push(tid);
     });
 
     const cascadeDuration = words.length * staggerDelay + getDevourDuration(phase) + 300;
-    setTimeout(async () => {
-      if (!mountedRef.current) return;
-      const freshState = await getHarvestState();
-      if (mountedRef.current) {
-        // Sync display to latest prop value (use ref to avoid stale closure)
-        setDisplayBalance(amberBalanceRef.current);
-        spawnAmberRise(result.amberAwarded);
-        showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
-        setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
-        setFlyingWords([]);
-        setOverflowCount(0);
-        setPendingAmberOffset(0);
-        setIsOffering(false);
-        // Trigger ceremony if pending
-        if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
-          setTimeout(() => { if (mountedRef.current) startCeremony(); }, 600);
-        }
-      }
+    const completionTid = setTimeout(async () => {
+      if (!mountedRef.current || cascadeSkippedRef.current) return;
+      finalizeCascade(totalWordCount, result.amberAwarded);
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
+    cascadeTimeoutsRef.current.push(completionTid);
+  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, finalizeCascade]);
 
   // Stable ref for handleHarvestAll (used by onboarding auto-offer effect)
   const handleHarvestAllRef = useRef(handleHarvestAll);
@@ -1975,6 +2028,20 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </Animated.View>
       )}
 
+      {/* Skip button — visible during harvest cascade */}
+      {isOffering && !isOnboarding && (
+        <TouchableOpacity
+          style={[styles.cascadeSkipButton, {
+            borderColor: (phaseColors.glow ?? '#FFFFFF') + '80',
+          }]}
+          onPress={skipCascade}
+          accessibilityLabel="Skip offering animation"
+          accessibilityRole="button"
+        >
+          <Text style={[styles.cascadeSkipText, { color: (phaseColors.glow ?? '#FFFFFF') + '80' }]}>Skip</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Bottom panel — hidden during onboarding (FoxGuide occupies this space) */}
       {!isOnboarding && (
         <View style={styles.bottomPanel}>
@@ -2197,5 +2264,20 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 6,
+  },
+  // ---- Cascade skip button ----
+  cascadeSkipButton: {
+    position: 'absolute',
+    top: STATUS_BAR_HEIGHT + 56,
+    right: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    zIndex: 200,
+  },
+  cascadeSkipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

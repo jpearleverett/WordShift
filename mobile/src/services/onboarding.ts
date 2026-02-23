@@ -10,6 +10,7 @@ const ONBOARDING_KEY = 'wordshift_onboarding_step';
  * 2. fox_invited     → Fox intro dialogue plays on home screen
  * 3. going_to_puzzle → Fox says "follow me!" — transitioning to puzzle
  * 4. puzzle_tutorial → Guided easy puzzle with Fox tips
+ * 4b. puzzle_tutorial_free → Unguided second puzzle (teaches preview evaluation)
  * 5. puzzle_complete → Victory shown, Fox congratulates
  * 6. going_to_pit    → Fox introduces word harvesting concept
  * 7. pit_intro       → Fox explains the Offering Pit on the pit screen
@@ -24,6 +25,7 @@ export type OnboardingStep =
   | 'fox_invited'
   | 'going_to_puzzle'
   | 'puzzle_tutorial'
+  | 'puzzle_tutorial_free'
   | 'puzzle_complete'
   | 'going_to_pit'
   | 'pit_intro'
@@ -36,8 +38,9 @@ let cachedStep: OnboardingStep | null = null;
 
 const VALID_STEPS: Set<string> = new Set([
   'not_started', 'home_empty', 'fox_invited', 'going_to_puzzle',
-  'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',
-  'pit_offering', 'returning_home', 'unlock_explained', 'complete',
+  'puzzle_tutorial', 'puzzle_tutorial_free', 'puzzle_complete',
+  'going_to_pit', 'pit_intro', 'pit_offering', 'returning_home',
+  'unlock_explained', 'complete',
 ]);
 
 /**
@@ -120,7 +123,15 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Hmm, that didn't make a real word.\nTry undoing and picking a different spot!",
   ],
   puzzle_tutorial_complete: [
-    "Perfect. You felt that click, right? That's how we build this place.",
+    "Perfect. You felt that click, right?\nLet's try one more, but this time you lead.",
+  ],
+
+  // Step 4b: Unguided puzzle — teaches preview evaluation without highlights
+  puzzle_tutorial_free_intro: [
+    "This time, check the word previews below each slot.\nGreen means it makes a real word!",
+  ],
+  puzzle_tutorial_free_complete: [
+    "You read the previews like a natural. That's how we build this place.",
     "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
   ],
 

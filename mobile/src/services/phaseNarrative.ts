@@ -31,9 +31,9 @@ export function getVictoryGlitch(phase: number, puzzlesSolved: number): string |
   if (phase !== 0) return null;
   // First victory always gets a brief glitch
   if (puzzlesSolved === 1) return VICTORY_GLITCH_TEXTS[0];
-  // ~8% chance on subsequent Phase 0 victories — enough for ~2 glitches
+  // ~10% chance on subsequent Phase 0 victories — enough for ~3 glitches
   // across 25 puzzles, creating subliminal unease that pays off later
-  if (Math.random() < 0.08) {
+  if (Math.random() < 0.10) {
     return VICTORY_GLITCH_TEXTS[Math.floor(Math.random() * VICTORY_GLITCH_TEXTS.length)];
   }
   return null;
@@ -45,6 +45,7 @@ const PHASE_0_SEED_MESSAGES = [
   'Something shifted.',
   'Did you feel that?',
   'The word wanted that.',
+  'That word was waiting for you.',
 ];
 
 /**
@@ -955,6 +956,28 @@ export interface NarrativeMicroBeat {
  * - Puzzle 130: The letters have agency — player complicity deepens
  */
 const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
+  // Phase 0 micro-beats — warm and inviting, but plant connection seeds
+  8: {
+    type: 'ambient_whisper',
+    text: 'The house likes when you play.',
+    durationMs: 2500,
+  },
+  12: {
+    type: 'ambient_whisper',
+    text: 'Fox has been watching your puzzles from the den window.',
+    durationMs: 3000,
+  },
+  18: {
+    type: 'ambient_whisper',
+    text: 'You\'re finding the interesting moves now. The middle ones.',
+    durationMs: 3000,
+  },
+  22: {
+    type: 'ambient_whisper',
+    text: 'The animals talk about your word chains when you\'re not here.',
+    durationMs: 3000,
+  },
+  // Phase 1+ micro-beats — break the retention valley
   30: {
     type: 'ambient_whisper',
     text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
@@ -1701,6 +1724,85 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
     "You're getting really good at this! Want to push yourself?",
     'Challenge Mode removes hints and limits your undos — but rewards you with 50% more amber.',
     'Look for it in the puzzle setup menu when you\'re feeling bold.',
+  ];
+}
+
+/**
+ * Fox's one-time intro lines when a new puzzle variant is unlocked.
+ * Each variant gets its own dialogue set with phase-aware tone.
+ */
+export function getVariantUnlockLines(variant: string, phase: DialoguePhase): string[] {
+  if (variant === 'reverse') {
+    if (phase >= 3) {
+      return [
+        'There\'s a new way to arrange the letters. One that demands you retrace your steps.',
+        'Reverse Shift — play to the bottom, then carry every letter back to the top. The path locks behind you.',
+        'Look for it in the puzzle setup. The arrangement values those who can walk both directions.',
+      ];
+    }
+    return [
+      'I learned something new! You can play puzzles in reverse now.',
+      'Reverse Shift — solve to the bottom, then shift letters all the way back up. It\'s tricky!',
+      'Try it from the puzzle setup menu. You\'ll earn a little extra amber too.',
+    ];
+  }
+  if (variant === 'speed') {
+    if (phase >= 3) {
+      return [
+        'The letters grow impatient. A new mode demands haste.',
+        'Speed Shift — a countdown ticks while you work. No time for hesitation.',
+        'Find it in the puzzle setup. The arrangement does not wait.',
+      ];
+    }
+    return [
+      'Feeling quick? There\'s a new puzzle style that adds a timer!',
+      'Speed Shift — race to solve before time runs out. Short puzzles, fast pace.',
+      'Check the puzzle setup menu when you want a sprint.',
+    ];
+  }
+  if (variant === 'double_shift') {
+    if (phase >= 3) {
+      return [
+        'The pattern hungers for more. Two letters per step, now.',
+        'Double Shift — pick two letters from each word and place them into the next. The arrangement demands more.',
+        'It\'s in the puzzle setup. The amber reward is generous.',
+      ];
+    }
+    return [
+      'Ready for something bigger? You can move two letters at once now!',
+      'Double Shift — pick two letters from each word, drop them both into the next one.',
+      'It\'s a bit of a brain-twister, but the amber reward is great. Find it in the puzzle setup!',
+    ];
+  }
+  // Fallback for unknown variants
+  return [
+    'A new puzzle style is available! Check the puzzle setup menu.',
+  ];
+}
+
+/**
+ * Fox's one-time nudge when the player has completed several EASY puzzles
+ * without trying MEDIUM. Encourages difficulty progression.
+ */
+export function getDifficultyNudgeLines(phase: DialoguePhase): string[] {
+  if (phase >= 3) {
+    return [
+      'The shorter patterns come easily to you now. The arrangement has noticed.',
+      'There are longer chains waiting. Four rows. More letters to shift.',
+      'Choose Medium from the puzzle setup. The words grow more interesting there.',
+    ];
+  }
+  if (phase >= 1) {
+    return [
+      'You\'re breezing through these, friend. Want to try something with more rows?',
+      'Medium puzzles have four rows instead of three. Same letters, bigger journey.',
+      'Give it a try next time — I think you\'re ready.',
+    ];
+  }
+  return [
+    'You\'re getting fast at these! Want to try a longer puzzle?',
+    'Medium puzzles add an extra row — same rules, more moves, more fun.',
+    'Select Medium from the setup menu when you\'re feeling adventurous!',
   ];
 }
 

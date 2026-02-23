@@ -29,10 +29,16 @@ import {
   markChallengeIntroSeen,
   hasSeenPitNudge,
   markPitNudgeSeen,
+  hasSeenVariantUnlock,
+  markVariantUnlockSeen,
+  hasSeenDifficultyNudge,
+  markDifficultyNudgeSeen,
 } from '../../services/amberCurrency';
 import {
   getDailyChallengeIntroLines,
   getChallengeIntroLines,
+  getVariantUnlockLines,
+  getDifficultyNudgeLines,
   getHouseCompletionText,
   getWordsOfferedText,
 } from '../../services/phaseNarrative';
@@ -66,7 +72,7 @@ import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
 import { isDailyChallengeUnlocked, isDailyCompleted } from '../../services/dailyChallenge';
-import { getUnlockedVariants } from '../../services/puzzleVariety';
+import { getUnlockedVariants, getNewlyUnlockedVariants } from '../../services/puzzleVariety';
 import {
   isSacrificeAvailable,
   getSacrificeAmounts,
@@ -125,7 +131,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge' | 'variant_unlock' | 'difficulty_nudge'>('animal_intro');
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -172,6 +178,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // loadAllData reference for unlock hook (defined below, stable via useCallback)
   const loadAllDataRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  // Tracks which variant unlock is currently being shown in the intro dialogue
+  const variantUnlockPendingRef = useRef<string | null>(null);
 
   // Unlock flow hook
   const unlockFlow = useUnlockFlow({
@@ -331,6 +339,82 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [
     pitPhaseReady,
     progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // Variant unlock fanfare (one-time Fox intro when a new variant unlocks).
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    const puzzlesSolved = progress.puzzlesSolved || 0;
+    if (puzzlesSolved < 10) return; // Earliest variant unlock is at 10
+
+    let cancelled = false;
+    (async () => {
+      const newVariants = getNewlyUnlockedVariants(puzzlesSolved, progress.currentPhase);
+      for (const variant of newVariants) {
+        if (variant === 'standard') continue;
+        const seen = await hasSeenVariantUnlock(variant);
+        if (seen || cancelled) continue;
+
+        const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+        if (!fox) break;
+
+        setIntroAnimal(fox);
+        setIntroDialogueIndex(0);
+        setIntroOverrideLines(getVariantUnlockLines(variant, progress.currentPhase));
+        setIntroContext('variant_unlock');
+        setShowIntroDialogue(true);
+        // Store the variant name so we can mark it seen on completion
+        variantUnlockPendingRef.current = variant;
+        break; // Only show one at a time
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // Difficulty nudge (one-time Fox suggestion after 5 EASY puzzles without trying MEDIUM).
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    const puzzlesSolved = progress.puzzlesSolved || 0;
+    if (puzzlesSolved < 5) return;
+    // Only nudge if player has never completed MEDIUM or higher
+    const completedDiffs = progress.completedDifficulties || [];
+    const hasTriedMediumPlus = completedDiffs.some(
+      (d: string) => d === 'MEDIUM' || d === 'MEDIUM_PLUS' || d === 'HARD'
+    );
+    if (hasTriedMediumPlus) return;
+
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenDifficultyNudge();
+      if (seen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getDifficultyNudgeLines(progress.currentPhase));
+      setIntroContext('difficulty_nudge');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    progress?.completedDifficulties,
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
@@ -610,6 +694,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'variant_unlock') {
+        if (variantUnlockPendingRef.current) {
+          await markVariantUnlockSeen(variantUnlockPendingRef.current);
+          variantUnlockPendingRef.current = null;
+        }
+      } else if (introContext === 'difficulty_nudge') {
+        await markDifficultyNudgeSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -631,6 +722,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'variant_unlock') {
+        if (variantUnlockPendingRef.current) {
+          await markVariantUnlockSeen(variantUnlockPendingRef.current);
+          variantUnlockPendingRef.current = null;
+        }
+      } else if (introContext === 'difficulty_nudge') {
+        await markDifficultyNudgeSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
