@@ -17,6 +17,8 @@ interface DraggableTileProps {
   enabled: boolean;
   /** Phase for styling the drag shadow */
   phase?: number;
+  /** Called when drag activation state changes — used to disable parent ScrollView during drag */
+  onDragActiveChange?: (active: boolean) => void;
 }
 
 const DRAG_THRESHOLD = 10;
@@ -41,6 +43,7 @@ export function DraggableTile({
   onTap,
   enabled,
   phase = 0,
+  onDragActiveChange,
 }: DraggableTileProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
@@ -57,19 +60,30 @@ export function DraggableTile({
   const onDragEndRef = useRef(onDragEnd);
   const onTapRef = useRef(onTap);
   const enabledRef = useRef(enabled);
+  const onDragActiveChangeRef = useRef(onDragActiveChange);
   onDragStartRef.current = onDragStart;
   onDragEndRef.current = onDragEnd;
   onTapRef.current = onTap;
   enabledRef.current = enabled;
+  onDragActiveChangeRef.current = onDragActiveChange;
 
   const panResponder = useRef(
     PanResponder.create({
+      // Capture phase: claim responder before ScrollView can intercept
+      onStartShouldSetPanResponderCapture: () => enabledRef.current,
+      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+        if (!enabledRef.current) return false;
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
+      },
       onStartShouldSetPanResponder: () => enabledRef.current,
       onMoveShouldSetPanResponder: (_, gestureState) => {
         if (!enabledRef.current) return false;
         const { dx, dy } = gestureState;
         return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
       },
+      // Refuse to surrender responder once drag is active
+      onPanResponderTerminationRequest: () => !dragActivated.current,
       onPanResponderGrant: (evt) => {
         startPos.current = {
           x: evt.nativeEvent.pageX,
@@ -79,6 +93,8 @@ export function DraggableTile({
         dragActivated.current = false;
         translateX.setValue(0);
         translateY.setValue(0);
+        // Disable parent ScrollView immediately on touch to prevent scroll race
+        onDragActiveChangeRef.current?.(true);
       },
       onPanResponderMove: (_, gestureState) => {
         if (!isDragging.current) return;
@@ -111,6 +127,8 @@ export function DraggableTile({
       },
       onPanResponderRelease: (evt, gestureState) => {
         isDragging.current = false;
+        // Re-enable parent ScrollView
+        onDragActiveChangeRef.current?.(false);
 
         if (dragActivated.current) {
           // Drag was active — fire drop callback with finger position
@@ -170,6 +188,8 @@ export function DraggableTile({
       onPanResponderTerminate: () => {
         isDragging.current = false;
         dragActivated.current = false;
+        // Re-enable parent ScrollView on termination
+        onDragActiveChangeRef.current?.(false);
         translateX.setValue(0);
         translateY.setValue(0);
         floatingOpacity.setValue(0);

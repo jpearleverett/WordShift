@@ -761,6 +761,13 @@ export default function App() {
     puzzleActions.handleLetterPress(letter, rowIndex);
   }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
 
+  // Disable puzzle ScrollView during drag to prevent scroll-vs-drag conflict.
+  // Toggled by DraggableTile via onDragActiveChange callback.
+  const [puzzleScrollEnabled, setPuzzleScrollEnabled] = useState(true);
+  const handleDragActiveChange = useCallback((active: boolean) => {
+    setPuzzleScrollEnabled(!active);
+  }, []);
+
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
   // Uses refs + setTimeout to ensure React has processed the letter selection state
@@ -1278,6 +1285,7 @@ export default function App() {
           <ScrollView
             contentContainerStyle={styles.rowsContainer}
             showsVerticalScrollIndicator={false}
+            scrollEnabled={puzzleScrollEnabled}
             accessibilityRole="list"
             accessibilityLabel={`Puzzle with ${puzzle.rows.length} word rows`}
           >
@@ -1301,6 +1309,7 @@ export default function App() {
                 invalidDropSignal={invalidDropSignal}
                 successDropSignal={successDropSignal}
                 onLetterDragDrop={handleLetterDragDrop}
+                onDragActiveChange={handleDragActiveChange}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews
