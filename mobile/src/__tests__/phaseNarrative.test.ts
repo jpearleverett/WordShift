@@ -435,10 +435,38 @@ describe('checkNarrativeMicroBeat', () => {
   });
 
   test('returns null for non-milestone puzzle counts', async () => {
+    expect(await checkNarrativeMicroBeat(1)).toBeNull();
     expect(await checkNarrativeMicroBeat(10)).toBeNull();
-    expect(await checkNarrativeMicroBeat(20)).toBeNull();
     expect(await checkNarrativeMicroBeat(36)).toBeNull();
     expect(await checkNarrativeMicroBeat(99)).toBeNull();
+  });
+
+  test('returns early micro-beats in puzzles 5-25', async () => {
+    const beat5 = await checkNarrativeMicroBeat(5);
+    expect(beat5).not.toBeNull();
+    expect(beat5!.type).toBe('ambient_whisper');
+    expect(beat5!.text).toContain('Fox');
+
+    const beat8 = await checkNarrativeMicroBeat(8);
+    expect(beat8).not.toBeNull();
+    expect(beat8!.type).toBe('ambient_whisper');
+
+    const beat12 = await checkNarrativeMicroBeat(12);
+    expect(beat12).not.toBeNull();
+    expect(beat12!.type).toBe('ambient_whisper');
+
+    const beat16 = await checkNarrativeMicroBeat(16);
+    expect(beat16).not.toBeNull();
+    expect(beat16!.type).toBe('glitch_title');
+    expect(beat16!.glitchTitle).toBe('WELCOME HOME');
+
+    const beat20 = await checkNarrativeMicroBeat(20);
+    expect(beat20).not.toBeNull();
+    expect(beat20!.type).toBe('ambient_whisper');
+
+    const beat25 = await checkNarrativeMicroBeat(25);
+    expect(beat25).not.toBeNull();
+    expect(beat25!.type).toBe('ambient_whisper');
   });
 
   test('returns a beat at puzzle 35', async () => {
@@ -547,8 +575,8 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
-  test('all 12 micro-beat thresholds fire independently', async () => {
-    const thresholds = [35, 40, 50, 55, 65, 70, 74, 80, 90, 100, 110, 130];
+  test('all 19 micro-beat thresholds fire independently', async () => {
+    const thresholds = [5, 8, 12, 16, 20, 25, 30, 35, 40, 50, 55, 65, 70, 74, 80, 90, 100, 110, 130];
     for (const t of thresholds) {
       const beat = await checkNarrativeMicroBeat(t);
       expect(beat).not.toBeNull();

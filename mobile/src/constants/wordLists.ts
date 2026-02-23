@@ -138,6 +138,28 @@ export const CURATED_EARLY_PUZZLES: CuratedPuzzle[] = [
       { stepIndex: 2, sourceWord: "LIKE", targetWord: "THAN", letterToMove: "K", explanation: "Move 'K' from LIKED to form THANK." },
     ],
   },
+  // Puzzle 3: TALE → MEAL → PACE → SOIL — 4-row MEDIUM, grounded thematic journey
+  // Pick T → ALE; METAL. Pick L → META; PLACE. Pick P → LACE; SPOIL.
+  // "SPOIL" seeds subtle wrongness (innocuous at Phase 0, resonant later)
+  {
+    words: ["TALE", "MEAL", "PACE", "SOIL"],
+    solution: [
+      { stepIndex: 0, sourceWord: "TALE", targetWord: "MEAL", letterToMove: "T", explanation: "Move 'T' from TALE to form METAL." },
+      { stepIndex: 1, sourceWord: "MEAL", targetWord: "PACE", letterToMove: "L", explanation: "Move 'L' from METAL to form PLACE." },
+      { stepIndex: 2, sourceWord: "PACE", targetWord: "SOIL", letterToMove: "P", explanation: "Move 'P' from PLACE to form SPOIL." },
+    ],
+  },
+  // Puzzle 4: RIDE → FINS → AIDE → WAKE — 4-row MEDIUM, journey to awakening
+  // Pick E → RID; FINES. Pick S → FINE; ASIDE. Pick A → SIDE; AWAKE.
+  // "AWAKE" is innocent now (morning energy), ominous in retrospect (the entity awakening)
+  {
+    words: ["RIDE", "FINS", "AIDE", "WAKE"],
+    solution: [
+      { stepIndex: 0, sourceWord: "RIDE", targetWord: "FINS", letterToMove: "E", explanation: "Move 'E' from RIDE to form FINES." },
+      { stepIndex: 1, sourceWord: "FINS", targetWord: "AIDE", letterToMove: "S", explanation: "Move 'S' from FINES to form ASIDE." },
+      { stepIndex: 2, sourceWord: "AIDE", targetWord: "WAKE", letterToMove: "A", explanation: "Move 'A' from ASIDE to form AWAKE." },
+    ],
+  },
 ];
 
 /** Number of curated puzzles to use before switching to generated puzzles */
