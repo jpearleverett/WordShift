@@ -25,6 +25,21 @@ jest.mock('../services/eventLogger', () => ({
   logEvent: (...args: any[]) => mockLogEvent(args[0]),
 }));
 
+jest.mock('../services/iap', () => ({
+  getIapStatus: () => ({
+    enabled: false,
+    configured: false,
+    initialized: false,
+    patronEntitled: false,
+    provider: 'RevenueCat',
+    lastError: null,
+  }),
+  isPatronEntitled: async () => false,
+  purchasePatronEntitlement: async () => ({ success: false, patronEntitled: false, message: 'disabled' }),
+  restorePatronEntitlement: async () => ({ success: false, patronEntitled: false, message: 'disabled' }),
+  syncIapEntitlement: async () => false,
+}));
+
 describe('monetization', () => {
   beforeEach(async () => {
     (AsyncStorage.clear as jest.Mock)();
@@ -37,6 +52,7 @@ describe('monetization', () => {
     const state = await getMonetizationState();
     expect(state.patronKeyOwned).toBe(false);
     expect(state.rewardedAmberClaimsRemaining).toBe(3);
+    expect(state.iapConfigured).toBe(false);
     expect(await getRewardedAmberClaimsRemaining()).toBe(3);
   });
 

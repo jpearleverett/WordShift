@@ -2,6 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 import { awardBonusAmber } from './amberCurrency';
 import { logEvent } from './eventLogger';
+import {
+  getIapStatus,
+  isPatronEntitled as isPatronEntitledFromIap,
+  purchasePatronEntitlement,
+  restorePatronEntitlement,
+  syncIapEntitlement,
+} from './iap';
 
 const STORAGE_KEY = 'wordshift_monetization_state';
 
@@ -80,32 +87,106 @@ function rewardedBlockedText(phase: DialoguePhase): string {
 export async function getMonetizationState(): Promise<{
   patronKeyOwned: boolean;
   rewardedAmberClaimsRemaining: number;
+  iapConfigured: boolean;
 }> {
   const state = normalizeRewardDay(await loadState());
+  const iapStatus = getIapStatus();
+  if (iapStatus.configured) {
+    state.patronKeyOwned = await isPatronEntitledFromIap();
+    cache = state;
+    await saveState();
+  }
   return {
     patronKeyOwned: state.patronKeyOwned,
     rewardedAmberClaimsRemaining: Math.max(0, REWARDED_AMBER_DAILY_CAP - state.rewardedAmberClaims),
+    iapConfigured: iapStatus.configured,
   };
 }
 
 export async function hasPatronKey(): Promise<boolean> {
   const state = await loadState();
+  if (getIapStatus().configured) {
+    state.patronKeyOwned = await isPatronEntitledFromIap();
+    cache = state;
+    await saveState();
+  }
   return state.patronKeyOwned;
 }
 
 export async function setPatronKeyOwned(owned: boolean): Promise<void> {
+  // Fallback-only local override. Real IAP entitlement comes from RevenueCat.
   const state = await loadState();
   state.patronKeyOwned = owned;
   cache = state;
   await saveState();
 }
 
+export async function syncPatronEntitlement(): Promise<boolean> {
+  const state = await loadState();
+  if (getIapStatus().configured) {
+    state.patronKeyOwned = await syncIapEntitlement();
+    cache = state;
+    await saveState();
+  }
+  return state.patronKeyOwned;
+}
+
+export async function purchasePatronKey(): Promise<{
+  success: boolean;
+  patronKeyOwned: boolean;
+  message: string;
+}> {
+  const result = await purchasePatronEntitlement();
+  logEvent({
+    type: 'unlock_purchased',
+    data: {
+      unlockType: 'patron_key',
+      success: result.success,
+      source: 'iap',
+    },
+  });
+  const state = await loadState();
+  state.patronKeyOwned = result.patronEntitled;
+  cache = state;
+  await saveState();
+  return {
+    success: result.success,
+    patronKeyOwned: result.patronEntitled,
+    message: result.message,
+  };
+}
+
+export async function restorePatronKeyPurchases(): Promise<{
+  success: boolean;
+  patronKeyOwned: boolean;
+  message: string;
+}> {
+  const result = await restorePatronEntitlement();
+  logEvent({
+    type: 'unlock_purchased',
+    data: {
+      unlockType: 'patron_key_restore',
+      success: result.success,
+      source: 'iap',
+    },
+  });
+  const state = await loadState();
+  state.patronKeyOwned = result.patronEntitled;
+  cache = state;
+  await saveState();
+  return {
+    success: result.success,
+    patronKeyOwned: result.patronEntitled,
+    message: result.message,
+  };
+}
+
 /**
  * Patron's Key perk: flat +2 amber per puzzle (queued to pit with other rewards).
  */
 export async function getPatronAmberDripBonus(): Promise<number> {
-  const state = await loadState();
-  return state.patronKeyOwned ? PATRON_AMBER_DRIP : 0;
+  const owned = await hasPatronKey();
+  return owned ? PATRON_AMBER_DRIP : 0;
 }
 
 export async function getRewardedAmberClaimsRemaining(): Promise<number> {

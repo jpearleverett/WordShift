@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { trackAnalyticsEvent } from './analytics';
 
 const STORAGE_KEY = 'wordshift_event_log';
 const MAX_EVENTS = 500;
@@ -50,6 +51,11 @@ export function logEvent(event: GameEvent, options?: { immediate?: boolean }): v
   };
 
   eventBuffer.push(storedEvent);
+
+  trackAnalyticsEvent(storedEvent.type, {
+    ...storedEvent.data,
+    timestamp: storedEvent.timestamp,
+  }).catch(() => {});
 
   if (options?.immediate) {
     flushEvents().catch(() => {});

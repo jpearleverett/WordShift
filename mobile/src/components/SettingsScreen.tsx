@@ -31,8 +31,21 @@ import { clearChoiceState } from '../services/dialogueChoices';
 import { resetMicroBeats } from '../services/phaseNarrative';
 import { resetNotificationPrefs } from '../services/notifications';
 import { clearRoomUpgrades } from '../services/roomUpgrades';
-import { clearSyncStatus, getSyncStatus } from '../services/cloudSave';
-import { clearMonetizationState, getMonetizationState, setPatronKeyOwned } from '../services/monetization';
+import { clearAnalyticsState } from '../services/analytics';
+import {
+  checkForNewerSave,
+  clearSyncStatus,
+  downloadFromCloud,
+  getSyncStatus,
+  uploadToCloud,
+} from '../services/cloudSave';
+import {
+  clearMonetizationState,
+  getMonetizationState,
+  purchasePatronKey,
+  restorePatronKeyPurchases,
+  setPatronKeyOwned,
+} from '../services/monetization';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -42,6 +55,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<GameSettings | null>(null);
   const [patronKeyOwned, setPatronKeyState] = useState(false);
   const [rewardedClaimsRemaining, setRewardedClaimsRemaining] = useState(0);
+  const [iapConfigured, setIapConfigured] = useState(false);
   const [syncProvider, setSyncProvider] = useState('Not Connected');
   const [syncPending, setSyncPending] = useState(false);
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState(0);
@@ -55,6 +69,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
       setSettings(loadedSettings);
       setPatronKeyState(monetizationState.patronKeyOwned);
       setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
+      setIapConfigured(monetizationState.iapConfigured);
       setSyncProvider(syncStatus.provider);
       setSyncPending(syncStatus.pendingChanges);
       setLastSyncTimestamp(syncStatus.lastSyncTimestamp);
@@ -98,6 +113,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               resetNotificationPrefs(),
               clearRoomUpgrades(),
               clearMonetizationState(),
+              clearAnalyticsState(),
               clearSyncStatus(),
             ]);
             const [freshSettings, monetizationState, syncStatus] = await Promise.all([
@@ -108,6 +124,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             setSettings(freshSettings);
             setPatronKeyState(monetizationState.patronKeyOwned);
             setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
+            setIapConfigured(monetizationState.iapConfigured);
             setSyncProvider(syncStatus.provider);
             setSyncPending(syncStatus.pendingChanges);
             setLastSyncTimestamp(syncStatus.lastSyncTimestamp);
@@ -124,6 +141,68 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
     const monetizationState = await getMonetizationState();
     setPatronKeyState(monetizationState.patronKeyOwned);
     setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
+    setIapConfigured(monetizationState.iapConfigured);
+  };
+
+  const refreshSyncStatus = async () => {
+    const syncStatus = await getSyncStatus();
+    setSyncProvider(syncStatus.provider);
+    setSyncPending(syncStatus.pendingChanges);
+    setLastSyncTimestamp(syncStatus.lastSyncTimestamp);
+  };
+
+  const handlePurchasePatronKey = async () => {
+    hapticLight();
+    const result = await purchasePatronKey();
+    Alert.alert(result.success ? 'Purchase' : 'Purchase Unavailable', result.message);
+    const monetizationState = await getMonetizationState();
+    setPatronKeyState(monetizationState.patronKeyOwned);
+    setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
+    setIapConfigured(monetizationState.iapConfigured);
+  };
+
+  const handleRestorePatronKey = async () => {
+    hapticLight();
+    const result = await restorePatronKeyPurchases();
+    Alert.alert(result.success ? 'Restore' : 'Restore Result', result.message);
+    const monetizationState = await getMonetizationState();
+    setPatronKeyState(monetizationState.patronKeyOwned);
+    setRewardedClaimsRemaining(monetizationState.rewardedAmberClaimsRemaining);
+    setIapConfigured(monetizationState.iapConfigured);
+  };
+
+  const handleSyncNow = async () => {
+    hapticLight();
+    const success = await uploadToCloud();
+    await refreshSyncStatus();
+    Alert.alert(success ? 'Sync Complete' : 'Sync Failed', success ? 'Progress uploaded to cloud.' : 'Cloud upload failed.');
+  };
+
+  const handlePullCloud = async () => {
+    hapticLight();
+    const hasNewer = await checkForNewerSave();
+    if (!hasNewer) {
+      Alert.alert('Cloud Save', 'No newer cloud save found.');
+      return;
+    }
+    Alert.alert(
+      'Use Cloud Save?',
+      'A newer cloud save was found. This will overwrite local progress.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Use Cloud',
+          style: 'destructive',
+          onPress: async () => {
+            const success = await downloadFromCloud();
+            await refreshSyncStatus();
+            Alert.alert(success ? 'Cloud Restored' : 'Restore Failed', success
+              ? 'Cloud save restored. Restart the app to refresh all in-memory state.'
+              : 'Unable to restore cloud save.');
+          },
+        },
+      ]
+    );
   };
 
   if (!settings) return null;
@@ -214,22 +293,52 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           </View>
           <View style={styles.divider} />
           <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>IAP Mode</Text>
+            <Text style={styles.aboutValue}>{iapConfigured ? 'RevenueCat' : 'Local fallback'}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.aboutRow}>
             <Text style={styles.aboutLabel}>Bonus amber claims left</Text>
             <Text style={styles.aboutValue}>{rewardedClaimsRemaining}/{3}</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.patronButton, patronKeyOwned && styles.patronButtonActive]}
-            onPress={handleTogglePatronKey}
-            accessibilityLabel={patronKeyOwned ? 'Disable Patron key' : 'Enable Patron key'}
-            accessibilityRole="button"
-          >
-            <Text style={styles.patronButtonText}>
-              {patronKeyOwned ? 'Disable Patron Key' : 'Enable Patron Key'}
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.helperText}>
-            Temporary manual entitlement toggle until IAP wiring is connected.
-          </Text>
+          {iapConfigured ? (
+            <>
+              <TouchableOpacity
+                style={[styles.patronButton, patronKeyOwned && styles.patronButtonActive]}
+                onPress={handlePurchasePatronKey}
+                accessibilityLabel="Buy Patron Key"
+                accessibilityRole="button"
+              >
+                <Text style={styles.patronButtonText}>
+                  {patronKeyOwned ? 'Patron Key Active' : "Buy Patron's Key"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.patronButton, styles.patronButtonSecondary]}
+                onPress={handleRestorePatronKey}
+                accessibilityLabel="Restore purchases"
+                accessibilityRole="button"
+              >
+                <Text style={styles.patronButtonText}>Restore Purchases</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[styles.patronButton, patronKeyOwned && styles.patronButtonActive]}
+                onPress={handleTogglePatronKey}
+                accessibilityLabel={patronKeyOwned ? 'Disable Patron key' : 'Enable Patron key'}
+                accessibilityRole="button"
+              >
+                <Text style={styles.patronButtonText}>
+                  {patronKeyOwned ? 'Disable Patron Key' : 'Enable Patron Key (Local)'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.helperText}>
+                RevenueCat keys are missing or IAP is disabled. Using local fallback entitlement.
+              </Text>
+            </>
+          )}
         </View>
 
         {/* Sync diagnostics */}
@@ -251,6 +360,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               {lastSyncTimestamp > 0 ? new Date(lastSyncTimestamp).toLocaleString() : 'Never'}
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.syncButton}
+            onPress={handleSyncNow}
+            accessibilityLabel="Upload cloud save now"
+            accessibilityRole="button"
+          >
+            <Text style={styles.syncButtonText}>Sync Now</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.syncButton, styles.syncButtonSecondary]}
+            onPress={handlePullCloud}
+            accessibilityLabel="Download newer cloud save"
+            accessibilityRole="button"
+          >
+            <Text style={styles.syncButtonText}>Check / Pull Cloud Save</Text>
+          </TouchableOpacity>
         </View>
 
         {/* About */}
@@ -387,6 +512,10 @@ const styles = StyleSheet.create({
   patronButtonActive: {
     backgroundColor: CandyColors.green.main,
   },
+  patronButtonSecondary: {
+    backgroundColor: CandyColors.blue.main,
+    marginTop: -4,
+  },
   patronButtonText: {
     color: CandyColors.white,
     fontSize: 14,
@@ -397,6 +526,23 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[400],
     paddingHorizontal: 16,
     paddingBottom: 12,
+  },
+  syncButton: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 4,
+    backgroundColor: CandyColors.purple.main,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  syncButtonSecondary: {
+    backgroundColor: CandyColors.gray[400],
+  },
+  syncButtonText: {
+    color: CandyColors.white,
+    fontSize: 14,
+    fontWeight: '800',
   },
   bottomSpacer: {
     height: 60,

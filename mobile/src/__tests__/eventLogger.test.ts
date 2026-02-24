@@ -8,6 +8,10 @@ import {
 } from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+jest.mock('../services/analytics', () => ({
+  trackAnalyticsEvent: jest.fn(async () => {}),
+}));
+
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
   await clearEvents();

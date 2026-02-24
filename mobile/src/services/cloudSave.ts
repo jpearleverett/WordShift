@@ -152,6 +152,12 @@ let syncStatusCache: SyncStatus | null = null;
  */
 export function setCloudProvider(newProvider: CloudProvider): void {
   provider = newProvider;
+  if (syncStatusCache) {
+    syncStatusCache = {
+      ...syncStatusCache,
+      provider: provider.getName(),
+    };
+  }
 }
 
 /**
@@ -326,5 +332,6 @@ export async function clearSyncStatus(): Promise<void> {
   try {
     await AsyncStorage.removeItem(SYNC_STATUS_KEY);
     await AsyncStorage.removeItem('wordshift_device_id');
+    await AsyncStorage.removeItem('wordshift_supabase_user_id');
   } catch {}
 }

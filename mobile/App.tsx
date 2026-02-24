@@ -57,13 +57,18 @@ import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
 import { scheduleAllNotifications } from './src/services/notifications';
-import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import { markPendingChanges, setCloudProvider, uploadToCloud } from './src/services/cloudSave';
 import { estimateSlotIndex } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { claimRewardedAmber, getRewardedAmberClaimsRemaining } from './src/services/monetization';
+import { initAnalytics } from './src/services/analytics';
+import { initIap } from './src/services/iap';
+import { initSentryCrashReporter } from './src/services/sentryCrashReporter';
+import { SupabaseCloudProvider } from './src/services/cloudSaveSupabase';
+import { getRuntimeConfig } from './src/config/runtime';
 import {
   hasVariantModifier,
   getVariantTimeLimit,
@@ -308,9 +313,16 @@ export default function App() {
 
   // App-level initialization (non-onboarding)
   useEffect(() => {
+    const runtime = getRuntimeConfig();
     initAudio();
     startFrameMonitoring();
     installGlobalErrorHandler();
+    initSentryCrashReporter();
+    initAnalytics().catch(() => {});
+    initIap().catch(() => {});
+    if (runtime.enableCloudSync) {
+      setCloudProvider(new SupabaseCloudProvider());
+    }
     scheduleAllNotifications(0).catch(() => {});
     uploadToCloud().catch(() => {});
     getRewardedAmberClaimsRemaining().then(setRewardedAmberRemaining).catch(() => {});

@@ -19,6 +19,10 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
 
+jest.mock('../services/analytics', () => ({
+  trackAnalyticsEvent: jest.fn(async () => {}),
+}));
+
 function createMockProvider(overrides: Partial<CloudProvider> = {}): CloudProvider {
   return {
     upload: jest.fn(async () => true),
