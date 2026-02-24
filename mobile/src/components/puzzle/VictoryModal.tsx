@@ -384,7 +384,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 3: Amber breakdown + Collect Now */}
-            <Animated.View style={{ opacity: contentOpacity3 }}>
+            <Animated.View style={{ opacity: contentOpacity3, width: '100%' }}>
             {victoryData && (() => {
               const baseAmber = AMBER_REWARDS[difficulty as keyof typeof AMBER_REWARDS] || 0;
               const starBonus = earnedStars >= 3
@@ -506,7 +506,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 4: Action buttons — 3D candy style */}
-            <Animated.View style={{ opacity: contentOpacity4 }}>
+            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
             {isOnboarding ? (
             <View style={styles.victoryButtonRow}>
               {/* Onboarding: single "Continue" button */}
@@ -698,6 +698,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     marginBottom: 20,
+    width: '100%',
   },
   bonusBreakdown: {
     gap: 4,
@@ -753,6 +754,7 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'center',
     alignItems: 'flex-start',
+    width: '100%',
   },
   victoryButtonRowSecondary: {
     flexDirection: 'row',
