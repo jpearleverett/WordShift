@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 360,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.4)',
     shadowColor: CandyColors.purple.dark,
