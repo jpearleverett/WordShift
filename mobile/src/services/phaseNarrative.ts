@@ -977,7 +977,12 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The animals talk about your word chains when you\'re not here.',
     durationMs: 3000,
   },
-  // Phase 1+ micro-beats — break the retention valley
+  // Phase 1 micro-beats — surface narrative hooks earlier (Phase 1 starts at puzzle 15 now)
+  26: {
+    type: 'ambient_whisper',
+    text: 'Have you noticed the animals whispering when you finish a puzzle?',
+    durationMs: 3000,
+  },
   30: {
     type: 'ambient_whisper',
     text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
@@ -989,9 +994,19 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'PERFECT!',
     durationMs: 400,
   },
+  38: {
+    type: 'ambient_whisper',
+    text: 'Some rooms feel warmer after you solve a puzzle. Did you notice?',
+    durationMs: 3000,
+  },
   40: {
     type: 'ambient_whisper',
     text: 'The house settles at night. You can almost hear it breathing.',
+    durationMs: 3000,
+  },
+  45: {
+    type: 'ambient_whisper',
+    text: 'The animals have favorite words. They perk up when you form them.',
     durationMs: 3000,
   },
   50: {
@@ -1004,6 +1019,12 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'Some words leave marks where others don\'t. Have you noticed which ones?',
     durationMs: 3000,
   },
+  60: {
+    type: 'glitch_title',
+    glitchTitle: 'IT BEGINS',
+    text: 'PERFECT!',
+    durationMs: 300,
+  },
   65: {
     type: 'ambient_whisper',
     text: 'The words you\'ve formed... they remember each other.',
@@ -1013,12 +1034,6 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     type: 'ambient_whisper',
     text: 'The rooms are quieter now. Not empty — listening.',
     durationMs: 3000,
-  },
-  74: {
-    type: 'glitch_title',
-    glitchTitle: 'IT BEGINS',
-    text: 'PERFECT!',
-    durationMs: 300,
   },
   80: {
     type: 'glitch_title',
@@ -1821,4 +1836,90 @@ export function getPitMandatoryText(phase: DialoguePhase): string {
 export function getPitMandatoryCTA(phase: DialoguePhase): string {
   if (phase >= 3) return 'The pit demands your presence';
   return 'Visit the Pit';
+}
+
+// ============================================================================
+// SESSION ENGAGEMENT NUDGES — contextual prompts between puzzles to extend
+// session length. Surfaces quest progress, animal availability, streak status,
+// and variant teasers to keep players invested beyond the core puzzle loop.
+// ============================================================================
+
+export interface SessionNudge {
+  text: string;
+  /** Target screen or action the nudge encourages */
+  target: 'quest' | 'home' | 'variant' | 'streak' | 'pit';
+  /** Priority (higher = more important, used for selection) */
+  priority: number;
+}
+
+/**
+ * Generate contextual session nudges based on the player's current state.
+ * Returns up to 1 nudge — the highest-priority relevant one.
+ * Called after puzzle completion to add context to the between-puzzle moment.
+ */
+export function getSessionNudge(context: {
+  phase: DialoguePhase;
+  puzzlesThisSession: number;
+  hasUnclaimedQuests: boolean;
+  hasPendingHarvest: boolean;
+  animalsWithDialogue: string[];
+  currentStreak: number;
+  puzzlesSolved: number;
+  unlockedVariantCount: number;
+}): SessionNudge | null {
+  const nudges: SessionNudge[] = [];
+
+  // Quest completion nudge (high priority — tangible reward)
+  if (context.hasUnclaimedQuests) {
+    if (context.phase >= 3) {
+      nudges.push({ text: 'A quest offering awaits collection.', target: 'quest', priority: 80 });
+    } else {
+      nudges.push({ text: 'You completed a weekly quest! Claim your reward.', target: 'quest', priority: 80 });
+    }
+  }
+
+  // Pending harvest nudge (medium priority — deferred amber)
+  if (context.hasPendingHarvest && context.puzzlesThisSession >= 2) {
+    if (context.phase >= 3) {
+      nudges.push({ text: 'The pit hungers. Words await offering.', target: 'pit', priority: 60 });
+    } else {
+      nudges.push({ text: 'You have words waiting in the pit.', target: 'pit', priority: 60 });
+    }
+  }
+
+  // Animal dialogue availability (medium priority — narrative pull)
+  if (context.animalsWithDialogue.length > 0) {
+    const animal = context.animalsWithDialogue[0];
+    if (context.phase >= 3) {
+      nudges.push({ text: `${animal} has something to tell you.`, target: 'home', priority: 55 });
+    } else if (context.phase >= 2) {
+      nudges.push({ text: `${animal} wants to talk.`, target: 'home', priority: 55 });
+    } else {
+      nudges.push({ text: `${animal} has new things to say!`, target: 'home', priority: 50 });
+    }
+  }
+
+  // Streak encouragement (lower priority — retention nudge)
+  if (context.currentStreak >= 2 && context.puzzlesThisSession <= 1) {
+    if (context.phase >= 3) {
+      nudges.push({ text: `${context.currentStreak}-day chain intact. Continue.`, target: 'streak', priority: 40 });
+    } else {
+      nudges.push({ text: `${context.currentStreak}-day streak! Keep it going.`, target: 'streak', priority: 40 });
+    }
+  }
+
+  // Variant discovery nudge (low priority — variety pull)
+  if (context.unlockedVariantCount > 0 && context.puzzlesThisSession >= 3) {
+    if (context.phase >= 3) {
+      nudges.push({ text: 'Other patterns await exploration.', target: 'variant', priority: 30 });
+    } else {
+      nudges.push({ text: 'Try a different puzzle style for variety!', target: 'variant', priority: 30 });
+    }
+  }
+
+  if (nudges.length === 0) return null;
+
+  // Return highest-priority nudge
+  nudges.sort((a, b) => b.priority - a.priority);
+  return nudges[0];
 }

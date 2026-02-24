@@ -7,6 +7,10 @@ import { incrementShareCount } from './achievements';
  *
  * Generates Wordle-style emoji grids and shareable text
  * for puzzle completions and daily challenges.
+ *
+ * At higher phases, share text captures narrative moments
+ * (eerie victory titles, named incantations) to create
+ * intrigue without spoiling the arc for new players.
  */
 
 interface ShareableResult {
@@ -27,6 +31,10 @@ interface ShareableResult {
   phase?: number;
   /** Named incantation for the puzzle chain (Phase 2+) */
   incantationName?: string;
+  /** Victory title text (phase-aware — "PERFECT!" → "WHY DOES IT MATTER?") */
+  victoryTitle?: string;
+  /** Total words offered to the arrangement (cumulative count) */
+  totalWordsOffered?: number;
   /** Share frame style from cosmetics */
   shareFrame?: string;
 }
@@ -90,6 +98,19 @@ function formatWordChain(words: string[], phase: number): string {
 }
 
 /**
+ * Phase-aware tagline for the share footer.
+ * Creates intrigue at higher phases without spoiling the narrative.
+ * New players see something intriguing; existing players recognize the tone shift.
+ */
+function getShareTagline(phase: number): string | null {
+  if (phase <= 1) return null;
+  if (phase === 2) return 'The words are changing.';
+  if (phase === 3) return 'Something is listening.';
+  if (phase === 4) return 'The arrangement continues.';
+  return 'The pattern hums.'; // Phase 5
+}
+
+/**
  * Apply share frame decorations based on cosmetic frame style
  */
 function applyFrame(lines: string[], frameStyle?: string): string[] {
@@ -116,6 +137,7 @@ function applyFrame(lines: string[], frameStyle?: string): string[] {
  */
 export function generateShareText(result: ShareableResult): string {
   const lines: string[] = [];
+  const phase = result.phase || 0;
 
   if (result.isDaily && result.dailyDate) {
     lines.push(`WordShift Daily ${result.dailyDate}`);
@@ -127,9 +149,16 @@ export function generateShareText(result: ShareableResult): string {
   lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${result.difficulty}${challengeTag}`);
   lines.push(performanceGrid(result.moveCount, result.hintsUsed, result.invalidAttempts));
 
+  // Victory title capture (Phase 2+ — the eerie titles are the viral hook)
+  if (result.victoryTitle && phase >= 2) {
+    // Clean up any newlines in the title (e.g., "WHY DOES\nIT MATTER?" → single line)
+    const cleanTitle = result.victoryTitle.replace(/\n/g, ' ');
+    lines.push('');
+    lines.push(cleanTitle);
+  }
+
   // Word chain (enhanced sharing)
   if (result.wordChain && result.wordChain.length > 0) {
-    const phase = result.phase || 0;
     lines.push('');
     lines.push(formatWordChain(result.wordChain, phase));
   }
@@ -145,10 +174,22 @@ export function generateShareText(result: ShareableResult): string {
     lines.push('No hints, no mistakes!');
   }
 
+  // Total words offered (Phase 3+ — creates "how deep are you?" intrigue)
+  if (result.totalWordsOffered && result.totalWordsOffered >= 100 && phase >= 3) {
+    lines.push(`${result.totalWordsOffered} words offered.`);
+  }
+
   // Animal whisper
   if (result.animalWhisper) {
     lines.push('');
     lines.push(`"${result.animalWhisper}"`);
+  }
+
+  // Phase-aware tagline (creates intrigue for viewers)
+  const tagline = getShareTagline(phase);
+  if (tagline) {
+    lines.push('');
+    lines.push(tagline);
   }
 
   // Apply cosmetic frame

@@ -18,6 +18,7 @@ import {
   getChallengeIntroLines,
   getPitMandatoryText,
   getPitMandatoryCTA,
+  getSessionNudge,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -95,7 +96,7 @@ describe('getMoveMessage', () => {
     // getMoveMessage uses Math.random; Phase 0 now includes ~5% rare "seed" messages
     // that hint at darkness. Both normal upbeat and rare seed messages are valid.
     const phase0Words = ['Delicious', 'Tasty', 'Sweet', 'Yummy', 'Perfect', 'Brilliant', 'Nice', 'Sparkling', 'Juicy', 'Wonderful'];
-    const seedWords = ['remember', 'shifted', 'feel', 'wanted'];
+    const seedWords = ['remember', 'shifted', 'feel', 'wanted', 'waiting'];
     for (let i = 0; i < 50; i++) {
       const msg = getMoveMessage(0);
       const isUpbeat = phase0Words.some(w => msg.includes(w));
@@ -547,8 +548,35 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.text).toBeDefined();
   });
 
-  test('all 12 micro-beat thresholds fire independently', async () => {
-    const thresholds = [35, 40, 50, 55, 65, 70, 74, 80, 90, 100, 110, 130];
+  test('returns a beat at puzzle 26', async () => {
+    const beat = await checkNarrativeMicroBeat(26);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+    expect(beat!.text).toBeDefined();
+  });
+
+  test('returns a beat at puzzle 38', async () => {
+    const beat = await checkNarrativeMicroBeat(38);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+  });
+
+  test('returns a beat at puzzle 45', async () => {
+    const beat = await checkNarrativeMicroBeat(45);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('ambient_whisper');
+  });
+
+  test('returns a glitch_title beat at puzzle 60', async () => {
+    const beat = await checkNarrativeMicroBeat(60);
+    expect(beat).not.toBeNull();
+    expect(beat!.type).toBe('glitch_title');
+    expect(beat!.glitchTitle).toBeDefined();
+  });
+
+  test('all micro-beat thresholds fire independently', async () => {
+    // 8, 12, 18, 22 (Phase 0) + 26, 30, 35, 38, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100, 110, 130
+    const thresholds = [8, 12, 18, 22, 26, 30, 35, 38, 40, 45, 50, 55, 60, 65, 70, 80, 90, 100, 110, 130];
     for (const t of thresholds) {
       const beat = await checkNarrativeMicroBeat(t);
       expect(beat).not.toBeNull();
@@ -747,5 +775,81 @@ describe('getPitMandatoryCTA', () => {
   test('phase 3+ is more demanding', () => {
     expect(getPitMandatoryCTA(3)).toContain('demands');
     expect(getPitMandatoryCTA(4)).toContain('demands');
+  });
+});
+
+// ============================================================================
+// Session Engagement Nudges
+// ============================================================================
+
+describe('getSessionNudge', () => {
+  const baseContext = {
+    phase: 0 as DialoguePhase,
+    puzzlesThisSession: 1,
+    hasUnclaimedQuests: false,
+    hasPendingHarvest: false,
+    animalsWithDialogue: [] as string[],
+    currentStreak: 0,
+    puzzlesSolved: 10,
+    unlockedVariantCount: 0,
+  };
+
+  test('returns null when no conditions are met', () => {
+    const nudge = getSessionNudge(baseContext);
+    expect(nudge).toBeNull();
+  });
+
+  test('returns quest nudge when quests are unclaimed', () => {
+    const nudge = getSessionNudge({ ...baseContext, hasUnclaimedQuests: true });
+    expect(nudge).not.toBeNull();
+    expect(nudge!.target).toBe('quest');
+  });
+
+  test('returns pit nudge when harvest is pending and session is 2+ puzzles', () => {
+    const nudge = getSessionNudge({
+      ...baseContext,
+      hasPendingHarvest: true,
+      puzzlesThisSession: 2,
+    });
+    expect(nudge).not.toBeNull();
+    expect(nudge!.target).toBe('pit');
+  });
+
+  test('returns animal nudge when dialogue is available', () => {
+    const nudge = getSessionNudge({
+      ...baseContext,
+      animalsWithDialogue: ['Ember'],
+    });
+    expect(nudge).not.toBeNull();
+    expect(nudge!.target).toBe('home');
+    expect(nudge!.text).toContain('Ember');
+  });
+
+  test('returns streak nudge for active streaks', () => {
+    const nudge = getSessionNudge({
+      ...baseContext,
+      currentStreak: 5,
+      puzzlesThisSession: 1,
+    });
+    expect(nudge).not.toBeNull();
+    expect(nudge!.target).toBe('streak');
+    expect(nudge!.text).toContain('5');
+  });
+
+  test('quest nudge takes priority over pit nudge', () => {
+    const nudge = getSessionNudge({
+      ...baseContext,
+      hasUnclaimedQuests: true,
+      hasPendingHarvest: true,
+      puzzlesThisSession: 2,
+    });
+    expect(nudge).not.toBeNull();
+    expect(nudge!.target).toBe('quest');
+  });
+
+  test('nudge text shifts tone at higher phases', () => {
+    const phase0 = getSessionNudge({ ...baseContext, hasUnclaimedQuests: true, phase: 0 as DialoguePhase });
+    const phase4 = getSessionNudge({ ...baseContext, hasUnclaimedQuests: true, phase: 4 as DialoguePhase });
+    expect(phase0!.text).not.toBe(phase4!.text);
   });
 });

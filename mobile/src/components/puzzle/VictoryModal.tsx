@@ -79,6 +79,8 @@ interface VictoryModalProps {
   // Bonus breakdown data
   variant?: string;
   gameMode?: string;
+  // Session engagement nudge (between-puzzle context)
+  sessionNudge?: { text: string; target: string } | null;
 }
 
 // Phase-aware 3D button colors — matches LetterTile's phase palette
@@ -144,6 +146,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onOnboardingContinue,
   variant,
   gameMode,
+  sessionNudge,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const btn = getButtonTheme(phase);
@@ -593,6 +596,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
+
+            {/* Session engagement nudge — contextual hint to extend session */}
+            {sessionNudge && (
+              <Text style={[styles.sessionNudge, { color: theme.modalSecondaryTextColor }]}>
+                {sessionNudge.text}
+              </Text>
+            )}
             </>
             )}
             </Animated.View>
@@ -860,6 +870,15 @@ const styles = StyleSheet.create({
   btnFlatUniform: {
     fontSize: 14,
     fontWeight: '700',
+  },
+
+  // Session engagement nudge — subtle text below action buttons
+  sessionNudge: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.7,
   },
 
   // Collect Now pill (inside amber stats box)

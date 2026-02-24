@@ -48,6 +48,8 @@ import {
   getLoadingMessage,
   getRitualMicroEvent,
   getHarvestOverflowMessage,
+  getVictoryTitle,
+  getSessionNudge,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
@@ -157,6 +159,9 @@ export default function App() {
 
   // Home nudge — track consecutive puzzles without visiting home
   const puzzlesSinceHomeVisit = useRef(0);
+
+  // Session engagement nudge — contextual between-puzzle prompt
+  const [sessionNudge, setSessionNudge] = useState<{ text: string; target: string } | null>(null);
 
   // Guard: pit-resume useEffect should only fire on initial mount
   const pitResumeCheckedRef = useRef(false);
@@ -646,6 +651,19 @@ export default function App() {
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
       });
 
+      // Compute session engagement nudge (contextual between-puzzle prompt)
+      const nudge = getSessionNudge({
+        phase: persistence.currentPhase as 0 | 1 | 2 | 3 | 4 | 5,
+        puzzlesThisSession: puzzlesSinceHomeVisit.current,
+        hasUnclaimedQuests: false, // Would need async check; simplified for now
+        hasPendingHarvest: (victory.pendingHarvest?.pendingBatches ?? 0) > 0,
+        animalsWithDialogue: [], // Would need cooldown check; simplified for now
+        currentStreak: victory.currentStreak ?? 0,
+        puzzlesSolved: victory.cumulativeStats?.totalPuzzlesCompleted ?? 0,
+        unlockedVariantCount: 0, // Simplified — just pit/harvest/streak nudges
+      });
+      setSessionNudge(nudge);
+
       // Re-schedule notifications after puzzle completion
       scheduleAllNotifications(persistence.currentPhase).catch(() => {});
 
@@ -817,6 +835,7 @@ export default function App() {
     setIsPlayingDaily(false);
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
+    setSessionNudge(null);
     puzzleActions.handleNextLevel();
   }, [puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
@@ -876,6 +895,7 @@ export default function App() {
     if (!victoryFlow.victoryData) return;
     hapticLight();
     const moveCount = puzzle.rows.length - 1;
+    const phase = persistence.currentPhase;
     await sharePuzzleResult({
       stars: victoryFlow.victoryData.earnedStars,
       difficulty: puzzle.difficulty,
@@ -887,8 +907,10 @@ export default function App() {
       moveCount,
       wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
       animalWhisper: orchestration.whisper?.text,
-      phase: persistence.currentPhase,
+      phase,
       incantationName: puzzle.lastIncantationName || undefined,
+      victoryTitle: getVictoryTitle(victoryFlow.victoryData.earnedStars, phase as 0 | 1 | 2 | 3 | 4 | 5),
+      totalWordsOffered: victoryFlow.victoryData.totalWordsFormed,
     });
   }, [victoryFlow.victoryData, puzzle, isPlayingDaily, orchestration.whisper, persistence.currentPhase]);
 
@@ -1423,6 +1445,7 @@ export default function App() {
           onOnboardingContinue={handleOnboardingVictoryContinue}
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}
+          sessionNudge={sessionNudge}
         />
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}

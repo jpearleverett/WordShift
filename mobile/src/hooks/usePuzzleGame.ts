@@ -140,8 +140,34 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Double shift state: tracks the 4-step flow (pick1 → drop1 → pick2 → drop2)
   const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
 
+  // Phase 5 "fading previews" — previews are visible briefly then fade, making the
+  // player rely on intuition. The arrangement is done helping. ("Terrible peace")
+  const [phase5PreviewVisible, setPhase5PreviewVisible] = useState(true);
+  const phase5PreviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Phase 5 fading previews: when a letter is selected, previews show for 1.5s then fade
+  useEffect(() => {
+    if (phase5PreviewTimer.current) {
+      clearTimeout(phase5PreviewTimer.current);
+      phase5PreviewTimer.current = null;
+    }
+    if (currentPhase === 5 && selectedLetter) {
+      setPhase5PreviewVisible(true);
+      phase5PreviewTimer.current = setTimeout(() => {
+        setPhase5PreviewVisible(false);
+      }, 1500);
+    } else {
+      setPhase5PreviewVisible(true);
+    }
+    return () => {
+      if (phase5PreviewTimer.current) {
+        clearTimeout(phase5PreviewTimer.current);
+      }
+    };
+  }, [currentPhase, selectedLetter]);
 
   // Clean up shakeError timeout on unmount
   useEffect(() => {
@@ -899,8 +925,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
   // Compute word previews for the target row when a letter is selected.
   // Shows what word would form at each slot position — valid words in green, invalid in red.
+  // At Phase 5, previews fade after 1.5s — the arrangement is done helping.
   const slotPreviews = useMemo(() => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return undefined;
+
+    // Phase 5 fading previews: once timer expires, hide previews
+    if (currentPhase === 5 && !phase5PreviewVisible) return undefined;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -947,7 +977,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
     }
     return previews;
-  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase]);
+  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, currentPhase, phase5PreviewVisible]);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter

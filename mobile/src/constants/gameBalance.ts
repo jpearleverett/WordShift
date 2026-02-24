@@ -18,8 +18,13 @@ import { DialoguePhase } from '../types/homeWorld';
 // PHASE PROGRESSION
 // ============================================================================
 
-/** Puzzle thresholds for phase transitions (weighted progress values). */
-export const PHASE_THRESHOLDS = [0, 25, 75, 150, 235];
+/**
+ * Puzzle thresholds for phase transitions (weighted progress values).
+ * Phase 1 starts at 15 (was 25) to surface narrative hooks earlier —
+ * the assessment identified the Phase 0-1 retention valley as the
+ * critical risk (70-80% of players churn before seeing any narrative).
+ */
+export const PHASE_THRESHOLDS = [0, 15, 65, 140, 225];
 
 /**
  * Minimum real puzzles the player must have completed before a phase
@@ -27,11 +32,11 @@ export const PHASE_THRESHOLDS = [0, 25, 75, 150, 235];
  */
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
-  1: 20,
-  2: 65,
-  3: 135,
-  4: 225,
-  5: 300, // Post-revelation — after house completion + final puzzle
+  1: 12,
+  2: 55,
+  3: 120,
+  4: 210,
+  5: 285, // Post-revelation — after house completion + final puzzle
 };
 
 // ============================================================================
