@@ -19,7 +19,7 @@ import { DialoguePhase } from '../types/homeWorld';
 // ============================================================================
 
 /** Puzzle thresholds for phase transitions (weighted progress values). */
-export const PHASE_THRESHOLDS = [0, 25, 75, 150, 235];
+export const PHASE_THRESHOLDS = [0, 20, 65, 150, 235];
 
 /**
  * Minimum real puzzles the player must have completed before a phase
@@ -27,8 +27,8 @@ export const PHASE_THRESHOLDS = [0, 25, 75, 150, 235];
  */
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
-  1: 20,
-  2: 65,
+  1: 15,
+  2: 55,
   3: 135,
   4: 225,
   5: 300, // Post-revelation — after house completion + final puzzle

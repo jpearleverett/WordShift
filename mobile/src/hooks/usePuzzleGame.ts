@@ -7,7 +7,7 @@ import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHi
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
 import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
-import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress } from '../services/amberCurrency';
+import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords, isPostRevelation } from '../services/amberCurrency';
 import {
   getVariantOverrides,
   getVariantInstruction,
@@ -64,6 +64,8 @@ export interface PuzzleGameState {
   slotPreviews?: Array<{ word: string; isValid: boolean }>;
   /** Double shift phase tracking: pick1 → drop1 → pick2 → drop2 */
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
+  /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
+  isEchoPuzzle: boolean;
 }
 
 export interface PuzzleGameActions {
@@ -139,6 +141,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
   // Double shift state: tracks the 4-step flow (pick1 → drop1 → pick2 → drop2)
   const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
+  const [isEchoPuzzle, setIsEchoPuzzle] = useState(false);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -374,6 +377,34 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         initGame(curated.words, undefined, curated.solution, curated.words[0].length, 'standard');
         setMessage(getStartMessage(currentPhase));
         return;
+      }
+
+      // Phase 5 echo puzzles: every 5th puzzle seeds a word from ritual history.
+      // Falls through to normal bank/generation if echo seeding fails.
+      setIsEchoPuzzle(false);
+      if (currentPhase === 5 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
+        try {
+          const postRev = await isPostRevelation();
+          if (postRev) {
+            const ritualWords = await getRitualWords();
+            // Pick words matching the target word length for this difficulty
+            const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
+            const candidates = ritualWords.filter(w => w.length === targetLen);
+            if (candidates.length > 0) {
+              const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
+              const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
+              if (echoPuzzle) {
+                initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
+                await recordPuzzleWords(echoPuzzle.words);
+                setIsEchoPuzzle(true);
+                setMessage('The words are returning. They remember you.');
+                return;
+              }
+            }
+          }
+        } catch {
+          // Echo puzzle generation failed — fall through to normal path
+        }
       }
 
       // Use pre-generated puzzle bank for standard/reverse/double_shift variants at all difficulties
@@ -998,6 +1029,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setLastIncantationName(null);
     setLastFormedWord(null);
     setDoubleShiftPhase(null);
+    setIsEchoPuzzle(false);
   }, []);
 
   const state: PuzzleGameState = {
@@ -1032,6 +1064,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     moveDirection,
     slotPreviews,
     doubleShiftPhase,
+    isEchoPuzzle,
   };
 
   const actions: PuzzleGameActions = {

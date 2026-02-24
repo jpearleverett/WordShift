@@ -941,20 +941,47 @@ export interface NarrativeMicroBeat {
 
 /**
  * Micro-beats keyed by exact puzzle count. Each fires exactly once.
- * These are subtle moments of wrongness during the long Phase 1-2 corridor:
+ * These are subtle moments of wrongness seeded throughout the experience:
  *
- * - Puzzle 35: Victory title briefly shows wrong text then corrects itself
- * - Puzzle 40: The house is alive — first environmental foreshadowing
- * - Puzzle 50: A whisper appears unbidden on the home screen
- * - Puzzle 55: Word-specific foreshadowing — some words leave marks
- * - Puzzle 65: The victory feedback text contains an anomaly
- * - Puzzle 80: Second glitch title — they're listening
- * - Puzzle 90: The animals are coordinating — collective awareness
- * - Puzzle 100: A brief ambient whisper during puzzle solving
- * - Puzzle 110: The house is changing physically
- * - Puzzle 130: The letters have agency — player complicity deepens
+ * Early game (puzzles 5-25): Warm but slightly "too aware" observations.
+ *   Innocent on first read, resonant in retrospect. Create early "wait,
+ *   what?" hooks before the Phase 1 transition.
+ *
+ * Mid game (puzzles 30-74): Escalating environmental wrongness.
+ * Late game (puzzles 80-130): Overt coordination and agency.
  */
 const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
+  5: {
+    type: 'ambient_whisper',
+    text: 'Fox watched you solve that one. He seemed... pleased.',
+    durationMs: 3000,
+  },
+  8: {
+    type: 'ambient_whisper',
+    text: 'The house feels warmer when you play.',
+    durationMs: 2500,
+  },
+  12: {
+    type: 'ambient_whisper',
+    text: 'Have you noticed? The words almost arrange themselves.',
+    durationMs: 3000,
+  },
+  16: {
+    type: 'glitch_title',
+    glitchTitle: 'WELCOME HOME',
+    text: 'GREAT!',
+    durationMs: 300,
+  },
+  20: {
+    type: 'ambient_whisper',
+    text: 'The animals talk about you when you\'re away. All good things. Probably.',
+    durationMs: 3500,
+  },
+  25: {
+    type: 'ambient_whisper',
+    text: 'Each puzzle builds something. You can feel it, can\'t you?',
+    durationMs: 3000,
+  },
   30: {
     type: 'ambient_whisper',
     text: 'The house feels fuller with each puzzle. Or maybe it just wants to.',
