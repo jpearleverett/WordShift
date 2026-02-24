@@ -698,6 +698,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     marginBottom: 20,
+    width: '100%',
   },
   bonusBreakdown: {
     gap: 4,
@@ -753,6 +754,7 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'center',
     alignItems: 'flex-start',
+    width: '100%',
   },
   victoryButtonRowSecondary: {
     flexDirection: 'row',
