@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import { getRuntimeConfig } from '../config/runtime';
 
 interface IapStatus {
@@ -23,9 +22,23 @@ let lastError: string | null = null;
 
 function resolveApiKey(): string {
   const runtime = getRuntimeConfig();
-  return Platform.OS === 'ios'
+  return getPlatformOs() === 'ios'
     ? runtime.revenueCatIosApiKey
     : runtime.revenueCatAndroidApiKey;
+}
+
+function getPlatformOs(): 'ios' | 'android' {
+  try {
+    const rn = require('react-native');
+    const os = rn?.Platform?.OS;
+    if (os === 'ios' || os === 'android') {
+      return os;
+    }
+  } catch {
+    // Fall through to env-based fallback.
+  }
+  const envOs = (process.env.EXPO_OS ?? process.env.REACT_NATIVE_PLATFORM ?? '').toLowerCase();
+  return envOs === 'ios' ? 'ios' : 'android';
 }
 
 function isConfigured(): boolean {
