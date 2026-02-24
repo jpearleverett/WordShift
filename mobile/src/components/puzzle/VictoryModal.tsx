@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
     backgroundColor: CandyColors.white,
     borderRadius: 32,
     paddingTop: 28,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingBottom: 24,
     alignItems: 'center',
     width: '100%',
@@ -761,6 +761,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     marginBottom: 4,
+    width: '100%',
   },
   btn3dWrapper: {
     alignItems: 'center',
