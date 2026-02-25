@@ -7,6 +7,10 @@ import {
   ScrollView,
   Animated,
 } from 'react-native';
+import Reanimated, {
+  SharedValue,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
 import {
@@ -62,12 +66,12 @@ interface VictoryModalProps {
   // Ritual echo data
   completedWords?: string[];
   incantationName?: string | null;
-  // Animated values from useVictoryFlow
-  modalScale: Animated.Value;
-  modalOpacity: Animated.Value;
-  star1Scale: Animated.Value;
-  star2Scale: Animated.Value;
-  star3Scale: Animated.Value;
+  // Shared values from useVictoryFlow (Reanimated)
+  modalScale: SharedValue<number>;
+  modalOpacity: SharedValue<number>;
+  star1Scale: SharedValue<number>;
+  star2Scale: SharedValue<number>;
+  star3Scale: SharedValue<number>;
   // Callbacks
   onNextLevel: () => void;
   onReturnHome: () => void;
@@ -148,6 +152,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const phaseTheme = getPhaseTheme(phase);
   const btn = getButtonTheme(phase);
 
+  // Reanimated animated styles for shared values from useVictoryFlow
+  const modalAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: modalScale.value }],
+    opacity: modalOpacity.value,
+  }));
+  const star1AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: star1Scale.value }],
+  }));
+  const star2AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: star2Scale.value }],
+  }));
+  const star3AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: star3Scale.value }],
+  }));
+
   // Cascade animation — 4 staggered content groups
   const contentOpacity1 = useRef(new Animated.Value(0)).current;
   const contentOpacity2 = useRef(new Animated.Value(0)).current;
@@ -180,12 +199,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-          <Animated.View style={[styles.victoryModal, {
+          <Reanimated.View style={[styles.victoryModal, {
             backgroundColor: phaseTheme.modalBgColor,
             borderColor: btn.modalBorder,
-            transform: [{ scale: modalScale }],
-            opacity: modalOpacity,
-          }]}>
+          }, modalAnimStyle]}>
             <View style={[styles.victoryGlow, {
               backgroundColor: phaseTheme.victoryGlowColor,
             }]} />
@@ -193,28 +210,28 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Stars — choreographed pop-in */}
             <View style={styles.starsContainer}>
-              <Animated.Text style={[
+              <Reanimated.Text style={[
                 styles.victoryStar,
                 earnedStars < 1 && styles.victoryStarEmpty,
-                { transform: [{ scale: star1Scale }] },
+                star1AnimStyle,
               ]}>
                 {earnedStars >= 1 ? '\u2B50' : '\u2606'}
-              </Animated.Text>
-              <Animated.Text style={[
+              </Reanimated.Text>
+              <Reanimated.Text style={[
                 styles.victoryStar,
                 styles.victoryStarBig,
                 earnedStars < 2 && styles.victoryStarEmpty,
-                { transform: [{ scale: star2Scale }] },
+                star2AnimStyle,
               ]}>
                 {earnedStars >= 2 ? '\u2B50' : '\u2606'}
-              </Animated.Text>
-              <Animated.Text style={[
+              </Reanimated.Text>
+              <Reanimated.Text style={[
                 styles.victoryStar,
                 earnedStars < 3 && styles.victoryStarEmpty,
-                { transform: [{ scale: star3Scale }] },
+                star3AnimStyle,
               ]}>
                 {earnedStars >= 3 ? '\u2B50' : '\u2606'}
-              </Animated.Text>
+              </Reanimated.Text>
             </View>
 
             <Text style={[styles.victoryTitle, {
@@ -596,7 +613,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </>
             )}
             </Animated.View>
-          </Animated.View>
+          </Reanimated.View>
         </ScrollView>
       </View>
   );

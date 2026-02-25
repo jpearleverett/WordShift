@@ -8,6 +8,13 @@ import {
   Easing,
   GestureResponderEvent,
 } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+} from 'react-native-reanimated';
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
 import { DraggableTile } from './DraggableTile';
@@ -435,9 +442,17 @@ export const Row: React.FC<RowProps> = memo(({
   const glowAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
-  const invalidShakeX = useRef(new Animated.Value(0)).current;
-  const successBounceScale = useRef(new Animated.Value(1)).current;
+  const invalidShakeX = useSharedValue(0);
+  const successBounceScale = useSharedValue(1);
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Reanimated animated style for shake + bounce (runs on UI thread)
+  const shakeAndBounceStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: successBounceScale.value },
+      { translateX: invalidShakeX.value },
+    ],
+  }));
 
   useEffect(() => {
     // Animate row transitions
@@ -464,13 +479,13 @@ export const Row: React.FC<RowProps> = memo(({
               toValue: 1,
               duration: 1500,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
+              useNativeDriver: true,
             }),
             Animated.timing(glowAnim, {
               toValue: 0,
               duration: 1500,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
+              useNativeDriver: true,
             }),
           ])
         );
@@ -553,30 +568,24 @@ export const Row: React.FC<RowProps> = memo(({
     }
   }, [showSlots, selectedLetter?.id]);
 
-  // Micro-shake the target row on invalid drop attempts.
+  // Micro-shake the target row on invalid drop attempts (Reanimated — UI thread).
   useEffect(() => {
     if (!isTarget || invalidDropSignal <= 0) return;
-    invalidShakeX.setValue(0);
-    Animated.sequence([
-      Animated.timing(invalidShakeX, { toValue: 7, duration: 45, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: -7, duration: 45, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: 5, duration: 40, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: -5, duration: 40, useNativeDriver: true }),
-      Animated.timing(invalidShakeX, { toValue: 0, duration: 35, useNativeDriver: true }),
-    ]).start();
-  }, [invalidDropSignal, isTarget, invalidShakeX]);
+    invalidShakeX.value = withSequence(
+      withTiming(7, { duration: 45 }),
+      withTiming(-7, { duration: 45 }),
+      withTiming(5, { duration: 40 }),
+      withTiming(-5, { duration: 40 }),
+      withTiming(0, { duration: 35 }),
+    );
+  }, [invalidDropSignal, isTarget]);
 
-  // Brief scale bounce on the target row when a letter successfully lands.
+  // Brief scale bounce on the target row when a letter successfully lands (Reanimated — UI thread).
   useEffect(() => {
     if (!isTarget || successDropSignal <= 0 || getSettingsSync().reducedMotion) return;
-    successBounceScale.setValue(1.08);
-    Animated.spring(successBounceScale, {
-      toValue: 1,
-      friction: 5,
-      tension: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [successDropSignal, isTarget, successBounceScale]);
+    successBounceScale.value = 1.08;
+    successBounceScale.value = withSpring(1, { damping: 5, stiffness: 200 });
+  }, [successDropSignal, isTarget]);
 
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
@@ -730,6 +739,7 @@ export const Row: React.FC<RowProps> = memo(({
   };
 
   return (
+    <Reanimated.View style={[{ overflow: 'visible' as const }, shakeAndBounceStyle]}>
     <Animated.View
       style={[
         styles.rowWrapper,
@@ -737,8 +747,7 @@ export const Row: React.FC<RowProps> = memo(({
         isSource && !!onLetterDragDrop && { zIndex: 10 },
         {
           transform: [
-            { scale: Animated.multiply(scaleAnim, successBounceScale) },
-            { translateX: invalidShakeX },
+            { scale: scaleAnim },
             { translateY: slideAnim },
           ],
           opacity: opacityAnim,
@@ -799,6 +808,7 @@ export const Row: React.FC<RowProps> = memo(({
         </View>
       </View>
     </Animated.View>
+    </Reanimated.View>
   );
 });
 

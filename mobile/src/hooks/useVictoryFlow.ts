@@ -1,5 +1,13 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Animated } from 'react-native';
+import {
+  SharedValue,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  withDelay,
+  withSequence,
+  cancelAnimation,
+} from 'react-native-reanimated';
 import { VictoryData } from './useGamePersistence';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticHeavy } from '../services/haptics';
@@ -7,12 +15,12 @@ import { hapticLight, hapticHeavy } from '../services/haptics';
 export interface VictoryFlowState {
   victoryData: VictoryData | null;
   isProcessingVictory: boolean;
-  victoryStar1: Animated.Value;
-  victoryStar2: Animated.Value;
-  victoryStar3: Animated.Value;
-  victoryModalScale: Animated.Value;
-  victoryModalOpacity: Animated.Value;
-  phaseFlashOpacity: Animated.Value;
+  victoryStar1: SharedValue<number>;
+  victoryStar2: SharedValue<number>;
+  victoryStar3: SharedValue<number>;
+  victoryModalScale: SharedValue<number>;
+  victoryModalOpacity: SharedValue<number>;
+  phaseFlashOpacity: SharedValue<number>;
 }
 
 export interface VictoryFlowActions {
@@ -29,70 +37,63 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
   const [victoryData, setVictoryData] = useState<VictoryData | null>(null);
   const [isProcessingVictory, setProcessingVictory] = useState(false);
 
-  const victoryStar1 = useRef(new Animated.Value(0)).current;
-  const victoryStar2 = useRef(new Animated.Value(0)).current;
-  const victoryStar3 = useRef(new Animated.Value(0)).current;
-  const victoryModalScale = useRef(new Animated.Value(0.8)).current;
-  const victoryModalOpacity = useRef(new Animated.Value(0)).current;
-  const phaseFlashOpacity = useRef(new Animated.Value(0)).current;
+  const victoryStar1 = useSharedValue(0);
+  const victoryStar2 = useSharedValue(0);
+  const victoryStar3 = useSharedValue(0);
+  const victoryModalScale = useSharedValue(0.8);
+  const victoryModalOpacity = useSharedValue(0);
+  const phaseFlashOpacity = useSharedValue(0);
   const hapticTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
-  /** Ref to the running victory sequence animation (so skipToEnd can stop it). */
-  const runningAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Cleanup haptic timeouts and running animations on unmount
+  // Cleanup haptic timeouts on unmount
   useEffect(() => {
     return () => {
       hapticTimeouts.current.forEach(clearTimeout);
-      runningAnimRef.current?.stop();
-      runningAnimRef.current = null;
     };
   }, []);
 
   const playVictorySequence = useCallback((stars: number) => {
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) {
-      victoryStar1.setValue(stars >= 1 ? 1 : 0);
-      victoryStar2.setValue(stars >= 2 ? 1 : 0);
-      victoryStar3.setValue(stars >= 3 ? 1 : 0);
-      victoryModalScale.setValue(1);
-      victoryModalOpacity.setValue(1);
+      victoryStar1.value = stars >= 1 ? 1 : 0;
+      victoryStar2.value = stars >= 2 ? 1 : 0;
+      victoryStar3.value = stars >= 3 ? 1 : 0;
+      victoryModalScale.value = 1;
+      victoryModalOpacity.value = 1;
       hapticHeavy();
       return;
     }
 
-    victoryStar1.setValue(0);
-    victoryStar2.setValue(0);
-    victoryStar3.setValue(0);
-    victoryModalScale.setValue(0.8);
-    victoryModalOpacity.setValue(0);
+    // Reset all values
+    victoryStar1.value = 0;
+    victoryStar2.value = 0;
+    victoryStar3.value = 0;
+    victoryModalScale.value = 0.8;
+    victoryModalOpacity.value = 0;
 
-    const starAnims: Animated.CompositeAnimation[] = [];
+    // Stars pop in with staggered delay (200ms apart)
+    const starDelay = 200;
+    const springConfig = { damping: 4, stiffness: 120 };
     if (stars >= 1) {
-      starAnims.push(
-        Animated.spring(victoryStar1, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
-      );
+      victoryStar1.value = withDelay(0, withSpring(1, springConfig));
     }
     if (stars >= 2) {
-      starAnims.push(
-        Animated.spring(victoryStar2, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
-      );
+      victoryStar2.value = withDelay(starDelay, withSpring(1, springConfig));
     }
     if (stars >= 3) {
-      starAnims.push(
-        Animated.spring(victoryStar3, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true })
-      );
+      victoryStar3.value = withDelay(starDelay * 2, withSpring(1, springConfig));
     }
 
-    runningAnimRef.current?.stop();
-    const sequence = Animated.sequence([
-      Animated.stagger(200, starAnims),
-      Animated.parallel([
-        Animated.spring(victoryModalScale, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
-        Animated.timing(victoryModalOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-      ]),
-    ]);
-    runningAnimRef.current = sequence;
-    sequence.start(() => { runningAnimRef.current = null; });
+    // Modal reveal after stars (delay = stars * 200ms + buffer for spring settle)
+    const modalDelay = stars * starDelay + 100;
+    victoryModalScale.value = withDelay(
+      modalDelay,
+      withSpring(1, { damping: 6, stiffness: 80 }),
+    );
+    victoryModalOpacity.value = withDelay(
+      modalDelay,
+      withTiming(1, { duration: 250 }),
+    );
 
     // Haptic rhythm synced to star stagger: tap-tap-tap-THUD
     hapticTimeouts.current.forEach(clearTimeout);
@@ -101,33 +102,35 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 300));
     if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 500));
     hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), 100 + stars * 200 + 150));
-  }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
+  }, []);
 
   const playPhaseChangeFlash = useCallback(() => {
     const reducedMotion = getSettingsSync().reducedMotion;
     if (reducedMotion) return;
 
-    phaseFlashOpacity.setValue(0);
-    Animated.sequence([
-      Animated.timing(phaseFlashOpacity, { toValue: 0.7, duration: 150, useNativeDriver: true }),
-      Animated.timing(phaseFlashOpacity, { toValue: 0, duration: 100, useNativeDriver: true }),
-      Animated.delay(100),
-      Animated.timing(phaseFlashOpacity, { toValue: 0.5, duration: 100, useNativeDriver: true }),
-      Animated.timing(phaseFlashOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
-    ]).start();
-  }, [phaseFlashOpacity]);
+    phaseFlashOpacity.value = 0;
+    phaseFlashOpacity.value = withSequence(
+      withTiming(0.7, { duration: 150 }),
+      withTiming(0, { duration: 100 }),
+      withDelay(100, withTiming(0.5, { duration: 100 })),
+      withTiming(0, { duration: 400 }),
+    );
+  }, []);
 
   const skipToEnd = useCallback((stars: number) => {
-    // Stop the running victory sequence to prevent in-flight callbacks
-    // from overwriting the final values we're about to set.
-    runningAnimRef.current?.stop();
-    runningAnimRef.current = null;
-    victoryStar1.setValue(stars >= 1 ? 1 : 0);
-    victoryStar2.setValue(stars >= 2 ? 1 : 0);
-    victoryStar3.setValue(stars >= 3 ? 1 : 0);
-    victoryModalScale.setValue(1);
-    victoryModalOpacity.setValue(1);
-  }, [victoryStar1, victoryStar2, victoryStar3, victoryModalScale, victoryModalOpacity]);
+    // Cancel any running animations — Reanimated cancels automatically when
+    // we assign new values, but explicit cancel ensures cleanup of withDelay
+    cancelAnimation(victoryStar1);
+    cancelAnimation(victoryStar2);
+    cancelAnimation(victoryStar3);
+    cancelAnimation(victoryModalScale);
+    cancelAnimation(victoryModalOpacity);
+    victoryStar1.value = stars >= 1 ? 1 : 0;
+    victoryStar2.value = stars >= 2 ? 1 : 0;
+    victoryStar3.value = stars >= 3 ? 1 : 0;
+    victoryModalScale.value = 1;
+    victoryModalOpacity.value = 1;
+  }, []);
 
   const resetVictory = useCallback(() => {
     setVictoryData(null);

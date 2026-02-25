@@ -10,6 +10,8 @@ import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
 import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../../services/puzzleVariety';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
+import { getSettingsSync } from '../../services/settings';
 
 interface DifficultyMenuProps {
   visible: boolean;
@@ -38,6 +40,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
 }) => {
   if (!visible) return null;
 
+  const reducedMotion = getSettingsSync().reducedMotion;
   const phaseTheme = getPhaseTheme(phase);
   const isDark = phase >= 3;
   const title = phase >= 3 ? 'ARRANGEMENT SETUP' : 'PUZZLE SETUP';
@@ -89,10 +92,13 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   };
 
   return (
-    <View style={[styles.difficultyMenu, !hasNonStandardVariants && styles.difficultyMenuCompact, isDark && {
-      backgroundColor: phaseTheme.modalBgColor,
-      shadowColor: '#000',
-    }]}>
+    <Reanimated.View
+      entering={reducedMotion ? undefined : FadeIn.duration(200)}
+      style={[styles.difficultyMenu, !hasNonStandardVariants && styles.difficultyMenuCompact, isDark && {
+        backgroundColor: phaseTheme.modalBgColor,
+        shadowColor: '#000',
+      }]}
+    >
       <Text style={[
         styles.menuTitle,
         isDark && { color: phaseTheme.modalTextColor },
@@ -221,7 +227,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </View>
         </TouchableOpacity>
       </ScrollView>
-    </View>
+    </Reanimated.View>
   );
 };
 

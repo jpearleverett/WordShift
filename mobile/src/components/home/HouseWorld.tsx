@@ -8,6 +8,15 @@ import {
   Easing,
   Image,
 } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  cancelAnimation,
+  Easing as REasing,
+} from 'react-native-reanimated';
 import {
   GestureHandlerRootView,
   PanGestureHandler,
@@ -393,6 +402,43 @@ const PHASE_BG_COLORS: Record<number, string> = {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
+  const pulseProgress = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (phase < 3) return;
+
+    // Energy pulse — flows through connector lines
+    const pulseDuration = phase >= 4 ? 2000 : 3000;
+    pulseProgress.value = 0;
+    pulseProgress.value = withRepeat(
+      withTiming(1, { duration: pulseDuration, easing: REasing.inOut(REasing.sin) }),
+      -1,
+      true,
+    );
+
+    return () => cancelAnimation(pulseProgress);
+  }, [phase]);
+
+  const lineAnimStyle = useAnimatedStyle(() => {
+    if (phase < 3) return {};
+    // Subtle brightness pulse on the connector line
+    const baseOpacity = phase === 5 ? 0.3 : phase >= 4 ? 0.7 : 0.4;
+    const pulseRange = phase >= 4 ? 0.25 : 0.15;
+    return {
+      opacity: baseOpacity + pulseProgress.value * pulseRange,
+    };
+  });
+
+  const nodeAnimStyle = useAnimatedStyle(() => {
+    if (phase < 3) return {};
+    // Node pulses in size and opacity
+    const s = 1.0 + pulseProgress.value * (phase >= 4 ? 0.3 : 0.15);
+    return {
+      transform: [{ scale: s }],
+      opacity: 0.7 + pulseProgress.value * 0.3,
+    };
+  });
+
   if (phase < 2) return null;
 
   const lineWidth = phase === 5 ? 1.5 : phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
@@ -403,25 +449,39 @@ const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
 
   return (
     <View style={arrangementStyles.connector}>
-      {/* Vertical line */}
-      <View
-        style={[
-          arrangementStyles.line,
-          {
-            width: lineWidth,
-            backgroundColor: lineColor,
-            opacity: lineOpacity,
-          },
-          showGlow && arrangementStyles.lineGlow,
-        ]}
-      />
-      {/* Node circle at connection point */}
-      {showNodes && (
+      {/* Vertical energy line — pulses at Phase 3+ */}
+      {phase >= 3 ? (
+        <Reanimated.View
+          style={[
+            arrangementStyles.line,
+            {
+              width: lineWidth,
+              backgroundColor: lineColor,
+            },
+            showGlow && arrangementStyles.lineGlow,
+            lineAnimStyle,
+          ]}
+        />
+      ) : (
         <View
+          style={[
+            arrangementStyles.line,
+            {
+              width: lineWidth,
+              backgroundColor: lineColor,
+              opacity: lineOpacity,
+            },
+          ]}
+        />
+      )}
+      {/* Node circle at connection point — pulses at Phase 3+ */}
+      {showNodes && (
+        <Reanimated.View
           style={[
             arrangementStyles.node,
             { borderColor: lineColor },
             showGlow && arrangementStyles.nodeGlow,
+            nodeAnimStyle,
           ]}
         />
       )}
@@ -477,68 +537,68 @@ const arrangementStyles = StyleSheet.create({
  * pulsing crimson eyes at Phase 4 with glow effect.
  */
 const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
-  const breatheAnim = React.useRef(new Animated.Value(0)).current;
-  const eyePulseAnim = React.useRef(new Animated.Value(0)).current;
+  const breatheProgress = useSharedValue(0);
+  const eyePulseProgress = useSharedValue(0);
 
   React.useEffect(() => {
     if (phase < 2) return;
 
-    // Breathing animation — slow scale pulse
+    // Breathing animation — slow scale pulse via Reanimated
     const breatheDuration = phase === 5 ? 6000 : phase >= 4 ? 3000 : 4000;
-    const breatheLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breatheAnim, { toValue: 1, duration: breatheDuration, useNativeDriver: true }),
-        Animated.timing(breatheAnim, { toValue: 0, duration: breatheDuration, useNativeDriver: true }),
-      ])
+    breatheProgress.value = 0;
+    breatheProgress.value = withRepeat(
+      withTiming(1, { duration: breatheDuration * 2, easing: REasing.inOut(REasing.sin) }),
+      -1,
+      true,
     );
-    breatheLoop.start();
 
     // Eye pulse at Phase 4+
-    let eyeLoop: Animated.CompositeAnimation | undefined;
     if (phase >= 4) {
-      eyeLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(eyePulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-          Animated.timing(eyePulseAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
-        ])
+      eyePulseProgress.value = 0;
+      eyePulseProgress.value = withRepeat(
+        withTiming(1, { duration: 3000, easing: REasing.inOut(REasing.sin) }),
+        -1,
+        true,
       );
-      eyeLoop.start();
     }
 
     return () => {
-      breatheLoop.stop();
-      eyeLoop?.stop();
+      cancelAnimation(breatheProgress);
+      cancelAnimation(eyePulseProgress);
     };
   }, [phase]);
 
+  const bodyAnimStyle = useAnimatedStyle(() => {
+    if (phase < 2) return { opacity: 0 };
+    const baseOpacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : phase === 5 ? 0.20 : 0.30;
+    const scaleMax = phase >= 4 ? 1.06 : 1.03;
+    const s = 1.0 + breatheProgress.value * (scaleMax - 1.0);
+    return {
+      opacity: baseOpacity,
+      transform: [{ scale: s }],
+    };
+  });
+
+  const eyeAnimStyle = useAnimatedStyle(() => {
+    const op = 0.5 + eyePulseProgress.value * 0.5;
+    return { opacity: op };
+  });
+
   if (phase < 2) return null;
 
-  const opacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : phase === 5 ? 0.20 : 0.30;
   const scaleVal = phase === 2 ? 0.6 : phase === 3 ? 0.8 : 1.0;
   const height = 180 * scaleVal;
   const width = 100 * scaleVal;
 
-  const breatheScale = breatheAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.0, phase >= 4 ? 1.06 : 1.03],
-  });
-
-  const eyeOpacity = phase >= 4 ? eyePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.5, 1.0],
-  }) : 0.7;
-
   return (
-    <Animated.View style={{
+    <Reanimated.View style={[{
       position: 'absolute',
       top: -height * 0.3,
       alignSelf: 'center',
       width: width,
       height: height,
-      opacity: opacity,
       zIndex: -1,
-      transform: [{ scale: breatheScale }],
-    }}>
+    }, bodyAnimStyle]}>
       {/* Central body - tall dark oval */}
       <View style={{
         flex: 1,
@@ -575,7 +635,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
       )}
       {/* "Eyes" at Phase 4+ - pulsing dots with glow (crimson at Phase 4, soft purple at Phase 5) */}
       {phase >= 4 && (
-        <Animated.View style={{
+        <Reanimated.View style={[{
           position: 'absolute',
           top: height * 0.25,
           left: 0,
@@ -583,8 +643,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
           flexDirection: 'row',
           justifyContent: 'center',
           gap: width * 0.2,
-          opacity: eyeOpacity,
-        }}>
+        }, eyeAnimStyle]}>
           <View style={{
             width: 8,
             height: 5,
@@ -605,9 +664,9 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
             shadowOpacity: phase === 5 ? 0.5 : 0.8,
             shadowRadius: 6,
           }} />
-        </Animated.View>
+        </Reanimated.View>
       )}
-    </Animated.View>
+    </Reanimated.View>
   );
 };
 
