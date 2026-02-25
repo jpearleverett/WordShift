@@ -36,7 +36,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
     try {
       const progress = await getFullProgress();
       const shareCount = await getShareCount();
-      const dailyStatus = await getDailyStatus();
+      const dailyStatus = getDailyStatus();
       const state: AchievementCheckState = {
         stats: victory.cumulativeStats || {
           totalPuzzlesCompleted: 0,

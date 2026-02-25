@@ -1,9 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 /**
  * Data Migration System
  *
- * Provides versioned schema migrations for AsyncStorage data.
+ * Provides versioned schema migrations for MMKV data.
  * Each migration transforms data from version N to version N+1.
  * On app load, runs any pending migrations sequentially.
  */
@@ -16,7 +16,7 @@ export const CURRENT_SCHEMA_VERSION = 3;
 interface Migration {
   version: number;
   description: string;
-  migrate: () => Promise<void>;
+  migrate: () => void;
 }
 
 /**
@@ -27,7 +27,7 @@ const MIGRATIONS: Migration[] = [
   {
     version: 1,
     description: 'Initialize schema version tracking',
-    migrate: async () => {
+    migrate: () => {
       // No data changes — just establishes the versioning system.
       // All existing data is considered version 0 (pre-migration).
     },
@@ -35,98 +35,86 @@ const MIGRATIONS: Migration[] = [
   {
     version: 2,
     description: 'Add phaseProgress, challengeCompletions, lastClaimedMilestone defaults; migrate wordHistory to grouped format',
-    migrate: async () => {
+    migrate: () => {
       // Migrate home progress — add missing fields with safe defaults
       const progressKey = 'wordshift_home_progress';
-      try {
-        const stored = await AsyncStorage.getItem(progressKey);
-        if (stored) {
-          const progress = JSON.parse(stored);
+      const stored = storage.getString(progressKey);
+      if (stored !== undefined) {
+        const progress = JSON.parse(stored);
 
-          // Add phaseProgress if missing (initialize from puzzlesSolved)
-          if (progress.phaseProgress === undefined) {
-            progress.phaseProgress = progress.puzzlesSolved || 0;
-          }
-
-          // Add challengeCompletions if missing
-          if (progress.challengeCompletions === undefined) {
-            progress.challengeCompletions = 0;
-          }
-
-          // Add lastClaimedMilestone if missing
-          if (progress.lastClaimedMilestone === undefined) {
-            // Find the highest milestone at or below current puzzle count
-            const milestones = [10, 25, 50, 75, 100, 150, 200, 250, 300, 350];
-            const claimed = milestones.filter(m => m <= (progress.puzzlesSolved || 0));
-            progress.lastClaimedMilestone = claimed.length > 0 ? claimed[claimed.length - 1] : 0;
-          }
-
-          // Add introsSeen if missing
-          if (!progress.introsSeen) {
-            progress.introsSeen = [];
-          }
-
-          // Add decorations if missing
-          if (!progress.decorations) {
-            progress.decorations = {};
-          }
-
-          await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
+        // Add phaseProgress if missing (initialize from puzzlesSolved)
+        if (progress.phaseProgress === undefined) {
+          progress.phaseProgress = progress.puzzlesSolved || 0;
         }
-      } catch (error) {
-        console.warn('Migration v2: Failed to migrate home progress:', error);
+
+        // Add challengeCompletions if missing
+        if (progress.challengeCompletions === undefined) {
+          progress.challengeCompletions = 0;
+        }
+
+        // Add lastClaimedMilestone if missing
+        if (progress.lastClaimedMilestone === undefined) {
+          // Find the highest milestone at or below current puzzle count
+          const milestones = [10, 25, 50, 75, 100, 150, 200, 250, 300, 350];
+          const claimed = milestones.filter(m => m <= (progress.puzzlesSolved || 0));
+          progress.lastClaimedMilestone = claimed.length > 0 ? claimed[claimed.length - 1] : 0;
+        }
+
+        // Add introsSeen if missing
+        if (!progress.introsSeen) {
+          progress.introsSeen = [];
+        }
+
+        // Add decorations if missing
+        if (!progress.decorations) {
+          progress.decorations = {};
+        }
+
+        storage.set(progressKey, JSON.stringify(progress));
       }
 
       // Migrate word history — convert flat array to grouped format
       const historyKey = 'wordshift_word_history';
-      try {
-        const stored = await AsyncStorage.getItem(historyKey);
-        if (stored) {
-          const data = JSON.parse(stored);
-          // Only migrate if it has the old flat format (recentWords) and not the new grouped format
-          if (data.recentWords && !data.puzzleGroups) {
-            const words: string[] = data.recentWords;
-            const groups: string[][] = [];
-            const approxWordsPerPuzzle = 5;
-            for (let i = 0; i < words.length; i += approxWordsPerPuzzle) {
-              groups.push(words.slice(i, i + approxWordsPerPuzzle));
-            }
-            const migrated = {
-              puzzleGroups: groups,
-              lastUpdated: data.lastUpdated || Date.now(),
-            };
-            await AsyncStorage.setItem(historyKey, JSON.stringify(migrated));
+      const historyStored = storage.getString(historyKey);
+      if (historyStored !== undefined) {
+        const data = JSON.parse(historyStored);
+        // Only migrate if it has the old flat format (recentWords) and not the new grouped format
+        if (data.recentWords && !data.puzzleGroups) {
+          const words: string[] = data.recentWords;
+          const groups: string[][] = [];
+          const approxWordsPerPuzzle = 5;
+          for (let i = 0; i < words.length; i += approxWordsPerPuzzle) {
+            groups.push(words.slice(i, i + approxWordsPerPuzzle));
           }
+          const migrated = {
+            puzzleGroups: groups,
+            lastUpdated: data.lastUpdated || Date.now(),
+          };
+          storage.set(historyKey, JSON.stringify(migrated));
         }
-      } catch (error) {
-        console.warn('Migration v2: Failed to migrate word history:', error);
       }
     },
   },
   {
     version: 3,
     description: 'Add pendingPhaseTransition and phaseProgressFraction defaults for deferred phase transitions',
-    migrate: async () => {
+    migrate: () => {
       const progressKey = 'wordshift_home_progress';
-      try {
-        const stored = await AsyncStorage.getItem(progressKey);
-        if (stored) {
-          const progress = JSON.parse(stored);
+      const stored = storage.getString(progressKey);
+      if (stored !== undefined) {
+        const progress = JSON.parse(stored);
 
-          // Add pendingPhaseTransition if missing
-          if (progress.pendingPhaseTransition === undefined) {
-            progress.pendingPhaseTransition = null;
-          }
-
-          // Add phaseProgressFraction if missing
-          if (progress.phaseProgressFraction === undefined) {
-            progress.phaseProgressFraction = 0;
-          }
-
-          await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
+        // Add pendingPhaseTransition if missing
+        if (progress.pendingPhaseTransition === undefined) {
+          progress.pendingPhaseTransition = null;
         }
-      } catch (error) {
-        console.warn('Migration v3: Failed to migrate home progress:', error);
+
+        // Add phaseProgressFraction if missing
+        if (progress.phaseProgressFraction === undefined) {
+          progress.phaseProgressFraction = 0;
+        }
+
+        storage.set(progressKey, JSON.stringify(progress));
       }
     },
   },
@@ -135,13 +123,9 @@ const MIGRATIONS: Migration[] = [
 /**
  * Get the current stored schema version
  */
-export async function getSchemaVersion(): Promise<number> {
-  try {
-    const stored = await AsyncStorage.getItem(SCHEMA_VERSION_KEY);
-    return stored ? parseInt(stored, 10) : 0;
-  } catch {
-    return 0;
-  }
+export function getSchemaVersion(): number {
+  const stored = storage.getString(SCHEMA_VERSION_KEY);
+  return stored !== undefined ? parseInt(stored, 10) : 0;
 }
 
 /**
@@ -149,12 +133,12 @@ export async function getSchemaVersion(): Promise<number> {
  * Should be called once on app startup before any data access.
  * Safe to call multiple times — only runs migrations that haven't been applied.
  */
-export async function runMigrations(): Promise<{
+export function runMigrations(): {
   migrationsRun: number;
   fromVersion: number;
   toVersion: number;
-}> {
-  const currentVersion = await getSchemaVersion();
+} {
+  const currentVersion = getSchemaVersion();
   let migrationsRun = 0;
 
   if (currentVersion >= CURRENT_SCHEMA_VERSION) {
@@ -166,8 +150,8 @@ export async function runMigrations(): Promise<{
 
   for (const migration of pendingMigrations) {
     try {
-      await migration.migrate();
-      await AsyncStorage.setItem(SCHEMA_VERSION_KEY, String(migration.version));
+      migration.migrate();
+      storage.set(SCHEMA_VERSION_KEY, String(migration.version));
       migrationsRun++;
     } catch (error) {
       console.warn(`Migration v${migration.version} failed:`, error);
@@ -176,7 +160,7 @@ export async function runMigrations(): Promise<{
     }
   }
 
-  const finalVersion = await getSchemaVersion();
+  const finalVersion = getSchemaVersion();
   return {
     migrationsRun,
     fromVersion: currentVersion,
@@ -187,6 +171,6 @@ export async function runMigrations(): Promise<{
 /**
  * Reset schema version (for testing)
  */
-export async function resetSchemaVersion(): Promise<void> {
-  await AsyncStorage.removeItem(SCHEMA_VERSION_KEY);
+export function resetSchemaVersion(): void {
+  storage.remove(SCHEMA_VERSION_KEY);
 }

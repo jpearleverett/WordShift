@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   enqueueHarvestBatch,
   getHarvestState,
@@ -10,10 +9,12 @@ import {
   HarvestBatch,
 } from '../services/wordHarvest';
 
-// Mock AsyncStorage using shared factory
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+// Mock MMKV storage using shared factory
+jest.mock('../services/storage', () =>
+  require('./helpers/mockStorage').createMockStorage()
 );
+
+import { storage } from '../services/storage';
 
 function makeBatch(overrides: Partial<HarvestBatch> = {}): HarvestBatch {
   return {
@@ -30,9 +31,9 @@ function makeBatch(overrides: Partial<HarvestBatch> = {}): HarvestBatch {
 }
 
 describe('wordHarvest', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
-    await clearHarvestState();
+  beforeEach(() => {
+    storage.clearAll();
+    clearHarvestState();
   });
 
   // ===========================================================================
@@ -311,11 +312,11 @@ describe('wordHarvest', () => {
       expect(state.totalAmberClaimed).toBe(0);
     });
 
-    it('removes the storage key', async () => {
-      await enqueueHarvestBatch(makeBatch({ id: 'b1' }));
-      await clearHarvestState();
+    it('removes the storage key', () => {
+      enqueueHarvestBatch(makeBatch({ id: 'b1' }));
+      clearHarvestState();
 
-      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_word_harvest');
+      expect(storage.remove).toHaveBeenCalledWith('wordshift_word_harvest');
     });
   });
 
@@ -343,31 +344,31 @@ describe('wordHarvest', () => {
   // ===========================================================================
 
   describe('persistence', () => {
-    it('saves to AsyncStorage on enqueue', async () => {
-      await enqueueHarvestBatch(makeBatch({ id: 'b1' }));
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+    it('saves to storage on enqueue', () => {
+      enqueueHarvestBatch(makeBatch({ id: 'b1' }));
+      expect(storage.set).toHaveBeenCalledWith(
         'wordshift_word_harvest',
         expect.any(String)
       );
     });
 
-    it('saves to AsyncStorage on offer', async () => {
-      await enqueueHarvestBatch(makeBatch({ id: 'b1' }));
+    it('saves to storage on offer', () => {
+      enqueueHarvestBatch(makeBatch({ id: 'b1' }));
       jest.clearAllMocks();
 
-      await offerBatch('b1');
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      offerBatch('b1');
+      expect(storage.set).toHaveBeenCalledWith(
         'wordshift_word_harvest',
         expect.any(String)
       );
     });
 
-    it('saves to AsyncStorage on offer all', async () => {
-      await enqueueHarvestBatch(makeBatch({ id: 'b1' }));
+    it('saves to storage on offer all', () => {
+      enqueueHarvestBatch(makeBatch({ id: 'b1' }));
       jest.clearAllMocks();
 
-      await offerAllBatches();
-      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      offerAllBatches();
+      expect(storage.set).toHaveBeenCalledWith(
         'wordshift_word_harvest',
         expect.any(String)
       );

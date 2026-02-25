@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 /**
  * Whisper Gallery — Collectible dialogue and whisper archive.
@@ -34,10 +34,8 @@ export interface WhisperGalleryState {
 }
 
 // ============================================================================
-// In-memory cache
+// ID Generation (deterministic from content)
 // ============================================================================
-
-let galleryCache: WhisperGalleryState | null = null;
 
 function getDefaultState(): WhisperGalleryState {
   return {
@@ -46,10 +44,6 @@ function getDefaultState(): WhisperGalleryState {
     totalCollected: 0,
   };
 }
-
-// ============================================================================
-// ID Generation (deterministic from content)
-// ============================================================================
 
 /**
  * Generate a stable ID for a whisper entry based on its content.
@@ -74,31 +68,26 @@ function generateEntryId(animalType: string, text: string, type: string): string
 /**
  * Load the whisper gallery state from storage.
  */
-export async function loadWhisperGallery(): Promise<WhisperGalleryState> {
-  if (galleryCache) return galleryCache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      galleryCache = JSON.parse(stored);
-      return galleryCache!;
-    }
-  } catch {}
-  galleryCache = getDefaultState();
-  return galleryCache;
+export function loadWhisperGallery(): WhisperGalleryState {
+  const stored = storage.getString(STORAGE_KEY);
+  if (stored !== undefined) {
+    return JSON.parse(stored);
+  }
+  return getDefaultState();
 }
 
 /**
  * Record a new whisper/dialogue entry. Deduplicates by content.
  * Returns true if newly recorded, false if already seen.
  */
-export async function recordWhisper(entry: {
+export function recordWhisper(entry: {
   animalType: string;
   animalName: string;
   text: string;
   phase: number;
   type: WhisperEntry['type'];
-}): Promise<boolean> {
-  const state = await loadWhisperGallery();
+}): boolean {
+  const state = loadWhisperGallery();
   const id = generateEntryId(entry.animalType, entry.text, entry.type);
 
   if (state.seenIds.includes(id)) return false;
@@ -119,15 +108,15 @@ export async function recordWhisper(entry: {
     state.seenIds = state.entries.map(e => e.id);
   }
 
-  await saveGalleryState(state);
+  saveGalleryState(state);
   return true;
 }
 
 /**
  * Get all entries for a specific animal, sorted by phase then timestamp.
  */
-export async function getEntriesForAnimal(animalType: string): Promise<WhisperEntry[]> {
-  const state = await loadWhisperGallery();
+export function getEntriesForAnimal(animalType: string): WhisperEntry[] {
+  const state = loadWhisperGallery();
   return state.entries
     .filter(e => e.animalType === animalType)
     .sort((a, b) => a.phase - b.phase || a.timestamp - b.timestamp);
@@ -136,8 +125,8 @@ export async function getEntriesForAnimal(animalType: string): Promise<WhisperEn
 /**
  * Get all entries grouped by animal.
  */
-export async function getGroupedEntries(): Promise<Record<string, WhisperEntry[]>> {
-  const state = await loadWhisperGallery();
+export function getGroupedEntries(): Record<string, WhisperEntry[]> {
+  const state = loadWhisperGallery();
   const grouped: Record<string, WhisperEntry[]> = {};
 
   for (const entry of state.entries) {
@@ -156,13 +145,13 @@ export async function getGroupedEntries(): Promise<Record<string, WhisperEntry[]
 /**
  * Get collection stats for the gallery screen header.
  */
-export async function getGalleryStats(): Promise<{
+export function getGalleryStats(): {
   totalCollected: number;
   byAnimal: Record<string, number>;
   byPhase: Record<number, number>;
   byType: Record<string, number>;
-}> {
-  const state = await loadWhisperGallery();
+} {
+  const state = loadWhisperGallery();
   const byAnimal: Record<string, number> = {};
   const byPhase: Record<number, number> = {};
   const byType: Record<string, number> = {};
@@ -205,19 +194,13 @@ export function getGallerySubtitle(phase: number, count: number): string {
 // Internal
 // ============================================================================
 
-async function saveGalleryState(state: WhisperGalleryState): Promise<void> {
-  galleryCache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
+function saveGalleryState(state: WhisperGalleryState): void {
+  storage.set(STORAGE_KEY, JSON.stringify(state));
 }
 
 /**
  * Clear all gallery data (for Settings > Reset All).
  */
-export async function clearWhisperGallery(): Promise<void> {
-  galleryCache = null;
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {}
+export function clearWhisperGallery(): void {
+  storage.remove(STORAGE_KEY);
 }

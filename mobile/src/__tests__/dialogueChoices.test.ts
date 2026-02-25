@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loadChoiceState,
   getChoiceForAnimal,
@@ -12,10 +11,21 @@ import {
   PlayerChoice,
 } from '../services/dialogueChoices';
 
-// Mock AsyncStorage using shared factory
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+// Mock MMKV storage using shared factory
+jest.mock('../services/storage', () =>
+  require('./helpers/mockStorage').createMockStorage()
 );
+
+const { storage } = require('../services/storage') as {
+  storage: {
+    getString: jest.Mock;
+    set: jest.Mock;
+    remove: jest.Mock;
+    clearAll: jest.Mock;
+    getAllKeys: jest.Mock;
+    contains: jest.Mock;
+  };
+};
 
 const ALL_ANIMALS = [
   'fox', 'owl', 'pangolin', 'axolotl', 'capybara',
@@ -23,9 +33,9 @@ const ALL_ANIMALS = [
 ];
 
 describe('dialogueChoices', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
-    await clearChoiceState();
+  beforeEach(() => {
+    storage.clearAll();
+    clearChoiceState();
   });
 
   // ===========================================================================
@@ -72,31 +82,32 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('loadChoiceState', () => {
-    it('returns default empty state on first load', async () => {
-      const state = await loadChoiceState();
+    it('returns default empty state on first load', () => {
+      const state = loadChoiceState();
       expect(state.offeredBy).toEqual([]);
       expect(state.choices).toEqual({});
       expect(state.hasSeenChoice).toBe(false);
     });
 
-    it('returns cached state on subsequent calls', async () => {
-      const state1 = await loadChoiceState();
-      const state2 = await loadChoiceState();
-      expect(state1).toBe(state2);
+    it('returns cached state on subsequent calls', () => {
+      const state1 = loadChoiceState();
+      const state2 = loadChoiceState();
+      // Both calls return the same shape (MMKV reads from the same store)
+      expect(state1).toEqual(state2);
     });
 
-    it('loads from storage after cache clear', async () => {
-      await recordChoice('fox', 'ask');
-      await clearChoiceState();
+    it('loads from storage after cache clear', () => {
+      recordChoice('fox', 'ask');
+      clearChoiceState();
 
       const saved = {
         offeredBy: ['owl'],
         choices: { owl: 'refuse' },
         hasSeenChoice: true,
       };
-      await AsyncStorage.setItem('wordshift_dialogue_choices', JSON.stringify(saved));
+      storage.set('wordshift_dialogue_choices', JSON.stringify(saved));
 
-      const state = await loadChoiceState();
+      const state = loadChoiceState();
       expect(state.offeredBy).toContain('owl');
       expect(state.choices.owl).toBe('refuse');
     });
@@ -107,75 +118,75 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('getChoiceForAnimal', () => {
-    it('returns null for phase 0', async () => {
-      const result = await getChoiceForAnimal('fox', 0, 5);
+    it('returns null for phase 0', () => {
+      const result = getChoiceForAnimal('fox', 0, 5);
       expect(result).toBeNull();
     });
 
-    it('returns null for phase 1', async () => {
-      const result = await getChoiceForAnimal('fox', 1, 5);
+    it('returns null for phase 1', () => {
+      const result = getChoiceForAnimal('fox', 1, 5);
       expect(result).toBeNull();
     });
 
-    it('returns null for phase 2', async () => {
-      const result = await getChoiceForAnimal('fox', 2, 5);
+    it('returns null for phase 2', () => {
+      const result = getChoiceForAnimal('fox', 2, 5);
       expect(result).toBeNull();
     });
 
-    it('returns choice content for phase 3', async () => {
-      const result = await getChoiceForAnimal('fox', 3, 5);
+    it('returns choice content for phase 3', () => {
+      const result = getChoiceForAnimal('fox', 3, 5);
       expect(result).not.toBeNull();
       expect(result!.prompt).toBe(ANIMAL_CHOICES.fox.prompt);
     });
 
-    it('returns null for phase 4', async () => {
-      const result = await getChoiceForAnimal('fox', 4, 5);
+    it('returns null for phase 4', () => {
+      const result = getChoiceForAnimal('fox', 4, 5);
       expect(result).toBeNull();
     });
 
-    it('returns null for dialogueIndex < 4', async () => {
+    it('returns null for dialogueIndex < 4', () => {
       for (let i = 0; i < 4; i++) {
-        const result = await getChoiceForAnimal('fox', 3, i);
+        const result = getChoiceForAnimal('fox', 3, i);
         expect(result).toBeNull();
       }
     });
 
-    it('returns choice for dialogueIndex 4-6', async () => {
+    it('returns choice for dialogueIndex 4-6', () => {
       for (let i = 4; i <= 6; i++) {
-        await clearChoiceState();
-        const result = await getChoiceForAnimal('fox', 3, i);
+        clearChoiceState();
+        const result = getChoiceForAnimal('fox', 3, i);
         expect(result).not.toBeNull();
       }
     });
 
-    it('returns null for dialogueIndex > 6', async () => {
-      const result = await getChoiceForAnimal('fox', 3, 7);
+    it('returns null for dialogueIndex > 6', () => {
+      const result = getChoiceForAnimal('fox', 3, 7);
       expect(result).toBeNull();
     });
 
-    it('returns null if animal already offered choice', async () => {
-      await recordChoice('fox', 'ask');
-      const result = await getChoiceForAnimal('fox', 3, 5);
+    it('returns null if animal already offered choice', () => {
+      recordChoice('fox', 'ask');
+      const result = getChoiceForAnimal('fox', 3, 5);
       expect(result).toBeNull();
     });
 
-    it('returns choice for different animal after one has offered', async () => {
-      await recordChoice('fox', 'ask');
-      const result = await getChoiceForAnimal('owl', 3, 5);
+    it('returns choice for different animal after one has offered', () => {
+      recordChoice('fox', 'ask');
+      const result = getChoiceForAnimal('owl', 3, 5);
       expect(result).not.toBeNull();
     });
 
-    it('returns choice content for all 10 animals', async () => {
+    it('returns choice content for all 10 animals', () => {
       for (const animal of ALL_ANIMALS) {
-        await clearChoiceState();
-        const result = await getChoiceForAnimal(animal, 3, 5);
+        clearChoiceState();
+        const result = getChoiceForAnimal(animal, 3, 5);
         expect(result).not.toBeNull();
         expect(result!.prompt).toBe(ANIMAL_CHOICES[animal].prompt);
       }
     });
 
-    it('returns null for unknown animal', async () => {
-      const result = await getChoiceForAnimal('unicorn', 3, 5);
+    it('returns null for unknown animal', () => {
+      const result = getChoiceForAnimal('unicorn', 3, 5);
       expect(result).toBeNull();
     });
   });
@@ -185,47 +196,47 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('recordChoice', () => {
-    it('records an "ask" choice correctly', async () => {
-      const result = await recordChoice('fox', 'ask');
+    it('records an "ask" choice correctly', () => {
+      const result = recordChoice('fox', 'ask');
       expect(result.response).toBe(ANIMAL_CHOICES.fox.responses.ask);
       expect(result.convergence).toBe(ANIMAL_CHOICES.fox.convergence);
     });
 
-    it('records a "refuse" choice correctly', async () => {
-      const result = await recordChoice('owl', 'refuse');
+    it('records a "refuse" choice correctly', () => {
+      const result = recordChoice('owl', 'refuse');
       expect(result.response).toBe(ANIMAL_CHOICES.owl.responses.refuse);
       expect(result.convergence).toBe(ANIMAL_CHOICES.owl.convergence);
     });
 
-    it('marks animal as offered', async () => {
-      await recordChoice('fox', 'ask');
-      const state = await loadChoiceState();
+    it('marks animal as offered', () => {
+      recordChoice('fox', 'ask');
+      const state = loadChoiceState();
       expect(state.offeredBy).toContain('fox');
     });
 
-    it('stores the player choice', async () => {
-      await recordChoice('pangolin', 'refuse');
-      const state = await loadChoiceState();
+    it('stores the player choice', () => {
+      recordChoice('pangolin', 'refuse');
+      const state = loadChoiceState();
       expect(state.choices.pangolin).toBe('refuse');
     });
 
-    it('sets hasSeenChoice to true', async () => {
-      await recordChoice('fox', 'ask');
-      const state = await loadChoiceState();
+    it('sets hasSeenChoice to true', () => {
+      recordChoice('fox', 'ask');
+      const state = loadChoiceState();
       expect(state.hasSeenChoice).toBe(true);
     });
 
-    it('persists to storage', async () => {
-      await recordChoice('fox', 'ask');
-      expect(AsyncStorage.setItem).toHaveBeenCalled();
+    it('persists to storage', () => {
+      recordChoice('fox', 'ask');
+      expect(storage.set).toHaveBeenCalled();
     });
 
-    it('can record choices for multiple animals', async () => {
-      await recordChoice('fox', 'ask');
-      await recordChoice('owl', 'refuse');
-      await recordChoice('pangolin', 'ask');
+    it('can record choices for multiple animals', () => {
+      recordChoice('fox', 'ask');
+      recordChoice('owl', 'refuse');
+      recordChoice('pangolin', 'ask');
 
-      const state = await loadChoiceState();
+      const state = loadChoiceState();
       expect(state.offeredBy).toContain('fox');
       expect(state.offeredBy).toContain('owl');
       expect(state.offeredBy).toContain('pangolin');
@@ -240,26 +251,26 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('getPlayerChoice', () => {
-    it('returns null when no choice has been made', async () => {
-      const choice = await getPlayerChoice('fox');
+    it('returns null when no choice has been made', () => {
+      const choice = getPlayerChoice('fox');
       expect(choice).toBeNull();
     });
 
-    it('returns "ask" after ask choice', async () => {
-      await recordChoice('fox', 'ask');
-      const choice = await getPlayerChoice('fox');
+    it('returns "ask" after ask choice', () => {
+      recordChoice('fox', 'ask');
+      const choice = getPlayerChoice('fox');
       expect(choice).toBe('ask');
     });
 
-    it('returns "refuse" after refuse choice', async () => {
-      await recordChoice('owl', 'refuse');
-      const choice = await getPlayerChoice('owl');
+    it('returns "refuse" after refuse choice', () => {
+      recordChoice('owl', 'refuse');
+      const choice = getPlayerChoice('owl');
       expect(choice).toBe('refuse');
     });
 
-    it('returns null for animal that has not been offered yet', async () => {
-      await recordChoice('fox', 'ask');
-      const choice = await getPlayerChoice('owl');
+    it('returns null for animal that has not been offered yet', () => {
+      recordChoice('fox', 'ask');
+      const choice = getPlayerChoice('owl');
       expect(choice).toBeNull();
     });
   });
@@ -269,13 +280,13 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('hasSeenAnyChoice', () => {
-    it('returns false initially', async () => {
-      expect(await hasSeenAnyChoice()).toBe(false);
+    it('returns false initially', () => {
+      expect(hasSeenAnyChoice()).toBe(false);
     });
 
-    it('returns true after any choice is made', async () => {
-      await recordChoice('fox', 'ask');
-      expect(await hasSeenAnyChoice()).toBe(true);
+    it('returns true after any choice is made', () => {
+      recordChoice('fox', 'ask');
+      expect(hasSeenAnyChoice()).toBe(true);
     });
   });
 
@@ -284,26 +295,26 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('getChoiceCount', () => {
-    it('returns 0 initially', async () => {
-      expect(await getChoiceCount()).toBe(0);
+    it('returns 0 initially', () => {
+      expect(getChoiceCount()).toBe(0);
     });
 
-    it('increments with each choice', async () => {
-      await recordChoice('fox', 'ask');
-      expect(await getChoiceCount()).toBe(1);
+    it('increments with each choice', () => {
+      recordChoice('fox', 'ask');
+      expect(getChoiceCount()).toBe(1);
 
-      await recordChoice('owl', 'refuse');
-      expect(await getChoiceCount()).toBe(2);
+      recordChoice('owl', 'refuse');
+      expect(getChoiceCount()).toBe(2);
 
-      await recordChoice('pangolin', 'ask');
-      expect(await getChoiceCount()).toBe(3);
+      recordChoice('pangolin', 'ask');
+      expect(getChoiceCount()).toBe(3);
     });
 
-    it('counts up to 10 for all animals', async () => {
+    it('counts up to 10 for all animals', () => {
       for (const animal of ALL_ANIMALS) {
-        await recordChoice(animal, 'ask');
+        recordChoice(animal, 'ask');
       }
-      expect(await getChoiceCount()).toBe(10);
+      expect(getChoiceCount()).toBe(10);
     });
   });
 
@@ -366,28 +377,28 @@ describe('dialogueChoices', () => {
   // ===========================================================================
 
   describe('clearChoiceState', () => {
-    it('resets all choice data', async () => {
-      await recordChoice('fox', 'ask');
-      await recordChoice('owl', 'refuse');
-      await clearChoiceState();
+    it('resets all choice data', () => {
+      recordChoice('fox', 'ask');
+      recordChoice('owl', 'refuse');
+      clearChoiceState();
 
-      const state = await loadChoiceState();
+      const state = loadChoiceState();
       expect(state.offeredBy).toEqual([]);
       expect(state.choices).toEqual({});
       expect(state.hasSeenChoice).toBe(false);
     });
 
-    it('allows new choices after clear', async () => {
-      await recordChoice('fox', 'ask');
-      await clearChoiceState();
+    it('allows new choices after clear', () => {
+      recordChoice('fox', 'ask');
+      clearChoiceState();
 
-      const result = await getChoiceForAnimal('fox', 3, 5);
+      const result = getChoiceForAnimal('fox', 3, 5);
       expect(result).not.toBeNull();
     });
 
-    it('calls AsyncStorage.removeItem', async () => {
-      await clearChoiceState();
-      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_dialogue_choices');
+    it('calls storage.remove', () => {
+      clearChoiceState();
+      expect(storage.remove).toHaveBeenCalledWith('wordshift_dialogue_choices');
     });
   });
 });

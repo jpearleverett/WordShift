@@ -107,8 +107,8 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
     };
   }, [isCompleted]);
 
-  const loadStatus = async () => {
-    const status = await getDailyStatus();
+  const loadStatus = () => {
+    const status = getDailyStatus();
     setIsCompleted(status.isCompleted);
     setDifficulty(status.difficulty);
     setStreak(status.streak);

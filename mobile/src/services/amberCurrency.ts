@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
 import { getWeekId } from './weeklyQuests';
@@ -106,8 +106,8 @@ function isToday(dateString: string): boolean {
  * Update streak based on play activity
  * Should be called when a puzzle is completed
  */
-async function updateStreak(): Promise<number> {
-  const progress = await loadProgress();
+function updateStreak(): number {
+  const progress = loadProgress();
   const today = getTodayDateString();
 
   // Handle missing streak data (migration)
@@ -142,7 +142,7 @@ async function updateStreak(): Promise<number> {
   }
 
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
   return progress.currentStreak;
 }
 
@@ -193,15 +193,15 @@ const FREE_FREEZE_INTERVAL_DAYS = 14;
  * Purchase a streak freeze using amber.
  * Returns true if purchased successfully, false if insufficient amber.
  */
-export async function purchaseStreakFreeze(): Promise<boolean> {
-  const progress = await loadProgress();
+export function purchaseStreakFreeze(): boolean {
+  const progress = loadProgress();
   if (progress.amber < STREAK_FREEZE_COST) return false;
 
   progress.amber -= STREAK_FREEZE_COST;
   progress.streakFreezes = (progress.streakFreezes ?? 0) + 1;
   progressCache = progress;
-  await saveProgress();
-  await recordTransaction({
+  saveProgress();
+  recordTransaction({
     amount: STREAK_FREEZE_COST,
     type: 'spend',
     source: 'streak_freeze_purchase',
@@ -213,8 +213,8 @@ export async function purchaseStreakFreeze(): Promise<boolean> {
 /**
  * Get current streak freeze count.
  */
-export async function getStreakFreezeCount(): Promise<number> {
-  const progress = await loadProgress();
+export function getStreakFreezeCount(): number {
+  const progress = loadProgress();
   return progress.streakFreezes ?? 0;
 }
 
@@ -222,8 +222,8 @@ export async function getStreakFreezeCount(): Promise<number> {
  * Check and grant a free streak freeze every 14 days.
  * Called on app launch.
  */
-export async function checkFreeStreakFreeze(): Promise<boolean> {
-  const progress = await loadProgress();
+export function checkFreeStreakFreeze(): boolean {
+  const progress = loadProgress();
   const today = getTodayDateString();
   const lastFree = progress.lastFreeStreakFreezeDate;
 
@@ -232,7 +232,7 @@ export async function checkFreeStreakFreeze(): Promise<boolean> {
     progress.streakFreezes = (progress.streakFreezes ?? 0) + 1;
     progress.lastFreeStreakFreezeDate = today;
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
     return true;
   }
 
@@ -244,7 +244,7 @@ export async function checkFreeStreakFreeze(): Promise<boolean> {
     progress.streakFreezes = (progress.streakFreezes ?? 0) + 1;
     progress.lastFreeStreakFreezeDate = today;
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
     return true;
   }
 
@@ -255,21 +255,17 @@ export async function checkFreeStreakFreeze(): Promise<boolean> {
 export const STREAK_FREEZE_AMBER_COST = STREAK_FREEZE_COST;
 
 /**
- * Load progress from AsyncStorage
+ * Load progress from MMKV storage (synchronous).
  */
-export async function loadProgress(): Promise<HomeWorldProgress> {
-  try {
-    if (progressCache) {
-      return progressCache;
-    }
+export function loadProgress(): HomeWorldProgress {
+  if (progressCache) {
+    return progressCache;
+  }
 
-    const stored = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
-    if (stored) {
-      progressCache = JSON.parse(stored);
-      return progressCache!;
-    }
-  } catch (error) {
-    console.warn('Failed to load home progress:', error);
+  const stored = storage.getString(PROGRESS_STORAGE_KEY);
+  if (stored !== undefined) {
+    progressCache = JSON.parse(stored);
+    return progressCache!;
   }
 
   progressCache = getDefaultProgress();
@@ -277,22 +273,18 @@ export async function loadProgress(): Promise<HomeWorldProgress> {
 }
 
 /**
- * Save progress to AsyncStorage
+ * Save progress to MMKV storage (synchronous).
  */
-async function saveProgress(): Promise<void> {
+function saveProgress(): void {
   if (!progressCache) return;
-  try {
-    await AsyncStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(progressCache));
-  } catch (error) {
-    console.warn('Failed to save home progress:', error);
-  }
+  storage.set(PROGRESS_STORAGE_KEY, JSON.stringify(progressCache));
 }
 
 /**
  * Get current amber balance
  */
-export async function getAmberBalance(): Promise<number> {
-  const progress = await loadProgress();
+export function getAmberBalance(): number {
+  const progress = loadProgress();
   return progress.amber;
 }
 
@@ -347,13 +339,13 @@ export function calculatePhaseAcceleration(
  * The caller is responsible for crediting later (e.g. via awardBonusAmber
  * when the player offers words in the pit).
  */
-export async function awardPuzzleAmber(
+export function awardPuzzleAmber(
   difficulty: Difficulty,
   starsEarned: number,
   gameMode: GameMode = 'standard',
   threeStarRate: number = 0,
   creditToBalance: boolean = false
-): Promise<{
+): {
   amount: number;
   baseAmount: number;
   streakBonus: number;
@@ -370,14 +362,14 @@ export async function awardPuzzleAmber(
   streakMilestoneBonus: number;
   streakMilestoneMessage: string | null;
   phaseTransitionPending: boolean;
-}> {
-  const progress = await loadProgress();
+} {
+  const progress = loadProgress();
 
   // Capture previous streak before updating
   const previousStreak = progress.currentStreak ?? 0;
 
   // Update streak first
-  const currentStreak = await updateStreak();
+  const currentStreak = updateStreak();
 
   // Base reward by difficulty
   let baseAmount = AMBER_REWARDS[difficulty];
@@ -438,7 +430,7 @@ export async function awardPuzzleAmber(
     progress.lastClaimedMilestone = milestone.puzzles;
 
     // Record milestone transaction separately
-    await recordTransaction({
+    recordTransaction({
       amount: milestoneBonus,
       type: 'earn',
       source: `milestone_${milestone.puzzles}`,
@@ -457,7 +449,7 @@ export async function awardPuzzleAmber(
     progress.totalAmberEarned += firstCompletionBonus;
     progress.completedDifficulties = [...completedDiffs, difficulty];
     if (firstCompletionBonus > 0) {
-      await recordTransaction({
+      recordTransaction({
         amount: firstCompletionBonus,
         type: 'earn',
         source: `first_completion_${difficulty.toLowerCase()}`,
@@ -478,7 +470,7 @@ export async function awardPuzzleAmber(
     }
     progress.totalAmberEarned += streakMilestoneBonus;
 
-    await recordTransaction({
+    recordTransaction({
       amount: streakMilestoneBonus,
       type: 'earn',
       source: `streak_milestone_${currentStreak}`,
@@ -534,10 +526,10 @@ export async function awardPuzzleAmber(
   }
 
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 
   // Record puzzle transaction
-  await recordTransaction({
+  recordTransaction({
     amount: totalAmount,
     type: 'earn',
     source: `puzzle_${difficulty.toLowerCase()}${gameMode === 'challenge' ? '_challenge' : ''}${streakBonus > 0 ? `_streak${currentStreak}` : ''}`,
@@ -571,10 +563,10 @@ let spendInProgress = false;
  * Spend amber on an unlock
  * Protected against concurrent calls with a guard flag
  */
-export async function spendAmber(
+export function spendAmber(
   amount: number,
   targetId: string
-): Promise<{ success: boolean; newBalance: number; error?: string }> {
+): { success: boolean; newBalance: number; error?: string } {
   if (spendInProgress) {
     return {
       success: false,
@@ -585,7 +577,7 @@ export async function spendAmber(
 
   spendInProgress = true;
   try {
-    const progress = await loadProgress();
+    const progress = loadProgress();
 
     if (progress.amber < amount) {
       return {
@@ -597,9 +589,9 @@ export async function spendAmber(
 
     progress.amber -= amount;
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
 
-    await recordTransaction({
+    recordTransaction({
       amount,
       type: 'spend',
       source: targetId,
@@ -618,15 +610,15 @@ export async function spendAmber(
 /**
  * Unlock an animal
  */
-export async function unlockAnimal(animalId: string, cost: number): Promise<boolean> {
-  const result = await spendAmber(cost, `animal_${animalId}`);
+export function unlockAnimal(animalId: string, cost: number): boolean {
+  const result = spendAmber(cost, `animal_${animalId}`);
   if (!result.success) return false;
 
-  const progress = await loadProgress();
+  const progress = loadProgress();
   if (!progress.unlockedAnimals.includes(animalId)) {
     progress.unlockedAnimals.push(animalId);
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
   }
 
   return true;
@@ -635,15 +627,15 @@ export async function unlockAnimal(animalId: string, cost: number): Promise<bool
 /**
  * Unlock a room
  */
-export async function unlockRoom(roomId: string, cost: number): Promise<boolean> {
-  const result = await spendAmber(cost, `room_${roomId}`);
+export function unlockRoom(roomId: string, cost: number): boolean {
+  const result = spendAmber(cost, `room_${roomId}`);
   if (!result.success) return false;
 
-  const progress = await loadProgress();
+  const progress = loadProgress();
   if (!progress.unlockedRooms.includes(roomId)) {
     progress.unlockedRooms.push(roomId);
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
   }
 
   return true;
@@ -676,8 +668,8 @@ function calculatePhase(effectiveProgress: number, puzzlesSolved: number): Dialo
 /**
  * Get current phase
  */
-export async function getCurrentPhase(): Promise<DialoguePhase> {
-  const progress = await loadProgress();
+export function getCurrentPhase(): DialoguePhase {
+  const progress = loadProgress();
   return progress.currentPhase;
 }
 
@@ -686,11 +678,11 @@ export async function getCurrentPhase(): Promise<DialoguePhase> {
  * Bumps currentPhase to the pending value and clears the pending flag.
  * Returns the new phase and previous phase, or null if no pending transition.
  */
-export async function confirmPhaseTransition(): Promise<{
+export function confirmPhaseTransition(): {
   newPhase: DialoguePhase;
   previousPhase: DialoguePhase;
-} | null> {
-  const progress = await loadProgress();
+} | null {
+  const progress = loadProgress();
   const pending = progress.pendingPhaseTransition;
 
   if (pending == null) return null;
@@ -701,10 +693,10 @@ export async function confirmPhaseTransition(): Promise<{
   progress.phaseProgressFraction = 0; // Reset for next phase
 
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 
   // Reset pit nudge so the next pending transition can show a new one
-  await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY).catch(() => {});
+  storage.remove(PIT_NUDGE_SEEN_KEY);
 
   return { newPhase: pending, previousPhase };
 }
@@ -713,8 +705,8 @@ export async function confirmPhaseTransition(): Promise<{
  * Check if there's a pending phase transition.
  * Returns the target phase or null.
  */
-export async function getPendingPhaseTransition(): Promise<DialoguePhase | null> {
-  const progress = await loadProgress();
+export function getPendingPhaseTransition(): DialoguePhase | null {
+  const progress = loadProgress();
   return progress.pendingPhaseTransition ?? null;
 }
 
@@ -722,16 +714,16 @@ export async function getPendingPhaseTransition(): Promise<DialoguePhase | null>
  * Get the normalized progress fraction toward the next phase (0.0 to 1.0).
  * Used by the pit screen to drive ward mark illumination.
  */
-export async function getPhaseProgressFraction(): Promise<number> {
-  const progress = await loadProgress();
+export function getPhaseProgressFraction(): number {
+  const progress = loadProgress();
   return progress.phaseProgressFraction ?? 0;
 }
 
 /**
  * Get puzzles until next phase
  */
-export async function getPuzzlesUntilNextPhase(): Promise<number | null> {
-  const progress = await loadProgress();
+export function getPuzzlesUntilNextPhase(): number | null {
+  const progress = loadProgress();
   const currentPhase = progress.currentPhase;
 
   if (currentPhase >= 4) return null; // Max phase reached
@@ -747,46 +739,42 @@ export async function getPuzzlesUntilNextPhase(): Promise<number | null> {
 /**
  * Record an amber transaction for history
  */
-async function recordTransaction(transaction: AmberTransaction): Promise<void> {
-  try {
-    const stored = await AsyncStorage.getItem(TRANSACTIONS_STORAGE_KEY);
-    const transactions: AmberTransaction[] = stored ? JSON.parse(stored) : [];
+function recordTransaction(transaction: AmberTransaction): void {
+  const stored = storage.getString(TRANSACTIONS_STORAGE_KEY);
+  const transactions: AmberTransaction[] = stored !== undefined ? JSON.parse(stored) : [];
 
-    transactions.push(transaction);
+  transactions.push(transaction);
 
-    // Keep last 100 transactions
-    if (transactions.length > 100) {
-      transactions.splice(0, transactions.length - 100);
-    }
-
-    await AsyncStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
-  } catch (error) {
-    console.warn('Failed to record transaction:', error);
+  // Keep last 100 transactions
+  if (transactions.length > 100) {
+    transactions.splice(0, transactions.length - 100);
   }
+
+  storage.set(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
 }
 
 /**
  * Get full progress data
  */
-export async function getFullProgress(): Promise<HomeWorldProgress> {
+export function getFullProgress(): HomeWorldProgress {
   return loadProgress();
 }
 
 /**
  * Mark dialogue as read for an animal
  */
-export async function markDialogueRead(animalId: string, dialogueIndex: number): Promise<void> {
-  const progress = await loadProgress();
+export function markDialogueRead(animalId: string, dialogueIndex: number): void {
+  const progress = loadProgress();
   progress.lastDialogueRead[animalId] = dialogueIndex;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Check if an animal's intro dialogue has been seen
  */
-export async function hasSeenIntro(animalId: string): Promise<boolean> {
-  const progress = await loadProgress();
+export function hasSeenIntro(animalId: string): boolean {
+  const progress = loadProgress();
   // Handle old progress data that doesn't have introsSeen array
   if (!progress.introsSeen) {
     progress.introsSeen = [];
@@ -797,8 +785,8 @@ export async function hasSeenIntro(animalId: string): Promise<boolean> {
 /**
  * Mark an animal's intro dialogue as seen
  */
-export async function markIntroSeen(animalId: string): Promise<void> {
-  const progress = await loadProgress();
+export function markIntroSeen(animalId: string): void {
+  const progress = loadProgress();
   // Handle old progress data that doesn't have introsSeen array
   if (!progress.introsSeen) {
     progress.introsSeen = [];
@@ -806,20 +794,20 @@ export async function markIntroSeen(animalId: string): Promise<void> {
   if (!progress.introsSeen.includes(animalId)) {
     progress.introsSeen.push(animalId);
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
   }
 }
 
 /**
  * Get current streak info
  */
-export async function getStreakInfo(): Promise<{
+export function getStreakInfo(): {
   currentStreak: number;
   lastPlayDate: string | null;
   streakMultiplier: number;
   bonusPercentage: number;
-}> {
-  const progress = await loadProgress();
+} {
+  const progress = loadProgress();
   const streak = progress.currentStreak || 0;
   const multiplier = calculateStreakMultiplier(streak);
   return {
@@ -833,29 +821,25 @@ export async function getStreakInfo(): Promise<{
 /**
  * Clear all progress (for testing/reset)
  */
-export async function clearProgress(): Promise<void> {
-  try {
-    progressCache = getDefaultProgress();
-    await AsyncStorage.removeItem(PROGRESS_STORAGE_KEY);
-    await AsyncStorage.removeItem(TRANSACTIONS_STORAGE_KEY);
-    await AsyncStorage.removeItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
-    await AsyncStorage.removeItem(CHALLENGE_INTRO_SEEN_KEY);
-    await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
-    await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
-    for (let i = 1; i <= 4; i++) {
-      await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
-    }
-    await clearPlayedPuzzles();
-  } catch (error) {
-    console.warn('Failed to clear progress:', error);
+export function clearProgress(): void {
+  progressCache = getDefaultProgress();
+  storage.remove(PROGRESS_STORAGE_KEY);
+  storage.remove(TRANSACTIONS_STORAGE_KEY);
+  storage.remove(DAILY_CHALLENGE_INTRO_SEEN_KEY);
+  storage.remove(CHALLENGE_INTRO_SEEN_KEY);
+  storage.remove(FOX_PLAY_NUDGE_SEEN_KEY);
+  storage.remove(PIT_NUDGE_SEEN_KEY);
+  for (let i = 1; i <= 4; i++) {
+    storage.remove(`wordshift_guaranteed_crossref_phase_${i}`);
   }
+  clearPlayedPuzzles();
 }
 
 /**
  * Check if player can afford an unlock
  */
-export async function canAfford(cost: number): Promise<boolean> {
-  const progress = await loadProgress();
+export function canAfford(cost: number): boolean {
+  const progress = loadProgress();
   return progress.amber >= cost;
 }
 
@@ -872,16 +856,16 @@ export async function canAfford(cost: number): Promise<boolean> {
  * @param ritualEnergy The ritual energy score of this puzzle (0-10)
  * @param triggerWords Notable words that animals may react to
  */
-export async function recordRitualWords(
+export function recordRitualWords(
   words: string[],
   ritualEnergy: number,
   triggerWords: string[]
-): Promise<{
+): {
   totalWordsFormed: number;
   totalRitualEnergy: number;
   triggerWordQueue: string[];
-}> {
-  const progress = await loadProgress();
+} {
+  const progress = loadProgress();
 
   // Initialize ritual tracking fields
   if (!progress.ritualWords) progress.ritualWords = [];
@@ -915,7 +899,7 @@ export async function recordRitualWords(
   }
 
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 
   return {
     totalWordsFormed: progress.totalWordsFormed,
@@ -927,16 +911,16 @@ export async function recordRitualWords(
 /**
  * Get the ritual ledger - all words the player has formed
  */
-export async function getRitualWords(): Promise<string[]> {
-  const progress = await loadProgress();
+export function getRitualWords(): string[] {
+  const progress = loadProgress();
   return progress.ritualWords || [];
 }
 
 /**
  * Get total words ever formed
  */
-export async function getTotalWordsFormed(): Promise<number> {
-  const progress = await loadProgress();
+export function getTotalWordsFormed(): number {
+  const progress = loadProgress();
   return progress.totalWordsFormed || 0;
 }
 
@@ -949,15 +933,15 @@ export async function getTotalWordsFormed(): Promise<number> {
  *
  * @param animalType Optional animal type to filter by. If omitted, consumes all (legacy behavior).
  */
-export async function consumeTriggerWords(animalType?: string): Promise<string[]> {
-  const progress = await loadProgress();
+export function consumeTriggerWords(animalType?: string): string[] {
+  const progress = loadProgress();
   const queue = progress.triggerWordQueue || [];
 
   if (!animalType) {
     // Legacy: consume all
     progress.triggerWordQueue = [];
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
     return queue;
   }
 
@@ -984,7 +968,7 @@ export async function consumeTriggerWords(animalType?: string): Promise<string[]
 
   progress.triggerWordQueue = remaining;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
   return consumed;
 }
 
@@ -992,9 +976,9 @@ export async function consumeTriggerWords(animalType?: string): Promise<string[]
  * Queue a newly encountered variant so an animal can explain it in dialogue.
  * This is one-time per variant key to avoid repetitive tutorial chatter.
  */
-export async function recordVariantEncounter(variant: string): Promise<void> {
+export function recordVariantEncounter(variant: string): void {
   if (!variant || variant === 'standard') return;
-  const progress = await loadProgress();
+  const progress = loadProgress();
   if (!progress.pendingVariantTutorials) progress.pendingVariantTutorials = [];
   if (!progress.seenVariantTutorials) progress.seenVariantTutorials = [];
 
@@ -1012,15 +996,15 @@ export async function recordVariantEncounter(variant: string): Promise<void> {
   }
 
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Consume the next pending variant tutorial key.
  * Marks it as seen immediately to prevent repeats.
  */
-export async function consumePendingVariantTutorial(): Promise<string | null> {
-  const progress = await loadProgress();
+export function consumePendingVariantTutorial(): string | null {
+  const progress = loadProgress();
   if (!progress.pendingVariantTutorials) progress.pendingVariantTutorials = [];
   if (!progress.seenVariantTutorials) progress.seenVariantTutorials = [];
 
@@ -1034,26 +1018,26 @@ export async function consumePendingVariantTutorial(): Promise<string | null> {
   }
 
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
   return next;
 }
 
 /**
  * Persist the player's preferred puzzle variant for future runs.
  */
-export async function setPreferredPuzzleVariant(variant: string): Promise<void> {
+export function setPreferredPuzzleVariant(variant: string): void {
   if (!variant) return;
-  const progress = await loadProgress();
+  const progress = loadProgress();
   progress.preferredPuzzleVariant = variant;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Load the player's preferred puzzle variant key.
  */
-export async function getPreferredPuzzleVariant(): Promise<string> {
-  const progress = await loadProgress();
+export function getPreferredPuzzleVariant(): string {
+  const progress = loadProgress();
   return progress.preferredPuzzleVariant || 'standard';
 }
 
@@ -1071,19 +1055,19 @@ function getVariantRepeatDecay(repeatCount: number): number {
  * When `creditToBalance` is false, the bonus is NOT added to spendable amber.
  * The caller is responsible for crediting later.
  */
-export async function applyVariantAmberBonus(
+export function applyVariantAmberBonus(
   variant: string,
   baseAmberAward: number,
   configuredMultiplier: number,
   creditToBalance: boolean = false
-): Promise<{
+): {
   bonus: number;
   newBalance: number;
   appliedMultiplier: number;
   repeatCount: number;
   repeatDecay: number;
-}> {
-  const progress = await loadProgress();
+} {
+  const progress = loadProgress();
   if (progress.lastVariantPlayed === undefined) progress.lastVariantPlayed = 'standard';
   if (progress.sameVariantStreak === undefined) progress.sameVariantStreak = 0;
 
@@ -1091,7 +1075,7 @@ export async function applyVariantAmberBonus(
     progress.lastVariantPlayed = variant || 'standard';
     progress.sameVariantStreak = 0;
     progressCache = progress;
-    await saveProgress();
+    saveProgress();
     return {
       bonus: 0,
       newBalance: progress.amber,
@@ -1128,10 +1112,10 @@ export async function applyVariantAmberBonus(
   }
   progress.totalAmberEarned += bonus;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 
   if (bonus > 0) {
-    await recordTransaction({
+    recordTransaction({
       amount: bonus,
       type: 'earn',
       source: `variant_${variant}_x${appliedMultiplier.toFixed(2)}`,
@@ -1151,88 +1135,88 @@ export async function applyVariantAmberBonus(
 /**
  * Get total accumulated ritual energy
  */
-export async function getTotalRitualEnergy(): Promise<number> {
-  const progress = await loadProgress();
+export function getTotalRitualEnergy(): number {
+  const progress = loadProgress();
   return progress.ritualEnergy || 0;
 }
 
 /**
  * Mark house as completed (all 10 rooms + all 10 animals)
  */
-export async function markHouseCompleted(): Promise<void> {
-  const progress = await loadProgress();
+export function markHouseCompleted(): void {
+  const progress = loadProgress();
   progress.houseCompleted = true;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Check if house is fully completed
  */
-export async function isHouseCompleted(): Promise<boolean> {
-  const progress = await loadProgress();
+export function isHouseCompleted(): boolean {
+  const progress = loadProgress();
   return progress.houseCompleted === true;
 }
 
 /**
  * Mark the final puzzle as completed (deep Phase 4 endgame)
  */
-export async function markFinalPuzzleCompleted(): Promise<void> {
-  const progress = await loadProgress();
+export function markFinalPuzzleCompleted(): void {
+  const progress = loadProgress();
   progress.finalPuzzleCompleted = true;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Check if the final puzzle has been completed
  */
-export async function isFinalPuzzleCompleted(): Promise<boolean> {
-  const progress = await loadProgress();
+export function isFinalPuzzleCompleted(): boolean {
+  const progress = loadProgress();
   return progress.finalPuzzleCompleted === true;
 }
 
 /**
  * Mark post-revelation state (Phase 5)
  */
-export async function markPostRevelation(): Promise<void> {
-  const progress = await loadProgress();
+export function markPostRevelation(): void {
+  const progress = loadProgress();
   progress.postRevelation = true;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Check if post-revelation (Phase 5) is active
  */
-export async function isPostRevelation(): Promise<boolean> {
-  const progress = await loadProgress();
+export function isPostRevelation(): boolean {
+  const progress = loadProgress();
   return progress.postRevelation === true;
 }
 
 /**
  * Mark tutorial seeds as planted (for Phase 4 callbacks)
  */
-export async function markTutorialSeedsPlanted(): Promise<void> {
-  const progress = await loadProgress();
+export function markTutorialSeedsPlanted(): void {
+  const progress = loadProgress();
   progress.tutorialSeedsPlanted = true;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Check if tutorial seeds were planted
  */
-export async function wereTutorialSeedsPlanted(): Promise<boolean> {
-  const progress = await loadProgress();
+export function wereTutorialSeedsPlanted(): boolean {
+  const progress = loadProgress();
   return progress.tutorialSeedsPlanted === true;
 }
 
 /**
  * Record a coordinated dialogue event as consumed so it doesn't fire again.
  */
-export async function recordConsumedCoordinatedEvent(theme: string): Promise<void> {
-  const progress = await loadProgress();
+export function recordConsumedCoordinatedEvent(theme: string): void {
+  const progress = loadProgress();
   if (!progress.consumedCoordinatedEvents) {
     progress.consumedCoordinatedEvents = [];
   }
@@ -1240,14 +1224,14 @@ export async function recordConsumedCoordinatedEvent(theme: string): Promise<voi
     progress.consumedCoordinatedEvents.push(theme);
   }
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
 }
 
 /**
  * Get consumed coordinated events
  */
-export async function getConsumedCoordinatedEvents(): Promise<string[]> {
-  const progress = await loadProgress();
+export function getConsumedCoordinatedEvents(): string[] {
+  const progress = loadProgress();
   return progress.consumedCoordinatedEvents || [];
 }
 
@@ -1255,125 +1239,76 @@ export async function getConsumedCoordinatedEvents(): Promise<string[]> {
  * Track whether a guaranteed cross-reference has been shown for a phase.
  * Key: `wordshift_guaranteed_crossref_phase_{phase}`
  */
-export async function hasSeenGuaranteedCrossRef(phase: number): Promise<boolean> {
-  try {
-    const key = `wordshift_guaranteed_crossref_phase_${phase}`;
-    const value = await AsyncStorage.getItem(key);
-    return value === 'true';
-  } catch {
-    return false;
-  }
+export function hasSeenGuaranteedCrossRef(phase: number): boolean {
+  const key = `wordshift_guaranteed_crossref_phase_${phase}`;
+  return storage.getString(key) === 'true';
 }
 
-export async function markGuaranteedCrossRefSeen(phase: number): Promise<void> {
-  try {
-    const key = `wordshift_guaranteed_crossref_phase_${phase}`;
-    await AsyncStorage.setItem(key, 'true');
-  } catch {
-    // Non-critical
-  }
+export function markGuaranteedCrossRefSeen(phase: number): void {
+  const key = `wordshift_guaranteed_crossref_phase_${phase}`;
+  storage.set(key, 'true');
 }
 
 /**
  * Track whether the daily challenge unlock explanation has been shown.
  */
-export async function hasSeenDailyChallengeIntro(): Promise<boolean> {
-  try {
-    const value = await AsyncStorage.getItem(DAILY_CHALLENGE_INTRO_SEEN_KEY);
-    return value === 'true';
-  } catch {
-    return false;
-  }
+export function hasSeenDailyChallengeIntro(): boolean {
+  return storage.getString(DAILY_CHALLENGE_INTRO_SEEN_KEY) === 'true';
 }
 
-export async function markDailyChallengeIntroSeen(): Promise<void> {
-  try {
-    await AsyncStorage.setItem(DAILY_CHALLENGE_INTRO_SEEN_KEY, 'true');
-  } catch {
-    // Non-critical
-  }
+export function markDailyChallengeIntroSeen(): void {
+  storage.set(DAILY_CHALLENGE_INTRO_SEEN_KEY, 'true');
 }
 
 /**
  * Track whether Fox's one-time Challenge Mode intro has been shown (after 15 puzzles).
  */
-export async function hasSeenChallengeIntro(): Promise<boolean> {
-  try {
-    const value = await AsyncStorage.getItem(CHALLENGE_INTRO_SEEN_KEY);
-    return value === 'true';
-  } catch {
-    return false;
-  }
+export function hasSeenChallengeIntro(): boolean {
+  return storage.getString(CHALLENGE_INTRO_SEEN_KEY) === 'true';
 }
 
-export async function markChallengeIntroSeen(): Promise<void> {
-  try {
-    await AsyncStorage.setItem(CHALLENGE_INTRO_SEEN_KEY, 'true');
-  } catch {
-    // Non-critical
-  }
+export function markChallengeIntroSeen(): void {
+  storage.set(CHALLENGE_INTRO_SEEN_KEY, 'true');
 }
 
 /**
  * Track whether Fox's one-time post-tutorial "play more" nudge has appeared.
  */
-export async function hasSeenFoxPlayNudge(): Promise<boolean> {
-  try {
-    const value = await AsyncStorage.getItem(FOX_PLAY_NUDGE_SEEN_KEY);
-    return value === 'true';
-  } catch {
-    return false;
-  }
+export function hasSeenFoxPlayNudge(): boolean {
+  return storage.getString(FOX_PLAY_NUDGE_SEEN_KEY) === 'true';
 }
 
-export async function markFoxPlayNudgeSeen(): Promise<void> {
-  try {
-    await AsyncStorage.setItem(FOX_PLAY_NUDGE_SEEN_KEY, 'true');
-  } catch {
-    // Non-critical
-  }
+export function markFoxPlayNudgeSeen(): void {
+  storage.set(FOX_PLAY_NUDGE_SEEN_KEY, 'true');
 }
 
 /**
  * Track whether the one-time Fox pit nudge has been shown for the current pending transition.
  * Resets each time a phase transition is confirmed (new pending transition = new nudge).
  */
-export async function hasSeenPitNudge(): Promise<boolean> {
-  try {
-    const value = await AsyncStorage.getItem(PIT_NUDGE_SEEN_KEY);
-    return value === 'true';
-  } catch {
-    return false;
-  }
+export function hasSeenPitNudge(): boolean {
+  return storage.getString(PIT_NUDGE_SEEN_KEY) === 'true';
 }
 
-export async function markPitNudgeSeen(): Promise<void> {
-  try {
-    await AsyncStorage.setItem(PIT_NUDGE_SEEN_KEY, 'true');
-  } catch {
-    // Non-critical
-  }
+export function markPitNudgeSeen(): void {
+  storage.set(PIT_NUDGE_SEEN_KEY, 'true');
 }
 
-export async function resetPitNudge(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
-  } catch {
-    // Non-critical
-  }
+export function resetPitNudge(): void {
+  storage.remove(PIT_NUDGE_SEEN_KEY);
 }
 
 /**
  * Award bonus amber from non-puzzle sources (e.g., daily streak milestones).
  * Credits amber, records a transaction, and returns the new balance.
  */
-export async function awardBonusAmber(amount: number, source: string): Promise<number> {
-  const progress = await loadProgress();
+export function awardBonusAmber(amount: number, source: string): number {
+  const progress = loadProgress();
   progress.amber += amount;
   progress.totalAmberEarned += amount;
   progressCache = progress;
-  await saveProgress();
-  await recordTransaction({
+  saveProgress();
+  recordTransaction({
     amount,
     type: 'earn',
     source,
@@ -1396,20 +1331,20 @@ function getWeeklyVariantDecay(variantUsageThisWeek: number): number {
 /**
  * DEV ONLY: Add amber directly (for testing)
  */
-export async function devAddAmber(amount: number): Promise<number> {
-  const progress = await loadProgress();
+export function devAddAmber(amount: number): number {
+  const progress = loadProgress();
   progress.amber += amount;
   progress.totalAmberEarned += amount;
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
   return progress.amber;
 }
 
 /**
  * DEV ONLY: Add puzzles and update phase (for testing dialogue progression)
  */
-export async function devAddPuzzles(amount: number): Promise<{ puzzles: number; phase: DialoguePhase }> {
-  const progress = await loadProgress();
+export function devAddPuzzles(amount: number): { puzzles: number; phase: DialoguePhase } {
+  const progress = loadProgress();
   progress.puzzlesSolved += amount;
   // Keep phaseProgress in sync for tests
   progress.phaseProgress = (progress.phaseProgress || 0) + amount;
@@ -1420,6 +1355,6 @@ export async function devAddPuzzles(amount: number): Promise<{ puzzles: number; 
   progress.currentPhase = newPhase;
 
   progressCache = progress;
-  await saveProgress();
+  saveProgress();
   return { puzzles: progress.puzzlesSolved, phase: progress.currentPhase };
 }

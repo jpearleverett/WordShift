@@ -527,14 +527,14 @@ export default function App() {
 
       // Record daily challenge completion if applicable
       if (isPlayingDaily) {
-        const previousDailyStatus = await getDailyStatus();
+        const previousDailyStatus = getDailyStatus();
         const previousDailyStreak = previousDailyStatus.streak;
-        await recordDailyCompletion(
+        recordDailyCompletion(
           victory.earnedStars,
           result.hintsUsed,
           result.invalidAttempts
         );
-        const updatedDailyStatus = await getDailyStatus();
+        const updatedDailyStatus = getDailyStatus();
 
         // Check for daily streak milestone
         const dailyMilestone = checkDailyStreakMilestone(
@@ -550,7 +550,7 @@ export default function App() {
         }
 
         // Track daily_streak quest progress
-        updateQuestProgress({ dailyStreak: updatedDailyStatus.streak }, persistence.currentPhase).catch(() => {});
+        updateQuestProgress({ dailyStreak: updatedDailyStatus.streak }, persistence.currentPhase);
       }
 
       // Check for ritual micro-event on high-energy puzzles

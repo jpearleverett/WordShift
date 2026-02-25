@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { DialogueSession, DialoguePhase, DIALOGUE_SESSION_CONFIG, getDialoguesPerSession, getPuzzlesBetweenSessions } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_dialogue_sessions';
@@ -7,9 +7,6 @@ const STORAGE_KEY = 'wordshift_dialogue_sessions';
  * Dialogue Session Manager (Puzzle-Based)
  * Sessions unlock after completing a certain number of puzzles
  */
-
-// In-memory cache of sessions
-let sessionsCache: Map<string, DialogueSession> = new Map();
 
 // Current puzzle count (must be updated externally)
 let currentPuzzleCount = 0;
@@ -29,38 +26,38 @@ export function getPuzzleCount(): number {
 }
 
 /**
- * Load all dialogue sessions from storage
+ * Read all dialogue sessions from MMKV
  */
-export async function loadDialogueSessions(): Promise<Map<string, DialogueSession>> {
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const sessionsArray: DialogueSession[] = JSON.parse(stored);
-      sessionsCache = new Map(sessionsArray.map(s => [s.animalId, s]));
-    }
-  } catch (error) {
-    console.error('Failed to load dialogue sessions:', error);
+function readSessions(): Map<string, DialogueSession> {
+  const stored = storage.getString(STORAGE_KEY);
+  if (stored !== undefined) {
+    const sessionsArray: DialogueSession[] = JSON.parse(stored);
+    return new Map(sessionsArray.map(s => [s.animalId, s]));
   }
-  return sessionsCache;
+  return new Map();
 }
 
 /**
- * Save all dialogue sessions to storage
+ * Write all dialogue sessions to MMKV
  */
-async function saveSessions(): Promise<void> {
-  try {
-    const sessionsArray = Array.from(sessionsCache.values());
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(sessionsArray));
-  } catch (error) {
-    console.error('Failed to save dialogue sessions:', error);
-  }
+function writeSessions(sessions: Map<string, DialogueSession>): void {
+  const sessionsArray = Array.from(sessions.values());
+  storage.set(STORAGE_KEY, JSON.stringify(sessionsArray));
+}
+
+/**
+ * Load all dialogue sessions from storage
+ */
+export function loadDialogueSessions(): Map<string, DialogueSession> {
+  return readSessions();
 }
 
 /**
  * Get session for a specific animal
  */
 export function getSession(animalId: string): DialogueSession | null {
-  return sessionsCache.get(animalId) || null;
+  const sessions = readSessions();
+  return sessions.get(animalId) || null;
 }
 
 // Current phase for phase-aware session limits
@@ -94,12 +91,13 @@ function getCooldownRemaining(session: DialogueSession): number {
  * Check if an animal is available for dialogue
  * Returns: { available: boolean, reason?: string, puzzlesRemaining?: number }
  */
-export async function checkDialogueAvailability(animalId: string): Promise<{
+export function checkDialogueAvailability(animalId: string): {
   available: boolean;
   reason?: string;
   puzzlesRemaining?: number;
-}> {
-  const session = sessionsCache.get(animalId);
+} {
+  const sessions = readSessions();
+  const session = sessions.get(animalId);
 
   if (!session) {
     // No session exists - animal is available
@@ -117,8 +115,8 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
       // Cooldown complete (or grace period) - reset session for new round, preserving sessionsCompleted
       session.dialoguesInSession = 0;
       session.puzzlesAtSessionEnd = null;
-      sessionsCache.set(animalId, session);
-      await saveSessions();
+      sessions.set(animalId, session);
+      writeSessions(sessions);
       return { available: true };
     }
 
@@ -133,7 +131,7 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
   // Session is active - check if max dialogues reached (phase-aware limit)
   const maxDialogues = getEffectiveMaxDialogues();
   if ((session.dialoguesInSession ?? 0) >= maxDialogues) {
-    await startCooldown(animalId);
+    startCooldown(animalId);
     return {
       available: false,
       reason: 'max_dialogues',
@@ -149,7 +147,8 @@ export async function checkDialogueAvailability(animalId: string): Promise<{
  * Check if an animal is on cooldown (for UI indicators like hiding exclamation)
  */
 export function isOnCooldown(animalId: string): boolean {
-  const session = sessionsCache.get(animalId);
+  const sessions = readSessions();
+  const session = sessions.get(animalId);
   if (!session || session.puzzlesAtSessionEnd === null) return false;
   // Grace period: skip cooldown for newly unlocked animals' first sessions
   const inGracePeriod = (session.sessionsCompleted ?? 0) < DIALOGUE_SESSION_CONFIG.GRACE_PERIOD_SESSIONS;
@@ -160,8 +159,9 @@ export function isOnCooldown(animalId: string): boolean {
 /**
  * Start or continue a dialogue session with an animal
  */
-export async function recordDialogue(animalId: string): Promise<DialogueSession> {
-  let session = sessionsCache.get(animalId);
+export function recordDialogue(animalId: string): DialogueSession {
+  const sessions = readSessions();
+  let session = sessions.get(animalId);
 
   if (!session) {
     // Start new session
@@ -185,22 +185,23 @@ export async function recordDialogue(animalId: string): Promise<DialogueSession>
     };
   }
 
-  sessionsCache.set(animalId, session);
-  await saveSessions();
+  sessions.set(animalId, session);
+  writeSessions(sessions);
   return session;
 }
 
 /**
  * Start cooldown for an animal (requires puzzles to unlock)
  */
-export async function startCooldown(animalId: string): Promise<void> {
-  const session = sessionsCache.get(animalId);
+export function startCooldown(animalId: string): void {
+  const sessions = readSessions();
+  const session = sessions.get(animalId);
 
   if (session) {
     session.puzzlesAtSessionEnd = currentPuzzleCount;
     session.sessionsCompleted = (session.sessionsCompleted ?? 0) + 1;
-    sessionsCache.set(animalId, session);
-    await saveSessions();
+    sessions.set(animalId, session);
+    writeSessions(sessions);
   } else {
     // Create a session just for cooldown
     const newSession: DialogueSession = {
@@ -209,8 +210,8 @@ export async function startCooldown(animalId: string): Promise<void> {
       puzzlesAtSessionEnd: currentPuzzleCount,
       sessionsCompleted: 1,
     };
-    sessionsCache.set(animalId, newSession);
-    await saveSessions();
+    sessions.set(animalId, newSession);
+    writeSessions(sessions);
   }
 }
 
@@ -218,12 +219,13 @@ export async function startCooldown(animalId: string): Promise<void> {
  * End a dialogue session manually (player leaves dialogue)
  * This triggers cooldown if session was active
  */
-export async function endSession(animalId: string): Promise<void> {
-  const session = sessionsCache.get(animalId);
+export function endSession(animalId: string): void {
+  const sessions = readSessions();
+  const session = sessions.get(animalId);
 
   if (session && session.puzzlesAtSessionEnd === null && session.dialoguesInSession > 0) {
     // Session was active, start cooldown
-    await startCooldown(animalId);
+    startCooldown(animalId);
   }
 }
 
@@ -235,7 +237,8 @@ export function getSessionStatus(animalId: string): {
   dialoguesRemaining?: number;
   puzzlesRemaining?: number;
 } {
-  const session = sessionsCache.get(animalId);
+  const sessions = readSessions();
+  const session = sessions.get(animalId);
 
   if (!session) {
     return { status: 'available' };
@@ -275,7 +278,6 @@ export function formatTimeRemaining(puzzles: number): string {
 /**
  * Clear all sessions (for testing)
  */
-export async function clearAllSessions(): Promise<void> {
-  sessionsCache.clear();
-  await AsyncStorage.removeItem(STORAGE_KEY);
+export function clearAllSessions(): void {
+  storage.remove(STORAGE_KEY);
 }

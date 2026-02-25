@@ -16,7 +16,7 @@ import {
   Image,
   ImageSourcePropType,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '../services/storage';
 import { CandyColors, getTileColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { markTutorialSeedsPlanted } from '../services/amberCurrency';
@@ -27,31 +27,22 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 /**
  * Check if tutorial has been completed
  */
-export async function hasTutorialCompleted(): Promise<boolean> {
-  try {
-    const val = await AsyncStorage.getItem(TUTORIAL_KEY);
-    return val === 'true';
-  } catch {
-    return false;
-  }
+export function hasTutorialCompleted(): boolean {
+  return storage.getString(TUTORIAL_KEY) === 'true';
 }
 
 /**
  * Mark tutorial as completed
  */
-export async function markTutorialCompleted(): Promise<void> {
-  try {
-    await AsyncStorage.setItem(TUTORIAL_KEY, 'true');
-  } catch {}
+export function markTutorialCompleted(): void {
+  storage.set(TUTORIAL_KEY, 'true');
 }
 
 /**
  * Reset tutorial state (for testing)
  */
-export async function resetTutorial(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(TUTORIAL_KEY);
-  } catch {}
+export function resetTutorial(): void {
+  storage.remove(TUTORIAL_KEY);
 }
 
 // ============================================================================
@@ -342,11 +333,11 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
     }
   }, [phase, celebrateScale, reducedMotion]);
 
-  const handleComplete = async () => {
-    await markTutorialCompleted();
+  const handleComplete = () => {
+    markTutorialCompleted();
     // Track that tutorial seeds were planted - Fox will reference these later at higher phases
     // "We've been waiting for someone like you" and "Every puzzle you solve helps us build the house"
-    await markTutorialSeedsPlanted().catch(() => {});
+    try { markTutorialSeedsPlanted(); } catch {};
     if (reducedMotion) {
       onComplete();
       return;

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { Difficulty } from '../types';
 import { CumulativeStats } from './starRating';
 
@@ -342,9 +342,6 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
 ];
 
-// In-memory cache
-let progressCache: AchievementProgress | null = null;
-
 function getDefaultProgress(): AchievementProgress {
   return {
     unlockedIds: [],
@@ -356,31 +353,22 @@ function getDefaultProgress(): AchievementProgress {
 /**
  * Load achievement progress
  */
-export async function loadAchievements(): Promise<AchievementProgress> {
-  if (progressCache) return progressCache;
-
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      progressCache = JSON.parse(stored);
-      return progressCache!;
-    }
-  } catch (err) {
-    console.warn('Failed to load achievements:', err);
+export function loadAchievements(): AchievementProgress {
+  const stored = storage.getString(STORAGE_KEY);
+  if (stored !== undefined) {
+    return JSON.parse(stored);
   }
-
-  progressCache = getDefaultProgress();
-  return progressCache;
+  return getDefaultProgress();
 }
 
 /**
  * Check for newly earned achievements
  * Returns array of newly unlocked achievements (empty if none)
  */
-export async function checkAchievements(
+export function checkAchievements(
   state: AchievementCheckState
-): Promise<Achievement[]> {
-  const progress = await loadAchievements();
+): Achievement[] {
+  const progress = loadAchievements();
   const newlyUnlocked: Achievement[] = [];
 
   for (const achievement of ACHIEVEMENTS) {
@@ -397,12 +385,7 @@ export async function checkAchievements(
 
   if (newlyUnlocked.length > 0) {
     progress.lastChecked = Date.now();
-    progressCache = progress;
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-    } catch (err) {
-      console.warn('Failed to save achievements:', err);
-    }
+    storage.set(STORAGE_KEY, JSON.stringify(progress));
   }
 
   return newlyUnlocked;
@@ -411,10 +394,8 @@ export async function checkAchievements(
 /**
  * Get all achievements with their unlock status
  */
-export async function getAchievementsWithStatus(): Promise<
-  (Achievement & { isUnlocked: boolean; unlockedAt: number | null })[]
-> {
-  const progress = await loadAchievements();
+export function getAchievementsWithStatus(): (Achievement & { isUnlocked: boolean; unlockedAt: number | null })[] {
+  const progress = loadAchievements();
 
   return ACHIEVEMENTS.map((a) => ({
     ...a,
@@ -426,16 +407,16 @@ export async function getAchievementsWithStatus(): Promise<
 /**
  * Get count of unlocked achievements
  */
-export async function getUnlockedCount(): Promise<number> {
-  const progress = await loadAchievements();
+export function getUnlockedCount(): number {
+  const progress = loadAchievements();
   return progress.unlockedIds.length;
 }
 
 /**
  * Get all unlocked achievement IDs
  */
-export async function getUnlockedAchievementIds(): Promise<string[]> {
-  const progress = await loadAchievements();
+export function getUnlockedAchievementIds(): string[] {
+  const progress = loadAchievements();
   return [...progress.unlockedIds];
 }
 
@@ -449,38 +430,27 @@ export function getTotalCount(): number {
 /**
  * Increment share count (stored separately for achievement tracking)
  */
-export async function incrementShareCount(): Promise<number> {
+export function incrementShareCount(): number {
   const key = 'wordshift_share_count';
-  try {
-    const stored = await AsyncStorage.getItem(key);
-    const count = (stored ? parseInt(stored, 10) : 0) + 1;
-    await AsyncStorage.setItem(key, count.toString());
-    return count;
-  } catch {
-    return 1;
-  }
+  const stored = storage.getString(key);
+  const count = (stored !== undefined ? parseInt(stored, 10) : 0) + 1;
+  storage.set(key, count.toString());
+  return count;
 }
 
 /**
  * Get share count
  */
-export async function getShareCount(): Promise<number> {
+export function getShareCount(): number {
   const key = 'wordshift_share_count';
-  try {
-    const stored = await AsyncStorage.getItem(key);
-    return stored ? parseInt(stored, 10) : 0;
-  } catch {
-    return 0;
-  }
+  const stored = storage.getString(key);
+  return stored !== undefined ? parseInt(stored, 10) : 0;
 }
 
 /**
  * Clear all achievement data (for testing)
  */
-export async function clearAchievements(): Promise<void> {
-  progressCache = getDefaultProgress();
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-    await AsyncStorage.removeItem('wordshift_share_count');
-  } catch {}
+export function clearAchievements(): void {
+  storage.remove(STORAGE_KEY);
+  storage.remove('wordshift_share_count');
 }
