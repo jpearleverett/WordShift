@@ -44,9 +44,53 @@ A word puzzle game where players shift letters between words to form valid Engli
 
 ```bash
 cd mobile
-npx expo start           # Start dev server (scan QR with Expo Go)
-npx expo start --clear   # Clear cache and start
+npx expo start --dev-client          # Start Metro for dev client
+npx expo start --dev-client --clear  # Clear cache and start
 ```
+
+## Development Runtime (Dev Client)
+
+This is a **dev-client app**, not an Expo Go app. The custom development build contains native code for `react-native-reanimated`, `@shopify/react-native-skia`, and `react-native-worklets-core` that Expo Go cannot provide.
+
+### Two runtimes
+- **Metro bundler** runs on your machine (or Termux) and serves the JavaScript bundle.
+- A **custom development build** (Expo Dev Client) is installed on the phone/emulator. It connects to Metro like Expo Go used to, but contains the correct native modules.
+
+### Known-working dependency versions (SDK 54)
+| Package | Version |
+|---------|---------|
+| `react-native-reanimated` | ~4.1.1 |
+| `react-native-worklets-core` | 0.5.1 |
+| `@shopify/react-native-skia` | 2.2.12 |
+| `expo-dev-client` | ~6.0.20 |
+
+JS package versions and the native code inside the dev build must match.
+
+### Install / align dependencies
+```bash
+cd mobile
+npm install --legacy-peer-deps   # Avoids peer-dep conflicts
+npx expo install --fix           # Let Expo align what it can
+```
+
+### Build or update the dev client (native)
+Needed when native deps change (add/remove/update packages with native code) or when `app.json`/plugin config affects native build output.
+```bash
+eas build  # For a development build profile — produces installable APK/AAB or IPA
+```
+
+You do **not** need a new EAS build for normal JS/TS edits.
+
+### Run the app (JS)
+Once the dev client is installed on the device:
+```bash
+cd mobile
+npx expo start --dev-client --clear
+```
+Then open the dev client app on the device and connect to Metro.
+
+### Termux-specific notes
+- Set `EAS_SKIP_AUTO_FINGERPRINT=1` before EAS commands to skip the auto-fingerprint step that can fail in Termux.
 
 ## Testing
 
@@ -54,7 +98,7 @@ npx expo start --clear   # Clear cache and start
 - **Run a single test file**: `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
-- Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
+- Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed. When needed, use `npm install --legacy-peer-deps` to avoid peer-dep conflicts, then `npx expo install --fix`.
 - The full suite has 948 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Recent Implementation Notes (2026-02)
@@ -235,7 +279,7 @@ npx expo start --clear   # Clear cache and start
 - **Haptics**: expo-haptics (settings-gated)
 - **Audio**: expo-av (placeholder infrastructure, awaiting real audio assets)
 - **Testing**: Jest with ts-jest preset
-- **Target**: iOS and Android via Expo Go
+- **Target**: iOS and Android via Expo Dev Client (custom development build)
 
 ## Project Structure
 
@@ -1362,9 +1406,9 @@ cd mobile && npx jest --no-coverage  # 948 tests, 33 suites
 
 ### Manual Testing
 
-Test on physical device via Expo Go app:
-1. Run `npx expo start` in mobile/
-2. Scan QR code with Expo Go
+Test on physical device via Expo Dev Client:
+1. Run `npx expo start --dev-client` in mobile/
+2. Open the dev client app on the device and connect to Metro
 3. Test all three difficulty modes
 4. Verify puzzle generation doesn't hang (should complete in <3s)
 5. Test tutorial on fresh install
