@@ -417,7 +417,7 @@ export default function App() {
           data: { difficulty: saved.difficulty, isDaily: Boolean(saved.isPlayingDaily && canRestoreDaily) },
         });
       } else {
-        clearPuzzleState().catch(() => {});
+        try { clearPuzzleState(); } catch (_e) { /* ignore */ }
         puzzleActions.startNewGame(diff);
         setIsPlayingDaily(false);
         logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
@@ -455,7 +455,7 @@ export default function App() {
         return;
       }
 
-      clearPuzzleState().catch(() => {});
+      try { clearPuzzleState(); } catch (_e) { /* ignore */ }
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);
       try {
@@ -509,7 +509,7 @@ export default function App() {
     if (result?.completed) {
       isDragDropRef.current = false;
       // Clear mid-puzzle save on completion
-      clearPuzzleState().catch(() => {});
+      try { clearPuzzleState(); } catch (_e) { /* ignore */ }
 
       // Lock interaction during async victory chain
       victoryActions.setProcessingVictory(true);
@@ -650,7 +650,7 @@ export default function App() {
       scheduleAllNotifications(persistence.currentPhase).catch(() => {});
 
       // Mark cloud save as having pending changes
-      markPendingChanges().catch(() => {});
+      try { markPendingChanges(); } catch (_e) { /* ignore */ }
       uploadToCloud().catch(() => {});
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
@@ -811,7 +811,7 @@ export default function App() {
   const handleNextLevel = useCallback(() => {
     hapticLight();
     clearVictoryTimeouts();
-    clearPuzzleState().catch(() => {});
+    try { clearPuzzleState(); } catch (_e) { /* ignore */ }
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);

@@ -38,11 +38,11 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [selectedTab, setSelectedTab] = useState<'overview' | 'achievements'>('overview');
 
   useEffect(() => {
-    getCumulativeStats().then(setStats);
-    getAchievementsWithStatus().then(setAchievements);
+    setStats(getCumulativeStats());
+    setAchievements(getAchievementsWithStatus());
     const s = getDailyStatus();
     setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak });
-    getStreakInfo().then(info => setCurrentStreak(info.currentStreak));
+    setCurrentStreak(getStreakInfo().currentStreak);
   }, []);
 
   if (!stats) return null;
