@@ -12,6 +12,7 @@ import {
   Pressable,
 } from 'react-native';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
@@ -1540,7 +1541,7 @@ export default function App() {
 
   // Render screen with global overlays on top
   return (
-    <View style={{ flex: 1, backgroundColor: rootBgColor }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: rootBgColor }}>
       {renderScreen()}
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
@@ -1555,6 +1556,6 @@ export default function App() {
         event={phaseTransitionEvent}
         onComplete={() => setPhaseTransitionEvent(null)}
       />
-    </View>
+    </GestureHandlerRootView>
   );
 }
