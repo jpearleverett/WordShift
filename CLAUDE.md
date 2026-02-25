@@ -50,7 +50,7 @@ npx expo start --dev-client --clear  # Clear cache and start
 
 ## Development Runtime (Dev Client)
 
-This is a **dev-client app**, not an Expo Go app. The custom development build contains native code for `react-native-reanimated`, `@shopify/react-native-skia`, and `react-native-worklets-core` that Expo Go cannot provide.
+This is a **dev-client app**, not an Expo Go app. The custom development build contains native code for `react-native-reanimated`, `@shopify/react-native-skia`, `react-native-worklets`, `react-native-mmkv`, and `react-native-nitro-modules` that Expo Go cannot provide.
 
 ### Two runtimes
 - **Metro bundler** runs on your machine (or Termux) and serves the JavaScript bundle.
@@ -59,12 +59,14 @@ This is a **dev-client app**, not an Expo Go app. The custom development build c
 ### Known-working dependency versions (SDK 54)
 | Package | Version |
 |---------|---------|
-| `react-native-reanimated` | ~4.1.1 |
-| `react-native-worklets-core` | 0.5.1 |
-| `@shopify/react-native-skia` | 2.2.12 |
-| `expo-dev-client` | ~6.0.20 |
+| `react-native-reanimated` | ~3.16.1 |
+| `react-native-worklets` | ~0.7.4 |
+| `@shopify/react-native-skia` | ~2.4.21 |
+| `react-native-mmkv` | ^4.1.2 |
+| `react-native-nitro-modules` | ^0.33.9 |
+| `expo-dev-client` | ^6.0.20 |
 
-JS package versions and the native code inside the dev build must match.
+JS package versions and the native code inside the dev build must match. A new dev client build is required whenever a package with native code is added, removed, or updated.
 
 ### Install / align dependencies
 ```bash
@@ -73,16 +75,34 @@ npm install --legacy-peer-deps   # Avoids peer-dep conflicts
 npx expo install --fix           # Let Expo align what it can
 ```
 
-### Build or update the dev client (native)
+### Build the dev client (EAS Build)
 Needed when native deps change (add/remove/update packages with native code) or when `app.json`/plugin config affects native build output.
+
+**From any machine with network access:**
 ```bash
-eas build  # For a development build profile — produces installable APK/AAB or IPA
+cd mobile
+npx eas-cli build --profile development --platform android   # Android APK
+npx eas-cli build --profile development --platform ios       # iOS simulator build
 ```
 
-You do **not** need a new EAS build for normal JS/TS edits.
+**From Termux (Android phone):**
+```bash
+cd mobile
+export EAS_SKIP_AUTO_FINGERPRINT=1   # Required — fingerprint step fails in Termux
+npx eas-cli build --profile development --platform android
+```
+
+The build runs on EAS servers and produces a downloadable `.apk` (Android) or `.app` (iOS simulator). Install the APK on your device via `adb install` or direct download from the EAS dashboard.
+
+**Build profiles** are defined in `eas.json`:
+- `development` — Dev client with debugging, APK output (Android), simulator build (iOS)
+- `preview` — Internal distribution (ad-hoc/enterprise signing)
+- `production` — Store-ready build
+
+You do **not** need a new EAS build for normal JS/TS edits — only for native dependency changes.
 
 ### Run the app (JS)
-Once the dev client is installed on the device:
+Once the dev client APK/app is installed on the device:
 ```bash
 cd mobile
 npx expo start --dev-client --clear
@@ -90,7 +110,9 @@ npx expo start --dev-client --clear
 Then open the dev client app on the device and connect to Metro.
 
 ### Termux-specific notes
-- Set `EAS_SKIP_AUTO_FINGERPRINT=1` before EAS commands to skip the auto-fingerprint step that can fail in Termux.
+- Set `EAS_SKIP_AUTO_FINGERPRINT=1` before all EAS commands to skip the auto-fingerprint step that fails in Termux.
+- EAS builds run remotely on Expo's servers — Termux only submits the build request and downloads the artifact.
+- If `npx eas-cli` is slow to start, install globally once: `npm install -g eas-cli` then use `eas build` directly.
 
 ## Testing
 
@@ -99,10 +121,18 @@ Then open the dev client app on the device and connect to Metro.
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed. When needed, use `npm install --legacy-peer-deps` to avoid peer-dep conflicts, then `npx expo install --fix`.
-- The full suite has 948 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has 941 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Recent Implementation Notes (2026-02)
 
+- **AsyncStorage → MMKV migration (2026-02-25)**:
+  - Replaced `@react-native-async-storage/async-storage` with `react-native-mmkv` V4 (via `react-native-nitro-modules`) across all 20+ service files, 5 hooks, and 4 components.
+  - All storage operations are now **synchronous** — no more `async`/`await` for reads and writes. This eliminates race conditions, simplifies control flow, and removes the need for most in-memory cache patterns.
+  - **New files**: `src/services/storage.ts` (MMKV singleton with `getObject<T>`/`setObject<T>` typed helpers), `src/services/storageMigration.ts` (one-time migration reads all AsyncStorage keys and writes them to MMKV on first launch).
+  - **AsyncStorage retained** as a dependency solely for the one-time migration — `storageMigration.ts` reads old data on first post-upgrade launch, then sets a `hasMigratedFromAsyncStorage` flag. Can be removed once all users have migrated.
+  - **Test infrastructure**: New MMKV mock (`__mocks__/mmkv.ts`) backed by a `Map<string, string>`, nitro-modules stub (`__mocks__/nitroModules.ts`), and `helpers/mockStorage.ts` factory. Jest `moduleNameMapper` redirects native module imports to mocks.
+  - **EAS build setup**: Added `expo-dev-client` dependency, `eas.json` with development/preview/production profiles, and `expo-dev-client` plugin in `app.json`. **A new dev client build is required** since `react-native-mmkv` and `react-native-nitro-modules` contain native code.
+  - Net result: 57 files changed, ~113 lines removed (2164 added, 2277 removed), all 33 test suites passing (941 tests).
 - **Bug audit and fixes — seventh pass (2026-02-21)**:
   - **Premature UI phase advance with pending transition (HIGH)**: `awardPuzzleAmber()` in `amberCurrency.ts` returned `phaseTransitionPending: phaseChanged`, which was `false` when a pending transition already existed from a prior puzzle. This caused `useGamePersistence.ts` to advance the UI phase (`setCurrentPhase`) to the transition target on the next puzzle, bypassing pit confirmation. Fixed by returning `phaseTransitionPending: phaseChanged || progress.pendingPhaseTransition != null`.
   - **Challenge mode blocks mid-step double shift undo (MEDIUM)**: The challenge mode `undosRemaining <= 0` guard in `usePuzzleGame.ts` `handleUndo` ran before the double shift mid-step undo check, blocking free mid-step undos (reverting uncommitted `drop1`) when undos were exhausted. Moved the `isDoubleShift` mid-step check before the challenge mode guard so mid-step undos are always allowed.
@@ -275,7 +305,7 @@ Then open the dev client app on the device and connect to Metro.
 - **Language**: TypeScript (strict)
 - **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`)
 - **State**: React useState/useEffect (no external state library)
-- **Persistence**: AsyncStorage with in-memory cache pattern
+- **Persistence**: react-native-mmkv V4 (synchronous key-value storage via Nitro Modules). AsyncStorage retained only for one-time data migration on first launch after upgrade
 - **Haptics**: expo-haptics (settings-gated)
 - **Audio**: expo-av (placeholder infrastructure, awaiting real audio assets)
 - **Testing**: Jest with ts-jest preset
@@ -326,7 +356,7 @@ mobile/
 │   │   ├── useAchievementQueue.ts # Achievement checking + toast queue processing
 │   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging. Phase 5 post-revelation routing
 │   │   ├── useUnlockFlow.ts     # Home unlock flow: in-world room/animal prompts, purchases, modal state
-│   │   └── useAutosave.ts      # Debounced mid-session puzzle state autosave to AsyncStorage
+│   │   └── useAutosave.ts      # Debounced mid-session puzzle state autosave to MMKV
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails, resonant word glow (compact mode for 6+ letters)
@@ -408,10 +438,17 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
 │       ├── slotEstimation.ts     # Drag-and-drop slot position estimation: arc layout geometry → slot index mapping
+│       ├── storage.ts           # MMKV V4 storage singleton + getObject/setObject helpers
+│       ├── storageMigration.ts  # One-time AsyncStorage → MMKV data migration (runs on first launch after upgrade)
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (948 tests, 33 suites)
+├── eas.json                     # EAS Build profiles (development, preview, production)
+├── src/__tests__/               # Test suites (941 tests, 33 suites)
+│   ├── __mocks__/
+│   │   ├── mmkv.ts             # In-memory MMKV mock (Map-backed, supports getString/set/delete/clearAll)
+│   │   └── nitroModules.ts     # Stub for react-native-nitro-modules
 │   ├── helpers/
-│   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
+│   │   ├── mockAsyncStorage.ts  # Legacy AsyncStorage mock (for migration tests)
+│   │   └── mockStorage.ts      # MMKV storage mock factory — use createMockStorage()
 │   ├── achievements.test.ts
 │   ├── animalDialogueVariants.test.ts # Variant tutorial dialogue coverage across variants/animals/phases
 │   ├── amberCurrency.test.ts
@@ -1379,7 +1416,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - **MoveDelta pattern**: Undo history uses lightweight deltas (`{rowIndex, letterIndex, letter, action}`) instead of deep-cloning entire game state
 - **Schema versioning**: Persistent data uses `dataMigration.ts` for schema versions + sequential migrations; always bump version when storage format changes
 - **Concurrent spend guard**: `amberCurrency.ts` uses `spendInProgress` flag to prevent double-spend race conditions
-- Services use AsyncStorage with in-memory cache pattern (load -> cache -> return cached)
+- Services use MMKV synchronous storage via `storage.ts` singleton (`storage.getString`, `storage.set`, `getObject<T>`, `setObject<T>`). All service functions are synchronous — no async/await needed for storage operations
 - TS strict: module-level nullable caches need local variable assignment before return to avoid TS2322
 - Accessibility: interactive elements should have `accessibilityLabel` and `accessibilityRole`; progress bars use `accessibilityValue` with `min`/`max`/`now`
 - **reducedMotion**: All animations must check `getSettingsSync().reducedMotion` and either skip or set values instantly
@@ -1390,13 +1427,14 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 948 tests, 33 suites
+cd mobile && npx jest --no-coverage  # 941 tests, 33 suites
 ```
 
 **Test patterns:**
-- Shared AsyncStorage mock factory in `src/__tests__/helpers/mockAsyncStorage.ts` — use `createMockAsyncStorage()` instead of duplicating inline mocks
+- Shared MMKV storage mock factory in `src/__tests__/helpers/mockStorage.ts` — use `createMockStorage()` instead of duplicating inline mocks. Legacy `mockAsyncStorage.ts` still exists for migration tests
+- Jest module name mappers in `jest.config.js` redirect `react-native-mmkv` and `react-native-nitro-modules` to in-memory mocks in `src/__tests__/__mocks__/`
 - Tests that import react-native modules need `jest.mock('react-native', ...)` at top
-- `beforeEach` must call both `AsyncStorage.clear()` AND service-specific clear functions
+- `beforeEach` must call `storage.clearAll()` (from mock) AND service-specific clear functions. All service functions are now synchronous — use `mockReturnValue` not `mockResolvedValue`
 - Puzzle generator tests mock `amberCurrency.getCurrentPhase` + all `wordHistory` functions
 - Hook tests (`usePuzzleGame`, `useGamePersistence`) use manual React mock with stateStore Map + index rewind pattern
 - `jest.fn(async () => ...)` infers 0 args — add typed optional params `(_d?: any, _s?: any)` for TS
