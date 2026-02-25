@@ -125,7 +125,6 @@ export function DraggableTile({
         const dropX = startPageX.value + e.x;
         const dropY = startPageY.value + e.y;
 
-        const reducedMotion = false; // Checked on JS thread below
         // Pop-then-collapse animation on UI thread
         floatingScale.value = withSequence(
           withTiming(1.15, {
@@ -142,17 +141,13 @@ export function DraggableTile({
         });
 
         runOnJS(jsDragEnd)(dropX, dropY);
-      } else {
-        // No drag activation — treat as tap
-        runOnJS(jsTap)();
       }
     })
     .onFinalize(() => {
       'worklet';
       runOnJS(jsDragActiveChange)(false);
-      // Reset after a short delay to allow collapse animation to play
       if (dragActivated.value) {
-        // Schedule reset after collapse completes
+        // Drag completed — reset after collapse animation plays
         translateX.value = withTiming(0, { duration: 0 });
         translateY.value = withTiming(0, { duration: 0 });
         floatingScale.value = withTiming(1, { duration: 0 });
@@ -160,6 +155,8 @@ export function DraggableTile({
           duration: DROP_IMPACT_POP_MS + DROP_IMPACT_COLLAPSE_MS,
         });
       } else {
+        // Gesture failed (tap — finger lifted before minDistance) — fire tap callback
+        runOnJS(jsTap)();
         sourceOpacity.value = 1;
         floatingOpacity.value = 0;
       }

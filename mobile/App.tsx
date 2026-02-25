@@ -143,7 +143,8 @@ export default function App() {
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
   const clearRitualEchoWords = useCallback(() => setRitualEchoWords([]), []);
 
-  // Victory animation skip-forward state
+  // Victory animation skip-forward state (state drives render, ref for sync checks)
+  const [victoryAnimating, setVictoryAnimating] = useState(false);
   const victoryAnimatingRef = useRef(false);
 
   // Track victory-flow setTimeout IDs so they can be cleared on navigation/unmount
@@ -601,8 +602,9 @@ export default function App() {
 
       // Play choreographed victory sequence (with skip-forward window)
       victoryAnimatingRef.current = true;
+      setVictoryAnimating(true);
       victoryActions.playVictorySequence(victory.earnedStars);
-      addVictoryTimeout(() => { victoryAnimatingRef.current = false; }, 1200);
+      addVictoryTimeout(() => { victoryAnimatingRef.current = false; setVictoryAnimating(false); }, 1200);
 
       // Phase transitions are now DEFERRED to the Offering Pit.
       // When phaseTransitionPending is true, the phase change will be confirmed
@@ -891,6 +893,7 @@ export default function App() {
   const handleVictoryTapAccelerate = useCallback(() => {
     if (victoryAnimatingRef.current && victoryFlow.victoryData) {
       victoryAnimatingRef.current = false;
+      setVictoryAnimating(false);
       victoryActions.skipToEnd(victoryFlow.victoryData.earnedStars);
     }
   }, [victoryFlow.victoryData, victoryActions]);
@@ -1391,12 +1394,12 @@ export default function App() {
           onClose={() => puzzleActions.setShowRules(false)}
         />
 
-        {/* Tap-to-accelerate overlay for victory animation */}
-        {puzzle.gameState === GameState.WON && (
+        {/* Tap-to-accelerate overlay for victory animation — only during star stagger,
+            removed once the modal appears so buttons remain tappable */}
+        {puzzle.gameState === GameState.WON && victoryAnimating && (
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={handleVictoryTapAccelerate}
-            pointerEvents="box-none"
           />
         )}
 
