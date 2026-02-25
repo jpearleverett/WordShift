@@ -78,7 +78,11 @@ export function useAutosave(deps: AutosaveDeps): void {
             : null,
           savedAt: Date.now(),
         };
-        savePuzzleState(saveData as SavedPuzzleState).catch(() => {});
+        try {
+          savePuzzleState(saveData as SavedPuzzleState);
+        } catch (_e) {
+          // Silently ignore save failures
+        }
       }, AUTOSAVE_DEBOUNCE_MS);
     }
 
