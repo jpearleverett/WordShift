@@ -1416,7 +1416,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - **MoveDelta pattern**: Undo history uses lightweight deltas (`{rowIndex, letterIndex, letter, action}`) instead of deep-cloning entire game state
 - **Schema versioning**: Persistent data uses `dataMigration.ts` for schema versions + sequential migrations; always bump version when storage format changes
 - **Concurrent spend guard**: `amberCurrency.ts` uses `spendInProgress` flag to prevent double-spend race conditions
-- Services use MMKV synchronous storage via `storage.ts` singleton (`storage.getString`, `storage.set`, `getObject<T>`, `setObject<T>`). All service functions are synchronous — no async/await needed for storage operations
+- Services use MMKV synchronous storage via `storage.ts` singleton (`storage.getString`, `storage.set`, `getObject<T>`, `setObject<T>`). All service functions are synchronous — **never chain `.then()`/`.catch()` on their return values** (they return plain values, not Promises — chaining `.catch()` on `void`/`undefined` throws `TypeError`). Use `try/catch` for error handling and direct assignment for return values
 - TS strict: module-level nullable caches need local variable assignment before return to avoid TS2322
 - Accessibility: interactive elements should have `accessibilityLabel` and `accessibilityRole`; progress bars use `accessibilityValue` with `min`/`max`/`now`
 - **reducedMotion**: All animations must check `getSettingsSync().reducedMotion` and either skip or set values instantly
