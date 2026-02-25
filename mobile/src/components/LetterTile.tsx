@@ -4,6 +4,7 @@ import { Letter } from '../types';
 import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { TileGlowCanvas } from './TileGlowCanvas';
 
 interface LetterTileProps {
   letter: Letter;
@@ -45,8 +46,6 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const shineAnim = useRef(new Animated.Value(0)).current;
   const wobbleAnim = useRef(new Animated.Value(0)).current;
-  const trailGlowAnim = useRef(new Animated.Value(0)).current;
-  const resonanceAnim = useRef(new Animated.Value(0)).current;
   const guidePulseAnim = useRef(new Animated.Value(0)).current;
 
   // Loop refs for proper cleanup (prevents memory leaks)
@@ -54,17 +53,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   const shineLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const wobbleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const trailGlowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const resonanceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const guideLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const trailParticleAnims = useRef(
-    Array.from({ length: 4 }, () => ({
-      opacity: new Animated.Value(0),
-      scale: new Animated.Value(0.5),
-      translateY: new Animated.Value(0),
-    }))
-  ).current;
-  const trailParticleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Phase-aware animation parameters for selected tiles
   const getSelectedSpringParams = () => {
@@ -95,20 +84,20 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   useEffect(() => {
     if (settings.reducedMotion) return;
     if (isInteractable && !isSelected) {
-      // Subtle pulse glow
+      // Subtle pulse glow — drives opacity only, native driver safe
       const glowLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
             duration: 1200,
             easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0,
             duration: 1200,
             easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ])
       );
@@ -160,7 +149,6 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       scaleAnim.setValue(isSelected ? 1.08 : 1);
       bounceAnim.setValue(0);
       wobbleAnim.setValue(0);
-      trailGlowAnim.setValue(0);
       return;
     }
     if (isSelected) {
@@ -229,32 +217,11 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       bounceLoopRef.current = bounceLoop;
       bounceLoop.start();
 
-      // Trail glow effect at Phase 3+ (energy mark pulsing shadow)
-      if (phase >= 3) {
-        const trailGlowLoop = Animated.loop(
-          Animated.sequence([
-            Animated.timing(trailGlowAnim, {
-              toValue: 1,
-              duration: phase >= 4 ? 800 : 600,
-              easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false, // shadowRadius cannot use native driver
-            }),
-            Animated.timing(trailGlowAnim, {
-              toValue: 0,
-              duration: phase >= 4 ? 800 : 600,
-              easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
-            }),
-          ])
-        );
-        trailGlowLoopRef.current = trailGlowLoop;
-        trailGlowLoop.start();
-      }
+      // Trail glow at Phase 3+ is now handled by TileGlowCanvas (Skia)
     } else {
       scaleAnim.setValue(1);
       bounceAnim.setValue(0);
       wobbleAnim.setValue(0);
-      trailGlowAnim.setValue(0);
     }
 
     return () => {
@@ -266,64 +233,13 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         bounceLoopRef.current.stop();
         bounceLoopRef.current = null;
       }
-      if (trailGlowLoopRef.current) {
-        trailGlowLoopRef.current.stop();
-        trailGlowLoopRef.current = null;
-      }
       scaleAnim.stopAnimation();
       bounceAnim.stopAnimation();
       wobbleAnim.stopAnimation();
-      trailGlowAnim.stopAnimation();
     };
   }, [isSelected, phase]);
 
-  // Resonance glow — phase-aware inner light for dread/ritual words.
-  // Phase 1: subliminal shimmer. Phase 2: faint pulse. Phase 3: visible aura.
-  // Phase 4: crimson breathing. Phase 5: ghostly settled glow.
-  useEffect(() => {
-    if (!isResonant || phase < 1) {
-      resonanceAnim.setValue(0);
-      return;
-    }
-
-    if (settings.reducedMotion || shouldSimplifyAnimations()) {
-      // Static resonance glow (no animation)
-      resonanceAnim.setValue(0.5);
-      return () => { resonanceAnim.setValue(0); };
-    }
-
-    // Phase 1: very slow, barely perceptible shimmer
-    // Phase 2-3: moderate pulse
-    // Phase 4: faster breathing
-    const cycleDuration = phase >= 4 ? 2000 : phase >= 3 ? 2500 : phase >= 2 ? 3000 : 4000;
-
-    const resonanceLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(resonanceAnim, {
-          toValue: 1,
-          duration: cycleDuration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(resonanceAnim, {
-          toValue: 0,
-          duration: cycleDuration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    resonanceLoopRef.current = resonanceLoop;
-    resonanceLoop.start();
-
-    return () => {
-      if (resonanceLoopRef.current) {
-        resonanceLoopRef.current.stop();
-        resonanceLoopRef.current = null;
-      }
-      resonanceAnim.stopAnimation();
-    };
-  }, [isResonant, phase, settings.reducedMotion]);
+  // Resonance glow is now handled by TileGlowCanvas (Skia)
 
   // Tutorial guidance pulse for the exact recommended tile.
   useEffect(() => {
@@ -366,65 +282,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- guidePulseAnim is a stable ref
   }, [isGuided, settings.reducedMotion]);
 
-  // Particle trail for selected tiles
-  useEffect(() => {
-    if (!isSelected || settings.reducedMotion || shouldSimplifyAnimations()) {
-      // Reset particles
-      trailParticleAnims.forEach(p => {
-        p.opacity.setValue(0);
-        p.scale.setValue(0.5);
-        p.translateY.setValue(0);
-      });
-      if (trailParticleLoopRef.current) {
-        trailParticleLoopRef.current.stop();
-        trailParticleLoopRef.current = null;
-      }
-      return;
-    }
-
-    const particleAnimations = trailParticleAnims.map((p, i) =>
-      Animated.sequence([
-        Animated.delay(i * 150),
-        Animated.parallel([
-          Animated.timing(p.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-          Animated.timing(p.scale, { toValue: 1.5, duration: 600, useNativeDriver: true }),
-          Animated.timing(p.translateY, { toValue: -25, duration: 600, useNativeDriver: true }),
-        ]),
-        Animated.timing(p.opacity, { toValue: 0, duration: 100, useNativeDriver: true }),
-        Animated.parallel([
-          Animated.timing(p.scale, { toValue: 0.5, duration: 0, useNativeDriver: true }),
-          Animated.timing(p.translateY, { toValue: 0, duration: 0, useNativeDriver: true }),
-        ]),
-      ])
-    );
-
-    const loop = Animated.loop(Animated.stagger(150, particleAnimations));
-    trailParticleLoopRef.current = loop;
-    loop.start();
-
-    return () => {
-      loop.stop();
-      trailParticleAnims.forEach(p => {
-        p.opacity.stopAnimation();
-        p.scale.stopAnimation();
-        p.translateY.stopAnimation();
-      });
-    };
-  }, [isSelected]);
-
-  // Resonance visual config — color and opacity range per phase
-  const getResonanceConfig = () => {
-    if (phase >= 5) return { color: '#7B6B8A', minOpacity: 0.06, maxOpacity: 0.10 };   // Ghostly mauve
-    if (phase >= 4) return { color: '#8B0000', minOpacity: 0.12, maxOpacity: 0.28 };   // Crimson
-    if (phase >= 3) return { color: '#4A2080', minOpacity: 0.08, maxOpacity: 0.20 };   // Dark purple
-    if (phase >= 2) return { color: '#6B5B95', minOpacity: 0.04, maxOpacity: 0.12 };   // Purple-blue
-    return { color: '#DAA520', minOpacity: 0.02, maxOpacity: 0.05 };                   // Warm gold (Phase 1)
-  };
-  const resonanceConfig = isResonant && phase >= 1 ? getResonanceConfig() : null;
-  const resonanceOpacity = resonanceConfig ? resonanceAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [resonanceConfig.minOpacity, resonanceConfig.maxOpacity],
-  }) : null;
+  // Trail particles are now handled by TileGlowCanvas (Skia sparks)
 
   const handlePressIn = () => {
     if (settings.reducedMotion) return;
@@ -569,7 +427,6 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   const tileStyles = getStyles();
   const isClickable = (isInteractable || isSelected) && onPress;
-  const trailColor = phase >= 4 ? '#C03050' : phase >= 3 ? '#9050B0' : '#FFD700';
 
   // Animated glow intensity
   const glowOpacity = glowAnim.interpolate({
@@ -589,15 +446,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     outputRange: ['-3deg', '0deg', '3deg'],
   });
 
-  // Trail glow interpolations for Phase 3+ energy mark effect
-  const trailGlowRadius = trailGlowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [6, phase >= 4 ? 24 : 16],
-  });
-  const trailGlowOpacity = trailGlowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, phase >= 4 ? 0.7 : 0.55],
-  });
+  // Trail glow color (still used for static shadow tint; animated glow is via TileGlowCanvas)
   const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
   const guideRingScale = guidePulseAnim.interpolate({
     inputRange: [0, 1],
@@ -622,29 +471,13 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         },
       ]}
     >
-      {isSelected && !settings.reducedMotion && !shouldSimplifyAnimations() && (
-        <View style={trailStyles.container} pointerEvents="none">
-          {trailParticleAnims.map((anim, i) => (
-            <Animated.View
-              key={i}
-              style={{
-                position: 'absolute',
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: trailColor,
-                opacity: anim.opacity,
-                transform: [
-                  { scale: anim.scale },
-                  { translateY: anim.translateY },
-                  { translateX: (i - 1.5) * 12 },
-                ],
-                top: -5,
-              }}
-            />
-          ))}
-        </View>
-      )}
+      {/* Skia glow canvas — trail glow, sparks, and resonance bloom */}
+      <TileGlowCanvas
+        isSelected={!!isSelected}
+        phase={phase}
+        isResonant={isResonant}
+        compact={compact}
+      />
 
       {/* Outer glow for interactable/selected */}
       {(isInteractable || isSelected) && highlight !== 'locked' && (
@@ -685,11 +518,6 @@ export const LetterTile: React.FC<LetterTileProps> = ({
           isGuided && styles.tileBodyGuided,
           isSelected && styles.tileBodySelected,
           highlight === 'locked' && styles.tileBodyLocked,
-          // Trail glow effect: pulsing shadow at Phase 3+
-          (isSelected && phase >= 3) && {
-            shadowRadius: trailGlowRadius,
-            shadowOpacity: trailGlowOpacity,
-          },
         ]}
       >
         {/* Top highlight (bevel effect) */}
@@ -698,19 +526,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         {/* Glossy shine overlay */}
         <View style={styles.glossyShine} />
 
-        {/* Resonance glow — inner light for dread/ritual words */}
-        {resonanceConfig && (
-          <Animated.View
-            style={[
-              styles.resonanceOverlay,
-              {
-                backgroundColor: resonanceConfig.color,
-                opacity: resonanceOpacity!,
-              },
-            ]}
-            pointerEvents="none"
-          />
-        )}
+        {/* Resonance glow is now rendered via TileGlowCanvas (Skia blur) */}
 
         {/* Letter text with shadow */}
         <Text
@@ -901,21 +717,6 @@ const styles = StyleSheet.create({
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
-  resonanceOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 14,
-  },
-});
-
-const trailStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 20,
   },
 });
 

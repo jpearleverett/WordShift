@@ -36,13 +36,13 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
             toValue: 1,
             duration: 1500,
             easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0,
             duration: 1500,
             easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ])
       ).start();

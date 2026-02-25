@@ -37,6 +37,7 @@ import { awardBonusAmber } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
+import { PitGlowCanvas } from './PitGlowCanvas';
 
 // ---------------------------------------------------------------------------
 // Assets & Constants
@@ -129,23 +130,7 @@ const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: 
   4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070', core: '#1A0510' },
 };
 
-// Multi-layered concentric glow — creates depth and natural radial falloff
-// Each layer is rendered as a circle then stretched with scaleX for a true ellipse
-// (football/rugby ball shape with tapered pointed ends, not a flat-edged capsule)
-const PIT_GLOW_BASE_WIDTH = SCREEN_WIDTH * 0.7;
-const PIT_GLOW_BASE_HEIGHT = 90;
-
-// Pre-computed ellipse scaleX ratios (targetWidth / circleSize) for each layer
-const GLOW_OUTER_SIZE = PIT_GLOW_BASE_HEIGHT * 1.1;     // 99px circle
-const GLOW_OUTER_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.9) / GLOW_OUTER_SIZE;
-const GLOW_MIDDLE_SIZE = PIT_GLOW_BASE_HEIGHT * 0.9;    // 81px circle
-const GLOW_MIDDLE_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.64) / GLOW_MIDDLE_SIZE;
-const GLOW_INNER_SIZE = PIT_GLOW_BASE_HEIGHT * 0.7;     // 63px circle
-const GLOW_INNER_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.4) / GLOW_INNER_SIZE;
-const GLOW_CORE_SIZE = PIT_GLOW_BASE_HEIGHT * 0.5;      // 45px circle
-const GLOW_CORE_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.28) / GLOW_CORE_SIZE;
-const GLOW_RIM_SIZE_Y = PIT_OVAL.radiusY * 2;           // rim uses PIT_OVAL dims
-const GLOW_RIM_SCALE_X = (PIT_OVAL.radiusX * 2) / GLOW_RIM_SIZE_Y;
+// Glow layers now rendered by PitGlowCanvas (Skia)
 
 // Colors that match the pit rim glow baked into each background image
 const RIM_PARTICLE_COLORS: Record<number, string> = {
@@ -156,25 +141,7 @@ const RIM_PARTICLE_COLORS: Record<number, string> = {
   4: '#60D8C8',
 };
 
-// Phase-aware breathing glow opacity [min, max]
-const BREATH_OPACITY: Record<number, [number, number]> = {
-  0: [0.03, 0.12],
-  1: [0.03, 0.12],
-  2: [0.05, 0.18],
-  3: [0.06, 0.22],
-  4: [0.08, 0.30],
-};
-
-// Phase-aware breathing glow scale [min, max]
-const BREATH_SCALE: Record<number, [number, number]> = {
-  0: [0.90, 1.05],
-  1: [0.90, 1.05],
-  2: [0.92, 1.06],
-  3: [0.93, 1.08],
-  4: [0.95, 1.10],
-};
-
-const BREATH_CYCLE_MS = 4000; // half-cycle: 4s in, 4s out = 8s full
+// Breathing glow parameters now in PitGlowCanvas
 
 function getDevourDuration(phase: number): number {
   if (phase >= 3) return 600;
@@ -251,6 +218,8 @@ interface FlyingWord {
   isDevoured: boolean;
   floatLoopX: Animated.CompositeAnimation | null;
   floatLoopY: Animated.CompositeAnimation | null;
+  /** Timestamp when float loops started — used to compute position without __getValue() */
+  floatStartTime: number;
 }
 
 interface TrailParticle {
@@ -633,17 +602,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const batchWordCounts = useRef<Map<string, number>>(new Map());
   const finalizingBatches = useRef<Set<string>>(new Set());
 
-  // Surge glow — flashes on devour impact / inhale
-  const pitSurgeOpacity = useRef(new Animated.Value(0)).current;
-  const pitSurgeScale = useRef(new Animated.Value(0.8)).current;
-
-  // Breathing glow — continuous ambient pulse
-  const pitBreathProgress = useRef(new Animated.Value(0)).current;
-  const breathLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  // Glow intensity — dims when no words are floating (0.35 = quiet, 1.0 = full)
-  const glowIntensity = useRef(new Animated.Value(0.35)).current;
-  const glowIntensityAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  // Signal counters for PitGlowCanvas surge/inhale triggers
+  const [surgeSignal, setSurgeSignal] = useState(0);
+  const [inhaleSignal, setInhaleSignal] = useState(0);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
@@ -787,93 +748,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
   }, [pendingPhaseTransition, ceremonyStatus, harvestState, isOnboarding, startCeremony]);
 
-  // ---- Ambient breathing glow loop ----
-  useEffect(() => {
-    if (reducedMotion) {
-      // Static mid-value glow for reduced motion
-      pitBreathProgress.setValue(0.5);
-      return;
-    }
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pitBreathProgress, {
-          toValue: 1,
-          duration: BREATH_CYCLE_MS,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pitBreathProgress, {
-          toValue: 0,
-          duration: BREATH_CYCLE_MS,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    breathLoopRef.current = loop;
-    loop.start();
-
-    return () => {
-      loop.stop();
-      breathLoopRef.current = null;
-    };
-  }, [reducedMotion, pitBreathProgress]);
-
-  // Animate glow intensity based on floating word presence
+  // Derive pitIsActive for PitGlowCanvas intensity tracking
   const hasActiveWords = flyingWords.some(w => !w.isDevoured);
   const hasPendingBatches = harvestState != null && harvestState.pendingBatches.length > 0;
   const pitIsActive = hasActiveWords || hasPendingBatches;
-  useEffect(() => {
-    glowIntensityAnimRef.current?.stop();
-    const anim = Animated.timing(glowIntensity, {
-      toValue: pitIsActive ? 1.0 : 0.35,
-      duration: pitIsActive ? 400 : 800,
-      useNativeDriver: true,
-    });
-    glowIntensityAnimRef.current = anim;
-    anim.start(() => { glowIntensityAnimRef.current = null; });
-    return () => { anim.stop(); };
-  }, [pitIsActive, glowIntensity]);
-
-  // Derive breathing opacity and scale from progress + phase
-  const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
-  const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
-
-  // Per-layer opacity interpolations for concentric glow (outer→inner: 0.4x, 0.7x, 1.0x, 2.5x of base)
-  // Each layer is multiplied by glowIntensity so the glow dims when no words are present
-  const breathOpacityOuter = Animated.multiply(
-    pitBreathProgress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [breathOpacityRange[0] * 0.4, breathOpacityRange[1] * 0.4],
-    }),
-    glowIntensity,
-  );
-  const breathOpacityMiddle = Animated.multiply(
-    pitBreathProgress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [breathOpacityRange[0] * 0.7, breathOpacityRange[1] * 0.7],
-    }),
-    glowIntensity,
-  );
-  const breathOpacityInner = Animated.multiply(
-    pitBreathProgress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [breathOpacityRange[0], breathOpacityRange[1]],
-    }),
-    glowIntensity,
-  );
-  const breathOpacityCore = Animated.multiply(
-    pitBreathProgress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [Math.min(breathOpacityRange[0] * 2.5, 0.7), Math.min(breathOpacityRange[1] * 2.5, 0.85)],
-    }),
-    glowIntensity,
-  );
-  const breathScale = pitBreathProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [breathScaleRange[0], breathScaleRange[1]],
-  });
 
   // ---- Ambient rim particles (embers rising from pit edge) ----
   useEffect(() => {
@@ -997,6 +875,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           isDevoured: false,
           floatLoopX: null,
           floatLoopY: null,
+          floatStartTime: Date.now(),
         });
       }
     }
@@ -1045,6 +924,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Smooth float loop using single linear progress → interpolated sine ----
   const startFloatLoop = useCallback((fw: FlyingWord) => {
     if (reducedMotion || simplify || fw.isDevoured) return;
+    fw.floatStartTime = Date.now();
 
     // X drift: single linear timing 0→1 looped, interpolated to sine in render
     const loopX = Animated.loop(
@@ -1074,36 +954,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Pit surge flash (on devour impact) ----
   const flashPitSurge = useCallback(() => {
     if (reducedMotion) return;
-    const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
-    pitSurgeScale.setValue(0.8);
-    Animated.parallel([
-      Animated.sequence([
-        Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity, duration: 120, useNativeDriver: true }),
-        Animated.delay(40),
-        Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.spring(pitSurgeScale, { toValue: 1.3, friction: 4, tension: 200, useNativeDriver: true }),
-        Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
-      ]),
-    ]).start();
-  }, [phase, pitSurgeOpacity, pitSurgeScale, reducedMotion]);
+    setSurgeSignal(s => s + 1);
+  }, [reducedMotion]);
 
   // ---- Pit inhale surge (on devour START — pit "pulls" the word) ----
   const triggerInhale = useCallback(() => {
     if (reducedMotion) return;
-    const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
-    Animated.parallel([
-      Animated.sequence([
-        Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity * 0.6, duration: 150, useNativeDriver: true }),
-        Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
-      ]),
-      Animated.sequence([
-        Animated.timing(pitSurgeScale, { toValue: 1.1, duration: 150, useNativeDriver: true }),
-        Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
-      ]),
-    ]).start();
-  }, [phase, pitSurgeOpacity, pitSurgeScale, reducedMotion]);
+    setInhaleSignal(s => s + 1);
+  }, [reducedMotion]);
 
   // ---- Spawn trail particles ----
   const spawnTrail = useCallback((startX: number, startY: number) => {
@@ -1408,11 +1266,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     tryFinalizeBatch(fw.batchId);
   }, [flashPitSurge, spawnImpactBurst, spawnShockwave, tryFinalizeBatch]);
 
-  // ---- Compute approximate current position from progress + phase offset ----
+  // ---- Compute current position from elapsed time (no __getValue() hack) ----
   const getCurrentPos = useCallback((fw: FlyingWord): { x: number; y: number } => {
     const TWO_PI = 2 * Math.PI;
-    const driftT = (fw.driftProgress as any).__getValue?.() ?? 0;
-    const bobT = (fw.bobProgress as any).__getValue?.() ?? 0;
+    const elapsed = Date.now() - fw.floatStartTime;
+    const driftT = (elapsed % fw.driftPeriod) / fw.driftPeriod;
+    const bobT = (elapsed % fw.bobPeriod) / fw.bobPeriod;
     return {
       x: fw.baseX + fw.driftAmplitude * Math.sin(TWO_PI * (driftT + fw.driftPhaseOffset)),
       y: fw.baseY + -fw.bobAmplitude * Math.sin(TWO_PI * (bobT + fw.bobPhaseOffset)),
@@ -1678,113 +1537,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Layered breathing glow — outer halo (faintest, largest) */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
-          width: GLOW_OUTER_SIZE,
-          height: GLOW_OUTER_SIZE,
-          borderRadius: GLOW_OUTER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: breathOpacityOuter,
-          transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Middle glow */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_MIDDLE_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_MIDDLE_SIZE / 2,
-          width: GLOW_MIDDLE_SIZE,
-          height: GLOW_MIDDLE_SIZE,
-          borderRadius: GLOW_MIDDLE_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: breathOpacityMiddle,
-          transform: [{ scaleX: GLOW_MIDDLE_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Inner glow — brightest, smallest */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
-          width: GLOW_INNER_SIZE,
-          height: GLOW_INNER_SIZE,
-          borderRadius: GLOW_INNER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: breathOpacityInner,
-          transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Dark pit core — creates depth illusion */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_CORE_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_CORE_SIZE / 2,
-          width: GLOW_CORE_SIZE,
-          height: GLOW_CORE_SIZE,
-          borderRadius: GLOW_CORE_SIZE / 2,
-          backgroundColor: coreColor,
-          opacity: breathOpacityCore,
-          transform: [{ scaleX: GLOW_CORE_SCALE_X }, { scale: breathScale }],
-        }}
-      />
-      {/* Pit rim ring — subtle edge definition (circle + scaleX for true ellipse) */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_RIM_SIZE_Y / 2,
-          top: PIT_CENTER.y - GLOW_RIM_SIZE_Y / 2,
-          width: GLOW_RIM_SIZE_Y,
-          height: GLOW_RIM_SIZE_Y,
-          borderRadius: GLOW_RIM_SIZE_Y / 2,
-          borderWidth: 1,
-          borderColor: glowColor + '25',
-          transform: [{ scaleX: GLOW_RIM_SCALE_X }],
-        }}
-      />
-
-      {/* Pit surge glow layers — flash on devour impact / inhale */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
-          width: GLOW_OUTER_SIZE,
-          height: GLOW_OUTER_SIZE,
-          borderRadius: GLOW_OUTER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: pitSurgeOpacity.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 0.5],
-          }),
-          transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: pitSurgeScale }],
-        }}
-      />
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
-          top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
-          width: GLOW_INNER_SIZE,
-          height: GLOW_INNER_SIZE,
-          borderRadius: GLOW_INNER_SIZE / 2,
-          backgroundColor: glowColor,
-          opacity: pitSurgeOpacity,
-          transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: pitSurgeScale }],
-        }}
+      {/* Skia pit glow — breathing layers + surge flash + rim */}
+      <PitGlowCanvas
+        phase={phase}
+        glowColor={glowColor}
+        coreColor={coreColor}
+        isActive={pitIsActive}
+        surgeSignal={surgeSignal}
+        inhaleSignal={inhaleSignal}
+        surgeGlowOpacity={phaseColors.glowOpacity}
+        reducedMotion={reducedMotion}
+        simplify={simplify}
       />
 
       {/* Ambient rim particles — embers rising from pit edge */}

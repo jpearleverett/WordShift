@@ -1,12 +1,35 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { StyleSheet, Dimensions } from 'react-native';
+import {
+  Canvas,
+  Rect,
+  Circle,
+  Group,
+  Path,
+  RoundedRect,
+  BlurMask,
+  LinearGradient,
+  RadialGradient,
+  vec,
+} from '@shopify/react-native-skia';
+import {
+  useSharedValue,
+  useDerivedValue,
+  withRepeat,
+  withTiming,
+  cancelAnimation,
+  Easing,
+} from 'react-native-reanimated';
+import type { SharedValue } from 'react-native-reanimated';
 import { getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
-import { getMaxParticleCount } from '../services/deviceTier';
+import { getMaxParticleCount, shouldSimplifyAnimations } from '../services/deviceTier';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-interface FloatingParticle {
+// ─── Particle seed data ────────────────────────────────────────────────
+
+interface ParticleSeed {
   id: number;
   x: number;
   size: number;
@@ -16,11 +39,9 @@ interface FloatingParticle {
   type: 'circle' | 'star' | 'diamond';
 }
 
-// Generate random particles for the background using phase-specific colors
-const generateParticles = (count: number, colors: string[]): FloatingParticle[] => {
-  const particles: FloatingParticle[] = [];
+const generateParticles = (count: number, colors: string[]): ParticleSeed[] => {
   const types: Array<'circle' | 'star' | 'diamond'> = ['circle', 'star', 'diamond'];
-
+  const particles: ParticleSeed[] = [];
   for (let i = 0; i < count; i++) {
     particles.push({
       id: i,
@@ -35,167 +56,112 @@ const generateParticles = (count: number, colors: string[]): FloatingParticle[] 
   return particles;
 };
 
-const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT + 50)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const rotate = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.5)).current;
-  const mountedRef = useRef(true);
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
+// ─── Skia particle (rendered inside Canvas) ────────────────────────────
+
+const SkiaParticle: React.FC<{
+  particle: ParticleSeed;
+  useBlur: boolean;
+}> = ({ particle, useBlur }) => {
+  const progress = useSharedValue(0);
+  const totalCycle = particle.delay + particle.duration;
+  const delayFrac = particle.delay / totalCycle;
 
   useEffect(() => {
-    const animate = () => {
-      // Reset values
-      translateY.setValue(SCREEN_HEIGHT + 50);
-      opacity.setValue(0);
-      rotate.setValue(0);
-      scale.setValue(0.5);
-
-      animRef.current = Animated.sequence([
-        Animated.delay(particle.delay),
-        Animated.parallel([
-          // Float upward
-          Animated.timing(translateY, {
-            toValue: -100,
-            duration: particle.duration,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
-          // Fade in then out
-          Animated.sequence([
-            Animated.timing(opacity, {
-              toValue: 1,
-              duration: particle.duration * 0.2,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0.6,
-              duration: particle.duration * 0.6,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0,
-              duration: particle.duration * 0.2,
-              useNativeDriver: true,
-            }),
-          ]),
-          // Rotate
-          Animated.timing(rotate, {
-            toValue: 1,
-            duration: particle.duration,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
-          // Scale pulse
-          Animated.sequence([
-            Animated.timing(scale, {
-              toValue: 1,
-              duration: particle.duration * 0.3,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: true,
-            }),
-            Animated.timing(scale, {
-              toValue: 0.8,
-              duration: particle.duration * 0.7,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]),
-      ]);
-      animRef.current.start(() => {
-        if (mountedRef.current) animate();
-      });
-    };
-
-    animate();
-
-    return () => {
-      mountedRef.current = false;
-      animRef.current?.stop();
-    };
+    progress.value = withRepeat(
+      withTiming(1, { duration: totalCycle, easing: Easing.linear }),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(progress);
   }, []);
 
-  const spin = rotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+  const transform = useDerivedValue(() => {
+    const p = progress.value;
+    if (p < delayFrac) {
+      return [
+        { translateX: particle.x },
+        { translateY: SCREEN_HEIGHT + 50 },
+        { scale: 0 },
+      ] as const;
+    }
+    const ap = (p - delayFrac) / (1 - delayFrac); // active progress 0→1
+    // Float upward (linear)
+    const ty = SCREEN_HEIGHT + 50 - ap * (SCREEN_HEIGHT + 150);
+    // Rotate one full turn
+    const rot = ap * Math.PI * 2;
+    // Scale: grow in first 30%, then slowly shrink
+    const scl = ap < 0.3
+      ? 0.5 + (ap / 0.3) * 0.5
+      : 1.0 - (ap - 0.3) * 0.2 / 0.7;
+    return [
+      { translateX: particle.x },
+      { translateY: ty },
+      { rotate: rot },
+      { scale: scl },
+    ] as const;
   });
 
-  const getShape = () => {
+  const opacity = useDerivedValue(() => {
+    const p = progress.value;
+    if (p < delayFrac) return 0;
+    const ap = (p - delayFrac) / (1 - delayFrac);
+    // Fade in 20%, sustain at 0.6-1.0, fade out 20%
+    if (ap < 0.2) return ap / 0.2;
+    if (ap > 0.8) return (1 - ap) / 0.2;
+    return 0.6 + 0.4 * (1 - (ap - 0.2) / 0.6);
+  });
+
+  const s = particle.size;
+  const blurR = useBlur ? (particle.type === 'circle' ? 4 : 3) : 0;
+
+  // Pre-compute star path SVG string (4-point star)
+  const starPath = useMemo(() => {
+    if (particle.type !== 'star') return '';
+    const r = s / 2;
+    const ir = r * 0.35;
+    return `M 0 ${-r} L ${ir} ${-ir} L ${r} 0 L ${ir} ${ir} L 0 ${r} L ${-ir} ${ir} L ${-r} 0 L ${-ir} ${-ir} Z`;
+  }, [particle.type, s]);
+
+  const renderShape = () => {
     switch (particle.type) {
       case 'star':
         return (
-          <View style={styles.starContainer}>
-            <View
-              style={[
-                styles.starH,
-                {
-                  width: particle.size,
-                  height: particle.size * 0.35,
-                  backgroundColor: particle.color,
-                },
-              ]}
-            />
-            <View
-              style={[
-                styles.starV,
-                {
-                  width: particle.size * 0.35,
-                  height: particle.size,
-                  backgroundColor: particle.color,
-                },
-              ]}
-            />
-          </View>
+          <Path path={starPath} color={particle.color}>
+            {blurR > 0 && <BlurMask blur={blurR} style="solid" />}
+          </Path>
         );
       case 'diamond':
         return (
-          <View
-            style={[
-              styles.diamond,
-              {
-                width: particle.size * 0.7,
-                height: particle.size * 0.7,
-                backgroundColor: particle.color,
-              },
-            ]}
-          />
+          <Group transform={[{ rotate: Math.PI / 4 }]}>
+            <RoundedRect
+              x={-s * 0.35}
+              y={-s * 0.35}
+              width={s * 0.7}
+              height={s * 0.7}
+              r={2}
+              color={particle.color}
+            >
+              {blurR > 0 && <BlurMask blur={blurR} style="solid" />}
+            </RoundedRect>
+          </Group>
         );
-      default:
+      default: // circle
         return (
-          <View
-            style={[
-              styles.circle,
-              {
-                width: particle.size,
-                height: particle.size,
-                backgroundColor: particle.color,
-                borderRadius: particle.size / 2,
-              },
-            ]}
-          />
+          <Circle cx={0} cy={0} r={s / 2} color={particle.color}>
+            {blurR > 0 && <BlurMask blur={blurR} style="solid" />}
+          </Circle>
         );
     }
   };
 
   return (
-    <Animated.View
-      style={[
-        styles.particle,
-        {
-          left: particle.x,
-          transform: [
-            { translateY },
-            { rotate: spin },
-            { scale },
-          ],
-          opacity,
-        },
-      ]}
-    >
-      {getShape()}
-    </Animated.View>
+    <Group transform={transform} opacity={opacity}>
+      {renderShape()}
+    </Group>
   );
 };
+
+// ─── AnimatedBackground ────────────────────────────────────────────────
 
 interface AnimatedBackgroundProps {
   phase?: number;
@@ -204,69 +170,101 @@ interface AnimatedBackgroundProps {
 export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
-  const particleCount = getMaxParticleCount();
-  const particles = useRef(
-    reducedMotion ? [] : generateParticles(particleCount, theme.particleColors)
-  ).current;
-  // Use opacity-based pulse with native driver instead of JS-bridge backgroundColor
-  const pulseOpacity = useRef(new Animated.Value(0)).current;
+  const useBlur = !shouldSimplifyAnimations();
+
+  // Pulse animation (secondary color overlay, 4s in + 4s out)
+  const pulseProgress = useSharedValue(0);
 
   useEffect(() => {
     if (reducedMotion) return;
-    // Subtle pulse: animate opacity of a secondary color overlay (native driver)
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseOpacity, {
-          toValue: 1,
-          duration: 4000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseOpacity, {
-          toValue: 0,
-          duration: 4000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
+    pulseProgress.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true, // reverse (ping-pong)
     );
-    pulseLoop.start();
-
-    return () => {
-      pulseLoop.stop();
-      pulseOpacity.stopAnimation();
-    };
+    return () => cancelAnimation(pulseProgress);
   }, [reducedMotion]);
 
+  const pulseOpacity = useDerivedValue(() =>
+    reducedMotion ? 0.5 : pulseProgress.value
+  );
+
+  // Generate particle seeds (static per mount)
+  const particles = useMemo(() => {
+    if (reducedMotion) return [];
+    return generateParticles(getMaxParticleCount(), theme.particleColors);
+  }, []);
+
+  // Center glow position
+  const glowCx = SCREEN_WIDTH * 0.5;
+  const glowCy = SCREEN_HEIGHT * 0.3 + SCREEN_WIDTH * 0.3;
+  const glowR = SCREEN_WIDTH * 0.3;
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.bgPrimary }]}>
-      {/* Pulsing secondary color overlay — uses native driver via opacity */}
-      <Animated.View
-        style={[
-          styles.pulseOverlay,
-          { backgroundColor: theme.bgSecondary, opacity: pulseOpacity },
-        ]}
-        pointerEvents="none"
+    <Canvas style={styles.container}>
+      {/* Solid base background */}
+      <Rect x={0} y={0} width={SCREEN_WIDTH} height={SCREEN_HEIGHT} color={theme.bgPrimary} />
+
+      {/* Pulsing secondary color overlay */}
+      <Rect
+        x={0}
+        y={0}
+        width={SCREEN_WIDTH}
+        height={SCREEN_HEIGHT}
+        color={theme.bgSecondary}
+        opacity={pulseOpacity}
       />
 
-      {/* Gradient overlay layers */}
-      <View style={[styles.gradientLayer1, { backgroundColor: theme.overlayTop }]} />
-      <View style={[styles.gradientLayer2, { backgroundColor: theme.overlayMid }]} />
-      <View style={[styles.gradientLayer3, { backgroundColor: theme.overlayBottom }]} />
+      {/* Smooth top gradient overlay (replaces hard-edged View layers) */}
+      <Rect x={0} y={0} width={SCREEN_WIDTH} height={SCREEN_HEIGHT * 0.5}>
+        <LinearGradient
+          start={vec(0, 0)}
+          end={vec(0, SCREEN_HEIGHT * 0.5)}
+          colors={[theme.overlayTop, 'transparent']}
+        />
+      </Rect>
 
-      {/* Radial glow in center */}
-      <View style={[styles.centerGlow, { backgroundColor: theme.centerGlow }]} />
+      {/* Smooth bottom gradient overlay */}
+      <Rect x={0} y={SCREEN_HEIGHT * 0.5} width={SCREEN_WIDTH} height={SCREEN_HEIGHT * 0.5}>
+        <LinearGradient
+          start={vec(0, SCREEN_HEIGHT * 0.5)}
+          end={vec(0, SCREEN_HEIGHT)}
+          colors={['transparent', theme.overlayBottom]}
+        />
+      </Rect>
 
-      {/* Floating particles */}
-      {particles.map((particle) => (
-        <Particle key={particle.id} particle={particle} />
+      {/* Center radial glow (replaces View + shadowRadius hack) */}
+      <Circle cx={glowCx} cy={glowCy} r={glowR}>
+        <RadialGradient
+          c={vec(glowCx, glowCy)}
+          r={glowR}
+          colors={[theme.centerGlow, 'transparent']}
+        />
+      </Circle>
+
+      {/* Floating particles with blur glow */}
+      {particles.map(particle => (
+        <SkiaParticle key={particle.id} particle={particle} useBlur={useBlur} />
       ))}
 
-      {/* Top vignette */}
-      <View style={[styles.vignetteTop, { shadowColor: theme.vignetteColor }]} />
+      {/* Top vignette (smooth gradient instead of shadow hack) */}
+      <Rect x={0} y={0} width={SCREEN_WIDTH} height={120}>
+        <LinearGradient
+          start={vec(0, 0)}
+          end={vec(0, 120)}
+          colors={[theme.vignetteColor + '4D', 'transparent']}
+        />
+      </Rect>
+
       {/* Bottom vignette */}
-      <View style={[styles.vignetteBottom, { backgroundColor: theme.vignetteColor + '4D' }]} />
-    </View>
+      <Rect x={0} y={SCREEN_HEIGHT - 100} width={SCREEN_WIDTH} height={100}>
+        <LinearGradient
+          start={vec(0, SCREEN_HEIGHT - 100)}
+          end={vec(0, SCREEN_HEIGHT)}
+          colors={['transparent', theme.vignetteColor + '4D']}
+        />
+      </Rect>
+    </Canvas>
   );
 };
 
@@ -274,83 +272,6 @@ const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-  },
-  pulseOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  gradientLayer1: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.35,
-  },
-  gradientLayer2: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.5,
-  },
-  gradientLayer3: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.5,
-  },
-  centerGlow: {
-    position: 'absolute',
-    top: SCREEN_HEIGHT * 0.3,
-    left: SCREEN_WIDTH * 0.2,
-    width: SCREEN_WIDTH * 0.6,
-    height: SCREEN_WIDTH * 0.6,
-    borderRadius: SCREEN_WIDTH * 0.3,
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 60,
-  },
-  vignetteTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-    backgroundColor: 'transparent',
-    // Top shadow effect
-    shadowOffset: { width: 0, height: 40 },
-    shadowOpacity: 0.3,
-    shadowRadius: 40,
-  },
-  vignetteBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-  },
-  particle: {
-    position: 'absolute',
-  },
-  circle: {
-    // Styles applied dynamically
-  },
-  starContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  starH: {
-    position: 'absolute',
-    borderRadius: 2,
-  },
-  starV: {
-    position: 'absolute',
-    borderRadius: 2,
-  },
-  diamond: {
-    transform: [{ rotate: '45deg' }],
-    borderRadius: 2,
   },
 });
 

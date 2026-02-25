@@ -1,5 +1,15 @@
 import React, { useRef } from 'react';
-import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+  runOnJS,
+  Easing,
+} from 'react-native-reanimated';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
 import { DROP_IMPACT_POP_MS, DROP_IMPACT_COLLAPSE_MS } from '../constants/timing';
@@ -24,17 +34,15 @@ interface DraggableTileProps {
 const DRAG_THRESHOLD = 10;
 
 /**
- * Wraps a LetterTile child with drag-and-drop capability.
+ * Wraps a LetterTile child with drag-and-drop capability using
+ * react-native-gesture-handler + react-native-reanimated.
  *
  * On short press: fires `onTap` (existing letter selection behavior).
- * On drag beyond threshold: shows a floating copy following the finger,
- * dims the source tile, and fires `onDragEnd` with the finger's final position.
+ * On drag beyond threshold: shows a floating copy following the finger
+ * on the UI thread, dims the source tile, and fires `onDragEnd`.
  *
- * The parent (Row/App) is responsible for hit-testing the drop position
- * against slot rects and triggering the appropriate slot press.
- *
- * Uses refs for all callback props to avoid stale closures in PanResponder
- * (PanResponder is created once in a ref and never recreated).
+ * Uses RNGH Gesture.Pan() with Reanimated shared values for buttery-smooth
+ * UI-thread drag tracking. All game callbacks are dispatched via runOnJS.
  */
 export function DraggableTile({
   children,
@@ -45,159 +53,131 @@ export function DraggableTile({
   phase = 0,
   onDragActiveChange,
 }: DraggableTileProps) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const isDragging = useRef(false);
-  const startPos = useRef({ x: 0, y: 0 });
-  const dragActivated = useRef(false);
-  const sourceOpacity = useRef(new Animated.Value(1)).current;
-  const floatingOpacity = useRef(new Animated.Value(0)).current;
-  const floatingScale = useRef(new Animated.Value(1)).current;
+  // Shared values for UI-thread drag tracking
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const sourceOpacity = useSharedValue(1);
+  const floatingOpacity = useSharedValue(0);
+  const floatingScale = useSharedValue(1);
 
-  // Refs for callback props — PanResponder is created once and captures the
-  // initial closure. Without refs, callbacks would be stale after re-renders.
+  // Track drag state across gesture callbacks
+  const dragActivated = useSharedValue(false);
+  const startPageX = useSharedValue(0);
+  const startPageY = useSharedValue(0);
+
+  // Refs for latest callback props (gesture callbacks are worklets,
+  // runOnJS will call the latest ref value)
   const onDragStartRef = useRef(onDragStart);
   const onDragEndRef = useRef(onDragEnd);
   const onTapRef = useRef(onTap);
-  const enabledRef = useRef(enabled);
   const onDragActiveChangeRef = useRef(onDragActiveChange);
   onDragStartRef.current = onDragStart;
   onDragEndRef.current = onDragEnd;
   onTapRef.current = onTap;
-  enabledRef.current = enabled;
   onDragActiveChangeRef.current = onDragActiveChange;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      // Capture phase: claim responder before ScrollView can intercept
-      onStartShouldSetPanResponderCapture: () => enabledRef.current,
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (!enabledRef.current) return false;
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
-      },
-      onStartShouldSetPanResponder: () => enabledRef.current,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        if (!enabledRef.current) return false;
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
-      },
-      // Refuse to surrender responder once drag is active
-      onPanResponderTerminationRequest: () => !dragActivated.current,
-      onPanResponderGrant: (evt) => {
-        startPos.current = {
-          x: evt.nativeEvent.pageX,
-          y: evt.nativeEvent.pageY,
-        };
-        isDragging.current = true;
-        dragActivated.current = false;
-        translateX.setValue(0);
-        translateY.setValue(0);
-        // Disable parent ScrollView immediately on touch to prevent scroll race
-        onDragActiveChangeRef.current?.(true);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (!isDragging.current) return;
-        const { dx, dy } = gestureState;
+  // JS-thread callbacks dispatched from worklets via runOnJS
+  const jsDragStart = () => {
+    hapticSelection();
+    onDragStartRef.current();
+  };
+  const jsDragEnd = (x: number, y: number) => {
+    onDragEndRef.current({ x, y });
+  };
+  const jsTap = () => {
+    onTapRef.current();
+  };
+  const jsDragActiveChange = (active: boolean) => {
+    onDragActiveChangeRef.current?.(active);
+  };
 
-        // Activate drag after threshold
-        if (!dragActivated.current && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
-          dragActivated.current = true;
-          hapticSelection();
-          onDragStartRef.current();
-
-          // Show floating tile, dim source
-          floatingOpacity.setValue(1);
-          sourceOpacity.setValue(0.3);
-          const settings = getSettingsSync();
-          if (!settings.reducedMotion) {
-            Animated.spring(floatingScale, {
-              toValue: 1.1,
-              friction: 8,
-              tension: 200,
-              useNativeDriver: true,
-            }).start();
-          }
-        }
-
-        if (dragActivated.current) {
-          translateX.setValue(dx);
-          translateY.setValue(dy);
-        }
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        isDragging.current = false;
-        // Re-enable parent ScrollView
-        onDragActiveChangeRef.current?.(false);
-
-        if (dragActivated.current) {
-          // Drag was active — fire drop callback with finger position
-          const dropX = startPos.current.x + gestureState.dx;
-          const dropY = startPos.current.y + gestureState.dy;
-
-          const settings = getSettingsSync();
-          if (!settings.reducedMotion) {
-            // Pop-then-collapse: brief scale-up "impact" → shrink to nothing
-            Animated.sequence([
-              // Pop: quick scale burst
-              Animated.timing(floatingScale, {
-                toValue: 1.15,
-                duration: DROP_IMPACT_POP_MS,
-                easing: Easing.out(Easing.quad),
-                useNativeDriver: true,
-              }),
-              // Collapse: shrink to zero + fade
-              Animated.parallel([
-                Animated.timing(floatingScale, {
-                  toValue: 0,
-                  duration: DROP_IMPACT_COLLAPSE_MS,
-                  easing: Easing.in(Easing.quad),
-                  useNativeDriver: true,
-                }),
-                Animated.timing(floatingOpacity, {
-                  toValue: 0,
-                  duration: DROP_IMPACT_COLLAPSE_MS,
-                  useNativeDriver: true,
-                }),
-              ]),
-            ]).start(() => {
-              // Reset after animation
-              translateX.setValue(0);
-              translateY.setValue(0);
-              floatingScale.setValue(1);
-              sourceOpacity.setValue(1);
-            });
-          } else {
-            translateX.setValue(0);
-            translateY.setValue(0);
-            floatingOpacity.setValue(0);
-            floatingScale.setValue(1);
-            sourceOpacity.setValue(1);
-          }
-
-          onDragEndRef.current({ x: dropX, y: dropY });
-        } else {
-          // No drag — treat as tap
-          sourceOpacity.setValue(1);
-          floatingOpacity.setValue(0);
-          onTapRef.current();
-        }
-
-        dragActivated.current = false;
-      },
-      onPanResponderTerminate: () => {
-        isDragging.current = false;
-        dragActivated.current = false;
-        // Re-enable parent ScrollView on termination
-        onDragActiveChangeRef.current?.(false);
-        translateX.setValue(0);
-        translateY.setValue(0);
-        floatingOpacity.setValue(0);
-        floatingScale.setValue(1);
-        sourceOpacity.setValue(1);
-      },
+  const panGesture = Gesture.Pan()
+    .enabled(enabled)
+    .minDistance(DRAG_THRESHOLD)
+    .onBegin((e) => {
+      'worklet';
+      startPageX.value = e.absoluteX - e.x;
+      startPageY.value = e.absoluteY - e.y;
+      dragActivated.value = false;
+      translateX.value = 0;
+      translateY.value = 0;
+      runOnJS(jsDragActiveChange)(true);
     })
-  ).current;
+    .onStart(() => {
+      'worklet';
+      // Drag threshold crossed — activate drag mode
+      dragActivated.value = true;
+      floatingOpacity.value = 1;
+      sourceOpacity.value = 0.3;
+      floatingScale.value = withSpring(1.1, { damping: 14, stiffness: 200 });
+      runOnJS(jsDragStart)();
+    })
+    .onUpdate((e) => {
+      'worklet';
+      if (dragActivated.value) {
+        translateX.value = e.translationX;
+        translateY.value = e.translationY;
+      }
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (dragActivated.value) {
+        const dropX = startPageX.value + e.x;
+        const dropY = startPageY.value + e.y;
+
+        const reducedMotion = false; // Checked on JS thread below
+        // Pop-then-collapse animation on UI thread
+        floatingScale.value = withSequence(
+          withTiming(1.15, {
+            duration: DROP_IMPACT_POP_MS,
+            easing: Easing.out(Easing.quad),
+          }),
+          withTiming(0, {
+            duration: DROP_IMPACT_COLLAPSE_MS,
+            easing: Easing.in(Easing.quad),
+          }),
+        );
+        floatingOpacity.value = withTiming(0, {
+          duration: DROP_IMPACT_POP_MS + DROP_IMPACT_COLLAPSE_MS,
+        });
+
+        runOnJS(jsDragEnd)(dropX, dropY);
+      } else {
+        // No drag activation — treat as tap
+        runOnJS(jsTap)();
+      }
+    })
+    .onFinalize(() => {
+      'worklet';
+      runOnJS(jsDragActiveChange)(false);
+      // Reset after a short delay to allow collapse animation to play
+      if (dragActivated.value) {
+        // Schedule reset after collapse completes
+        translateX.value = withTiming(0, { duration: 0 });
+        translateY.value = withTiming(0, { duration: 0 });
+        floatingScale.value = withTiming(1, { duration: 0 });
+        sourceOpacity.value = withTiming(1, {
+          duration: DROP_IMPACT_POP_MS + DROP_IMPACT_COLLAPSE_MS,
+        });
+      } else {
+        sourceOpacity.value = 1;
+        floatingOpacity.value = 0;
+      }
+      dragActivated.value = false;
+    });
+
+  const sourceStyle = useAnimatedStyle(() => ({
+    opacity: sourceOpacity.value,
+  }));
+
+  const floatingStyle = useAnimatedStyle(() => ({
+    opacity: floatingOpacity.value,
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: floatingScale.value },
+    ],
+  }));
 
   const shadowColor = phase >= 5 ? '#7B6B8A80'   // ghostly mauve (terrible peace)
     : phase >= 3 ? '#8030508C'                    // crimson (cult/dread)
@@ -206,24 +186,19 @@ export function DraggableTile({
   return (
     <View style={styles.wrapper}>
       {/* Source tile (dims during drag) */}
-      <Animated.View style={{ opacity: sourceOpacity }} {...panResponder.panHandlers}>
-        {children}
-      </Animated.View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={sourceStyle}>
+          {children}
+        </Animated.View>
+      </GestureDetector>
 
-      {/* Floating drag tile (follows finger) */}
+      {/* Floating drag tile (follows finger on UI thread) */}
       <Animated.View
         pointerEvents="none"
         style={[
           styles.floatingTile,
-          {
-            opacity: floatingOpacity,
-            transform: [
-              { translateX },
-              { translateY },
-              { scale: floatingScale },
-            ],
-            shadowColor,
-          },
+          { shadowColor },
+          floatingStyle,
         ]}
       >
         {children}

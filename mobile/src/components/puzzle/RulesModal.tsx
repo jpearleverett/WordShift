@@ -9,6 +9,8 @@ import {
 import { CandyColors } from '../../theme/colors';
 import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
+import { getSettingsSync } from '../../services/settings';
 
 const STEP_COLORS = [
   { bg: CandyColors.pink.light, text: CandyColors.pink.dark },
@@ -37,7 +39,11 @@ export const RulesModal: React.FC<RulesModalProps> = ({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={styles.rulesModal} onStartShouldSetResponder={() => true}>
+        <Reanimated.View
+          entering={getSettingsSync().reducedMotion ? undefined : FadeIn.duration(250)}
+          style={styles.rulesModal}
+          onStartShouldSetResponder={() => true}
+        >
           <View style={styles.modalShine} />
 
           <TouchableOpacity
@@ -71,7 +77,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
             <View style={styles.buttonShine} />
             <Text style={styles.gotItButtonText}>{rules.dismissLabel}</Text>
           </TouchableOpacity>
-        </View>
+        </Reanimated.View>
       </TouchableOpacity>
     </Modal>
   );
