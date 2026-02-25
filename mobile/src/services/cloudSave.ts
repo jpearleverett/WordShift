@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -22,7 +22,7 @@ export interface CloudSaveData {
   version: number;
   timestamp: number;
   deviceId: string;
-  /** All AsyncStorage keys and their values */
+  /** All storage keys and their values */
   data: Record<string, string>;
 }
 
@@ -50,7 +50,7 @@ export interface SyncStatus {
 // Storage Keys to Sync
 // ============================================================================
 
-/** All AsyncStorage keys that should be included in cloud saves */
+/** All storage keys that should be included in cloud saves */
 const SYNC_KEYS = [
   'wordshift_progress',
   'wordshift_star_stats',
@@ -103,7 +103,6 @@ class NoOpProvider implements CloudProvider {
 // ============================================================================
 
 let provider: CloudProvider = new NoOpProvider();
-let syncStatusCache: SyncStatus | null = null;
 
 /**
  * Set the cloud save provider. Call this during app initialization
@@ -123,37 +122,31 @@ export function getCloudProvider(): CloudProvider {
 /**
  * Generate a device ID for identifying save sources.
  */
-async function getDeviceId(): Promise<string> {
+function getDeviceId(): string {
   const key = 'wordshift_device_id';
-  try {
-    const existing = await AsyncStorage.getItem(key);
-    if (existing) return existing;
-    const id = `device_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-    await AsyncStorage.setItem(key, id);
-    return id;
-  } catch {
-    return `device_${Date.now()}`;
-  }
+  const existing = storage.getString(key);
+  if (existing !== undefined) return existing;
+  const id = `device_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+  storage.set(key, id);
+  return id;
 }
 
 /**
  * Collect all local save data into a CloudSaveData object.
  */
-export async function collectLocalSaveData(): Promise<CloudSaveData> {
+export function collectLocalSaveData(): CloudSaveData {
   const data: Record<string, string> = {};
   for (const key of SYNC_KEYS) {
-    try {
-      const value = await AsyncStorage.getItem(key);
-      if (value !== null) {
-        data[key] = value;
-      }
-    } catch {}
+    const value = storage.getString(key);
+    if (value !== undefined) {
+      data[key] = value;
+    }
   }
 
   return {
     version: CURRENT_SAVE_VERSION,
     timestamp: Date.now(),
-    deviceId: await getDeviceId(),
+    deviceId: getDeviceId(),
     data,
   };
 }
@@ -162,17 +155,12 @@ export async function collectLocalSaveData(): Promise<CloudSaveData> {
  * Restore save data from a CloudSaveData object.
  * Overwrites all local data with cloud data.
  */
-export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<boolean> {
-  try {
-    const entries = Object.entries(cloudData.data);
-    // Write all keys from cloud data
-    for (const [key, value] of entries) {
-      await AsyncStorage.setItem(key, value);
-    }
-    return true;
-  } catch {
-    return false;
+export function restoreFromCloudData(cloudData: CloudSaveData): boolean {
+  const entries = Object.entries(cloudData.data);
+  for (const [key, value] of entries) {
+    storage.set(key, value);
   }
+  return true;
 }
 
 /**
@@ -182,10 +170,10 @@ export async function uploadToCloud(): Promise<boolean> {
   const isReady = await provider.isReady();
   if (!isReady) return false;
 
-  const saveData = await collectLocalSaveData();
+  const saveData = collectLocalSaveData();
   const success = await provider.upload(saveData);
 
-  await updateSyncStatus(success);
+  updateSyncStatus(success);
   return success;
 }
 
@@ -200,9 +188,9 @@ export async function downloadFromCloud(): Promise<boolean> {
   const cloudData = await provider.download();
   if (!cloudData) return false;
 
-  const success = await restoreFromCloudData(cloudData);
+  const success = restoreFromCloudData(cloudData);
   if (success) {
-    await updateSyncStatus(true);
+    updateSyncStatus(true);
   }
   return success;
 }
@@ -214,67 +202,53 @@ export async function checkForNewerSave(): Promise<boolean> {
   const isReady = await provider.isReady();
   if (!isReady) return false;
 
-  const status = await getSyncStatus();
+  const status = getSyncStatus();
   return provider.hasNewerSave(status.lastSyncTimestamp);
 }
 
 /**
  * Get current sync status.
  */
-export async function getSyncStatus(): Promise<SyncStatus> {
-  if (syncStatusCache) return syncStatusCache;
-  try {
-    const stored = await AsyncStorage.getItem(SYNC_STATUS_KEY);
-    if (stored) {
-      syncStatusCache = JSON.parse(stored);
-      return syncStatusCache!;
-    }
-  } catch {}
-  syncStatusCache = {
+export function getSyncStatus(): SyncStatus {
+  const stored = storage.getString(SYNC_STATUS_KEY);
+  if (stored !== undefined) {
+    return JSON.parse(stored);
+  }
+  return {
     lastSyncTimestamp: 0,
     lastSyncSuccess: false,
     pendingChanges: false,
     provider: provider.getName(),
   };
-  return syncStatusCache;
 }
 
 /**
  * Mark that local changes exist that haven't been synced.
  */
-export async function markPendingChanges(): Promise<void> {
-  const status = await getSyncStatus();
+export function markPendingChanges(): void {
+  const status = getSyncStatus();
   status.pendingChanges = true;
-  syncStatusCache = status;
-  try {
-    await AsyncStorage.setItem(SYNC_STATUS_KEY, JSON.stringify(status));
-  } catch {}
+  storage.set(SYNC_STATUS_KEY, JSON.stringify(status));
 }
 
 // ============================================================================
 // Internal
 // ============================================================================
 
-async function updateSyncStatus(success: boolean): Promise<void> {
+function updateSyncStatus(success: boolean): void {
   const status: SyncStatus = {
     lastSyncTimestamp: Date.now(),
     lastSyncSuccess: success,
     pendingChanges: !success,
     provider: provider.getName(),
   };
-  syncStatusCache = status;
-  try {
-    await AsyncStorage.setItem(SYNC_STATUS_KEY, JSON.stringify(status));
-  } catch {}
+  storage.set(SYNC_STATUS_KEY, JSON.stringify(status));
 }
 
 /**
  * Clear sync status (for Settings > Reset All).
  */
-export async function clearSyncStatus(): Promise<void> {
-  syncStatusCache = null;
-  try {
-    await AsyncStorage.removeItem(SYNC_STATUS_KEY);
-    await AsyncStorage.removeItem('wordshift_device_id');
-  } catch {}
+export function clearSyncStatus(): void {
+  storage.remove(SYNC_STATUS_KEY);
+  storage.remove('wordshift_device_id');
 }

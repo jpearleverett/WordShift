@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 /**
  * Sacrifice mechanic for Phase 4+.
@@ -63,10 +63,8 @@ const SACRIFICE_MILESTONES: Record<number, string> = {
 };
 
 // ============================================================================
-// In-memory cache
+// Storage helpers
 // ============================================================================
-
-let sacrificeCache: SacrificeState | null = null;
 
 function getDefaultState(): SacrificeState {
   return {
@@ -84,38 +82,31 @@ function getDefaultState(): SacrificeState {
 /**
  * Load sacrifice state from storage.
  */
-export async function loadSacrificeState(): Promise<SacrificeState> {
-  if (sacrificeCache) return sacrificeCache;
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (
-        parsed &&
-        typeof parsed.totalAmberSacrificed === 'number' &&
-        typeof parsed.sacrificeCount === 'number' &&
-        Array.isArray(parsed.sacrificeHistory)
-      ) {
-        sacrificeCache = parsed;
-      } else {
-        sacrificeCache = getDefaultState();
-      }
-      return sacrificeCache!;
+export function loadSacrificeState(): SacrificeState {
+  const stored = storage.getString(STORAGE_KEY);
+  if (stored !== undefined) {
+    const parsed = JSON.parse(stored);
+    if (
+      parsed &&
+      typeof parsed.totalAmberSacrificed === 'number' &&
+      typeof parsed.sacrificeCount === 'number' &&
+      Array.isArray(parsed.sacrificeHistory)
+    ) {
+      return parsed;
     }
-  } catch {}
-  sacrificeCache = getDefaultState();
-  return sacrificeCache;
+  }
+  return getDefaultState();
 }
 
 /**
  * Perform a sacrifice. Returns the response message.
  * The caller is responsible for deducting amber from the player's balance.
  */
-export async function performSacrifice(
+export function performSacrifice(
   amount: number,
   currentPhase: number
-): Promise<{ message: string; isMilestone: boolean }> {
-  const state = await loadSacrificeState();
+): { message: string; isMilestone: boolean } {
+  const state = loadSacrificeState();
 
   const entry: SacrificeEntry = {
     amount,
@@ -133,7 +124,7 @@ export async function performSacrifice(
     state.sacrificeHistory = state.sacrificeHistory.slice(-100);
   }
 
-  await saveSacrificeState(state);
+  saveSacrificeState(state);
 
   // First sacrifice gets special message
   if (state.sacrificeCount === 1) {
@@ -192,12 +183,12 @@ export function getSacrificePrompt(phase: number): { title: string; subtitle: st
 /**
  * Get sacrifice stats for display.
  */
-export async function getSacrificeStats(): Promise<{
+export function getSacrificeStats(): {
   totalSacrificed: number;
   count: number;
   lastSacrifice: number;
-}> {
-  const state = await loadSacrificeState();
+} {
+  const state = loadSacrificeState();
   return {
     totalSacrificed: state.totalAmberSacrificed,
     count: state.sacrificeCount,
@@ -209,26 +200,23 @@ export async function getSacrificeStats(): Promise<{
 // Internal
 // ============================================================================
 
-async function saveSacrificeState(state: SacrificeState): Promise<void> {
-  sacrificeCache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
+function saveSacrificeState(state: SacrificeState): void {
+  storage.set(STORAGE_KEY, JSON.stringify(state));
 }
 
 /**
  * Get the current sacrifice count (for dialogue reactions).
  */
-export async function getSacrificeCount(): Promise<number> {
-  const state = await loadSacrificeState();
+export function getSacrificeCount(): number {
+  const state = loadSacrificeState();
   return state.sacrificeCount;
 }
 
 /**
  * Get total amber sacrificed this week (for weekly quest tracking).
  */
-export async function getWeeklySacrificeTotal(): Promise<number> {
-  const state = await loadSacrificeState();
+export function getWeeklySacrificeTotal(): number {
+  const state = loadSacrificeState();
   const now = new Date();
   // Calculate start of current week (Monday)
   const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
@@ -246,9 +234,6 @@ export async function getWeeklySacrificeTotal(): Promise<number> {
 /**
  * Clear sacrifice data (for Settings > Reset All).
  */
-export async function clearSacrificeState(): Promise<void> {
-  sacrificeCache = null;
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {}
+export function clearSacrificeState(): void {
+  storage.remove(STORAGE_KEY);
 }

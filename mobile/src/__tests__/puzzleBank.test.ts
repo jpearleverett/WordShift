@@ -1,7 +1,7 @@
-import { createMockAsyncStorage } from './helpers/mockAsyncStorage';
+import { createMockStorage } from './helpers/mockStorage';
 
-jest.mock('@react-native-async-storage/async-storage', () =>
-  createMockAsyncStorage()
+jest.mock('../services/storage', () =>
+  createMockStorage()
 );
 
 // Mock wordHistory for isInHardCooldown used by puzzleBank
@@ -12,7 +12,7 @@ jest.mock('../services/wordHistory', () => ({
   recordPuzzleWords: jest.fn(async () => {}),
 }));
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '../services/storage';
 import { selectPreGeneratedPuzzle, clearPlayedPuzzles } from '../services/puzzleBank';
 import { PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
@@ -25,16 +25,16 @@ function emptyRecencyMap(): Map<string, number> {
   return new Map();
 }
 
-beforeEach(async () => {
-  await AsyncStorage.clear();
-  await clearPlayedPuzzles();
+beforeEach(() => {
+  (storage as any).clearAll();
+  clearPlayedPuzzles();
   jest.clearAllMocks();
 });
 
 describe('puzzleBank', () => {
   describe('selectPreGeneratedPuzzle', () => {
-    it('returns a valid PuzzleConfig for HARD difficulty', async () => {
-      const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+    it('returns a valid PuzzleConfig for HARD difficulty', () => {
+      const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
       expect(result).not.toBeNull();
       expect(result!.words).toBeDefined();
       expect(result!.words.length).toBe(5); // HARD = 5 rows
@@ -44,39 +44,39 @@ describe('puzzleBank', () => {
       expect(result!.hint).toBeDefined();
     });
 
-    it('returns valid puzzles for all standard difficulties', async () => {
-      const easy = await selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap());
+    it('returns valid puzzles for all standard difficulties', () => {
+      const easy = selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap());
       expect(easy).not.toBeNull();
       expect(easy!.words.length).toBe(3); // EASY = 3 rows
       expect(easy!.wordLength).toBe(4);
 
-      const medium = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap());
+      const medium = selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap());
       expect(medium).not.toBeNull();
       expect(medium!.words.length).toBe(4); // MEDIUM = 4 rows
       expect(medium!.wordLength).toBe(4);
 
-      const mediumPlus = await selectPreGeneratedPuzzle('MEDIUM_PLUS', 0, emptyRecencyMap());
+      const mediumPlus = selectPreGeneratedPuzzle('MEDIUM_PLUS', 0, emptyRecencyMap());
       expect(mediumPlus).not.toBeNull();
       expect(mediumPlus!.words.length).toBe(4); // MEDIUM_PLUS = 4 rows
       expect(mediumPlus!.wordLength).toBe(5);
     });
 
-    it('does not return the same puzzle twice in succession', async () => {
-      const first = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
-      const second = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+    it('does not return the same puzzle twice in succession', () => {
+      const first = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+      const second = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
       expect(first).not.toBeNull();
       expect(second).not.toBeNull();
       // Word chains should differ
       expect(first!.words.join(',')).not.toBe(second!.words.join(','));
     });
 
-    it('excludes already-played puzzles', async () => {
+    it('excludes already-played puzzles', () => {
       // Play many puzzles and track what we get
       const seenWordChains = new Set<string>();
       const numToPlay = 20;
 
       for (let i = 0; i < numToPlay; i++) {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
         expect(result).not.toBeNull();
         const chainKey = result!.words.join(',');
         expect(seenWordChains.has(chainKey)).toBe(false);
@@ -86,14 +86,14 @@ describe('puzzleBank', () => {
       expect(seenWordChains.size).toBe(numToPlay);
     });
 
-    it('prefers phase-appropriate puzzles at Phase 0', async () => {
+    it('prefers phase-appropriate puzzles at Phase 0', () => {
       // At phase 0, tier 0 (no dread words) puzzles should score highest.
       // Run multiple selections and check that most have dreadTier 0
       let tier0Count = 0;
       const trials = 20;
 
       for (let i = 0; i < trials; i++) {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
         if (result) {
           // Find the matching bank entry
           const entry = PUZZLE_BANK_HARD.find(p => p.words.join(',') === result.words.join(','));
@@ -105,8 +105,8 @@ describe('puzzleBank', () => {
       expect(tier0Count).toBeGreaterThanOrEqual(trials * 0.7);
     });
 
-    it('returns puzzles with valid solution steps', async () => {
-      const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+    it('returns puzzles with valid solution steps', () => {
+      const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
       expect(result).not.toBeNull();
 
       for (const step of result!.solution!) {
@@ -119,16 +119,16 @@ describe('puzzleBank', () => {
       }
     });
 
-    it('recycles oldest puzzles when bank is exhausted', async () => {
+    it('recycles oldest puzzles when bank is exhausted', () => {
       // Skip this test if bank is too large (would be slow)
       if (PUZZLE_BANK_HARD.length > 50) {
         // Use a focused test: manually mark all puzzles as played, then check recycling
         const usedKey = 'wordshift_played_puzzle_ids';
         const allIds = PUZZLE_BANK_HARD.map(p => p.id);
-        await AsyncStorage.setItem(usedKey, JSON.stringify(allIds));
+        storage.set(usedKey, JSON.stringify(allIds));
         // Clear the in-memory cache to force reload from storage
-        await clearPlayedPuzzles();
-        await AsyncStorage.setItem(usedKey, JSON.stringify(allIds));
+        clearPlayedPuzzles();
+        storage.set(usedKey, JSON.stringify(allIds));
 
         // Force cache reload by creating a fresh import context
         // Since clearPlayedPuzzles resets the cache, re-set the storage
@@ -140,32 +140,32 @@ describe('puzzleBank', () => {
         // by setting up a smaller scenario
 
         // Mark just 10 puzzles as played with incremental storage writes
-        await clearPlayedPuzzles();
+        clearPlayedPuzzles();
         const first10 = PUZZLE_BANK_HARD.slice(0, 10);
         const first10Ids = first10.map(p => p.id);
         // Set up as if all 500 were played
-        await AsyncStorage.setItem(usedKey, JSON.stringify(allIds));
+        storage.set(usedKey, JSON.stringify(allIds));
         // Now clear and verify we can still get puzzles
-        await clearPlayedPuzzles();
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+        clearPlayedPuzzles();
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
         expect(result).not.toBeNull();
       }
     });
   });
 
   describe('clearPlayedPuzzles', () => {
-    it('resets played puzzle tracking', async () => {
+    it('resets played puzzle tracking', () => {
       // Play some puzzles
-      await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
-      await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+      selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+      selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
 
       // Clear
-      await clearPlayedPuzzles();
+      clearPlayedPuzzles();
 
       // The first puzzle we played should now be available again
       // (since played list is cleared, it could be selected again)
-      const stored = await AsyncStorage.getItem('wordshift_played_puzzle_ids');
-      expect(stored).toBeNull();
+      const stored = storage.getString('wordshift_played_puzzle_ids');
+      expect(stored).toBeUndefined();
     });
   });
 
@@ -207,26 +207,26 @@ describe('puzzleBank', () => {
   describe('selectPreGeneratedPuzzle - reverse variant', () => {
     const hasReversePuzzles = PUZZLE_BANK_REVERSE_HARD.length > 0;
 
-    it('returns puzzles for reverse at EASY and MEDIUM difficulties', async () => {
-      const easy = await selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap(), 'reverse');
+    it('returns puzzles for reverse at EASY and MEDIUM difficulties', () => {
+      const easy = selectPreGeneratedPuzzle('EASY', 0, emptyRecencyMap(), 'reverse');
       expect(easy).not.toBeNull();
       expect(easy!.words.length).toBe(3); // 3 rows
       expect(easy!.wordLength).toBe(4);   // 4-letter words
 
-      const medium = await selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
+      const medium = selectPreGeneratedPuzzle('MEDIUM', 0, emptyRecencyMap(), 'reverse');
       expect(medium).not.toBeNull();
       expect(medium!.words.length).toBe(4); // 4 rows
       expect(medium!.wordLength).toBe(4);   // 4-letter words
     });
 
-    it('returns null for unsupported variants', async () => {
-      const speed = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'speed');
+    it('returns null for unsupported variants', () => {
+      const speed = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'speed');
       expect(speed).toBeNull();
     });
 
     if (hasReversePuzzles) {
-      it('returns a valid PuzzleConfig for HARD reverse', async () => {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+      it('returns a valid PuzzleConfig for HARD reverse', () => {
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
         expect(result).not.toBeNull();
         expect(result!.words).toBeDefined();
         expect(result!.words.length).toBe(5);
@@ -237,25 +237,25 @@ describe('puzzleBank', () => {
       });
 
 
-      it('does not return the same reverse puzzle twice', async () => {
-        const first = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
-        const second = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+      it('does not return the same reverse puzzle twice', () => {
+        const first = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+        const second = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
         expect(first).not.toBeNull();
         expect(second).not.toBeNull();
         expect(first!.words.join(',')).not.toBe(second!.words.join(','));
       });
 
-      it('uses separate tracking from standard puzzles', async () => {
+      it('uses separate tracking from standard puzzles', () => {
         // Play a standard puzzle
-        await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
+        selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
         // Play a reverse puzzle
-        await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+        selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
 
         // Both storage keys should have entries
-        const standardStored = await AsyncStorage.getItem('wordshift_played_puzzle_ids');
-        const reverseStored = await AsyncStorage.getItem('wordshift_played_reverse_puzzle_ids');
-        expect(standardStored).not.toBeNull();
-        expect(reverseStored).not.toBeNull();
+        const standardStored = storage.getString('wordshift_played_puzzle_ids');
+        const reverseStored = storage.getString('wordshift_played_reverse_puzzle_ids');
+        expect(standardStored).not.toBeUndefined();
+        expect(reverseStored).not.toBeUndefined();
 
         const standardIds = JSON.parse(standardStored!);
         const reverseIds = JSON.parse(reverseStored!);
@@ -265,8 +265,8 @@ describe('puzzleBank', () => {
         expect(standardIds[0]).not.toBe(reverseIds[0]);
       });
 
-      it('returns reverse puzzles with valid solution steps', async () => {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+      it('returns reverse puzzles with valid solution steps', () => {
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
         expect(result).not.toBeNull();
 
         for (const step of result!.solution!) {
@@ -282,11 +282,11 @@ describe('puzzleBank', () => {
   });
 
   describe('bank word novelty scoring', () => {
-    it('prefers puzzles with novel words over puzzles with previously seen words', async () => {
+    it('prefers puzzles with novel words over puzzles with previously seen words', () => {
       // Play 30 puzzles to build up bank word history
       const playedWords = new Set<string>();
       for (let i = 0; i < 30; i++) {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
         if (result) {
           result.words.forEach(w => playedWords.add(w));
         }
@@ -298,7 +298,7 @@ describe('puzzleBank', () => {
       let totalWords = 0;
       const trialsAfter = 10;
       for (let i = 0; i < trialsAfter; i++) {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
         if (result) {
           for (const word of result.words) {
             totalWords++;
@@ -316,11 +316,11 @@ describe('puzzleBank', () => {
       expect(novelRate).toBeGreaterThan(0.4); // Conservatively, at least 40% novel
     });
 
-    it('produces more diverse word sets than a naive approach over many selections', async () => {
+    it('produces more diverse word sets than a naive approach over many selections', () => {
       // Play 50 puzzles and track total unique words seen
       const allSeenWords = new Set<string>();
       for (let i = 0; i < 50; i++) {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
         if (result) {
           result.words.forEach(w => allSeenWords.add(w));
         }
@@ -334,19 +334,19 @@ describe('puzzleBank', () => {
       expect(allSeenWords.size).toBeGreaterThan(170);
     });
 
-    it('standard and reverse banks have independent word novelty tracking', async () => {
+    it('standard and reverse banks have independent word novelty tracking', () => {
       if (PUZZLE_BANK_REVERSE_HARD.length === 0) return;
 
       // Play 10 standard puzzles
       const standardWords = new Set<string>();
       for (let i = 0; i < 10; i++) {
-        const result = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
+        const result = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
         if (result) result.words.forEach(w => standardWords.add(w));
       }
 
       // Now play a reverse puzzle — its word novelty should NOT be affected by
       // standard bank history (they use separate ID tracking)
-      const reverseResult = await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+      const reverseResult = selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
       expect(reverseResult).not.toBeNull();
       // The reverse puzzle's words can overlap with standard words — that's fine,
       // because the banks track independently
@@ -450,20 +450,20 @@ describe('puzzleBank', () => {
   });
 
   describe('clearPlayedPuzzles - both banks', () => {
-    it('resets both standard and reverse puzzle tracking', async () => {
+    it('resets both standard and reverse puzzle tracking', () => {
       if (PUZZLE_BANK_REVERSE_HARD.length > 0) {
-        await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
-        await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
+        selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'standard');
+        selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap(), 'reverse');
       } else {
-        await selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
+        selectPreGeneratedPuzzle('HARD', 0, emptyRecencyMap());
       }
 
-      await clearPlayedPuzzles();
+      clearPlayedPuzzles();
 
-      const standardStored = await AsyncStorage.getItem('wordshift_played_puzzle_ids');
-      const reverseStored = await AsyncStorage.getItem('wordshift_played_reverse_puzzle_ids');
-      expect(standardStored).toBeNull();
-      expect(reverseStored).toBeNull();
+      const standardStored = storage.getString('wordshift_played_puzzle_ids');
+      const reverseStored = storage.getString('wordshift_played_reverse_puzzle_ids');
+      expect(standardStored).toBeUndefined();
+      expect(reverseStored).toBeUndefined();
     });
   });
 

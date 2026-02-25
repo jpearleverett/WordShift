@@ -40,7 +40,8 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   useEffect(() => {
     getCumulativeStats().then(setStats);
     getAchievementsWithStatus().then(setAchievements);
-    getDailyStatus().then(s => setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak }));
+    const s = getDailyStatus();
+    setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak });
     getStreakInfo().then(info => setCurrentStreak(info.currentStreak));
   }, []);
 

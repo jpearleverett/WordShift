@@ -68,12 +68,18 @@ describe('puzzleVariety', () => {
     it('unlocks additional variants by progression bands', () => {
       const origRandom = Math.random;
 
+      // Use multiples of 10 so `puzzlesSolved % 10 === 0` triggers isVariantPuzzle.
+      // Unlock thresholds: reverse=8, double_shift=25, speed=35.
+
+      // At 30: reverse (8) + double_shift (25) unlocked
       Math.random = () => 0.99;
-      expect(['reverse', 'double_shift']).toContain(shouldOfferVariant(25, 0)!.variant);
+      expect(['reverse', 'double_shift']).toContain(shouldOfferVariant(30, 0)!.variant);
 
+      // At 40: reverse + double_shift + speed (35) unlocked
       Math.random = () => 0.9;
-      expect(['reverse', 'speed', 'double_shift']).toContain(shouldOfferVariant(60, 0)!.variant);
+      expect(['reverse', 'speed', 'double_shift']).toContain(shouldOfferVariant(40, 0)!.variant);
 
+      // At 90: all three unlocked
       Math.random = () => 0.9;
       expect(['reverse', 'speed', 'double_shift']).toContain(
         shouldOfferVariant(90, 0)!.variant

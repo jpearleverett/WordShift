@@ -404,7 +404,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       // Check daily availability
       const dailyUnlocked = isDailyChallengeUnlocked(puzzles, phase as number);
-      const dailyDone = dailyUnlocked ? await isDailyCompleted() : true;
+      const dailyDone = dailyUnlocked ? isDailyCompleted() : true;
       const dailyAvailable = dailyUnlocked && !dailyDone;
 
       // Check untried difficulties
@@ -421,11 +421,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         : null;
 
       // Check weekly quests
-      let hasActiveQuests = false;
-      try {
-        const questState = await loadWeeklyQuests(phase as number);
-        hasActiveQuests = questState.quests.some(q => !q.completed);
-      } catch { /* ignore */ }
+      const questState = loadWeeklyQuests(phase as number);
+      const hasActiveQuests = questState.quests.some(q => !q.completed);
 
       if (cancelled) return;
       const suggestion = getGoalSuggestion(phase, dailyAvailable, untried, newVariant, hasActiveQuests);
@@ -1534,7 +1531,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       onAmberChange?.(spendResult.newBalance);
                       setSacrificeMessage(result.message);
                       // Track sacrifice for weekly quest progress
-                      updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase).catch(() => {});
+                      updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase);
                     }}
                     accessibilityLabel={`Offer ${amount} amber`}
                     accessibilityRole="button"

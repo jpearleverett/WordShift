@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 const STORAGE_KEY = 'wordshift_event_log';
 const MAX_EVENTS = 500;
@@ -35,7 +35,7 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Log a game event. Events are buffered in memory and periodically
- * flushed to AsyncStorage.
+ * flushed to MMKV.
  */
 export function logEvent(event: GameEvent): void {
   const storedEvent: StoredEvent = {
@@ -55,54 +55,43 @@ export function logEvent(event: GameEvent): void {
 }
 
 /**
- * Flush buffered events to AsyncStorage
+ * Flush buffered events to MMKV
  */
-async function flushEvents(): Promise<void> {
+function flushEvents(): void {
   if (eventBuffer.length === 0) return;
 
   const eventsToFlush = [...eventBuffer];
   eventBuffer = [];
 
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    const existing: StoredEvent[] = stored ? JSON.parse(stored) : [];
+  const stored = storage.getString(STORAGE_KEY);
+  const existing: StoredEvent[] = stored !== undefined ? JSON.parse(stored) : [];
 
-    const combined = [...existing, ...eventsToFlush];
+  const combined = [...existing, ...eventsToFlush];
 
-    // Keep only the most recent events
-    if (combined.length > MAX_EVENTS) {
-      combined.splice(0, combined.length - MAX_EVENTS);
-    }
-
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(combined));
-  } catch (error) {
-    console.warn('Failed to flush events:', error);
-    // Put events back in buffer so they're not lost
-    eventBuffer = [...eventsToFlush, ...eventBuffer];
+  // Keep only the most recent events
+  if (combined.length > MAX_EVENTS) {
+    combined.splice(0, combined.length - MAX_EVENTS);
   }
+
+  storage.set(STORAGE_KEY, JSON.stringify(combined));
 }
 
 /**
  * Get all stored events (for diagnostics/export)
  */
-export async function getEvents(): Promise<StoredEvent[]> {
-  try {
-    // Flush any pending events first
-    await flushEvents();
+export function getEvents(): StoredEvent[] {
+  // Flush any pending events first
+  flushEvents();
 
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.warn('Failed to load events:', error);
-    return [];
-  }
+  const stored = storage.getString(STORAGE_KEY);
+  return stored !== undefined ? JSON.parse(stored) : [];
 }
 
 /**
  * Get event counts by type (for quick diagnostics)
  */
-export async function getEventSummary(): Promise<Record<string, number>> {
-  const events = await getEvents();
+export function getEventSummary(): Record<string, number> {
+  const events = getEvents();
   const summary: Record<string, number> = {};
 
   for (const event of events) {
@@ -115,8 +104,8 @@ export async function getEventSummary(): Promise<Record<string, number>> {
 /**
  * Get recent events of a specific type
  */
-export async function getRecentEvents(type: EventType, limit: number = 20): Promise<StoredEvent[]> {
-  const events = await getEvents();
+export function getRecentEvents(type: EventType, limit: number = 20): StoredEvent[] {
+  const events = getEvents();
   return events
     .filter(e => e.type === type)
     .slice(-limit);
@@ -125,15 +114,11 @@ export async function getRecentEvents(type: EventType, limit: number = 20): Prom
 /**
  * Clear all stored events (for testing/reset)
  */
-export async function clearEvents(): Promise<void> {
-  try {
-    eventBuffer = [];
-    if (flushTimer) {
-      clearTimeout(flushTimer);
-      flushTimer = null;
-    }
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.warn('Failed to clear events:', error);
+export function clearEvents(): void {
+  eventBuffer = [];
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
   }
+  storage.remove(STORAGE_KEY);
 }

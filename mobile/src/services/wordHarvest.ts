@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import { PuzzleVariant } from './puzzleVariety';
@@ -45,8 +45,6 @@ export interface OfferResult {
 const HARVEST_STORAGE_KEY = 'wordshift_word_harvest';
 const MAX_PENDING_BATCHES = 200;
 
-let harvestCache: HarvestState | null = null;
-
 function getDefaultHarvestState(): HarvestState {
   return {
     pendingBatches: [],
@@ -56,31 +54,19 @@ function getDefaultHarvestState(): HarvestState {
   };
 }
 
-async function loadHarvestState(): Promise<HarvestState> {
-  if (harvestCache) return harvestCache;
-  try {
-    const stored = await AsyncStorage.getItem(HARVEST_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed && Array.isArray(parsed.pendingBatches)) {
-        harvestCache = parsed;
-        return harvestCache!;
-      }
+function loadHarvestState(): HarvestState {
+  const stored = storage.getString(HARVEST_STORAGE_KEY);
+  if (stored !== undefined) {
+    const parsed = JSON.parse(stored);
+    if (parsed && Array.isArray(parsed.pendingBatches)) {
+      return parsed;
     }
-  } catch (error) {
-    console.warn('Failed to load harvest state:', error);
   }
-  harvestCache = getDefaultHarvestState();
-  return harvestCache;
+  return getDefaultHarvestState();
 }
 
-async function saveHarvestState(): Promise<void> {
-  if (!harvestCache) return;
-  try {
-    await AsyncStorage.setItem(HARVEST_STORAGE_KEY, JSON.stringify(harvestCache));
-  } catch (error) {
-    console.warn('Failed to save harvest state:', error);
-  }
+function saveHarvestState(state: HarvestState): void {
+  storage.set(HARVEST_STORAGE_KEY, JSON.stringify(state));
 }
 
 // ============================================================================
@@ -91,8 +77,8 @@ async function saveHarvestState(): Promise<void> {
  * Enqueue a harvest batch from a completed puzzle.
  * Words are normalized to uppercase and deduplicated within the batch.
  */
-export async function enqueueHarvestBatch(batch: HarvestBatch): Promise<{ overflow: boolean }> {
-  const state = await loadHarvestState();
+export function enqueueHarvestBatch(batch: HarvestBatch): { overflow: boolean } {
+  const state = loadHarvestState();
 
   // Deduplicate by ID
   if (state.pendingBatches.some(b => b.id === batch.id)) return { overflow: false };
@@ -112,23 +98,22 @@ export async function enqueueHarvestBatch(batch: HarvestBatch): Promise<{ overfl
     state.pendingBatches = state.pendingBatches.slice(-MAX_PENDING_BATCHES);
   }
 
-  harvestCache = state;
-  await saveHarvestState();
+  saveHarvestState(state);
   return { overflow };
 }
 
 /**
  * Get the full harvest state.
  */
-export async function getHarvestState(): Promise<HarvestState> {
+export function getHarvestState(): HarvestState {
   return loadHarvestState();
 }
 
 /**
  * Get a summary of pending harvest data.
  */
-export async function getPendingHarvestSummary(): Promise<HarvestSummary> {
-  const state = await loadHarvestState();
+export function getPendingHarvestSummary(): HarvestSummary {
+  const state = loadHarvestState();
   return computeSummary(state.pendingBatches);
 }
 
@@ -136,8 +121,8 @@ export async function getPendingHarvestSummary(): Promise<HarvestSummary> {
  * Offer a single batch by ID. Returns the amber awarded and updated summary.
  * Returns null if batch not found.
  */
-export async function offerBatch(batchId: string): Promise<OfferResult | null> {
-  const state = await loadHarvestState();
+export function offerBatch(batchId: string): OfferResult | null {
+  const state = loadHarvestState();
   const index = state.pendingBatches.findIndex(b => b.id === batchId);
   if (index === -1) return null;
 
@@ -147,8 +132,7 @@ export async function offerBatch(batchId: string): Promise<OfferResult | null> {
   state.totalBatchesOffered += 1;
   state.totalAmberClaimed += batch.amberValue;
 
-  harvestCache = state;
-  await saveHarvestState();
+  saveHarvestState(state);
 
   return {
     amberAwarded: batch.amberValue,
@@ -160,8 +144,8 @@ export async function offerBatch(batchId: string): Promise<OfferResult | null> {
 /**
  * Offer all pending batches at once. Returns total amber awarded and updated summary.
  */
-export async function offerAllBatches(): Promise<OfferResult> {
-  const state = await loadHarvestState();
+export function offerAllBatches(): OfferResult {
+  const state = loadHarvestState();
   const batches = state.pendingBatches;
 
   let totalAmber = 0;
@@ -176,8 +160,7 @@ export async function offerAllBatches(): Promise<OfferResult> {
   state.totalAmberClaimed += totalAmber;
   state.pendingBatches = [];
 
-  harvestCache = state;
-  await saveHarvestState();
+  saveHarvestState(state);
 
   return {
     amberAwarded: totalAmber,
@@ -189,13 +172,8 @@ export async function offerAllBatches(): Promise<OfferResult> {
 /**
  * Clear all harvest state (for Reset All Data).
  */
-export async function clearHarvestState(): Promise<void> {
-  harvestCache = getDefaultHarvestState();
-  try {
-    await AsyncStorage.removeItem(HARVEST_STORAGE_KEY);
-  } catch (error) {
-    console.warn('Failed to clear harvest state:', error);
-  }
+export function clearHarvestState(): void {
+  storage.remove(HARVEST_STORAGE_KEY);
 }
 
 // ============================================================================

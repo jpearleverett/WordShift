@@ -1,8 +1,8 @@
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+jest.mock('../services/storage', () =>
+  require('./helpers/mockStorage').createMockStorage()
 );
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '../services/storage';
 import {
   savePuzzleState,
   loadPuzzleState,
@@ -40,10 +40,9 @@ function makeSavedState(overrides: Partial<SavedPuzzleState> = {}): SavedPuzzleS
 }
 
 describe('puzzleSaveState', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
-    // Reset module-level cache by clearing and reloading
-    await clearPuzzleState();
+  beforeEach(() => {
+    (storage as any).clearAll();
+    clearPuzzleState();
   });
 
   it('saves and loads a puzzle state round-trip', async () => {
@@ -70,24 +69,18 @@ describe('puzzleSaveState', () => {
     expect(loaded).toBeNull();
   });
 
-  it('restores Infinity for undosRemaining when serialized as null', async () => {
+  it('restores Infinity for undosRemaining when serialized as null', () => {
     const state = makeSavedState({ undosRemaining: Infinity });
-    await savePuzzleState(state);
+    savePuzzleState(state);
 
-    // Clear cache so load reads from storage (where Infinity becomes null)
-    await clearPuzzleState();
-    // Re-save via storage directly to simulate JSON null
-    const raw = JSON.parse(
-      (await AsyncStorage.getItem('wordshift_in_progress_puzzle'))!
-    );
-    // Manually set to null to simulate Infinity serialization
-    // (savePuzzleState caches, so we need to go through AsyncStorage)
-    await AsyncStorage.setItem(
+    // Manually set undosRemaining to null in storage to simulate Infinity serialization
+    // (JSON.stringify(Infinity) === 'null')
+    storage.set(
       'wordshift_in_progress_puzzle',
       JSON.stringify({ ...state, undosRemaining: null })
     );
 
-    const loaded = await loadPuzzleState();
+    const loaded = loadPuzzleState();
     expect(loaded).not.toBeNull();
     expect(loaded!.undosRemaining).toBe(Infinity);
   });

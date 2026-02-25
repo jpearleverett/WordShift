@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { Difficulty } from '../types';
 import { generateLocalPuzzle } from './localGenerator';
 
@@ -141,17 +141,13 @@ export function getDailyDifficulty(_dateStr?: string): Difficulty {
 /**
  * Load daily challenge progress
  */
-export async function loadDailyProgress(): Promise<DailyChallengeProgress> {
+export function loadDailyProgress(): DailyChallengeProgress {
   if (progressCache) return progressCache;
 
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      progressCache = JSON.parse(stored);
-      return progressCache!;
-    }
-  } catch (err) {
-    console.warn('Failed to load daily challenge progress:', err);
+  const stored = storage.getString(STORAGE_KEY);
+  if (stored !== undefined) {
+    progressCache = JSON.parse(stored);
+    return progressCache!;
   }
 
   progressCache = getDefaultProgress();
@@ -161,8 +157,8 @@ export async function loadDailyProgress(): Promise<DailyChallengeProgress> {
 /**
  * Check if today's daily challenge has been completed
  */
-export async function isDailyCompleted(): Promise<boolean> {
-  const progress = await loadDailyProgress();
+export function isDailyCompleted(): boolean {
+  const progress = loadDailyProgress();
   return progress.lastCompletedDate === getTodayString();
 }
 
@@ -228,12 +224,12 @@ export async function generateDailyPuzzle(): Promise<{
 /**
  * Record completion of today's daily challenge
  */
-export async function recordDailyCompletion(
+export function recordDailyCompletion(
   stars: number,
   hintsUsed: number,
   invalidAttempts: number
-): Promise<DailyChallengeProgress> {
-  const progress = await loadDailyProgress();
+): DailyChallengeProgress {
+  const progress = loadDailyProgress();
   const today = getTodayString();
 
   // Don't record if already completed today
@@ -270,11 +266,7 @@ export async function recordDailyCompletion(
 
   progressCache = progress;
 
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-  } catch (err) {
-    console.warn('Failed to save daily challenge progress:', err);
-  }
+  storage.set(STORAGE_KEY, JSON.stringify(progress));
 
   return progress;
 }
@@ -282,15 +274,15 @@ export async function recordDailyCompletion(
 /**
  * Get today's daily challenge status
  */
-export async function getDailyStatus(): Promise<{
+export function getDailyStatus(): {
   isCompleted: boolean;
   difficulty: Difficulty;
   todayResult: DailyChallengeResult | null;
   streak: number;
   bestStreak: number;
   totalCompleted: number;
-}> {
-  const progress = await loadDailyProgress();
+} {
+  const progress = loadDailyProgress();
   const today = getTodayString();
   const isCompleted = progress.lastCompletedDate === today;
   const todayResult = progress.completedChallenges.find(c => c.date === today) || null;
@@ -387,9 +379,7 @@ export function checkDailyStreakMilestone(
 /**
  * Clear daily challenge data (for testing)
  */
-export async function clearDailyProgress(): Promise<void> {
+export function clearDailyProgress(): void {
   progressCache = getDefaultProgress();
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {}
+  storage.remove(STORAGE_KEY);
 }
