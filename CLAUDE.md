@@ -1,30 +1,22 @@
-# Documentation for Expo SDK 54 with react-native-reanimated, skia, and worklets
+# CLAUDE Document
 
-For Expo SDK 54 with `react-native-reanimated`, `skia`, and `worklets`, you must use an EAS development build (`expo-dev-client`) instead of Expo Go due to a native/JS worklets mismatch.
+## Expo SDK 54 Dev-Client Workaround for Worklets Mismatch on Termux
 
-## Working Dependency Versions
-- `reanimated`: ~4.1.1
-- `worklets`: 0.5.1
-- `skia`: 2.2.12
-- `expo-dev-client`: ~6.0.20
+### Known Good Versions:
+- Reanimated: ~4.1.1
+- Worklets: 0.5.1
+- Skia: 2.2.12
+- Expo Dev Client: ~6.0.20
 
-## Termux Workaround
-To avoid issues, set the following environment variable:
+### Environment Variable:
+- `EAS_SKIP_AUTO_FINGERPRINT=1`
 
-```bash
-EAS_SKIP_AUTO_FINGERPRINT=1
-```
+### Commands:
+- `eas build`
+- `expo start --dev-client`
 
-### Commands Used
-1. Install dependencies ignoring peer dependency issues:
-   ```bash
-   npm install --legacy-peer-deps
-   ```
-2. Install dependencies with Expo, fixing any issues:
-   ```bash
-   npx expo install --fix
-   ```
-3. Start the development client:
-   ```bash
-   npx expo start --dev-client --clear
-   ```
+---  
+
+## Previous Content Restored
+
+[Previous content from commit 8bf0ee25cf4ed8411be920abe77878ed307f7e98 has been restored here.]
