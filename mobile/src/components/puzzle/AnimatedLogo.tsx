@@ -1,57 +1,74 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
-  cancelAnimation,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, View, Text, StyleSheet } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 
 export const AnimatedLogo: React.FC = () => {
-  const bounceY = useSharedValue(0);
-  const rotation = useSharedValue(0);
+  const bounceY = useRef(new Animated.Value(0)).current;
+  const rotation = useRef(new Animated.Value(0)).current;
+  const bounceAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const rotationAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     // Subtle vertical bounce loop
-    bounceY.value = withRepeat(
-      withSequence(
-        withTiming(-3, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
+    bounceAnimRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceY, {
+          toValue: -3,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceY, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
     );
+    bounceAnimRef.current.start();
 
     // Very subtle rotation loop
-    rotation.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(-1, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
+    rotationAnimRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(rotation, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotation, {
+          toValue: -1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
     );
+    rotationAnimRef.current.start();
 
     return () => {
-      cancelAnimation(bounceY);
-      cancelAnimation(rotation);
+      bounceAnimRef.current?.stop();
+      rotationAnimRef.current?.stop();
     };
   }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: bounceY.value },
-      { rotate: `${rotation.value}deg` },
-    ],
-  }));
+  const rotateInterpolation = rotation.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-1deg', '1deg'],
+  });
 
   return (
     <Animated.View
-      style={[styles.logoContainer, animatedStyle]}
+      style={[
+        styles.logoContainer,
+        {
+          transform: [
+            { translateY: bounceY },
+            { rotate: rotateInterpolation },
+          ],
+        },
+      ]}
       accessibilityLabel="WordShift"
       accessibilityRole="header"
     >
@@ -66,6 +83,52 @@ export const AnimatedLogo: React.FC = () => {
     </Animated.View>
   );
 };
+
+const styles = StyleSheet.create({
+  logoContainer: {
+    position: 'relative',
+  },
+  logoInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoWord: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: CandyColors.white,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  logoShift: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: CandyColors.yellow.main,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  logoSparkle: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    backgroundColor: CandyColors.white,
+    borderRadius: 4,
+  },
+  logoSparkle1: {
+    top: -5,
+    left: 20,
+  },
+  logoSparkle2: {
+    top: 5,
+    right: -10,
+  },
+  logoSparkle3: {
+    bottom: -3,
+    left: 60,
+  },
+});
+
 
 const styles = StyleSheet.create({
   logoContainer: {
