@@ -204,14 +204,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-          <Reanimated.View style={[styles.victoryModal, {
-            backgroundColor: phaseTheme.modalBgColor,
-            borderColor: btn.modalBorder,
-          }, modalAnimStyle]}>
+          {/* pointerEvents="box-none": RN routes via reactSubviewForRNHitTest, bypassing
+              iOS UIKit's hitTest short-circuit that ignores views with CALayer alpha ≤ 0.01.
+              Without this, the Reanimated native-driver opacity=0 start value makes the
+              entire subtree (including buttons) non-hittable until animation completes. */}
+          <Reanimated.View
+            style={[styles.victoryModal, {
+              backgroundColor: phaseTheme.modalBgColor,
+              borderColor: btn.modalBorder,
+            }, modalAnimStyle]}
+            pointerEvents="box-none"
+          >
             <View style={[styles.victoryGlow, {
               backgroundColor: phaseTheme.victoryGlowColor,
-            }]} />
-            <View style={styles.modalShine} />
+            }]} pointerEvents="none" />
+            <View style={styles.modalShine} pointerEvents="none" />
 
             {/* Stars — choreographed pop-in */}
             <View style={styles.starsContainer}>
@@ -530,8 +537,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
             </>)}
 
-            {/* Group 4: Action buttons — 3D candy style */}
-            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
+            {/* Group 4: Action buttons — 3D candy style.
+                pointerEvents="box-none": on Android Fabric, Animated.Value(0) sets
+                setAlpha(0) via the native layer before useEffect fires setValue(1).
+                React Native's Fabric C++ touch dispatcher skips views with alpha=0,
+                making CONTINUE unreachable until the re-render propagates. box-none
+                bypasses the alpha check so children always receive touches. */}
+            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }} pointerEvents="box-none">
             {isOnboarding ? (
             <View style={styles.victoryButtonRow}>
               {/* Onboarding: single "Continue" button */}
