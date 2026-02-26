@@ -1879,3 +1879,229 @@ Monetization UI shifts through **visual desaturation**, not narrative voice. The
 - **Dark patterns** — no disguised ads, no tiny X buttons, no opt-out-by-default
 - **Amber bundles for cash** — breaks the earn/spend loop
 - **Guest/temporary animals** — breaks the closed cult narrative
+
+---
+
+## Victory Modal Touch Incident – 2026-02
+
+Engineering postmortem and reusable guidance for modal layering, touch delivery, and regression-safe testing on React Native / Android Fabric.
+
+---
+
+### 1. Incident Timeline
+
+#### Stage 1 — Initial bug: tutorial victory CONTINUE untappable
+- **Symptom**: During onboarding, the VictoryModal CONTINUE button was visually present but completely non-interactive on Android. Tapping anywhere on the modal had no effect.
+- **Initial hypothesis**: The `onOnboardingContinue` callback was not being wired up correctly, or the `isOnboarding` prop was not reaching `VictoryModal`.
+
+#### Stage 2 — Callback-wiring fixes that did not resolve user-facing behavior
+- Added explicit `console.log` in `handleOnboardingVictoryContinue` and the VictoryModal `onPress` handler to confirm the callbacks were present.
+- Confirmed: callbacks were correctly wired. The prop chain (`App.tsx → VictoryModal`) was intact.
+- No improvement in behavior. The button press handlers were never firing — not even `onPressIn`.
+- **Conclusion**: The callback chain was not the problem. The touch events were never reaching the component.
+
+#### Stage 3 — Logging phase and findings
+- Added `[VictoryModal]`, `[AppVictory]`, and `[OnboardingFlow]` prefixed logs to trace the full touch path.
+- Key diagnostic signal: `onPressIn` was **never logged** even when pressing directly on the CONTINUE button area.
+- **Confirmed**: Touch interception was occurring above the button in the native layer. The modal card was visible but the native touch dispatcher was routing taps to a different view.
+- The puzzle-screen `ScrollView` (game area) was identified as the interceptor — it sits later in the native view tree and claims all touch events via its gesture recognizer.
+
+#### Stage 4 — Native Modal isolation fix for the onboarding path
+- **Root fix**: Wrapped the onboarding VictoryModal in a React Native `<Modal>` (native modal). This creates a separate Android `Window` object above the host `Activity` window, giving it priority for both rendering and touch dispatch regardless of zIndex or view tree order.
+- Secondary fix (App.tsx): For onboarding, `skipToEnd()` is called immediately after `playVictorySequence()`. `skipToEnd()` calls `cancelAnimation()` on every Reanimated shared value before setting final values — closing the 1-2 frame race window where `modalOpacity=0` had already been committed to the native layer (making the subtree non-hittable).
+- Secondary fix (VictoryModal.tsx): When `isOnboarding`, the Reanimated animated style is replaced with a static `{ opacity: 1, scale: 1 }` object so Reanimated's worklet never modifies the view's alpha.
+- Also: `ScrollView` intentionally removed from the onboarding modal path (onboarding content is minimal — stars + title + one button — and never needs to scroll, eliminating scroll-gesture swallowing as a source of future regressions).
+- **Result**: CONTINUE button became reliably tappable.
+
+#### Stage 5 — Regressions introduced
+- **Regression A — Achievement popup behind modal**: After wrapping VictoryModal in a native `<Modal>`, `AchievementToast` (rendered in the puzzle screen's in-tree view hierarchy) appeared behind the Modal window and was no longer visible or tappable.
+- **Regression B — Regular (non-onboarding) victory modal untappable**: The same ScrollView touch-interception root cause applied to the non-onboarding `VictoryModal` path. Once the onboarding fix revealed the true root cause, the non-onboarding path was found to have the same problem.
+- **Regression C — Tap-to-skip overlay no longer worked**: The fullscreen `Pressable` overlay used to accelerate the victory animation (tap-to-skip) was in the in-tree view hierarchy at a zIndex above the puzzle area but below the Modal window. Once `VictoryModal` used a native Modal, the overlay was in a different window and could not intercept taps destined for the Modal.
+
+#### Stage 6 — Follow-up fixes for regressions
+- **Achievement toast fix**: Moved `AchievementToast` into its own native `<Modal>` mounted **after** `VictoryModal` in `App.tsx`'s return tree. On both iOS and Android, later-mounted Modal windows stack above earlier-mounted ones — so the achievement toast always appears above the victory modal. The Modal is only mounted when `achievementState.currentAchievement` is non-null (no layout cost otherwise).
+- **Regular victory modal fix**: Applied the same native `<Modal>` wrapper to the non-onboarding `VictoryModal` return path. Both paths now use `<Modal transparent animationType="none" statusBarTranslucent>`.
+- **Tap-to-skip fix**: Moved the tap-to-accelerate overlay inside `VictoryModal` as `isAnimating` / `onTapToSkip` props so it lives within the same native Modal window and correctly intercepts taps.
+
+---
+
+### 2. Root-Cause Analysis
+
+#### Touch interception by the ScrollView game area
+On Android Fabric, the React Native shadow thread computes `zIndex` for layout purposes, but the **native touch dispatcher** routes hit-tests by view elevation and paint order in the native view tree. A `ScrollView` (or any view with an active gesture recognizer) that is painted after the overlay in the native tree will claim touch events even when the overlay renders visually on top via `zIndex`.
+
+In this codebase, the puzzle-screen `ScrollView` wrapping the game rows is rendered before the VictoryModal overlay in `renderScreen()`. Even though the overlay used `StyleSheet.absoluteFill` + `zIndex: 500`, on Android the ScrollView's gesture recognizer intercepted all touches in its bounds before React Native's JS thread saw them.
+
+#### Pointer-events and z-order/layering conflicts
+- `pointerEvents="box-none"` on a container means the **container itself** does not receive touches but its children do. It does **not** prevent a sibling higher in the native tree from intercepting touches before they reach the children.
+- `zIndex` in React Native is a rendering/composition hint. It does not change the native hit-test order on Android Fabric.
+- `Animated.Value` opacity at `0` (set by the Reanimated worklet on the UI thread) makes the entire animated subtree non-hittable on Android, even if the JS-visible opacity value has been immediately reset to `1`. The native layer commits the `0` before the next frame's worklet correction arrives.
+
+#### Differences between onboarding and non-onboarding render paths
+- Both paths were affected by the same ScrollView interception root cause.
+- The onboarding path was discovered first because the minimal content (one button) made it obvious that nothing was tappable.
+- The non-onboarding path had more buttons, but once the game area ScrollView claimed the touch, none of them fired.
+
+#### Native Modal stacking behavior affecting popup ordering
+- React Native `<Modal>` creates a separate Android `Window` (or iOS `UIWindow`) that is always presented above the host `Activity`/`ViewController` window.
+- When multiple Modals are active simultaneously, the **later-mounted** Modal appears on top on both platforms.
+- Consequences:
+  - `AchievementToast` (previously in-tree) became invisible behind the Modal window → fix: wrap in its own Modal, mounted after `VictoryModal`.
+  - `Pressable` tap-to-skip overlays in the in-tree hierarchy cannot intercept taps within a Modal window → fix: move the overlay inside the Modal.
+
+---
+
+### 3. Engineering Guidelines / Best Practices
+
+#### Modal layering policy
+- Any full-screen interactive overlay (victory, achievement, phase transition, rules, dialogue choice) **must** be implemented as a native `<Modal>` if it appears while a `ScrollView` or gesture-handler view is active behind it.
+- Stack modals intentionally: if Modal B must appear above Modal A, mount Modal B **after** Modal A in the component tree.
+- Never rely on `zIndex` alone to place interactive UI above a ScrollView.
+
+#### Touch handling rules for absolute overlays
+- `pointerEvents="none"` — purely decorative views that must never intercept touches (overlays, glows, confetti backdrops). This is the default for all non-interactive fullscreen views.
+- `pointerEvents="box-none"` — container views whose children are interactive but the container itself should be transparent to touches. Use for modal card wrappers and decorative overlay containers.
+- Never use `pointerEvents="box-none"` and expect it to override ScrollView gesture recognition — it only affects the container, not siblings.
+- When in doubt: add `onPressIn` logging before adding `onPress` logic. If `onPressIn` does not fire, the touch is being intercepted above your component.
+
+#### When to use native `<Modal>` vs in-tree overlay
+| Use native `<Modal>` | Use in-tree overlay (`absoluteFill` + `zIndex`) |
+|---|---|
+| Interactive content shown while game area is visible | Purely decorative overlays (flash effects, glows, particles) |
+| Achievement notifications | Phase flash overlay (`pointerEvents="none"`) |
+| Victory modal | Victory glitch flash overlay |
+| Onboarding modal overlays | Screen shake / dread pulse overlays |
+| Any dialog requiring guaranteed touch delivery | Transition overlay during screen swap |
+
+#### Reanimated opacity and touch hittability
+- On Android Fabric, Reanimated runs on the native UI thread. Setting `opacity = 0` on a `SharedValue` before a frame is committed makes the view non-hittable at the native layer, even if JS code immediately resets the value.
+- For any modal that must be tappable immediately on mount:
+  - Either call `cancelAnimation()` + set final values before the modal is shown (`skipToEnd()` pattern).
+  - Or use a static style object instead of `useAnimatedStyle` for the onboarding/immediate-interaction path.
+- Do not combine Reanimated opacity animations with immediate user interaction requirements.
+
+#### Avoiding ScrollView/gesture cancellation pitfalls for CTA-only modals
+- If a modal contains only a small number of fixed-height elements that will never overflow, **omit the ScrollView**. A non-scrollable `ScrollView` is still a gesture recognizer that can swallow vertical swipes.
+- If a ScrollView is genuinely needed (long content), set `keyboardShouldPersistTaps="handled"` and `bounces={false}` to reduce unintended gesture conflicts.
+
+---
+
+### 4. Debugging Playbook
+
+#### Step 1 — Add `onPressIn` to every button under investigation
+Before investigating callback wiring, confirm the touch reaches the button:
+```typescript
+// In VictoryModal.tsx
+<Pressable
+  onPressIn={() => console.log('[VictoryModal] CONTINUE onPressIn', { ts: Date.now() })}
+  onPressOut={() => console.log('[VictoryModal] CONTINUE onPressOut', { ts: Date.now() })}
+  onPress={() => console.log('[VictoryModal] CONTINUE onPress', { ts: Date.now() })}
+  ...
+>
+```
+- **`onPressIn` fires** → touch reached the component; investigate callback logic.
+- **`onPressIn` missing** → touch intercepted above the component at the native layer; investigate overlays, ScrollViews, Modal hierarchy.
+
+#### Step 2 — Log modal visibility with consistent prefixes
+```typescript
+// App.tsx — when gameState changes to WON
+console.log('[AppVictory] gameState → WON', {
+  isOnboarding,
+  onboardingStep,
+  modalVisible,
+  victoryAnimating,
+  ts: Date.now(),
+});
+
+// VictoryModal.tsx — when visible prop changes
+console.log('[VictoryModal] visible=true', {
+  isOnboarding: !!isOnboarding,
+  hasOnboardingContinue: !!onOnboardingContinue,
+  phase,
+  ts: Date.now(),
+});
+
+// useOnboardingFlow — when step advances
+console.log('[OnboardingFlow] step advanced', {
+  from: prevStep,
+  to: nextStep,
+  ts: Date.now(),
+});
+```
+
+#### Signal interpretation
+| Log output | Meaning | Action |
+|---|---|---|
+| `[AppVictory] gameState → WON` present | Modal render triggered | Check `modalVisible` field |
+| `[VictoryModal] visible=true` present | Component received `visible=true` | Check onboarding path rendering |
+| `[VictoryModal] CONTINUE onPressIn` **missing** | Touch intercepted before React Native | Wrap in native `<Modal>` |
+| `[VictoryModal] CONTINUE onPressIn` present, `onPress` missing | Long-press threshold or gesture conflict | Check `hitSlop`, scroll gesture settings |
+| `[AppVictory] onboarding continue handler entered` missing | Callback never called despite `onPress` firing | Check prop wiring from App.tsx |
+
+#### Repro checklist — onboarding victory flow
+1. Reset all data (Settings → Reset All Data).
+2. Launch app → complete onboarding first puzzle.
+3. In Metro/Termux terminal, verify `[AppVictory] gameState → WON` log appears with `isOnboarding: true`.
+4. Verify `[VictoryModal] visible=true` log appears with `hasOnboardingContinue: true`.
+5. Tap CONTINUE button.
+6. Verify `[VictoryModal] CONTINUE onPressIn` fires within 200ms of tap.
+7. Verify `[VictoryModal] CONTINUE onPress fired` fires.
+8. Verify `[AppVictory] onboarding continue handler entered` fires.
+9. Verify navigation proceeds to pit screen.
+
+#### Repro checklist — regular (non-onboarding) victory flow
+1. Complete any puzzle (non-onboarding).
+2. Verify `[AppVictory] gameState → WON` appears with `isOnboarding: false`.
+3. Verify `[VictoryModal] visible=true` appears.
+4. Tap Next Level, Share, and Return Home buttons individually.
+5. Each should produce an `onPress` log within 200ms of tap.
+6. Tap the modal card while animation is playing — verify tap-to-skip fires `[AppVictory] skipToEnd`.
+
+#### Validation matrix
+
+| Scenario | Expected behavior | Pass signal |
+|---|---|---|
+| Onboarding CONTINUE | Modal tappable immediately, navigates to pit | `[AppVictory] onboarding continue handler entered` |
+| Regular Next Level | Tappable after animation OR tap-to-skip | `[AppVictory] handleNextLevel called` |
+| Regular Return Home | Tappable, navigates to home screen | `[AppVictory] handleReturnHome called` |
+| Achievement popup during victory | Visible and tappable above VictoryModal | Achievement toast renders above Modal window |
+| Achievement popup z-order | AchievementToast Modal mounts after VictoryModal | `currentAchievement` Modal visible above VictoryModal |
+| Tap-to-skip during animation | Accelerates animation, does not break buttons | `victoryAnimating` clears, `skipToEnd` called |
+| No regression in phase transition overlay | `pointerEvents="none"` flash overlay, non-blocking | No touch interception after flash completes |
+
+---
+
+### 5. PR Checklist Template
+
+Copy this into PR descriptions for any change touching modal visibility, layering, overlay rendering, or touch handling:
+
+```markdown
+## Modal / Touch Change Checklist
+
+- [ ] **Touch-path logs verified**: `onPressIn` fires for all interactive elements in the affected modal/overlay (tested on Android)
+- [ ] **Overlay disable conditions verified**: all `pointerEvents="none"` and `pointerEvents="box-none"` assignments are intentional and documented
+- [ ] **Native Modal ordering verified**: if multiple `<Modal>` components can be simultaneously visible, the desired stacking order matches mount order in the component tree
+- [ ] **Reanimated opacity safety**: no interactive view depends on a Reanimated `opacity` SharedValue being `1` for hittability — either use `skipToEnd()` pattern or static styles for immediate-interaction paths
+- [ ] **ScrollView non-interference**: no `ScrollView` sits above (in paint/tree order) any interactive overlay that must receive touches
+- [ ] **Tap-to-skip path**: if a tap-to-accelerate overlay exists, it is inside the same native Modal window as the animated content
+- [ ] **Onboarding path not broken**: complete onboarding repro checklist (CONTINUE button tappable, navigates to pit)
+- [ ] **Regular victory path not broken**: regular puzzle completion repro checklist (Next Level, Return Home, Share all tappable)
+- [ ] **Achievement popup z-order**: AchievementToast appears above VictoryModal (not behind it)
+- [ ] **No regressions in non-target flows**: phase transition overlay, dread pulse overlay, screen shake, and victory glitch overlays are all still `pointerEvents="none"` and non-blocking
+```
+
+---
+
+### 6. Do / Don't
+
+| ✅ Do | ❌ Don't |
+|---|---|
+| Use native `<Modal>` for any interactive overlay shown while a ScrollView is active | Use `absoluteFill + zIndex` as the sole method to layer interactive UI above a ScrollView |
+| Add `onPressIn` logging before investigating callback wiring | Assume a missing `onPress` log means callback wiring is wrong |
+| Mount achievement/notification Modals **after** VictoryModal in the tree | Mount secondary Modals before the primary Modal and expect them to appear on top |
+| Use `pointerEvents="none"` on all purely decorative absolute overlays | Leave `pointerEvents` unset on non-interactive overlays (default is `"auto"`, which intercepts touches) |
+| Call `skipToEnd()` (with `cancelAnimation()`) before requiring immediate interactivity | Set `sharedValue.value = 1` and assume the native layer will apply the change before the next touch |
+| Use static style objects (not `useAnimatedStyle`) for onboarding/immediate-interaction paths | Animate `opacity` on a view that must be tappable immediately on mount |
+| Omit ScrollView for CTA-only modals with no scrollable content | Wrap every modal in ScrollView by default |
+| Document overlay ordering intent in inline code comments | Leave the "why" of Modal vs in-tree overlay as implicit knowledge |
+| Test on a physical Android device (Fabric behavior differs from iOS/simulator) | Validate touch behavior only on iOS simulator |
