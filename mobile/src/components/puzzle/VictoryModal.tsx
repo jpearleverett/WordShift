@@ -537,8 +537,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
             </>)}
 
-            {/* Group 4: Action buttons — 3D candy style */}
-            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
+            {/* Group 4: Action buttons — 3D candy style.
+                pointerEvents="box-none": on Android Fabric, Animated.Value(0) sets
+                setAlpha(0) via the native layer before useEffect fires setValue(1).
+                React Native's Fabric C++ touch dispatcher skips views with alpha=0,
+                making CONTINUE unreachable until the re-render propagates. box-none
+                bypasses the alpha check so children always receive touches. */}
+            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }} pointerEvents="box-none">
             {isOnboarding ? (
             <View style={styles.victoryButtonRow}>
               {/* Onboarding: single "Continue" button */}
