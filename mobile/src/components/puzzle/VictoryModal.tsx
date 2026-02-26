@@ -175,6 +175,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      if (isOnboarding) {
+        // During tutorial: skip cascade, show button immediately
+        contentOpacity4.setValue(1);
+        return;
+      }
       contentOpacity1.setValue(0);
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
@@ -245,6 +250,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
+            {/* Groups 1-3 skipped during onboarding — tutorial shows only stars + title + CONTINUE */}
+            {!isOnboarding && (<>
             {/* Group 1: Harvest, bonuses, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
             {/* Harvested words (queued for the pit) */}
@@ -521,6 +528,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             })()}
 
             </Animated.View>
+            </>)}
 
             {/* Group 4: Action buttons — 3D candy style */}
             <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
