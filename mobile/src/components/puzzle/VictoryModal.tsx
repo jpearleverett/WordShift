@@ -536,7 +536,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <View style={styles.victoryButtonRow}>
               {/* Onboarding: single "Continue" button */}
               <TouchableOpacity
-                onPress={onOnboardingContinue}
+                onPress={onOnboardingContinue ?? onNextLevel}
                 activeOpacity={0.85}
                 accessibilityLabel="Continue"
                 accessibilityRole="button"

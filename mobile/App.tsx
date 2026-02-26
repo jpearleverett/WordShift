@@ -1425,7 +1425,7 @@ export default function App() {
           onReturnHome={handleReturnHome}
           onGoToPit={handleGoToPit}
           onShare={handleShare}
-          isOnboarding={onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_tutorial'}
+          isOnboarding={onboardingFlow.isOnboarding}
           onOnboardingContinue={handleOnboardingVictoryContinue}
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}
