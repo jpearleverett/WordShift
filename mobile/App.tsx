@@ -604,6 +604,17 @@ export default function App() {
       victoryAnimatingRef.current = true;
       setVictoryAnimating(true);
       victoryActions.playVictorySequence(victory.earnedStars);
+      // During onboarding the CONTINUE button must be tappable immediately.
+      // playVictorySequence sets victoryModalOpacity to 0 then delays animating to 1,
+      // but Reanimated's native driver sets a real CALayer alpha=0 on the render thread —
+      // iOS UIKit then skips hitTest for the entire subtree (including CONTINUE) until
+      // opacity > 0. The underdamped spring on scale also keeps the touch area shrunk.
+      // Override both to 1 instantly so the modal is interactive from the first frame.
+      // Stars animate independently and are unaffected.
+      if (onboardingFlow.isOnboarding) {
+        victoryFlow.victoryModalOpacity.value = 1;
+        victoryFlow.victoryModalScale.value = 1;
+      }
       addVictoryTimeout(() => { victoryAnimatingRef.current = false; setVictoryAnimating(false); }, 1200);
 
       // Phase transitions are now DEFERRED to the Offering Pit.

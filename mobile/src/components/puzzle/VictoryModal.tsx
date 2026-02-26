@@ -204,14 +204,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-          <Reanimated.View style={[styles.victoryModal, {
-            backgroundColor: phaseTheme.modalBgColor,
-            borderColor: btn.modalBorder,
-          }, modalAnimStyle]}>
+          {/* pointerEvents="box-none": RN routes via reactSubviewForRNHitTest, bypassing
+              iOS UIKit's hitTest short-circuit that ignores views with CALayer alpha ≤ 0.01.
+              Without this, the Reanimated native-driver opacity=0 start value makes the
+              entire subtree (including buttons) non-hittable until animation completes. */}
+          <Reanimated.View
+            style={[styles.victoryModal, {
+              backgroundColor: phaseTheme.modalBgColor,
+              borderColor: btn.modalBorder,
+            }, modalAnimStyle]}
+            pointerEvents="box-none"
+          >
             <View style={[styles.victoryGlow, {
               backgroundColor: phaseTheme.victoryGlowColor,
-            }]} />
-            <View style={styles.modalShine} />
+            }]} pointerEvents="none" />
+            <View style={styles.modalShine} pointerEvents="none" />
 
             {/* Stars — choreographed pop-in */}
             <View style={styles.starsContainer}>
