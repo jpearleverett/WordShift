@@ -133,7 +133,7 @@ function getPhaseRowColors(phase: number) {
   };
 }
 
-// Animated drop slot component
+// Animated drop slot component (memoized to prevent animation loop restarts on parent re-render)
 const Slot: React.FC<{
   onPress: (origin?: { x: number; y: number }) => void;
   index: number;
@@ -143,7 +143,7 @@ const Slot: React.FC<{
   preview?: SlotPreview;
   /** Incremented when a letter successfully lands in this slot (triggers catch bounce) */
   triggerCatch?: number;
-}> = ({ onPress, index, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
+}> = memo(({ onPress, index, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
@@ -313,7 +313,7 @@ const Slot: React.FC<{
           styles.slotOuter,
           {
             transform: [
-              { scale: Animated.multiply(Animated.multiply(scaleAnim, pulseScale), catchBounceAnim) },
+              { scale: Animated.multiply(scaleAnim, catchBounceAnim) },
             ],
           },
         ]}
@@ -397,7 +397,7 @@ const Slot: React.FC<{
       </Animated.View>
     </TouchableOpacity>
   );
-};
+});
 
 export const Row: React.FC<RowProps> = memo(({
   rowData,
@@ -566,7 +566,7 @@ export const Row: React.FC<RowProps> = memo(({
         useNativeDriver: true,
       }).start();
     }
-  }, [showSlots, selectedLetter?.id]);
+  }, [showSlots]);
 
   // Micro-shake the target row on invalid drop attempts (Reanimated — UI thread).
   useEffect(() => {

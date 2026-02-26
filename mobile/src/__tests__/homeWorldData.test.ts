@@ -13,9 +13,9 @@ import { clearProgress, loadProgress, devAddAmber } from '../services/amberCurre
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Reset state between tests
-beforeEach(async () => {
+beforeEach(() => {
   (AsyncStorage.clear as jest.Mock)();
-  await clearProgress();
+  clearProgress();
 });
 
 describe('ROOMS data', () => {
@@ -98,83 +98,83 @@ describe('UNLOCK_PROGRESSION', () => {
 });
 
 describe('isUnlockAvailable', () => {
-  test('first unlock (fox) is always available', async () => {
-    const result = await isUnlockAvailable('unlock_fox');
+  test('first unlock (fox) is always available', () => {
+    const result = isUnlockAvailable('unlock_fox');
     expect(result.available).toBe(true);
   });
 
-  test('second unlock requires fox to be unlocked first', async () => {
-    const result = await isUnlockAvailable('unlock_kitchen');
+  test('second unlock requires fox to be unlocked first', () => {
+    const result = isUnlockAvailable('unlock_kitchen');
     expect(result.available).toBe(false);
     expect(result.reason).toContain('Ember');
   });
 
-  test('invalid unlock ID returns unavailable', async () => {
-    const result = await isUnlockAvailable('nonexistent');
+  test('invalid unlock ID returns unavailable', () => {
+    const result = isUnlockAvailable('nonexistent');
     expect(result.available).toBe(false);
     expect(result.reason).toBe('Invalid unlock ID');
   });
 });
 
 describe('purchaseUnlock', () => {
-  test('can purchase free fox unlock', async () => {
-    const result = await purchaseUnlock('unlock_fox');
+  test('can purchase free fox unlock', () => {
+    const result = purchaseUnlock('unlock_fox');
     expect(result.success).toBe(true);
   });
 
-  test('fox unlock makes fox appear in animals', async () => {
-    await purchaseUnlock('unlock_fox');
-    const animals = await getAnimalsWithStatus();
+  test('fox unlock makes fox appear in animals', () => {
+    purchaseUnlock('unlock_fox');
+    const animals = getAnimalsWithStatus();
     const fox = animals.find(a => a.id === 'fox');
     expect(fox!.isUnlocked).toBe(true);
   });
 
-  test('cannot purchase out-of-order unlock', async () => {
+  test('cannot purchase out-of-order unlock', () => {
     // Try to buy kitchen without unlocking fox first
-    await devAddAmber(1000);
-    const result = await purchaseUnlock('unlock_kitchen');
+    devAddAmber(1000);
+    const result = purchaseUnlock('unlock_kitchen');
     expect(result.success).toBe(false);
   });
 
-  test('cannot purchase without enough amber', async () => {
+  test('cannot purchase without enough amber', () => {
     // Unlock fox first (free)
-    await purchaseUnlock('unlock_fox');
+    purchaseUnlock('unlock_fox');
     // Try to buy kitchen without amber
-    const result = await purchaseUnlock('unlock_kitchen');
+    const result = purchaseUnlock('unlock_kitchen');
     expect(result.success).toBe(false);
     expect(result.error).toBe('Not enough amber');
   });
 
-  test('successful purchase deducts amber', async () => {
-    await purchaseUnlock('unlock_fox');
-    await devAddAmber(100);
-    const progressBefore = await loadProgress();
+  test('successful purchase deducts amber', () => {
+    purchaseUnlock('unlock_fox');
+    devAddAmber(100);
+    const progressBefore = loadProgress();
     const balanceBefore = progressBefore.amber;
 
-    await purchaseUnlock('unlock_kitchen');
-    const progressAfter = await loadProgress();
+    purchaseUnlock('unlock_kitchen');
+    const progressAfter = loadProgress();
     expect(progressAfter.amber).toBe(balanceBefore - 50); // Kitchen costs 50
   });
 });
 
 describe('getNextUnlock', () => {
-  test('returns fox as first unlock on fresh game', async () => {
-    const next = await getNextUnlock();
+  test('returns fox as first unlock on fresh game', () => {
+    const next = getNextUnlock();
     expect(next).not.toBeNull();
     expect(next!.targetId).toBe('fox');
   });
 
-  test('returns kitchen after fox is unlocked', async () => {
-    await purchaseUnlock('unlock_fox');
-    const next = await getNextUnlock();
+  test('returns kitchen after fox is unlocked', () => {
+    purchaseUnlock('unlock_fox');
+    const next = getNextUnlock();
     expect(next).not.toBeNull();
     expect(next!.targetId).toBe('kitchen');
   });
 });
 
 describe('getRoomsWithStatus', () => {
-  test('only cozy_den is unlocked initially', async () => {
-    const rooms = await getRoomsWithStatus();
+  test('only cozy_den is unlocked initially', () => {
+    const rooms = getRoomsWithStatus();
     const unlocked = rooms.filter(r => r.isUnlocked);
     expect(unlocked).toHaveLength(1);
     expect(unlocked[0].id).toBe('cozy_den');

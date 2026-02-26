@@ -108,6 +108,11 @@ export function useDialogueFlow({
   const cooldownOpacity = useRef(new Animated.Value(0)).current;
   const cooldownSlide = useRef(new Animated.Value(20)).current;
 
+  // Track cooldown toast visibility to prevent flicker on repeated taps
+  const cooldownVisibleRef = useRef(false);
+  const cooldownDismissTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cooldownAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
   // Update session status when selected animal changes
   useEffect(() => {
     if (selectedAnimal) {
@@ -116,43 +121,73 @@ export function useDialogueFlow({
     }
   }, [selectedAnimal]);
 
+  // Cleanup cooldown timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
+      if (cooldownAnimRef.current) cooldownAnimRef.current.stop();
+    };
+  }, []);
+
   // Timer for dismissing cooldown message with animation
   useEffect(() => {
     if (cooldownMessage) {
       const reducedMotion = getSettingsSync().reducedMotion;
 
+      // Cancel any pending dismiss
+      if (cooldownDismissTimeout.current) {
+        clearTimeout(cooldownDismissTimeout.current);
+        cooldownDismissTimeout.current = null;
+      }
+      if (cooldownAnimRef.current) {
+        cooldownAnimRef.current.stop();
+        cooldownAnimRef.current = null;
+      }
+
       if (reducedMotion) {
         cooldownOpacity.setValue(1);
         cooldownSlide.setValue(0);
+        cooldownVisibleRef.current = true;
 
-        const timeout = setTimeout(() => {
+        cooldownDismissTimeout.current = setTimeout(() => {
           cooldownOpacity.setValue(0);
           cooldownSlide.setValue(20);
+          cooldownVisibleRef.current = false;
           setCooldownMessage(null);
         }, 2500);
-        return () => clearTimeout(timeout);
+        return () => {
+          if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
+        };
       }
 
-      // Animate in
-      cooldownOpacity.setValue(0);
-      cooldownSlide.setValue(20);
-      Animated.parallel([
-        Animated.timing(cooldownOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.spring(cooldownSlide, {
-          toValue: 0,
-          friction: 14,
-          tension: 100,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Only animate in if not already visible — prevents flicker on repeated taps
+      if (!cooldownVisibleRef.current) {
+        cooldownOpacity.setValue(0);
+        cooldownSlide.setValue(20);
+        const enterAnim = Animated.parallel([
+          Animated.timing(cooldownOpacity, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.spring(cooldownSlide, {
+            toValue: 0,
+            friction: 14,
+            tension: 100,
+            useNativeDriver: true,
+          }),
+        ]);
+        cooldownAnimRef.current = enterAnim;
+        enterAnim.start(() => {
+          cooldownAnimRef.current = null;
+        });
+        cooldownVisibleRef.current = true;
+      }
+      // If already visible, the message text updates without animation restart
 
-      // Animate out after delay
-      const timeout = setTimeout(() => {
-        Animated.parallel([
+      // Schedule dismiss after delay
+      cooldownDismissTimeout.current = setTimeout(() => {
+        const exitAnim = Animated.parallel([
           Animated.timing(cooldownOpacity, {
             toValue: 0,
             duration: 300,
@@ -163,11 +198,19 @@ export function useDialogueFlow({
             duration: 300,
             useNativeDriver: true,
           }),
-        ]).start(() => {
+        ]);
+        cooldownAnimRef.current = exitAnim;
+        exitAnim.start(() => {
+          cooldownAnimRef.current = null;
+          cooldownVisibleRef.current = false;
           setCooldownMessage(null);
         });
       }, 2500);
-      return () => clearTimeout(timeout);
+      return () => {
+        if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
+      };
+    } else {
+      cooldownVisibleRef.current = false;
     }
   }, [cooldownMessage]);
 

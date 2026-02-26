@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -40 }, { translateY: -35 }],
+    transform: [{ translateX: -52 }, { translateY: -38 }],
   },
   lockedAnimalBadge: {
     width: 60,

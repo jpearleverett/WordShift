@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -76,20 +76,20 @@ export function DraggableTile({
   onTapRef.current = onTap;
   onDragActiveChangeRef.current = onDragActiveChange;
 
-  // JS-thread callbacks dispatched from worklets via runOnJS
-  const jsDragStart = () => {
+  // JS-thread callbacks dispatched from worklets via runOnJS (memoized — refs handle staleness)
+  const jsDragStart = useCallback(() => {
     hapticSelection();
     onDragStartRef.current();
-  };
-  const jsDragEnd = (x: number, y: number) => {
+  }, []);
+  const jsDragEnd = useCallback((x: number, y: number) => {
     onDragEndRef.current({ x, y });
-  };
-  const jsTap = () => {
+  }, []);
+  const jsTap = useCallback(() => {
     onTapRef.current();
-  };
-  const jsDragActiveChange = (active: boolean) => {
+  }, []);
+  const jsDragActiveChange = useCallback((active: boolean) => {
     onDragActiveChangeRef.current?.(active);
-  };
+  }, []);
 
   const panGesture = Gesture.Pan()
     .enabled(enabled)

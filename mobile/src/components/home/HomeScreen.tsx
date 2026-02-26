@@ -114,9 +114,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onAdvanceOnboarding,
 }) => {
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
-  const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [animals, setAnimals] = useState<Animal[]>([]);
+  const [progress, setProgress] = useState<HomeWorldProgress>(() => getFullProgress());
+  const [rooms, setRooms] = useState<Room[]>(() => getRoomsWithStatus());
+  const [animals, setAnimals] = useState<Animal[]>(() => getAnimalsWithStatus());
 
   // Decoration shop state
 
@@ -171,7 +171,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   });
 
   // loadAllData reference for unlock hook (defined below, stable via useCallback)
-  const loadAllDataRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const loadAllDataRef = useRef<() => void>(() => {});
 
   // Unlock flow hook
   const unlockFlow = useUnlockFlow({
@@ -185,13 +185,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setShowIntroDialogue,
   });
 
-  // Load all data from storage
-  const loadAllData = useCallback(async () => {
-    const [progressData, roomsData, animalsData] = await Promise.all([
-      getFullProgress(),
-      getRoomsWithStatus(),
-      getAnimalsWithStatus(),
-    ]);
+  // Load all data from storage (synchronous — MMKV reads are sync)
+  const loadAllData = useCallback(() => {
+    const progressData = getFullProgress();
+    const roomsData = getRoomsWithStatus();
+    const animalsData = getAnimalsWithStatus();
 
     // Update puzzle count for dialogue session system
     updatePuzzleCount(progressData.puzzlesSolved);
@@ -205,21 +203,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= 10;
       const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= 10;
       if (allRoomsUnlocked && allAnimalsUnlocked) {
-        await markHouseCompleted();
+        markHouseCompleted();
         setShowHouseCompletion(true);
         setHouseCompletionTextIndex(0);
       }
     }
 
     // Refresh unlock data with fresh arrays (avoids stale state)
-    await unlockFlow.refreshUnlockData(roomsData, animalsData);
+    unlockFlow.refreshUnlockData(roomsData, animalsData);
 
     // Load pending harvest for pit badge
-    const harvestSummary = await getPendingHarvestSummary();
+    const harvestSummary = getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
 
     // Load room upgrades
-    const upgrades = await getPurchasedUpgrades();
+    const upgrades = getPurchasedUpgrades();
     setPurchasedUpgrades(upgrades);
   }, [unlockFlow.refreshUnlockData]);
 
@@ -692,20 +690,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays >= 1;
   }, [progress?.currentStreak, progress?.lastPlayDate]);
-
-  if (!progress || rooms.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingCard}>
-          <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-            <Text style={styles.loadingEmoji}>🏡</Text>
-          </Animated.View>
-          <Text style={styles.loadingText}>Loading your home...</Text>
-          <Text style={styles.loadingSubtext}>Placing rooms and waking friends.</Text>
-        </View>
-      </View>
-    );
-  }
 
   const phaseBgColor = {
     0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',

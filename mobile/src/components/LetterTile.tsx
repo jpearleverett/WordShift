@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Letter } from '../types';
 import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
@@ -27,7 +27,7 @@ const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
 const COMPACT_FONT = 21;
 
-export const LetterTile: React.FC<LetterTileProps> = ({
+export const LetterTile: React.FC<LetterTileProps> = memo(({
   letter,
   onPress,
   isSelected,
@@ -590,7 +590,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   }
 
   return content;
-};
+});
 
 const styles = StyleSheet.create({
   tileOuter: {
