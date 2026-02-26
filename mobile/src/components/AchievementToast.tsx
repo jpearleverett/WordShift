@@ -34,7 +34,7 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
       // Reset and slide in
       slideY.value = -120;
       opacity.value = 0;
-      slideY.value = withSpring(0, { damping: 8, stiffness: 60 });
+      slideY.value = withSpring(0, { damping: 14, stiffness: 60 });
       opacity.value = withTiming(1, { duration: 200 });
 
       // Auto-dismiss: exit animation after 3s, then callback

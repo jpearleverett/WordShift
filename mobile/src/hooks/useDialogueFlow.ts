@@ -144,7 +144,7 @@ export function useDialogueFlow({
         }),
         Animated.spring(cooldownSlide, {
           toValue: 0,
-          friction: 8,
+          friction: 14,
           tension: 100,
           useNativeDriver: true,
         }),
@@ -450,8 +450,8 @@ export function useDialogueFlow({
       dialogueSlide.setValue(0);
       Animated.spring(dialogueSlide, {
         toValue: 1,
-        friction: 8,
-        tension: 40,
+        friction: 14,
+        tension: 50,
         useNativeDriver: true,
       }).start();
     }

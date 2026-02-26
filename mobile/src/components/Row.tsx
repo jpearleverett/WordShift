@@ -584,7 +584,7 @@ export const Row: React.FC<RowProps> = memo(({
   useEffect(() => {
     if (!isTarget || successDropSignal <= 0 || getSettingsSync().reducedMotion) return;
     successBounceScale.value = 1.08;
-    successBounceScale.value = withSpring(1, { damping: 5, stiffness: 200 });
+    successBounceScale.value = withSpring(1, { damping: 14, stiffness: 200 });
   }, [successDropSignal, isTarget]);
 
   // Calculate arc multipliers for position in sequence

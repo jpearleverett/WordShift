@@ -25,7 +25,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
     opacity.value = 0;
     shakeX.value = 0;
 
-    slideY.value = withSpring(0, { damping: 5, stiffness: 100 });
+    slideY.value = withSpring(0, { damping: 14, stiffness: 100 });
     opacity.value = withTiming(1, { duration: 200 });
 
     if (isError) {

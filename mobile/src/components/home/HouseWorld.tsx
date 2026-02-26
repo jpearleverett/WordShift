@@ -18,7 +18,6 @@ import Reanimated, {
   Easing as REasing,
 } from 'react-native-reanimated';
 import {
-  GestureHandlerRootView,
   PanGestureHandler,
   State,
   PanGestureHandlerGestureEvent,
@@ -925,7 +924,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   }, [numRows, containerHeight]);
 
   return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
+    <View style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -1152,7 +1151,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             </Animated.View>
         </Animated.View>
       </PanGestureHandler>
-    </GestureHandlerRootView>
+    </View>
   );
 };
 
