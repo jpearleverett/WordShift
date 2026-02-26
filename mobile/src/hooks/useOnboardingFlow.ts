@@ -148,6 +148,7 @@ export function useOnboardingFlow(
   // advanceOnboarding — move to an explicit step
   // ------------------------------------------------------------------
   const advanceOnboarding = useCallback((step: OnboardingStep) => {
+    console.log('[OnboardingFlow] advanceOnboarding →', step, { ts: Date.now() });
     setOnboardingStep(step);
     setOnboardingStepState(step);
     setOnboardingLineIndex(0);

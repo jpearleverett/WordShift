@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -175,9 +175,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      console.log('[VictoryModal] visible=true', {
+        isOnboarding: !!isOnboarding,
+        hasOnboardingContinue: !!onOnboardingContinue,
+        phase,
+        ts: Date.now(),
+      });
       if (isOnboarding) {
-        // During tutorial: skip cascade, show button immediately
+        // During tutorial: skip cascade, show button immediately.
+        // contentOpacity4 starts at 0; set to 1 synchronously so the
+        // CONTINUE button is rendered at full opacity on the first frame.
         contentOpacity4.setValue(1);
+        console.log('[VictoryModal] onboarding path: contentOpacity4 set to 1, modal static style applied');
         return;
       }
       contentOpacity1.setValue(0);
@@ -190,8 +199,43 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         Animated.timing(contentOpacity3, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity4, { toValue: 1, duration: 350, useNativeDriver: true }),
       ]).start();
+    } else {
+      console.log('[VictoryModal] visible=false (hidden)', { isOnboarding: !!isOnboarding, ts: Date.now() });
     }
-  }, [visible]);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  // contentOpacity1-4 are stable Animated.Value refs (never reassigned) and
+  // isOnboarding does not change while the modal is visible, so [visible] is
+  // the only reactive dependency this effect needs.
+
+  // ---------------------------------------------------------------------------
+  // Explicit CONTINUE press handler with step-by-step diagnostics.
+  // Logs every stage of the press so Termux / Metro output shows exactly
+  // which part of the touch chain executes (or fails to execute).
+  // ---------------------------------------------------------------------------
+  const handleContinuePressIn = useCallback(() => {
+    console.log('[VictoryModal] CONTINUE onPressIn', { ts: Date.now() });
+  }, []);
+
+  const handleContinuePressOut = useCallback(() => {
+    console.log('[VictoryModal] CONTINUE onPressOut', { ts: Date.now() });
+  }, []);
+
+  const handleContinuePress = useCallback(() => {
+    console.log('[VictoryModal] CONTINUE onPress fired', {
+      hasOnboardingContinue: !!onOnboardingContinue,
+      isOnboarding: !!isOnboarding,
+      ts: Date.now(),
+    });
+    if (onOnboardingContinue) {
+      console.log('[VictoryModal] CONTINUE calling onOnboardingContinue callback');
+      onOnboardingContinue();
+    } else {
+      // Safety fallback: if the onboarding callback is somehow missing,
+      // fall back to the normal next-level action so the player is never stuck.
+      console.warn('[VictoryModal] CONTINUE: onOnboardingContinue is undefined — falling back to onNextLevel');
+      onNextLevel();
+    }
+  }, [onOnboardingContinue, onNextLevel]);
 
   if (!visible) return null;
 
@@ -199,20 +243,37 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     <View style={[styles.modalOverlay, {
       backgroundColor: phaseTheme.modalOverlayColor,
     }]}>
+      {/* keyboardShouldPersistTaps="handled": prevents ScrollView from consuming
+          the first tap on Android when no keyboard is visible — without this,
+          Android's scroll gesture recogniser can swallow the CONTINUE tap. */}
       <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
+        keyboardShouldPersistTaps="handled"
       >
-          {/* pointerEvents="box-none": RN routes via reactSubviewForRNHitTest, bypassing
-              iOS UIKit's hitTest short-circuit that ignores views with CALayer alpha ≤ 0.01.
-              Without this, the Reanimated native-driver opacity=0 start value makes the
-              entire subtree (including buttons) non-hittable until animation completes. */}
+          {/* During onboarding we bypass modalAnimStyle entirely with a static
+              {opacity:1, scale:1} override placed AFTER it in the style array.
+              Root cause: playVictorySequence resets modalOpacity→0 on the
+              Reanimated UI thread; the App.tsx override (skipToEnd / .value=1)
+              cancels the animation, but there is a 1-2 frame race window on
+              Android Fabric where alpha=0 has already been committed to the
+              native layer.  Even with pointerEvents="box-none" the Fabric C++
+              touch dispatcher can still skip the subtree at alpha=0 on some
+              Android versions.  Using a plain JS style object for onboarding
+              means Reanimated's worklet never touches the view's alpha, making
+              the modal fully interactive from the very first frame. */}
           <Reanimated.View
             style={[styles.victoryModal, {
               backgroundColor: phaseTheme.modalBgColor,
               borderColor: btn.modalBorder,
-            }, modalAnimStyle]}
+            },
+            // Onboarding: static override — bypasses Reanimated entirely so the
+            // modal is immediately interactive.  Non-onboarding: animated reveal.
+            isOnboarding
+              ? { opacity: 1, transform: [{ scale: 1 }] }
+              : modalAnimStyle,
+            ]}
             pointerEvents="box-none"
           >
             <View style={[styles.victoryGlow, {
@@ -546,9 +607,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <Animated.View style={{ opacity: contentOpacity4, width: '100%' }} pointerEvents="box-none">
             {isOnboarding ? (
             <View style={styles.victoryButtonRow}>
-              {/* Onboarding: single "Continue" button */}
+              {/* Onboarding: single "Continue" button with explicit press handler
+                  that logs every stage of the touch chain for Termux diagnostics. */}
               <TouchableOpacity
-                onPress={onOnboardingContinue ?? onNextLevel}
+                onPressIn={handleContinuePressIn}
+                onPressOut={handleContinuePressOut}
+                onPress={handleContinuePress}
                 activeOpacity={0.85}
                 accessibilityLabel="Continue"
                 accessibilityRole="button"

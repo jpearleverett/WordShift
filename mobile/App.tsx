@@ -332,6 +332,25 @@ export default function App() {
     }
   }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
 
+  // [AppVictory] Diagnostic: log a snapshot of the relevant state whenever the
+  // puzzle transitions to/from the WON state.  Output appears in the Metro /
+  // Termux terminal and helps confirm whether the modal is shown and whether
+  // the onboarding callback is wired up correctly.
+  useEffect(() => {
+    if (puzzle.gameState === GameState.WON) {
+      const modalVisible = !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete');
+      console.log('[AppVictory] gameState → WON', {
+        isOnboarding: onboardingFlow.isOnboarding,
+        onboardingStep: onboardingFlow.onboardingStep,
+        modalVisible,
+        victoryAnimating,
+        ts: Date.now(),
+      });
+    }
+  }, [puzzle.gameState]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Intentionally shallow: we only want one log per WON transition, not on every
+  // re-render of the dependent values while already in WON state.
+
   // Onboarding tutorial guidance: exact source letter + target slot from solver steps.
   const tutorialGuidance = useMemo(() => {
     if (onboardingFlow.onboardingStep !== 'puzzle_tutorial') return null;
@@ -604,22 +623,36 @@ export default function App() {
       victoryAnimatingRef.current = true;
       setVictoryAnimating(true);
       victoryActions.playVictorySequence(victory.earnedStars);
-      // During onboarding the CONTINUE button must be tappable immediately.
-      // playVictorySequence sets victoryModalOpacity to 0 then delays animating to 1,
-      // but Reanimated's native driver sets real alpha=0 on both platforms:
-      //   iOS: CALayer.alpha=0 causes UIKit hitTest to skip the entire subtree.
-      //   Android/Fabric: setAlpha(0) causes the Fabric C++ touch dispatcher to
-      //   skip hit-testing for views before the useEffect setValue(1) re-render lands.
-      // The underdamped spring on scale also keeps the touch area shrunk for ~2s.
-      // Override both to 1 instantly so the modal is interactive from the first frame.
-      // Also clear victoryAnimating so the tap-to-accelerate Pressable
-      // (guarded by !isOnboarding) has zero window to accidentally appear.
-      // Stars animate independently via their own SharedValues and are unaffected.
+      // -----------------------------------------------------------------------
+      // Onboarding: the CONTINUE button must be tappable from the very first
+      // frame the modal is rendered.
+      //
+      // Problem: playVictorySequence resets victoryModalOpacity→0 on the
+      // Reanimated UI thread, then schedules a withDelay(N, withTiming(1)).
+      // Even though we immediately cancel via skipToEnd(), there is a 1-2 frame
+      // race window on Android Fabric where alpha=0 has already been committed
+      // to the native layer — making the entire modal subtree non-hittable.
+      // pointerEvents="box-none" alone is not sufficient on all Android versions.
+      //
+      // Fix A (App.tsx): call skipToEnd() which uses explicit cancelAnimation()
+      //   on every shared value before setting the final values — more reliable
+      //   than direct .value = 1 assignment.
+      // Fix B (VictoryModal.tsx): when isOnboarding, the Reanimated animated
+      //   style is replaced with a static {opacity:1, scale:1} object so
+      //   Reanimated's worklet never touches the view's alpha at all.
+      // Together these guarantee the modal is fully interactive immediately.
+      // -----------------------------------------------------------------------
       if (onboardingFlow.isOnboarding) {
-        victoryFlow.victoryModalOpacity.value = 1;
-        victoryFlow.victoryModalScale.value = 1;
+        // skipToEnd() calls cancelAnimation() on all shared values, then sets
+        // them to their final values — the most reliable reset path.
+        victoryActions.skipToEnd(victory.earnedStars);
         victoryAnimatingRef.current = false;
         setVictoryAnimating(false);
+        console.log('[AppVictory] Onboarding victory: skipToEnd called, victoryAnimating cleared', {
+          earnedStars: victory.earnedStars,
+          onboardingStep: onboardingFlow.onboardingStep,
+          ts: Date.now(),
+        });
       }
       addVictoryTimeout(() => { victoryAnimatingRef.current = false; setVictoryAnimating(false); }, 1200);
 
@@ -847,17 +880,25 @@ export default function App() {
 
   // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
   const handleOnboardingVictoryContinue = useCallback(() => {
+    console.log('[OnboardingFlow] handleOnboardingVictoryContinue ENTERED', {
+      onboardingStep: onboardingFlow.onboardingStep,
+      gameState: puzzle.gameState,
+      ts: Date.now(),
+    });
     hapticLight();
     clearVictoryTimeouts();
     // Dismiss modal immediately by setting IDLE before clearing data
+    console.log('[OnboardingFlow] setting gameState → IDLE');
     puzzleActions.setGameState(GameState.IDLE);
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
     // Navigate directly to pit (skip puzzle_complete and going_to_pit steps)
+    console.log('[OnboardingFlow] advancing onboarding to pit_intro, transitioning to pit screen');
     onboardingActions.advanceOnboarding('pit_intro');
     transitionTo('pit');
+    console.log('[OnboardingFlow] handleOnboardingVictoryContinue COMPLETE');
   }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
 
   const handleReturnHome = useCallback(() => {
