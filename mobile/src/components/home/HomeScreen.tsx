@@ -899,45 +899,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
-      {ambientLine && !isOnboarding && (
-        <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
-          <Text
-            style={[
-              styles.ambientLineText,
-              { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
-            ]}
-          >
-            {ambientLine}
-          </Text>
-        </Animated.View>
-      )}
-
-      {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
-      {goalSuggestion && !isOnboarding && (
-        <Animated.View style={{ opacity: goalOpacity }}>
-          <TouchableOpacity
-            style={styles.goalSuggestionContainer}
-            onPress={() => {
-              if (goalSuggestion.action === 'daily' && onStartDaily) {
-                onStartDaily('HARD' as Difficulty);
-              } else if (goalSuggestion.action === 'play') {
-                onPlayPuzzle();
-              }
-            }}
-            activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
+      {/* Ambient line + Goal suggestion — zero-height wrapper prevents layout shifts */}
+      <View style={styles.floatingTextWrapper} pointerEvents="box-none">
+        {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
+        {ambientLine && !isOnboarding && (
+          <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}
+            pointerEvents="none"
           >
             <Text
               style={[
-                styles.goalSuggestionText,
-                { color: getPhaseTheme(progress.currentPhase).modalTextColor },
+                styles.ambientLineText,
+                { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
               ]}
             >
-              {goalSuggestion.text}
+              {ambientLine}
             </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+          </Animated.View>
+        )}
+
+        {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
+        {goalSuggestion && !isOnboarding && (
+          <Animated.View style={{ opacity: goalOpacity }}>
+            <TouchableOpacity
+              style={styles.goalSuggestionContainer}
+              onPress={() => {
+                if (goalSuggestion.action === 'daily' && onStartDaily) {
+                  onStartDaily('HARD' as Difficulty);
+                } else if (goalSuggestion.action === 'play') {
+                  onPlayPuzzle();
+                }
+              }}
+              activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
+            >
+              <Text
+                style={[
+                  styles.goalSuggestionText,
+                  { color: getPhaseTheme(progress.currentPhase).modalTextColor },
+                ]}
+              >
+                {goalSuggestion.text}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </View>
 
       {/* Celebration Confetti */}
       {showCelebration && (
@@ -957,25 +962,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         purchasedUpgrades={purchasedUpgrades}
       />
 
-      {/* Cooldown Message Toast */}
-      {Boolean(dialogueFlow.cooldownMessage) && (
-        <Animated.View
-          style={[
-            styles.cooldownToast,
-            {
-              backgroundColor: dt.cooldownBg,
-              borderColor: dt.cooldownBorder,
-              opacity: dialogueFlow.cooldownOpacity,
-              transform: [{ translateY: dialogueFlow.cooldownSlide }],
-            },
-          ]}
-          pointerEvents="none"
-          accessibilityLiveRegion="polite"
-          accessibilityLabel={dialogueFlow.cooldownMessage}
-        >
-          <Text style={styles.cooldownToastText}>{dialogueFlow.cooldownMessage}</Text>
-        </Animated.View>
-      )}
+      {/* Cooldown Message Toast — always mounted, animated in/out via opacity + translateY */}
+      <Animated.View
+        style={[
+          styles.cooldownToast,
+          {
+            backgroundColor: dt.cooldownBg,
+            borderColor: dt.cooldownBorder,
+            opacity: dialogueFlow.cooldownOpacity,
+            transform: [{ translateY: dialogueFlow.cooldownSlide }],
+          },
+        ]}
+        pointerEvents="none"
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={dialogueFlow.cooldownMessage || undefined}
+      >
+        <Text style={styles.cooldownToastText}>{dialogueFlow.cooldownMessage || ''}</Text>
+      </Animated.View>
 
       {/* Dialogue Modal */}
       <Modal
@@ -2233,12 +2236,17 @@ const styles = StyleSheet.create({
   },
 
   // Ambient home line
+  floatingTextWrapper: {
+    height: 0,
+    overflow: 'visible',
+    zIndex: 10,
+    alignItems: 'center',
+  },
   ambientLineContainer: {
     alignSelf: 'center',
     paddingHorizontal: 16,
     paddingVertical: 6,
     marginBottom: 2,
-    zIndex: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.20)',
     borderRadius: 10,
   },
@@ -2255,7 +2263,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     borderRadius: 10,
-    zIndex: 10,
   },
   goalSuggestionText: {
     fontSize: 11,

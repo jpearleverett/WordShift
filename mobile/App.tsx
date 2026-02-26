@@ -829,19 +829,18 @@ export default function App() {
   }, [puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
   // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
-  const handleOnboardingVictoryContinue = useCallback(async () => {
+  const handleOnboardingVictoryContinue = useCallback(() => {
     hapticLight();
     clearVictoryTimeouts();
-    // Clean up victory state
+    // Dismiss modal immediately by setting IDLE before clearing data
+    puzzleActions.setGameState(GameState.IDLE);
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
     // Navigate directly to pit (skip puzzle_complete and going_to_pit steps)
-    await onboardingActions.advanceOnboarding('pit_intro');
-    transitionTo('pit', () => {
-      puzzleActions.setGameState(GameState.IDLE);
-    });
+    onboardingActions.advanceOnboarding('pit_intro');
+    transitionTo('pit');
   }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
 
   const handleReturnHome = useCallback(() => {
@@ -1396,7 +1395,7 @@ export default function App() {
 
         {/* Tap-to-accelerate overlay for victory animation — only during star stagger,
             removed once the modal appears so buttons remain tappable */}
-        {puzzle.gameState === GameState.WON && victoryAnimating && (
+        {puzzle.gameState === GameState.WON && victoryAnimating && !onboardingFlow.isOnboarding && (
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={handleVictoryTapAccelerate}
