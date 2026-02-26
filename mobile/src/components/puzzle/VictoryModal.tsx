@@ -82,6 +82,9 @@ interface VictoryModalProps {
   // Onboarding mode
   isOnboarding?: boolean;
   onOnboardingContinue?: () => void;
+  // Tap-to-skip: true while victory animation is running (non-onboarding only)
+  isAnimating?: boolean;
+  onTapToSkip?: () => void;
   // Bonus breakdown data
   variant?: string;
   gameMode?: string;
@@ -148,6 +151,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onShare,
   isOnboarding,
   onOnboardingContinue,
+  isAnimating,
+  onTapToSkip,
   variant,
   gameMode,
 }) => {
@@ -335,10 +340,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   }
 
   return (
-    <View style={[styles.modalOverlay, {
-      backgroundColor: phaseTheme.modalOverlayColor,
-    }]}>
-      <ScrollView
+    // Non-onboarding path: native Modal for guaranteed touch delivery on Android.
+    // The game-area ScrollView (puzzle rows) intercepts native touches before
+    // React Native sees them, regardless of zIndex.  A native Modal creates a
+    // separate Android Window that sits above the host Activity window for both
+    // rendering AND touch dispatch — the same root fix used for the onboarding path.
+    <Modal
+      transparent
+      animationType="none"
+      visible={true}
+      statusBarTranslucent
+    >
+      <View style={[styles.regularModalOverlay, {
+        backgroundColor: phaseTheme.modalOverlayColor,
+      }]}>
+        <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
@@ -684,7 +700,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <>
             {/* Next Level — full-width primary 3D candy button */}
             <TouchableOpacity
-              onPress={onNextLevel}
+              onPressIn={() => console.log('[VictoryModal] NEXT LEVEL onPressIn', { ts: Date.now() })}
+              onPress={() => { console.log('[VictoryModal] NEXT LEVEL onPress', { ts: Date.now() }); onNextLevel(); }}
               activeOpacity={0.85}
               accessibilityLabel="Next level"
               accessibilityRole="button"
@@ -709,7 +726,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <View style={styles.victoryButtonRowSecondary}>
               {/* Share — uniform secondary */}
               <TouchableOpacity
-                onPress={onShare}
+                onPressIn={() => console.log('[VictoryModal] SHARE onPressIn', { ts: Date.now() })}
+                onPress={() => { console.log('[VictoryModal] SHARE onPress', { ts: Date.now() }); onShare(); }}
                 activeOpacity={0.8}
                 accessibilityLabel="Share result"
                 accessibilityRole="button"
@@ -725,7 +743,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
               {/* Home — uniform secondary */}
               <TouchableOpacity
-                onPress={onReturnHome}
+                onPressIn={() => console.log('[VictoryModal] HOME onPressIn', { ts: Date.now() })}
+                onPress={() => { console.log('[VictoryModal] HOME onPress', { ts: Date.now() }); onReturnHome(); }}
                 activeOpacity={0.8}
                 accessibilityLabel="Return home"
                 accessibilityRole="button"
@@ -744,15 +763,27 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
           </Reanimated.View>
         </ScrollView>
+        {/* Tap-to-skip overlay — absoluteFill within Modal so any tap during the
+            star/reveal animation skips to the end.  Rendered after ScrollView so
+            it sits on top of the (still-invisible) card and intercepts taps.
+            Removed as soon as the animation finishes (isAnimating becomes false). */}
+        {isAnimating && onTapToSkip && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onTapToSkip}
+            accessibilityLabel="Tap to skip animation"
+          />
+        )}
       </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(76, 29, 149, 0.7)',
-    zIndex: 500,
+  // Root view for the non-onboarding native-Modal path.
+  // flex:1 fills the Modal window so the card can be centred by the inner ScrollView.
+  regularModalOverlay: {
+    flex: 1,
   },
   // Full-screen overlay for onboarding native-Modal path.
   // flex:1 fills the Modal window; justifyContent/alignItems center the card.

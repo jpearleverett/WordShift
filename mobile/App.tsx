@@ -10,6 +10,7 @@ import {
   Dimensions,
   Animated,
   Pressable,
+  Modal,
 } from 'react-native';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -1189,12 +1190,9 @@ export default function App() {
           pointerEvents="none"
         />
 
-        {/* Achievement toast overlay */}
-        <AchievementToast
-          achievement={achievementState.currentAchievement}
-          onDismiss={achievementActions.dismissAchievement}
-          phase={persistence.currentPhase}
-        />
+        {/* Achievement toast overlay — moved to a native Modal after VictoryModal
+            so it stacks above the victory Modal window on both iOS and Android.
+            See the corresponding <Modal> block below, near VictoryModal. */}
 
         {/* Header */}
         <View style={styles.header}>
@@ -1449,19 +1447,9 @@ export default function App() {
           onClose={() => puzzleActions.setShowRules(false)}
         />
 
-        {/* Tap-to-accelerate overlay for victory animation — only during star stagger.
-            Touch-interception audit: `!onboardingFlow.isOnboarding` guard ensures this
-            full-screen Pressable is NEVER mounted while onboarding victory is visible.
-            The onboarding victory modal now uses React Native's <Modal> (a separate
-            Android Window) so it cannot be intercepted by any view in this hierarchy,
-            but keeping the guard makes the intent explicit and provides defence-in-depth.
-            Removed once victoryAnimating clears so normal buttons remain tappable. */}
-        {puzzle.gameState === GameState.WON && victoryAnimating && !onboardingFlow.isOnboarding && (
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={handleVictoryTapAccelerate}
-          />
-        )}
+        {/* Tap-to-accelerate overlay for victory animation — now lives INSIDE VictoryModal
+            (passed as isAnimating / onTapToSkip props) so it works within the native Modal
+            window created for guaranteed Android touch delivery.  Removed from here. */}
 
         {/* Victory Modal — shown during onboarding puzzle_tutorial (hidden during puzzle_complete when FoxGuide takes over) */}
         <VictoryModal
@@ -1488,9 +1476,27 @@ export default function App() {
           onShare={handleShare}
           isOnboarding={onboardingFlow.isOnboarding}
           onOnboardingContinue={handleOnboardingVictoryContinue}
+          isAnimating={victoryAnimating && !onboardingFlow.isOnboarding}
+          onTapToSkip={handleVictoryTapAccelerate}
           variant={puzzle.currentVariant}
           gameMode={puzzle.gameMode}
         />
+
+        {/* Achievement toast — rendered in its own native Modal mounted AFTER VictoryModal
+            so it always stacks above the victory Modal window.  The Modal is only shown
+            when an achievement is actually present so it has no layout cost otherwise. */}
+        <Modal
+          transparent
+          animationType="none"
+          visible={!!achievementState.currentAchievement}
+          statusBarTranslucent
+        >
+          <AchievementToast
+            achievement={achievementState.currentAchievement}
+            onDismiss={achievementActions.dismissAchievement}
+            phase={persistence.currentPhase}
+          />
+        </Modal>
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
         {orchestration.showVictoryGlitch && orchestration.victoryGlitch && (
