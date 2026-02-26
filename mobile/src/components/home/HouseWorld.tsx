@@ -710,8 +710,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // State tracking for gestures
   const baseTranslateY = useRef(0);
 
-  // Track container height for proper initial positioning
-  const [containerHeight, setContainerHeight] = useState<number | null>(null);
+  // Track container height for proper initial positioning (default to screen height to avoid opacity flash)
+  const [containerHeight, setContainerHeight] = useState<number>(SCREEN_HEIGHT);
   const onContainerLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
     const { height } = event.nativeEvent.layout;
     if (height > 0) {
@@ -914,7 +914,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   // extends above when the house is taller than the viewport. A positive
   // translateY shifts the view down, bringing the roof into view.
   useEffect(() => {
-    if (containerHeight === null) return;
     const connectorHeight = Math.max(0, numRows - 1) * 10;
     const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
     const overflow = Math.max(0, totalContentHeight - containerHeight);
@@ -943,7 +942,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             style={[
               styles.transformContainer,
               {
-                opacity: containerHeight === null ? 0 : 1,
+                opacity: 1,
                 transform: [
                   { translateY },
                 ],

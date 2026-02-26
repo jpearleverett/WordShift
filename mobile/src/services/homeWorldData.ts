@@ -656,8 +656,8 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
 /**
  * Get the next available unlock (respects unlock sequence)
  */
-export async function getNextUnlock(): Promise<Unlockable | null> {
-  const progress = await loadProgress();
+export function getNextUnlock(): Unlockable | null {
+  const progress = loadProgress();
 
   for (const unlock of UNLOCK_PROGRESSION) {
     const isTargetUnlocked = unlock.type === 'character'
@@ -666,7 +666,7 @@ export async function getNextUnlock(): Promise<Unlockable | null> {
 
     if (!isTargetUnlocked) {
       // Check if this unlock is available
-      const availability = await isUnlockAvailable(unlock.id);
+      const availability = isUnlockAvailable(unlock.id);
       if (availability.available) {
         return unlock;
       }
@@ -682,8 +682,8 @@ export async function getNextUnlock(): Promise<Unlockable | null> {
 /**
  * Get all unlocks with their current status
  */
-export async function getUnlockStatus(): Promise<Unlockable[]> {
-  const progress = await loadProgress();
+export function getUnlockStatus(): Unlockable[] {
+  const progress = loadProgress();
 
   return UNLOCK_PROGRESSION.map(unlock => ({
     ...unlock,
@@ -706,11 +706,11 @@ function getAnimalForRoom(roomId: string): string | null {
  * Flow: invite animal → build room → invite animal → build room
  * For the first animal, the room already exists
  */
-export async function isUnlockAvailable(unlockId: string): Promise<{
+export function isUnlockAvailable(unlockId: string): {
   available: boolean;
   reason?: string;
-}> {
-  const progress = await loadProgress();
+} {
+  const progress = loadProgress();
   const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
 
   if (!unlock) {
@@ -767,31 +767,31 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
 /**
  * Attempt to purchase an unlock
  */
-export async function purchaseUnlock(unlockId: string): Promise<{
+export function purchaseUnlock(unlockId: string): {
   success: boolean;
   error?: string;
-}> {
+} {
   const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
   if (!unlock) {
     return { success: false, error: 'Invalid unlock ID' };
   }
 
   // Check if unlock is available (sequence validation)
-  const availability = await isUnlockAvailable(unlockId);
+  const availability = isUnlockAvailable(unlockId);
   if (!availability.available) {
     return { success: false, error: availability.reason };
   }
 
-  const affordable = await canAfford(unlock.cost);
+  const affordable = canAfford(unlock.cost);
   if (!affordable) {
     return { success: false, error: 'Not enough amber' };
   }
 
   let success: boolean;
   if (unlock.type === 'character') {
-    success = await unlockAnimal(unlock.targetId, unlock.cost);
+    success = unlockAnimal(unlock.targetId, unlock.cost);
   } else {
-    success = await unlockRoom(unlock.targetId, unlock.cost);
+    success = unlockRoom(unlock.targetId, unlock.cost);
   }
 
   return { success };
@@ -800,8 +800,8 @@ export async function purchaseUnlock(unlockId: string): Promise<{
 /**
  * Get rooms with unlock status
  */
-export async function getRoomsWithStatus(): Promise<Room[]> {
-  const progress = await loadProgress();
+export function getRoomsWithStatus(): Room[] {
+  const progress = loadProgress();
 
   return ROOMS.map(room => ({
     ...room,
@@ -812,8 +812,8 @@ export async function getRoomsWithStatus(): Promise<Room[]> {
 /**
  * Get animals with unlock status and saved dialogue progress
  */
-export async function getAnimalsWithStatus(): Promise<Animal[]> {
-  const progress = await loadProgress();
+export function getAnimalsWithStatus(): Animal[] {
+  const progress = loadProgress();
 
   return ANIMALS.map(animal => {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
@@ -839,12 +839,12 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
 /**
  * Get total unlock progress
  */
-export async function getUnlockProgress(): Promise<{
+export function getUnlockProgress(): {
   unlockedCount: number;
   totalCount: number;
   percentage: number;
-}> {
-  const progress = await loadProgress();
+} {
+  const progress = loadProgress();
   const totalCount = UNLOCK_PROGRESSION.length;
   const unlockedCount = progress.unlockedAnimals.length + progress.unlockedRooms.length - 1; // Subtract starter room (cozy_den is pre-unlocked)
 
