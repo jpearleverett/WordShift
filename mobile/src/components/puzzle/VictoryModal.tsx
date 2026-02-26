@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ScrollView,
   Animated,
+  Modal,
+  Pressable,
 } from 'react-native';
 import Reanimated, {
   SharedValue,
@@ -181,14 +183,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         phase,
         ts: Date.now(),
       });
-      if (isOnboarding) {
-        // During tutorial: skip cascade, show button immediately.
-        // contentOpacity4 starts at 0; set to 1 synchronously so the
-        // CONTINUE button is rendered at full opacity on the first frame.
-        contentOpacity4.setValue(1);
-        console.log('[VictoryModal] onboarding path: contentOpacity4 set to 1, modal static style applied');
-        return;
-      }
+      // Note: when isOnboarding is true, this component returns the native-Modal
+      // path before rendering — the cascade animations below are only used by
+      // the non-onboarding path.
       contentOpacity1.setValue(0);
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
@@ -239,40 +236,120 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   if (!visible) return null;
 
+  // ---------------------------------------------------------------------------
+  // Onboarding path: native Modal layer for guaranteed touch delivery on Android.
+  //
+  // Root cause of the tap-not-working bug: VictoryModal's overlay uses
+  // StyleSheet.absoluteFillObject + zIndex:500, but on Android Fabric zIndex is
+  // a JS/shadow-thread compositor concept only.  The native touch dispatcher
+  // routes hits by view elevation/tree-order — the puzzle-screen ScrollView
+  // (game area) sits later in the native view tree and intercepts touches even
+  // though the overlay renders visually on top.  Multiple prior fixes (static
+  // opacity, skipToEnd, pointerEvents="box-none") had no effect because the
+  // interception happens entirely at the Android native layer before React
+  // Native even sees the event.
+  //
+  // React Native's <Modal> creates a separate Android Window that is always
+  // above the host Activity's window for both rendering AND touch dispatch —
+  // the definitive fix regardless of zIndex, Reanimated state, or ScrollView
+  // nesting depth.
+  //
+  // ScrollView is intentionally omitted: onboarding content is minimal (stars +
+  // title + one button) and never needs to scroll, eliminating another class of
+  // scroll-gesture swallowing.
+  // ---------------------------------------------------------------------------
+  if (isOnboarding) {
+    console.log('[VictoryModal] onboarding native-Modal path rendering', {
+      earnedStars,
+      hasOnboardingContinue: !!onOnboardingContinue,
+      ts: Date.now(),
+    });
+    return (
+      <Modal
+        transparent
+        animationType="none"
+        visible={true}
+        statusBarTranslucent
+      >
+        <View
+          style={[styles.onboardingModalOverlay, { backgroundColor: phaseTheme.modalOverlayColor }]}
+          pointerEvents="box-none"
+        >
+          <View
+            style={[styles.victoryModal, {
+              backgroundColor: phaseTheme.modalBgColor,
+              borderColor: btn.modalBorder,
+            }]}
+            pointerEvents="box-none"
+          >
+            <View style={[styles.victoryGlow, { backgroundColor: phaseTheme.victoryGlowColor }]} pointerEvents="none" />
+            <View style={styles.modalShine} pointerEvents="none" />
+
+            {/* Stars — static, no Reanimated in onboarding path */}
+            <View style={styles.starsContainer}>
+              <Text style={[styles.victoryStar, earnedStars < 1 && styles.victoryStarEmpty]}>
+                {earnedStars >= 1 ? '\u2B50' : '\u2606'}
+              </Text>
+              <Text style={[styles.victoryStar, styles.victoryStarBig, earnedStars < 2 && styles.victoryStarEmpty]}>
+                {earnedStars >= 2 ? '\u2B50' : '\u2606'}
+              </Text>
+              <Text style={[styles.victoryStar, earnedStars < 3 && styles.victoryStarEmpty]}>
+                {earnedStars >= 3 ? '\u2B50' : '\u2606'}
+              </Text>
+            </View>
+
+            <Text style={[styles.victoryTitle, { color: phaseTheme.victoryTitleColor }]}>
+              {getVictoryTitle(earnedStars, phase)}
+            </Text>
+            <Text style={[styles.victorySubtitle, { color: phaseTheme.modalSecondaryTextColor }]}>
+              {`Level ${level} Complete`}
+            </Text>
+
+            {/* CONTINUE — Pressable with generous hitSlop for easy tapping */}
+            <View style={[styles.victoryButtonRow, { width: '100%', marginTop: 20 }]}>
+              <Pressable
+                onPressIn={handleContinuePressIn}
+                onPressOut={handleContinuePressOut}
+                onPress={handleContinuePress}
+                accessibilityLabel="Continue"
+                accessibilityRole="button"
+                hitSlop={{ top: 24, bottom: 24, left: 24, right: 24 }}
+              >
+                <View style={styles.btn3dWrapper}>
+                  <View style={[styles.btn3dBody, {
+                    backgroundColor: btn.primary.bg,
+                    shadowColor: btn.primary.shadow,
+                  }]}>
+                    <View style={styles.btn3dBevel} />
+                    <View style={styles.btn3dGlossy} />
+                    <Text style={styles.btn3dPrimaryText}>CONTINUE</Text>
+                  </View>
+                  <View style={[styles.btn3dEdge, { backgroundColor: btn.primary.edge }]} />
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   return (
     <View style={[styles.modalOverlay, {
       backgroundColor: phaseTheme.modalOverlayColor,
     }]}>
-      {/* keyboardShouldPersistTaps="handled": prevents ScrollView from consuming
-          the first tap on Android when no keyboard is visible — without this,
-          Android's scroll gesture recogniser can swallow the CONTINUE tap. */}
       <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
         keyboardShouldPersistTaps="handled"
       >
-          {/* During onboarding we bypass modalAnimStyle entirely with a static
-              {opacity:1, scale:1} override placed AFTER it in the style array.
-              Root cause: playVictorySequence resets modalOpacity→0 on the
-              Reanimated UI thread; the App.tsx override (skipToEnd / .value=1)
-              cancels the animation, but there is a 1-2 frame race window on
-              Android Fabric where alpha=0 has already been committed to the
-              native layer.  Even with pointerEvents="box-none" the Fabric C++
-              touch dispatcher can still skip the subtree at alpha=0 on some
-              Android versions.  Using a plain JS style object for onboarding
-              means Reanimated's worklet never touches the view's alpha, making
-              the modal fully interactive from the very first frame. */}
           <Reanimated.View
             style={[styles.victoryModal, {
               backgroundColor: phaseTheme.modalBgColor,
               borderColor: btn.modalBorder,
             },
-            // Onboarding: static override — bypasses Reanimated entirely so the
-            // modal is immediately interactive.  Non-onboarding: animated reveal.
-            isOnboarding
-              ? { opacity: 1, transform: [{ scale: 1 }] }
-              : modalAnimStyle,
+            modalAnimStyle,
             ]}
             pointerEvents="box-none"
           >
@@ -598,41 +675,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
             </>)}
 
-            {/* Group 4: Action buttons — 3D candy style.
-                pointerEvents="box-none": on Android Fabric, Animated.Value(0) sets
-                setAlpha(0) via the native layer before useEffect fires setValue(1).
-                React Native's Fabric C++ touch dispatcher skips views with alpha=0,
-                making CONTINUE unreachable until the re-render propagates. box-none
-                bypasses the alpha check so children always receive touches. */}
+            {/* Group 4: Action buttons */}
             <Animated.View style={{ opacity: contentOpacity4, width: '100%' }} pointerEvents="box-none">
-            {isOnboarding ? (
-            <View style={styles.victoryButtonRow}>
-              {/* Onboarding: single "Continue" button with explicit press handler
-                  that logs every stage of the touch chain for Termux diagnostics. */}
-              <TouchableOpacity
-                onPressIn={handleContinuePressIn}
-                onPressOut={handleContinuePressOut}
-                onPress={handleContinuePress}
-                activeOpacity={0.85}
-                accessibilityLabel="Continue"
-                accessibilityRole="button"
-              >
-                <View style={styles.btn3dWrapper}>
-                  <View style={[styles.btn3dBody, {
-                    backgroundColor: btn.primary.bg,
-                    shadowColor: btn.primary.shadow,
-                  }]}>
-                    <View style={styles.btn3dBevel} />
-                    <View style={styles.btn3dGlossy} />
-                    <Text style={styles.btn3dPrimaryText}>CONTINUE</Text>
-                  </View>
-                  <View style={[styles.btn3dEdge, {
-                    backgroundColor: btn.primary.edge,
-                  }]} />
-                </View>
-              </TouchableOpacity>
-            </View>
-            ) : phaseTransitionPending ? (
+            {phaseTransitionPending ? (
             // Phase transition pending: pit CTA is the only action
             null
             ) : (
@@ -708,6 +753,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(76, 29, 149, 0.7)',
     zIndex: 500,
+  },
+  // Full-screen overlay for onboarding native-Modal path.
+  // flex:1 fills the Modal window; justifyContent/alignItems center the card.
+  onboardingModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 32,
   },
   modalShine: {
     position: 'absolute',

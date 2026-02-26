@@ -880,7 +880,7 @@ export default function App() {
 
   // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
   const handleOnboardingVictoryContinue = useCallback(() => {
-    console.log('[OnboardingFlow] handleOnboardingVictoryContinue ENTERED', {
+    console.log('[AppVictory] onboarding continue handler entered', {
       onboardingStep: onboardingFlow.onboardingStep,
       gameState: puzzle.gameState,
       ts: Date.now(),
@@ -888,17 +888,15 @@ export default function App() {
     hapticLight();
     clearVictoryTimeouts();
     // Dismiss modal immediately by setting IDLE before clearing data
-    console.log('[OnboardingFlow] setting gameState → IDLE');
     puzzleActions.setGameState(GameState.IDLE);
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
     // Navigate directly to pit (skip puzzle_complete and going_to_pit steps)
-    console.log('[OnboardingFlow] advancing onboarding to pit_intro, transitioning to pit screen');
     onboardingActions.advanceOnboarding('pit_intro');
     transitionTo('pit');
-    console.log('[OnboardingFlow] handleOnboardingVictoryContinue COMPLETE');
+    console.log('[AppVictory] onboarding continue handler exited');
   }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
 
   const handleReturnHome = useCallback(() => {
@@ -1451,8 +1449,13 @@ export default function App() {
           onClose={() => puzzleActions.setShowRules(false)}
         />
 
-        {/* Tap-to-accelerate overlay for victory animation — only during star stagger,
-            removed once the modal appears so buttons remain tappable */}
+        {/* Tap-to-accelerate overlay for victory animation — only during star stagger.
+            Touch-interception audit: `!onboardingFlow.isOnboarding` guard ensures this
+            full-screen Pressable is NEVER mounted while onboarding victory is visible.
+            The onboarding victory modal now uses React Native's <Modal> (a separate
+            Android Window) so it cannot be intercepted by any view in this hierarchy,
+            but keeping the guard makes the intent explicit and provides defence-in-depth.
+            Removed once victoryAnimating clears so normal buttons remain tappable. */}
         {puzzle.gameState === GameState.WON && victoryAnimating && !onboardingFlow.isOnboarding && (
           <Pressable
             style={StyleSheet.absoluteFill}
