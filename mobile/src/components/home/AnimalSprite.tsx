@@ -241,11 +241,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = React.memo(({
   // New juice animations
   const tapScale = useRef(new Animated.Value(1)).current;
   const breatheScale = useRef(new Animated.Value(1)).current;
+  const combinedScale = useRef(Animated.multiply(tapScale, breatheScale)).current;
   const emotionOpacity = useRef(new Animated.Value(0)).current;
   const emotionY = useRef(new Animated.Value(0)).current;
   const wiggleRotation = useRef(new Animated.Value(0)).current;
 
   const currentXRef = useRef(animal.position.x);
+  const lastTapTime = useRef(0);
 
   const [isMoving, setIsMoving] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
@@ -319,8 +321,12 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = React.memo(({
     return () => clearInterval(interval);
   }, [currentPhase, isOnCooldown]);
 
-  // Tap reaction animation
+  // Tap reaction animation (debounced to prevent cooldown toast flicker)
   const handlePress = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapTime.current < 500) return;
+    lastTapTime.current = now;
+
     if (!getSettingsSync().reducedMotion) {
       // Squish and bounce
       Animated.sequence([
@@ -493,7 +499,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = React.memo(({
       );
       bounceAnimation.start();
     } else {
-      bounceY.setValue(0);
+      // Smooth landing instead of instant snap to prevent teleporting
+      Animated.timing(bounceY, {
+        toValue: 0,
+        duration: 150,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
     }
 
     return () => {
@@ -576,7 +588,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = React.memo(({
             {
               transform: [
                 { scaleX },
-                { scale: Animated.multiply(tapScale, breatheScale) },
+                { scale: combinedScale },
                 { rotate: wiggleRotate },
               ],
             },

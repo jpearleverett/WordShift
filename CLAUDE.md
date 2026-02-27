@@ -138,7 +138,13 @@ npm install --legacy-peer-deps --ignore-scripts
 
 ## Recent Implementation Notes (2026-02)
 
-- **Home screen flickering and teleportation fix (2026-02-27)**:
+- **Home screen flickering and teleportation fix — second pass (2026-02-27)**:
+  - **AnimalSprite `Animated.multiply` in render**: `{ scale: Animated.multiply(tapScale, breatheScale) }` was called inline in the style array, creating a new animation node on every re-render and causing scale flicker. Moved to a stable ref: `const combinedScale = useRef(Animated.multiply(tapScale, breatheScale)).current`.
+  - **AnimalSprite bounce teleport**: When `isMoving` became false, `bounceY.setValue(0)` snapped the sprite to the floor instantly from whatever mid-bounce position it was at. Replaced with `Animated.timing(bounceY, { toValue: 0, duration: 150, easing: Easing.out(Easing.ease) })` for a smooth landing.
+  - **Cooldown toast spam-tap flicker**: Rapid tapping on a cooling-down animal triggered overlapping toast animation sequences. Added 500ms debounce via `lastTapTime` ref in `handlePress` — taps within 500ms of the last are ignored.
+  - **Cloud3 center-screen flash on mount**: `cloud3X` was initialized to `SCREEN_WIDTH / 2` (visible center of screen), causing a one-frame flash before the animation moved it off-screen. Changed all cloud initial values to start securely off-screen: cloud1X → -150, cloud2X → SCREEN_WIDTH + 100, cloud3X → -150.
+  - **Shooting star too fast / too low**: 800ms duration and y-start of 20-80px made the shooting star look like a UI glitch rather than an atmospheric effect. Slowed to 2000ms, restricted y-start to 0-30px (high in sky), and smoothed fade timing (fade-in 100→400ms, fade-out 700→1600ms).
+- **Home screen flickering and teleportation fix — first pass (2026-02-27)**:
   - **Root cause**: Cascading re-render chain — App.tsx passed inline arrow function callbacks (new references every render) through unmemoized HomeScreen → HouseWorld → RoomView → AnimalSprite. Particle system `setParticles()` every 2-4 seconds triggered full tree re-renders, restarting all sprite/cloud/particle animations mid-frame.
   - **App.tsx**: Extracted 5 inline navigation callbacks (`onOpenSettings`, `onOpenStats`, `onOpenLedger`, `onOpenGallery`, `onOpenPit`) into `useCallback` hooks to stabilize references.
   - **AnimalSprite**: Wrapped in `React.memo` with `onPressRef` pattern — stores `onPress` callback in a ref (updated every render) so the memo comparison ignores callback identity changes while `handlePress` always calls the latest version. Deps reduced to `[animal, currentPhase]`.
