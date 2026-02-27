@@ -327,31 +327,31 @@ const ShootingStar: React.FC = () => {
 
       const startX = Math.random() * SCREEN_WIDTH;
       x.setValue(startX);
-      y.setValue(20 + Math.random() * 60);
+      y.setValue(Math.random() * 30);
       opacity.setValue(0);
 
       const anim = Animated.parallel([
         Animated.timing(x, {
           toValue: startX + 150,
-          duration: 800,
+          duration: 2000,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(y, {
           toValue: 100 + Math.random() * 50,
-          duration: 800,
+          duration: 2000,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.sequence([
           Animated.timing(opacity, {
             toValue: 1,
-            duration: 100,
+            duration: 400,
             useNativeDriver: true,
           }),
           Animated.timing(opacity, {
             toValue: 0,
-            duration: 700,
+            duration: 1600,
             useNativeDriver: true,
           }),
         ]),
@@ -776,9 +776,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   const sunRotation = useRef(new Animated.Value(0)).current;
 
   // Cloud animations
-  const cloud1X = useRef(new Animated.Value(-100)).current;
-  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
-  const cloud3X = useRef(new Animated.Value(SCREEN_WIDTH / 2)).current;
+  const cloud1X = useRef(new Animated.Value(-150)).current;
+  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 100)).current;
+  const cloud3X = useRef(new Animated.Value(-150)).current;
 
   // Sun pulsing animation
   useEffect(() => {
