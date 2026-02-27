@@ -134,6 +134,7 @@ npm install --legacy-peer-deps --ignore-scripts
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - The full suite has 941 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- **Known issue — test step can hang**: The Bash tool call for running tests frequently stalls/hangs in this environment. The user may need to interrupt and say "keep going" for the test command to actually execute. This is a recurring pattern, not a one-off. When running tests, be aware that the step may appear stuck and require user intervention to proceed.
 
 ## Recent Implementation Notes (2026-02)
 
