@@ -138,6 +138,11 @@ npm install --legacy-peer-deps --ignore-scripts
 
 ## Recent Implementation Notes (2026-02)
 
+- **Home screen flickering and teleportation fix — third pass (2026-02-27)**:
+  - **HouseWorld React.memo bypass**: `onAnimalPress={dialogueFlow.handleAnimalTap}` and `onRoomPress={unlockFlow.handleRoomPress}` created new function references on every HomeScreen re-render (dialogue state, ambient lines, goal suggestions, etc.), bypassing HouseWorld's `React.memo` and causing full re-renders of the entire house/cloud/sky tree. Added `onAnimalPressRef`/`onRoomPressRef` pattern in HomeScreen with stable `useCallback` wrappers, same approach as AnimalSprite's `onPressRef`.
+  - **Dialogue modal `interpolate()` in render**: `dialogueFlow.dialogueSlide.interpolate({ inputRange: [0, 1], outputRange: [300, 0] })` was called inline in the modal's style, creating a new Animated interpolation node on every render (same bug class as `Animated.multiply`). Moved to a stable `useRef`.
+  - **Dialogue theme not memoized**: `getDialogueTheme(progress.currentPhase)` was called inline without memoization, returning a new object reference every render and triggering style recalculation on all dialogue/cooldown elements. Wrapped in `useMemo`.
+  - **Cloud inline styles recreated every render**: Each cloud `Animated.View` had `{ top: N, transform: [{ translateX: cloudNX }] }` and conditional `{ opacity: 0.6 }` objects created fresh on every render, causing style recalculation and visual flicker. Extracted to stable `useRef` (for static values) and `useMemo` (for phase-dependent values).
 - **Home screen flickering and teleportation fix — second pass (2026-02-27)**:
   - **AnimalSprite `Animated.multiply` in render**: `{ scale: Animated.multiply(tapScale, breatheScale) }` was called inline in the style array, creating a new animation node on every re-render and causing scale flicker. Moved to a stable ref: `const combinedScale = useRef(Animated.multiply(tapScale, breatheScale)).current`.
   - **AnimalSprite bounce teleport**: When `isMoving` became false, `bounceY.setValue(0)` snapped the sprite to the floor instantly from whatever mid-bounce position it was at. Replaced with `Animated.timing(bounceY, { toValue: 0, duration: 150, easing: Easing.out(Easing.ease) })` for a smooth landing.

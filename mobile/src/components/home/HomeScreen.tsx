@@ -224,6 +224,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Keep the ref in sync
   loadAllDataRef.current = loadAllData;
 
+  // Stable callback refs for HouseWorld — prevents React.memo bypass
+  // when dialogueFlow/unlockFlow recreate their callbacks on state changes
+  const onAnimalPressRef = useRef(dialogueFlow.handleAnimalTap);
+  onAnimalPressRef.current = dialogueFlow.handleAnimalTap;
+  const stableOnAnimalPress = useCallback((animal: Animal) => onAnimalPressRef.current(animal), []);
+
+  const onRoomPressRef = useRef(unlockFlow.handleRoomPress);
+  onRoomPressRef.current = unlockFlow.handleRoomPress;
+  const stableOnRoomPress = useCallback((room: Room) => onRoomPressRef.current(room), []);
+
   // Load data on mount
   useEffect(() => {
     loadAllData();
@@ -695,8 +705,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',
   }[progress.currentPhase] || '#6fb7df';
 
-  // Phase-aware dialogue theme for all modals and dialogue boxes
-  const dt = getDialogueTheme(progress.currentPhase);
+  // Phase-aware dialogue theme for all modals and dialogue boxes (memoized to prevent style object churn)
+  const dt = useMemo(() => getDialogueTheme(progress.currentPhase), [progress.currentPhase]);
+
+  // Stable interpolation for dialogue modal slide — prevents creating a new Animated node every render
+  const dialogueTranslateY = useRef(
+    dialogueFlow.dialogueSlide.interpolate({
+      inputRange: [0, 1],
+      outputRange: [300, 0],
+    })
+  ).current;
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
@@ -938,8 +956,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         rooms={rooms}
         animals={animals}
         currentPhase={progress.currentPhase}
-        onAnimalPress={dialogueFlow.handleAnimalTap}
-        onRoomPress={unlockFlow.handleRoomPress}
+        onAnimalPress={stableOnAnimalPress}
+        onRoomPress={stableOnRoomPress}
         ritualWords={progress.ritualWords}
         nextUnlock={unlockFlow.nextUnlock}
         amberBalance={progress.amber}
@@ -987,12 +1005,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 borderColor: dt.modalBorder,
                 shadowColor: dt.modalShadowColor,
                 transform: [
-                  {
-                    translateY: dialogueFlow.dialogueSlide.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [300, 0],
-                    }),
-                  },
+                  { translateY: dialogueTranslateY },
                 ],
                 opacity: dialogueFlow.dialogueSlide,
               },
