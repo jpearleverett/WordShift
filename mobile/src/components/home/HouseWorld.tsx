@@ -59,7 +59,7 @@ const PARTICLE_EMOJIS_BY_PHASE: Record<number, string[]> = {
   5: ['✨', '🌙', '💜'],
 };
 
-const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
+const FloatingParticle: React.FC<{ particle: Particle }> = React.memo(({ particle }) => {
   useEffect(() => {
     const startX = Math.random() * SCREEN_WIDTH;
     const endX = startX + (Math.random() - 0.5) * 100;
@@ -136,7 +136,7 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
       <Text style={{ fontSize: 16 }}>{particle.emoji}</Text>
     </Animated.View>
   );
-};
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SMOKE PUFF ANIMATION
@@ -678,6 +678,47 @@ const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTICLE LAYER - Isolated component to prevent particle state updates
+// from re-rendering the entire HouseWorld tree
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ParticleLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const particleIdRef = useRef(0);
+
+  useEffect(() => {
+    const spawnParticle = () => {
+      const emojis = PARTICLE_EMOJIS_BY_PHASE[currentPhase] || PARTICLE_EMOJIS_BY_PHASE[0];
+      const newParticle: Particle = {
+        id: particleIdRef.current++,
+        x: new Animated.Value(0),
+        y: new Animated.Value(0),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(1),
+        rotation: new Animated.Value(0),
+        emoji: emojis[Math.floor(Math.random() * emojis.length)],
+        duration: 8000 + Math.random() * 6000,
+      };
+      setParticles(prev => [...prev.slice(-8), newParticle]);
+    };
+
+    const spawnRate = currentPhase >= 3 ? 4000 : currentPhase >= 2 ? 3000 : 2000;
+    const interval = setInterval(spawnParticle, spawnRate);
+    spawnParticle();
+
+    return () => clearInterval(interval);
+  }, [currentPhase]);
+
+  return (
+    <>
+      {particles.map(particle => (
+        <FloatingParticle key={particle.id} particle={particle} />
+      ))}
+    </>
+  );
+});
+
 interface HouseWorldProps {
   rooms: Room[];
   animals: Animal[];
@@ -690,7 +731,7 @@ interface HouseWorldProps {
   purchasedUpgrades?: Record<string, number>;
 }
 
-export const HouseWorld: React.FC<HouseWorldProps> = ({
+export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   rooms,
   animals,
   currentPhase,
@@ -730,10 +771,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     })),
   []);
 
-  // Particle system state
-  const [particles, setParticles] = useState<Particle[]>([]);
-  const particleIdRef = useRef(0);
-
   // Sun animation
   const sunPulse = useRef(new Animated.Value(1)).current;
   const sunRotation = useRef(new Animated.Value(0)).current;
@@ -742,32 +779,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const cloud1X = useRef(new Animated.Value(-100)).current;
   const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
   const cloud3X = useRef(new Animated.Value(SCREEN_WIDTH / 2)).current;
-
-  // Spawn particles based on phase
-  useEffect(() => {
-    const spawnParticle = () => {
-      const emojis = PARTICLE_EMOJIS_BY_PHASE[currentPhase] || PARTICLE_EMOJIS_BY_PHASE[0];
-      const newParticle: Particle = {
-        id: particleIdRef.current++,
-        x: new Animated.Value(0),
-        y: new Animated.Value(0),
-        opacity: new Animated.Value(0),
-        scale: new Animated.Value(1),
-        rotation: new Animated.Value(0),
-        emoji: emojis[Math.floor(Math.random() * emojis.length)],
-        duration: 8000 + Math.random() * 6000,
-      };
-
-      setParticles(prev => [...prev.slice(-8), newParticle]); // Keep max 8 particles
-    };
-
-    // Spawn particles more frequently at lower phases (happy), less at higher (dread)
-    const spawnRate = currentPhase >= 3 ? 4000 : currentPhase >= 2 ? 3000 : 2000;
-    const interval = setInterval(spawnParticle, spawnRate);
-    spawnParticle(); // Spawn one immediately
-
-    return () => clearInterval(interval);
-  }, [currentPhase]);
 
   // Sun pulsing animation
   useEffect(() => {
@@ -808,15 +819,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     };
   }, [currentPhase]);
 
-  // Cloud animations
+  // Cloud animations — track only the 3 current animations (no unbounded array growth)
   const cloudMountedRef = useRef(true);
-  const cloudAnimRefs = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
     cloudMountedRef.current = true;
-    cloudAnimRefs.current = [];
+    const activeAnims: (Animated.CompositeAnimation | null)[] = [null, null, null];
 
-    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
+    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number, index: number) => {
       const animate = () => {
         if (!cloudMountedRef.current) return;
         cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
@@ -825,7 +835,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
           duration,
           useNativeDriver: true,
         });
-        cloudAnimRefs.current.push(anim);
+        activeAnims[index] = anim;
         anim.start(() => {
           if (cloudMountedRef.current) animate();
         });
@@ -833,14 +843,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       animate();
     };
 
-    animateCloud(cloud1X, -100, 45000);
-    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
-    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
+    animateCloud(cloud1X, -100, 45000, 0);
+    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000, 1);
+    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000, 2);
 
     return () => {
       cloudMountedRef.current = false;
-      cloudAnimRefs.current.forEach(anim => anim.stop());
-      cloudAnimRefs.current = [];
+      activeAnims.forEach(anim => anim?.stop());
     };
   }, []);
 
@@ -924,10 +933,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
-      {/* Floating particles */}
-      {particles.map(particle => (
-        <FloatingParticle key={particle.id} particle={particle} />
-      ))}
+      {/* Floating particles — isolated to prevent re-rendering the rest of the tree */}
+      <ParticleLayer currentPhase={currentPhase} />
 
       {/* Pan gesture handler - vertical only */}
       <PanGestureHandler
@@ -1152,7 +1159,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       </PanGestureHandler>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

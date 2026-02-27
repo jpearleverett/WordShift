@@ -219,7 +219,7 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   rabbit: 8, // Big hops
 };
 
-export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
+export const AnimalSprite: React.FC<AnimalSpriteProps> = React.memo(({
   animal,
   roomWidth,
   roomHeight,
@@ -228,6 +228,10 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   isOnCooldown = false,
   cooldownPuzzlesLeft,
 }) => {
+  // Ref pattern for onPress to avoid stale closures and keep memo effective
+  const onPressRef = useRef(onPress);
+  onPressRef.current = onPress;
+
   const posX = useRef(new Animated.Value(animal.position.x)).current;
   const posY = useRef(new Animated.Value(animal.position.y)).current;
   const bounceY = useRef(new Animated.Value(0)).current;
@@ -386,8 +390,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       ]).start();
     }
 
-    onPress(animal);
-  }, [animal, onPress, currentPhase]);
+    onPressRef.current(animal);
+  }, [animal, currentPhase]);
 
   const wiggleRotate = wiggleRotation.interpolate({
     inputRange: [-1, 0, 1],
@@ -669,7 +673,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
