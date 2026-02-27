@@ -780,6 +780,20 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 100)).current;
   const cloud3X = useRef(new Animated.Value(-150)).current;
 
+  // Stable cloud styles — prevents new object creation on every render
+  const cloud1Style = useRef({ top: 20 as number, transform: [{ translateX: cloud1X }] }).current;
+  const cloud2Style = useRef({ top: 70 as number, transform: [{ translateX: cloud2X }] }).current;
+  const cloud3Style = useRef({ top: 45 as number, transform: [{ translateX: cloud3X }] }).current;
+  const cloudDimStyle = useMemo(() => currentPhase >= 3 ? { opacity: 0.6 } : undefined, [currentPhase]);
+  const cloud3FontStyle = useMemo(() =>
+    currentPhase >= 3 ? { fontSize: 38, opacity: 0.6 } : { fontSize: 38 },
+    [currentPhase]
+  );
+  const cloud2MarginStyle = useMemo(() =>
+    currentPhase >= 3 ? { marginLeft: 25, opacity: 0.6 } : { marginLeft: 25 },
+    [currentPhase]
+  );
+
   // Sun pulsing animation
   useEffect(() => {
     const pulseAnimation = Animated.loop(
@@ -974,15 +988,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
               />
 
               {/* Animated clouds - inside transform so they move with the scene */}
-              <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              <Animated.View style={[styles.cloud, cloud1Style]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
               </Animated.View>
-              <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-                <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              <Animated.View style={[styles.cloud, cloud2Style]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
+                <Text style={[styles.cloudEmoji, cloud2MarginStyle]}>☁️</Text>
               </Animated.View>
-              <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              <Animated.View style={[styles.cloud, cloud3Style]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, cloud3FontStyle]}>☁️</Text>
               </Animated.View>
 
               {/* Sun with animated rays - hidden at phase 4 */}
