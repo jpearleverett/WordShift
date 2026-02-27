@@ -71,8 +71,8 @@ JS package versions and the native code inside the dev build must match. A new d
 ### Install / align dependencies
 ```bash
 cd mobile
-npm install --legacy-peer-deps   # Avoids peer-dep conflicts
-npx expo install --fix           # Let Expo align what it can
+npm install --legacy-peer-deps --ignore-scripts   # Avoids peer-dep conflicts; --ignore-scripts skips @shopify/react-native-skia's github download (safe for JS/tests, only needed for native builds)
+npx expo install --fix                             # Let Expo align what it can
 ```
 
 ### Build the dev client (EAS Build)
@@ -116,15 +116,36 @@ Then open the dev client app on the device and connect to Metro.
 
 ## Testing
 
+### Environment Setup (run once per session if `node_modules` is missing)
+
+```bash
+cd mobile
+npm install --legacy-peer-deps --ignore-scripts
+```
+
+- `--legacy-peer-deps` avoids peer-dep conflicts between Expo SDK 54 packages.
+- `--ignore-scripts` is **required** because `@shopify/react-native-skia` has a post-install script that tries to download prebuilt binaries from github.com, which is unreachable in sandboxed/CI environments. Skipping this script is safe — it only affects native builds (not needed for Jest tests or Metro bundling).
+- If `node_modules` already exists with all packages, skip this step.
+
+### Running Tests
+
 - **Run all tests**: `cd mobile && npm test -- --no-coverage`
 - **Run a single test file**: `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
-- Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed. When needed, use `npm install --legacy-peer-deps` to avoid peer-dep conflicts, then `npx expo install --fix`.
 - The full suite has 941 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Recent Implementation Notes (2026-02)
 
+- **Home screen flickering and teleportation fix (2026-02-27)**:
+  - **Root cause**: Cascading re-render chain — App.tsx passed inline arrow function callbacks (new references every render) through unmemoized HomeScreen → HouseWorld → RoomView → AnimalSprite. Particle system `setParticles()` every 2-4 seconds triggered full tree re-renders, restarting all sprite/cloud/particle animations mid-frame.
+  - **App.tsx**: Extracted 5 inline navigation callbacks (`onOpenSettings`, `onOpenStats`, `onOpenLedger`, `onOpenGallery`, `onOpenPit`) into `useCallback` hooks to stabilize references.
+  - **AnimalSprite**: Wrapped in `React.memo` with `onPressRef` pattern — stores `onPress` callback in a ref (updated every render) so the memo comparison ignores callback identity changes while `handlePress` always calls the latest version. Deps reduced to `[animal, currentPhase]`.
+  - **HouseWorld**: Wrapped in `React.memo` to block re-renders from HomeScreen state changes that don't affect the house.
+  - **ParticleLayer**: Extracted particle system (`particles` state, `particleIdRef`, spawn interval) into isolated `ParticleLayer` component wrapped in `React.memo`. Particle spawns now only re-render the particle layer, not the entire rooms/animals tree.
+  - **FloatingParticle**: Wrapped in `React.memo` to prevent re-rendering all particles when one is added/removed.
+  - **Cloud animation leak**: `cloudAnimRefs.current.push(anim)` grew unboundedly as each cloud loop iteration pushed a new animation ref. Replaced with fixed-size `activeAnims[index] = anim` array of 3 slots. Removed `cloudAnimRefs` ref entirely.
+  - **Cooldown toast teleportation**: `useDialogueFlow.ts` cooldown slide-in used `Animated.spring` (friction: 14, tension: 100) which caused visible overshoot/bounce. Replaced with `Animated.timing` (duration: 250ms, `Easing.out(Easing.cubic)`) for smooth deceleration without bounce.
 - **AsyncStorage → MMKV migration (2026-02-25)**:
   - Replaced `@react-native-async-storage/async-storage` with `react-native-mmkv` V4 (via `react-native-nitro-modules`) across all 20+ service files, 5 hooks, and 4 components.
   - All storage operations are now **synchronous** — no more `async`/`await` for reads and writes. This eliminates race conditions, simplifies control flow, and removes the need for most in-memory cache patterns.
@@ -1427,7 +1448,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 941 tests, 33 suites
+cd mobile && npm test -- --no-coverage  # 941 tests, 33 suites
 ```
 
 **Test patterns:**
