@@ -506,6 +506,13 @@ export default function App() {
     });
   }, [puzzleActions, transitionTo]);
 
+  // Stable navigation callbacks for HomeScreen (prevents re-render cascade)
+  const handleOpenSettings = useCallback(() => transitionTo('settings'), [transitionTo]);
+  const handleOpenStats = useCallback(() => transitionTo('stats'), [transitionTo]);
+  const handleOpenLedger = useCallback(() => transitionTo('ledger'), [transitionTo]);
+  const handleOpenGallery = useCallback(() => transitionTo('gallery'), [transitionTo]);
+  const handleOpenPit = useCallback(() => transitionTo('pit'), [transitionTo]);
+
   const handleSlotPress = useCallback(async (
     targetIndex: number,
     feedbackOrigin?: { x: number; y: number }
@@ -1113,11 +1120,11 @@ export default function App() {
             <HomeScreen
               onPlayPuzzle={handlePlayPuzzle}
               onAmberChange={persistenceActions.setAmberBalance}
-              onOpenSettings={() => transitionTo('settings')}
-              onOpenStats={() => transitionTo('stats')}
-              onOpenLedger={() => transitionTo('ledger')}
-              onOpenGallery={() => transitionTo('gallery')}
-              onOpenPit={() => transitionTo('pit')}
+              onOpenSettings={handleOpenSettings}
+              onOpenStats={handleOpenStats}
+              onOpenLedger={handleOpenLedger}
+              onOpenGallery={handleOpenGallery}
+              onOpenPit={handleOpenPit}
               onStartDaily={handleStartDaily}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}

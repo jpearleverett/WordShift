@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Animated } from 'react-native';
+import { Animated, Easing } from 'react-native';
 import { Animal, HomeWorldProgress, getAnimalPhase, DialoguePhase, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
 import {
   getCurrentDialogue,
@@ -170,10 +170,10 @@ export function useDialogueFlow({
             duration: 250,
             useNativeDriver: true,
           }),
-          Animated.spring(cooldownSlide, {
+          Animated.timing(cooldownSlide, {
             toValue: 0,
-            friction: 14,
-            tension: 100,
+            duration: 250,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
         ]);
