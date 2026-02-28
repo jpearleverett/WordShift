@@ -142,13 +142,20 @@ const FloatingParticle: React.FC<{ particle: Particle }> = React.memo(({ particl
 // SMOKE PUFF ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
+const SmokePuff: React.FC<{ delay: number }> = React.memo(({ delay }) => {
   const y = useRef(new Animated.Value(0)).current;
   const x = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.5)).current;
   const mountedRef = useRef(true);
-  const animationRef = useRef<Animated.CompositeAnimation>();
+  const animationRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
+
+  // Stable style ref — prevents new object creation on re-render
+  const animStyle = useRef({
+    position: 'absolute' as const,
+    transform: [{ translateX: x }, { translateY: y }, { scale }],
+    opacity,
+  }).current;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -212,30 +219,36 @@ const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
   }, []);
 
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [{ translateX: x }, { translateY: y }, { scale }],
-        opacity,
-      }}
-    >
-      <Text style={{ fontSize: 20, color: '#999' }}>💨</Text>
+    <Animated.View style={animStyle}>
+      <Text style={smokeTextStyle}>💨</Text>
     </Animated.View>
   );
-};
+});
+const smokeTextStyle = { fontSize: 20, color: '#999' };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FLYING BIRD ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ startDelay, yPosition }) => {
+const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = React.memo(({ startDelay, yPosition }) => {
   const x = useRef(new Animated.Value(-50)).current;
   const y = useRef(new Animated.Value(yPosition)).current;
   const flapRotation = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const flapAnimRef = useRef<Animated.CompositeAnimation>();
-  const moveAnimRef = useRef<Animated.CompositeAnimation>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const flapAnimRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
+  const moveAnimRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
+
+  const scaleY = useRef(flapRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.6],
+  })).current;
+
+  // Stable style ref — prevents new object creation on re-render
+  const animStyle = useRef({
+    position: 'absolute' as const,
+    transform: [{ translateX: x }, { translateY: y }, { scaleY }],
+  }).current;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -289,35 +302,32 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
     };
   }, []);
 
-  const scaleY = flapRotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.6],
-  });
-
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [{ translateX: x }, { translateY: y }, { scaleY }],
-      }}
-      pointerEvents="none"
-    >
-      <Text style={{ fontSize: 18 }}>🐦</Text>
+    <Animated.View style={animStyle} pointerEvents="none">
+      <Text style={birdTextStyle}>🐦</Text>
     </Animated.View>
   );
-};
+});
+const birdTextStyle = { fontSize: 18 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHOOTING STAR (appears at higher phases)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const ShootingStar: React.FC = () => {
+const ShootingStar: React.FC = React.memo(() => {
   const x = useRef(new Animated.Value(0)).current;
   const y = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const animationRef = useRef<Animated.CompositeAnimation>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const animationRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
+
+  // Stable style ref — prevents new object creation on re-render
+  const animStyle = useRef({
+    position: 'absolute' as const,
+    transform: [{ translateX: x }, { translateY: y }],
+    opacity,
+  }).current;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -373,18 +383,12 @@ const ShootingStar: React.FC = () => {
   }, []);
 
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [{ translateX: x }, { translateY: y }],
-        opacity,
-      }}
-      pointerEvents="none"
-    >
-      <Text style={{ fontSize: 14 }}>⭐</Text>
+    <Animated.View style={animStyle} pointerEvents="none">
+      <Text style={shootingStarTextStyle}>⭐</Text>
     </Animated.View>
   );
-};
+});
+const shootingStarTextStyle = { fontSize: 14 };
 
 // Phase-aware background colors (blends with each sky image's edges)
 const PHASE_BG_COLORS: Record<number, string> = {
@@ -751,12 +755,26 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   // State tracking for gestures
   const baseTranslateY = useRef(0);
 
-  // Track container height for proper initial positioning (default to screen height to avoid opacity flash)
-  const [containerHeight, setContainerHeight] = useState<number>(SCREEN_HEIGHT);
+  // Track container height via ref to avoid state-triggered re-renders.
+  // Position updates are applied directly via translateY.setValue in the
+  // onContainerLayout callback, bypassing React's reconciliation entirely.
+  const containerHeightRef = useRef<number>(SCREEN_HEIGHT);
+  // numRows ref keeps the layout callback in sync with the latest room count
+  // without needing to be in a useCallback dependency array.
+  const numRowsRef = useRef(1);
+  const houseHeightRef = useRef(0);
   const onContainerLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
     const { height } = event.nativeEvent.layout;
-    if (height > 0) {
-      setContainerHeight(height);
+    if (height > 0 && Math.abs(height - containerHeightRef.current) > 1) {
+      containerHeightRef.current = height;
+      // Recalculate and apply translateY directly — no state update, no re-render
+      const nr = numRowsRef.current;
+      const hh = houseHeightRef.current;
+      const connectorH = Math.max(0, nr - 1) * 10;
+      const totalH = 50 + 80 + hh + 25 + 40 + connectorH;
+      const overflow = Math.max(0, totalH - height);
+      translateY.setValue(overflow);
+      baseTranslateY.current = overflow;
     }
   }, []);
 
@@ -867,86 +885,116 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
     };
   }, []);
 
-  const sunRotate = sunRotation.interpolate({
+  // Stable sun rotation interpolation — stored in ref to avoid recreation
+  const sunRotate = useRef(sunRotation.interpolate({
     inputRange: [0, 360],
     outputRange: ['0deg', '360deg'],
-  });
+  })).current;
 
+  // Memoize room computations to avoid new arrays/objects on every render.
   // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
-  // This allows players to tap the house itself to build, instead of using header controls.
-  const unlockedRooms = rooms.filter(room => room.isUnlocked).sort((a, b) => a.floor - b.floor);
-  const pendingRoomUnlock = nextUnlock?.type === 'room'
-    ? rooms.find(room => room.id === nextUnlock.targetId && !room.isUnlocked) || null
-    : null;
-  const displayRooms = pendingRoomUnlock
-    ? [...unlockedRooms, pendingRoomUnlock]
-    : unlockedRooms;
+  const { sortedRooms, numRows, houseHeight } = useMemo(() => {
+    const unlocked = rooms.filter(room => room.isUnlocked).sort((a, b) => a.floor - b.floor);
+    const pendingRoom = nextUnlock?.type === 'room'
+      ? rooms.find(room => room.id === nextUnlock.targetId && !room.isUnlocked) || null
+      : null;
+    const display = pendingRoom ? [...unlocked, pendingRoom] : unlocked;
+    const sorted = [...display].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
+    const nr = Math.max(1, display.length);
+    const hh = nr * ROOM_HEIGHT + Math.max(0, nr - 1) * ROOM_GAP + HOUSE_PADDING * 2;
+    return { sortedRooms: sorted, numRows: nr, houseHeight: hh };
+  }, [rooms, nextUnlock]);
 
-  const getAnimalForRoom = (roomId: string): Animal | null => {
-    return animals.find(a => a.roomId === roomId) || null;
-  };
+  // Keep refs in sync for the layout callback (avoids stale closure)
+  numRowsRef.current = numRows;
+  houseHeightRef.current = houseHeight;
 
-  // Single-column layout: each room is its own row, sorted top-to-bottom.
-  const sortedRooms = [...displayRooms].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
-  const numRows = Math.max(1, displayRooms.length);
-
-  const calculateHouseHeight = (): number => {
-    return numRows * ROOM_HEIGHT +
-           Math.max(0, numRows - 1) * ROOM_GAP +
-           HOUSE_PADDING * 2;
-  };
+  // Memoize animal-room lookup
+  const animalByRoom = useMemo(() => {
+    const map = new Map<string, Animal>();
+    for (const a of animals) {
+      map.set(a.roomId, a);
+    }
+    return map;
+  }, [animals]);
 
   // Calculate pan bounds based on content size
-  // Returns asymmetric bounds: min=0 (house bottom at viewport bottom),
-  // max=overflow (house top at viewport top)
-  const getPanBounds = () => {
-    // Full height of the house structure including margins and connectors
-    const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
-    // How much the house overflows above the visible viewport
-    const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
+  // Uses refs so gesture callbacks don't need to be recreated when these values change.
+  const getPanBoundsRef = useRef(() => ({ min: 0, max: 0 }));
+  getPanBoundsRef.current = () => {
+    const connectorHeight = Math.max(0, numRows - 1) * 10;
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
+    const overflow = Math.max(0, totalContentHeight - containerHeightRef.current);
     return {
-      min: 0,  // Don't allow panning below the house (prevents empty space below foundation)
-      max: Math.max(0, overflow + 50),  // Allow panning up to see the roof + small padding
+      min: 0,
+      max: Math.max(0, overflow + 50),
     };
   };
 
-  // Pan gesture handler - vertical only to prevent horizontal gaps
-  const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
-    const { translationY } = event.nativeEvent;
-
-    const bounds = getPanBounds();
-    const newY = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
-
+  // Stable pan gesture callbacks — use refs to avoid PanGestureHandler reconfiguration
+  const onPanGestureEvent = useCallback((event: PanGestureHandlerGestureEvent) => {
+    const { translationY: ty } = event.nativeEvent;
+    const bounds = getPanBoundsRef.current();
+    const newY = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + ty));
     translateY.setValue(newY);
-  };
+  }, []);
 
-  const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
+  const onPanHandlerStateChange = useCallback((event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
-      const { translationY } = event.nativeEvent;
-      const bounds = getPanBounds();
-
-      baseTranslateY.current = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
+      const { translationY: ty } = event.nativeEvent;
+      const bounds = getPanBoundsRef.current();
+      baseTranslateY.current = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + ty));
     }
-  };
+  }, []);
 
-  const houseHeight = calculateHouseHeight();
+  // Stable transform container style — translateY is an Animated.Value ref, safe to store
+  const transformStyle = useRef([
+    styles.transformContainer,
+    { transform: [{ translateY }] },
+  ]).current;
 
-  // Set initial pan position so the house is properly framed.
-  // With flex-end, the house bottom is at the viewport bottom and the roof
-  // extends above when the house is taller than the viewport. A positive
-  // translateY shifts the view down, bringing the roof into view.
+  // Stable sun style with animated transform — stored in ref to avoid recreation
+  const sunStyle = useRef([
+    styles.sun,
+    { transform: [{ scale: sunPulse }, { rotate: sunRotate }] },
+  ]).current;
+
+  // Set initial pan position when room count changes.
+  // containerHeight changes are handled directly in onContainerLayout.
   useEffect(() => {
     const connectorHeight = Math.max(0, numRows - 1) * 10;
     const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
-    const overflow = Math.max(0, totalContentHeight - containerHeight);
+    const overflow = Math.max(0, totalContentHeight - containerHeightRef.current);
 
     translateY.setValue(overflow);
     baseTranslateY.current = overflow;
-  }, [numRows, containerHeight]);
+  }, [numRows]);
+
+  // Phase-aware container bg color — memoized to avoid inline object creation
+  const containerBgStyle = useMemo(() => [
+    styles.container,
+    { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' },
+  ], [currentPhase]);
+
+  // Phase-aware sky source
+  const skySource = currentPhase >= 4 ? SKY_SHADOW
+    : currentPhase >= 3 ? SKY_STORM
+    : currentPhase >= 2 ? SKY_DUSK
+    : SKY_DAY;
+
+  // Sun opacity based on phase — memoized
+  const sunOpacityStyle = useMemo(
+    () => currentPhase >= 3 ? { opacity: 0.4 } : undefined,
+    [currentPhase]
+  );
+
+  // Memoized sun ray transform styles — avoids recreating 8 objects per render
+  const sunRayStyles = useRef(
+    [...Array(8)].map((_, i) => [styles.sunRay, { transform: [{ rotate: `${i * 45}deg` }] }])
+  ).current;
 
   return (
-    <View style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
+    <View style={containerBgStyle}>
       {/* Floating particles — isolated to prevent re-rendering the rest of the tree */}
       <ParticleLayer currentPhase={currentPhase} />
 
@@ -959,31 +1007,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
         avgTouches
       >
         <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
-          <Animated.View
-            style={[
-              styles.transformContainer,
-              {
-                opacity: 1,
-                transform: [
-                  { translateY },
-                ],
-              },
-            ]}
-          >
-              {/* Sky background - inside transform so it moves with the scene.
-                  Oversized to prevent gaps at any zoom/pan combination.
-                  Top offset grows with house height so the fill color above
-                  the image seamlessly extends the sky as rooms are added. */}
+          <Animated.View style={transformStyle}>
+              {/* Sky background - inside transform so it moves with the scene */}
               <Image
-                source={
-                  currentPhase >= 4 ? SKY_SHADOW :
-                  currentPhase >= 3 ? SKY_STORM :
-                  currentPhase >= 2 ? SKY_DUSK :
-                  SKY_DAY
-                }
-                style={[styles.skyBackground, {
-                  top: -Math.max(SCREEN_HEIGHT * 0.20, houseHeight * 0.0),
-                }]}
+                source={skySource}
+                style={styles.skyBackground}
                 resizeMode="cover"
               />
 
@@ -1002,27 +1030,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
               {/* Sun with animated rays - hidden at phase 4 */}
               {currentPhase < 4 && (
                 <Animated.View
-                  style={[
-                    styles.sun,
-                    {
-                      transform: [
-                        { scale: sunPulse },
-                        { rotate: sunRotate },
-                      ],
-                      opacity: currentPhase >= 3 ? 0.4 : 1,
-                    }
-                  ]}
+                  style={sunOpacityStyle ? [sunStyle[0], sunStyle[1], sunOpacityStyle] : sunStyle}
                   pointerEvents="none"
                 >
                   <View style={styles.sunRays}>
-                    {[...Array(8)].map((_, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.sunRay,
-                          { transform: [{ rotate: `${i * 45}deg` }] }
-                        ]}
-                      />
+                    {sunRayStyles.map((rayStyle, i) => (
+                      <View key={i} style={rayStyle} />
                     ))}
                   </View>
                   <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
@@ -1031,7 +1044,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
 
               {/* Moon for phase 4 */}
               {currentPhase >= 4 && (
-                <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
+                <View style={moonStyle} pointerEvents="none">
                   <Text style={styles.sunEmoji}>🌑</Text>
                 </View>
               )}
@@ -1092,7 +1105,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
                           <View key={i} style={styles.shingle} />
                         ))}
                       </View>
-                      <View style={[styles.shingleRow, { marginLeft: 10 }]}>
+                      <View style={[styles.shingleRow, shingleRow2Style]}>
                         {[...Array(7)].map((_, i) => (
                           <View key={i} style={styles.shingle} />
                         ))}
@@ -1112,7 +1125,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
 
                   {/* Render rooms from top to bottom (highest row number first) */}
                   {sortedRooms.map((room, index) => {
-                    const roomAnimal = getAnimalForRoom(room.id);
+                    const roomAnimal = animalByRoom.get(room.id) || null;
                     const roomUnlockCost = (!room.isUnlocked && nextUnlock?.type === 'room' && nextUnlock.targetId === room.id)
                       ? nextUnlock.cost
                       : null;
@@ -1151,7 +1164,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
                     );
                   })}
 
-                  {displayRooms.length === 0 && (
+                  {sortedRooms.length === 0 && (
                     <View style={styles.emptyHouse}>
                       <Text style={styles.emptyHouseText}>🏠</Text>
                       <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>
@@ -1175,6 +1188,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   );
 });
 
+// Static styles defined outside the component to avoid recreation on each render
+const moonStyle = { position: 'absolute' as const, top: 15, right: 20, zIndex: 200, alignItems: 'center' as const, justifyContent: 'center' as const, opacity: 0.8 };
+const shingleRow2Style = { marginLeft: 10 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1186,10 +1203,10 @@ const styles = StyleSheet.create({
   // Sky background - moves with scene, oversized to prevent gaps during pan.
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * 0,
-    left: -SCREEN_WIDTH * 0,
-    width: SCREEN_WIDTH * 1,
-    height: SCREEN_HEIGHT * 1,
+    top: -SCREEN_HEIGHT * 0.20,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     zIndex: -1,
   },
   // Clouds - inside transform container
