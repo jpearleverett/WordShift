@@ -131,7 +131,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const amberPulse = useRef(new Animated.Value(1)).current;
   const playPulse = useRef(new Animated.Value(0)).current;
   const pitPulseAnim = useRef(new Animated.Value(0)).current;
+  const pitPulseScale = useRef(pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] })).current;
+  const pitPulseOpacity = useRef(pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] })).current;
+  const pitPulseStyle = useRef({
+    transform: [{ scale: pitPulseScale }],
+    opacity: pitPulseOpacity,
+  }).current;
+  const playPulseScale = useRef(playPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] })).current;
+  const playPulseStyle = useRef({
+    transform: [{ scale: playPulseScale }],
+  }).current;
   const introDialogueSlide = useRef(new Animated.Value(0)).current;
+  const introDialogueTranslateY = useRef(introDialogueSlide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+  })).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
   // Celebration state
@@ -778,14 +792,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
           {!isOnboarding && (
           <Animated.View
-            style={highlightPlayButton ? {
-              transform: [{
-                scale: playPulse.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.06],
-                }),
-              }],
-            } : undefined}
+            style={highlightPlayButton ? playPulseStyle : undefined}
           >
             <JuicyButton
               style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
@@ -861,10 +868,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
           {onOpenPit && (
-            <Animated.View style={pitPhaseReady ? {
-              transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
-              opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
-            } : undefined}>
+            <Animated.View style={pitPhaseReady ? pitPulseStyle : undefined}>
               <TouchableOpacity
                 style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
                 onPress={() => {
@@ -1397,12 +1401,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 borderColor: dt.modalBorder,
                 shadowColor: dt.modalShadowColor,
                 transform: [
-                  {
-                    translateY: introDialogueSlide.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [300, 0],
-                    }),
-                  },
+                  { translateY: introDialogueTranslateY },
                 ],
                 opacity: introDialogueSlide,
               },

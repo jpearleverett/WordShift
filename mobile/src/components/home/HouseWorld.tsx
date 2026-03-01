@@ -59,7 +59,27 @@ const PARTICLE_EMOJIS_BY_PHASE: Record<number, string[]> = {
   5: ['✨', '🌙', '💜'],
 };
 
+const particleTextStyle = { fontSize: 16 };
+
 const FloatingParticle: React.FC<{ particle: Particle }> = React.memo(({ particle }) => {
+  // Store interpolation in ref so it's not recreated every render
+  const rotate = useRef(particle.rotation.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+  })).current;
+
+  // Stable style ref — Animated values are mutable, so the object identity stays the same
+  const animStyle = useRef({
+    position: 'absolute' as const,
+    transform: [
+      { translateX: particle.x },
+      { translateY: particle.y },
+      { scale: particle.scale },
+      { rotate },
+    ],
+    opacity: particle.opacity,
+  }).current;
+
   useEffect(() => {
     const startX = Math.random() * SCREEN_WIDTH;
     const endX = startX + (Math.random() - 0.5) * 100;
@@ -114,26 +134,9 @@ const FloatingParticle: React.FC<{ particle: Particle }> = React.memo(({ particl
     return () => anim.stop();
   }, []);
 
-  const rotate = particle.rotation.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
-  });
-
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [
-          { translateX: particle.x },
-          { translateY: particle.y },
-          { scale: particle.scale },
-          { rotate },
-        ],
-        opacity: particle.opacity,
-      }}
-      pointerEvents="none"
-    >
-      <Text style={{ fontSize: 16 }}>{particle.emoji}</Text>
+    <Animated.View style={animStyle} pointerEvents="none">
+      <Text style={particleTextStyle}>{particle.emoji}</Text>
     </Animated.View>
   );
 });
@@ -404,7 +407,7 @@ const PHASE_BG_COLORS: Record<number, string> = {
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
 // ═══════════════════════════════════════════════════════════════════════════
 
-const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
+const ArrangementConnector: React.FC<{ phase: number }> = React.memo(({ phase }) => {
   const pulseProgress = useSharedValue(0);
 
   React.useEffect(() => {
@@ -490,7 +493,7 @@ const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
       )}
     </View>
   );
-};
+});
 
 const arrangementStyles = StyleSheet.create({
   connector: {
@@ -539,7 +542,7 @@ const arrangementStyles = StyleSheet.create({
  * Enhanced: Animated breathing (scale pulse), wispy tendrils at Phase 3+,
  * pulsing crimson eyes at Phase 4 with glow effect.
  */
-const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
+const ShadowPresence: React.FC<{ phase: number }> = React.memo(({ phase }) => {
   const breatheProgress = useSharedValue(0);
   const eyePulseProgress = useSharedValue(0);
 
@@ -671,7 +674,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
       )}
     </Reanimated.View>
   );
-};
+});
 
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
@@ -1186,6 +1189,33 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
       </PanGestureHandler>
     </View>
   );
+}, (prevProps, nextProps) => {
+  // Custom comparator to prevent re-renders from irrelevant prop changes.
+  // The animals array gets a new reference on every dialogue interaction
+  // (handleNextDialogue/handleCloseDialogue call setAnimals with .map()),
+  // but only unlock/cooldown status actually affects HouseWorld visuals.
+  if (prevProps.currentPhase !== nextProps.currentPhase) return false;
+  if (prevProps.amberBalance !== nextProps.amberBalance) return false;
+  if (prevProps.onAnimalPress !== nextProps.onAnimalPress) return false;
+  if (prevProps.onRoomPress !== nextProps.onRoomPress) return false;
+  if (prevProps.nextUnlock !== nextProps.nextUnlock) return false;
+  if (prevProps.purchasedUpgrades !== nextProps.purchasedUpgrades) return false;
+  if (prevProps.ritualWords !== nextProps.ritualWords) return false;
+  if (prevProps.rooms !== nextProps.rooms) return false;
+
+  // Deep-compare animals by the fields that affect HouseWorld visuals
+  const prevAnimals = prevProps.animals;
+  const nextAnimals = nextProps.animals;
+  if (prevAnimals.length !== nextAnimals.length) return false;
+  for (let i = 0; i < prevAnimals.length; i++) {
+    const pa = prevAnimals[i];
+    const na = nextAnimals[i];
+    if (pa.id !== na.id || pa.isUnlocked !== na.isUnlocked || pa.hasNewDialogue !== na.hasNewDialogue) {
+      return false;
+    }
+  }
+
+  return true;
 });
 
 // Static styles defined outside the component to avoid recreation on each render

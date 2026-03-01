@@ -42,6 +42,24 @@ const WORD_ECHO_POSITIONS = [
   { top: '30%', left: '55%', rotate: '-8deg' },
 ];
 
+// Pre-computed word echo styles per position × phase to avoid inline style creation on every render.
+// Key: `${phase}-${positionIndex}` → stable style object
+const WORD_ECHO_STYLES: Record<string, object> = {};
+for (const phase of [2, 3, 4]) {
+  const config = WORD_ECHO_CONFIG[phase];
+  for (let i = 0; i < WORD_ECHO_POSITIONS.length; i++) {
+    const pos = WORD_ECHO_POSITIONS[i];
+    WORD_ECHO_STYLES[`${phase}-${i}`] = {
+      top: pos.top,
+      left: pos.left,
+      transform: [{ rotate: pos.rotate }],
+      opacity: config.opacity,
+      fontSize: config.fontSize,
+      color: config.color,
+    };
+  }
+}
+
 interface RoomViewProps {
   room: Room;
   animal: Animal | null;
@@ -186,6 +204,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
       {/* Word Echo Overlay - ritual words faintly inscribed in rooms */}
       {currentPhase >= 2 && ritualWords.length > 0 && (() => {
         const config = WORD_ECHO_CONFIG[currentPhase] || WORD_ECHO_CONFIG[2];
+        const effectivePhase = WORD_ECHO_CONFIG[currentPhase] ? currentPhase : 2;
         const offset = (room.floor * 7) % Math.max(1, ritualWords.length);
         const words: string[] = [];
         for (let i = 0; i < config.count && i < ritualWords.length; i++) {
@@ -194,20 +213,13 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         return (
           <View style={styles.wordEchoOverlay} pointerEvents="none">
             {words.map((word, i) => {
-              const pos = WORD_ECHO_POSITIONS[i % WORD_ECHO_POSITIONS.length];
+              const posIdx = i % WORD_ECHO_POSITIONS.length;
               return (
                 <Text
                   key={`echo-${i}`}
                   style={[
                     styles.wordEchoText,
-                    {
-                      top: pos.top as any,
-                      left: pos.left as any,
-                      transform: [{ rotate: pos.rotate }],
-                      opacity: config.opacity,
-                      fontSize: config.fontSize,
-                      color: config.color,
-                    },
+                    WORD_ECHO_STYLES[`${effectivePhase}-${posIdx}`],
                   ]}
                 >
                   {word}
