@@ -107,6 +107,7 @@ export function useDialogueFlow({
   const dialogueSlide = useRef(new Animated.Value(0)).current;
   const cooldownOpacity = useRef(new Animated.Value(0)).current;
   const cooldownSlide = useRef(new Animated.Value(20)).current;
+  const dialogueAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Track cooldown toast visibility to prevent flicker on repeated taps
   const cooldownVisibleRef = useRef(false);
@@ -126,6 +127,7 @@ export function useDialogueFlow({
     return () => {
       if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
       if (cooldownAnimRef.current) cooldownAnimRef.current.stop();
+      if (dialogueAnimRef.current) dialogueAnimRef.current.stop();
     };
   }, []);
 
@@ -183,6 +185,8 @@ export function useDialogueFlow({
         });
         cooldownVisibleRef.current = true;
       }
+      cooldownOpacity.setValue(1);
+      cooldownSlide.setValue(0);
       // If already visible, the message text updates without animation restart
 
       // Schedule dismiss after delay
@@ -487,16 +491,24 @@ export function useDialogueFlow({
     setSessionInfo(status);
 
     // Animate dialogue modal in
+    if (dialogueAnimRef.current) {
+      dialogueAnimRef.current.stop();
+      dialogueAnimRef.current = null;
+    }
     if (getSettingsSync().reducedMotion) {
       dialogueSlide.setValue(1);
     } else {
       dialogueSlide.setValue(0);
-      Animated.spring(dialogueSlide, {
+      const enterAnim = Animated.timing(dialogueSlide, {
         toValue: 1,
-        friction: 14,
-        tension: 50,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start();
+      });
+      dialogueAnimRef.current = enterAnim;
+      enterAnim.start(() => {
+        dialogueAnimRef.current = null;
+      });
     }
   }, [dialogueSlide, progress]);
 
@@ -512,6 +524,11 @@ export function useDialogueFlow({
   // Handle closing dialogue (and ending session)
   const handleCloseDialogue = useCallback(() => {
     hapticLight();
+    if (dialogueAnimRef.current) {
+      dialogueAnimRef.current.stop();
+      dialogueAnimRef.current = null;
+    }
+    dialogueSlide.setValue(0);
     const closingAnimal = selectedAnimal;
     if (closingAnimal) {
       endSession(closingAnimal.id);
@@ -528,7 +545,7 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
-  }, [selectedAnimal, recomputeHasNewDialogue, setAnimals]);
+  }, [dialogueSlide, selectedAnimal, recomputeHasNewDialogue, setAnimals]);
 
   // Handle dialogue advance
   const handleNextDialogue = useCallback(() => {
