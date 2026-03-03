@@ -164,21 +164,14 @@ export function useDialogueFlow({
 
       // Only animate in if not already visible — prevents flicker on repeated taps
       if (!cooldownVisibleRef.current) {
-        cooldownOpacity.setValue(0);
+        cooldownOpacity.setValue(1);
         cooldownSlide.setValue(20);
-        const enterAnim = Animated.parallel([
-          Animated.timing(cooldownOpacity, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-          Animated.timing(cooldownSlide, {
-            toValue: 0,
-            duration: 250,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]);
+        const enterAnim = Animated.timing(cooldownSlide, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        });
         cooldownAnimRef.current = enterAnim;
         enterAnim.start(() => {
           cooldownAnimRef.current = null;
@@ -321,9 +314,6 @@ export function useDialogueFlow({
     if (progress) {
       recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak);
     }
-
-    setSelectedAnimal(animal);
-    setShowDialogue(true);
 
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow
@@ -490,6 +480,8 @@ export function useDialogueFlow({
 
     const status = getSessionStatus(animal.id);
     setSessionInfo(status);
+    setSelectedAnimal(animal);
+    setShowDialogue(true);
 
     // Animate dialogue modal in
     if (dialogueAnimRef.current) {

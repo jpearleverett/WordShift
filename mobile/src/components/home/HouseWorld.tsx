@@ -177,31 +177,32 @@ const SmokePuff: React.FC<{ delay: number }> = React.memo(({ delay }) => {
           toValue: -40,
           duration: 3000,
           easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
+          // Emoji glyphs can visibly flicker on Android with native-driver transforms.
+          useNativeDriver: false,
         }),
         Animated.timing(x, {
           toValue: 15 + Math.random() * 10,
           duration: 3000,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
         Animated.sequence([
           Animated.timing(opacity, {
             toValue: 0.6,
             duration: 500,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
           Animated.timing(opacity, {
             toValue: 0,
             duration: 2500,
-            useNativeDriver: true,
+            useNativeDriver: false,
           }),
         ]),
         Animated.timing(scale, {
           toValue: 1.5,
           duration: 3000,
           easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: false,
         }),
       ]);
       animationRef.current = anim;
@@ -888,7 +889,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
         const anim = Animated.timing(cloudAnim, {
           toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
           duration,
-          useNativeDriver: true,
+          // Keep cloud emoji rendering stable (avoid native-driver text flicker).
+          useNativeDriver: false,
         });
         activeAnims[index] = anim;
         anim.start(() => {
