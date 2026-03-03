@@ -107,6 +107,7 @@ export function useDialogueFlow({
   const dialogueSlide = useRef(new Animated.Value(0)).current;
   const cooldownOpacity = useRef(new Animated.Value(0)).current;
   const cooldownSlide = useRef(new Animated.Value(20)).current;
+  const dialogueAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Track cooldown toast visibility to prevent flicker on repeated taps
   const cooldownVisibleRef = useRef(false);
@@ -126,6 +127,7 @@ export function useDialogueFlow({
     return () => {
       if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
       if (cooldownAnimRef.current) cooldownAnimRef.current.stop();
+      if (dialogueAnimRef.current) dialogueAnimRef.current.stop();
     };
   }, []);
 
@@ -162,26 +164,22 @@ export function useDialogueFlow({
 
       // Only animate in if not already visible — prevents flicker on repeated taps
       if (!cooldownVisibleRef.current) {
-        cooldownOpacity.setValue(0);
+        cooldownOpacity.setValue(1);
         cooldownSlide.setValue(20);
-        const enterAnim = Animated.parallel([
-          Animated.timing(cooldownOpacity, {
-            toValue: 1,
-            duration: 250,
-            useNativeDriver: true,
-          }),
-          Animated.timing(cooldownSlide, {
-            toValue: 0,
-            duration: 250,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]);
+        const enterAnim = Animated.timing(cooldownSlide, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        });
         cooldownAnimRef.current = enterAnim;
         enterAnim.start(() => {
           cooldownAnimRef.current = null;
         });
         cooldownVisibleRef.current = true;
+      } else {
+        cooldownOpacity.setValue(1);
+        cooldownSlide.setValue(0);
       }
       // If already visible, the message text updates without animation restart
 
@@ -316,9 +314,6 @@ export function useDialogueFlow({
     if (progress) {
       recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak);
     }
-
-    setSelectedAnimal(animal);
-    setShowDialogue(true);
 
     // Build pre-dialogue pages: these show as sequential conversation pages
     // before the regular dialogue, creating natural conversational flow
@@ -485,20 +480,30 @@ export function useDialogueFlow({
 
     const status = getSessionStatus(animal.id);
     setSessionInfo(status);
+    setSelectedAnimal(animal);
+    setShowDialogue(true);
 
     // Animate dialogue modal in
+    if (dialogueAnimRef.current) {
+      dialogueAnimRef.current.stop();
+      dialogueAnimRef.current = null;
+    }
     if (getSettingsSync().reducedMotion) {
       dialogueSlide.setValue(1);
     } else {
       dialogueSlide.setValue(0);
-      Animated.spring(dialogueSlide, {
+      const enterAnim = Animated.timing(dialogueSlide, {
         toValue: 1,
-        friction: 14,
-        tension: 50,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
-      }).start();
+      });
+      dialogueAnimRef.current = enterAnim;
+      enterAnim.start(() => {
+        dialogueAnimRef.current = null;
+      });
     }
-  }, [dialogueSlide, progress]);
+  }, [progress]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
@@ -512,6 +517,11 @@ export function useDialogueFlow({
   // Handle closing dialogue (and ending session)
   const handleCloseDialogue = useCallback(() => {
     hapticLight();
+    if (dialogueAnimRef.current) {
+      dialogueAnimRef.current.stop();
+      dialogueAnimRef.current = null;
+    }
+    dialogueSlide.setValue(0);
     const closingAnimal = selectedAnimal;
     if (closingAnimal) {
       endSession(closingAnimal.id);
