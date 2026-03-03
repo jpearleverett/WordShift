@@ -184,9 +184,10 @@ export function useDialogueFlow({
           cooldownAnimRef.current = null;
         });
         cooldownVisibleRef.current = true;
+      } else {
+        cooldownOpacity.setValue(1);
+        cooldownSlide.setValue(0);
       }
-      cooldownOpacity.setValue(1);
-      cooldownSlide.setValue(0);
       // If already visible, the message text updates without animation restart
 
       // Schedule dismiss after delay
@@ -510,7 +511,7 @@ export function useDialogueFlow({
         dialogueAnimRef.current = null;
       });
     }
-  }, [dialogueSlide, progress]);
+  }, [progress]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
@@ -545,7 +546,7 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
-  }, [dialogueSlide, selectedAnimal, recomputeHasNewDialogue, setAnimals]);
+  }, [selectedAnimal, recomputeHasNewDialogue, setAnimals]);
 
   // Handle dialogue advance
   const handleNextDialogue = useCallback(() => {

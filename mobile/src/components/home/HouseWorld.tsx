@@ -401,12 +401,12 @@ const PHASE_BG_COLORS: Record<number, string> = {
   5: '#1E1830',
 };
 
-const getTotalContentHeight = (numRows: number, houseHeight: number): number => {
+export const getTotalContentHeight = (numRows: number, houseHeight: number): number => {
   const connectorHeight = Math.max(0, numRows - 1) * 10;
   return 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
 };
 
-const getOverflowForLayout = (
+export const getOverflowForLayout = (
   numRows: number,
   houseHeight: number,
   containerHeight: number,
