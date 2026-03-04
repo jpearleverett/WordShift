@@ -739,7 +739,16 @@ const CLOUD3_FONT_DIM = { fontSize: 38, opacity: 0.6 };
 const CLOUD2_MARGIN_FULL = { marginLeft: 25 };
 const CLOUD2_MARGIN_DIM = { marginLeft: 25, opacity: 0.6 };
 
+const cloudRenderCount = { current: 0 };
 const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
+  cloudRenderCount.current += 1;
+  console.log('[CloudLayer] render #' + cloudRenderCount.current, { currentPhase, ts: Date.now() });
+
+  useEffect(() => {
+    console.log('[CloudLayer] MOUNTED', { ts: Date.now() });
+    return () => console.log('[CloudLayer] UNMOUNTED', { ts: Date.now() });
+  }, []);
+
   // Cloud animated values
   const cloud1X = useRef(new Animated.Value(-150)).current;
   const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 100)).current;
@@ -792,7 +801,15 @@ const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhas
     animateCloud(cloud2X, SCREEN_WIDTH + 100, -150, 38000, 1);   // right → left
     animateCloud(cloud3X, -150, SCREEN_WIDTH + 100, 52000, 2);   // left → right
 
+    // Diagnostic: log cloud1 position every 5 seconds to confirm animation is running
+    const diagInterval = setInterval(() => {
+      // @ts-ignore — __getValue() exists on Animated.Value but isn't typed
+      const val = cloud1X.__getValue?.() ?? 'unavailable';
+      console.log('[CloudLayer] cloud1X position:', val, { ts: Date.now() });
+    }, 5000);
+
     return () => {
+      clearInterval(diagInterval);
       activeAnims.forEach(anim => anim?.stop());
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, animated values are stable refs
