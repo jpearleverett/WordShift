@@ -446,98 +446,189 @@ const chipStyles = StyleSheet.create({
 // Particle & effect renderers
 // ---------------------------------------------------------------------------
 
-const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => (
-  <Animated.View
-    pointerEvents="none"
-    style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: p.color,
-      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
-      opacity: p.opacity,
-    }}
-  />
-));
+const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => {
+  const style = useMemo(() => ({
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: p.color,
+    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+    opacity: p.opacity,
+  }), [p.color, p.x, p.y, p.scale, p.opacity]);
 
-const ImpactParticleView = React.memo(({ p }: { p: ImpactParticle }) => (
-  <Animated.View
-    pointerEvents="none"
-    style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      backgroundColor: p.color,
-      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
-      opacity: p.opacity,
-    }}
-  />
-));
+  return <Animated.View pointerEvents="none" style={style} />;
+});
 
-const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
-  <Animated.View
-    pointerEvents="none"
-    style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: 12,
-      height: 12,
-      borderRadius: 2,
-      backgroundColor: '#FFBF00',
-      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }, { rotate: '45deg' }],
-      opacity: p.opacity,
-    }}
-  />
-));
+const ImpactParticleView = React.memo(({ p }: { p: ImpactParticle }) => {
+  const style = useMemo(() => ({
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: p.color,
+    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+    opacity: p.opacity,
+  }), [p.color, p.x, p.y, p.scale, p.opacity]);
 
-const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
-  <Animated.View
-    pointerEvents="none"
-    style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: 7,
-      height: 7,
-      borderRadius: 3.5,
-      backgroundColor: p.color,
-      shadowColor: p.color,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.8,
-      shadowRadius: 4,
-      elevation: 3,
-      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
-      opacity: p.opacity,
-    }}
-  />
-));
+  return <Animated.View pointerEvents="none" style={style} />;
+});
+
+const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => {
+  const style = useMemo(() => ({
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: '#FFBF00',
+    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }, { rotate: '45deg' as const }],
+    opacity: p.opacity,
+  }), [p.x, p.y, p.scale, p.opacity]);
+
+  return <Animated.View pointerEvents="none" style={style} />;
+});
+
+const RimParticleView = React.memo(({ p }: { p: RimParticle }) => {
+  // Stable style — deps are Animated.Value refs (never change) and color (immutable per particle)
+  const style = useMemo(() => ({
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: p.color,
+    shadowColor: p.color,
+    shadowOffset: { width: 0, height: 0 } as const,
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 3,
+    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+    opacity: p.opacity,
+  }), [p.color, p.x, p.y, p.scale, p.opacity]);
+
+  return <Animated.View pointerEvents="none" style={style} />;
+});
 
 const ShockwaveRingView = React.memo(({ ring }: { ring: ShockwaveRing }) => {
-  const size = PIT_OVAL.radiusX * 2.6;
-  const sizeY = PIT_OVAL.radiusY * 2.6;
+  const style = useMemo(() => {
+    const size = PIT_OVAL.radiusX * 2.6;
+    const sizeY = PIT_OVAL.radiusY * 2.6;
+    return {
+      position: 'absolute' as const,
+      top: PIT_CENTER.y - sizeY / 2,
+      left: PIT_CENTER.x - size / 2,
+      width: size,
+      height: sizeY,
+      borderRadius: size / 2,
+      borderWidth: 2,
+      borderColor: ring.color,
+      transform: [{ scale: ring.scale }],
+      opacity: ring.opacity,
+    };
+  }, [ring.color, ring.scale, ring.opacity]);
+
+  return <Animated.View pointerEvents="none" style={style} />;
+});
+
+// ---------------------------------------------------------------------------
+// Rim Particle Layer — isolated from OfferingPitScreen to prevent setRimParticles
+// state updates (~1/sec) from re-rendering the entire screen
+// (same isolation pattern as ParticleLayer in HouseWorld.tsx)
+// ---------------------------------------------------------------------------
+
+interface RimParticleLayerProps {
+  phase: DialoguePhase;
+  reducedMotion: boolean;
+  simplify: boolean;
+}
+
+const RimParticleLayer: React.FC<RimParticleLayerProps> = React.memo(({
+  phase, reducedMotion, simplify,
+}) => {
+  const [rimParticles, setRimParticles] = useState<RimParticle[]>([]);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion || simplify) return;
+
+    const maxRim = getMaxRimParticles();
+    const spawnInterval = 1000;
+    let spawnCount = 0;
+
+    const spawnRimParticle = () => {
+      if (!mountedRef.current) return;
+      const color = RIM_PARTICLE_COLORS[phase] ?? RIM_PARTICLE_COLORS[0];
+      const angle = Math.random() * Math.PI * 2;
+      const startX = PIT_CENTER.x + PIT_OVAL.radiusX * Math.cos(angle) * (0.7 + Math.random() * 0.3);
+      const startY = PIT_CENTER.y + PIT_OVAL.radiusY * Math.sin(angle) * (0.7 + Math.random() * 0.3);
+      const riseHeight = 80 + Math.random() * 100;
+      const driftX = (Math.random() - 0.5) * 40;
+      const duration = 3000 + Math.random() * 2000;
+
+      const p: RimParticle = {
+        id: `rim_${Date.now()}_${spawnCount++}`,
+        x: new Animated.Value(startX),
+        y: new Animated.Value(startY),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(0.3 + Math.random() * 0.4),
+        color,
+      };
+
+      setRimParticles(prev => {
+        const capped = prev.length >= maxRim * 2 ? prev.slice(-maxRim) : prev;
+        return [...capped, p];
+      });
+
+      Animated.parallel([
+        Animated.timing(p.y, {
+          toValue: startY - riseHeight,
+          duration,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(p.x, {
+          toValue: startX + driftX,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(p.opacity, { toValue: 0.7 + Math.random() * 0.3, duration: duration * 0.2, useNativeDriver: true }),
+          Animated.delay(duration * 0.4),
+          Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(p.scale, { toValue: 0.8 + Math.random() * 0.4, duration: duration * 0.5, useNativeDriver: true }),
+          Animated.timing(p.scale, { toValue: 0, duration: duration * 0.5, useNativeDriver: true }),
+        ]),
+      ]).start(() => {
+        if (mountedRef.current) setRimParticles(prev => prev.filter(rp => rp.id !== p.id));
+      });
+    };
+
+    for (let i = 0; i < maxRim; i++) {
+      setTimeout(() => spawnRimParticle(), i * (spawnInterval / maxRim));
+    }
+
+    const interval = setInterval(spawnRimParticle, spawnInterval);
+    return () => clearInterval(interval);
+  }, [phase, reducedMotion, simplify]);
+
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        top: PIT_CENTER.y - sizeY / 2,
-        left: PIT_CENTER.x - size / 2,
-        width: size,
-        height: sizeY,
-        borderRadius: size / 2,
-        borderWidth: 2,
-        borderColor: ring.color,
-        transform: [{ scale: ring.scale }],
-        opacity: ring.opacity,
-      }}
-    />
+    <>
+      {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
+    </>
   );
 });
 
@@ -589,7 +680,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
   const [impactParticles, setImpactParticles] = useState<ImpactParticle[]>([]);
   const [amberParticles, setAmberParticles] = useState<AmberParticle[]>([]);
-  const [rimParticles, setRimParticles] = useState<RimParticle[]>([]);
+  // rimParticles state moved into isolated RimParticleLayer component
   const [shockwaveRings, setShockwaveRings] = useState<ShockwaveRing[]>([]);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
@@ -753,73 +844,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const hasPendingBatches = harvestState != null && harvestState.pendingBatches.length > 0;
   const pitIsActive = hasActiveWords || hasPendingBatches;
 
-  // ---- Ambient rim particles (embers rising from pit edge) ----
-  useEffect(() => {
-    if (reducedMotion || simplify) return;
-
-    const maxRim = getMaxRimParticles();
-    const spawnInterval = 1000; // ms between spawns
-    let spawnCount = 0;
-
-    const spawnRimParticle = () => {
-      if (!mountedRef.current) return;
-      const color = RIM_PARTICLE_COLORS[phase] ?? RIM_PARTICLE_COLORS[0];
-      const angle = Math.random() * Math.PI * 2;
-      const startX = PIT_CENTER.x + PIT_OVAL.radiusX * Math.cos(angle) * (0.7 + Math.random() * 0.3);
-      const startY = PIT_CENTER.y + PIT_OVAL.radiusY * Math.sin(angle) * (0.7 + Math.random() * 0.3);
-      const riseHeight = 80 + Math.random() * 100;
-      const driftX = (Math.random() - 0.5) * 40;
-      const duration = 3000 + Math.random() * 2000;
-
-      const p: RimParticle = {
-        id: `rim_${Date.now()}_${spawnCount++}`,
-        x: new Animated.Value(startX),
-        y: new Animated.Value(startY),
-        opacity: new Animated.Value(0),
-        scale: new Animated.Value(0.3 + Math.random() * 0.4),
-        color,
-      };
-
-      setRimParticles(prev => {
-        // Cap total rim particles
-        const capped = prev.length >= maxRim * 2 ? prev.slice(-maxRim) : prev;
-        return [...capped, p];
-      });
-
-      Animated.parallel([
-        Animated.timing(p.y, {
-          toValue: startY - riseHeight,
-          duration,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(p.x, {
-          toValue: startX + driftX,
-          duration,
-          useNativeDriver: true,
-        }),
-        Animated.sequence([
-          Animated.timing(p.opacity, { toValue: 0.7 + Math.random() * 0.3, duration: duration * 0.2, useNativeDriver: true }),
-          Animated.delay(duration * 0.4),
-          Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
-        ]),
-        Animated.sequence([
-          Animated.timing(p.scale, { toValue: 0.8 + Math.random() * 0.4, duration: duration * 0.5, useNativeDriver: true }),
-          Animated.timing(p.scale, { toValue: 0, duration: duration * 0.5, useNativeDriver: true }),
-        ]),
-      ]).start(() => {
-        if (mountedRef.current) setRimParticles(prev => prev.filter(rp => rp.id !== p.id));
-      });
-    };
-
-    // Stagger initial spawns
-    for (let i = 0; i < maxRim; i++) {
-      setTimeout(() => spawnRimParticle(), i * (spawnInterval / maxRim));
-    }
-
-    const interval = setInterval(spawnRimParticle, spawnInterval);
-    return () => clearInterval(interval);
-  }, [phase, reducedMotion, simplify]);
+  // Rim particles are now managed by the isolated RimParticleLayer component
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
@@ -1550,8 +1575,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         simplify={simplify}
       />
 
-      {/* Ambient rim particles — embers rising from pit edge */}
-      {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
+      {/* Ambient rim particles — isolated layer prevents setRimParticles from re-rendering entire screen */}
+      <RimParticleLayer phase={phase} reducedMotion={reducedMotion} simplify={simplify} />
 
       {/* Shockwave rings — expanding ripple on word impact */}
       {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}

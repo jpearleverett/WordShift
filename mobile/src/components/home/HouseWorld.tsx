@@ -726,6 +726,86 @@ const ParticleLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentP
   );
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CLOUD LAYER - Isolated from HouseWorld to prevent re-renders from room/animal
+// prop changes (same isolation pattern as ParticleLayer above)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
+  // Cloud animated values
+  const cloud1X = useRef(new Animated.Value(-150)).current;
+  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 100)).current;
+  const cloud3X = useRef(new Animated.Value(-150)).current;
+
+  // Stable cloud styles — prevents new object creation on every render
+  const cloud1Style = useRef({ top: 20 as number, transform: [{ translateX: cloud1X }] }).current;
+  const cloud2Style = useRef({ top: 70 as number, transform: [{ translateX: cloud2X }] }).current;
+  const cloud3Style = useRef({ top: 45 as number, transform: [{ translateX: cloud3X }] }).current;
+  const cloudDimStyle = useMemo(() => currentPhase >= 3 ? { opacity: 0.6 } : undefined, [currentPhase]);
+  const cloud3FontStyle = useMemo(() =>
+    currentPhase >= 3 ? { fontSize: 38, opacity: 0.6 } : { fontSize: 38 },
+    [currentPhase]
+  );
+  const cloud2MarginStyle = useMemo(() =>
+    currentPhase >= 3 ? { marginLeft: 25, opacity: 0.6 } : { marginLeft: 25 },
+    [currentPhase]
+  );
+
+  // Stable style arrays — prevents [styles.cloud, cloudNStyle] array recreation
+  const cloud1StyleArr = useRef([styles.cloud, cloud1Style]).current;
+  const cloud2StyleArr = useRef([styles.cloud, cloud2Style]).current;
+  const cloud3StyleArr = useRef([styles.cloud, cloud3Style]).current;
+
+  // Cloud animations — track only the 3 current animations (no unbounded array growth)
+  const cloudMountedRef = useRef(true);
+
+  useEffect(() => {
+    cloudMountedRef.current = true;
+    const activeAnims: (Animated.CompositeAnimation | null)[] = [null, null, null];
+
+    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number, index: number) => {
+      const animate = () => {
+        if (!cloudMountedRef.current) return;
+        cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
+        const anim = Animated.timing(cloudAnim, {
+          toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
+          duration,
+          useNativeDriver: true,
+        });
+        activeAnims[index] = anim;
+        anim.start(() => {
+          if (cloudMountedRef.current) animate();
+        });
+      };
+      animate();
+    };
+
+    animateCloud(cloud1X, -100, 45000, 0);
+    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000, 1);
+    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000, 2);
+
+    return () => {
+      cloudMountedRef.current = false;
+      activeAnims.forEach(anim => anim?.stop());
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, animated values are stable refs
+
+  return (
+    <>
+      <Animated.View style={cloud1StyleArr} pointerEvents="none">
+        <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
+      </Animated.View>
+      <Animated.View style={cloud2StyleArr} pointerEvents="none">
+        <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
+        <Text style={[styles.cloudEmoji, cloud2MarginStyle]}>☁️</Text>
+      </Animated.View>
+      <Animated.View style={cloud3StyleArr} pointerEvents="none">
+        <Text style={[styles.cloudEmoji, cloud3FontStyle]}>☁️</Text>
+      </Animated.View>
+    </>
+  );
+});
+
 interface HouseWorldProps {
   rooms: Room[];
   animals: Animal[];
@@ -796,24 +876,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   const sunPulse = useRef(new Animated.Value(1)).current;
   const sunRotation = useRef(new Animated.Value(0)).current;
 
-  // Cloud animations
-  const cloud1X = useRef(new Animated.Value(-150)).current;
-  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 100)).current;
-  const cloud3X = useRef(new Animated.Value(-150)).current;
-
-  // Stable cloud styles — prevents new object creation on every render
-  const cloud1Style = useRef({ top: 20 as number, transform: [{ translateX: cloud1X }] }).current;
-  const cloud2Style = useRef({ top: 70 as number, transform: [{ translateX: cloud2X }] }).current;
-  const cloud3Style = useRef({ top: 45 as number, transform: [{ translateX: cloud3X }] }).current;
-  const cloudDimStyle = useMemo(() => currentPhase >= 3 ? { opacity: 0.6 } : undefined, [currentPhase]);
-  const cloud3FontStyle = useMemo(() =>
-    currentPhase >= 3 ? { fontSize: 38, opacity: 0.6 } : { fontSize: 38 },
-    [currentPhase]
-  );
-  const cloud2MarginStyle = useMemo(() =>
-    currentPhase >= 3 ? { marginLeft: 25, opacity: 0.6 } : { marginLeft: 25 },
-    [currentPhase]
-  );
+  // Cloud animations are now in the isolated CloudLayer component
 
   // Sun pulsing animation
   useEffect(() => {
@@ -853,40 +916,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
       rotateAnimation.stop();
     };
   }, [currentPhase]);
-
-  // Cloud animations — track only the 3 current animations (no unbounded array growth)
-  const cloudMountedRef = useRef(true);
-
-  useEffect(() => {
-    cloudMountedRef.current = true;
-    const activeAnims: (Animated.CompositeAnimation | null)[] = [null, null, null];
-
-    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number, index: number) => {
-      const animate = () => {
-        if (!cloudMountedRef.current) return;
-        cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
-        const anim = Animated.timing(cloudAnim, {
-          toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
-          duration,
-          useNativeDriver: true,
-        });
-        activeAnims[index] = anim;
-        anim.start(() => {
-          if (cloudMountedRef.current) animate();
-        });
-      };
-      animate();
-    };
-
-    animateCloud(cloud1X, -100, 45000, 0);
-    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000, 1);
-    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000, 2);
-
-    return () => {
-      cloudMountedRef.current = false;
-      activeAnims.forEach(anim => anim?.stop());
-    };
-  }, []);
 
   // Stable sun rotation interpolation — stored in ref to avoid recreation
   const sunRotate = useRef(sunRotation.interpolate({
@@ -1018,17 +1047,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
                 resizeMode="cover"
               />
 
-              {/* Animated clouds - inside transform so they move with the scene */}
-              <Animated.View style={[styles.cloud, cloud1Style]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
-              </Animated.View>
-              <Animated.View style={[styles.cloud, cloud2Style]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
-                <Text style={[styles.cloudEmoji, cloud2MarginStyle]}>☁️</Text>
-              </Animated.View>
-              <Animated.View style={[styles.cloud, cloud3Style]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, cloud3FontStyle]}>☁️</Text>
-              </Animated.View>
+              {/* Animated clouds — isolated from HouseWorld re-renders */}
+              <CloudLayer currentPhase={currentPhase} />
 
               {/* Sun with animated rays - hidden at phase 4 */}
               {currentPhase < 4 && (
