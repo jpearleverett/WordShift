@@ -731,6 +731,14 @@ const ParticleLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentP
 // prop changes (same isolation pattern as ParticleLayer above)
 // ═══════════════════════════════════════════════════════════════════════════
 
+// Stable style constants for cloud phase-dependent opacity (avoids useMemo/undefined churn)
+const CLOUD_FULL_OPACITY = {};
+const CLOUD_DIM_OPACITY = { opacity: 0.6 };
+const CLOUD3_FONT_FULL = { fontSize: 38 };
+const CLOUD3_FONT_DIM = { fontSize: 38, opacity: 0.6 };
+const CLOUD2_MARGIN_FULL = { marginLeft: 25 };
+const CLOUD2_MARGIN_DIM = { marginLeft: 25, opacity: 0.6 };
+
 const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
   // Cloud animated values
   const cloud1X = useRef(new Animated.Value(-150)).current;
@@ -741,51 +749,50 @@ const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhas
   const cloud1Style = useRef({ top: 20 as number, transform: [{ translateX: cloud1X }] }).current;
   const cloud2Style = useRef({ top: 70 as number, transform: [{ translateX: cloud2X }] }).current;
   const cloud3Style = useRef({ top: 45 as number, transform: [{ translateX: cloud3X }] }).current;
-  const cloudDimStyle = useMemo(() => currentPhase >= 3 ? { opacity: 0.6 } : undefined, [currentPhase]);
-  const cloud3FontStyle = useMemo(() =>
-    currentPhase >= 3 ? { fontSize: 38, opacity: 0.6 } : { fontSize: 38 },
-    [currentPhase]
-  );
-  const cloud2MarginStyle = useMemo(() =>
-    currentPhase >= 3 ? { marginLeft: 25, opacity: 0.6 } : { marginLeft: 25 },
-    [currentPhase]
-  );
+
+  // Phase-dependent styles use module-level constants (no useMemo needed)
+  const cloudDimStyle = currentPhase >= 3 ? CLOUD_DIM_OPACITY : CLOUD_FULL_OPACITY;
+  const cloud3FontStyle = currentPhase >= 3 ? CLOUD3_FONT_DIM : CLOUD3_FONT_FULL;
+  const cloud2MarginStyle = currentPhase >= 3 ? CLOUD2_MARGIN_DIM : CLOUD2_MARGIN_FULL;
 
   // Stable style arrays — prevents [styles.cloud, cloudNStyle] array recreation
   const cloud1StyleArr = useRef([styles.cloud, cloud1Style]).current;
   const cloud2StyleArr = useRef([styles.cloud, cloud2Style]).current;
   const cloud3StyleArr = useRef([styles.cloud, cloud3Style]).current;
 
-  // Cloud animations — track only the 3 current animations (no unbounded array growth)
-  const cloudMountedRef = useRef(true);
-
+  // Cloud animations — Animated.loop keeps the entire loop on the native thread,
+  // eliminating the JS-thread round-trip gap that caused flickering with the
+  // recursive .start() callback pattern in the custom dev build
   useEffect(() => {
-    cloudMountedRef.current = true;
     const activeAnims: (Animated.CompositeAnimation | null)[] = [null, null, null];
 
-    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number, index: number) => {
-      const animate = () => {
-        if (!cloudMountedRef.current) return;
-        cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
-        const anim = Animated.timing(cloudAnim, {
-          toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
-          duration,
-          useNativeDriver: true,
-        });
-        activeAnims[index] = anim;
-        anim.start(() => {
-          if (cloudMountedRef.current) animate();
-        });
-      };
-      animate();
+    const animateCloud = (cloudAnim: Animated.Value, fromX: number, toX: number, duration: number, index: number) => {
+      cloudAnim.setValue(fromX);
+      const anim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(cloudAnim, {
+            toValue: toX,
+            duration,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          }),
+          // Instant reset to start position — runs on native thread, no frame gap
+          Animated.timing(cloudAnim, {
+            toValue: fromX,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      activeAnims[index] = anim;
+      anim.start();
     };
 
-    animateCloud(cloud1X, -100, 45000, 0);
-    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000, 1);
-    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000, 2);
+    animateCloud(cloud1X, -150, SCREEN_WIDTH + 100, 45000, 0);   // left → right
+    animateCloud(cloud2X, SCREEN_WIDTH + 100, -150, 38000, 1);   // right → left
+    animateCloud(cloud3X, -150, SCREEN_WIDTH + 100, 52000, 2);   // left → right
 
     return () => {
-      cloudMountedRef.current = false;
       activeAnims.forEach(anim => anim?.stop());
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, animated values are stable refs
@@ -1264,6 +1271,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     flexDirection: 'row',
     zIndex: 200,
+    height: 55, // Explicit height prevents native layout recalculation during animation
   },
   cloudEmoji: {
     fontSize: 45,
