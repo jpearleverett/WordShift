@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -81,6 +81,9 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  // Stable negated slide node — avoids creating a new Animated node on every render
+  // (same fix pattern as AnimalSprite combinedScale, documented in CLAUDE.md 2026-02-27)
+  const slideNegated = useRef(Animated.multiply(slideAnim, -1)).current;
   const bounceProgress = useSharedValue(0);
   const textFadeAnim = useRef(new Animated.Value(1)).current;
   const reducedMotion = getSettingsSync().reducedMotion;
@@ -150,11 +153,28 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     }).start();
   }, [text]);
 
-  if (!visible) return null;
+  // Memoize position style so it's stable across re-renders
+  const resolvedPositionStyle = useMemo(
+    () =>
+      anchorStyle ||
+      (position === 'top'
+        ? { top: Math.max(80, SCREEN_HEIGHT * 0.12) }
+        : position === 'middle'
+          ? { top: Math.max(180, SCREEN_HEIGHT * 0.25) }
+          : { bottom: Math.max(30, SCREEN_HEIGHT * 0.04) }),
+    [position, anchorStyle],
+  );
 
-  const isTop = position === 'top';
-  const isMiddle = position === 'middle';
-  const resolvedPositionStyle = anchorStyle || (isTop ? { top: Math.max(80, SCREEN_HEIGHT * 0.12) } : isMiddle ? { top: Math.max(180, SCREEN_HEIGHT * 0.25) } : { bottom: Math.max(30, SCREEN_HEIGHT * 0.04) });
+  // Stable animated style — uses pre-built slideNegated ref instead of inline Animated.multiply
+  const animatedStyle = useMemo(
+    () => ({
+      opacity: fadeAnim,
+      transform: [{ translateY: position === 'top' ? slideNegated : slideAnim }],
+    }),
+    [position, fadeAnim, slideNegated, slideAnim],
+  );
+
+  if (!visible) return null;
 
   // Dialogue theme for the dialogue variant (always Phase 0 during tutorial)
   const dt = getDialogueTheme(0);
@@ -163,14 +183,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     const foxSprite = speaking ? foxTalkSprite : foxIdleSprite;
     return (
       <Animated.View
-        style={[
-          styles.container,
-          resolvedPositionStyle,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
-          },
-        ]}
+        style={[styles.container, resolvedPositionStyle, animatedStyle]}
         pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       >
         <View style={[
@@ -251,14 +264,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   // Compact variant (original floating card)
   return (
     <Animated.View
-      style={[
-        styles.container,
-        resolvedPositionStyle,
-        {
-          opacity: fadeAnim,
-          transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
-        },
-      ]}
+      style={[styles.container, resolvedPositionStyle, animatedStyle]}
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       accessibilityRole="alert"

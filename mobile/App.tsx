@@ -411,6 +411,18 @@ export default function App() {
     puzzle.rows,
   ]);
 
+  // Stable anchor style for FoxGuide on puzzle screen — prevents new object on every render
+  const foxPuzzleAnchorStyle = useMemo(() => {
+    if (!onboardingFlow.isOnboarding) return undefined;
+    if (onboardingFlow.onboardingStep === 'puzzle_complete') {
+      return { top: Math.min(Math.max(SCREEN_HEIGHT * 0.35, 280), 380), left: 8, right: 8 };
+    }
+    if (onboardingFlow.onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.PLAYING) {
+      return { top: Math.min(Math.max(SCREEN_HEIGHT * 0.64, 470), 580), left: 8, right: 8 };
+    }
+    return undefined;
+  }, [onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzle.gameState]);
+
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
   // ========================================================================
@@ -1590,24 +1602,7 @@ export default function App() {
                 : undefined
             }
             position="bottom"
-            anchorStyle={
-              onboardingFlow.onboardingStep === 'puzzle_complete'
-                ? {
-                    // Center the completion dialogue on screen
-                    top: Math.min(Math.max(SCREEN_HEIGHT * 0.35, 280), 380),
-                    left: 8,
-                    right: 8,
-                  }
-                : puzzle.gameState === GameState.PLAYING
-                  ? {
-                      // Position well below the 3 tutorial rows
-                      // (~50px status bar + ~80px header + 3 rows * ~90px + padding)
-                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.64, 470), 580),
-                      left: 8,
-                      right: 8,
-                    }
-                  : undefined
-            }
+            anchorStyle={foxPuzzleAnchorStyle}
           />
         )}
       </Animated.View>
