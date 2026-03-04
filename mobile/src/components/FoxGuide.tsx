@@ -1,11 +1,9 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated,
-  Easing,
   Image,
   ImageSourcePropType,
   Dimensions,
@@ -15,6 +13,7 @@ import Reanimated, {
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  withSpring,
   cancelAnimation,
   Easing as REasing,
 } from 'react-native-reanimated';
@@ -79,50 +78,38 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   speaking = true,
   variant = 'compact',
 }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  // Stable negated slide node — avoids creating a new Animated node on every render
-  // (same fix pattern as AnimalSprite combinedScale, documented in CLAUDE.md 2026-02-27)
-  const slideNegated = useRef(Animated.multiply(slideAnim, -1)).current;
+  // All animations use Reanimated shared values — runs on UI thread, no JS round-trips.
+  // Cancels previous animations before starting new ones to prevent overlap jank.
+  const fadeVal = useSharedValue(0);
+  const slideVal = useSharedValue(30);
   const bounceProgress = useSharedValue(0);
-  const textFadeAnim = useRef(new Animated.Value(1)).current;
+  const textFadeVal = useSharedValue(1);
   const reducedMotion = getSettingsSync().reducedMotion;
   const hasInteractiveControls = Boolean(onContinue || (showSkip && onSkip));
 
   // Show/hide animation
   useEffect(() => {
     if (reducedMotion) {
-      fadeAnim.setValue(visible ? 1 : 0);
-      slideAnim.setValue(visible ? 0 : 30);
+      fadeVal.value = visible ? 1 : 0;
+      slideVal.value = visible ? 0 : 30;
       return;
     }
     if (visible) {
-      slideAnim.setValue(30);
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          friction: 8,
-          tension: 60,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      cancelAnimation(fadeVal);
+      cancelAnimation(slideVal);
+      slideVal.value = 30;
+      fadeVal.value = withTiming(1, { duration: 300 });
+      slideVal.value = withSpring(0, { damping: 12, stiffness: 100 });
     } else {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+      cancelAnimation(fadeVal);
+      fadeVal.value = withTiming(0, { duration: 200 });
     }
-  }, [visible]);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fox bounce when speaking — Reanimated
   useEffect(() => {
     if (reducedMotion || !speaking || !visible) {
+      cancelAnimation(bounceProgress);
       bounceProgress.value = 0;
       return;
     }
@@ -133,7 +120,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       true,
     );
     return () => cancelAnimation(bounceProgress);
-  }, [speaking, visible]);
+  }, [speaking, visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bounceStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -4 * bounceProgress.value }],
@@ -142,16 +129,13 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   // Animate text changes
   useEffect(() => {
     if (reducedMotion) {
-      textFadeAnim.setValue(1);
+      textFadeVal.value = 1;
       return;
     }
-    textFadeAnim.setValue(0);
-    Animated.timing(textFadeAnim, {
-      toValue: 1,
-      duration: 250,
-      useNativeDriver: true,
-    }).start();
-  }, [text]);
+    cancelAnimation(textFadeVal);
+    textFadeVal.value = 0;
+    textFadeVal.value = withTiming(1, { duration: 250 });
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Memoize position style so it's stable across re-renders
   const resolvedPositionStyle = useMemo(
@@ -165,14 +149,18 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     [position, anchorStyle],
   );
 
-  // Stable animated style — uses pre-built slideNegated ref instead of inline Animated.multiply
-  const animatedStyle = useMemo(
-    () => ({
-      opacity: fadeAnim,
-      transform: [{ translateY: position === 'top' ? slideNegated : slideAnim }],
-    }),
-    [position, fadeAnim, slideNegated, slideAnim],
-  );
+  // Container animated style — combines fade + slide with position-aware direction.
+  // Negation for top position handled inline (replaces the old Animated.multiply ref).
+  const isTop = position === 'top';
+  const containerAnimStyle = useAnimatedStyle(() => ({
+    opacity: fadeVal.value,
+    transform: [{ translateY: isTop ? -slideVal.value : slideVal.value }],
+  }));
+
+  // Text fade style
+  const textAnimStyle = useAnimatedStyle(() => ({
+    opacity: textFadeVal.value,
+  }));
 
   if (!visible) return null;
 
@@ -182,8 +170,8 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   if (variant === 'dialogue') {
     const foxSprite = speaking ? foxTalkSprite : foxIdleSprite;
     return (
-      <Animated.View
-        style={[styles.container, resolvedPositionStyle, animatedStyle]}
+      <Reanimated.View
+        style={[styles.container, resolvedPositionStyle, containerAnimStyle]}
         pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       >
         <View style={[
@@ -220,11 +208,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
               <View style={[styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
 
               <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
-                <Animated.Text
-                  style={[styles.dialogueText, { color: dt.textColor, opacity: textFadeAnim }]}
+                <Reanimated.Text
+                  style={[styles.dialogueText, { color: dt.textColor }, textAnimStyle]}
                 >
                   {text}
-                </Animated.Text>
+                </Reanimated.Text>
               </View>
 
               {/* Action row */}
@@ -257,14 +245,14 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
             </View>
           </View>
         </View>
-      </Animated.View>
+      </Reanimated.View>
     );
   }
 
   // Compact variant (original floating card)
   return (
-    <Animated.View
-      style={[styles.container, resolvedPositionStyle, animatedStyle]}
+    <Reanimated.View
+      style={[styles.container, resolvedPositionStyle, containerAnimStyle]}
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       accessibilityRole="alert"
@@ -294,11 +282,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           <View style={styles.speechBubble}>
             <View style={styles.speechAccentBar} />
             <View style={styles.speechShine} />
-            <Animated.Text
-              style={[styles.speechText, { opacity: textFadeAnim }]}
+            <Reanimated.Text
+              style={[styles.speechText, textAnimStyle]}
             >
               {text}
-            </Animated.Text>
+            </Reanimated.Text>
           </View>
 
           {/* Action row */}
@@ -327,7 +315,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           </View>
         </View>
       </View>
-    </Animated.View>
+    </Reanimated.View>
   );
 };
 
