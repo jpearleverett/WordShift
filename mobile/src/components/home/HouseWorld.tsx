@@ -727,11 +727,13 @@ const ParticleLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentP
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CLOUD LAYER - Isolated from HouseWorld to prevent re-renders from room/animal
-// prop changes (same isolation pattern as ParticleLayer above)
+// CLOUD LAYER - Uses Reanimated worklets for guaranteed UI-thread animation.
+// Previous approach used RN Animated.loop which still round-trips through JS
+// for loop management on some Android builds, causing 1-2 frame flicker gaps.
+// Reanimated's withRepeat runs entirely as a UI-thread worklet — zero JS involvement.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Stable style constants for cloud phase-dependent opacity (avoids useMemo/undefined churn)
+// Stable style constants for cloud phase-dependent opacity
 const CLOUD_FULL_OPACITY = {};
 const CLOUD_DIM_OPACITY = { opacity: 0.6 };
 const CLOUD3_FONT_FULL = { fontSize: 38 };
@@ -739,76 +741,79 @@ const CLOUD3_FONT_DIM = { fontSize: 38, opacity: 0.6 };
 const CLOUD2_MARGIN_FULL = { marginLeft: 25 };
 const CLOUD2_MARGIN_DIM = { marginLeft: 25, opacity: 0.6 };
 
-const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
-  // Cloud animated values
-  const cloud1X = useRef(new Animated.Value(-150)).current;
-  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 100)).current;
-  const cloud3X = useRef(new Animated.Value(-150)).current;
+// Stable top position styles (module-level to avoid inline object creation)
+const CLOUD1_TOP_STYLE = { top: 20 };
+const CLOUD2_TOP_STYLE = { top: 70 };
+const CLOUD3_TOP_STYLE = { top: 45 };
 
-  // Stable cloud styles — prevents new object creation on every render
-  const cloud1Style = useRef({ top: 20 as number, transform: [{ translateX: cloud1X }] }).current;
-  const cloud2Style = useRef({ top: 70 as number, transform: [{ translateX: cloud2X }] }).current;
-  const cloud3Style = useRef({ top: 45 as number, transform: [{ translateX: cloud3X }] }).current;
+// Pre-computed animation range: total distance from off-screen-left to off-screen-right
+const CLOUD_RANGE = SCREEN_WIDTH + 250; // (-150) to (SCREEN_WIDTH + 100)
+const CLOUD_FROM_LEFT = -150;
+const CLOUD_FROM_RIGHT = SCREEN_WIDTH + 100;
+
+const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
+  // Reanimated shared values — animation runs entirely on the UI thread via worklets.
+  // withRepeat(withTiming(...), -1, false) loops infinitely without reversing:
+  // progress goes 0→1, snaps back to 0, repeats. The snap-back happens within
+  // the same worklet frame — no rendering of the reset position.
+  const cloud1Progress = useSharedValue(0);
+  const cloud2Progress = useSharedValue(0);
+  const cloud3Progress = useSharedValue(0);
+
+  useEffect(() => {
+    // Cloud 1: left → right (45s)
+    cloud1Progress.value = withRepeat(
+      withTiming(1, { duration: 45000, easing: REasing.linear }),
+      -1, false
+    );
+    // Cloud 2: right → left (38s)
+    cloud2Progress.value = withRepeat(
+      withTiming(1, { duration: 38000, easing: REasing.linear }),
+      -1, false
+    );
+    // Cloud 3: left → right (52s)
+    cloud3Progress.value = withRepeat(
+      withTiming(1, { duration: 52000, easing: REasing.linear }),
+      -1, false
+    );
+
+    return () => {
+      cancelAnimation(cloud1Progress);
+      cancelAnimation(cloud2Progress);
+      cancelAnimation(cloud3Progress);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, shared values are stable
+
+  // Animated styles computed on the UI thread — no JS bridge involvement
+  const cloud1AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: CLOUD_FROM_LEFT + cloud1Progress.value * CLOUD_RANGE }],
+  }));
+
+  const cloud2AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: CLOUD_FROM_RIGHT - cloud2Progress.value * CLOUD_RANGE }],
+  }));
+
+  const cloud3AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: CLOUD_FROM_LEFT + cloud3Progress.value * CLOUD_RANGE }],
+  }));
 
   // Phase-dependent styles use module-level constants (no useMemo needed)
   const cloudDimStyle = currentPhase >= 3 ? CLOUD_DIM_OPACITY : CLOUD_FULL_OPACITY;
   const cloud3FontStyle = currentPhase >= 3 ? CLOUD3_FONT_DIM : CLOUD3_FONT_FULL;
   const cloud2MarginStyle = currentPhase >= 3 ? CLOUD2_MARGIN_DIM : CLOUD2_MARGIN_FULL;
 
-  // Stable style arrays — prevents [styles.cloud, cloudNStyle] array recreation
-  const cloud1StyleArr = useRef([styles.cloud, cloud1Style]).current;
-  const cloud2StyleArr = useRef([styles.cloud, cloud2Style]).current;
-  const cloud3StyleArr = useRef([styles.cloud, cloud3Style]).current;
-
-  // Cloud animations — Animated.loop keeps the entire loop on the native thread,
-  // eliminating the JS-thread round-trip gap that caused flickering with the
-  // recursive .start() callback pattern in the custom dev build
-  useEffect(() => {
-    const activeAnims: (Animated.CompositeAnimation | null)[] = [null, null, null];
-
-    const animateCloud = (cloudAnim: Animated.Value, fromX: number, toX: number, duration: number, index: number) => {
-      cloudAnim.setValue(fromX);
-      const anim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(cloudAnim, {
-            toValue: toX,
-            duration,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
-          // Instant reset to start position — runs on native thread, no frame gap
-          Animated.timing(cloudAnim, {
-            toValue: fromX,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      activeAnims[index] = anim;
-      anim.start();
-    };
-
-    animateCloud(cloud1X, -150, SCREEN_WIDTH + 100, 45000, 0);   // left → right
-    animateCloud(cloud2X, SCREEN_WIDTH + 100, -150, 38000, 1);   // right → left
-    animateCloud(cloud3X, -150, SCREEN_WIDTH + 100, 52000, 2);   // left → right
-
-    return () => {
-      activeAnims.forEach(anim => anim?.stop());
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, animated values are stable refs
-
   return (
     <>
-      <Animated.View style={cloud1StyleArr} pointerEvents="none">
+      <Reanimated.View style={[styles.cloud, CLOUD1_TOP_STYLE, cloud1AnimStyle]} pointerEvents="none">
         <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
-      </Animated.View>
-      <Animated.View style={cloud2StyleArr} pointerEvents="none">
+      </Reanimated.View>
+      <Reanimated.View style={[styles.cloud, CLOUD2_TOP_STYLE, cloud2AnimStyle]} pointerEvents="none">
         <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
         <Text style={[styles.cloudEmoji, cloud2MarginStyle]}>☁️</Text>
-      </Animated.View>
-      <Animated.View style={cloud3StyleArr} pointerEvents="none">
+      </Reanimated.View>
+      <Reanimated.View style={[styles.cloud, CLOUD3_TOP_STYLE, cloud3AnimStyle]} pointerEvents="none">
         <Text style={[styles.cloudEmoji, cloud3FontStyle]}>☁️</Text>
-      </Animated.View>
+      </Reanimated.View>
     </>
   );
 });
