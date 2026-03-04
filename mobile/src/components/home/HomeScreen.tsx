@@ -1011,6 +1011,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 transform: [
                   { translateY: dialogueTranslateY },
                 ],
+                opacity: dialogueFlow.dialogueSlide,
               },
             ]}
             onStartShouldSetResponder={() => true}

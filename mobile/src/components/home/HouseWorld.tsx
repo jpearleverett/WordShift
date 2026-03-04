@@ -152,7 +152,6 @@ const SmokePuff: React.FC<{ delay: number }> = React.memo(({ delay }) => {
   const scale = useRef(new Animated.Value(0.5)).current;
   const mountedRef = useRef(true);
   const animationRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
-  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Stable style ref — prevents new object creation on re-render
   const animStyle = useRef({
@@ -177,32 +176,35 @@ const SmokePuff: React.FC<{ delay: number }> = React.memo(({ delay }) => {
           toValue: -40,
           duration: 3000,
           easing: Easing.out(Easing.ease),
-          // Emoji glyphs can visibly flicker on Android with native-driver transforms.
-          useNativeDriver: false,
+          useNativeDriver: true,
+          delay,
         }),
         Animated.timing(x, {
           toValue: 15 + Math.random() * 10,
           duration: 3000,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: false,
+          useNativeDriver: true,
+          delay,
         }),
         Animated.sequence([
           Animated.timing(opacity, {
             toValue: 0.6,
             duration: 500,
-            useNativeDriver: false,
+            useNativeDriver: true,
+            delay,
           }),
           Animated.timing(opacity, {
             toValue: 0,
             duration: 2500,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ]),
         Animated.timing(scale, {
           toValue: 1.5,
           duration: 3000,
           easing: Easing.out(Easing.ease),
-          useNativeDriver: false,
+          useNativeDriver: true,
+          delay,
         }),
       ]);
       animationRef.current = anim;
@@ -211,14 +213,13 @@ const SmokePuff: React.FC<{ delay: number }> = React.memo(({ delay }) => {
       });
     };
 
-    startTimeoutRef.current = setTimeout(animate, delay);
+    animate();
 
     return () => {
       mountedRef.current = false;
-      if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
       if (animationRef.current) animationRef.current.stop();
     };
-  }, [delay]);
+  }, []);
 
   return (
     <Animated.View style={animStyle}>
@@ -401,19 +402,6 @@ const PHASE_BG_COLORS: Record<number, string> = {
   4: '#1a122a',
   5: '#1E1830',
 };
-
-export const getTotalContentHeight = (numRows: number, houseHeight: number): number => {
-  const connectorHeight = Math.max(0, numRows - 1) * 10;
-  return 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
-};
-
-export const getOverflowForLayout = (
-  numRows: number,
-  houseHeight: number,
-  containerHeight: number,
-): number => Math.max(0, getTotalContentHeight(numRows, houseHeight) - containerHeight);
-
-let cachedHouseWorldContainerHeight = SCREEN_HEIGHT;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
@@ -761,30 +749,19 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   amberBalance = 0,
   purchasedUpgrades = {},
 }) => {
-  const unlockedRoomCount = rooms.filter(room => room.isUnlocked).length;
-  const hasPendingRoom = nextUnlock?.type === 'room'
-    && rooms.some(room => room.id === nextUnlock.targetId && !room.isUnlocked);
-  const initialNumRows = Math.max(1, unlockedRoomCount + (hasPendingRoom ? 1 : 0));
-  const initialHouseHeight = initialNumRows * ROOM_HEIGHT + Math.max(0, initialNumRows - 1) * ROOM_GAP + HOUSE_PADDING * 2;
-  const initialOverflow = getOverflowForLayout(
-    initialNumRows,
-    initialHouseHeight,
-    cachedHouseWorldContainerHeight,
-  );
-
   // Animated values
-  const translateY = useRef(new Animated.Value(initialOverflow)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
 
   // Refs for gesture tracking
   const panRef = useRef<PanGestureHandler>(null);
 
   // State tracking for gestures
-  const baseTranslateY = useRef(initialOverflow);
+  const baseTranslateY = useRef(0);
 
   // Track container height via ref to avoid state-triggered re-renders.
   // Position updates are applied directly via translateY.setValue in the
   // onContainerLayout callback, bypassing React's reconciliation entirely.
-  const containerHeightRef = useRef<number>(cachedHouseWorldContainerHeight);
+  const containerHeightRef = useRef<number>(SCREEN_HEIGHT);
   // numRows ref keeps the layout callback in sync with the latest room count
   // without needing to be in a useCallback dependency array.
   const numRowsRef = useRef(1);
@@ -793,10 +770,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
     const { height } = event.nativeEvent.layout;
     if (height > 0 && Math.abs(height - containerHeightRef.current) > 1) {
       containerHeightRef.current = height;
-      cachedHouseWorldContainerHeight = height;
+      // Recalculate and apply translateY directly — no state update, no re-render
       const nr = numRowsRef.current;
       const hh = houseHeightRef.current;
-      const overflow = getOverflowForLayout(nr, hh, height);
+      const connectorH = Math.max(0, nr - 1) * 10;
+      const totalH = 50 + 80 + hh + 25 + 40 + connectorH;
+      const overflow = Math.max(0, totalH - height);
       translateY.setValue(overflow);
       baseTranslateY.current = overflow;
     }
@@ -889,8 +868,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
         const anim = Animated.timing(cloudAnim, {
           toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
           duration,
-          // Keep cloud emoji rendering stable (avoid native-driver text flicker).
-          useNativeDriver: false,
+          useNativeDriver: true,
         });
         activeAnims[index] = anim;
         anim.start(() => {
@@ -987,10 +965,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   // Set initial pan position when room count changes.
   // containerHeight changes are handled directly in onContainerLayout.
   useEffect(() => {
-    const overflow = getOverflowForLayout(numRows, houseHeight, containerHeightRef.current);
+    const connectorHeight = Math.max(0, numRows - 1) * 10;
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
+    const overflow = Math.max(0, totalContentHeight - containerHeightRef.current);
+
     translateY.setValue(overflow);
     baseTranslateY.current = overflow;
-  }, [numRows, houseHeight]);
+  }, [numRows]);
 
   // Phase-aware container bg color — memoized to avoid inline object creation
   const containerBgStyle = useMemo(() => [
