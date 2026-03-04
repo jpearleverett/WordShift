@@ -12,7 +12,7 @@ import {
   Pressable,
   Modal,
 } from 'react-native';
-import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, cancelAnimation, runOnJS } from 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -175,11 +175,31 @@ export default function App() {
   // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
 
-  // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
-  const transitionOverlay = useRef(new Animated.Value(0)).current;
+  // Screen transition overlay — Reanimated shared value for flicker-free fade on UI thread.
+  // withTiming completion callback + runOnJS bridges back to React state for the screen swap.
+  const transitionOverlay = useSharedValue(0);
   // Dynamic background colors for smooth transitions — match overlay/root to destination screen
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
+
+  // Transition overlay animated style — computed on UI thread
+  const transitionOverlayStyle = useAnimatedStyle(() => ({
+    opacity: transitionOverlay.value,
+  }));
+
+  // Screen swap helper — called from UI thread via runOnJS after fade-in completes.
+  // Sets colors/screen state then starts fade-out.
+  const doScreenSwap = useCallback((screen: AppScreen, callback?: () => void) => {
+    const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
+    setTransitionOverlayColor(destColor);
+    setRootBgColor(destColor);
+    setCurrentScreen(screen);
+    callback?.();
+    // Wait one frame for React to render the new screen before revealing
+    requestAnimationFrame(() => {
+      transitionOverlay.value = withTiming(0, { duration: 180 });
+    });
+  }, [persistence.currentPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
@@ -192,30 +212,17 @@ export default function App() {
       callback?.();
       return;
     }
-    // Fade overlay IN (covers old screen)
-    Animated.timing(transitionOverlay, {
-      toValue: 1,
-      duration: 120,
-      useNativeDriver: true,
-    }).start(() => {
-      // While fully opaque: swap colors to match destination screen
-      const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
-      setTransitionOverlayColor(destColor);
-      setRootBgColor(destColor);
-
-      setCurrentScreen(screen);
-      callback?.();
-      // Wait one frame for React to render the new screen before revealing
-      requestAnimationFrame(() => {
-        // Fade overlay OUT — now blends through destination-matching color
-        Animated.timing(transitionOverlay, {
-          toValue: 0,
-          duration: 180,
-          useNativeDriver: true,
-        }).start();
-      });
+    // Cancel any in-flight transition
+    cancelAnimation(transitionOverlay);
+    // Fade overlay IN (covers old screen) — runs on UI thread
+    transitionOverlay.value = withTiming(1, { duration: 120 }, (finished) => {
+      'worklet';
+      if (finished) {
+        // Bridge back to JS thread for React state updates
+        runOnJS(doScreenSwap)(screen, callback);
+      }
     });
-  }, [transitionOverlay, persistence.currentPhase]);
+  }, [persistence.currentPhase, doScreenSwap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep root background in sync with current screen + phase (handles phase changes without transitions)
   useEffect(() => {
@@ -1615,12 +1622,9 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: rootBgColor }}>
       {renderScreen()}
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
-      <Animated.View
+      <Reanimated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, {
-          backgroundColor: transitionOverlayColor,
-          opacity: transitionOverlay,
-        }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: transitionOverlayColor }, transitionOverlayStyle]}
       />
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay

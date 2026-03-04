@@ -14,6 +14,7 @@ import Reanimated, {
   withRepeat,
   withTiming,
   withSequence,
+  withDelay,
   cancelAnimation,
   Easing as REasing,
 } from 'react-native-reanimated';
@@ -146,85 +147,37 @@ const FloatingParticle: React.FC<{ particle: Particle }> = React.memo(({ particl
 // ═══════════════════════════════════════════════════════════════════════════
 
 const SmokePuff: React.FC<{ delay: number }> = React.memo(({ delay }) => {
-  const y = useRef(new Animated.Value(0)).current;
-  const x = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.5)).current;
-  const mountedRef = useRef(true);
-  const animationRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
-
-  // Stable style ref — prevents new object creation on re-render
-  const animStyle = useRef({
-    position: 'absolute' as const,
-    transform: [{ translateX: x }, { translateY: y }, { scale }],
-    opacity,
-  }).current;
+  // Single progress value (0→1 over 3000ms) drives all smoke properties via worklet.
+  // withDelay offsets each puff; withRepeat loops on the UI thread — no JS round-trips.
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    mountedRef.current = true;
+    progress.value = withDelay(
+      delay,
+      withRepeat(withTiming(1, { duration: 3000, easing: REasing.linear }), -1, false)
+    );
+    return () => cancelAnimation(progress);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const animate = () => {
-      if (!mountedRef.current) return;
-
-      y.setValue(0);
-      x.setValue(0);
-      opacity.setValue(0);
-      scale.setValue(0.5);
-
-      const anim = Animated.parallel([
-        Animated.timing(y, {
-          toValue: -40,
-          duration: 3000,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-          delay,
-        }),
-        Animated.timing(x, {
-          toValue: 15 + Math.random() * 10,
-          duration: 3000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          delay,
-        }),
-        Animated.sequence([
-          Animated.timing(opacity, {
-            toValue: 0.6,
-            duration: 500,
-            useNativeDriver: true,
-            delay,
-          }),
-          Animated.timing(opacity, {
-            toValue: 0,
-            duration: 2500,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(scale, {
-          toValue: 1.5,
-          duration: 3000,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-          delay,
-        }),
-      ]);
-      animationRef.current = anim;
-      anim.start(() => {
-        if (mountedRef.current) animate();
-      });
+  const animStyle = useAnimatedStyle(() => {
+    const p = progress.value;
+    // Opacity: ramp up 0→0.6 in first ~17%, then fade 0.6→0 over remaining ~83%
+    const op = p < 0.167 ? (p / 0.167) * 0.6 : 0.6 * (1 - (p - 0.167) / 0.833);
+    return {
+      position: 'absolute' as const,
+      transform: [
+        { translateX: p * 20 },
+        { translateY: p * -40 },
+        { scale: 0.5 + p * 1.0 },
+      ],
+      opacity: op,
     };
-
-    animate();
-
-    return () => {
-      mountedRef.current = false;
-      if (animationRef.current) animationRef.current.stop();
-    };
-  }, []);
+  });
 
   return (
-    <Animated.View style={animStyle}>
+    <Reanimated.View style={animStyle}>
       <Text style={smokeTextStyle}>💨</Text>
-    </Animated.View>
+    </Reanimated.View>
   );
 });
 const smokeTextStyle = { fontSize: 20, color: '#999' };
@@ -234,23 +187,25 @@ const smokeTextStyle = { fontSize: 20, color: '#999' };
 // ═══════════════════════════════════════════════════════════════════════════
 
 const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = React.memo(({ startDelay, yPosition }) => {
+  // Movement stays on RN Animated (one-shot per cycle, not looping)
   const x = useRef(new Animated.Value(-50)).current;
   const y = useRef(new Animated.Value(yPosition)).current;
-  const flapRotation = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const flapAnimRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
   const moveAnimRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
 
-  const scaleY = useRef(flapRotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.6],
-  })).current;
+  // Flap loop uses Reanimated — runs entirely on UI thread, no JS round-trips.
+  // withRepeat(..., -1, true) = infinite, reversing: smooth 0→1→0→1...
+  const flapProgress = useSharedValue(0);
 
-  // Stable style ref — prevents new object creation on re-render
+  const flapStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleY: 1 - 0.4 * flapProgress.value }],
+  }));
+
+  // Stable position style ref for RN Animated (movement)
   const animStyle = useRef({
     position: 'absolute' as const,
-    transform: [{ translateX: x }, { translateY: y }, { scaleY }],
+    transform: [{ translateX: x }, { translateY: y }],
   }).current;
 
   useEffect(() => {
@@ -263,22 +218,11 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = React.me
       x.setValue(goingRight ? -50 : SCREEN_WIDTH + 50);
       y.setValue(yPosition + (Math.random() - 0.5) * 40);
 
-      const flapAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(flapRotation, {
-            toValue: 1,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-          Animated.timing(flapRotation, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-        ])
+      // Start flap on Reanimated UI thread
+      flapProgress.value = withRepeat(
+        withTiming(1, { duration: 150, easing: REasing.linear }),
+        -1, true
       );
-      flapAnimRef.current = flapAnimation;
-      flapAnimation.start();
 
       const moveAnimation = Animated.timing(x, {
         toValue: goingRight ? SCREEN_WIDTH + 50 : -50,
@@ -289,7 +233,8 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = React.me
       });
       moveAnimRef.current = moveAnimation;
       moveAnimation.start(() => {
-        flapAnimation.stop();
+        cancelAnimation(flapProgress);
+        flapProgress.value = 0;
         if (!mountedRef.current) return;
         timeoutRef.current = setTimeout(animate, 5000 + Math.random() * 10000);
       });
@@ -300,14 +245,16 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = React.me
     return () => {
       mountedRef.current = false;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (flapAnimRef.current) flapAnimRef.current.stop();
+      cancelAnimation(flapProgress);
       if (moveAnimRef.current) moveAnimRef.current.stop();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Animated.View style={animStyle} pointerEvents="none">
-      <Text style={birdTextStyle}>🐦</Text>
+      <Reanimated.View style={flapStyle}>
+        <Text style={birdTextStyle}>🐦</Text>
+      </Reanimated.View>
     </Animated.View>
   );
 });
@@ -884,56 +831,44 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
     })),
   []);
 
-  // Sun animation
-  const sunPulse = useRef(new Animated.Value(1)).current;
-  const sunRotation = useRef(new Animated.Value(0)).current;
+  // Sun animation — Reanimated worklets for flicker-free pulse + rotation
+  const sunPulseVal = useSharedValue(1);
+  const sunRotateVal = useSharedValue(0);
 
-  // Cloud animations are now in the isolated CloudLayer component
-
-  // Sun pulsing animation
   useEffect(() => {
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sunPulse, {
-          toValue: 1.15,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(sunPulse, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    const rotateAnimation = Animated.loop(
-      Animated.timing(sunRotation, {
-        toValue: 360,
-        duration: 60000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-
     if (currentPhase < 3) {
-      pulseAnimation.start();
-      rotateAnimation.start();
+      // Pulse: 1 → 1.15 → 1 (4s cycle), entirely on UI thread
+      sunPulseVal.value = withRepeat(
+        withSequence(
+          withTiming(1.15, { duration: 2000, easing: REasing.inOut(REasing.sin) }),
+          withTiming(1, { duration: 2000, easing: REasing.inOut(REasing.sin) }),
+        ),
+        -1, false
+      );
+      // Rotation: 0 → 1 (60s cycle, maps to 0-360deg in style)
+      sunRotateVal.value = withRepeat(
+        withTiming(1, { duration: 60000, easing: REasing.linear }),
+        -1, false
+      );
+    } else {
+      cancelAnimation(sunPulseVal);
+      cancelAnimation(sunRotateVal);
+      sunPulseVal.value = 1;
+      sunRotateVal.value = 0;
     }
 
     return () => {
-      pulseAnimation.stop();
-      rotateAnimation.stop();
+      cancelAnimation(sunPulseVal);
+      cancelAnimation(sunRotateVal);
     };
-  }, [currentPhase]);
+  }, [currentPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Stable sun rotation interpolation — stored in ref to avoid recreation
-  const sunRotate = useRef(sunRotation.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
-  })).current;
+  const sunAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: sunPulseVal.value },
+      { rotate: `${sunRotateVal.value * 360}deg` },
+    ],
+  }));
 
   // Memoize room computations to avoid new arrays/objects on every render.
   // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
@@ -997,12 +932,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
     { transform: [{ translateY }] },
   ]).current;
 
-  // Stable sun style with animated transform — stored in ref to avoid recreation
-  const sunStyle = useRef([
-    styles.sun,
-    { transform: [{ scale: sunPulse }, { rotate: sunRotate }] },
-  ]).current;
-
   // Set initial pan position when room count changes.
   // containerHeight changes are handled directly in onContainerLayout.
   useEffect(() => {
@@ -1064,8 +993,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
 
               {/* Sun with animated rays - hidden at phase 4 */}
               {currentPhase < 4 && (
-                <Animated.View
-                  style={sunOpacityStyle ? [sunStyle[0], sunStyle[1], sunOpacityStyle] : sunStyle}
+                <Reanimated.View
+                  style={sunOpacityStyle ? [styles.sun, sunAnimStyle, sunOpacityStyle] : [styles.sun, sunAnimStyle]}
                   pointerEvents="none"
                 >
                   <View style={styles.sunRays}>
@@ -1074,7 +1003,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
                     ))}
                   </View>
                   <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
-                </Animated.View>
+                </Reanimated.View>
               )}
 
               {/* Moon for phase 4 */}
