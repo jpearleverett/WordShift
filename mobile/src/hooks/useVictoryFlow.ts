@@ -71,8 +71,8 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     victoryModalScale.value = 0.8;
     victoryModalOpacity.value = 0;
 
-    // Stars pop in with staggered delay (200ms apart)
-    const starDelay = 200;
+    // Stars pop in with staggered delay (150ms apart)
+    const starDelay = 150;
     const springConfig = { damping: 4, stiffness: 120 };
     if (stars >= 1) {
       victoryStar1.value = withDelay(0, withSpring(1, springConfig));
@@ -84,11 +84,11 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
       victoryStar3.value = withDelay(starDelay * 2, withSpring(1, springConfig));
     }
 
-    // Modal reveal after stars (delay = stars * 200ms + buffer for spring settle)
+    // Modal reveal after stars (delay = stars * 150ms + buffer for spring settle)
     const modalDelay = stars * starDelay + 100;
     victoryModalScale.value = withDelay(
       modalDelay,
-      withSpring(1, { damping: 6, stiffness: 80 }),
+      withSpring(1, { damping: 8, stiffness: 150 }),
     );
     victoryModalOpacity.value = withDelay(
       modalDelay,
@@ -99,9 +99,9 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     hapticTimeouts.current.forEach(clearTimeout);
     hapticTimeouts.current = [];
     if (stars >= 1) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 100));
-    if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 300));
-    if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 500));
-    hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), 100 + stars * 200 + 150));
+    if (stars >= 2) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 250));
+    if (stars >= 3) hapticTimeouts.current.push(setTimeout(() => hapticLight(), 400));
+    hapticTimeouts.current.push(setTimeout(() => hapticHeavy(), 100 + stars * 150 + 100));
   }, []);
 
   const playPhaseChangeFlash = useCallback(() => {

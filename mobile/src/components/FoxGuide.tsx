@@ -11,11 +11,9 @@ import {
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
-  withRepeat,
   withTiming,
   withSpring,
   cancelAnimation,
-  Easing as REasing,
 } from 'react-native-reanimated';
 import { CandyColors, getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
@@ -82,7 +80,6 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   // Cancels previous animations before starting new ones to prevent overlap jank.
   const fadeVal = useSharedValue(0);
   const slideVal = useSharedValue(30);
-  const bounceProgress = useSharedValue(0);
   const textFadeVal = useSharedValue(1);
   const reducedMotion = getSettingsSync().reducedMotion;
   const hasInteractiveControls = Boolean(onContinue || (showSkip && onSkip));
@@ -98,33 +95,13 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       cancelAnimation(fadeVal);
       cancelAnimation(slideVal);
       slideVal.value = 30;
-      fadeVal.value = withTiming(1, { duration: 300 });
-      slideVal.value = withSpring(0, { damping: 12, stiffness: 100 });
+      fadeVal.value = withTiming(1, { duration: 200 });
+      slideVal.value = withSpring(0, { damping: 14, stiffness: 160 });
     } else {
       cancelAnimation(fadeVal);
-      fadeVal.value = withTiming(0, { duration: 200 });
+      fadeVal.value = withTiming(0, { duration: 150 });
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fox bounce when speaking — Reanimated
-  useEffect(() => {
-    if (reducedMotion || !speaking || !visible) {
-      cancelAnimation(bounceProgress);
-      bounceProgress.value = 0;
-      return;
-    }
-    bounceProgress.value = 0;
-    bounceProgress.value = withRepeat(
-      withTiming(1, { duration: 600, easing: REasing.inOut(REasing.sin) }),
-      -1,
-      true,
-    );
-    return () => cancelAnimation(bounceProgress);
-  }, [speaking, visible]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const bounceStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -4 * bounceProgress.value }],
-  }));
 
   // Animate text changes
   useEffect(() => {
@@ -188,18 +165,16 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           <View style={styles.dialogueRow}>
             {/* Sprite column — 28% width */}
             <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
-              <Reanimated.View style={bounceStyle}>
-                {foxSprite ? (
-                  <Image
-                    source={foxSprite}
-                    style={styles.dialogueSpriteImage}
-                    resizeMode="cover"
-                    accessibilityLabel="Ember portrait"
-                  />
-                ) : (
-                  <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
-                )}
-              </Reanimated.View>
+              {foxSprite ? (
+                <Image
+                  source={foxSprite}
+                  style={styles.dialogueSpriteImage}
+                  resizeMode="cover"
+                  accessibilityLabel="Ember portrait"
+                />
+              ) : (
+                <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
+              )}
             </View>
 
             {/* Text column — 72% */}
@@ -260,12 +235,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     >
       <View style={styles.guideCard}>
         {/* Fox sprite */}
-        <Reanimated.View
-          style={[
-            styles.foxContainer,
-            bounceStyle,
-          ]}
-        >
+        <View style={styles.foxContainer}>
           {foxTalkSprite ? (
             <Image
               source={foxTalkSprite}
@@ -275,7 +245,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           ) : (
             <Text style={styles.foxEmoji}>🦊</Text>
           )}
-        </Reanimated.View>
+        </View>
 
         {/* Speech content */}
         <View style={styles.speechArea}>

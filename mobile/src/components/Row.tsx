@@ -254,7 +254,7 @@ const Slot: React.FC<{
         Animated.spring(previewScale, {
           toValue: 1,
           friction: 6,
-          tension: 180,
+          tension: 220,
           useNativeDriver: true,
         }),
       ]).start();

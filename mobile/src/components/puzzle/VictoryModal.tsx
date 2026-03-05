@@ -195,11 +195,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
       contentOpacity4.setValue(0);
-      Animated.stagger(200, [
-        Animated.timing(contentOpacity1, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(contentOpacity2, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(contentOpacity3, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(contentOpacity4, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.stagger(120, [
+        Animated.timing(contentOpacity1, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.timing(contentOpacity2, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.timing(contentOpacity3, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.timing(contentOpacity4, { toValue: 1, duration: 250, useNativeDriver: true }),
       ]).start();
     } else {
       console.log('[VictoryModal] visible=false (hidden)', { isOnboarding: !!isOnboarding, ts: Date.now() });

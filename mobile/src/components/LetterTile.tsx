@@ -57,23 +57,23 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
 
   // Phase-aware animation parameters for selected tiles
   const getSelectedSpringParams = () => {
-    if (phase >= 4) return { friction: 9, tension: 80 };
-    if (phase >= 3) return { friction: 7, tension: 100 };
-    if (phase >= 2) return { friction: 5, tension: 150 };
+    if (phase >= 4) return { friction: 7, tension: 120 };
+    if (phase >= 3) return { friction: 6, tension: 140 };
+    if (phase >= 2) return { friction: 5, tension: 180 };
     return { friction: 3, tension: 200 };
   };
 
   const getWobbleDurations = () => {
-    if (phase >= 4) return { quarter: 400, half: 800 };
-    if (phase >= 3) return { quarter: 300, half: 600 };
-    if (phase >= 2) return { quarter: 200, half: 400 };
+    if (phase >= 4) return { quarter: 250, half: 500 };
+    if (phase >= 3) return { quarter: 200, half: 400 };
+    if (phase >= 2) return { quarter: 150, half: 300 };
     return { quarter: 150, half: 300 };
   };
 
   const getBounceHeight = () => {
-    if (phase >= 4) return -1.5;
-    if (phase >= 3) return -2;
-    if (phase >= 2) return -3;
+    if (phase >= 4) return -2;
+    if (phase >= 3) return -2.5;
+    if (phase >= 2) return -3.5;
     return -4;
   };
 
@@ -89,13 +89,13 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
-            duration: 1200,
+            duration: 900,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0,
-            duration: 1200,
+            duration: 900,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
