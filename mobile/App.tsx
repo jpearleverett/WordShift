@@ -197,7 +197,7 @@ export default function App() {
     callback?.();
     // Wait one frame for React to render the new screen before revealing
     requestAnimationFrame(() => {
-      transitionOverlay.value = withTiming(0, { duration: 180 });
+      transitionOverlay.value = withTiming(0, { duration: 120 });
     });
   }, [persistence.currentPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -215,7 +215,7 @@ export default function App() {
     // Cancel any in-flight transition
     cancelAnimation(transitionOverlay);
     // Fade overlay IN (covers old screen) — runs on UI thread
-    transitionOverlay.value = withTiming(1, { duration: 120 }, (finished) => {
+    transitionOverlay.value = withTiming(1, { duration: 80 }, (finished) => {
       'worklet';
       if (finished) {
         // Bridge back to JS thread for React state updates
