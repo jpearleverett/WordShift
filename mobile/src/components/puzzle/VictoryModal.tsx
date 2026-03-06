@@ -5,13 +5,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Animated,
   Modal,
   Pressable,
 } from 'react-native';
-import Reanimated, {
+import Animated, {
   SharedValue,
   useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withDelay,
 } from 'react-native-reanimated';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
@@ -174,11 +176,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     transform: [{ scale: star3Scale.value }],
   }));
 
-  // Cascade animation — 4 staggered content groups
-  const contentOpacity1 = useRef(new Animated.Value(0)).current;
-  const contentOpacity2 = useRef(new Animated.Value(0)).current;
-  const contentOpacity3 = useRef(new Animated.Value(0)).current;
-  const contentOpacity4 = useRef(new Animated.Value(0)).current;
+  // Cascade animation — 4 staggered content groups (Reanimated — UI thread)
+  const contentOpacity1 = useSharedValue(0);
+  const contentOpacity2 = useSharedValue(0);
+  const contentOpacity3 = useSharedValue(0);
+  const contentOpacity4 = useSharedValue(0);
+
+  const cascadeStyle1 = useAnimatedStyle(() => ({ opacity: contentOpacity1.value }));
+  const cascadeStyle2 = useAnimatedStyle(() => ({ opacity: contentOpacity2.value }));
+  const cascadeStyle3 = useAnimatedStyle(() => ({ opacity: contentOpacity3.value }));
+  const cascadeStyle4 = useAnimatedStyle(() => ({ opacity: contentOpacity4.value }));
 
   useEffect(() => {
     if (visible) {
@@ -188,24 +195,20 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         phase,
         ts: Date.now(),
       });
-      // Note: when isOnboarding is true, this component returns the native-Modal
-      // path before rendering — the cascade animations below are only used by
-      // the non-onboarding path.
-      contentOpacity1.setValue(0);
-      contentOpacity2.setValue(0);
-      contentOpacity3.setValue(0);
-      contentOpacity4.setValue(0);
-      Animated.stagger(120, [
-        Animated.timing(contentOpacity1, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(contentOpacity2, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(contentOpacity3, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(contentOpacity4, { toValue: 1, duration: 250, useNativeDriver: true }),
-      ]).start();
+      // Staggered cascade: groups fade in 120ms apart, each over 250ms
+      contentOpacity1.value = 0;
+      contentOpacity2.value = 0;
+      contentOpacity3.value = 0;
+      contentOpacity4.value = 0;
+      contentOpacity1.value = withTiming(1, { duration: 250 });
+      contentOpacity2.value = withDelay(120, withTiming(1, { duration: 250 }));
+      contentOpacity3.value = withDelay(240, withTiming(1, { duration: 250 }));
+      contentOpacity4.value = withDelay(360, withTiming(1, { duration: 250 }));
     } else {
       console.log('[VictoryModal] visible=false (hidden)', { isOnboarding: !!isOnboarding, ts: Date.now() });
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
-  // contentOpacity1-4 are stable Animated.Value refs (never reassigned) and
+  // contentOpacity1-4 are stable shared values (never reassigned) and
   // isOnboarding does not change while the modal is visible, so [visible] is
   // the only reactive dependency this effect needs.
 
@@ -360,7 +363,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         bounces={false}
         keyboardShouldPersistTaps="handled"
       >
-          <Reanimated.View
+          <Animated.View
             style={[styles.victoryModal, {
               backgroundColor: phaseTheme.modalBgColor,
               borderColor: btn.modalBorder,
@@ -376,28 +379,28 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Stars — choreographed pop-in */}
             <View style={styles.starsContainer}>
-              <Reanimated.Text style={[
+              <Animated.Text style={[
                 styles.victoryStar,
                 earnedStars < 1 && styles.victoryStarEmpty,
                 star1AnimStyle,
               ]}>
                 {earnedStars >= 1 ? '\u2B50' : '\u2606'}
-              </Reanimated.Text>
-              <Reanimated.Text style={[
+              </Animated.Text>
+              <Animated.Text style={[
                 styles.victoryStar,
                 styles.victoryStarBig,
                 earnedStars < 2 && styles.victoryStarEmpty,
                 star2AnimStyle,
               ]}>
                 {earnedStars >= 2 ? '\u2B50' : '\u2606'}
-              </Reanimated.Text>
-              <Reanimated.Text style={[
+              </Animated.Text>
+              <Animated.Text style={[
                 styles.victoryStar,
                 earnedStars < 3 && styles.victoryStarEmpty,
                 star3AnimStyle,
               ]}>
                 {earnedStars >= 3 ? '\u2B50' : '\u2606'}
-              </Reanimated.Text>
+              </Animated.Text>
             </View>
 
             <Text style={[styles.victoryTitle, {
@@ -414,7 +417,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {/* Groups 1-3 skipped during onboarding — tutorial shows only stars + title + CONTINUE */}
             {!isOnboarding && (<>
             {/* Group 1: Harvest, bonuses, streak, milestone */}
-            <Animated.View style={{ opacity: contentOpacity1 }}>
+            <Animated.View style={cascadeStyle1}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
               <View style={[styles.harvestWordContainer, {
@@ -501,7 +504,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 2: Ritual echo chain */}
-            <Animated.View style={{ opacity: contentOpacity2 }}>
+            <Animated.View style={cascadeStyle2}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
             {completedWords && completedWords.length > 0 && (
               <View style={[
@@ -569,7 +572,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 3: Amber breakdown + Collect Now */}
-            <Animated.View style={{ opacity: contentOpacity3, width: '100%' }}>
+            <Animated.View style={[cascadeStyle3, { width: '100%' }]}>
             {victoryData && (() => {
               const baseAmber = AMBER_REWARDS[difficulty as keyof typeof AMBER_REWARDS] || 0;
               const starBonus = earnedStars >= 3
@@ -692,7 +695,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </>)}
 
             {/* Group 4: Action buttons */}
-            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }} pointerEvents="box-none">
+            <Animated.View style={[cascadeStyle4, { width: '100%' }]} pointerEvents="box-none">
             {phaseTransitionPending ? (
             // Phase transition pending: pit CTA is the only action
             null
@@ -761,7 +764,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </>
             )}
             </Animated.View>
-          </Reanimated.View>
+          </Animated.View>
         </ScrollView>
         {/* Tap-to-skip overlay — absoluteFill within Modal so any tap during the
             star/reveal animation skips to the end.  Rendered after ScrollView so

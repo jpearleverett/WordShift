@@ -42,6 +42,7 @@ import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
+import { DragOverlayPortal, useDragOverlay } from './src/components/DragOverlayPortal';
 import { recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettingsSync } from './src/services/settings';
@@ -138,7 +139,7 @@ export default function App() {
   // Track whether the current slot press originated from a drag-drop (for haptic/effect escalation)
   const isDragDropRef = useRef(false);
   // Store drop-shake animation so it can be stopped if a new one starts before it finishes
-  const dropShakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  // dropShakeAnimRef removed — drop shake now uses Reanimated via dreadActions.triggerDropShake()
 
   // In-progress ritual echo chain — words formed during current puzzle
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
@@ -268,8 +269,19 @@ export default function App() {
     stopSpeedTimer,
   ]);
 
-  // Dread pulse overlay + screen shake
+  // Dread pulse overlay + screen shake (Reanimated — UI thread)
   const [dreadEffects, dreadActions] = useDreadEffects();
+
+  // Animated styles for dread effects
+  const dreadShakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: dreadEffects.screenShakeX.value }],
+  }));
+  const dreadPulseStyle = useAnimatedStyle(() => ({
+    opacity: dreadEffects.dreadPulseOpacity.value,
+  }));
+
+  // Global drag overlay — renders floating tile above all rows to fix z-index clipping
+  const { sharedValues: dragOverlayShared, snapshotRef: dragSnapshotRef, setSnapshot: setDragSnapshot } = useDragOverlay();
 
   // Post-victory orchestration: whisper, interjection, glitch, micro-beat
   const [orchestration, orchestrationActions] = useVictoryOrchestration();
@@ -770,19 +782,8 @@ export default function App() {
       if (wasDragDrop) {
         setSuccessDropSignal(prev => prev + 1);
 
-        // Light screen micro-shake via existing dread shake infrastructure
-        const settings = getSettingsSync();
-        if (!settings.reducedMotion) {
-          dropShakeAnimRef.current?.stop();
-          const shakeAnim = Animated.sequence([
-            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
-            Animated.timing(dreadEffects.screenShakeRef, { toValue: -DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
-            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY * 0.5, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
-            Animated.timing(dreadEffects.screenShakeRef, { toValue: 0, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
-          ]);
-          dropShakeAnimRef.current = shakeAnim;
-          shakeAnim.start(() => { dropShakeAnimRef.current = null; });
-        }
+        // Light screen micro-shake via dread shake infrastructure (Reanimated — UI thread)
+        dreadActions.triggerDropShake(DROP_SHAKE_INTENSITY);
       }
 
       // Track formed word for in-puzzle ritual echo chain
@@ -1190,7 +1191,7 @@ export default function App() {
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
-      <Animated.View style={[styles.container, { transform: [{ translateX: dreadEffects.screenShakeRef }] }]}>
+      <Reanimated.View style={[styles.container, dreadShakeStyle]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
         {/* Animated Background — darkens with narrative phase */}
@@ -1406,6 +1407,8 @@ export default function App() {
                 successDropSignal={successDropSignal}
                 onLetterDragDrop={handleLetterDragDrop}
                 onDragActiveChange={handleDragActiveChange}
+                overlaySharedValues={dragOverlayShared}
+                onSetDragSnapshot={setDragSnapshot}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews
@@ -1567,8 +1570,8 @@ export default function App() {
         )}
 
         {/* Dread Pulse — subtle dark flash when a dread word is formed */}
-        <Animated.View
-          style={[styles.dreadPulseOverlay, { opacity: dreadEffects.dreadPulseOpacity }]}
+        <Reanimated.View
+          style={[styles.dreadPulseOverlay, dreadPulseStyle]}
           pointerEvents="none"
         />
 
@@ -1612,7 +1615,7 @@ export default function App() {
             anchorStyle={foxPuzzleAnchorStyle}
           />
         )}
-      </Animated.View>
+      </Reanimated.View>
       </ErrorBoundary>
     );
   };
@@ -1621,6 +1624,8 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: rootBgColor }}>
       {renderScreen()}
+      {/* Global drag overlay — renders floating tile above all rows/content */}
+      <DragOverlayPortal sharedValues={dragOverlayShared} snapshotRef={dragSnapshotRef} />
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Reanimated.View
         pointerEvents="none"
