@@ -1,5 +1,18 @@
-import React, { useEffect, useRef, memo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import React, { useEffect, memo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useDerivedValue,
+  withSpring,
+  withTiming,
+  withRepeat,
+  withSequence,
+  withDelay,
+  cancelAnimation,
+  Easing,
+  SharedValue,
+} from 'react-native-reanimated';
 import { Letter } from '../types';
 import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
@@ -27,6 +40,28 @@ const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
 const COMPACT_FONT = 21;
 
+// Phase-aware animation parameters for selected tiles
+function getSelectedSpringParams(phase: number) {
+  if (phase >= 4) return { damping: 9, stiffness: 100 };
+  if (phase >= 3) return { damping: 7, stiffness: 140 };
+  if (phase >= 2) return { damping: 6, stiffness: 180 };
+  return { damping: 4, stiffness: 220 };
+}
+
+function getWobbleDurations(phase: number) {
+  if (phase >= 4) return { quarter: 250, half: 500 };
+  if (phase >= 3) return { quarter: 200, half: 400 };
+  if (phase >= 2) return { quarter: 150, half: 300 };
+  return { quarter: 150, half: 300 };
+}
+
+function getBounceHeight(phase: number) {
+  if (phase >= 4) return -2;
+  if (phase >= 3) return -2.5;
+  if (phase >= 2) return -3.5;
+  return -4;
+}
+
 export const LetterTile: React.FC<LetterTileProps> = memo(({
   letter,
   onPress,
@@ -39,436 +74,227 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
   isGuided = false,
 }) => {
   const settings = getSettingsSync();
+  const reducedMotion = settings.reducedMotion;
 
-  // Animation values
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const shineAnim = useRef(new Animated.Value(0)).current;
-  const wobbleAnim = useRef(new Animated.Value(0)).current;
-  const guidePulseAnim = useRef(new Animated.Value(0)).current;
-
-  // Loop refs for proper cleanup (prevents memory leaks)
-  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const shineLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const wobbleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const guideLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  // Phase-aware animation parameters for selected tiles
-  const getSelectedSpringParams = () => {
-    if (phase >= 4) return { friction: 7, tension: 120 };
-    if (phase >= 3) return { friction: 6, tension: 140 };
-    if (phase >= 2) return { friction: 5, tension: 180 };
-    return { friction: 3, tension: 200 };
-  };
-
-  const getWobbleDurations = () => {
-    if (phase >= 4) return { quarter: 250, half: 500 };
-    if (phase >= 3) return { quarter: 200, half: 400 };
-    if (phase >= 2) return { quarter: 150, half: 300 };
-    return { quarter: 150, half: 300 };
-  };
-
-  const getBounceHeight = () => {
-    if (phase >= 4) return -2;
-    if (phase >= 3) return -2.5;
-    if (phase >= 2) return -3.5;
-    return -4;
-  };
+  // === REANIMATED SHARED VALUES ===
+  const scaleAnim = useSharedValue(1);
+  const glowAnim = useSharedValue(0);
+  const bounceAnim = useSharedValue(0);
+  const shineAnim = useSharedValue(0);
+  const wobbleAnim = useSharedValue(0);
+  const guidePulseAnim = useSharedValue(0);
 
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
 
-  // Idle animation for interactable tiles
+  // === IDLE ANIMATION (glow + shine) — Reanimated UI thread ===
   useEffect(() => {
-    if (settings.reducedMotion) return;
+    if (reducedMotion) return;
     if (isInteractable && !isSelected) {
-      // Subtle pulse glow — drives opacity only, native driver safe
-      const glowLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 900,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 900,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
+      // Pulse glow: 0→1→0 on 1800ms cycle
+      glowAnim.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
       );
-      glowLoopRef.current = glowLoop;
-      glowLoop.start();
-
-      // Shine sweep animation
-      const shineLoop = Animated.loop(
-        Animated.sequence([
-          Animated.delay(2000),
-          Animated.timing(shineAnim, {
-            toValue: 1,
-            duration: 600,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(shineAnim, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
+      // Shine sweep: wait 2s then flash 0→1→0
+      shineAnim.value = withRepeat(
+        withSequence(
+          withDelay(2000, withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) })),
+          withTiming(0, { duration: 1 }),
+        ),
+        -1,
       );
-      shineLoopRef.current = shineLoop;
-      shineLoop.start();
     } else {
-      glowAnim.setValue(0);
-      shineAnim.setValue(0);
+      glowAnim.value = 0;
+      shineAnim.value = 0;
     }
 
     return () => {
-      if (glowLoopRef.current) {
-        glowLoopRef.current.stop();
-        glowLoopRef.current = null;
-      }
-      if (shineLoopRef.current) {
-        shineLoopRef.current.stop();
-        shineLoopRef.current = null;
-      }
-      glowAnim.stopAnimation();
-      shineAnim.stopAnimation();
+      cancelAnimation(glowAnim);
+      cancelAnimation(shineAnim);
     };
-  }, [isInteractable, isSelected, settings.reducedMotion]);
+  }, [isInteractable, isSelected, reducedMotion]);
 
-  // Selected bounce animation (phase-aware: bouncy at Phase 0, heavy/ritualistic at Phase 4)
+  // === SELECTED ANIMATION (bounce + wobble + scale) — Reanimated UI thread ===
   useEffect(() => {
-    const currentSettings = getSettingsSync();
-    if (currentSettings.reducedMotion) {
-      scaleAnim.setValue(isSelected ? 1.08 : 1);
-      bounceAnim.setValue(0);
-      wobbleAnim.setValue(0);
+    if (reducedMotion) {
+      scaleAnim.value = isSelected ? 1.08 : 1;
+      bounceAnim.value = 0;
+      wobbleAnim.value = 0;
       return;
     }
     if (isSelected) {
-      const springParams = getSelectedSpringParams();
-      const wobbleDurations = getWobbleDurations();
-      const bounceHeight = getBounceHeight();
+      const spring = getSelectedSpringParams(phase);
+      const wobbleDur = getWobbleDurations(phase);
+      const bounceH = getBounceHeight(phase);
 
-      // Initial pop - phase-aware spring (bouncy Phase 0 → heavy Phase 4)
-      Animated.sequence([
-        Animated.spring(scaleAnim, {
-          toValue: 1.15,
-          friction: springParams.friction,
-          tension: springParams.tension,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1.08,
-          friction: springParams.friction + 1,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Continuous wobble - phase-aware speed (quick Phase 0 → very slow Phase 4)
-      const wobbleLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(wobbleAnim, {
-            toValue: 1,
-            duration: wobbleDurations.quarter,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(wobbleAnim, {
-            toValue: -1,
-            duration: wobbleDurations.half,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(wobbleAnim, {
-            toValue: 0,
-            duration: wobbleDurations.quarter,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
+      // Initial pop — phase-aware spring
+      scaleAnim.value = withSequence(
+        withSpring(1.15, { damping: spring.damping, stiffness: spring.stiffness }),
+        withSpring(1.08, { damping: spring.damping + 2, stiffness: spring.stiffness }),
       );
-      wobbleLoopRef.current = wobbleLoop;
-      wobbleLoop.start();
 
-      // Floating bounce - phase-aware height (light Phase 0 → weighed down Phase 4)
-      const bounceLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(bounceAnim, {
-            toValue: bounceHeight,
-            duration: 400,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounceAnim, {
-            toValue: 0,
-            duration: 400,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
+      // Continuous wobble — ±3° rotation
+      wobbleAnim.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: wobbleDur.quarter, easing: Easing.inOut(Easing.sin) }),
+          withTiming(-1, { duration: wobbleDur.half, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0, { duration: wobbleDur.quarter, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
       );
-      bounceLoopRef.current = bounceLoop;
-      bounceLoop.start();
 
-      // Trail glow at Phase 3+ is now handled by TileGlowCanvas (Skia)
+      // Floating bounce — phase-aware height
+      bounceAnim.value = withRepeat(
+        withSequence(
+          withTiming(bounceH, { duration: 400, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0, { duration: 400, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+      );
     } else {
-      scaleAnim.setValue(1);
-      bounceAnim.setValue(0);
-      wobbleAnim.setValue(0);
+      scaleAnim.value = withTiming(1, { duration: 150 });
+      bounceAnim.value = withTiming(0, { duration: 150 });
+      wobbleAnim.value = withTiming(0, { duration: 100 });
     }
 
     return () => {
-      if (wobbleLoopRef.current) {
-        wobbleLoopRef.current.stop();
-        wobbleLoopRef.current = null;
-      }
-      if (bounceLoopRef.current) {
-        bounceLoopRef.current.stop();
-        bounceLoopRef.current = null;
-      }
-      scaleAnim.stopAnimation();
-      bounceAnim.stopAnimation();
-      wobbleAnim.stopAnimation();
+      cancelAnimation(scaleAnim);
+      cancelAnimation(bounceAnim);
+      cancelAnimation(wobbleAnim);
     };
   }, [isSelected, phase]);
 
-  // Resonance glow is now handled by TileGlowCanvas (Skia)
-
-  // Tutorial guidance pulse for the exact recommended tile.
+  // === TUTORIAL GUIDANCE PULSE ===
   useEffect(() => {
     if (!isGuided) {
-      guidePulseAnim.setValue(0);
+      guidePulseAnim.value = 0;
       return;
     }
-
-    if (settings.reducedMotion) {
-      guidePulseAnim.setValue(1);
+    if (reducedMotion) {
+      guidePulseAnim.value = 1;
       return;
     }
-
-    const guideLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(guidePulseAnim, {
-          toValue: 1,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(guidePulseAnim, {
-          toValue: 0,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
+    guidePulseAnim.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 700, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 700, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
     );
-    guideLoopRef.current = guideLoop;
-    guideLoop.start();
 
-    return () => {
-      if (guideLoopRef.current) {
-        guideLoopRef.current.stop();
-        guideLoopRef.current = null;
-      }
-      guidePulseAnim.stopAnimation();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- guidePulseAnim is a stable ref
-  }, [isGuided, settings.reducedMotion]);
+    return () => { cancelAnimation(guidePulseAnim); };
+  }, [isGuided, reducedMotion]);
 
-  // Trail particles are now handled by TileGlowCanvas (Skia sparks)
-
+  // === PRESS HANDLERS ===
   const handlePressIn = () => {
-    if (settings.reducedMotion) return;
+    if (reducedMotion) return;
     if (isInteractable || isSelected) {
-      Animated.spring(scaleAnim, {
-        toValue: 0.92,
-        friction: 5,
-        tension: 300,
-        useNativeDriver: true,
-      }).start();
+      scaleAnim.value = withSpring(0.92, { damping: 12, stiffness: 300 });
     }
   };
 
   const handlePressOut = () => {
-    if (settings.reducedMotion) return;
+    if (reducedMotion) return;
     if (isInteractable || isSelected) {
-      Animated.spring(scaleAnim, {
-        toValue: isSelected ? 1.08 : 1,
-        friction: 3,
-        tension: 200,
-        useNativeDriver: true,
-      }).start();
+      scaleAnim.value = withSpring(isSelected ? 1.08 : 1, { damping: 8, stiffness: 200 });
     }
   };
 
+  // === STYLES ===
   const getStyles = () => {
     if (highlight === 'locked') {
       if (phase >= 5) {
-        return {
-          bgColor: '#2E2A40',        // Muted purple-gray — eerie calm
-          borderColor: '#3A3555',
-          textColor: '#706890',       // Soft ghostly purple
-          shadowColor: '#2E2A40',
-        };
+        return { bgColor: '#2E2A40', borderColor: '#3A3555', textColor: '#706890', shadowColor: '#2E2A40' };
       }
       if (phase >= 4) {
-        return {
-          bgColor: CandyColors.gray[700],
-          borderColor: CandyColors.gray[800],
-          textColor: CandyColors.gray[500],
-          shadowColor: CandyColors.gray[800],
-        };
+        return { bgColor: CandyColors.gray[700], borderColor: CandyColors.gray[800], textColor: CandyColors.gray[500], shadowColor: CandyColors.gray[800] };
       }
       if (phase >= 3) {
-        return {
-          bgColor: CandyColors.gray[500],
-          borderColor: CandyColors.gray[600],
-          textColor: CandyColors.gray[700],
-          shadowColor: CandyColors.gray[600],
-        };
+        return { bgColor: CandyColors.gray[500], borderColor: CandyColors.gray[600], textColor: CandyColors.gray[700], shadowColor: CandyColors.gray[600] };
       }
-      return {
-        bgColor: CandyColors.gray[300],
-        borderColor: CandyColors.gray[400],
-        textColor: CandyColors.gray[500],
-        shadowColor: CandyColors.gray[400],
-      };
+      return { bgColor: CandyColors.gray[300], borderColor: CandyColors.gray[400], textColor: CandyColors.gray[500], shadowColor: CandyColors.gray[400] };
     }
     if (isSelected) {
       if (phase >= 5) {
-        // Muted purple — peaceful, not aggressive
-        return {
-          bgColor: '#504580',
-          borderColor: '#3A3060',
-          textColor: '#D0C8E8',       // Soft lavender text
-          shadowColor: '#504580',
-        };
+        return { bgColor: '#504580', borderColor: '#3A3060', textColor: '#D0C8E8', shadowColor: '#504580' };
       }
       if (phase >= 4) {
-        // Deep purple instead of pink at phase 4
-        return {
-          bgColor: CandyColors.purple.dark,
-          borderColor: CandyColors.purple.shadow,
-          textColor: CandyColors.gray[200],
-          shadowColor: CandyColors.purple.dark,
-        };
+        return { bgColor: CandyColors.purple.dark, borderColor: CandyColors.purple.shadow, textColor: CandyColors.gray[200], shadowColor: CandyColors.purple.dark };
       }
       if (phase >= 3) {
-        // Darker pink/purple at phase 3
-        return {
-          bgColor: CandyColors.pink.dark,
-          borderColor: CandyColors.pink.shadow,
-          textColor: CandyColors.gray[100],
-          shadowColor: CandyColors.pink.dark,
-        };
+        return { bgColor: CandyColors.pink.dark, borderColor: CandyColors.pink.shadow, textColor: CandyColors.gray[100], shadowColor: CandyColors.pink.dark };
       }
-      return {
-        bgColor: CandyColors.pink.main,
-        borderColor: CandyColors.pink.shadow,
-        textColor: CandyColors.white,
-        shadowColor: CandyColors.pink.main,
-      };
+      return { bgColor: CandyColors.pink.main, borderColor: CandyColors.pink.shadow, textColor: CandyColors.white, shadowColor: CandyColors.pink.main };
     }
     if (isInteractable && highlight === 'source') {
-      return {
-        bgColor: tileColor.bg,
-        borderColor: tileColor.border,
-        textColor: CandyColors.white,
-        shadowColor: tileColor.bg,
-      };
+      return { bgColor: tileColor.bg, borderColor: tileColor.border, textColor: CandyColors.white, shadowColor: tileColor.bg };
     }
-    // Default (non-interactable, non-selected)
     if (phase >= 5) {
-      return {
-        bgColor: '#3A3550',      // Muted purple-gray instead of dark gray
-        borderColor: '#4A4565',
-        textColor: '#9990B0',     // Soft purple text
-        shadowColor: '#3A3550',
-      };
+      return { bgColor: '#3A3550', borderColor: '#4A4565', textColor: '#9990B0', shadowColor: '#3A3550' };
     }
     if (phase >= 4) {
-      return {
-        bgColor: CandyColors.gray[600],
-        borderColor: CandyColors.gray[700],
-        textColor: CandyColors.gray[300],
-        shadowColor: CandyColors.gray[700],
-      };
+      return { bgColor: CandyColors.gray[600], borderColor: CandyColors.gray[700], textColor: CandyColors.gray[300], shadowColor: CandyColors.gray[700] };
     }
     if (phase >= 3) {
-      return {
-        bgColor: CandyColors.gray[200],
-        borderColor: CandyColors.gray[400],
-        textColor: CandyColors.gray[500],
-        shadowColor: CandyColors.gray[400],
-      };
+      return { bgColor: CandyColors.gray[200], borderColor: CandyColors.gray[400], textColor: CandyColors.gray[500], shadowColor: CandyColors.gray[400] };
     }
     if (phase >= 2) {
-      return {
-        bgColor: CandyColors.gray[100],
-        borderColor: CandyColors.gray[300],
-        textColor: CandyColors.gray[600],
-        shadowColor: CandyColors.gray[400],
-      };
+      return { bgColor: CandyColors.gray[100], borderColor: CandyColors.gray[300], textColor: CandyColors.gray[600], shadowColor: CandyColors.gray[400] };
     }
-    return {
-      bgColor: CandyColors.white,
-      borderColor: CandyColors.gray[300],
-      textColor: CandyColors.gray[600],
-      shadowColor: CandyColors.gray[400],
-    };
+    return { bgColor: CandyColors.white, borderColor: CandyColors.gray[300], textColor: CandyColors.gray[600], shadowColor: CandyColors.gray[400] };
   };
 
   const tileStyles = getStyles();
   const isClickable = (isInteractable || isSelected) && onPress;
 
-  // Animated glow intensity
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
+  // === ANIMATED STYLES (all on UI thread via Reanimated) ===
+  const glowOpacity = useDerivedValue(() => 0.3 + glowAnim.value * 0.4);
 
-  // Shine sweep position
-  const shineTranslate = shineAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-60, 60],
-  });
+  const shineTranslateX = useDerivedValue(() => -60 + shineAnim.value * 120);
 
-  // Wobble rotation
-  const wobbleRotate = wobbleAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-3deg', '0deg', '3deg'],
-  });
+  const wobbleRotateDeg = useDerivedValue(() => `${wobbleAnim.value * 3}deg`);
 
-  // Trail glow color (still used for static shadow tint; animated glow is via TileGlowCanvas)
+  // Trail glow color (static shadow tint; animated glow is via TileGlowCanvas)
   const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
-  const guideRingScale = guidePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.18],
-  });
-  const guideRingOpacity = guidePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 1.0],
-  });
+
+  const guideRingScaleVal = useDerivedValue(() => 1 + guidePulseAnim.value * 0.18);
+  const guideRingOpacityVal = useDerivedValue(() => 0.6 + guidePulseAnim.value * 0.4);
+
+  // Main tile transform (scale + bounce + wobble)
+  const tileAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scaleAnim.value },
+      { translateY: bounceAnim.value },
+      { rotate: wobbleRotateDeg.value },
+    ],
+  }));
+
+  // Glow outer opacity
+  const glowAnimStyle = useAnimatedStyle(() => ({
+    opacity: isSelected ? 0.6 : glowOpacity.value,
+  }));
+
+  // Shine sweep transform
+  const shineAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shineTranslateX.value }],
+  }));
+
+  // Guide ring
+  const guideRingAnimStyle = useAnimatedStyle(() => ({
+    opacity: guideRingOpacityVal.value,
+    transform: [{ scale: guideRingScaleVal.value }],
+  }));
 
   const content = (
     <Animated.View
       style={[
         styles.tileOuter,
         compact && { width: COMPACT_OUTER_W, height: COMPACT_OUTER_H, marginHorizontal: 2 },
-        {
-          transform: [
-            { scale: scaleAnim },
-            { translateY: bounceAnim },
-            { rotate: isSelected ? wobbleRotate : '0deg' },
-          ],
-        },
+        tileAnimStyle,
       ]}
     >
       {/* Skia glow canvas — trail glow, sparks, and resonance bloom */}
@@ -484,29 +310,21 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         <Animated.View
           style={[
             styles.glowOuter,
-            {
-              backgroundColor: tileStyles.shadowColor,
-              opacity: isSelected ? 0.6 : glowOpacity,
-            },
+            { backgroundColor: tileStyles.shadowColor },
+            glowAnimStyle,
           ]}
         />
       )}
 
       {isGuided && (
         <Animated.View
-          style={[
-            styles.guideRing,
-            {
-              opacity: guideRingOpacity,
-              transform: [{ scale: guideRingScale }],
-            },
-          ]}
+          style={[styles.guideRing, guideRingAnimStyle]}
           pointerEvents="none"
         />
       )}
 
       {/* Main tile body */}
-      <Animated.View
+      <View
         style={[
           styles.tileBody,
           compact && { width: COMPACT_BODY_W, height: COMPACT_BODY_H, borderRadius: 12 },
@@ -525,8 +343,6 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
 
         {/* Glossy shine overlay */}
         <View style={styles.glossyShine} />
-
-        {/* Resonance glow is now rendered via TileGlowCanvas (Skia blur) */}
 
         {/* Letter text with shadow */}
         <Text
@@ -548,12 +364,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         {/* Moving shine effect */}
         {isInteractable && !isSelected && (
           <Animated.View
-            style={[
-              styles.shineSweep,
-              {
-                transform: [{ translateX: shineTranslate }],
-              },
-            ]}
+            style={[styles.shineSweep, shineAnimStyle]}
           />
         )}
 
@@ -561,7 +372,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         {highlight === 'locked' && (
           <View style={styles.lockOverlay} />
         )}
-      </Animated.View>
+      </View>
 
       {/* 3D bottom edge */}
       <View

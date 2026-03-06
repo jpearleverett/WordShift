@@ -1,5 +1,13 @@
 import React, { useEffect, useRef } from 'react';
-import { Text, StyleSheet, Animated } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  withSequence,
+  runOnJS,
+} from 'react-native-reanimated';
 import { DialoguePhase } from '../../types/homeWorld';
 import { getSettingsSync } from '../../services/settings';
 import { CandyColors } from '../../theme/colors';
@@ -20,6 +28,8 @@ const FADE_OUT_DURATION = 600;
  * A ghost-like whisper from an animal that fades in and out at the bottom
  * of the puzzle screen after puzzle completion. Phase-aware styling shifts
  * from friendly pink/purple to dark crimson as the narrative progresses.
+ *
+ * Fully migrated to Reanimated — fade animation runs on the UI thread.
  */
 export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
   visible,
@@ -28,15 +38,19 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
   phase,
   onComplete,
 }) => {
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useSharedValue(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ref to always call the latest onComplete, avoiding stale closure capture
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
 
+  const fireComplete = () => {
+    onCompleteRef.current();
+  };
+
   useEffect(() => {
     if (!visible) {
-      opacityAnim.setValue(0);
+      opacityAnim.value = 0;
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -48,28 +62,21 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 
     if (reducedMotion) {
       // Show instantly, hold, then hide and call onComplete
-      opacityAnim.setValue(1);
+      opacityAnim.value = 1;
       timerRef.current = setTimeout(() => {
-        opacityAnim.setValue(0);
+        opacityAnim.value = 0;
         onCompleteRef.current();
       }, HOLD_DURATION);
     } else {
-      // Fade in -> hold -> fade out -> onComplete
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: FADE_IN_DURATION,
-        useNativeDriver: true,
-      }).start(() => {
-        timerRef.current = setTimeout(() => {
-          Animated.timing(opacityAnim, {
-            toValue: 0,
-            duration: FADE_OUT_DURATION,
-            useNativeDriver: true,
-          }).start(() => {
-            onCompleteRef.current();
-          });
-        }, HOLD_DURATION);
-      });
+      // Fade in -> hold -> fade out -> onComplete (all on UI thread)
+      opacityAnim.value = withSequence(
+        withTiming(1, { duration: FADE_IN_DURATION }),
+        withDelay(HOLD_DURATION, withTiming(0, { duration: FADE_OUT_DURATION })),
+      );
+      // Fire onComplete after the full sequence
+      timerRef.current = setTimeout(() => {
+        runOnJS(fireComplete)();
+      }, FADE_IN_DURATION + HOLD_DURATION + FADE_OUT_DURATION);
     }
 
     return () => {
@@ -79,6 +86,10 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
       }
     };
   }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacityAnim.value,
+  }));
 
   if (!visible) return null;
 
@@ -102,7 +113,7 @@ export const AnimalWhisper: React.FC<AnimalWhisperProps> = ({
 
   return (
     <Animated.View
-      style={[styles.container, containerStyle, { opacity: opacityAnim }]}
+      style={[styles.container, containerStyle, animatedStyle]}
       pointerEvents="none"
       accessibilityRole="text"
       accessibilityLabel={`${animalName} whispers: ${whisperText}`}
