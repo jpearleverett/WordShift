@@ -152,22 +152,35 @@ function getTrailColor(phase: number): string {
  * Skia-rendered trail behind the floating drag tile.
  * Samples position every TRAIL_SAMPLE_INTERVAL frames and renders fading
  * rounded rects at previous positions — creates a satisfying motion trail.
+ *
+ * All hook calls are at the top level (not inside loops/maps) to satisfy
+ * Rules of Hooks. useFrameCallback is gated by isActive to avoid 60fps
+ * idle overhead when not dragging.
  */
 function DragTrailCanvas({ sharedValues, phase }: {
   sharedValues: DragOverlaySharedValues;
   phase: number;
 }) {
-  // Ring buffer of trail positions (stored as shared values for UI-thread access)
-  const trailX = Array.from({ length: TRAIL_COUNT }, () => useSharedValue(0));
-  const trailY = Array.from({ length: TRAIL_COUNT }, () => useSharedValue(0));
+  // Ring buffer of trail positions — fixed hook calls (NOT in Array.from)
+  const trail0X = useSharedValue(0);
+  const trail0Y = useSharedValue(0);
+  const trail1X = useSharedValue(0);
+  const trail1Y = useSharedValue(0);
+  const trail2X = useSharedValue(0);
+  const trail2Y = useSharedValue(0);
+  const trail3X = useSharedValue(0);
+  const trail3Y = useSharedValue(0);
   const trailActive = useSharedValue(0); // 0 = hidden, 1 = active
   const frameCount = useSharedValue(0);
   const trailIndex = useSharedValue(0);
 
-  // Sample positions on the UI thread
+  // Derive whether the drag is active (for gating the frame callback)
+  const isActive = useDerivedValue(() => sharedValues.opacity.value > 0.5);
+
+  // Sample positions on the UI thread — ONLY runs when drag is active
   useFrameCallback(() => {
     'worklet';
-    if (sharedValues.opacity.value < 0.5) {
+    if (!isActive.value) {
       trailActive.value = 0;
       frameCount.value = 0;
       return;
@@ -177,28 +190,60 @@ function DragTrailCanvas({ sharedValues, phase }: {
 
     if (frameCount.value % TRAIL_SAMPLE_INTERVAL === 0) {
       const idx = trailIndex.value % TRAIL_COUNT;
-      trailX[idx].value = sharedValues.translateX.value + sharedValues.offsetX.value;
-      trailY[idx].value = sharedValues.translateY.value + sharedValues.offsetY.value;
+      const posX = sharedValues.translateX.value + sharedValues.offsetX.value;
+      const posY = sharedValues.translateY.value + sharedValues.offsetY.value;
+      // Write to the correct trail slot
+      if (idx === 0) { trail0X.value = posX; trail0Y.value = posY; }
+      else if (idx === 1) { trail1X.value = posX; trail1Y.value = posY; }
+      else if (idx === 2) { trail2X.value = posX; trail2Y.value = posY; }
+      else { trail3X.value = posX; trail3Y.value = posY; }
       trailIndex.value++;
     }
-  });
+  }, isActive);
 
   const color = getTrailColor(phase);
   const tileW = 52;
   const tileH = 56;
 
-  // Derived opacity/position values for each trail element
-  const trailProps = trailX.map((_, i) => {
-    const x = useDerivedValue(() => trailX[i].value);
-    const y = useDerivedValue(() => trailY[i].value);
-    // Older trail elements are more faded; newest is index (trailIndex - 1)
-    const opacity = useDerivedValue(() => {
-      if (trailActive.value < 0.5) return 0;
-      const age = (trailIndex.value - 1 - i + TRAIL_COUNT) % TRAIL_COUNT;
-      return Math.max(0, 0.25 - age * 0.06);
-    });
-    return { x, y, opacity };
+  // Derived opacity/position values for each trail element — fixed hook calls (NOT in .map)
+  const t0x = useDerivedValue(() => trail0X.value);
+  const t0y = useDerivedValue(() => trail0Y.value);
+  const t0op = useDerivedValue(() => {
+    if (trailActive.value < 0.5) return 0;
+    const age = (trailIndex.value - 1 - 0 + TRAIL_COUNT) % TRAIL_COUNT;
+    return Math.max(0, 0.25 - age * 0.06);
   });
+
+  const t1x = useDerivedValue(() => trail1X.value);
+  const t1y = useDerivedValue(() => trail1Y.value);
+  const t1op = useDerivedValue(() => {
+    if (trailActive.value < 0.5) return 0;
+    const age = (trailIndex.value - 1 - 1 + TRAIL_COUNT) % TRAIL_COUNT;
+    return Math.max(0, 0.25 - age * 0.06);
+  });
+
+  const t2x = useDerivedValue(() => trail2X.value);
+  const t2y = useDerivedValue(() => trail2Y.value);
+  const t2op = useDerivedValue(() => {
+    if (trailActive.value < 0.5) return 0;
+    const age = (trailIndex.value - 1 - 2 + TRAIL_COUNT) % TRAIL_COUNT;
+    return Math.max(0, 0.25 - age * 0.06);
+  });
+
+  const t3x = useDerivedValue(() => trail3X.value);
+  const t3y = useDerivedValue(() => trail3Y.value);
+  const t3op = useDerivedValue(() => {
+    if (trailActive.value < 0.5) return 0;
+    const age = (trailIndex.value - 1 - 3 + TRAIL_COUNT) % TRAIL_COUNT;
+    return Math.max(0, 0.25 - age * 0.06);
+  });
+
+  const trailProps = [
+    { x: t0x, y: t0y, opacity: t0op },
+    { x: t1x, y: t1y, opacity: t1op },
+    { x: t2x, y: t2y, opacity: t2op },
+    { x: t3x, y: t3y, opacity: t3op },
+  ];
 
   return (
     <Canvas style={styles.trailCanvas} pointerEvents="none">
