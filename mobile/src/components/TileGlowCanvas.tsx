@@ -47,6 +47,8 @@ interface TileGlowCanvasProps {
   isResonant: boolean;
   /** Compact mode for 6+ letter words */
   compact: boolean;
+  /** Whether this tile is on the active (source) row — gates animation loops */
+  isActiveRow?: boolean;
 }
 
 // Trail glow color per phase
@@ -92,6 +94,7 @@ export const TileGlowCanvas: React.FC<TileGlowCanvasProps> = ({
   phase,
   isResonant,
   compact,
+  isActiveRow = false,
 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
   const simplified = shouldSimplifyAnimations();
@@ -139,12 +142,14 @@ export const TileGlowCanvas: React.FC<TileGlowCanvasProps> = ({
   }, [isSelected, phase, reducedMotion, simplified]);
 
   // --- Resonance pulse (Phase 1+, resonant words only) ---
+  // Only run animation loops on the active row to avoid saturating the UI thread.
   useEffect(() => {
     if (!isResonant || phase < 1) {
       resonancePulse.value = 0;
       return;
     }
-    if (reducedMotion || simplified) {
+    if (reducedMotion || simplified || !isActiveRow) {
+      // Static glow for non-active rows and reduced motion
       resonancePulse.value = 0.5;
       return;
     }
@@ -157,7 +162,7 @@ export const TileGlowCanvas: React.FC<TileGlowCanvasProps> = ({
       -1,
     );
     return () => cancelAnimation(resonancePulse);
-  }, [isResonant, phase, reducedMotion, simplified]);
+  }, [isResonant, phase, reducedMotion, simplified, isActiveRow]);
 
   // --- Derived glow values ---
   const showTrail = isSelected && phase >= 3;
@@ -181,6 +186,32 @@ export const TileGlowCanvas: React.FC<TileGlowCanvasProps> = ({
     if (!resConfig) return 0;
     return resConfig.minOp + resonancePulse.value * (resConfig.maxOp - resConfig.minOp);
   });
+
+  // --- Spark derived values (fixed hook calls — NOT inside .map()) ---
+  // Each spark needs cx, cy, opacity derived from sparkProgress + trailPulse.
+  // We pre-compute all 4 sets of derived values unconditionally to satisfy Rules of Hooks.
+  const spark0Cx = useDerivedValue(() => cx + Math.cos(SPARK_OFFSETS[0].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[0].dist);
+  const spark0Cy = useDerivedValue(() => cy + Math.sin(SPARK_OFFSETS[0].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[0].dist * 0.6);
+  const spark0Op = useDerivedValue(() => (Math.sin(SPARK_OFFSETS[0].angle + sparkProgress.value * Math.PI * 2) * 0.5 + 0.5) * trailPulse.value * 0.6);
+
+  const spark1Cx = useDerivedValue(() => cx + Math.cos(SPARK_OFFSETS[1].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[1].dist);
+  const spark1Cy = useDerivedValue(() => cy + Math.sin(SPARK_OFFSETS[1].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[1].dist * 0.6);
+  const spark1Op = useDerivedValue(() => (Math.sin(SPARK_OFFSETS[1].angle + sparkProgress.value * Math.PI * 2) * 0.5 + 0.5) * trailPulse.value * 0.6);
+
+  const spark2Cx = useDerivedValue(() => cx + Math.cos(SPARK_OFFSETS[2].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[2].dist);
+  const spark2Cy = useDerivedValue(() => cy + Math.sin(SPARK_OFFSETS[2].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[2].dist * 0.6);
+  const spark2Op = useDerivedValue(() => (Math.sin(SPARK_OFFSETS[2].angle + sparkProgress.value * Math.PI * 2) * 0.5 + 0.5) * trailPulse.value * 0.6);
+
+  const spark3Cx = useDerivedValue(() => cx + Math.cos(SPARK_OFFSETS[3].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[3].dist);
+  const spark3Cy = useDerivedValue(() => cy + Math.sin(SPARK_OFFSETS[3].angle + sparkProgress.value * Math.PI * 2) * SPARK_OFFSETS[3].dist * 0.6);
+  const spark3Op = useDerivedValue(() => (Math.sin(SPARK_OFFSETS[3].angle + sparkProgress.value * Math.PI * 2) * 0.5 + 0.5) * trailPulse.value * 0.6);
+
+  const sparkDerivedValues = [
+    { cx: spark0Cx, cy: spark0Cy, op: spark0Op },
+    { cx: spark1Cx, cy: spark1Cy, op: spark1Op },
+    { cx: spark2Cx, cy: spark2Cy, op: spark2Op },
+    { cx: spark3Cx, cy: spark3Cy, op: spark3Op },
+  ];
 
   // Determine if there's anything to render
   const hasTrail = isSelected && phase >= 3 && !reducedMotion;
@@ -220,35 +251,18 @@ export const TileGlowCanvas: React.FC<TileGlowCanvasProps> = ({
       )}
 
       {/* Layer 2: Trail sparks — small orbiting blurred circles */}
-      {hasSparks && SPARK_OFFSETS.map((spark, i) => {
-        const sparkCx = useDerivedValue(() => {
-          const angle = spark.angle + sparkProgress.value * Math.PI * 2;
-          return cx + Math.cos(angle) * spark.dist;
-        });
-        const sparkCy = useDerivedValue(() => {
-          const angle = spark.angle + sparkProgress.value * Math.PI * 2;
-          return cy + Math.sin(angle) * spark.dist * 0.6;
-        });
-        const sparkOp = useDerivedValue(() => {
-          // Fade in/out as sparks orbit
-          const angle = spark.angle + sparkProgress.value * Math.PI * 2;
-          const fade = Math.sin(angle) * 0.5 + 0.5; // 0→1→0 per orbit
-          return fade * trailPulse.value * 0.6;
-        });
-
-        return (
-          <Circle
-            key={i}
-            cx={sparkCx}
-            cy={sparkCy}
-            r={3}
-            color={trailColor}
-            opacity={sparkOp}
-          >
-            <BlurMask blur={4} style="solid" />
-          </Circle>
-        );
-      })}
+      {hasSparks && sparkDerivedValues.map((spark, i) => (
+        <Circle
+          key={i}
+          cx={spark.cx}
+          cy={spark.cy}
+          r={3}
+          color={trailColor}
+          opacity={spark.op}
+        >
+          <BlurMask blur={4} style="solid" />
+        </Circle>
+      ))}
 
       {/* Layer 3: Resonance glow — inner bloom for dread words */}
       {hasResonance && resConfig && (

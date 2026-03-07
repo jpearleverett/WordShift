@@ -31,6 +31,8 @@ interface LetterTileProps {
   isResonant?: boolean;
   /** Tutorial guidance highlight for the recommended tile */
   isGuided?: boolean;
+  /** Whether this tile is on the currently active (source) row — gates decorative animation loops */
+  isActiveRow?: boolean;
 }
 
 // Compact tile dimensions for 6+ letter words
@@ -72,6 +74,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
   compact = false,
   isResonant = false,
   isGuided = false,
+  isActiveRow = false,
 }) => {
   const settings = getSettingsSync();
   const reducedMotion = settings.reducedMotion;
@@ -88,9 +91,10 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
   const tileColor = getTileColor(letter.char);
 
   // === IDLE ANIMATION (glow + shine) — Reanimated UI thread ===
+  // Only run continuous loops on the active (source) row to avoid saturating the UI thread.
   useEffect(() => {
     if (reducedMotion) return;
-    if (isInteractable && !isSelected) {
+    if (isActiveRow && isInteractable && !isSelected) {
       // Pulse glow: 0→1→0 on 1800ms cycle
       glowAnim.value = withRepeat(
         withSequence(
@@ -116,7 +120,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
       cancelAnimation(glowAnim);
       cancelAnimation(shineAnim);
     };
-  }, [isInteractable, isSelected, reducedMotion]);
+  }, [isActiveRow, isInteractable, isSelected, reducedMotion]);
 
   // === SELECTED ANIMATION (bounce + wobble + scale) — Reanimated UI thread ===
   useEffect(() => {
@@ -303,6 +307,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         phase={phase}
         isResonant={isResonant}
         compact={compact}
+        isActiveRow={isActiveRow}
       />
 
       {/* Outer glow for interactable/selected */}

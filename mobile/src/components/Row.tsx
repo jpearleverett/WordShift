@@ -160,13 +160,11 @@ const Slot: React.FC<{
 
   // All animation values on the UI thread
   const scaleAnim = useSharedValue(settings.reducedMotion ? 1 : 0);
-  const pulseAnim = useSharedValue(0);
-  const glowAnim = useSharedValue(0);
   const catchBounceAnim = useSharedValue(1);
   const previewOpacity = useSharedValue(0);
   const previewScale = useSharedValue(0.85);
 
-  // Pop-in + decorative loops
+  // Pop-in (one-shot — no continuous loops to avoid saturating the UI thread)
   useEffect(() => {
     if (settings.reducedMotion) {
       scaleAnim.value = 1;
@@ -179,36 +177,9 @@ const Slot: React.FC<{
       withSpring(1, { damping: 10, stiffness: 150 })
     );
 
-    // Skip decorative loops on low-end devices
-    if (shouldSimplifyAnimations()) {
-      return () => {
-        cancelAnimation(scaleAnim);
-        cancelAnimation(catchBounceAnim);
-      };
-    }
-
-    // Continuous pulse (UI thread loop)
-    pulseAnim.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 800, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1
-    );
-
-    // Glow animation (UI thread loop)
-    glowAnim.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 1000, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1
-    );
-
     return () => {
-      cancelAnimation(pulseAnim);
-      cancelAnimation(glowAnim);
       cancelAnimation(scaleAnim);
+      cancelAnimation(catchBounceAnim);
     };
   }, []);
 
@@ -238,9 +209,8 @@ const Slot: React.FC<{
     }
   }, [preview?.word, preview?.isValid]);
 
-  // Derived values for interpolations
-  const pulseScale = useDerivedValue(() => 1 + pulseAnim.value * 0.08);
-  const glowOpacityDerived = useDerivedValue(() => 0.4 + glowAnim.value * 0.4);
+  // Static glow opacity (no continuous loop — saves 2 UI-thread animation loops per slot)
+  const STATIC_GLOW_OPACITY = 0.6;
 
   const handlePressIn = useCallback(() => {
     if (settings.reducedMotion) return;
@@ -258,12 +228,12 @@ const Slot: React.FC<{
   }));
 
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacityDerived.value,
+    opacity: STATIC_GLOW_OPACITY,
   }));
 
   const guidedHaloStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacityDerived.value,
-    transform: [{ scale: pulseScale.value }],
+    opacity: STATIC_GLOW_OPACITY,
+    transform: [{ scale: 1 }],
   }));
 
   const previewStyle = useAnimatedStyle(() => ({
@@ -450,17 +420,8 @@ export const Row: React.FC<RowProps> = memo(({
     if (isSource) {
       rowScale.value = withSpring(1, { damping: 10, stiffness: 100 });
       rowOpacity.value = withTiming(1, { duration: 300 });
-
-      // Glow pulse for active row (skip on low-end devices)
-      if (!shouldSimplifyAnimations()) {
-        rowGlow.value = withRepeat(
-          withSequence(
-            withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-            withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-          ),
-          -1
-        );
-      }
+      // Static glow — no continuous loop (saves 1 UI-thread animation loop per row)
+      rowGlow.value = 0.5;
     } else if (isTarget) {
       const guidedTarget = guidanceActive;
       rowScale.value = withSpring(guidedTarget ? 1 : 0.98, { damping: 12 });
@@ -473,10 +434,6 @@ export const Row: React.FC<RowProps> = memo(({
       rowScale.value = withTiming(0.88, { duration: 300 });
       rowOpacity.value = withTiming(0.25, { duration: 300 });
     }
-
-    return () => {
-      cancelAnimation(rowGlow);
-    };
   }, [isSource, isTarget, isCompleted, guidanceActive]);
 
   // Animate arc when slots appear/disappear - smooth glide effect
@@ -585,6 +542,7 @@ export const Row: React.FC<RowProps> = memo(({
               compact={compactTiles}
               isResonant={isRowResonant}
               isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
+              isActiveRow={isSource}
             />
           </ArcElement>
         );
@@ -615,6 +573,7 @@ export const Row: React.FC<RowProps> = memo(({
           compact={compactTiles}
           isResonant={isRowResonant}
           isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
+          isActiveRow={isSource}
         />
       );
 
