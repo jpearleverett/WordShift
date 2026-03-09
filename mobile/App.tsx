@@ -81,6 +81,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 export default function App() {
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
+  const [homePanY, setHomePanY] = useState<number | null>(null);
   // Daily challenge state
   const [isPlayingDaily, setIsPlayingDaily] = useState(false);
 
@@ -1057,6 +1058,8 @@ export default function App() {
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
               pitPhaseReady={persistence.pendingPhaseTransition != null}
+              initialHousePanY={homePanY}
+              onHousePanChange={setHomePanY}
             />
             {/* Achievement toast overlay */}
             <AchievementToast

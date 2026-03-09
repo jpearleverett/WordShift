@@ -98,6 +98,10 @@ interface HomeScreenProps {
   onAdvanceOnboarding?: (step: OnboardingStep) => Promise<void>;
   /** Whether a phase transition is pending in the pit */
   pitPhaseReady?: boolean;
+  /** Persisted vertical pan position for the house scene */
+  initialHousePanY?: number | null;
+  /** Persist the latest house pan position */
+  onHousePanChange?: (panY: number) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -112,6 +116,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onStartDaily,
   onboardingStep,
   onAdvanceOnboarding,
+  initialHousePanY = null,
+  onHousePanChange,
 }) => {
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
@@ -806,159 +812,165 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </View>
 
-      {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
-      {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
-        <View
-          style={styles.unlockProgressContainer}
-          accessibilityLabel={`Next unlock. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
-          accessibilityRole="progressbar"
-          accessibilityValue={{
-            min: 0,
-            max: unlockFlow.nextUnlock.cost || 1,
-            now: Math.min(progress.amber, unlockFlow.nextUnlock.cost || 1),
-          }}
-        >
-          <View style={styles.unlockProgressInner}>
-            <Text style={styles.unlockProgressLabel}>
-              Next Unlock
-            </Text>
-            <View style={styles.unlockProgressBarBg}>
-              <View
-                style={[
-                  styles.unlockProgressBarFill,
-                  {
-                    width: `${Math.min(100, unlockFlow.nextUnlock.cost > 0
-                      ? (progress.amber / unlockFlow.nextUnlock.cost) * 100
-                      : 100)}%`,
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.unlockProgressText}>
-              {unlockFlow.nextUnlock.cost === 0
-                ? 'FREE'
-                : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
-            </Text>
-          </View>
-        </View>
-      )}
+      <View style={styles.houseStage}>
+        {/* House World */}
+        <HouseWorld
+          rooms={rooms}
+          animals={animals}
+          currentPhase={progress.currentPhase}
+          onAnimalPress={dialogueFlow.handleAnimalTap}
+          onRoomPress={unlockFlow.handleRoomPress}
+          ritualWords={progress.ritualWords}
+          nextUnlock={unlockFlow.nextUnlock}
+          amberBalance={progress.amber}
+          purchasedUpgrades={purchasedUpgrades}
+          savedPanY={initialHousePanY}
+          onPanYChange={onHousePanChange}
+        />
 
-      {/* Action Row — Gallery + Pit (hidden during onboarding) */}
-      {!isOnboarding && (
-        <View style={styles.actionRow}>
-          {onOpenGallery && (
-            <TouchableOpacity
-              style={styles.actionRowButton}
-              onPress={() => {
-                hapticLight();
-                onOpenGallery?.();
+        <View style={styles.homeOverlayColumn} pointerEvents="box-none">
+          {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
+          {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
+            <View
+              style={styles.unlockProgressContainer}
+              accessibilityLabel={`Next unlock. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
+              accessibilityRole="progressbar"
+              accessibilityValue={{
+                min: 0,
+                max: unlockFlow.nextUnlock.cost || 1,
+                now: Math.min(progress.amber, unlockFlow.nextUnlock.cost || 1),
               }}
-              accessibilityLabel="Whisper Gallery"
-              accessibilityRole="button"
             >
-              <Text style={styles.actionRowButtonText}>
-                📜 {getGalleryTitle(progress.currentPhase)}
-              </Text>
-            </TouchableOpacity>
+              <View style={styles.unlockProgressInner}>
+                <Text style={styles.unlockProgressLabel}>
+                  Next Unlock
+                </Text>
+                <View style={styles.unlockProgressBarBg}>
+                  <View
+                    style={[
+                      styles.unlockProgressBarFill,
+                      {
+                        width: `${Math.min(100, unlockFlow.nextUnlock.cost > 0
+                          ? (progress.amber / unlockFlow.nextUnlock.cost) * 100
+                          : 100)}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.unlockProgressText}>
+                  {unlockFlow.nextUnlock.cost === 0
+                    ? 'FREE'
+                    : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
+                </Text>
+              </View>
+            </View>
           )}
-          {onOpenPit && (
-            <Animated.View style={pitPhaseReady ? {
-              transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
-              opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
-            } : undefined}>
-              <TouchableOpacity
-                style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
-                onPress={() => {
-                  hapticLight();
-                  onOpenPit();
-                }}
-                accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pitPhaseReady ? ' - phase transition ready' : ''}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
-                accessibilityRole="button"
+
+          {/* Action Row — Gallery + Pit (hidden during onboarding) */}
+          {!isOnboarding && (
+            <View style={styles.actionRow}>
+              {onOpenGallery && (
+                <TouchableOpacity
+                  style={styles.actionRowButton}
+                  onPress={() => {
+                    hapticLight();
+                    onOpenGallery?.();
+                  }}
+                  accessibilityLabel="Whisper Gallery"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionRowButtonText}>
+                    📜 {getGalleryTitle(progress.currentPhase)}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {onOpenPit && (
+                <Animated.View style={pitPhaseReady ? {
+                  transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+                  opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
+                } : undefined}>
+                  <TouchableOpacity
+                    style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
+                    onPress={() => {
+                      hapticLight();
+                      onOpenPit();
+                    }}
+                    accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pitPhaseReady ? ' - phase transition ready' : ''}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.actionRowButtonText, pitPhaseReady && { color: '#FFD700' }]}>
+                      {pitPhaseReady ? '🔥' : '⭕'} {getPitHomeBadgeLabel(progress.currentPhase)}
+                      {pendingHarvest && pendingHarvest.pendingBatches > 0 && (
+                        ` (${pendingHarvest.pendingWords})`
+                      )}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+              {isSacrificeAvailable(progress.currentPhase) && (
+                <TouchableOpacity
+                  style={[styles.actionRowButton, styles.sacrificeButton]}
+                  onPress={() => {
+                    hapticSelection();
+                    setShowSacrificeModal(true);
+                  }}
+                  accessibilityLabel="Offer amber to the arrangement"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionRowButtonText}>
+                    🕯️ {getSacrificePrompt(progress.currentPhase).title}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
+          {ambientLine && !isOnboarding && (
+            <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
+              <Text
+                style={[
+                  styles.ambientLineText,
+                  { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
+                ]}
               >
-                <Text style={[styles.actionRowButtonText, pitPhaseReady && { color: '#FFD700' }]}>
-                  {pitPhaseReady ? '🔥' : '⭕'} {getPitHomeBadgeLabel(progress.currentPhase)}
-                  {pendingHarvest && pendingHarvest.pendingBatches > 0 && (
-                    ` (${pendingHarvest.pendingWords})`
-                  )}
+                {ambientLine}
+              </Text>
+            </Animated.View>
+          )}
+
+          {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
+          {goalSuggestion && !isOnboarding && (
+            <Animated.View style={{ opacity: goalOpacity }}>
+              <TouchableOpacity
+                style={styles.goalSuggestionContainer}
+                onPress={() => {
+                  if (goalSuggestion.action === 'daily' && onStartDaily) {
+                    onStartDaily('HARD' as Difficulty);
+                  } else if (goalSuggestion.action === 'play') {
+                    onPlayPuzzle();
+                  }
+                }}
+                activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
+              >
+                <Text
+                  style={[
+                    styles.goalSuggestionText,
+                    { color: getPhaseTheme(progress.currentPhase).modalTextColor },
+                  ]}
+                >
+                  {goalSuggestion.text}
                 </Text>
               </TouchableOpacity>
             </Animated.View>
           )}
-          {isSacrificeAvailable(progress.currentPhase) && (
-            <TouchableOpacity
-              style={[styles.actionRowButton, styles.sacrificeButton]}
-              onPress={() => {
-                hapticSelection();
-                setShowSacrificeModal(true);
-              }}
-              accessibilityLabel="Offer amber to the arrangement"
-              accessibilityRole="button"
-            >
-              <Text style={styles.actionRowButtonText}>
-                🕯️ {getSacrificePrompt(progress.currentPhase).title}
-              </Text>
-            </TouchableOpacity>
-          )}
         </View>
-      )}
 
-      {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
-      {ambientLine && !isOnboarding && (
-        <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
-          <Text
-            style={[
-              styles.ambientLineText,
-              { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
-            ]}
-          >
-            {ambientLine}
-          </Text>
-        </Animated.View>
-      )}
-
-      {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
-      {goalSuggestion && !isOnboarding && (
-        <Animated.View style={{ opacity: goalOpacity }}>
-          <TouchableOpacity
-            style={styles.goalSuggestionContainer}
-            onPress={() => {
-              if (goalSuggestion.action === 'daily' && onStartDaily) {
-                onStartDaily('HARD' as Difficulty);
-              } else if (goalSuggestion.action === 'play') {
-                onPlayPuzzle();
-              }
-            }}
-            activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
-          >
-            <Text
-              style={[
-                styles.goalSuggestionText,
-                { color: getPhaseTheme(progress.currentPhase).modalTextColor },
-              ]}
-            >
-              {goalSuggestion.text}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
-      {/* Celebration Confetti */}
-      {showCelebration && (
-        <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
-      )}
-
-      {/* House World */}
-      <HouseWorld
-        rooms={rooms}
-        animals={animals}
-        currentPhase={progress.currentPhase}
-        onAnimalPress={dialogueFlow.handleAnimalTap}
-        onRoomPress={unlockFlow.handleRoomPress}
-        ritualWords={progress.ritualWords}
-        nextUnlock={unlockFlow.nextUnlock}
-        amberBalance={progress.amber}
-        purchasedUpgrades={purchasedUpgrades}
-      />
+        {/* Celebration Confetti */}
+        {showCelebration && (
+          <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
+        )}
+      </View>
 
       {/* Cooldown Message Toast */}
       {Boolean(dialogueFlow.cooldownMessage) && (
@@ -974,7 +986,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ]}
           pointerEvents="none"
           accessibilityLiveRegion="polite"
-          accessibilityLabel={dialogueFlow.cooldownMessage}
+          accessibilityLabel={dialogueFlow.cooldownMessage ?? undefined}
         >
           <Text style={styles.cooldownToastText}>{dialogueFlow.cooldownMessage}</Text>
         </Animated.View>
@@ -1645,6 +1657,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#6fb7df',
   },
+  houseStage: {
+    flex: 1,
+  },
+  homeOverlayColumn: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -2181,6 +2203,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     marginRight: 12,
+  },
+  introDialogueFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  introDialogueProgress: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  introContinueButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  introContinueButtonText: {
+    color: CandyColors.white,
+    fontSize: 15,
+    fontWeight: '800',
   },
 
   // Dialogue choice buttons (Phase 3)
