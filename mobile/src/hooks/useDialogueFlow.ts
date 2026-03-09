@@ -63,7 +63,6 @@ interface UseDialogueFlowReturn {
   cooldownOpacity: Animated.Value;
   cooldownSlide: Animated.Value;
   dialogueSlide: Animated.Value;
-  isTalking: boolean;
   hasMoreToShow: boolean;
   /** Active dialogue choice for Phase 3 choice points */
   activeChoice: DialogueChoice | null;
@@ -92,7 +91,6 @@ export function useDialogueFlow({
   const [showDialogue, setShowDialogue] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
-  const [isTalking, setIsTalking] = useState(false);
 
   // Pre-dialogue pages: shown before regular dialogue, one at a time
   // These are trigger reactions, cross-animal refs, coordinated events, etc.
@@ -213,22 +211,6 @@ export function useDialogueFlow({
       cooldownVisibleRef.current = false;
     }
   }, [cooldownMessage]);
-
-  // Talking animation - alternate between idle and talk sprites
-  useEffect(() => {
-    if (showDialogue) {
-      if (getSettingsSync().reducedMotion) {
-        setIsTalking(true);
-        return;
-      }
-      const interval = setInterval(() => {
-        setIsTalking(prev => !prev);
-      }, 300);
-      return () => clearInterval(interval);
-    } else {
-      setIsTalking(false);
-    }
-  }, [showDialogue]);
 
   // Get current dialogue text — shows pre-dialogue pages first, then regular dialogue
   const getDialogueText = (): string => {
@@ -652,7 +634,6 @@ export function useDialogueFlow({
     cooldownOpacity,
     cooldownSlide,
     dialogueSlide,
-    isTalking,
     hasMoreToShow: computeHasMore(),
     activeChoice,
     handleAnimalTap,

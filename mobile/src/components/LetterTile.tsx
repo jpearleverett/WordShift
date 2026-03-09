@@ -35,6 +35,10 @@ interface LetterTileProps {
   isActiveRow?: boolean;
 }
 
+export function shouldRenderTileGlow(isSelected: boolean, isResonant: boolean): boolean {
+  return isSelected || isResonant;
+}
+
 // Compact tile dimensions for 6+ letter words
 const COMPACT_OUTER_W = 42;
 const COMPACT_OUTER_H = 52;
@@ -301,14 +305,16 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         tileAnimStyle,
       ]}
     >
-      {/* Skia glow canvas — trail glow, sparks, and resonance bloom */}
-      <TileGlowCanvas
-        isSelected={!!isSelected}
-        phase={phase}
-        isResonant={isResonant}
-        compact={compact}
-        isActiveRow={isActiveRow}
-      />
+      {/* Skip idle glow canvases entirely to keep the board light while not selected/resonant. */}
+      {shouldRenderTileGlow(!!isSelected, isResonant) && (
+        <TileGlowCanvas
+          isSelected={!!isSelected}
+          phase={phase}
+          isResonant={isResonant}
+          compact={compact}
+          isActiveRow={isActiveRow}
+        />
+      )}
 
       {/* Outer glow for interactable/selected */}
       {(isInteractable || isSelected) && highlight !== 'locked' && (

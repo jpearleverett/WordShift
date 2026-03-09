@@ -127,12 +127,12 @@ export function DraggableTile({
       startAbsX.value = e.absoluteX - e.x;
       startAbsY.value = e.absoluteY - e.y;
       dragActivated.value = false;
-      runOnJS(jsDragActiveChange)(true);
     })
     .onStart((e) => {
       'worklet';
       // Drag threshold crossed — activate drag mode
       dragActivated.value = true;
+      runOnJS(jsDragActiveChange)(true);
 
       // Ghost the source tile with spring (smooth, not instant)
       sourceOpacity.value = withSpring(0.25, { damping: 20, stiffness: 300 });
