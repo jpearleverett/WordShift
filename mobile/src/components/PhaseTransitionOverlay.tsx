@@ -1,16 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withRepeat,
-  withSequence,
-  withDelay,
-  cancelAnimation,
-  runOnJS,
-  Easing,
-} from 'react-native-reanimated';
+import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
 import { PhaseTransitionEvent, PhaseScene, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
@@ -49,8 +38,9 @@ const CinematicParticle: React.FC<{
   config: CinematicParticleConfig;
   index: number;
 }> = ({ config, index }) => {
-  const translateMain = useSharedValue(0);
-  const wobble = useSharedValue(0);
+  const translateMain = useRef(new Animated.Value(0)).current;
+  const wobble = useRef(new Animated.Value(0)).current;
+  const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const startX = useRef(Math.random() * SCREEN_WIDTH).current;
   const startDelay = useRef(index * 300 + Math.random() * 500).current;
@@ -61,32 +51,35 @@ const CinematicParticle: React.FC<{
     const isVertical = config.direction === 'rise' || config.direction === 'fall';
     const distance = isVertical ? SCREEN_HEIGHT + 50 : SCREEN_WIDTH + 50;
     const duration = (distance / config.speed) * 80;
-    const target = config.direction === 'rise' ? -(SCREEN_HEIGHT + 50) : distance;
 
-    translateMain.value = withDelay(
-      startDelay,
-      withRepeat(
-        withSequence(
-          withTiming(target, { duration, easing: Easing.linear }),
-          withTiming(0, { duration: 0 })
-        ),
-        -1
-      )
+    const mainAnim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(startDelay),
+        Animated.timing(translateMain, {
+          toValue: config.direction === 'rise' ? -(SCREEN_HEIGHT + 50) : distance,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateMain, { toValue: 0, duration: 0, useNativeDriver: true }),
+      ])
     );
 
-    if (isVertical) {
-      wobble.value = withRepeat(
-        withSequence(
-          withTiming(15,  { duration: 1000 }),
-          withTiming(-15, { duration: 1000 })
-        ),
-        -1
-      );
-    }
+    const wobbleAnim = isVertical ? Animated.loop(
+      Animated.sequence([
+        Animated.timing(wobble, { toValue: 15, duration: 1000, useNativeDriver: true }),
+        Animated.timing(wobble, { toValue: -15, duration: 1000, useNativeDriver: true }),
+      ])
+    ) : null;
+
+    loopRef.current = mainAnim;
+    mainAnim.start();
+    wobbleAnim?.start();
 
     return () => {
-      cancelAnimation(translateMain);
-      cancelAnimation(wobble);
+      mainAnim.stop();
+      wobbleAnim?.stop();
+      translateMain.stopAnimation();
+      wobble.stopAnimation();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: particles are
   // created fresh per transition event and destroyed when the overlay closes.
@@ -94,29 +87,22 @@ const CinematicParticle: React.FC<{
 
   const isVertical = config.direction === 'rise' || config.direction === 'fall';
   const startY = config.direction === 'rise' ? SCREEN_HEIGHT : -50;
-  const baseOpacity = getSettingsSync().reducedMotion ? config.opacity * 0.5 : config.opacity;
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: isVertical
-      ? [{ translateY: translateMain.value }, { translateX: wobble.value }]
-      : [{ translateX: translateMain.value }],
-  }));
 
   return (
     <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          left: isVertical ? startX : -50,
-          top: isVertical ? startY : Math.random() * SCREEN_HEIGHT,
-          width: config.size,
-          height: config.size,
-          borderRadius: config.size / 2,
-          backgroundColor: config.color,
-          opacity: baseOpacity,
-        },
-        animStyle,
-      ]}
+      style={{
+        position: 'absolute',
+        left: isVertical ? startX : -50,
+        top: isVertical ? startY : Math.random() * SCREEN_HEIGHT,
+        width: config.size,
+        height: config.size,
+        borderRadius: config.size / 2,
+        backgroundColor: config.color,
+        opacity: getSettingsSync().reducedMotion ? config.opacity * 0.5 : config.opacity,
+        transform: isVertical
+          ? [{ translateY: translateMain }, { translateX: wobble }]
+          : [{ translateX: translateMain }],
+      }}
     />
   );
 };
@@ -125,32 +111,23 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   event,
   onComplete,
 }) => {
-  const overlayOpacity  = useSharedValue(0);
-  const sceneOpacity    = useSharedValue(0);
-  const sceneTranslateY = useSharedValue(20);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
+  const sceneOpacity = useRef(new Animated.Value(0)).current;
+  const sceneTranslateY = useRef(new Animated.Value(20)).current;
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const hasSkipped = useRef(false);
-
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-  }));
-
-  const sceneStyle = useAnimatedStyle(() => ({
-    opacity: sceneOpacity.value,
-    transform: [{ translateY: sceneTranslateY.value }],
-  }));
 
   const handleSkip = () => {
     if (hasSkipped.current) return;
     hasSkipped.current = true;
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
-    // Stop any in-flight animations
-    cancelAnimation(sceneOpacity);
-    cancelAnimation(sceneTranslateY);
-    cancelAnimation(overlayOpacity);
-    overlayOpacity.value = 0;
+    // Stop any in-flight animations from the current scene
+    sceneOpacity.stopAnimation();
+    sceneTranslateY.stopAnimation();
+    overlayOpacity.stopAnimation();
+    overlayOpacity.setValue(0);
     onComplete();
   };
 
@@ -159,18 +136,19 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     hasSkipped.current = false;
 
     const reducedMotion = getSettingsSync().reducedMotion;
-    // Scale ALL timing by 0.4x in reduced motion
+    // Scale ALL timing by 0.4x in reduced motion (not just skip animations)
     const timeScale = reducedMotion ? 0.4 : 1.0;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     // Fade in overlay
     if (reducedMotion) {
-      overlayOpacity.value = 1;
+      overlayOpacity.setValue(1);
     } else {
-      overlayOpacity.value = withTiming(1, {
+      Animated.timing(overlayOpacity, {
+        toValue: 1,
         duration: 600 * timeScale,
-        easing: Easing.out(Easing.cubic),
-      });
+        useNativeDriver: true,
+      }).start();
     }
 
     // Opening haptic beat
@@ -186,30 +164,35 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
           fireSceneHaptic(scene, event.shakeIntensity);
         }
         if (reducedMotion) {
-          sceneOpacity.value = 1;
-          sceneTranslateY.value = 0;
+          sceneOpacity.setValue(1);
+          sceneTranslateY.setValue(0);
         } else {
-          sceneOpacity.value = 0;
-          sceneTranslateY.value = 20;
-          sceneOpacity.value = withTiming(1, {
-            duration: 400 * timeScale,
-            easing: Easing.out(Easing.cubic),
-          });
-          sceneTranslateY.value = withTiming(0, {
-            duration: 400 * timeScale,
-            easing: Easing.out(Easing.cubic),
-          });
+          sceneOpacity.setValue(0);
+          sceneTranslateY.setValue(20);
+          Animated.parallel([
+            Animated.timing(sceneOpacity, {
+              toValue: 1,
+              duration: 400 * timeScale,
+              useNativeDriver: true,
+            }),
+            Animated.timing(sceneTranslateY, {
+              toValue: 0,
+              duration: 400 * timeScale,
+              useNativeDriver: true,
+            }),
+          ]).start();
         }
 
         // Fade out scene before next one
         const fadeOutTimer = setTimeout(() => {
           if (reducedMotion) {
-            sceneOpacity.value = 0;
+            sceneOpacity.setValue(0);
           } else {
-            sceneOpacity.value = withTiming(0, {
+            Animated.timing(sceneOpacity, {
+              toValue: 0,
               duration: 300 * timeScale,
-              easing: Easing.in(Easing.cubic),
-            });
+              useNativeDriver: true,
+            }).start();
           }
         }, (scene.duration - 300) * timeScale);
         timers.push(fadeOutTimer);
@@ -222,14 +205,14 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     const totalDuration = (lastScene.delay + lastScene.duration + 600 + 500) * timeScale;
     const completeTimer = setTimeout(() => {
       if (reducedMotion) {
-        overlayOpacity.value = 0;
+        overlayOpacity.setValue(0);
         onComplete();
       } else {
-        overlayOpacity.value = withTiming(
-          0,
-          { duration: 500 * timeScale, easing: Easing.in(Easing.cubic) },
-          (finished) => { if (finished) runOnJS(onComplete)(); }
-        );
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 500 * timeScale,
+          useNativeDriver: true,
+        }).start(() => onComplete());
       }
     }, totalDuration);
     timers.push(completeTimer);
@@ -248,8 +231,10 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     <Animated.View
       style={[
         styles.overlay,
-        { backgroundColor: event.bgColor },
-        overlayStyle,
+        {
+          opacity: overlayOpacity,
+          backgroundColor: event.bgColor,
+        },
       ]}
       accessibilityRole="alert"
       accessibilityLabel={`Phase transition: ${event.title}`}
@@ -269,7 +254,15 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
       </Text>
 
       {/* Active scene */}
-      <Animated.View style={[styles.sceneContainer, sceneStyle]}>
+      <Animated.View
+        style={[
+          styles.sceneContainer,
+          {
+            opacity: sceneOpacity,
+            transform: [{ translateY: sceneTranslateY }],
+          },
+        ]}
+      >
         {Boolean(activeScene?.emoji) && (
           <Text style={styles.sceneEmoji}>{activeScene.emoji}</Text>
         )}

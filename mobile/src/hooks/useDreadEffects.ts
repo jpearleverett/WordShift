@@ -1,11 +1,5 @@
-import { useCallback, useMemo } from 'react';
-import {
-  useSharedValue,
-  withTiming,
-  withSequence,
-  cancelAnimation,
-  SharedValue,
-} from 'react-native-reanimated';
+import { useRef, useCallback, useEffect } from 'react';
+import { Animated } from 'react-native';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium } from '../services/haptics';
 import {
@@ -19,10 +13,10 @@ import {
 } from '../constants/gameBalance';
 
 export interface DreadEffectsState {
-  /** Reanimated shared value for the crimson dread-pulse overlay opacity. */
-  dreadPulseOpacity: SharedValue<number>;
-  /** Reanimated shared value for horizontal screen shake translateX. */
-  screenShakeX: SharedValue<number>;
+  /** Animated opacity for the crimson dread-pulse overlay. */
+  dreadPulseOpacity: Animated.Value;
+  /** Animated translateX for horizontal screen shake. */
+  screenShakeRef: Animated.Value;
 }
 
 export interface DreadEffectsActions {
@@ -32,23 +26,31 @@ export interface DreadEffectsActions {
    * feedback.  Respects the `reducedMotion` setting.
    */
   triggerDreadPulse: (phase: number) => void;
-  /**
-   * Fire a micro-shake for drop impact (used by drag-drop in App.tsx).
-   * Runs on the UI thread via Reanimated.
-   */
-  triggerDropShake: (intensity: number) => void;
 }
 
 /**
  * Manages dread-word visual feedback: a brief crimson overlay flash
  * and a horizontal screen shake at higher narrative phases.
  *
- * Fully migrated to Reanimated — all animations run on the UI thread.
- * The shared values must be consumed via `useAnimatedStyle` in the host.
+ * The two Animated.Values it exposes must be wired into the render tree
+ * by the host component:
+ * - `dreadPulseOpacity` drives the overlay's opacity
+ * - `screenShakeRef`    drives `transform: [{ translateX }]` on the
+ *   main container
  */
 export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
-  const dreadPulseOpacity = useSharedValue(0);
-  const screenShakeX = useSharedValue(0);
+  const dreadPulseOpacity = useRef(new Animated.Value(0)).current;
+  const screenShakeRef = useRef(new Animated.Value(0)).current;
+  const pulseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Cleanup running animations on unmount
+  useEffect(() => {
+    return () => {
+      pulseAnimRef.current?.stop();
+      shakeAnimRef.current?.stop();
+    };
+  }, []);
 
   const triggerDreadPulse = useCallback((phase: number) => {
     // Haptic feedback scaled by phase intensity.
@@ -60,41 +62,56 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
 
     if (getSettingsSync().reducedMotion) return;
 
-    // Cancel any in-flight animations before starting new ones.
-    cancelAnimation(dreadPulseOpacity);
-    cancelAnimation(screenShakeX);
+    // Stop any in-flight animations before starting new ones.
+    pulseAnimRef.current?.stop();
+    shakeAnimRef.current?.stop();
 
-    // Crimson overlay pulse — UI thread.
+    // Crimson overlay pulse.
     const maxOpacity = DREAD_PULSE_OPACITY[phase] ?? (phase >= 4 ? 0.25 : 0.10);
-    dreadPulseOpacity.value = withSequence(
-      withTiming(maxOpacity, { duration: DREAD_PULSE_FADE_IN_MS }),
-      withTiming(0, { duration: DREAD_PULSE_FADE_OUT_MS }),
-    );
+    pulseAnimRef.current = Animated.sequence([
+      Animated.timing(dreadPulseOpacity, {
+        toValue: maxOpacity,
+        duration: DREAD_PULSE_FADE_IN_MS,
+        useNativeDriver: true,
+      }),
+      Animated.timing(dreadPulseOpacity, {
+        toValue: 0,
+        duration: DREAD_PULSE_FADE_OUT_MS,
+        useNativeDriver: true,
+      }),
+    ]);
+    pulseAnimRef.current.start(() => { pulseAnimRef.current = null; });
 
     // Horizontal screen shake at Phase 2+ (subtle at Phase 2, stronger at Phase 3-4).
     if (phase >= 2) {
       const intensity = SCREEN_SHAKE_INTENSITY[phase] ?? (phase >= 4 ? 4 : 2);
-      screenShakeX.value = withSequence(
-        withTiming(intensity, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-        withTiming(-intensity, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-        withTiming(intensity * 0.5, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-        withTiming(0, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-      );
+      shakeAnimRef.current = Animated.sequence([
+        Animated.timing(screenShakeRef, {
+          toValue: intensity,
+          duration: SCREEN_SHAKE_KEYFRAME_MS,
+          useNativeDriver: true,
+        }),
+        Animated.timing(screenShakeRef, {
+          toValue: -intensity,
+          duration: SCREEN_SHAKE_KEYFRAME_MS,
+          useNativeDriver: true,
+        }),
+        Animated.timing(screenShakeRef, {
+          toValue: intensity * 0.5,
+          duration: SCREEN_SHAKE_KEYFRAME_MS,
+          useNativeDriver: true,
+        }),
+        Animated.timing(screenShakeRef, {
+          toValue: 0,
+          duration: SCREEN_SHAKE_KEYFRAME_MS,
+          useNativeDriver: true,
+        }),
+      ]);
+      shakeAnimRef.current.start(() => { shakeAnimRef.current = null; });
     }
-  }, []);
+  }, [dreadPulseOpacity, screenShakeRef]);
 
-  const triggerDropShake = useCallback((intensity: number) => {
-    if (getSettingsSync().reducedMotion) return;
-    cancelAnimation(screenShakeX);
-    screenShakeX.value = withSequence(
-      withTiming(intensity, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-      withTiming(-intensity, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-      withTiming(intensity * 0.5, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-      withTiming(0, { duration: SCREEN_SHAKE_KEYFRAME_MS }),
-    );
-  }, []);
-
-  const state: DreadEffectsState = { dreadPulseOpacity, screenShakeX };
-  const actions: DreadEffectsActions = useMemo(() => ({ triggerDreadPulse, triggerDropShake }), [triggerDreadPulse, triggerDropShake]);
+  const state: DreadEffectsState = { dreadPulseOpacity, screenShakeRef };
+  const actions: DreadEffectsActions = { triggerDreadPulse };
   return [state, actions];
 }

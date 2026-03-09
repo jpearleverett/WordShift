@@ -1,20 +1,12 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Modal,
-  Pressable,
+  Animated,
 } from 'react-native';
-import Animated, {
-  SharedValue,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-  withDelay,
-} from 'react-native-reanimated';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
 import {
@@ -70,12 +62,12 @@ interface VictoryModalProps {
   // Ritual echo data
   completedWords?: string[];
   incantationName?: string | null;
-  // Shared values from useVictoryFlow (Reanimated)
-  modalScale: SharedValue<number>;
-  modalOpacity: SharedValue<number>;
-  star1Scale: SharedValue<number>;
-  star2Scale: SharedValue<number>;
-  star3Scale: SharedValue<number>;
+  // Animated values from useVictoryFlow
+  modalScale: Animated.Value;
+  modalOpacity: Animated.Value;
+  star1Scale: Animated.Value;
+  star2Scale: Animated.Value;
+  star3Scale: Animated.Value;
   // Callbacks
   onNextLevel: () => void;
   onReturnHome: () => void;
@@ -84,9 +76,6 @@ interface VictoryModalProps {
   // Onboarding mode
   isOnboarding?: boolean;
   onOnboardingContinue?: () => void;
-  // Tap-to-skip: true while victory animation is running (non-onboarding only)
-  isAnimating?: boolean;
-  onTapToSkip?: () => void;
   // Bonus breakdown data
   variant?: string;
   gameMode?: string;
@@ -153,199 +142,61 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onShare,
   isOnboarding,
   onOnboardingContinue,
-  isAnimating,
-  onTapToSkip,
   variant,
   gameMode,
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const btn = getButtonTheme(phase);
 
-  // Reanimated animated styles for shared values from useVictoryFlow
-  const modalAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: modalScale.value }],
-    opacity: modalOpacity.value,
-  }));
-  const star1AnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: star1Scale.value }],
-  }));
-  const star2AnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: star2Scale.value }],
-  }));
-  const star3AnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: star3Scale.value }],
-  }));
-
-  // Cascade animation — 4 staggered content groups (Reanimated — UI thread)
-  const contentOpacity1 = useSharedValue(0);
-  const contentOpacity2 = useSharedValue(0);
-  const contentOpacity3 = useSharedValue(0);
-  const contentOpacity4 = useSharedValue(0);
-
-  const cascadeStyle1 = useAnimatedStyle(() => ({ opacity: contentOpacity1.value }));
-  const cascadeStyle2 = useAnimatedStyle(() => ({ opacity: contentOpacity2.value }));
-  const cascadeStyle3 = useAnimatedStyle(() => ({ opacity: contentOpacity3.value }));
-  const cascadeStyle4 = useAnimatedStyle(() => ({ opacity: contentOpacity4.value }));
+  // Cascade animation — 4 staggered content groups
+  const contentOpacity1 = useRef(new Animated.Value(0)).current;
+  const contentOpacity2 = useRef(new Animated.Value(0)).current;
+  const contentOpacity3 = useRef(new Animated.Value(0)).current;
+  const contentOpacity4 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
-      // Staggered cascade: groups fade in 120ms apart, each over 250ms
-      contentOpacity1.value = 0;
-      contentOpacity2.value = 0;
-      contentOpacity3.value = 0;
-      contentOpacity4.value = 0;
-      contentOpacity1.value = withTiming(1, { duration: 250 });
-      contentOpacity2.value = withDelay(120, withTiming(1, { duration: 250 }));
-      contentOpacity3.value = withDelay(240, withTiming(1, { duration: 250 }));
-      contentOpacity4.value = withDelay(360, withTiming(1, { duration: 250 }));
+      contentOpacity1.setValue(0);
+      contentOpacity2.setValue(0);
+      contentOpacity3.setValue(0);
+      contentOpacity4.setValue(0);
+      Animated.stagger(200, [
+        Animated.timing(contentOpacity1, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(contentOpacity2, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(contentOpacity3, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(contentOpacity4, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]).start();
     }
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
-  // contentOpacity1-4 are stable shared values (never reassigned) and
-  // isOnboarding does not change while the modal is visible, so [visible] is
-  // the only reactive dependency this effect needs.
-
-  const handleContinuePress = useCallback(() => {
-    if (onOnboardingContinue) {
-      onOnboardingContinue();
-    } else {
-      onNextLevel();
-    }
-  }, [onOnboardingContinue, onNextLevel]);
+  }, [visible]);
 
   if (!visible) return null;
 
-  // ---------------------------------------------------------------------------
-  // Onboarding path: native Modal layer for guaranteed touch delivery on Android.
-  //
-  // Root cause of the tap-not-working bug: VictoryModal's overlay uses
-  // StyleSheet.absoluteFillObject + zIndex:500, but on Android Fabric zIndex is
-  // a JS/shadow-thread compositor concept only.  The native touch dispatcher
-  // routes hits by view elevation/tree-order — the puzzle-screen ScrollView
-  // (game area) sits later in the native view tree and intercepts touches even
-  // though the overlay renders visually on top.  Multiple prior fixes (static
-  // opacity, skipToEnd, pointerEvents="box-none") had no effect because the
-  // interception happens entirely at the Android native layer before React
-  // Native even sees the event.
-  //
-  // React Native's <Modal> creates a separate Android Window that is always
-  // above the host Activity's window for both rendering AND touch dispatch —
-  // the definitive fix regardless of zIndex, Reanimated state, or ScrollView
-  // nesting depth.
-  //
-  // ScrollView is intentionally omitted: onboarding content is minimal (stars +
-  // title + one button) and never needs to scroll, eliminating another class of
-  // scroll-gesture swallowing.
-  // ---------------------------------------------------------------------------
-  if (isOnboarding) {
-    return (
-      <Modal
-        transparent
-        animationType="none"
-        visible={true}
-        statusBarTranslucent
-      >
-        <View
-          style={[styles.onboardingModalOverlay, { backgroundColor: phaseTheme.modalOverlayColor }]}
-          pointerEvents="box-none"
-        >
-          <View
-            style={[styles.victoryModal, {
-              backgroundColor: phaseTheme.modalBgColor,
-              borderColor: btn.modalBorder,
-            }]}
-            pointerEvents="box-none"
-          >
-            <View style={[styles.victoryGlow, { backgroundColor: phaseTheme.victoryGlowColor }]} pointerEvents="none" />
-            <View style={styles.modalShine} pointerEvents="none" />
-
-            {/* Stars — static, no Reanimated in onboarding path */}
-            <View style={styles.starsContainer}>
-              <Text style={[styles.victoryStar, earnedStars < 1 && styles.victoryStarEmpty]}>
-                {earnedStars >= 1 ? '\u2B50' : '\u2606'}
-              </Text>
-              <Text style={[styles.victoryStar, styles.victoryStarBig, earnedStars < 2 && styles.victoryStarEmpty]}>
-                {earnedStars >= 2 ? '\u2B50' : '\u2606'}
-              </Text>
-              <Text style={[styles.victoryStar, earnedStars < 3 && styles.victoryStarEmpty]}>
-                {earnedStars >= 3 ? '\u2B50' : '\u2606'}
-              </Text>
-            </View>
-
-            <Text style={[styles.victoryTitle, { color: phaseTheme.victoryTitleColor }]}>
-              {getVictoryTitle(earnedStars, phase)}
-            </Text>
-            <Text style={[styles.victorySubtitle, { color: phaseTheme.modalSecondaryTextColor }]}>
-              {`Level ${level} Complete`}
-            </Text>
-
-            {/* CONTINUE — Pressable with generous hitSlop for easy tapping */}
-            <View style={[styles.victoryButtonRow, { width: '100%', marginTop: 20 }]}>
-              <Pressable
-                onPress={handleContinuePress}
-                accessibilityLabel="Continue"
-                accessibilityRole="button"
-                hitSlop={{ top: 24, bottom: 24, left: 24, right: 24 }}
-              >
-                <View style={styles.btn3dWrapper}>
-                  <View style={[styles.btn3dBody, {
-                    backgroundColor: btn.primary.bg,
-                    shadowColor: btn.primary.shadow,
-                  }]}>
-                    <View style={styles.btn3dBevel} />
-                    <View style={styles.btn3dGlossy} />
-                    <Text style={styles.btn3dPrimaryText}>CONTINUE</Text>
-                  </View>
-                  <View style={[styles.btn3dEdge, { backgroundColor: btn.primary.edge }]} />
-                </View>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
-
   return (
-    // Non-onboarding path: native Modal for guaranteed touch delivery on Android.
-    // The game-area ScrollView (puzzle rows) intercepts native touches before
-    // React Native sees them, regardless of zIndex.  A native Modal creates a
-    // separate Android Window that sits above the host Activity window for both
-    // rendering AND touch dispatch — the same root fix used for the onboarding path.
-    <Modal
-      transparent
-      animationType="none"
-      visible={true}
-      statusBarTranslucent
-    >
-      <View style={[styles.regularModalOverlay, {
-        backgroundColor: phaseTheme.modalOverlayColor,
-      }]}>
-        <ScrollView
+    <View style={[styles.modalOverlay, {
+      backgroundColor: phaseTheme.modalOverlayColor,
+    }]}>
+      <ScrollView
         contentContainerStyle={styles.victoryScrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
-        keyboardShouldPersistTaps="handled"
       >
-          <Animated.View
-            style={[styles.victoryModal, {
-              backgroundColor: phaseTheme.modalBgColor,
-              borderColor: btn.modalBorder,
-            },
-            modalAnimStyle,
-            ]}
-            pointerEvents="box-none"
-          >
+          <Animated.View style={[styles.victoryModal, {
+            backgroundColor: phaseTheme.modalBgColor,
+            borderColor: btn.modalBorder,
+            transform: [{ scale: modalScale }],
+            opacity: modalOpacity,
+          }]}>
             <View style={[styles.victoryGlow, {
               backgroundColor: phaseTheme.victoryGlowColor,
-            }]} pointerEvents="none" />
-            <View style={styles.modalShine} pointerEvents="none" />
+            }]} />
+            <View style={styles.modalShine} />
 
             {/* Stars — choreographed pop-in */}
             <View style={styles.starsContainer}>
               <Animated.Text style={[
                 styles.victoryStar,
                 earnedStars < 1 && styles.victoryStarEmpty,
-                star1AnimStyle,
+                { transform: [{ scale: star1Scale }] },
               ]}>
                 {earnedStars >= 1 ? '\u2B50' : '\u2606'}
               </Animated.Text>
@@ -353,14 +204,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 styles.victoryStar,
                 styles.victoryStarBig,
                 earnedStars < 2 && styles.victoryStarEmpty,
-                star2AnimStyle,
+                { transform: [{ scale: star2Scale }] },
               ]}>
                 {earnedStars >= 2 ? '\u2B50' : '\u2606'}
               </Animated.Text>
               <Animated.Text style={[
                 styles.victoryStar,
                 earnedStars < 3 && styles.victoryStarEmpty,
-                star3AnimStyle,
+                { transform: [{ scale: star3Scale }] },
               ]}>
                 {earnedStars >= 3 ? '\u2B50' : '\u2606'}
               </Animated.Text>
@@ -377,10 +228,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
             </Text>
 
-            {/* Groups 1-3 skipped during onboarding — tutorial shows only stars + title + CONTINUE */}
-            {!isOnboarding && (<>
             {/* Group 1: Harvest, bonuses, streak, milestone */}
-            <Animated.View style={cascadeStyle1}>
+            <Animated.View style={{ opacity: contentOpacity1 }}>
             {/* Harvested words (queued for the pit) */}
             {victoryData?.harvestedWords && victoryData.harvestedWords.length > 0 && (
               <View style={[styles.harvestWordContainer, {
@@ -467,7 +316,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 2: Ritual echo chain */}
-            <Animated.View style={cascadeStyle2}>
+            <Animated.View style={{ opacity: contentOpacity2 }}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
             {completedWords && completedWords.length > 0 && (
               <View style={[
@@ -535,7 +384,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
 
             {/* Group 3: Amber breakdown + Collect Now */}
-            <Animated.View style={[cascadeStyle3, { width: '100%' }]}>
+            <Animated.View style={{ opacity: contentOpacity3, width: '100%' }}>
             {victoryData && (() => {
               const baseAmber = AMBER_REWARDS[difficulty as keyof typeof AMBER_REWARDS] || 0;
               const starBonus = earnedStars >= 3
@@ -655,11 +504,34 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             })()}
 
             </Animated.View>
-            </>)}
 
-            {/* Group 4: Action buttons */}
-            <Animated.View style={[cascadeStyle4, { width: '100%' }]} pointerEvents="box-none">
-            {phaseTransitionPending ? (
+            {/* Group 4: Action buttons — 3D candy style */}
+            <Animated.View style={{ opacity: contentOpacity4, width: '100%' }}>
+            {isOnboarding ? (
+            <View style={styles.victoryButtonRow}>
+              {/* Onboarding: single "Continue" button */}
+              <TouchableOpacity
+                onPress={onOnboardingContinue}
+                activeOpacity={0.85}
+                accessibilityLabel="Continue"
+                accessibilityRole="button"
+              >
+                <View style={styles.btn3dWrapper}>
+                  <View style={[styles.btn3dBody, {
+                    backgroundColor: btn.primary.bg,
+                    shadowColor: btn.primary.shadow,
+                  }]}>
+                    <View style={styles.btn3dBevel} />
+                    <View style={styles.btn3dGlossy} />
+                    <Text style={styles.btn3dPrimaryText}>CONTINUE</Text>
+                  </View>
+                  <View style={[styles.btn3dEdge, {
+                    backgroundColor: btn.primary.edge,
+                  }]} />
+                </View>
+              </TouchableOpacity>
+            </View>
+            ) : phaseTransitionPending ? (
             // Phase transition pending: pit CTA is the only action
             null
             ) : (
@@ -726,36 +598,15 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
           </Animated.View>
         </ScrollView>
-        {/* Tap-to-skip overlay — absoluteFill within Modal so any tap during the
-            star/reveal animation skips to the end.  Rendered after ScrollView so
-            it sits on top of the (still-invisible) card and intercepts taps.
-            Removed as soon as the animation finishes (isAnimating becomes false). */}
-        {isAnimating && onTapToSkip && (
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={onTapToSkip}
-            accessibilityLabel="Tap to skip animation"
-          />
-        )}
       </View>
-    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  // Root view for the non-onboarding native-Modal path.
-  // flex:1 fills the Modal window so the card can be centred by the inner ScrollView.
-  regularModalOverlay: {
-    flex: 1,
-  },
-  // Full-screen overlay for onboarding native-Modal path.
-  // flex:1 fills the Modal window; justifyContent/alignItems center the card.
-  onboardingModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 32,
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(76, 29, 149, 0.7)',
+    zIndex: 500,
   },
   modalShine: {
     position: 'absolute',

@@ -1,21 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-} from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  withSpring,
-  cancelAnimation,
+  Animated,
   Easing,
-} from 'react-native-reanimated';
-import { getSettingsSync } from '../../services/settings';
+} from 'react-native';
 
 interface ActionButtonProps {
   icon: string;
@@ -34,63 +25,53 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   disabled,
   accessibilityLabel,
 }) => {
-  const scaleAnim = useSharedValue(1);
-  const glowAnim = useSharedValue(0);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const { reducedMotion } = getSettingsSync();
-    cancelAnimation(glowAnim);
-
-    if (reducedMotion) {
-      glowAnim.value = disabled ? 0 : 0.45;
-      return;
-    }
-
     if (!disabled) {
-      glowAnim.value = withRepeat(
-        withSequence(
-          withTiming(1, {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 1,
             duration: 1500,
             easing: Easing.inOut(Easing.sin),
+            useNativeDriver: false,
           }),
-          withTiming(0, {
+          Animated.timing(glowAnim, {
+            toValue: 0,
             duration: 1500,
             easing: Easing.inOut(Easing.sin),
+            useNativeDriver: false,
           }),
-        ),
-        -1,
-      );
-    } else {
-      glowAnim.value = withTiming(0, { duration: 150 });
+        ])
+      ).start();
     }
-
-    return () => {
-      cancelAnimation(glowAnim);
-    };
-  }, [disabled, glowAnim]);
+    return () => glowAnim.stopAnimation();
+  }, [disabled]);
 
   const handlePressIn = () => {
-    if (disabled) return;
-    scaleAnim.value = withSpring(0.9, {
-      damping: 12,
-      stiffness: 320,
-    });
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      friction: 5,
+      tension: 300,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handlePressOut = () => {
-    scaleAnim.value = withSpring(1, {
-      damping: 10,
-      stiffness: 220,
-    });
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 150,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const buttonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scaleAnim.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.3 + glowAnim.value * 0.3,
-  }));
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.6],
+  });
 
   return (
     <TouchableOpacity
@@ -107,7 +88,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
         style={[
           styles.actionButton,
           disabled && styles.actionButtonDisabled,
-          buttonStyle,
+          { transform: [{ scale: scaleAnim }] },
         ]}
       >
         {/* Glow effect */}
@@ -115,8 +96,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           <Animated.View
             style={[
               styles.actionButtonGlow,
-              { backgroundColor: colors.glow },
-              glowStyle,
+              { backgroundColor: colors.glow, opacity: glowOpacity },
             ]}
           />
         )}

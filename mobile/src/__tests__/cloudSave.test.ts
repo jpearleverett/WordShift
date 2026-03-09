@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   collectLocalSaveData,
   restoreFromCloudData,
@@ -13,21 +14,10 @@ import {
   CloudSaveData,
 } from '../services/cloudSave';
 
-// Mock MMKV storage using shared factory
-jest.mock('../services/storage', () =>
-  require('./helpers/mockStorage').createMockStorage()
+// Mock AsyncStorage using shared factory
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
-
-const { storage } = require('../services/storage') as {
-  storage: {
-    getString: jest.Mock;
-    set: jest.Mock;
-    remove: jest.Mock;
-    clearAll: jest.Mock;
-    getAllKeys: jest.Mock;
-    contains: jest.Mock;
-  };
-};
 
 function createMockProvider(overrides: Partial<CloudProvider> = {}): CloudProvider {
   return {
@@ -41,9 +31,9 @@ function createMockProvider(overrides: Partial<CloudProvider> = {}): CloudProvid
 }
 
 describe('cloudSave', () => {
-  beforeEach(() => {
-    storage.clearAll();
-    clearSyncStatus();
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    await clearSyncStatus();
     // Reset to a default no-op provider
     setCloudProvider(createMockProvider({
       upload: async () => false,
@@ -118,50 +108,50 @@ describe('cloudSave', () => {
   // ===========================================================================
 
   describe('collectLocalSaveData', () => {
-    it('returns correct version', () => {
-      const data = collectLocalSaveData();
+    it('returns correct version', async () => {
+      const data = await collectLocalSaveData();
       expect(data.version).toBe(1);
     });
 
-    it('returns current timestamp', () => {
+    it('returns current timestamp', async () => {
       const before = Date.now();
-      const data = collectLocalSaveData();
+      const data = await collectLocalSaveData();
       expect(data.timestamp).toBeGreaterThanOrEqual(before);
     });
 
-    it('generates a device ID', () => {
-      const data = collectLocalSaveData();
+    it('generates a device ID', async () => {
+      const data = await collectLocalSaveData();
       expect(data.deviceId).toBeTruthy();
       expect(typeof data.deviceId).toBe('string');
     });
 
-    it('returns consistent device ID across calls', () => {
-      const data1 = collectLocalSaveData();
-      const data2 = collectLocalSaveData();
+    it('returns consistent device ID across calls', async () => {
+      const data1 = await collectLocalSaveData();
+      const data2 = await collectLocalSaveData();
       expect(data1.deviceId).toBe(data2.deviceId);
     });
 
-    it('collects stored sync keys', () => {
-      storage.set('wordshift_progress', JSON.stringify({ amber: 100 }));
-      storage.set('wordshift_star_stats', JSON.stringify({ total: 50 }));
+    it('collects stored sync keys', async () => {
+      await AsyncStorage.setItem('wordshift_progress', JSON.stringify({ amber: 100 }));
+      await AsyncStorage.setItem('wordshift_star_stats', JSON.stringify({ total: 50 }));
 
-      const data = collectLocalSaveData();
+      const data = await collectLocalSaveData();
       expect(data.data['wordshift_progress']).toBeDefined();
       expect(data.data['wordshift_star_stats']).toBeDefined();
     });
 
-    it('ignores non-sync keys', () => {
-      storage.set('some_other_key', 'value');
-      const data = collectLocalSaveData();
+    it('ignores non-sync keys', async () => {
+      await AsyncStorage.setItem('some_other_key', 'value');
+      const data = await collectLocalSaveData();
       expect(data.data['some_other_key']).toBeUndefined();
     });
 
-    it('skips keys with no stored value', () => {
-      const data = collectLocalSaveData();
+    it('skips keys with no stored value', async () => {
+      const data = await collectLocalSaveData();
       expect(Object.keys(data.data).length).toBe(0);
     });
 
-    it('collects all relevant sync keys when present', () => {
+    it('collects all relevant sync keys when present', async () => {
       const syncKeys = [
         'wordshift_progress',
         'wordshift_star_stats',
@@ -172,26 +162,26 @@ describe('cloudSave', () => {
         'wordshift_sacrifices',
       ];
       for (const key of syncKeys) {
-        storage.set(key, JSON.stringify({ test: true }));
+        await AsyncStorage.setItem(key, JSON.stringify({ test: true }));
       }
 
-      const data = collectLocalSaveData();
+      const data = await collectLocalSaveData();
       for (const key of syncKeys) {
         expect(data.data[key]).toBeDefined();
       }
     });
 
-    it('device ID is stored in MMKV storage', () => {
-      collectLocalSaveData();
-      const storedId = storage.getString('wordshift_device_id');
-      expect(storedId).not.toBeUndefined();
+    it('device ID is stored in AsyncStorage', async () => {
+      await collectLocalSaveData();
+      const storedId = await AsyncStorage.getItem('wordshift_device_id');
+      expect(storedId).not.toBeNull();
     });
 
-    it('preserves exact string values from storage', () => {
+    it('preserves exact string values from storage', async () => {
       const value = JSON.stringify({ amber: 42, streak: 7 });
-      storage.set('wordshift_progress', value);
+      await AsyncStorage.setItem('wordshift_progress', value);
 
-      const data = collectLocalSaveData();
+      const data = await collectLocalSaveData();
       expect(data.data['wordshift_progress']).toBe(value);
     });
   });
@@ -201,7 +191,7 @@ describe('cloudSave', () => {
   // ===========================================================================
 
   describe('restoreFromCloudData', () => {
-    it('writes cloud data to storage', () => {
+    it('writes cloud data to AsyncStorage', async () => {
       const cloudData: CloudSaveData = {
         version: 1,
         timestamp: Date.now(),
@@ -212,28 +202,28 @@ describe('cloudSave', () => {
         },
       };
 
-      const success = restoreFromCloudData(cloudData);
+      const success = await restoreFromCloudData(cloudData);
       expect(success).toBe(true);
 
-      const progress = storage.getString('wordshift_progress');
+      const progress = await AsyncStorage.getItem('wordshift_progress');
       expect(JSON.parse(progress!).amber).toBe(500);
 
-      const stats = storage.getString('wordshift_star_stats');
+      const stats = await AsyncStorage.getItem('wordshift_star_stats');
       expect(JSON.parse(stats!).total).toBe(200);
     });
 
-    it('returns true on successful restore', () => {
+    it('returns true on successful restore', async () => {
       const cloudData: CloudSaveData = {
         version: 1,
         timestamp: Date.now(),
         deviceId: 'test',
         data: {},
       };
-      expect(restoreFromCloudData(cloudData)).toBe(true);
+      expect(await restoreFromCloudData(cloudData)).toBe(true);
     });
 
-    it('overwrites existing local data', () => {
-      storage.set('wordshift_progress', JSON.stringify({ amber: 100 }));
+    it('overwrites existing local data', async () => {
+      await AsyncStorage.setItem('wordshift_progress', JSON.stringify({ amber: 100 }));
 
       const cloudData: CloudSaveData = {
         version: 1,
@@ -244,23 +234,23 @@ describe('cloudSave', () => {
         },
       };
 
-      restoreFromCloudData(cloudData);
-      const progress = storage.getString('wordshift_progress');
+      await restoreFromCloudData(cloudData);
+      const progress = await AsyncStorage.getItem('wordshift_progress');
       expect(JSON.parse(progress!).amber).toBe(999);
     });
 
-    it('handles empty data object', () => {
+    it('handles empty data object', async () => {
       const cloudData: CloudSaveData = {
         version: 1,
         timestamp: Date.now(),
         deviceId: 'remote',
         data: {},
       };
-      const result = restoreFromCloudData(cloudData);
+      const result = await restoreFromCloudData(cloudData);
       expect(result).toBe(true);
     });
 
-    it('writes multiple keys', () => {
+    it('writes multiple keys', async () => {
       const cloudData: CloudSaveData = {
         version: 1,
         timestamp: Date.now(),
@@ -271,9 +261,9 @@ describe('cloudSave', () => {
         },
       };
 
-      restoreFromCloudData(cloudData);
-      expect(storage.getString('wordshift_progress')).toBe('"progress_data"');
-      expect(storage.getString('wordshift_achievements')).toBe('"achievement_data"');
+      await restoreFromCloudData(cloudData);
+      expect(await AsyncStorage.getItem('wordshift_progress')).toBe('"progress_data"');
+      expect(await AsyncStorage.getItem('wordshift_achievements')).toBe('"achievement_data"');
     });
   });
 
@@ -316,7 +306,7 @@ describe('cloudSave', () => {
     it('updates sync status on success', async () => {
       setCloudProvider(createMockProvider());
       await uploadToCloud();
-      const status = getSyncStatus();
+      const status = await getSyncStatus();
       expect(status.lastSyncSuccess).toBe(true);
       expect(status.lastSyncTimestamp).toBeGreaterThan(0);
     });
@@ -324,12 +314,12 @@ describe('cloudSave', () => {
     it('updates sync status on failure', async () => {
       setCloudProvider(createMockProvider({ upload: async () => false }));
       await uploadToCloud();
-      const status = getSyncStatus();
+      const status = await getSyncStatus();
       expect(status.lastSyncSuccess).toBe(false);
     });
 
     it('includes local data in upload', async () => {
-      storage.set('wordshift_progress', '{"test": true}');
+      await AsyncStorage.setItem('wordshift_progress', '{"test": true}');
       const mockUpload = jest.fn(async (_d?: any) => true);
       setCloudProvider(createMockProvider({ upload: mockUpload }));
 
@@ -340,17 +330,17 @@ describe('cloudSave', () => {
 
     it('clears pending changes on successful upload', async () => {
       setCloudProvider(createMockProvider());
-      markPendingChanges();
+      await markPendingChanges();
       await uploadToCloud();
-      const status = getSyncStatus();
+      const status = await getSyncStatus();
       expect(status.pendingChanges).toBe(false);
     });
 
     it('keeps pending changes on failed upload', async () => {
-      markPendingChanges();
+      await markPendingChanges();
       setCloudProvider(createMockProvider({ upload: async () => false }));
       await uploadToCloud();
-      const status = getSyncStatus();
+      const status = await getSyncStatus();
       expect(status.pendingChanges).toBe(true);
     });
   });
@@ -382,7 +372,7 @@ describe('cloudSave', () => {
       const result = await downloadFromCloud();
       expect(result).toBe(true);
 
-      const progress = storage.getString('wordshift_progress');
+      const progress = await AsyncStorage.getItem('wordshift_progress');
       expect(JSON.parse(progress!).amber).toBe(777);
     });
 
@@ -396,7 +386,7 @@ describe('cloudSave', () => {
       setCloudProvider(createMockProvider({ download: async () => cloudData }));
 
       await downloadFromCloud();
-      const status = getSyncStatus();
+      const status = await getSyncStatus();
       expect(status.lastSyncSuccess).toBe(true);
     });
   });
@@ -435,34 +425,35 @@ describe('cloudSave', () => {
   // ===========================================================================
 
   describe('getSyncStatus', () => {
-    it('returns default status when none stored', () => {
-      const status = getSyncStatus();
+    it('returns default status when none stored', async () => {
+      const status = await getSyncStatus();
       expect(status.lastSyncTimestamp).toBe(0);
       expect(status.lastSyncSuccess).toBe(false);
       expect(status.pendingChanges).toBe(false);
     });
 
-    it('returns same result on subsequent calls with no changes', () => {
-      const status1 = getSyncStatus();
-      const status2 = getSyncStatus();
-      expect(status1).toEqual(status2);
+    it('returns cached status on subsequent calls', async () => {
+      const status1 = await getSyncStatus();
+      const status2 = await getSyncStatus();
+      expect(status1).toBe(status2);
     });
 
-    it('includes provider name', () => {
-      const status = getSyncStatus();
+    it('includes provider name', async () => {
+      const status = await getSyncStatus();
       expect(typeof status.provider).toBe('string');
     });
 
-    it('loads from storage', () => {
+    it('loads from storage after cache clear', async () => {
       const saved = {
         lastSyncTimestamp: 12345,
         lastSyncSuccess: true,
         pendingChanges: true,
         provider: 'TestProvider',
       };
-      storage.set('wordshift_cloud_sync_status', JSON.stringify(saved));
+      await clearSyncStatus();
+      await AsyncStorage.setItem('wordshift_cloud_sync_status', JSON.stringify(saved));
 
-      const status = getSyncStatus();
+      const status = await getSyncStatus();
       expect(status.lastSyncTimestamp).toBe(12345);
       expect(status.lastSyncSuccess).toBe(true);
       expect(status.pendingChanges).toBe(true);
@@ -474,22 +465,22 @@ describe('cloudSave', () => {
   // ===========================================================================
 
   describe('markPendingChanges', () => {
-    it('marks pending changes in sync status', () => {
-      markPendingChanges();
-      const status = getSyncStatus();
+    it('marks pending changes in sync status', async () => {
+      await markPendingChanges();
+      const status = await getSyncStatus();
       expect(status.pendingChanges).toBe(true);
     });
 
-    it('persists to storage', () => {
-      markPendingChanges();
-      expect(storage.set).toHaveBeenCalled();
+    it('persists to storage', async () => {
+      await markPendingChanges();
+      expect(AsyncStorage.setItem).toHaveBeenCalled();
     });
 
-    it('preserves other status fields', () => {
-      const status = getSyncStatus();
+    it('preserves other status fields', async () => {
+      const status = await getSyncStatus();
       const originalTimestamp = status.lastSyncTimestamp;
-      markPendingChanges();
-      const updated = getSyncStatus();
+      await markPendingChanges();
+      const updated = await getSyncStatus();
       expect(updated.lastSyncTimestamp).toBe(originalTimestamp);
     });
   });
@@ -499,23 +490,23 @@ describe('cloudSave', () => {
   // ===========================================================================
 
   describe('clearSyncStatus', () => {
-    it('resets sync status', () => {
-      markPendingChanges();
-      clearSyncStatus();
-      const status = getSyncStatus();
+    it('resets sync status', async () => {
+      await markPendingChanges();
+      await clearSyncStatus();
+      const status = await getSyncStatus();
       expect(status.pendingChanges).toBe(false);
       expect(status.lastSyncTimestamp).toBe(0);
     });
 
-    it('removes sync status key from storage', () => {
-      clearSyncStatus();
-      expect(storage.remove).toHaveBeenCalledWith('wordshift_cloud_sync_status');
+    it('removes sync status key from storage', async () => {
+      await clearSyncStatus();
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_cloud_sync_status');
     });
 
-    it('removes device ID from storage', () => {
-      collectLocalSaveData(); // generates device ID
-      clearSyncStatus();
-      expect(storage.remove).toHaveBeenCalledWith('wordshift_device_id');
+    it('removes device ID from storage', async () => {
+      await collectLocalSaveData(); // generates device ID
+      await clearSyncStatus();
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_device_id');
     });
   });
 
@@ -525,7 +516,7 @@ describe('cloudSave', () => {
 
   describe('integration', () => {
     it('round-trips data through upload and download', async () => {
-      storage.set('wordshift_progress', JSON.stringify({ level: 42 }));
+      await AsyncStorage.setItem('wordshift_progress', JSON.stringify({ level: 42 }));
 
       let capturedData: CloudSaveData | null = null;
       const mock = createMockProvider({
@@ -541,13 +532,13 @@ describe('cloudSave', () => {
       expect(capturedData).not.toBeNull();
 
       // Clear local data
-      storage.clearAll();
+      await AsyncStorage.clear();
 
       // Download and restore
       const result = await downloadFromCloud();
       expect(result).toBe(true);
 
-      const progress = storage.getString('wordshift_progress');
+      const progress = await AsyncStorage.getItem('wordshift_progress');
       expect(JSON.parse(progress!).level).toBe(42);
     });
   });

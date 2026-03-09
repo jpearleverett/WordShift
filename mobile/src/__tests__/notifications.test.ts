@@ -1,8 +1,4 @@
-jest.mock('../services/storage', () =>
-  require('./helpers/mockStorage').createMockStorage()
-);
-
-import { storage } from '../services/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getNotificationPrefs,
   setNotificationPrefs,
@@ -13,15 +9,20 @@ import {
   NotificationPreferences,
 } from '../services/notifications';
 
+// Mock AsyncStorage using shared factory
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+);
+
 // Mock expo-notifications as unavailable (no-op behavior)
 jest.mock('expo-notifications', () => {
   throw new Error('Module not found');
 }, { virtual: true });
 
 describe('notifications', () => {
-  beforeEach(() => {
-    (storage as any).clearAll();
-    resetNotificationPrefs();
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    await resetNotificationPrefs();
   });
 
   // ===========================================================================
@@ -29,21 +30,21 @@ describe('notifications', () => {
   // ===========================================================================
 
   describe('getNotificationPrefs', () => {
-    it('returns default preferences when none stored', () => {
-      const prefs = getNotificationPrefs();
+    it('returns default preferences when none stored', async () => {
+      const prefs = await getNotificationPrefs();
       expect(prefs.enabled).toBe(true);
       expect(prefs.dailyReminderEnabled).toBe(true);
       expect(prefs.dailyReminderHour).toBe(9);
       expect(prefs.reengagementEnabled).toBe(true);
     });
 
-    it('returns cached preferences on subsequent calls', () => {
-      const prefs1 = getNotificationPrefs();
-      const prefs2 = getNotificationPrefs();
-      expect(prefs1).toEqual(prefs2);
+    it('returns cached preferences on subsequent calls', async () => {
+      const prefs1 = await getNotificationPrefs();
+      const prefs2 = await getNotificationPrefs();
+      expect(prefs1).toBe(prefs2);
     });
 
-    it('loads from storage after cache clear', () => {
+    it('loads from storage after cache clear', async () => {
       const saved: NotificationPreferences = {
         enabled: false,
         dailyReminderEnabled: false,
@@ -51,18 +52,18 @@ describe('notifications', () => {
         reengagementEnabled: false,
       };
       // Clear cache first, then set storage so it persists
-      resetNotificationPrefs();
-      storage.set('wordshift_notification_prefs', JSON.stringify(saved));
+      await resetNotificationPrefs();
+      await AsyncStorage.setItem('wordshift_notification_prefs', JSON.stringify(saved));
 
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.enabled).toBe(false);
       expect(prefs.dailyReminderHour).toBe(20);
       expect(prefs.dailyReminderEnabled).toBe(false);
       expect(prefs.reengagementEnabled).toBe(false);
     });
 
-    it('has all required fields in default prefs', () => {
-      const prefs = getNotificationPrefs();
+    it('has all required fields in default prefs', async () => {
+      const prefs = await getNotificationPrefs();
       expect(typeof prefs.enabled).toBe('boolean');
       expect(typeof prefs.dailyReminderEnabled).toBe('boolean');
       expect(typeof prefs.dailyReminderHour).toBe('number');
@@ -77,7 +78,7 @@ describe('notifications', () => {
   describe('setNotificationPrefs', () => {
     it('merges partial prefs with defaults', async () => {
       await setNotificationPrefs({ dailyReminderHour: 10 });
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderHour).toBe(10);
       expect(prefs.enabled).toBe(true); // default preserved
       expect(prefs.dailyReminderEnabled).toBe(true);
@@ -85,37 +86,37 @@ describe('notifications', () => {
 
     it('can disable master toggle', async () => {
       await setNotificationPrefs({ enabled: false });
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.enabled).toBe(false);
     });
 
     it('can disable daily reminders', async () => {
       await setNotificationPrefs({ dailyReminderEnabled: false });
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderEnabled).toBe(false);
     });
 
     it('can disable reengagement', async () => {
       await setNotificationPrefs({ reengagementEnabled: false });
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.reengagementEnabled).toBe(false);
     });
 
     it('can set custom reminder hour', async () => {
       await setNotificationPrefs({ dailyReminderHour: 22 });
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderHour).toBe(22);
     });
 
     it('persists to storage', async () => {
       await setNotificationPrefs({ dailyReminderHour: 15 });
-      expect(storage.set).toHaveBeenCalled();
+      expect(AsyncStorage.setItem).toHaveBeenCalled();
     });
 
     it('overwrites previous prefs', async () => {
       await setNotificationPrefs({ dailyReminderHour: 10 });
       await setNotificationPrefs({ dailyReminderHour: 14 });
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderHour).toBe(14);
     });
 
@@ -125,7 +126,7 @@ describe('notifications', () => {
         reengagementEnabled: false,
         dailyReminderHour: 7,
       });
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderEnabled).toBe(false);
       expect(prefs.reengagementEnabled).toBe(false);
       expect(prefs.dailyReminderHour).toBe(7);
@@ -317,15 +318,15 @@ describe('notifications', () => {
   describe('resetNotificationPrefs', () => {
     it('clears stored preferences', async () => {
       await setNotificationPrefs({ enabled: false, dailyReminderHour: 22 });
-      resetNotificationPrefs();
-      const prefs = getNotificationPrefs();
+      await resetNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.enabled).toBe(true);
       expect(prefs.dailyReminderHour).toBe(9);
     });
 
-    it('calls storage.remove', () => {
-      resetNotificationPrefs();
-      expect(storage.remove).toHaveBeenCalledWith('wordshift_notification_prefs');
+    it('calls AsyncStorage.removeItem', async () => {
+      await resetNotificationPrefs();
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_notification_prefs');
     });
 
     it('resets all fields to defaults', async () => {
@@ -335,9 +336,9 @@ describe('notifications', () => {
         dailyReminderHour: 23,
         reengagementEnabled: false,
       });
-      resetNotificationPrefs();
+      await resetNotificationPrefs();
 
-      const prefs = getNotificationPrefs();
+      const prefs = await getNotificationPrefs();
       expect(prefs.enabled).toBe(true);
       expect(prefs.dailyReminderEnabled).toBe(true);
       expect(prefs.dailyReminderHour).toBe(9);

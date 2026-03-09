@@ -1,30 +1,19 @@
-import React, { useEffect, memo, useCallback } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  GestureResponderEvent,
-  ViewStyle,
-} from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  useDerivedValue,
-  withSpring,
-  withTiming,
-  withSequence,
-  withDelay,
-  cancelAnimation,
+  Animated,
   Easing,
-  SharedValue,
-} from 'react-native-reanimated';
+  GestureResponderEvent,
+} from 'react-native';
 import { Letter, RowData } from '../types';
 import { LetterTile } from './LetterTile';
 import { DraggableTile } from './DraggableTile';
-import type { DragOverlaySharedValues, DragTileSnapshot } from './DragOverlayPortal';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getWordPhaseTier } from '../services/localGenerator';
 
 const ROW_HORIZONTAL_MARGIN = 12;
@@ -67,112 +56,6 @@ interface RowProps {
   onLetterDragDrop?: (letter: Letter, rowIndex: number, position: { x: number; y: number }) => void;
   /** Called when drag activation state changes — used to disable parent ScrollView during drag */
   onDragActiveChange?: (active: boolean) => void;
-  /** Shared values for the global drag overlay (rendered at App.tsx level) */
-  overlaySharedValues?: DragOverlaySharedValues;
-  /** Called to set tile snapshot for the drag overlay */
-  onSetDragSnapshot?: (snapshot: DragTileSnapshot | null) => void;
-}
-
-function isRowSource(rowIndex: number, activeRowIndex: number): boolean {
-  return rowIndex === activeRowIndex;
-}
-
-function getTargetRowIndex(activeRowIndex: number, moveDirection: 'down' | 'up'): number {
-  return activeRowIndex + (moveDirection === 'down' ? 1 : -1);
-}
-
-function isRowTarget(rowIndex: number, activeRowIndex: number, moveDirection: 'down' | 'up'): boolean {
-  return rowIndex === getTargetRowIndex(activeRowIndex, moveDirection);
-}
-
-function isRowCompleted(rowIndex: number, activeRowIndex: number, moveDirection: 'down' | 'up'): boolean {
-  return moveDirection === 'down'
-    ? rowIndex < activeRowIndex
-    : rowIndex > activeRowIndex;
-}
-
-function hasSameRowData(prev: RowData, next: RowData): boolean {
-  if (prev === next) return true;
-  if (prev.id !== next.id || prev.originalWord !== next.originalWord) return false;
-  if (prev.words.length !== next.words.length) return false;
-
-  for (let i = 0; i < prev.words.length; i++) {
-    const prevLetter = prev.words[i];
-    const nextLetter = next.words[i];
-    if (
-      prevLetter.id !== nextLetter.id ||
-      prevLetter.char !== nextLetter.char ||
-      prevLetter.isLocked !== nextLetter.isLocked
-    ) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function hasSameSlotPreviews(prev?: SlotPreview[], next?: SlotPreview[]): boolean {
-  if (prev === next) return true;
-  if (!prev || !next) return prev == null && next == null;
-  if (prev.length !== next.length) return false;
-
-  for (let i = 0; i < prev.length; i++) {
-    if (prev[i].word !== next[i].word || prev[i].isValid !== next[i].isValid) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-export function areRowPropsEqual(prev: RowProps, next: RowProps): boolean {
-  const prevIsSource = isRowSource(prev.rowIndex, prev.activeRowIndex);
-  const nextIsSource = isRowSource(next.rowIndex, next.activeRowIndex);
-  const prevIsTarget = isRowTarget(prev.rowIndex, prev.activeRowIndex, prev.moveDirection ?? 'down');
-  const nextIsTarget = isRowTarget(next.rowIndex, next.activeRowIndex, next.moveDirection ?? 'down');
-  const prevIsCompleted = isRowCompleted(prev.rowIndex, prev.activeRowIndex, prev.moveDirection ?? 'down');
-  const nextIsCompleted = isRowCompleted(next.rowIndex, next.activeRowIndex, next.moveDirection ?? 'down');
-
-  if (
-    prev.rowIndex !== next.rowIndex ||
-    (prev.moveDirection ?? 'down') !== (next.moveDirection ?? 'down') ||
-    prev.phase !== next.phase ||
-    prev.wordLength !== next.wordLength ||
-    prev.isProcessing !== next.isProcessing ||
-    prev.concealLetters !== next.concealLetters ||
-    prev.guidanceActive !== next.guidanceActive ||
-    prev.guidedLetterId !== next.guidedLetterId ||
-    prev.guidedSlotIndex !== next.guidedSlotIndex ||
-    prevIsSource !== nextIsSource ||
-    prevIsTarget !== nextIsTarget ||
-    prevIsCompleted !== nextIsCompleted ||
-    !hasSameRowData(prev.rowData, next.rowData)
-  ) {
-    return false;
-  }
-
-  if (prevIsSource || nextIsSource) {
-    if ((prev.selectedLetter?.id ?? null) !== (next.selectedLetter?.id ?? null)) {
-      return false;
-    }
-  }
-
-  if (prevIsTarget || nextIsTarget) {
-    if ((prev.selectedLetter?.id ?? null) !== (next.selectedLetter?.id ?? null)) {
-      return false;
-    }
-    if (!hasSameSlotPreviews(prev.slotPreviews, next.slotPreviews)) {
-      return false;
-    }
-    if ((prev.invalidDropSignal ?? 0) !== (next.invalidDropSignal ?? 0)) {
-      return false;
-    }
-    if ((prev.successDropSignal ?? 0) !== (next.successDropSignal ?? 0)) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 // Phase-aware row color helper
@@ -243,8 +126,7 @@ function getPhaseRowColors(phase: number) {
   };
 }
 
-// Animated drop slot component (memoized to prevent animation loop restarts on parent re-render)
-// Fully migrated to Reanimated — all animations run on the UI thread.
+// Animated drop slot component
 const Slot: React.FC<{
   onPress: (origin?: { x: number; y: number }) => void;
   index: number;
@@ -254,55 +136,156 @@ const Slot: React.FC<{
   preview?: SlotPreview;
   /** Incremented when a letter successfully lands in this slot (triggers catch bounce) */
   triggerCatch?: number;
-}> = memo(({ onPress, index, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
+}> = ({ onPress, index, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
-
-  // All animation values on the UI thread
-  const scaleAnim = useSharedValue(1);
-  const catchBounceAnim = useSharedValue(1);
+  const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const catchBounceAnim = useRef(new Animated.Value(1)).current;
+  const previewOpacity = useRef(new Animated.Value(0)).current;
+  const previewScale = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
+    if (settings.reducedMotion) {
+      scaleAnim.setValue(1);
+      return;
+    }
+
+    // Pop in animation with stagger
+    Animated.sequence([
+      Animated.delay(index * 50),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 4,
+        tension: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Skip decorative loops on low-end devices
+    if (shouldSimplifyAnimations()) {
+      return () => { scaleAnim.stopAnimation(); catchBounceAnim.stopAnimation(); };
+    }
+
+    // Continuous pulse
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0,
+          duration: 800,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+
+    // Glow animation (native driver — only drives opacity)
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    glowLoop.start();
+
     return () => {
-      cancelAnimation(scaleAnim);
-      cancelAnimation(catchBounceAnim);
+      pulseLoop.stop();
+      glowLoop.stop();
+      scaleAnim.stopAnimation();
+      pulseAnim.stopAnimation();
+      glowAnim.stopAnimation();
     };
   }, []);
 
   // Catch bounce when a letter lands
   useEffect(() => {
     if (triggerCatch > 0 && !settings.reducedMotion) {
-      catchBounceAnim.value = 1.2;
-      catchBounceAnim.value = withSpring(1, { damping: 12, stiffness: 200 });
+      catchBounceAnim.setValue(1.2);
+      Animated.spring(catchBounceAnim, {
+        toValue: 1,
+        friction: 5,
+        tension: 200,
+        useNativeDriver: true,
+      }).start();
     }
   }, [triggerCatch, settings.reducedMotion]);
 
-  // Static glow opacity (no continuous loop — saves 2 UI-thread animation loops per slot)
-  const STATIC_GLOW_OPACITY = 0.6;
+  // Animate preview appearance
+  useEffect(() => {
+    if (preview) {
+      if (settings.reducedMotion) {
+        previewOpacity.setValue(1);
+        previewScale.setValue(1);
+        return;
+      }
+      previewOpacity.setValue(0);
+      previewScale.setValue(0.85);
+      Animated.parallel([
+        Animated.timing(previewOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(previewScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 180,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      previewOpacity.setValue(0);
+      previewScale.setValue(0.85);
+    }
+  }, [preview?.word, preview?.isValid]);
 
-  const handlePressIn = useCallback(() => {
+  const pulseScale = pulseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08],
+  });
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 0.8],
+  });
+
+  const handlePressIn = () => {
     if (settings.reducedMotion) return;
-    scaleAnim.value = withSpring(0.9, { damping: 12, stiffness: 200 });
-  }, [settings.reducedMotion]);
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      friction: 5,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
+  };
 
-  const handlePressOut = useCallback(() => {
+  const handlePressOut = () => {
     if (settings.reducedMotion) return;
-    scaleAnim.value = withSpring(1, { damping: 10, stiffness: 150 });
-  }, [settings.reducedMotion]);
-
-  // Combined scale: scaleAnim * catchBounceAnim
-  const outerStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scaleAnim.value * catchBounceAnim.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: STATIC_GLOW_OPACITY,
-  }));
-
-  const guidedHaloStyle = useAnimatedStyle(() => ({
-    opacity: STATIC_GLOW_OPACITY,
-    transform: [{ scale: 1 }],
-  }));
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 150,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <TouchableOpacity
@@ -318,21 +301,36 @@ const Slot: React.FC<{
       accessibilityLabel={isGuided ? `Guided drop zone ${index + 1}` : `Drop zone ${index + 1}`}
       accessibilityRole="button"
     >
-      <Animated.View style={[styles.slotOuter, outerStyle]}>
+      <Animated.View
+        style={[
+          styles.slotOuter,
+          {
+            transform: [
+              { scale: Animated.multiply(Animated.multiply(scaleAnim, pulseScale), catchBounceAnim) },
+            ],
+          },
+        ]}
+      >
         {/* Glow background */}
         <Animated.View
           style={[
             styles.slotGlow,
             {
+              opacity: glowOpacity,
               backgroundColor: isGuided ? CandyColors.yellow.main : phaseColors.slotGlowColor,
             },
-            glowStyle,
           ]}
         />
 
         {isGuided && (
           <Animated.View
-            style={[styles.guidedSlotHalo, guidedHaloStyle]}
+            style={[
+              styles.guidedSlotHalo,
+              {
+                opacity: glowOpacity,
+                transform: [{ scale: pulseScale }],
+              },
+            ]}
             pointerEvents="none"
           />
         )}
@@ -372,7 +370,10 @@ const Slot: React.FC<{
 
         {/* Word preview label — animated fade + scale */}
         {preview && (
-          <View style={styles.slotPreviewContainer}>
+          <Animated.View style={[styles.slotPreviewContainer, {
+            opacity: previewOpacity,
+            transform: [{ scale: previewScale }],
+          }]}>
             <Text
               style={[
                 styles.slotPreviewText,
@@ -384,35 +385,12 @@ const Slot: React.FC<{
             >
               {preview.word}
             </Text>
-          </View>
+          </Animated.View>
         )}
       </Animated.View>
     </TouchableOpacity>
   );
-});
-
-/** Arc layout element — animated wrapper that smoothly transitions between flat (0) and arc (1) positions.
- * Uses Reanimated useAnimatedStyle so the arc interpolation runs on the UI thread. */
-const ArcElement: React.FC<{
-  arcProgress: SharedValue<number>;
-  yTarget: number;
-  rotTarget: number;
-  wrapperStyle: ViewStyle;
-  children: React.ReactNode;
-}> = memo(({ arcProgress, yTarget, rotTarget, wrapperStyle, children }) => {
-  const style = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: arcProgress.value * yTarget },
-      { rotate: `${arcProgress.value * rotTarget}deg` },
-    ],
-  }));
-
-  return (
-    <Animated.View style={[wrapperStyle, style]}>
-      {children}
-    </Animated.View>
-  );
-});
+};
 
 export const Row: React.FC<RowProps> = memo(({
   rowData,
@@ -434,139 +412,171 @@ export const Row: React.FC<RowProps> = memo(({
   slotPreviews,
   onLetterDragDrop,
   onDragActiveChange,
-  overlaySharedValues,
-  onSetDragSnapshot,
 }) => {
-  const disableMotion = getSettingsSync().reducedMotion;
   const phaseColors = getPhaseRowColors(phase);
-  const targetRowIndex = getTargetRowIndex(activeRowIndex, moveDirection);
-  const isSource = isRowSource(rowIndex, activeRowIndex);
-  const isTarget = isRowTarget(rowIndex, activeRowIndex, moveDirection);
+  const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
+  const isSource = rowIndex === activeRowIndex;
+  const isTarget = rowIndex === targetRowIndex;
   // Drop rows compact at 6+ (need room for insertion slots); pick rows compact at 7+
   const compactTiles = isTarget ? wordLength >= 6 : wordLength >= 7;
-  const isCompleted = isRowCompleted(rowIndex, activeRowIndex, moveDirection);
+  const isCompleted = moveDirection === 'down'
+    ? rowIndex < activeRowIndex
+    : rowIndex > activeRowIndex;
   const showSlots = isTarget && selectedLetter && !isProcessing;
-
-  const onLetterPressRef = React.useRef(onLetterPress);
-  const onSlotPressRef = React.useRef(onSlotPress);
-  const onLetterDragDropRef = React.useRef(onLetterDragDrop);
-  const onDragActiveChangeRef = React.useRef(onDragActiveChange);
-  const onSetDragSnapshotRef = React.useRef(onSetDragSnapshot);
-  onLetterPressRef.current = onLetterPress;
-  onSlotPressRef.current = onSlotPress;
-  onLetterDragDropRef.current = onLetterDragDrop;
-  onDragActiveChangeRef.current = onDragActiveChange;
-  onSetDragSnapshotRef.current = onSetDragSnapshot;
-
-  const forwardLetterPress = useCallback((letter: Letter, index: number) => {
-    onLetterPressRef.current(letter, index);
-  }, []);
-
-  const forwardSlotPress = useCallback((index: number, origin?: { x: number; y: number }) => {
-    onSlotPressRef.current(index, origin);
-  }, []);
-
-  const forwardLetterDragDrop = useCallback((letter: Letter, index: number, position: { x: number; y: number }) => {
-    onLetterDragDropRef.current?.(letter, index, position);
-  }, []);
-
-  const forwardDragActiveChange = useCallback((active: boolean) => {
-    onDragActiveChangeRef.current?.(active);
-  }, []);
-
-  const forwardSetDragSnapshot = useCallback((snapshot: DragTileSnapshot | null) => {
-    onSetDragSnapshotRef.current?.(snapshot);
-  }, []);
 
   // Resonance: check if this row's word belongs to a dread tier relevant to the current phase.
   // Only visible at Phase 1+ — creates the subliminal "these words feel different" effect.
   const wordTier = getWordPhaseTier(rowData.originalWord);
   const isRowResonant = phase >= 1 && wordTier > 0;
 
-  // All row-level animation values (Reanimated — UI thread)
-  const rowScale = useSharedValue(isSource ? 1 : 0.9);
-  const rowOpacity = useSharedValue(isSource ? 1 : 0.3);
-  const rowGlow = useSharedValue(0);
-  const rowSlide = useSharedValue(0);
-  const arcProgress = useSharedValue(0); // 0 = flat, 1 = full arc
-  const invalidShakeX = useSharedValue(0);
-  const successBounceScale = useSharedValue(1);
-
-  // Combined animated style for the row wrapper (shake + bounce + scale + opacity + slide)
-  const rowWrapperStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: rowScale.value * successBounceScale.value },
-      { translateY: rowSlide.value },
-      { translateX: invalidShakeX.value },
-    ],
-    opacity: rowOpacity.value,
-  }));
-
-  // Glow opacity derived
-  const rowGlowOpacity = useDerivedValue(() => 0.3 + rowGlow.value * 0.3);
-  const rowGlowStyle = useAnimatedStyle(() => ({
-    opacity: rowGlowOpacity.value,
-  }));
+  // Animation values
+  const scaleAnim = useRef(new Animated.Value(isSource ? 1 : 0.9)).current;
+  const opacityAnim = useRef(new Animated.Value(isSource ? 1 : 0.3)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const arcAnim = useRef(new Animated.Value(0)).current; // 0 = flat, 1 = full arc
+  const invalidShakeX = useRef(new Animated.Value(0)).current;
+  const successBounceScale = useRef(new Animated.Value(1)).current;
+  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    if (disableMotion) {
-      rowScale.value = isSource ? 1 : (isTarget ? 0.98 : isCompleted ? 0.92 : 0.88);
-      rowOpacity.value = isSource ? 1 : (isTarget ? 0.9 : isCompleted ? 0.4 : 0.25);
-      rowGlow.value = isSource ? 0.5 : 0;
-      rowSlide.value = isCompleted ? -8 : 0;
-      return;
-    }
-    // Animate row transitions — all on UI thread
+    // Animate row transitions
     if (isSource) {
-      rowScale.value = withSpring(1, { damping: 10, stiffness: 100 });
-      rowOpacity.value = withTiming(1, { duration: 300 });
-      // Static glow — no continuous loop (saves 1 UI-thread animation loop per row)
-      rowGlow.value = 0.5;
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 4,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Glow pulse for active row (skip on low-end devices)
+      if (!shouldSimplifyAnimations()) {
+        glowLoopRef.current = Animated.loop(
+          Animated.sequence([
+            Animated.timing(glowAnim, {
+              toValue: 1,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false,
+            }),
+            Animated.timing(glowAnim, {
+              toValue: 0,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: false,
+            }),
+          ])
+        );
+        glowLoopRef.current.start();
+      }
     } else if (isTarget) {
       const guidedTarget = guidanceActive;
-      rowScale.value = withSpring(guidedTarget ? 1 : 0.98, { damping: 12 });
-      rowOpacity.value = withTiming(guidedTarget ? 1 : 0.9, { duration: 300 });
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: guidedTarget ? 1 : 0.98,
+          friction: 5,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: guidedTarget ? 1 : 0.9,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else if (isCompleted) {
-      rowScale.value = withTiming(0.92, { duration: 400, easing: Easing.out(Easing.quad) });
-      rowOpacity.value = withTiming(0.4, { duration: 400 });
-      rowSlide.value = withTiming(-8, { duration: 400 });
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 0.92,
+          duration: 400,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0.4,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -8,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else {
-      rowScale.value = withTiming(0.88, { duration: 300 });
-      rowOpacity.value = withTiming(0.25, { duration: 300 });
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 0.88,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0.25,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
-  }, [isSource, isTarget, isCompleted, guidanceActive, disableMotion]);
+
+    return () => {
+      glowLoopRef.current?.stop();
+      glowLoopRef.current = null;
+      glowAnim.stopAnimation();
+    };
+  }, [isSource, isTarget, isCompleted, guidanceActive]);
 
   // Animate arc when slots appear/disappear - smooth glide effect
+  // Depends on both showSlots AND selectedLetter to replay animation on each selection
   useEffect(() => {
-    arcProgress.value = showSlots ? 1 : 0;
-  }, [showSlots]);
+    if (showSlots) {
+      // Reset to 0 first, then animate to 1 - ensures animation replays each time
+      arcAnim.setValue(0);
+      Animated.timing(arcAnim, {
+        toValue: 1,
+        duration: 450, // Visible glide animation
+        easing: Easing.out(Easing.cubic), // Smooth deceleration
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(arcAnim, {
+        toValue: 0,
+        duration: 300, // Faster collapse
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showSlots, selectedLetter?.id]);
 
-  // Micro-shake the target row on invalid drop attempts (Reanimated — UI thread).
+  // Micro-shake the target row on invalid drop attempts.
   useEffect(() => {
     if (!isTarget || invalidDropSignal <= 0) return;
-    if (disableMotion) {
-      invalidShakeX.value = 0;
-      return;
-    }
-    invalidShakeX.value = withSequence(
-      withTiming(7, { duration: 45 }),
-      withTiming(-7, { duration: 45 }),
-      withTiming(5, { duration: 40 }),
-      withTiming(-5, { duration: 40 }),
-      withTiming(0, { duration: 35 }),
-    );
-  }, [invalidDropSignal, isTarget, disableMotion]);
+    invalidShakeX.setValue(0);
+    Animated.sequence([
+      Animated.timing(invalidShakeX, { toValue: 7, duration: 45, useNativeDriver: true }),
+      Animated.timing(invalidShakeX, { toValue: -7, duration: 45, useNativeDriver: true }),
+      Animated.timing(invalidShakeX, { toValue: 5, duration: 40, useNativeDriver: true }),
+      Animated.timing(invalidShakeX, { toValue: -5, duration: 40, useNativeDriver: true }),
+      Animated.timing(invalidShakeX, { toValue: 0, duration: 35, useNativeDriver: true }),
+    ]).start();
+  }, [invalidDropSignal, isTarget, invalidShakeX]);
 
-  // Brief scale bounce on the target row when a letter successfully lands (Reanimated — UI thread).
+  // Brief scale bounce on the target row when a letter successfully lands.
   useEffect(() => {
-    if (!isTarget || successDropSignal <= 0) return;
-    if (disableMotion) {
-      successBounceScale.value = 1;
-      return;
-    }
-    successBounceScale.value = 1.08;
-    successBounceScale.value = withSpring(1, { damping: 14, stiffness: 200 });
-  }, [successDropSignal, isTarget, disableMotion]);
+    if (!isTarget || successDropSignal <= 0 || getSettingsSync().reducedMotion) return;
+    successBounceScale.setValue(1.08);
+    Animated.spring(successBounceScale, {
+      toValue: 1,
+      friction: 5,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [successDropSignal, isTarget, successBounceScale]);
 
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
@@ -588,7 +598,6 @@ export const Row: React.FC<RowProps> = memo(({
   };
 
   // Render interleaved arc layout: [slot][letter][slot][letter]...[slot]
-  // Uses Reanimated ArcElement wrapper for UI-thread arc transforms.
   const renderArcContent = () => {
     const letters = rowData.words;
     const totalElements = letters.length * 2 + 1;
@@ -598,25 +607,35 @@ export const Row: React.FC<RowProps> = memo(({
       const isSlot = i % 2 === 0;
       const { yMultiplier, rotationMultiplier } = getArcMultipliers(i, totalElements);
 
+      // Animated transforms - multiply by arcAnim for smooth transition
+      const translateY = arcAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, yMultiplier],
+      });
+      const rotate = arcAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', `${rotationMultiplier}deg`],
+      });
+
       if (isSlot) {
         const slotIndex = i / 2;
         elements.push(
-          <ArcElement
+          <Animated.View
             key={`slot-${slotIndex}`}
-            arcProgress={arcProgress}
-            yTarget={yMultiplier}
-            rotTarget={rotationMultiplier}
-            wrapperStyle={styles.arcSlotWrapper}
+            style={[
+              styles.arcSlotWrapper,
+              { transform: [{ translateY }, { rotate }] },
+            ]}
           >
             <Slot
-              onPress={(origin) => forwardSlotPress(slotIndex, origin)}
+              onPress={(origin) => onSlotPress(slotIndex, origin)}
               index={slotIndex}
               compact
               phase={phase}
               isGuided={guidanceActive && guidedSlotIndex === slotIndex}
               preview={slotPreviews?.[slotIndex]}
             />
-          </ArcElement>
+          </Animated.View>
         );
       } else {
         const letterIndex = Math.floor(i / 2);
@@ -624,13 +643,14 @@ export const Row: React.FC<RowProps> = memo(({
         const displayLetter = (concealLetters && !isSource)
           ? { ...letter, char: '•' }
           : letter;
+        // No wrapper View - LetterTile renders directly with animation
         elements.push(
-          <ArcElement
+          <Animated.View
             key={letter.id}
-            arcProgress={arcProgress}
-            yTarget={yMultiplier}
-            rotTarget={rotationMultiplier}
-            wrapperStyle={styles.arcLetterWrapper}
+            style={[
+              styles.arcLetterWrapper,
+              { transform: [{ translateY }, { rotate }] },
+            ]}
           >
             <LetterTile
               letter={displayLetter}
@@ -639,9 +659,8 @@ export const Row: React.FC<RowProps> = memo(({
               compact={compactTiles}
               isResonant={isRowResonant}
               isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
-              isActiveRow={isSource}
             />
-          </ArcElement>
+          </Animated.View>
         );
       }
     }
@@ -670,7 +689,6 @@ export const Row: React.FC<RowProps> = memo(({
           compact={compactTiles}
           isResonant={isRowResonant}
           isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
-          isActiveRow={isSource}
         />
       );
 
@@ -681,17 +699,13 @@ export const Row: React.FC<RowProps> = memo(({
             enabled={!isProcessing}
             onDragStart={() => {
               if (!selectedLetter || selectedLetter.id !== letter.id) {
-                forwardLetterPress(letter, rowIndex);
+                onLetterPress(letter, rowIndex);
               }
             }}
-            onDragEnd={(pos) => forwardLetterDragDrop(letter, rowIndex, pos)}
-            onTap={() => forwardLetterPress(letter, rowIndex)}
+            onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
+            onTap={() => onLetterPress(letter, rowIndex)}
             phase={phase}
-            onDragActiveChange={forwardDragActiveChange}
-            overlaySharedValues={overlaySharedValues}
-            onSetDragSnapshot={forwardSetDragSnapshot}
-            letterChar={letter.char}
-            compact={compactTiles}
+            onDragActiveChange={onDragActiveChange}
           >
             {tile}
           </DraggableTile>
@@ -701,6 +715,11 @@ export const Row: React.FC<RowProps> = memo(({
       return tile;
     });
   };
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.6],
+  });
 
   const getRowStyle = () => {
     if (isSource) return [styles.rowSource, { borderColor: phaseColors.sourceBorderColor, shadowColor: phaseColors.sourceShadowColor }];
@@ -716,7 +735,14 @@ export const Row: React.FC<RowProps> = memo(({
         styles.rowWrapper,
         // Source row with drag needs higher zIndex so floating tile renders above subsequent rows
         isSource && !!onLetterDragDrop && { zIndex: 10 },
-        rowWrapperStyle,
+        {
+          transform: [
+            { scale: Animated.multiply(scaleAnim, successBounceScale) },
+            { translateX: invalidShakeX },
+            { translateY: slideAnim },
+          ],
+          opacity: opacityAnim,
+        },
       ]}
     >
       {/* FLOATING BADGES - positioned outside row container */}
@@ -743,8 +769,7 @@ export const Row: React.FC<RowProps> = memo(({
         <Animated.View
           style={[
             styles.rowGlow,
-            { backgroundColor: phaseColors.glowColor },
-            rowGlowStyle,
+            { opacity: glowOpacity, backgroundColor: phaseColors.glowColor },
           ]}
         />
       )}
@@ -775,7 +800,7 @@ export const Row: React.FC<RowProps> = memo(({
       </View>
     </Animated.View>
   );
-}, areRowPropsEqual);
+});
 
 const styles = StyleSheet.create({
   rowWrapper: {

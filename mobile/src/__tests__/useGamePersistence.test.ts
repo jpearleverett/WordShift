@@ -54,10 +54,28 @@ jest.mock('react', () => ({
   useCallback: (fn: Function, _deps: unknown[]) => fn,
 }));
 
-// --- Mock MMKV storage ---
-jest.mock('../services/storage', () =>
-  require('./helpers/mockStorage').createMockStorage()
-);
+// --- Mock AsyncStorage ---
+jest.mock('@react-native-async-storage/async-storage', () => {
+  const store: Record<string, string> = {};
+  return {
+    __esModule: true,
+    default: {
+      getItem: jest.fn((key: string) => Promise.resolve(store[key] || null)),
+      setItem: jest.fn((key: string, value: string) => {
+        store[key] = value;
+        return Promise.resolve();
+      }),
+      removeItem: jest.fn((key: string) => {
+        delete store[key];
+        return Promise.resolve();
+      }),
+      clear: jest.fn(() => {
+        Object.keys(store).forEach(key => delete store[key]);
+        return Promise.resolve();
+      }),
+    },
+  };
+});
 
 // --- Mock starRating ---
 const mockCalculateStars = jest.fn((hintsUsed: number, invalidAttempts: number) => {
@@ -66,7 +84,7 @@ const mockCalculateStars = jest.fn((hintsUsed: number, invalidAttempts: number) 
   return 1;
 });
 
-const mockRecordPuzzleCompletion = jest.fn((_d?: any, _h?: any, _i?: any) => ({
+const mockRecordPuzzleCompletion = jest.fn(async (_d?: any, _h?: any, _i?: any) => ({
   difficulty: 'MEDIUM',
   starsEarned: 3,
   invalidAttempts: 0,
@@ -92,7 +110,7 @@ const defaultStats = {
   lastUpdated: Date.now(),
 };
 
-const mockGetCumulativeStats = jest.fn(() => ({ ...defaultStats }));
+const mockGetCumulativeStats = jest.fn(async () => ({ ...defaultStats }));
 const mockGetThreeStarRate = jest.fn((_stats?: any) => 100);
 
 jest.mock('../services/starRating', () => ({
@@ -103,7 +121,7 @@ jest.mock('../services/starRating', () => ({
 }));
 
 // --- Mock amberCurrency ---
-const mockAwardPuzzleAmber = jest.fn((_d?: any, _s?: any, _m?: any, _r?: any, _c?: any) => ({
+const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: any, _c?: any) => ({
   amount: 15,
   baseAmount: 15,
   newBalance: 115,
@@ -121,10 +139,10 @@ const mockAwardPuzzleAmber = jest.fn((_d?: any, _s?: any, _m?: any, _r?: any, _c
   streakMilestoneMessage: null as string | null,
 }));
 
-const mockGetAmberBalance = jest.fn(() => 100);
-const mockGetCurrentPhase = jest.fn(() => 0);
-const mockRecordVariantEncounter = jest.fn((_variant?: any) => {});
-const mockApplyVariantAmberBonus = jest.fn((_variant?: any, _base?: any, _mult?: any, _credit?: any) => ({
+const mockGetAmberBalance = jest.fn(async () => 100);
+const mockGetCurrentPhase = jest.fn(async () => 0);
+const mockRecordVariantEncounter = jest.fn(async (_variant?: any) => {});
+const mockApplyVariantAmberBonus = jest.fn(async (_variant?: any, _base?: any, _mult?: any, _credit?: any) => ({
   bonus: 0,
   newBalance: 115,
   appliedMultiplier: 1.0,
@@ -132,7 +150,7 @@ const mockApplyVariantAmberBonus = jest.fn((_variant?: any, _base?: any, _mult?:
   repeatDecay: 1.0,
 }));
 
-const mockRecordRitualWords = jest.fn((_w?: any, _e?: any, _t?: any) => ({
+const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
   totalWordsFormed: 0,
   totalRitualEnergy: 0,
   triggerWordQueue: [] as string[],
@@ -142,9 +160,9 @@ jest.mock('../services/amberCurrency', () => ({
   awardPuzzleAmber: (...args: any[]) => mockAwardPuzzleAmber(args[0], args[1], args[2], args[3], args[4]),
   getAmberBalance: () => mockGetAmberBalance(),
   getCurrentPhase: () => mockGetCurrentPhase(),
-  getPhaseProgressFraction: jest.fn(() => 0),
-  getPendingPhaseTransition: jest.fn(() => null),
-  isPostRevelation: jest.fn(() => false),
+  getPhaseProgressFraction: jest.fn(async () => 0),
+  getPendingPhaseTransition: jest.fn(async () => null),
+  isPostRevelation: jest.fn(async () => false),
   recordRitualWords: (...args: any[]) => mockRecordRitualWords(args[0], args[1], args[2]),
   recordVariantEncounter: (...args: any[]) => mockRecordVariantEncounter(args[0]),
   applyVariantAmberBonus: (...args: any[]) => mockApplyVariantAmberBonus(args[0], args[1], args[2], args[3]),
@@ -171,15 +189,15 @@ jest.mock('../services/eventLogger', () => ({
 }));
 
 // --- Mock weekly quests ---
-const mockUpdateQuestProgress = jest.fn((_event?: any, _phase?: any) => []);
+const mockUpdateQuestProgress = jest.fn(async (_event?: any, _phase?: any) => []);
 jest.mock('../services/weeklyQuests', () => ({
   updateQuestProgress: (...args: any[]) => mockUpdateQuestProgress(args[0], args[1]),
 }));
 
 // --- Mock wordHarvest ---
-const mockEnqueueHarvestBatch = jest.fn((_batch?: any) => ({ overflow: false }));
+const mockEnqueueHarvestBatch = jest.fn(async (_batch?: any) => ({ overflow: false }));
 const mockGenerateBatchId = jest.fn(() => 'hb_test_123');
-const mockGetPendingHarvestSummary = jest.fn(() => ({
+const mockGetPendingHarvestSummary = jest.fn(async () => ({
   pendingAmber: 15,
   pendingWords: 3,
   pendingBatches: 1,
@@ -209,7 +227,7 @@ describe('useGamePersistence', () => {
       return 1;
     });
 
-    mockAwardPuzzleAmber.mockReturnValue({
+    mockAwardPuzzleAmber.mockResolvedValue({
       amount: 15,
       baseAmount: 15,
       newBalance: 115,
@@ -227,18 +245,18 @@ describe('useGamePersistence', () => {
       streakMilestoneMessage: null,
     });
 
-    mockGetCumulativeStats.mockReturnValue({ ...defaultStats });
-    mockGetAmberBalance.mockReturnValue(100);
-    mockGetCurrentPhase.mockReturnValue(0);
+    mockGetCumulativeStats.mockResolvedValue({ ...defaultStats });
+    mockGetAmberBalance.mockResolvedValue(100);
+    mockGetCurrentPhase.mockResolvedValue(0);
     mockGetThreeStarRate.mockReturnValue(100);
-    mockApplyVariantAmberBonus.mockReturnValue({
+    mockApplyVariantAmberBonus.mockResolvedValue({
       bonus: 0,
       newBalance: 115,
       appliedMultiplier: 1.0,
       repeatCount: 1,
       repeatDecay: 1.0,
     });
-    mockUpdateQuestProgress.mockReturnValue([]);
+    mockUpdateQuestProgress.mockResolvedValue([]);
   });
 
   describe('initial state', () => {
@@ -331,7 +349,7 @@ describe('useGamePersistence', () => {
     });
 
     test('returns amberEarned from awardPuzzleAmber', async () => {
-      mockAwardPuzzleAmber.mockReturnValueOnce({
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
         amount: 25,
         baseAmount: 20,
         newBalance: 125,
@@ -358,7 +376,7 @@ describe('useGamePersistence', () => {
     });
 
     test('returns phaseChanged when phase transitions', async () => {
-      mockAwardPuzzleAmber.mockReturnValueOnce({
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
         amount: 10,
         baseAmount: 10,
         newBalance: 200,
@@ -385,7 +403,7 @@ describe('useGamePersistence', () => {
     });
 
     test('returns challenge bonus in challenge mode', async () => {
-      mockAwardPuzzleAmber.mockReturnValueOnce({
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
         amount: 22,
         baseAmount: 15,
         newBalance: 122,
@@ -435,7 +453,7 @@ describe('useGamePersistence', () => {
     });
 
     test('applies variant bonus via anti-farm calculator', async () => {
-      mockApplyVariantAmberBonus.mockReturnValueOnce({
+      mockApplyVariantAmberBonus.mockResolvedValueOnce({
         bonus: 4,
         newBalance: 119,
         appliedMultiplier: 1.2,
@@ -453,7 +471,7 @@ describe('useGamePersistence', () => {
     });
 
     test('handles service errors gracefully with default returns', async () => {
-      mockRecordPuzzleCompletion.mockImplementationOnce(() => { throw new Error('Storage failed'); });
+      mockRecordPuzzleCompletion.mockRejectedValueOnce(new Error('Storage failed'));
 
       const [, actions] = callHook();
       const result = await actions.recordVictory('MEDIUM', 0, 0);
@@ -471,7 +489,7 @@ describe('useGamePersistence', () => {
     });
 
     test('handles awardPuzzleAmber failure gracefully', async () => {
-      mockAwardPuzzleAmber.mockImplementationOnce(() => { throw new Error('Award failed'); });
+      mockAwardPuzzleAmber.mockRejectedValueOnce(new Error('Award failed'));
 
       const [, actions] = callHook();
       const result = await actions.recordVictory('EASY', 0, 1);
@@ -517,7 +535,7 @@ describe('useGamePersistence', () => {
     });
 
     test('returns harvestOverflow: true when enqueue reports overflow', async () => {
-      mockEnqueueHarvestBatch.mockReturnValueOnce({ overflow: true });
+      mockEnqueueHarvestBatch.mockResolvedValueOnce({ overflow: true });
       const [, actions] = callHook();
       const result = await actions.recordVictory('MEDIUM', 0, 0);
       expect(result.harvestOverflow).toBe(true);
@@ -534,12 +552,12 @@ describe('useGamePersistence', () => {
     });
 
     test('updates state with fresh values', async () => {
-      mockGetCumulativeStats.mockReturnValueOnce({
+      mockGetCumulativeStats.mockResolvedValueOnce({
         ...defaultStats,
         totalPuzzlesCompleted: 42,
         totalStars: 100,
       });
-      mockGetAmberBalance.mockReturnValueOnce(500);
+      mockGetAmberBalance.mockResolvedValueOnce(500);
 
       let [, actions] = callHook();
       await actions.refreshStats();

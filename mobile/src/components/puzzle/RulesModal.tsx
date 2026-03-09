@@ -9,8 +9,6 @@ import {
 import { CandyColors } from '../../theme/colors';
 import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
-import Reanimated, { FadeIn } from 'react-native-reanimated';
-import { getSettingsSync } from '../../services/settings';
 
 const STEP_COLORS = [
   { bg: CandyColors.pink.light, text: CandyColors.pink.dark },
@@ -25,7 +23,7 @@ interface RulesModalProps {
   onClose: () => void;
 }
 
-export const RulesModal: React.FC<RulesModalProps> = React.memo(({
+export const RulesModal: React.FC<RulesModalProps> = ({
   visible,
   phase,
   onClose,
@@ -39,11 +37,7 @@ export const RulesModal: React.FC<RulesModalProps> = React.memo(({
         activeOpacity={1}
         onPress={onClose}
       >
-        <Reanimated.View
-          entering={getSettingsSync().reducedMotion ? undefined : FadeIn.duration(250)}
-          style={styles.rulesModal}
-          onStartShouldSetResponder={() => true}
-        >
+        <View style={styles.rulesModal} onStartShouldSetResponder={() => true}>
           <View style={styles.modalShine} />
 
           <TouchableOpacity
@@ -77,11 +71,11 @@ export const RulesModal: React.FC<RulesModalProps> = React.memo(({
             <View style={styles.buttonShine} />
             <Text style={styles.gotItButtonText}>{rules.dismissLabel}</Text>
           </TouchableOpacity>
-        </Reanimated.View>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
-});
+};
 
 const styles = StyleSheet.create({
   modalOverlay: {
