@@ -1,8 +1,18 @@
-import React, { useRef } from 'react';
-import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
-import { getSettingsSync } from '../services/settings';
-import { hapticSelection } from '../services/haptics';
+import React, { useRef, useCallback } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+  runOnJS,
+  Easing,
+} from 'react-native-reanimated';
+import { hapticSelection, hapticHeavy } from '../services/haptics';
 import { DROP_IMPACT_POP_MS, DROP_IMPACT_COLLAPSE_MS } from '../constants/timing';
+import type { DragOverlaySharedValues, DragTileSnapshot } from './DragOverlayPortal';
 
 interface DraggableTileProps {
   /** The rendered child (LetterTile wrapped in its container) */
@@ -19,22 +29,29 @@ interface DraggableTileProps {
   phase?: number;
   /** Called when drag activation state changes — used to disable parent ScrollView during drag */
   onDragActiveChange?: (active: boolean) => void;
+  /** Shared values for the global drag overlay layer (rendered at App.tsx level) */
+  overlaySharedValues?: DragOverlaySharedValues;
+  /** Called to set the tile snapshot for the overlay on drag start */
+  onSetDragSnapshot?: (snapshot: DragTileSnapshot | null) => void;
+  /** The letter character for the overlay tile snapshot */
+  letterChar?: string;
+  /** Whether to use compact tile in overlay */
+  compact?: boolean;
 }
 
 const DRAG_THRESHOLD = 10;
 
 /**
- * Wraps a LetterTile child with drag-and-drop capability.
+ * Wraps a LetterTile child with drag-and-drop capability using
+ * react-native-gesture-handler + react-native-reanimated.
  *
  * On short press: fires `onTap` (existing letter selection behavior).
- * On drag beyond threshold: shows a floating copy following the finger,
- * dims the source tile, and fires `onDragEnd` with the finger's final position.
+ * On drag beyond threshold: activates a floating copy in the global
+ * DragOverlayPortal (rendered at App.tsx level, above all rows),
+ * dims the source tile, and fires `onDragEnd` on release.
  *
- * The parent (Row/App) is responsible for hit-testing the drop position
- * against slot rects and triggering the appropriate slot press.
- *
- * Uses refs for all callback props to avoid stale closures in PanResponder
- * (PanResponder is created once in a ref and never recreated).
+ * The floating tile position is written directly to shared values in the
+ * gesture worklet — zero JS bridge, pure UI-thread tracking.
  */
 export function DraggableTile({
   children,
@@ -44,190 +61,172 @@ export function DraggableTile({
   enabled,
   phase = 0,
   onDragActiveChange,
+  overlaySharedValues,
+  onSetDragSnapshot,
+  letterChar,
+  compact = false,
 }: DraggableTileProps) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-  const isDragging = useRef(false);
-  const startPos = useRef({ x: 0, y: 0 });
-  const dragActivated = useRef(false);
-  const sourceOpacity = useRef(new Animated.Value(1)).current;
-  const floatingOpacity = useRef(new Animated.Value(0)).current;
-  const floatingScale = useRef(new Animated.Value(1)).current;
+  // Source tile animation (dims + shrinks during drag)
+  const sourceOpacity = useSharedValue(1);
+  const sourceScale = useSharedValue(1);
 
-  // Refs for callback props — PanResponder is created once and captures the
-  // initial closure. Without refs, callbacks would be stale after re-renders.
+  // Track drag state across gesture callbacks
+  const dragActivated = useSharedValue(false);
+  const startAbsX = useSharedValue(0);
+  const startAbsY = useSharedValue(0);
+
+  // Refs for latest callback props
   const onDragStartRef = useRef(onDragStart);
   const onDragEndRef = useRef(onDragEnd);
   const onTapRef = useRef(onTap);
-  const enabledRef = useRef(enabled);
   const onDragActiveChangeRef = useRef(onDragActiveChange);
+  const onSetDragSnapshotRef = useRef(onSetDragSnapshot);
   onDragStartRef.current = onDragStart;
   onDragEndRef.current = onDragEnd;
   onTapRef.current = onTap;
-  enabledRef.current = enabled;
   onDragActiveChangeRef.current = onDragActiveChange;
+  onSetDragSnapshotRef.current = onSetDragSnapshot;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      // Capture phase: claim responder before ScrollView can intercept
-      onStartShouldSetPanResponderCapture: () => enabledRef.current,
-      onMoveShouldSetPanResponderCapture: (_, gestureState) => {
-        if (!enabledRef.current) return false;
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
-      },
-      onStartShouldSetPanResponder: () => enabledRef.current,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        if (!enabledRef.current) return false;
-        const { dx, dy } = gestureState;
-        return Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD;
-      },
-      // Refuse to surrender responder once drag is active
-      onPanResponderTerminationRequest: () => !dragActivated.current,
-      onPanResponderGrant: (evt) => {
-        startPos.current = {
-          x: evt.nativeEvent.pageX,
-          y: evt.nativeEvent.pageY,
-        };
-        isDragging.current = true;
-        dragActivated.current = false;
-        translateX.setValue(0);
-        translateY.setValue(0);
-        // Disable parent ScrollView immediately on touch to prevent scroll race
-        onDragActiveChangeRef.current?.(true);
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (!isDragging.current) return;
-        const { dx, dy } = gestureState;
+  // JS-thread callbacks
+  const jsDragStart = useCallback(() => {
+    hapticSelection();
+    // Set the tile snapshot for the overlay
+    if (onSetDragSnapshotRef.current && letterChar) {
+      onSetDragSnapshotRef.current({ char: letterChar, phase, compact });
+    }
+    onDragStartRef.current();
+  }, [letterChar, phase, compact]);
 
-        // Activate drag after threshold
-        if (!dragActivated.current && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
-          dragActivated.current = true;
-          hapticSelection();
-          onDragStartRef.current();
+  const jsDragEnd = useCallback((x: number, y: number) => {
+    hapticHeavy(); // Satisfying heavy haptic on drop landing
+    onDragEndRef.current({ x, y });
+  }, []);
 
-          // Show floating tile, dim source
-          floatingOpacity.setValue(1);
-          sourceOpacity.setValue(0.3);
-          const settings = getSettingsSync();
-          if (!settings.reducedMotion) {
-            Animated.spring(floatingScale, {
-              toValue: 1.1,
-              friction: 8,
-              tension: 200,
-              useNativeDriver: true,
-            }).start();
-          }
-        }
+  const jsTap = useCallback(() => {
+    onTapRef.current();
+  }, []);
 
-        if (dragActivated.current) {
-          translateX.setValue(dx);
-          translateY.setValue(dy);
-        }
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        isDragging.current = false;
-        // Re-enable parent ScrollView
-        onDragActiveChangeRef.current?.(false);
+  const jsDragActiveChange = useCallback((active: boolean) => {
+    onDragActiveChangeRef.current?.(active);
+  }, []);
 
-        if (dragActivated.current) {
-          // Drag was active — fire drop callback with finger position
-          const dropX = startPos.current.x + gestureState.dx;
-          const dropY = startPos.current.y + gestureState.dy;
+  const jsClearSnapshot = useCallback(() => {
+    if (onSetDragSnapshotRef.current) {
+      onSetDragSnapshotRef.current(null);
+    }
+  }, []);
 
-          const settings = getSettingsSync();
-          if (!settings.reducedMotion) {
-            // Pop-then-collapse: brief scale-up "impact" → shrink to nothing
-            Animated.sequence([
-              // Pop: quick scale burst
-              Animated.timing(floatingScale, {
-                toValue: 1.15,
-                duration: DROP_IMPACT_POP_MS,
-                easing: Easing.out(Easing.quad),
-                useNativeDriver: true,
-              }),
-              // Collapse: shrink to zero + fade
-              Animated.parallel([
-                Animated.timing(floatingScale, {
-                  toValue: 0,
-                  duration: DROP_IMPACT_COLLAPSE_MS,
-                  easing: Easing.in(Easing.quad),
-                  useNativeDriver: true,
-                }),
-                Animated.timing(floatingOpacity, {
-                  toValue: 0,
-                  duration: DROP_IMPACT_COLLAPSE_MS,
-                  useNativeDriver: true,
-                }),
-              ]),
-            ]).start(() => {
-              // Reset after animation
-              translateX.setValue(0);
-              translateY.setValue(0);
-              floatingScale.setValue(1);
-              sourceOpacity.setValue(1);
-            });
-          } else {
-            translateX.setValue(0);
-            translateY.setValue(0);
-            floatingOpacity.setValue(0);
-            floatingScale.setValue(1);
-            sourceOpacity.setValue(1);
-          }
+  const ov = overlaySharedValues;
 
-          onDragEndRef.current({ x: dropX, y: dropY });
-        } else {
-          // No drag — treat as tap
-          sourceOpacity.setValue(1);
-          floatingOpacity.setValue(0);
-          onTapRef.current();
-        }
-
-        dragActivated.current = false;
-      },
-      onPanResponderTerminate: () => {
-        isDragging.current = false;
-        dragActivated.current = false;
-        // Re-enable parent ScrollView on termination
-        onDragActiveChangeRef.current?.(false);
-        translateX.setValue(0);
-        translateY.setValue(0);
-        floatingOpacity.setValue(0);
-        floatingScale.setValue(1);
-        sourceOpacity.setValue(1);
-      },
+  const panGesture = Gesture.Pan()
+    .enabled(enabled)
+    .minDistance(DRAG_THRESHOLD)
+    .onBegin((e) => {
+      'worklet';
+      // Record the absolute position of the tile on screen
+      startAbsX.value = e.absoluteX - e.x;
+      startAbsY.value = e.absoluteY - e.y;
+      dragActivated.value = false;
     })
-  ).current;
+    .onStart((e) => {
+      'worklet';
+      // Drag threshold crossed — activate drag mode
+      dragActivated.value = true;
+      runOnJS(jsDragActiveChange)(true);
 
-  const shadowColor = phase >= 5 ? '#7B6B8A80'   // ghostly mauve (terrible peace)
-    : phase >= 3 ? '#8030508C'                    // crimson (cult/dread)
-    : '#FFD70050';                                // golden (bright days)
+      // Ghost the source tile with spring (smooth, not instant)
+      sourceOpacity.value = withSpring(0.25, { damping: 20, stiffness: 300 });
+      sourceScale.value = withSpring(0.9, { damping: 20, stiffness: 300 });
+
+      // Position the overlay tile at the finger's absolute position
+      if (ov) {
+        // Calculate tile center offset (tile is ~26px wide from center)
+        const tileCenterX = compact ? 21 : 26;
+        const tileCenterY = compact ? 30 : 32;
+        ov.offsetX.value = -tileCenterX;
+        ov.offsetY.value = -tileCenterY;
+        ov.translateX.value = e.absoluteX;
+        ov.translateY.value = e.absoluteY;
+        ov.scale.value = withSpring(1.12, { damping: 12, stiffness: 200 });
+        ov.opacity.value = 1;
+      }
+
+      runOnJS(jsDragStart)();
+    })
+    .onUpdate((e) => {
+      'worklet';
+      if (dragActivated.value && ov) {
+        // Update overlay position — pure UI thread, zero latency
+        ov.translateX.value = e.absoluteX;
+        ov.translateY.value = e.absoluteY;
+      }
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (dragActivated.value) {
+        const dropX = e.absoluteX;
+        const dropY = e.absoluteY;
+
+        // Pop-then-collapse animation on the overlay
+        if (ov) {
+          ov.scale.value = withSequence(
+            withTiming(1.2, {
+              duration: DROP_IMPACT_POP_MS,
+              easing: Easing.out(Easing.back(1.5)),
+            }),
+            withTiming(0, {
+              duration: DROP_IMPACT_COLLAPSE_MS,
+              easing: Easing.in(Easing.quad),
+            }),
+          );
+          ov.opacity.value = withTiming(0, {
+            duration: DROP_IMPACT_POP_MS + DROP_IMPACT_COLLAPSE_MS,
+          });
+        }
+
+        runOnJS(jsDragEnd)(dropX, dropY);
+      }
+    })
+    .onFinalize(() => {
+      'worklet';
+      runOnJS(jsDragActiveChange)(false);
+      if (dragActivated.value) {
+        // Drag completed — restore source tile with spring
+        sourceOpacity.value = withSpring(1, { damping: 15, stiffness: 200 });
+        sourceScale.value = withSpring(1, { damping: 15, stiffness: 200 });
+
+        // Reset overlay after collapse animation
+        if (ov) {
+          ov.translateX.value = withTiming(0, { duration: 0 });
+          ov.translateY.value = withTiming(0, { duration: 0 });
+          ov.scale.value = withTiming(1, { duration: 0 });
+        }
+        // Clear snapshot after animation completes
+        runOnJS(jsClearSnapshot)();
+      } else {
+        // Gesture failed (tap — finger lifted before minDistance) — fire tap
+        runOnJS(jsTap)();
+        sourceOpacity.value = 1;
+        sourceScale.value = 1;
+        if (ov) {
+          ov.opacity.value = 0;
+        }
+      }
+      dragActivated.value = false;
+    });
+
+  const sourceStyle = useAnimatedStyle(() => ({
+    opacity: sourceOpacity.value,
+    transform: [{ scale: sourceScale.value }],
+  }));
 
   return (
     <View style={styles.wrapper}>
-      {/* Source tile (dims during drag) */}
-      <Animated.View style={{ opacity: sourceOpacity }} {...panResponder.panHandlers}>
-        {children}
-      </Animated.View>
-
-      {/* Floating drag tile (follows finger) */}
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.floatingTile,
-          {
-            opacity: floatingOpacity,
-            transform: [
-              { translateX },
-              { translateY },
-              { scale: floatingScale },
-            ],
-            shadowColor,
-          },
-        ]}
-      >
-        {children}
-      </Animated.View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={sourceStyle}>
+          {children}
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
 }
@@ -235,15 +234,5 @@ export function DraggableTile({
 const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
-  },
-  floatingTile: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 100,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });

@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { PuzzleConfig, Difficulty } from '../types';
 import { PreGeneratedPuzzle, PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
 import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
@@ -148,19 +148,15 @@ function deriveBankWordRecency(
 /**
  * Load played puzzle IDs from storage into cache.
  */
-async function loadUsedPuzzles(bankKey: string = 'standard'): Promise<string[]> {
+function loadUsedPuzzles(bankKey: string = 'standard'): string[] {
   const config = getStorageConfig(bankKey);
   const cached = config.getCache();
   if (cached !== null) return cached;
-  try {
-    const stored = await AsyncStorage.getItem(config.key);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      config.setCache(parsed);
-      return parsed;
-    }
-  } catch {
-    // Fall through to empty
+  const stored = storage.getString(config.key);
+  if (stored !== undefined) {
+    const parsed = JSON.parse(stored);
+    config.setCache(parsed);
+    return parsed;
   }
   config.setCache([]);
   return [];
@@ -169,9 +165,9 @@ async function loadUsedPuzzles(bankKey: string = 'standard'): Promise<string[]> 
 /**
  * Record a puzzle as played.
  */
-async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'): Promise<void> {
+function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'): void {
   const config = getStorageConfig(bankKey);
-  const used = await loadUsedPuzzles(bankKey);
+  const used = loadUsedPuzzles(bankKey);
 
   // Remove if already present (re-sort to front)
   const idx = used.indexOf(puzzleId);
@@ -186,12 +182,7 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
   }
 
   config.setCache(used);
-
-  try {
-    await AsyncStorage.setItem(config.key, JSON.stringify(used));
-  } catch {
-    // Non-critical — will retry on next play
-  }
+  storage.set(config.key, JSON.stringify(used));
 }
 
 /**
@@ -299,18 +290,18 @@ function scorePuzzleForContext(
  *
  * When all puzzles have been played, recycles the oldest-played puzzles.
  */
-export async function selectPreGeneratedPuzzle(
+export function selectPreGeneratedPuzzle(
   difficulty: Difficulty,
   phase: DialoguePhase,
   recencyMap: Map<string, number>,
   variant: PuzzleVariant = 'standard'
-): Promise<PuzzleConfig | null> {
+): PuzzleConfig | null {
   const bank = getBankForSelection(difficulty, variant);
   if (!bank) return null;
 
   const bankKey = getBankKey(difficulty, variant);
   const storageConfig = getStorageConfig(bankKey);
-  const used = await loadUsedPuzzles(bankKey);
+  const used = loadUsedPuzzles(bankKey);
   const usedSet = new Set(used);
 
   // Filter out already-played puzzles
@@ -324,11 +315,7 @@ export async function selectPreGeneratedPuzzle(
     // Remove recycled IDs from the used list
     const trimmed = used.slice(0, halfIdx);
     storageConfig.setCache(trimmed);
-    try {
-      await AsyncStorage.setItem(storageConfig.key, JSON.stringify(trimmed));
-    } catch {
-      // Non-critical
-    }
+    storage.set(storageConfig.key, JSON.stringify(trimmed));
 
     available = bank.filter(p => recycledIds.has(p.id));
 
@@ -336,11 +323,7 @@ export async function selectPreGeneratedPuzzle(
     if (available.length === 0) {
       available = [...bank];
       storageConfig.setCache([]);
-      try {
-        await AsyncStorage.setItem(storageConfig.key, JSON.stringify([]));
-      } catch {
-        // Non-critical
-      }
+      storage.set(storageConfig.key, JSON.stringify([]));
     }
   }
 
@@ -364,7 +347,7 @@ export async function selectPreGeneratedPuzzle(
   const selected = scored[Math.floor(Math.random() * topN)];
 
   // Mark as played
-  await markPuzzlePlayed(selected.puzzle.id, bankKey);
+  markPuzzlePlayed(selected.puzzle.id, bankKey);
 
   // Convert to PuzzleConfig
   const sol0 = selected.puzzle.solution[0];
@@ -386,16 +369,10 @@ export async function selectPreGeneratedPuzzle(
 /**
  * Clear played puzzle tracking (for Reset All Data).
  */
-export async function clearPlayedPuzzles(): Promise<void> {
-  const keys: string[] = [];
+export function clearPlayedPuzzles(): void {
   for (const entry of Object.values(BANK_REGISTRY)) {
     entry.cache = null;
     entry.idToWords = null;
-    keys.push(entry.storageKey);
-  }
-  try {
-    await AsyncStorage.multiRemove(keys);
-  } catch {
-    // Non-critical
+    storage.remove(entry.storageKey);
   }
 }

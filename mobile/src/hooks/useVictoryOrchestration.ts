@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   getVictoryGlitch,
   checkNarrativeMicroBeat,
@@ -185,22 +185,22 @@ export function useVictoryOrchestration(): [
     }
 
     // ------ Narrative micro-beat (one-time surprises at milestone counts) ------
-    checkNarrativeMicroBeat(totalPuzzlesCompleted)
-      .then(beat => {
-        if (gen !== generationRef.current) return;
-        if (beat) {
-          const delay = beat.type === 'glitch_title'
-            ? MICRO_BEAT_GLITCH_DELAY_MS
-            : MICRO_BEAT_WHISPER_DELAY_MS;
-          addTimeout(() => {
-            if (gen !== generationRef.current) return;
-            setMicroBeat(beat);
-            setShowMicroBeat(true);
-            addTimeout(() => setShowMicroBeat(false), beat.durationMs);
-          }, delay);
-        }
-      })
-      .catch(() => {});
+    try {
+      const beat = checkNarrativeMicroBeat(totalPuzzlesCompleted);
+      if (beat) {
+        const delay = beat.type === 'glitch_title'
+          ? MICRO_BEAT_GLITCH_DELAY_MS
+          : MICRO_BEAT_WHISPER_DELAY_MS;
+        addTimeout(() => {
+          if (gen !== generationRef.current) return;
+          setMicroBeat(beat);
+          setShowMicroBeat(true);
+          addTimeout(() => setShowMicroBeat(false), beat.durationMs);
+        }, delay);
+      }
+    } catch (_e) {
+      // Micro-beats are non-critical
+    }
 
     // ------ Animal whisper (skip during onboarding) ------
     if (!onboarding) {
@@ -218,13 +218,15 @@ export function useVictoryOrchestration(): [
             setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
             setShowWhisper(true);
             // Record whisper in gallery
-            recordWhisper({
-              animalType: whisperData.animalType || 'unknown',
-              animalName: whisperData.animalName,
-              text: whisperData.text,
-              phase,
-              type: 'whisper',
-            }).catch(() => {});
+            try {
+              recordWhisper({
+                animalType: whisperData.animalType || 'unknown',
+                animalName: whisperData.animalName,
+                text: whisperData.text,
+                phase,
+                type: 'whisper',
+              });
+            } catch (_e) { /* ignore */ }
           }
         } catch {
           // Whispers are non-critical
@@ -313,12 +315,12 @@ export function useVictoryOrchestration(): [
     completionCoda,
   };
 
-  const actions: VictoryOrchestrationActions = {
+  const actions: VictoryOrchestrationActions = useMemo(() => ({
     processVictory,
     setCompletionCoda,
     resetOrchestration,
     dismissWhisper,
-  };
+  }), [processVictory, setCompletionCoda, resetOrchestration, dismissWhisper]);
 
   return [state, actions];
 }

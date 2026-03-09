@@ -13,7 +13,7 @@ interface UseUnlockFlowParams {
   progress: HomeWorldProgress | null;
   animals: Animal[];
   onAmberChange?: (newBalance: number) => void;
-  loadAllData: () => Promise<void>;
+  loadAllData: () => void;
   setShowCelebration: (show: boolean) => void;
   setIntroAnimal: (animal: Animal | null) => void;
   setIntroDialogueIndex: (index: number) => void;
@@ -27,7 +27,7 @@ interface UseUnlockFlowReturn {
   unlockAvailability: { available: boolean; reason?: string } | null;
   nextUnlock: Unlockable | null;
   allUnlocks: Unlockable[];
-  handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
+  handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => void;
   handleRoomPress: (room: Room) => void;
   setShowShop: (show: boolean) => void;
   setShowRoomUnlock: (room: Room | null) => void;
@@ -36,7 +36,7 @@ interface UseUnlockFlowReturn {
    * Update unlock state with fresh data from loadAllData.
    * Accepts the freshly-loaded rooms and animals arrays to avoid stale closure issues.
    */
-  refreshUnlockData: (freshRooms: Room[], freshAnimals: Animal[]) => Promise<void>;
+  refreshUnlockData: (freshRooms: Room[], freshAnimals: Animal[]) => void;
 }
 
 /**
@@ -72,17 +72,15 @@ export function useUnlockFlow({
   }, []);
 
   // Refresh unlock data using freshly-loaded rooms/animals (avoids stale state)
-  const refreshUnlockData = useCallback(async (freshRooms: Room[], freshAnimals: Animal[]) => {
-    const [unlock, unlocks] = await Promise.all([
-      getNextUnlock(),
-      getUnlockStatus(),
-    ]);
+  const refreshUnlockData = useCallback((freshRooms: Room[], freshAnimals: Animal[]) => {
+    const unlock = getNextUnlock();
+    const unlocks = getUnlockStatus();
 
     setNextUnlock(unlock);
     setAllUnlocks(unlocks);
 
     if (unlock) {
-      const availability = await isUnlockAvailable(unlock.id);
+      const availability = isUnlockAvailable(unlock.id);
       setUnlockAvailability(availability);
     } else {
       setUnlockAvailability(null);
@@ -119,13 +117,13 @@ export function useUnlockFlow({
   }, [animals, nextUnlock]);
 
   // Handle unlock purchase
-  const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
-    const result = await purchaseUnlock(unlock.id);
+  const handlePurchase = useCallback((unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
+    const result = purchaseUnlock(unlock.id);
     if (result.success) {
       hapticSuccess();
       setShowCelebration(true);
 
-      await loadAllData();
+      loadAllData();
       setShowShop(false);
       setShowRoomUnlock(null);
       setShowInvitePrompt(false);

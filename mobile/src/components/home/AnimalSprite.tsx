@@ -9,6 +9,16 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withDelay,
+  withSequence,
+  cancelAnimation,
+  Easing as REasing,
+} from 'react-native-reanimated';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
@@ -82,86 +92,83 @@ const EMOTION_BUBBLES: Record<number, string[]> = {
   4: ['💀', '👁️', '🌑', '⚫', '😱'],
 };
 
-// Z's animation component for sleeping animals
+// Z's animation component for sleeping animals — Reanimated
 const SleepingZs: React.FC = () => {
-  const z1Y = useRef(new Animated.Value(0)).current;
-  const z2Y = useRef(new Animated.Value(0)).current;
-  const z3Y = useRef(new Animated.Value(0)).current;
-  const z1Opacity = useRef(new Animated.Value(0)).current;
-  const z2Opacity = useRef(new Animated.Value(0)).current;
-  const z3Opacity = useRef(new Animated.Value(0)).current;
-
-  const animRef1 = useRef<Animated.CompositeAnimation | null>(null);
-  const animRef2 = useRef<Animated.CompositeAnimation | null>(null);
-  const animRef3 = useRef<Animated.CompositeAnimation | null>(null);
+  // Each Z uses a single progress value (0→1) for its float-up + fade cycle
+  const z1Progress = useSharedValue(0);
+  const z2Progress = useSharedValue(0);
+  const z3Progress = useSharedValue(0);
 
   useEffect(() => {
     if (getSettingsSync().reducedMotion) {
-      z1Opacity.setValue(1);
-      z2Opacity.setValue(1);
-      z3Opacity.setValue(1);
+      z1Progress.value = 0.15; // static mid-fade
+      z2Progress.value = 0.15;
+      z3Progress.value = 0.15;
       return;
     }
 
-    const animateZ = (
-      y: Animated.Value,
-      opacity: Animated.Value,
-      delay: number,
-      animRef: React.MutableRefObject<Animated.CompositeAnimation | null>,
-    ) => {
-      const animate = () => {
-        y.setValue(0);
-        opacity.setValue(0);
-        const anim = Animated.parallel([
-          Animated.timing(y, {
-            toValue: -25,
-            duration: 2000,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-            delay,
-          }),
-          Animated.sequence([
-            Animated.timing(opacity, {
-              toValue: 1,
-              duration: 300,
-              useNativeDriver: true,
-              delay,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0,
-              duration: 1700,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]);
-        animRef.current = anim;
-        anim.start(() => animate());
-      };
-      animate();
-    };
-
-    animateZ(z1Y, z1Opacity, 0, animRef1);
-    animateZ(z2Y, z2Opacity, 600, animRef2);
-    animateZ(z3Y, z3Opacity, 1200, animRef3);
+    const CYCLE_MS = 2000;
+    // Each Z loops 0→1 over 2s, staggered by 600ms
+    z1Progress.value = 0;
+    z1Progress.value = withRepeat(
+      withTiming(1, { duration: CYCLE_MS, easing: REasing.linear }),
+      -1,
+    );
+    z2Progress.value = 0;
+    z2Progress.value = withDelay(600, withRepeat(
+      withTiming(1, { duration: CYCLE_MS, easing: REasing.linear }),
+      -1,
+    ));
+    z3Progress.value = 0;
+    z3Progress.value = withDelay(1200, withRepeat(
+      withTiming(1, { duration: CYCLE_MS, easing: REasing.linear }),
+      -1,
+    ));
 
     return () => {
-      animRef1.current?.stop();
-      animRef2.current?.stop();
-      animRef3.current?.stop();
+      cancelAnimation(z1Progress);
+      cancelAnimation(z2Progress);
+      cancelAnimation(z3Progress);
     };
   }, []);
 
+  const z1Style = useAnimatedStyle(() => {
+    const p = z1Progress.value;
+    // Ease-out Y drift, quick fade-in then slow fade-out
+    const yFactor = 1 - (1 - p) * (1 - p); // ease-out
+    return {
+      transform: [{ translateY: -25 * yFactor }],
+      opacity: p < 0.15 ? p / 0.15 : 1 - (p - 0.15) / 0.85,
+    };
+  });
+  const z2Style = useAnimatedStyle(() => {
+    const p = z2Progress.value;
+    const yFactor = 1 - (1 - p) * (1 - p);
+    return {
+      transform: [{ translateY: -25 * yFactor }],
+      opacity: p < 0.15 ? p / 0.15 : 1 - (p - 0.15) / 0.85,
+    };
+  });
+  const z3Style = useAnimatedStyle(() => {
+    const p = z3Progress.value;
+    const yFactor = 1 - (1 - p) * (1 - p);
+    return {
+      transform: [{ translateY: -25 * yFactor }],
+      opacity: p < 0.15 ? p / 0.15 : 1 - (p - 0.15) / 0.85,
+    };
+  });
+
   return (
     <View style={sleepStyles.container}>
-      <Animated.Text style={[sleepStyles.z, sleepStyles.z1, { transform: [{ translateY: z1Y }], opacity: z1Opacity }]}>
+      <Reanimated.Text style={[sleepStyles.z, sleepStyles.z1, z1Style]}>
         z
-      </Animated.Text>
-      <Animated.Text style={[sleepStyles.z, sleepStyles.z2, { transform: [{ translateY: z2Y }], opacity: z2Opacity }]}>
+      </Reanimated.Text>
+      <Reanimated.Text style={[sleepStyles.z, sleepStyles.z2, z2Style]}>
         Z
-      </Animated.Text>
-      <Animated.Text style={[sleepStyles.z, sleepStyles.z3, { transform: [{ translateY: z3Y }], opacity: z3Opacity }]}>
+      </Reanimated.Text>
+      <Reanimated.Text style={[sleepStyles.z, sleepStyles.z3, z3Style]}>
         Z
-      </Animated.Text>
+      </Reanimated.Text>
     </View>
   );
 };
@@ -212,7 +219,7 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   rabbit: 8, // Big hops
 };
 
-export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
+export const AnimalSprite: React.FC<AnimalSpriteProps> = React.memo(({
   animal,
   roomWidth,
   roomHeight,
@@ -221,20 +228,26 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   isOnCooldown = false,
   cooldownPuzzlesLeft,
 }) => {
+  // Ref pattern for onPress to avoid stale closures and keep memo effective
+  const onPressRef = useRef(onPress);
+  onPressRef.current = onPress;
+
   const posX = useRef(new Animated.Value(animal.position.x)).current;
   const posY = useRef(new Animated.Value(animal.position.y)).current;
   const bounceY = useRef(new Animated.Value(0)).current;
   const scaleX = useRef(new Animated.Value(1)).current;
-  const notificationPulse = useRef(new Animated.Value(1)).current;
+  const notificationPulseVal = useSharedValue(1);
 
   // New juice animations
   const tapScale = useRef(new Animated.Value(1)).current;
   const breatheScale = useRef(new Animated.Value(1)).current;
+  const combinedScale = useRef(Animated.multiply(tapScale, breatheScale)).current;
   const emotionOpacity = useRef(new Animated.Value(0)).current;
   const emotionY = useRef(new Animated.Value(0)).current;
   const wiggleRotation = useRef(new Animated.Value(0)).current;
 
   const currentXRef = useRef(animal.position.x);
+  const lastTapTime = useRef(0);
 
   const [isMoving, setIsMoving] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
@@ -308,8 +321,12 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     return () => clearInterval(interval);
   }, [currentPhase, isOnCooldown]);
 
-  // Tap reaction animation
+  // Tap reaction animation (debounced to prevent cooldown toast flicker)
   const handlePress = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapTime.current < 500) return;
+    lastTapTime.current = now;
+
     if (!getSettingsSync().reducedMotion) {
       // Squish and bounce
       Animated.sequence([
@@ -379,8 +396,8 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       ]).start();
     }
 
-    onPress(animal);
-  }, [animal, onPress, currentPhase]);
+    onPressRef.current(animal);
+  }, [animal, currentPhase]);
 
   const wiggleRotate = wiggleRotation.interpolate({
     inputRange: [-1, 0, 1],
@@ -482,7 +499,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       );
       bounceAnimation.start();
     } else {
-      bounceY.setValue(0);
+      // Smooth landing instead of instant snap to prevent teleporting
+      Animated.timing(bounceY, {
+        toValue: 0,
+        duration: 150,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
     }
 
     return () => {
@@ -490,34 +513,31 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     };
   }, [isMoving, animal.type]);
 
-  // Notification pulse for new dialogue
+  // Notification pulse for new dialogue — Reanimated
   useEffect(() => {
     if (getSettingsSync().reducedMotion) {
-      notificationPulse.setValue(1);
+      notificationPulseVal.value = 1;
       return;
     }
     if (animal.hasNewDialogue) {
-      const pulse = Animated.loop(
-        Animated.sequence([
-          Animated.timing(notificationPulse, {
-            toValue: 1.3,
-            duration: 600,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(notificationPulse, {
-            toValue: 1,
-            duration: 600,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
+      notificationPulseVal.value = 1;
+      notificationPulseVal.value = withRepeat(
+        withSequence(
+          withTiming(1.3, { duration: 600, easing: REasing.inOut(REasing.ease) }),
+          withTiming(1, { duration: 600, easing: REasing.inOut(REasing.ease) }),
+        ),
+        -1,
       );
-      pulse.start();
-
-      return () => pulse.stop();
+    } else {
+      notificationPulseVal.value = 1;
     }
+
+    return () => cancelAnimation(notificationPulseVal);
   }, [animal.hasNewDialogue]);
+
+  const notificationPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: notificationPulseVal.value }],
+  }));
 
   // Get mood indicator color based on phase
   const getMoodColor = () => {
@@ -568,7 +588,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
             {
               transform: [
                 { scaleX },
-                { scale: Animated.multiply(tapScale, breatheScale) },
+                { scale: combinedScale },
                 { rotate: wiggleRotate },
               ],
             },
@@ -620,14 +640,14 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
           {/* New dialogue indicator - hidden when on cooldown */}
           {animal.hasNewDialogue && !isOnCooldown && (
-            <Animated.View
+            <Reanimated.View
               style={[
                 styles.notificationBadge,
-                { transform: [{ scale: notificationPulse }] },
+                notificationPulseStyle,
               ]}
             >
               <Text style={styles.notificationText}>!</Text>
-            </Animated.View>
+            </Reanimated.View>
           )}
 
           {/* Name tag with phase-based mood indicator */}
@@ -665,7 +685,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       </TouchableOpacity>
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

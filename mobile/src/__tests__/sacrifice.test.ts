@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loadSacrificeState,
   performSacrifice,
@@ -9,15 +8,17 @@ import {
   clearSacrificeState,
 } from '../services/sacrifice';
 
-// Mock AsyncStorage using shared factory
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+// Mock MMKV storage using shared factory
+jest.mock('../services/storage', () =>
+  require('./helpers/mockStorage').createMockStorage()
 );
 
+import { storage } from '../services/storage';
+
 describe('sacrifice', () => {
-  beforeEach(async () => {
-    await AsyncStorage.clear();
-    await clearSacrificeState();
+  beforeEach(() => {
+    storage.clearAll();
+    clearSacrificeState();
   });
 
   // ===========================================================================
@@ -33,13 +34,13 @@ describe('sacrifice', () => {
       expect(state.sacrificeHistory).toEqual([]);
     });
 
-    it('returns cached state on subsequent calls', async () => {
-      const state1 = await loadSacrificeState();
-      const state2 = await loadSacrificeState();
-      expect(state1).toBe(state2);
+    it('returns consistent state on subsequent calls', () => {
+      const state1 = loadSacrificeState();
+      const state2 = loadSacrificeState();
+      expect(state1).toEqual(state2);
     });
 
-    it('loads from storage after cache clear', async () => {
+    it('loads from storage after cache clear', () => {
       const saved = {
         totalAmberSacrificed: 50,
         sacrificeCount: 3,
@@ -47,10 +48,10 @@ describe('sacrifice', () => {
         sacrificeHistory: [],
       };
       // Clear cache first, then set storage so it persists
-      await clearSacrificeState();
-      await AsyncStorage.setItem('wordshift_sacrifices', JSON.stringify(saved));
+      clearSacrificeState();
+      storage.set('wordshift_sacrifices', JSON.stringify(saved));
 
-      const state = await loadSacrificeState();
+      const state = loadSacrificeState();
       expect(state.totalAmberSacrificed).toBe(50);
       expect(state.sacrificeCount).toBe(3);
     });
@@ -206,9 +207,9 @@ describe('sacrifice', () => {
       expect(state.sacrificeHistory[99].amount).toBe(105);
     });
 
-    it('persists to storage', async () => {
-      await performSacrifice(15, 4);
-      expect(AsyncStorage.setItem).toHaveBeenCalled();
+    it('persists to storage', () => {
+      performSacrifice(15, 4);
+      expect(storage.set).toHaveBeenCalled();
     });
 
     it('returns a string message', async () => {
@@ -322,9 +323,9 @@ describe('sacrifice', () => {
       expect(state.sacrificeHistory).toEqual([]);
     });
 
-    it('calls AsyncStorage.removeItem', async () => {
-      await clearSacrificeState();
-      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_sacrifices');
+    it('calls storage.remove', () => {
+      clearSacrificeState();
+      expect(storage.remove).toHaveBeenCalledWith('wordshift_sacrifices');
     });
   });
 });

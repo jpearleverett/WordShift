@@ -1,5 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { Achievement } from '../services/achievements';
 
@@ -18,57 +24,45 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
   onDismiss,
   phase = 0,
 }) => {
-  const slideAnim = useRef(new Animated.Value(-120)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const slideY = useSharedValue(-120);
+  const opacity = useSharedValue(0);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   useEffect(() => {
     if (achievement) {
-      // Slide in
-      Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          friction: 8,
-          tension: 60,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Reset and slide in
+      slideY.value = -120;
+      opacity.value = 0;
+      slideY.value = withSpring(0, { damping: 14, stiffness: 60 });
+      opacity.value = withTiming(1, { duration: 200 });
 
-      // Auto-dismiss
-      const timeout = setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(slideAnim, {
-            toValue: -120,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacityAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start(() => onDismiss());
+      // Auto-dismiss: exit animation after 3s, then callback
+      const dismissTimeout = setTimeout(() => {
+        slideY.value = withTiming(-120, { duration: 300 });
+        opacity.value = withTiming(0, { duration: 300 });
       }, 3000);
+      const callbackTimeout = setTimeout(() => {
+        onDismissRef.current();
+      }, 3300);
 
-      return () => clearTimeout(timeout);
+      return () => {
+        clearTimeout(dismissTimeout);
+        clearTimeout(callbackTimeout);
+      };
     }
   }, [achievement]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: slideY.value }],
+    opacity: opacity.value,
+  }));
 
   if (!achievement) return null;
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ translateY: slideAnim }],
-          opacity: opacityAnim,
-        },
-      ]}
+    <Reanimated.View
+      style={[styles.container, animStyle]}
       pointerEvents="none"
       accessibilityLiveRegion="polite"
       accessibilityLabel={`Achievement unlocked: ${achievement.title}. ${achievement.description}`}
@@ -88,7 +82,7 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
           <Text style={styles.title}>{achievement.title}</Text>
         </View>
       </View>
-    </Animated.View>
+    </Reanimated.View>
   );
 };
 

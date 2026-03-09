@@ -1,5 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+} from 'react-native-reanimated';
 import { CandyColors } from '../../theme/colors';
 
 interface ToastProps {
@@ -7,68 +14,45 @@ interface ToastProps {
   isError: boolean;
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
-  const slideAnim = useRef(new Animated.Value(-20)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-  const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+export const Toast: React.FC<ToastProps> = React.memo(({ message, isError }) => {
+  const slideY = useSharedValue(-20);
+  const opacity = useSharedValue(0);
+  const shakeX = useSharedValue(0);
 
   useEffect(() => {
-    // Stop any in-flight animations from a previous message before starting new ones
-    enterAnimRef.current?.stop();
-    shakeAnimRef.current?.stop();
+    // Setting new values automatically cancels any running animation on that shared value
+    slideY.value = -20;
+    opacity.value = 0;
+    shakeX.value = 0;
 
-    slideAnim.setValue(-20);
-    opacityAnim.setValue(0);
-    shakeAnim.setValue(0);
-
-    const enterAnim = Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]);
-    enterAnimRef.current = enterAnim;
-    enterAnim.start(() => { enterAnimRef.current = null; });
+    slideY.value = withSpring(0, { damping: 12, stiffness: 180 });
+    opacity.value = withTiming(1, { duration: 200 });
 
     if (isError) {
-      const shakeSeq = Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]);
-      shakeAnimRef.current = shakeSeq;
-      shakeSeq.start(() => { shakeAnimRef.current = null; });
+      shakeX.value = withSequence(
+        withTiming(10, { duration: 50 }),
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(-10, { duration: 50 }),
+        withTiming(0, { duration: 50 }),
+      );
     }
-
-    return () => {
-      enterAnimRef.current?.stop();
-      shakeAnimRef.current?.stop();
-    };
   }, [message, isError]);
 
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: slideY.value },
+      { translateX: shakeX.value },
+    ],
+    opacity: opacity.value,
+  }));
+
   return (
-    <Animated.View
+    <Reanimated.View
       style={[
         styles.toast,
         isError ? styles.toastError : styles.toastNormal,
-        {
-          transform: [
-            { translateY: slideAnim },
-            { translateX: shakeAnim },
-          ],
-          opacity: opacityAnim,
-        },
+        animStyle,
       ]}
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
@@ -77,9 +61,9 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
       <Text style={[styles.toastText, isError && styles.toastTextError]}>
         {message}
       </Text>
-    </Animated.View>
+    </Reanimated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   toast: {

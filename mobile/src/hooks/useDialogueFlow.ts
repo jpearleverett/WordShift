@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Animated } from 'react-native';
+import { Animated, Easing } from 'react-native';
 import { Animal, HomeWorldProgress, getAnimalPhase, DialoguePhase, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
 import {
   getCurrentDialogue,
@@ -63,14 +63,13 @@ interface UseDialogueFlowReturn {
   cooldownOpacity: Animated.Value;
   cooldownSlide: Animated.Value;
   dialogueSlide: Animated.Value;
-  isTalking: boolean;
   hasMoreToShow: boolean;
   /** Active dialogue choice for Phase 3 choice points */
   activeChoice: DialogueChoice | null;
-  handleAnimalTap: (animal: Animal) => Promise<void>;
-  handleNextDialogue: () => Promise<void>;
-  handleCloseDialogue: () => Promise<void>;
-  handleDialogueChoice: (choice: PlayerChoice) => Promise<void>;
+  handleAnimalTap: (animal: Animal) => void;
+  handleNextDialogue: () => void;
+  handleCloseDialogue: () => void;
+  handleDialogueChoice: (choice: PlayerChoice) => void;
 }
 
 /**
@@ -92,7 +91,6 @@ export function useDialogueFlow({
   const [showDialogue, setShowDialogue] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [cooldownMessage, setCooldownMessage] = useState<string | null>(null);
-  const [isTalking, setIsTalking] = useState(false);
 
   // Pre-dialogue pages: shown before regular dialogue, one at a time
   // These are trigger reactions, cross-animal refs, coordinated events, etc.
@@ -108,6 +106,11 @@ export function useDialogueFlow({
   const cooldownOpacity = useRef(new Animated.Value(0)).current;
   const cooldownSlide = useRef(new Animated.Value(20)).current;
 
+  // Track cooldown toast visibility to prevent flicker on repeated taps
+  const cooldownVisibleRef = useRef(false);
+  const cooldownDismissTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cooldownAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
   // Update session status when selected animal changes
   useEffect(() => {
     if (selectedAnimal) {
@@ -116,43 +119,73 @@ export function useDialogueFlow({
     }
   }, [selectedAnimal]);
 
+  // Cleanup cooldown timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
+      if (cooldownAnimRef.current) cooldownAnimRef.current.stop();
+    };
+  }, []);
+
   // Timer for dismissing cooldown message with animation
   useEffect(() => {
     if (cooldownMessage) {
       const reducedMotion = getSettingsSync().reducedMotion;
 
+      // Cancel any pending dismiss
+      if (cooldownDismissTimeout.current) {
+        clearTimeout(cooldownDismissTimeout.current);
+        cooldownDismissTimeout.current = null;
+      }
+      if (cooldownAnimRef.current) {
+        cooldownAnimRef.current.stop();
+        cooldownAnimRef.current = null;
+      }
+
       if (reducedMotion) {
         cooldownOpacity.setValue(1);
         cooldownSlide.setValue(0);
+        cooldownVisibleRef.current = true;
 
-        const timeout = setTimeout(() => {
+        cooldownDismissTimeout.current = setTimeout(() => {
           cooldownOpacity.setValue(0);
           cooldownSlide.setValue(20);
+          cooldownVisibleRef.current = false;
           setCooldownMessage(null);
         }, 2500);
-        return () => clearTimeout(timeout);
+        return () => {
+          if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
+        };
       }
 
-      // Animate in
-      cooldownOpacity.setValue(0);
-      cooldownSlide.setValue(20);
-      Animated.parallel([
-        Animated.timing(cooldownOpacity, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.spring(cooldownSlide, {
-          toValue: 0,
-          friction: 8,
-          tension: 100,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      // Only animate in if not already visible — prevents flicker on repeated taps
+      if (!cooldownVisibleRef.current) {
+        cooldownOpacity.setValue(0);
+        cooldownSlide.setValue(20);
+        const enterAnim = Animated.parallel([
+          Animated.timing(cooldownOpacity, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(cooldownSlide, {
+            toValue: 0,
+            duration: 250,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]);
+        cooldownAnimRef.current = enterAnim;
+        enterAnim.start(() => {
+          cooldownAnimRef.current = null;
+        });
+        cooldownVisibleRef.current = true;
+      }
+      // If already visible, the message text updates without animation restart
 
-      // Animate out after delay
-      const timeout = setTimeout(() => {
-        Animated.parallel([
+      // Schedule dismiss after delay
+      cooldownDismissTimeout.current = setTimeout(() => {
+        const exitAnim = Animated.parallel([
           Animated.timing(cooldownOpacity, {
             toValue: 0,
             duration: 300,
@@ -163,29 +196,21 @@ export function useDialogueFlow({
             duration: 300,
             useNativeDriver: true,
           }),
-        ]).start(() => {
+        ]);
+        cooldownAnimRef.current = exitAnim;
+        exitAnim.start(() => {
+          cooldownAnimRef.current = null;
+          cooldownVisibleRef.current = false;
           setCooldownMessage(null);
         });
       }, 2500);
-      return () => clearTimeout(timeout);
+      return () => {
+        if (cooldownDismissTimeout.current) clearTimeout(cooldownDismissTimeout.current);
+      };
+    } else {
+      cooldownVisibleRef.current = false;
     }
   }, [cooldownMessage]);
-
-  // Talking animation - alternate between idle and talk sprites
-  useEffect(() => {
-    if (showDialogue) {
-      if (getSettingsSync().reducedMotion) {
-        setIsTalking(true);
-        return;
-      }
-      const interval = setInterval(() => {
-        setIsTalking(prev => !prev);
-      }, 300);
-      return () => clearInterval(interval);
-    } else {
-      setIsTalking(false);
-    }
-  }, [showDialogue]);
 
   // Get current dialogue text — shows pre-dialogue pages first, then regular dialogue
   const getDialogueText = (): string => {
@@ -246,8 +271,8 @@ export function useDialogueFlow({
   };
 
   // Handle animal tap
-  const handleAnimalTap = useCallback(async (animal: Animal) => {
-    const availability = await checkDialogueAvailability(animal.id);
+  const handleAnimalTap = useCallback((animal: Animal) => {
+    const availability = checkDialogueAvailability(animal.id);
 
     if (!availability.available) {
       // Phase-aware cooldown messages
@@ -271,7 +296,7 @@ export function useDialogueFlow({
     hapticSelection();
 
     if (progress) {
-      recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak).catch(() => {});
+      recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak);
     }
 
     setSelectedAnimal(animal);
@@ -286,11 +311,11 @@ export function useDialogueFlow({
     // 1. Tutorial callback for Fox at Phase 4 — one-time chilling reference
     if (animal.type === 'fox' && progress && progress.currentPhase >= 4) {
       try {
-        const seedsPlanted = await wereTutorialSeedsPlanted();
+        const seedsPlanted = wereTutorialSeedsPlanted();
         if (!seedsPlanted) {
           const callbackLine = TUTORIAL_CALLBACK_DIALOGUES[Math.floor(Math.random() * TUTORIAL_CALLBACK_DIALOGUES.length)];
           pages.push(callbackLine);
-          await markTutorialSeedsPlanted();
+          markTutorialSeedsPlanted();
         }
       } catch {
         // Tutorial callback is non-critical
@@ -300,7 +325,7 @@ export function useDialogueFlow({
     // 2. Variant tutorial note — one-time explanation for newly encountered modes
     if (progress) {
       try {
-        const pendingVariant = await consumePendingVariantTutorial();
+        const pendingVariant = consumePendingVariantTutorial();
         if (pendingVariant) {
           const variantLine = getVariantTutorialDialogue(
             animal.type,
@@ -330,7 +355,7 @@ export function useDialogueFlow({
         if (coordEvent) {
           pages.push(coordEvent.text);
           hasCoordinatedEvent = true;
-          await recordConsumedCoordinatedEvent(coordEvent.theme);
+          recordConsumedCoordinatedEvent(coordEvent.theme);
         }
       } catch {
         // Coordinated events are non-critical
@@ -340,7 +365,7 @@ export function useDialogueFlow({
     // 4. Trigger word reaction — use the actual per-animal reactions
     if (!hasCoordinatedEvent) {
       try {
-        const consumed = await consumeTriggerWords(animal.type);
+        const consumed = consumeTriggerWords(animal.type);
         if (consumed.length > 0) {
           const word = consumed[0];
           if (animalPhase >= 1) {
@@ -359,7 +384,7 @@ export function useDialogueFlow({
     // 5. Sacrifice reaction — animals notice when the player offers amber (Phase 4+)
     if (!hasCoordinatedEvent && pages.length === 0 && progress && progress.currentPhase >= 4) {
       try {
-        const currentCount = await getSacrificeCount();
+        const currentCount = getSacrificeCount();
         if (lastSeenSacrificeCount.current[animal.type] === undefined) {
           // First access for this animal since mount — establish baseline without triggering.
           // This prevents stale reactions from old sacrifices after app restart.
@@ -397,10 +422,10 @@ export function useDialogueFlow({
 
       if (isVanguard && progress.currentPhase >= 1) {
         try {
-          const seen = await hasSeenGuaranteedCrossRef(progress.currentPhase);
+          const seen = hasSeenGuaranteedCrossRef(progress.currentPhase);
           if (!seen) {
             forceRef = true;
-            await markGuaranteedCrossRefSeen(progress.currentPhase);
+            markGuaranteedCrossRefSeen(progress.currentPhase);
           }
         } catch {
           // Non-critical
@@ -423,7 +448,7 @@ export function useDialogueFlow({
     // 8. Dialogue choice point (Phase 3 only) — illusion of agency
     if (animalPhase === 3) {
       try {
-        const choice = await getChoiceForAnimal(
+        const choice = getChoiceForAnimal(
           animal.type,
           animalPhase,
           animal.currentDialogueIndex
@@ -450,8 +475,8 @@ export function useDialogueFlow({
       dialogueSlide.setValue(0);
       Animated.spring(dialogueSlide, {
         toValue: 1,
-        friction: 8,
-        tension: 40,
+        friction: 14,
+        tension: 50,
         useNativeDriver: true,
       }).start();
     }
@@ -467,11 +492,11 @@ export function useDialogueFlow({
   }, [progress]);
 
   // Handle closing dialogue (and ending session)
-  const handleCloseDialogue = useCallback(async () => {
+  const handleCloseDialogue = useCallback(() => {
     hapticLight();
     const closingAnimal = selectedAnimal;
     if (closingAnimal) {
-      await endSession(closingAnimal.id);
+      endSession(closingAnimal.id);
       // Update hasNewDialogue for the animal that was talking
       setAnimals(prev =>
         prev.map(a =>
@@ -488,7 +513,7 @@ export function useDialogueFlow({
   }, [selectedAnimal, recomputeHasNewDialogue, setAnimals]);
 
   // Handle dialogue advance
-  const handleNextDialogue = useCallback(async () => {
+  const handleNextDialogue = useCallback(() => {
     if (!selectedAnimal || !progress) return;
     hapticSelection();
 
@@ -500,7 +525,7 @@ export function useDialogueFlow({
     }
 
     // Regular dialogue advance — check if session is still available
-    const availability = await checkDialogueAvailability(selectedAnimal.id);
+    const availability = checkDialogueAvailability(selectedAnimal.id);
     if (!availability.available) {
       handleCloseDialogue();
       setCooldownMessage(
@@ -518,7 +543,7 @@ export function useDialogueFlow({
     );
 
     if (hasMore) {
-      await recordDialogue(selectedAnimal.id);
+      recordDialogue(selectedAnimal.id);
 
       // Record dialogue text in whisper gallery
       const currentText = getDialogueText();
@@ -529,14 +554,14 @@ export function useDialogueFlow({
           text: currentText,
           phase: animalPhase,
           type: 'dialogue',
-        }).catch(() => {});
+        });
       }
 
       const status = getSessionStatus(selectedAnimal.id);
       setSessionInfo(status);
 
       const newIndex = selectedAnimal.currentDialogueIndex + 1;
-      await markDialogueRead(selectedAnimal.id, newIndex);
+      markDialogueRead(selectedAnimal.id, newIndex);
 
       const updatedAnimal = { ...selectedAnimal, currentDialogueIndex: newIndex };
       const totalDialogues = getTotalDialogueCount(selectedAnimal.type, animalPhase);
@@ -569,10 +594,10 @@ export function useDialogueFlow({
         progress.puzzlesSolved >= 1 &&
         progress.puzzlesSolved <= 40
       ) {
-        const seenNudge = await hasSeenFoxPlayNudge();
+        const seenNudge = hasSeenFoxPlayNudge();
         if (!seenNudge) {
           setPreDialoguePages([getFoxPostTutorialPlayPrompt(progress.currentPhase)]);
-          await markFoxPlayNudgeSeen();
+          markFoxPlayNudgeSeen();
           onFoxPlayPrompt?.();
           return;
         }
@@ -582,27 +607,22 @@ export function useDialogueFlow({
   }, [selectedAnimal, progress, handleCloseDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
-  const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {
+  const handleDialogueChoice = useCallback((choice: PlayerChoice) => {
     if (!selectedAnimal || !activeChoice) return;
     hapticSelection();
-    try {
-      const result = await recordChoice(selectedAnimal.type, choice);
-      // Replace the current pre-dialogue page with the response, then convergence
-      setPreDialoguePages([result.response, result.convergence]);
-      setActiveChoice(null);
+    const result = recordChoice(selectedAnimal.type, choice);
+    // Replace the current pre-dialogue page with the response, then convergence
+    setPreDialoguePages([result.response, result.convergence]);
+    setActiveChoice(null);
 
-      // Record the choice response in whisper gallery
-      recordWhisper({
-        animalType: selectedAnimal.type,
-        animalName: selectedAnimal.name,
-        text: result.response,
-        phase: 3,
-        type: 'dialogue',
-      }).catch(() => {});
-    } catch {
-      // Choice handling is non-critical, just close the choice
-      setActiveChoice(null);
-    }
+    // Record the choice response in whisper gallery
+    recordWhisper({
+      animalType: selectedAnimal.type,
+      animalName: selectedAnimal.name,
+      text: result.response,
+      phase: 3,
+      type: 'dialogue',
+    });
   }, [selectedAnimal, activeChoice]);
 
   return {
@@ -614,7 +634,6 @@ export function useDialogueFlow({
     cooldownOpacity,
     cooldownSlide,
     dialogueSlide,
-    isTalking,
     hasMoreToShow: computeHasMore(),
     activeChoice,
     handleAnimalTap,

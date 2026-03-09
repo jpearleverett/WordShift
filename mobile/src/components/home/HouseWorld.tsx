@@ -8,11 +8,19 @@ import {
   Easing,
   Image,
 } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+  withDelay,
+  cancelAnimation,
+  Easing as REasing,
+} from 'react-native-reanimated';
 import {
-  GestureHandlerRootView,
-  PanGestureHandler,
-  State,
-  PanGestureHandlerGestureEvent,
+  Gesture,
+  GestureDetector,
 } from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
@@ -51,7 +59,27 @@ const PARTICLE_EMOJIS_BY_PHASE: Record<number, string[]> = {
   5: ['✨', '🌙', '💜'],
 };
 
-const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
+const particleTextStyle = { fontSize: 16 };
+
+const FloatingParticle: React.FC<{ particle: Particle }> = React.memo(({ particle }) => {
+  // Store interpolation in ref so it's not recreated every render
+  const rotate = useRef(particle.rotation.interpolate({
+    inputRange: [0, 360],
+    outputRange: ['0deg', '360deg'],
+  })).current;
+
+  // Stable style ref — Animated values are mutable, so the object identity stays the same
+  const animStyle = useRef({
+    position: 'absolute' as const,
+    transform: [
+      { translateX: particle.x },
+      { translateY: particle.y },
+      { scale: particle.scale },
+      { rotate },
+    ],
+    opacity: particle.opacity,
+  }).current;
+
   useEffect(() => {
     const startX = Math.random() * SCREEN_WIDTH;
     const endX = startX + (Math.random() - 0.5) * 100;
@@ -106,128 +134,78 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
     return () => anim.stop();
   }, []);
 
-  const rotate = particle.rotation.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
-  });
-
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [
-          { translateX: particle.x },
-          { translateY: particle.y },
-          { scale: particle.scale },
-          { rotate },
-        ],
-        opacity: particle.opacity,
-      }}
-      pointerEvents="none"
-    >
-      <Text style={{ fontSize: 16 }}>{particle.emoji}</Text>
+    <Animated.View style={animStyle} pointerEvents="none">
+      <Text style={particleTextStyle}>{particle.emoji}</Text>
     </Animated.View>
   );
-};
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SMOKE PUFF ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
-  const y = useRef(new Animated.Value(0)).current;
-  const x = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.5)).current;
-  const mountedRef = useRef(true);
-  const animationRef = useRef<Animated.CompositeAnimation>();
+const SmokePuff: React.FC<{ delay: number }> = React.memo(({ delay }) => {
+  // Single progress value (0→1 over 3000ms) drives all smoke properties via worklet.
+  // withDelay offsets each puff; withRepeat loops on the UI thread — no JS round-trips.
+  const progress = useSharedValue(0);
 
   useEffect(() => {
-    mountedRef.current = true;
+    progress.value = withDelay(
+      delay,
+      withRepeat(withTiming(1, { duration: 3000, easing: REasing.linear }), -1, false)
+    );
+    return () => cancelAnimation(progress);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const animate = () => {
-      if (!mountedRef.current) return;
-
-      y.setValue(0);
-      x.setValue(0);
-      opacity.setValue(0);
-      scale.setValue(0.5);
-
-      const anim = Animated.parallel([
-        Animated.timing(y, {
-          toValue: -40,
-          duration: 3000,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-          delay,
-        }),
-        Animated.timing(x, {
-          toValue: 15 + Math.random() * 10,
-          duration: 3000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-          delay,
-        }),
-        Animated.sequence([
-          Animated.timing(opacity, {
-            toValue: 0.6,
-            duration: 500,
-            useNativeDriver: true,
-            delay,
-          }),
-          Animated.timing(opacity, {
-            toValue: 0,
-            duration: 2500,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(scale, {
-          toValue: 1.5,
-          duration: 3000,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-          delay,
-        }),
-      ]);
-      animationRef.current = anim;
-      anim.start(() => {
-        if (mountedRef.current) animate();
-      });
+  const animStyle = useAnimatedStyle(() => {
+    const p = progress.value;
+    // Opacity: ramp up 0→0.6 in first ~17%, then fade 0.6→0 over remaining ~83%
+    const op = p < 0.167 ? (p / 0.167) * 0.6 : 0.6 * (1 - (p - 0.167) / 0.833);
+    return {
+      position: 'absolute' as const,
+      transform: [
+        { translateX: p * 20 },
+        { translateY: p * -40 },
+        { scale: 0.5 + p * 1.0 },
+      ],
+      opacity: op,
     };
-
-    animate();
-
-    return () => {
-      mountedRef.current = false;
-      if (animationRef.current) animationRef.current.stop();
-    };
-  }, []);
+  });
 
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [{ translateX: x }, { translateY: y }, { scale }],
-        opacity,
-      }}
-    >
-      <Text style={{ fontSize: 20, color: '#999' }}>💨</Text>
-    </Animated.View>
+    <Reanimated.View style={animStyle}>
+      <Text style={smokeTextStyle}>💨</Text>
+    </Reanimated.View>
   );
-};
+});
+const smokeTextStyle = { fontSize: 20, color: '#999' };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FLYING BIRD ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ startDelay, yPosition }) => {
+const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = React.memo(({ startDelay, yPosition }) => {
+  // Movement stays on RN Animated (one-shot per cycle, not looping)
   const x = useRef(new Animated.Value(-50)).current;
   const y = useRef(new Animated.Value(yPosition)).current;
-  const flapRotation = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const flapAnimRef = useRef<Animated.CompositeAnimation>();
-  const moveAnimRef = useRef<Animated.CompositeAnimation>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const moveAnimRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
+
+  // Flap loop uses Reanimated — runs entirely on UI thread, no JS round-trips.
+  // withRepeat(..., -1, true) = infinite, reversing: smooth 0→1→0→1...
+  const flapProgress = useSharedValue(0);
+
+  const flapStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleY: 1 - 0.4 * flapProgress.value }],
+  }));
+
+  // Stable position style ref for RN Animated (movement)
+  const animStyle = useRef({
+    position: 'absolute' as const,
+    transform: [{ translateX: x }, { translateY: y }],
+  }).current;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -239,22 +217,11 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
       x.setValue(goingRight ? -50 : SCREEN_WIDTH + 50);
       y.setValue(yPosition + (Math.random() - 0.5) * 40);
 
-      const flapAnimation = Animated.loop(
-        Animated.sequence([
-          Animated.timing(flapRotation, {
-            toValue: 1,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-          Animated.timing(flapRotation, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-        ])
+      // Start flap on Reanimated UI thread
+      flapProgress.value = withRepeat(
+        withTiming(1, { duration: 150, easing: REasing.linear }),
+        -1, true
       );
-      flapAnimRef.current = flapAnimation;
-      flapAnimation.start();
 
       const moveAnimation = Animated.timing(x, {
         toValue: goingRight ? SCREEN_WIDTH + 50 : -50,
@@ -265,7 +232,8 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
       });
       moveAnimRef.current = moveAnimation;
       moveAnimation.start(() => {
-        flapAnimation.stop();
+        cancelAnimation(flapProgress);
+        flapProgress.value = 0;
         if (!mountedRef.current) return;
         timeoutRef.current = setTimeout(animate, 5000 + Math.random() * 10000);
       });
@@ -276,40 +244,39 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
     return () => {
       mountedRef.current = false;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (flapAnimRef.current) flapAnimRef.current.stop();
+      cancelAnimation(flapProgress);
       if (moveAnimRef.current) moveAnimRef.current.stop();
     };
-  }, []);
-
-  const scaleY = flapRotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0.6],
-  });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [{ translateX: x }, { translateY: y }, { scaleY }],
-      }}
-      pointerEvents="none"
-    >
-      <Text style={{ fontSize: 18 }}>🐦</Text>
+    <Animated.View style={animStyle} pointerEvents="none">
+      <Reanimated.View style={flapStyle}>
+        <Text style={birdTextStyle}>🐦</Text>
+      </Reanimated.View>
     </Animated.View>
   );
-};
+});
+const birdTextStyle = { fontSize: 18 };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SHOOTING STAR (appears at higher phases)
 // ═══════════════════════════════════════════════════════════════════════════
 
-const ShootingStar: React.FC = () => {
+const ShootingStar: React.FC = React.memo(() => {
   const x = useRef(new Animated.Value(0)).current;
   const y = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const animationRef = useRef<Animated.CompositeAnimation>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const animationRef = useRef<Animated.CompositeAnimation | undefined>(undefined);
+
+  // Stable style ref — prevents new object creation on re-render
+  const animStyle = useRef({
+    position: 'absolute' as const,
+    transform: [{ translateX: x }, { translateY: y }],
+    opacity,
+  }).current;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -319,31 +286,31 @@ const ShootingStar: React.FC = () => {
 
       const startX = Math.random() * SCREEN_WIDTH;
       x.setValue(startX);
-      y.setValue(20 + Math.random() * 60);
+      y.setValue(Math.random() * 30);
       opacity.setValue(0);
 
       const anim = Animated.parallel([
         Animated.timing(x, {
           toValue: startX + 150,
-          duration: 800,
+          duration: 2000,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(y, {
           toValue: 100 + Math.random() * 50,
-          duration: 800,
+          duration: 2000,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.sequence([
           Animated.timing(opacity, {
             toValue: 1,
-            duration: 100,
+            duration: 400,
             useNativeDriver: true,
           }),
           Animated.timing(opacity, {
             toValue: 0,
-            duration: 700,
+            duration: 1600,
             useNativeDriver: true,
           }),
         ]),
@@ -365,18 +332,12 @@ const ShootingStar: React.FC = () => {
   }, []);
 
   return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        transform: [{ translateX: x }, { translateY: y }],
-        opacity,
-      }}
-      pointerEvents="none"
-    >
-      <Text style={{ fontSize: 14 }}>⭐</Text>
+    <Animated.View style={animStyle} pointerEvents="none">
+      <Text style={shootingStarTextStyle}>⭐</Text>
     </Animated.View>
   );
-};
+});
+const shootingStarTextStyle = { fontSize: 14 };
 
 // Phase-aware background colors (blends with each sky image's edges)
 const PHASE_BG_COLORS: Record<number, string> = {
@@ -392,7 +353,44 @@ const PHASE_BG_COLORS: Record<number, string> = {
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
 // ═══════════════════════════════════════════════════════════════════════════
 
-const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
+const ArrangementConnector: React.FC<{ phase: number }> = React.memo(({ phase }) => {
+  const pulseProgress = useSharedValue(0);
+
+  React.useEffect(() => {
+    if (phase < 3) return;
+
+    // Energy pulse — flows through connector lines
+    const pulseDuration = phase >= 4 ? 2000 : 3000;
+    pulseProgress.value = 0;
+    pulseProgress.value = withRepeat(
+      withTiming(1, { duration: pulseDuration, easing: REasing.inOut(REasing.sin) }),
+      -1,
+      true,
+    );
+
+    return () => cancelAnimation(pulseProgress);
+  }, [phase]);
+
+  const lineAnimStyle = useAnimatedStyle(() => {
+    if (phase < 3) return {};
+    // Subtle brightness pulse on the connector line
+    const baseOpacity = phase === 5 ? 0.3 : phase >= 4 ? 0.7 : 0.4;
+    const pulseRange = phase >= 4 ? 0.25 : 0.15;
+    return {
+      opacity: baseOpacity + pulseProgress.value * pulseRange,
+    };
+  });
+
+  const nodeAnimStyle = useAnimatedStyle(() => {
+    if (phase < 3) return {};
+    // Node pulses in size and opacity
+    const s = 1.0 + pulseProgress.value * (phase >= 4 ? 0.3 : 0.15);
+    return {
+      transform: [{ scale: s }],
+      opacity: 0.7 + pulseProgress.value * 0.3,
+    };
+  });
+
   if (phase < 2) return null;
 
   const lineWidth = phase === 5 ? 1.5 : phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
@@ -403,31 +401,45 @@ const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
 
   return (
     <View style={arrangementStyles.connector}>
-      {/* Vertical line */}
-      <View
-        style={[
-          arrangementStyles.line,
-          {
-            width: lineWidth,
-            backgroundColor: lineColor,
-            opacity: lineOpacity,
-          },
-          showGlow && arrangementStyles.lineGlow,
-        ]}
-      />
-      {/* Node circle at connection point */}
-      {showNodes && (
+      {/* Vertical energy line — pulses at Phase 3+ */}
+      {phase >= 3 ? (
+        <Reanimated.View
+          style={[
+            arrangementStyles.line,
+            {
+              width: lineWidth,
+              backgroundColor: lineColor,
+            },
+            showGlow && arrangementStyles.lineGlow,
+            lineAnimStyle,
+          ]}
+        />
+      ) : (
         <View
+          style={[
+            arrangementStyles.line,
+            {
+              width: lineWidth,
+              backgroundColor: lineColor,
+              opacity: lineOpacity,
+            },
+          ]}
+        />
+      )}
+      {/* Node circle at connection point — pulses at Phase 3+ */}
+      {showNodes && (
+        <Reanimated.View
           style={[
             arrangementStyles.node,
             { borderColor: lineColor },
             showGlow && arrangementStyles.nodeGlow,
+            nodeAnimStyle,
           ]}
         />
       )}
     </View>
   );
-};
+});
 
 const arrangementStyles = StyleSheet.create({
   connector: {
@@ -476,69 +488,69 @@ const arrangementStyles = StyleSheet.create({
  * Enhanced: Animated breathing (scale pulse), wispy tendrils at Phase 3+,
  * pulsing crimson eyes at Phase 4 with glow effect.
  */
-const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
-  const breatheAnim = React.useRef(new Animated.Value(0)).current;
-  const eyePulseAnim = React.useRef(new Animated.Value(0)).current;
+const ShadowPresence: React.FC<{ phase: number }> = React.memo(({ phase }) => {
+  const breatheProgress = useSharedValue(0);
+  const eyePulseProgress = useSharedValue(0);
 
   React.useEffect(() => {
     if (phase < 2) return;
 
-    // Breathing animation — slow scale pulse
+    // Breathing animation — slow scale pulse via Reanimated
     const breatheDuration = phase === 5 ? 6000 : phase >= 4 ? 3000 : 4000;
-    const breatheLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breatheAnim, { toValue: 1, duration: breatheDuration, useNativeDriver: true }),
-        Animated.timing(breatheAnim, { toValue: 0, duration: breatheDuration, useNativeDriver: true }),
-      ])
+    breatheProgress.value = 0;
+    breatheProgress.value = withRepeat(
+      withTiming(1, { duration: breatheDuration * 2, easing: REasing.inOut(REasing.sin) }),
+      -1,
+      true,
     );
-    breatheLoop.start();
 
     // Eye pulse at Phase 4+
-    let eyeLoop: Animated.CompositeAnimation | undefined;
     if (phase >= 4) {
-      eyeLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(eyePulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-          Animated.timing(eyePulseAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
-        ])
+      eyePulseProgress.value = 0;
+      eyePulseProgress.value = withRepeat(
+        withTiming(1, { duration: 3000, easing: REasing.inOut(REasing.sin) }),
+        -1,
+        true,
       );
-      eyeLoop.start();
     }
 
     return () => {
-      breatheLoop.stop();
-      eyeLoop?.stop();
+      cancelAnimation(breatheProgress);
+      cancelAnimation(eyePulseProgress);
     };
   }, [phase]);
 
+  const bodyAnimStyle = useAnimatedStyle(() => {
+    if (phase < 2) return { opacity: 0 };
+    const baseOpacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : phase === 5 ? 0.20 : 0.30;
+    const scaleMax = phase >= 4 ? 1.06 : 1.03;
+    const s = 1.0 + breatheProgress.value * (scaleMax - 1.0);
+    return {
+      opacity: baseOpacity,
+      transform: [{ scale: s }],
+    };
+  });
+
+  const eyeAnimStyle = useAnimatedStyle(() => {
+    const op = 0.5 + eyePulseProgress.value * 0.5;
+    return { opacity: op };
+  });
+
   if (phase < 2) return null;
 
-  const opacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : phase === 5 ? 0.20 : 0.30;
   const scaleVal = phase === 2 ? 0.6 : phase === 3 ? 0.8 : 1.0;
   const height = 180 * scaleVal;
   const width = 100 * scaleVal;
 
-  const breatheScale = breatheAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.0, phase >= 4 ? 1.06 : 1.03],
-  });
-
-  const eyeOpacity = phase >= 4 ? eyePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.5, 1.0],
-  }) : 0.7;
-
   return (
-    <Animated.View style={{
+    <Reanimated.View style={[{
       position: 'absolute',
       top: -height * 0.3,
       alignSelf: 'center',
       width: width,
       height: height,
-      opacity: opacity,
       zIndex: -1,
-      transform: [{ scale: breatheScale }],
-    }}>
+    }, bodyAnimStyle]}>
       {/* Central body - tall dark oval */}
       <View style={{
         flex: 1,
@@ -575,7 +587,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
       )}
       {/* "Eyes" at Phase 4+ - pulsing dots with glow (crimson at Phase 4, soft purple at Phase 5) */}
       {phase >= 4 && (
-        <Animated.View style={{
+        <Reanimated.View style={[{
           position: 'absolute',
           top: height * 0.25,
           left: 0,
@@ -583,8 +595,7 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
           flexDirection: 'row',
           justifyContent: 'center',
           gap: width * 0.2,
-          opacity: eyeOpacity,
-        }}>
+        }, eyeAnimStyle]}>
           <View style={{
             width: 8,
             height: 5,
@@ -605,11 +616,11 @@ const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
             shadowOpacity: phase === 5 ? 0.5 : 0.8,
             shadowRadius: 6,
           }} />
-        </Animated.View>
+        </Reanimated.View>
       )}
-    </Animated.View>
+    </Reanimated.View>
   );
-};
+});
 
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
@@ -620,72 +631,15 @@ const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
 
-interface HouseWorldProps {
-  rooms: Room[];
-  animals: Animal[];
-  currentPhase: DialoguePhase;
-  onAnimalPress: (animal: Animal) => void;
-  onRoomPress: (room: Room) => void;
-  ritualWords?: string[];
-  nextUnlock?: Unlockable | null;
-  amberBalance?: number;
-  purchasedUpgrades?: Record<string, number>;
-}
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTICLE LAYER - Isolated component to prevent particle state updates
+// from re-rendering the entire HouseWorld tree
+// ═══════════════════════════════════════════════════════════════════════════
 
-export const HouseWorld: React.FC<HouseWorldProps> = ({
-  rooms,
-  animals,
-  currentPhase,
-  onAnimalPress,
-  onRoomPress,
-  ritualWords = [],
-  nextUnlock = null,
-  amberBalance = 0,
-  purchasedUpgrades = {},
-}) => {
-  // Animated values
-  const translateY = useRef(new Animated.Value(0)).current;
-
-  // Refs for gesture tracking
-  const panRef = useRef<PanGestureHandler>(null);
-
-  // State tracking for gestures
-  const baseTranslateY = useRef(0);
-
-  // Track container height for proper initial positioning
-  const [containerHeight, setContainerHeight] = useState<number | null>(null);
-  const onContainerLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
-    const { height } = event.nativeEvent.layout;
-    if (height > 0) {
-      setContainerHeight(height);
-    }
-  }, []);
-
-  // Memoize night star positions/sizes to prevent flicker on re-render
-  const nightStars = useMemo(() =>
-    [...Array(12)].map((_, i) => ({
-      id: i,
-      left: `${10 + (i * 7) % 80}%` as `${number}%`,
-      top: `${5 + (i * 11) % 15}%` as `${number}%`,
-      opacity: 0.3 + (((i * 17 + 7) % 10) / 10) * 0.5,
-      fontSize: 8 + (((i * 13 + 3) % 10) / 10) * 6,
-    })),
-  []);
-
-  // Particle system state
+const ParticleLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
 
-  // Sun animation
-  const sunPulse = useRef(new Animated.Value(1)).current;
-  const sunRotation = useRef(new Animated.Value(0)).current;
-
-  // Cloud animations
-  const cloud1X = useRef(new Animated.Value(-100)).current;
-  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
-  const cloud3X = useRef(new Animated.Value(SCREEN_WIDTH / 2)).current;
-
-  // Spawn particles based on phase
   useEffect(() => {
     const spawnParticle = () => {
       const emojis = PARTICLE_EMOJIS_BY_PHASE[currentPhase] || PARTICLE_EMOJIS_BY_PHASE[0];
@@ -699,261 +653,340 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
         emoji: emojis[Math.floor(Math.random() * emojis.length)],
         duration: 8000 + Math.random() * 6000,
       };
-
-      setParticles(prev => [...prev.slice(-8), newParticle]); // Keep max 8 particles
+      setParticles(prev => [...prev.slice(-8), newParticle]);
     };
 
-    // Spawn particles more frequently at lower phases (happy), less at higher (dread)
     const spawnRate = currentPhase >= 3 ? 4000 : currentPhase >= 2 ? 3000 : 2000;
     const interval = setInterval(spawnParticle, spawnRate);
-    spawnParticle(); // Spawn one immediately
+    spawnParticle();
 
     return () => clearInterval(interval);
   }, [currentPhase]);
 
-  // Sun pulsing animation
-  useEffect(() => {
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sunPulse, {
-          toValue: 1.15,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(sunPulse, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    const rotateAnimation = Animated.loop(
-      Animated.timing(sunRotation, {
-        toValue: 360,
-        duration: 60000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-
-    if (currentPhase < 3) {
-      pulseAnimation.start();
-      rotateAnimation.start();
-    }
-
-    return () => {
-      pulseAnimation.stop();
-      rotateAnimation.stop();
-    };
-  }, [currentPhase]);
-
-  // Cloud animations
-  const cloudMountedRef = useRef(true);
-  const cloudAnimRefs = useRef<Animated.CompositeAnimation[]>([]);
-
-  useEffect(() => {
-    cloudMountedRef.current = true;
-    cloudAnimRefs.current = [];
-
-    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
-      const animate = () => {
-        if (!cloudMountedRef.current) return;
-        cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
-        const anim = Animated.timing(cloudAnim, {
-          toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
-          duration,
-          useNativeDriver: true,
-        });
-        cloudAnimRefs.current.push(anim);
-        anim.start(() => {
-          if (cloudMountedRef.current) animate();
-        });
-      };
-      animate();
-    };
-
-    animateCloud(cloud1X, -100, 45000);
-    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
-    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
-
-    return () => {
-      cloudMountedRef.current = false;
-      cloudAnimRefs.current.forEach(anim => anim.stop());
-      cloudAnimRefs.current = [];
-    };
-  }, []);
-
-  const sunRotate = sunRotation.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
-  // This allows players to tap the house itself to build, instead of using header controls.
-  const unlockedRooms = rooms.filter(room => room.isUnlocked).sort((a, b) => a.floor - b.floor);
-  const pendingRoomUnlock = nextUnlock?.type === 'room'
-    ? rooms.find(room => room.id === nextUnlock.targetId && !room.isUnlocked) || null
-    : null;
-  const displayRooms = pendingRoomUnlock
-    ? [...unlockedRooms, pendingRoomUnlock]
-    : unlockedRooms;
-
-  const getAnimalForRoom = (roomId: string): Animal | null => {
-    return animals.find(a => a.roomId === roomId) || null;
-  };
-
-  // Single-column layout: each room is its own row, sorted top-to-bottom.
-  const sortedRooms = [...displayRooms].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
-  const numRows = Math.max(1, displayRooms.length);
-
-  const calculateHouseHeight = (): number => {
-    return numRows * ROOM_HEIGHT +
-           Math.max(0, numRows - 1) * ROOM_GAP +
-           HOUSE_PADDING * 2;
-  };
-
-  // Calculate pan bounds based on content size
-  // Returns asymmetric bounds: min=0 (house bottom at viewport bottom),
-  // max=overflow (house top at viewport top)
-  const getPanBounds = () => {
-    // Full height of the house structure including margins and connectors
-    const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
-    // How much the house overflows above the visible viewport
-    const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
-    return {
-      min: 0,  // Don't allow panning below the house (prevents empty space below foundation)
-      max: Math.max(0, overflow + 50),  // Allow panning up to see the roof + small padding
-    };
-  };
-
-  // Pan gesture handler - vertical only to prevent horizontal gaps
-  const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
-    const { translationY } = event.nativeEvent;
-
-    const bounds = getPanBounds();
-    const newY = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
-
-    translateY.setValue(newY);
-  };
-
-  const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      const { translationY } = event.nativeEvent;
-      const bounds = getPanBounds();
-
-      baseTranslateY.current = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
-    }
-  };
-
-  const houseHeight = calculateHouseHeight();
-
-  // Set initial pan position so the house is properly framed.
-  // With flex-end, the house bottom is at the viewport bottom and the roof
-  // extends above when the house is taller than the viewport. A positive
-  // translateY shifts the view down, bringing the roof into view.
-  useEffect(() => {
-    if (containerHeight === null) return;
-    const connectorHeight = Math.max(0, numRows - 1) * 10;
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
-    const overflow = Math.max(0, totalContentHeight - containerHeight);
-
-    translateY.setValue(overflow);
-    baseTranslateY.current = overflow;
-  }, [numRows, containerHeight]);
-
   return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
-      {/* Floating particles */}
+    <>
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
       ))}
+    </>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLOUD LAYER - Uses Reanimated worklets for guaranteed UI-thread animation.
+// Previous approach used RN Animated.loop which still round-trips through JS
+// for loop management on some Android builds, causing 1-2 frame flicker gaps.
+// Reanimated's withRepeat runs entirely as a UI-thread worklet — zero JS involvement.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Stable style constants for cloud phase-dependent opacity
+const CLOUD_FULL_OPACITY = {};
+const CLOUD_DIM_OPACITY = { opacity: 0.6 };
+const CLOUD3_FONT_FULL = { fontSize: 38 };
+const CLOUD3_FONT_DIM = { fontSize: 38, opacity: 0.6 };
+const CLOUD2_MARGIN_FULL = { marginLeft: 25 };
+const CLOUD2_MARGIN_DIM = { marginLeft: 25, opacity: 0.6 };
+
+// Stable top position styles (module-level to avoid inline object creation)
+const CLOUD1_TOP_STYLE = { top: 20 };
+const CLOUD2_TOP_STYLE = { top: 70 };
+const CLOUD3_TOP_STYLE = { top: 45 };
+
+// Pre-computed animation range: total distance from off-screen-left to off-screen-right
+const CLOUD_RANGE = SCREEN_WIDTH + 250; // (-150) to (SCREEN_WIDTH + 100)
+const CLOUD_FROM_LEFT = -150;
+const CLOUD_FROM_RIGHT = SCREEN_WIDTH + 100;
+
+const CloudLayer: React.FC<{ currentPhase: number }> = React.memo(({ currentPhase }) => {
+  // Reanimated shared values — animation runs entirely on the UI thread via worklets.
+  // withRepeat(withTiming(...), -1, false) loops infinitely without reversing:
+  // progress goes 0→1, snaps back to 0, repeats. The snap-back happens within
+  // the same worklet frame — no rendering of the reset position.
+  const cloud1Progress = useSharedValue(0);
+  const cloud2Progress = useSharedValue(0);
+  const cloud3Progress = useSharedValue(0);
+
+  useEffect(() => {
+    // Cloud 1: left → right (45s)
+    cloud1Progress.value = withRepeat(
+      withTiming(1, { duration: 45000, easing: REasing.linear }),
+      -1, false
+    );
+    // Cloud 2: right → left (38s)
+    cloud2Progress.value = withRepeat(
+      withTiming(1, { duration: 38000, easing: REasing.linear }),
+      -1, false
+    );
+    // Cloud 3: left → right (52s)
+    cloud3Progress.value = withRepeat(
+      withTiming(1, { duration: 52000, easing: REasing.linear }),
+      -1, false
+    );
+
+    return () => {
+      cancelAnimation(cloud1Progress);
+      cancelAnimation(cloud2Progress);
+      cancelAnimation(cloud3Progress);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only, shared values are stable
+
+  // Animated styles computed on the UI thread — no JS bridge involvement
+  const cloud1AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: CLOUD_FROM_LEFT + cloud1Progress.value * CLOUD_RANGE }],
+  }));
+
+  const cloud2AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: CLOUD_FROM_RIGHT - cloud2Progress.value * CLOUD_RANGE }],
+  }));
+
+  const cloud3AnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: CLOUD_FROM_LEFT + cloud3Progress.value * CLOUD_RANGE }],
+  }));
+
+  // Phase-dependent styles use module-level constants (no useMemo needed)
+  const cloudDimStyle = currentPhase >= 3 ? CLOUD_DIM_OPACITY : CLOUD_FULL_OPACITY;
+  const cloud3FontStyle = currentPhase >= 3 ? CLOUD3_FONT_DIM : CLOUD3_FONT_FULL;
+  const cloud2MarginStyle = currentPhase >= 3 ? CLOUD2_MARGIN_DIM : CLOUD2_MARGIN_FULL;
+
+  return (
+    <>
+      <Reanimated.View style={[styles.cloud, CLOUD1_TOP_STYLE, cloud1AnimStyle]} pointerEvents="none">
+        <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
+      </Reanimated.View>
+      <Reanimated.View style={[styles.cloud, CLOUD2_TOP_STYLE, cloud2AnimStyle]} pointerEvents="none">
+        <Text style={[styles.cloudEmoji, cloudDimStyle]}>☁️</Text>
+        <Text style={[styles.cloudEmoji, cloud2MarginStyle]}>☁️</Text>
+      </Reanimated.View>
+      <Reanimated.View style={[styles.cloud, CLOUD3_TOP_STYLE, cloud3AnimStyle]} pointerEvents="none">
+        <Text style={[styles.cloudEmoji, cloud3FontStyle]}>☁️</Text>
+      </Reanimated.View>
+    </>
+  );
+});
+
+interface HouseWorldProps {
+  rooms: Room[];
+  animals: Animal[];
+  currentPhase: DialoguePhase;
+  onAnimalPress: (animal: Animal) => void;
+  onRoomPress: (room: Room) => void;
+  ritualWords?: string[];
+  nextUnlock?: Unlockable | null;
+  amberBalance?: number;
+  purchasedUpgrades?: Record<string, number>;
+}
+
+export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
+  rooms,
+  animals,
+  currentPhase,
+  onAnimalPress,
+  onRoomPress,
+  ritualWords = [],
+  nextUnlock = null,
+  amberBalance = 0,
+  purchasedUpgrades = {},
+}) => {
+  const translateY = useSharedValue(0);
+  const baseTranslateY = useSharedValue(0);
+  const minTranslateY = useSharedValue(0);
+  const maxTranslateY = useSharedValue(0);
+
+  // Track container height via ref to avoid state-triggered re-renders.
+  // Position updates are applied directly via translateY.setValue in the
+  // onContainerLayout callback, bypassing React's reconciliation entirely.
+  const containerHeightRef = useRef<number>(SCREEN_HEIGHT);
+  // numRows ref keeps the layout callback in sync with the latest room count
+  // without needing to be in a useCallback dependency array.
+  const numRowsRef = useRef(1);
+  const houseHeightRef = useRef(0);
+  const onContainerLayout = useCallback((event: { nativeEvent: { layout: { height: number } } }) => {
+    const { height } = event.nativeEvent.layout;
+    if (height > 0 && Math.abs(height - containerHeightRef.current) > 1) {
+      containerHeightRef.current = height;
+      // Recalculate and apply translateY directly — no state update, no re-render
+      const nr = numRowsRef.current;
+      const hh = houseHeightRef.current;
+      const connectorH = Math.max(0, nr - 1) * 10;
+      const totalH = 50 + 80 + hh + 25 + 40 + connectorH;
+      const overflow = Math.max(0, totalH - height);
+      maxTranslateY.value = Math.max(0, overflow + 50);
+      minTranslateY.value = 0;
+      translateY.value = overflow;
+      baseTranslateY.value = overflow;
+    }
+  }, [baseTranslateY, maxTranslateY, minTranslateY, translateY]);
+
+  // Memoize night star positions/sizes to prevent flicker on re-render
+  const nightStars = useMemo(() =>
+    [...Array(12)].map((_, i) => ({
+      id: i,
+      left: `${10 + (i * 7) % 80}%` as `${number}%`,
+      top: `${5 + (i * 11) % 15}%` as `${number}%`,
+      opacity: 0.3 + (((i * 17 + 7) % 10) / 10) * 0.5,
+      fontSize: 8 + (((i * 13 + 3) % 10) / 10) * 6,
+    })),
+  []);
+
+  // Sun animation — Reanimated worklets for flicker-free pulse + rotation
+  const sunPulseVal = useSharedValue(1);
+  const sunRotateVal = useSharedValue(0);
+
+  useEffect(() => {
+    if (currentPhase < 3) {
+      // Pulse: 1 → 1.15 → 1 (4s cycle), entirely on UI thread
+      sunPulseVal.value = withRepeat(
+        withSequence(
+          withTiming(1.15, { duration: 2000, easing: REasing.inOut(REasing.sin) }),
+          withTiming(1, { duration: 2000, easing: REasing.inOut(REasing.sin) }),
+        ),
+        -1, false
+      );
+      // Rotation: 0 → 1 (60s cycle, maps to 0-360deg in style)
+      sunRotateVal.value = withRepeat(
+        withTiming(1, { duration: 60000, easing: REasing.linear }),
+        -1, false
+      );
+    } else {
+      cancelAnimation(sunPulseVal);
+      cancelAnimation(sunRotateVal);
+      sunPulseVal.value = 1;
+      sunRotateVal.value = 0;
+    }
+
+    return () => {
+      cancelAnimation(sunPulseVal);
+      cancelAnimation(sunRotateVal);
+    };
+  }, [currentPhase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sunAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: sunPulseVal.value },
+      { rotate: `${sunRotateVal.value * 360}deg` },
+    ],
+  }));
+
+  // Memoize room computations to avoid new arrays/objects on every render.
+  // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
+  const { sortedRooms, numRows, houseHeight } = useMemo(() => {
+    const unlocked = rooms.filter(room => room.isUnlocked).sort((a, b) => a.floor - b.floor);
+    const pendingRoom = nextUnlock?.type === 'room'
+      ? rooms.find(room => room.id === nextUnlock.targetId && !room.isUnlocked) || null
+      : null;
+    const display = pendingRoom ? [...unlocked, pendingRoom] : unlocked;
+    const sorted = [...display].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
+    const nr = Math.max(1, display.length);
+    const hh = nr * ROOM_HEIGHT + Math.max(0, nr - 1) * ROOM_GAP + HOUSE_PADDING * 2;
+    return { sortedRooms: sorted, numRows: nr, houseHeight: hh };
+  }, [rooms, nextUnlock]);
+
+  // Keep refs in sync for the layout callback (avoids stale closure)
+  numRowsRef.current = numRows;
+  houseHeightRef.current = houseHeight;
+
+  // Memoize animal-room lookup
+  const animalByRoom = useMemo(() => {
+    const map = new Map<string, Animal>();
+    for (const a of animals) {
+      map.set(a.roomId, a);
+    }
+    return map;
+  }, [animals]);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(10)
+        .onUpdate((event) => {
+          'worklet';
+          const nextY = baseTranslateY.value + event.translationY;
+          translateY.value = Math.max(minTranslateY.value, Math.min(maxTranslateY.value, nextY));
+        })
+        .onEnd(() => {
+          'worklet';
+          baseTranslateY.value = translateY.value;
+        }),
+    [baseTranslateY, maxTranslateY, minTranslateY, translateY]
+  );
+
+  const transformStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  // Set initial pan position when room count changes.
+  // containerHeight changes are handled directly in onContainerLayout.
+  useEffect(() => {
+    const connectorHeight = Math.max(0, numRows - 1) * 10;
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
+    const overflow = Math.max(0, totalContentHeight - containerHeightRef.current);
+
+    maxTranslateY.value = Math.max(0, overflow + 50);
+    minTranslateY.value = 0;
+    translateY.value = overflow;
+    baseTranslateY.value = overflow;
+  }, [baseTranslateY, houseHeight, maxTranslateY, minTranslateY, numRows, translateY]);
+
+  // Phase-aware container bg color — memoized to avoid inline object creation
+  const containerBgStyle = useMemo(() => [
+    styles.container,
+    { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' },
+  ], [currentPhase]);
+
+  // Phase-aware sky source
+  const skySource = currentPhase >= 4 ? SKY_SHADOW
+    : currentPhase >= 3 ? SKY_STORM
+    : currentPhase >= 2 ? SKY_DUSK
+    : SKY_DAY;
+
+  // Sun opacity based on phase — memoized
+  const sunOpacityStyle = useMemo(
+    () => currentPhase >= 3 ? { opacity: 0.4 } : undefined,
+    [currentPhase]
+  );
+
+  // Memoized sun ray transform styles — avoids recreating 8 objects per render
+  const sunRayStyles = useRef(
+    [...Array(8)].map((_, i) => [styles.sunRay, { transform: [{ rotate: `${i * 45}deg` }] }])
+  ).current;
+
+  return (
+    <View style={containerBgStyle}>
+      {/* Floating particles — isolated to prevent re-rendering the rest of the tree */}
+      <ParticleLayer currentPhase={currentPhase} />
 
       {/* Pan gesture handler - vertical only */}
-      <PanGestureHandler
-        ref={panRef}
-        onGestureEvent={onPanGestureEvent}
-        onHandlerStateChange={onPanHandlerStateChange}
-        minDist={10}
-        avgTouches
-      >
-        <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
-          <Animated.View
-            style={[
-              styles.transformContainer,
-              {
-                opacity: containerHeight === null ? 0 : 1,
-                transform: [
-                  { translateY },
-                ],
-              },
-            ]}
-          >
-              {/* Sky background - inside transform so it moves with the scene.
-                  Oversized to prevent gaps at any zoom/pan combination.
-                  Top offset grows with house height so the fill color above
-                  the image seamlessly extends the sky as rooms are added. */}
+      <GestureDetector gesture={panGesture}>
+        <Reanimated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
+          <Reanimated.View style={[styles.transformContainer, transformStyle]}>
+              {/* Sky background - inside transform so it moves with the scene */}
               <Image
-                source={
-                  currentPhase >= 4 ? SKY_SHADOW :
-                  currentPhase >= 3 ? SKY_STORM :
-                  currentPhase >= 2 ? SKY_DUSK :
-                  SKY_DAY
-                }
-                style={[styles.skyBackground, {
-                  top: -Math.max(SCREEN_HEIGHT * 0.20, houseHeight * 0.0),
-                }]}
+                source={skySource}
+                style={styles.skyBackground}
                 resizeMode="cover"
               />
 
-              {/* Animated clouds - inside transform so they move with the scene */}
-              <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-              </Animated.View>
-              <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-                <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-              </Animated.View>
-              <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-              </Animated.View>
+              {/* Animated clouds — isolated from HouseWorld re-renders */}
+              <CloudLayer currentPhase={currentPhase} />
 
               {/* Sun with animated rays - hidden at phase 4 */}
               {currentPhase < 4 && (
-                <Animated.View
-                  style={[
-                    styles.sun,
-                    {
-                      transform: [
-                        { scale: sunPulse },
-                        { rotate: sunRotate },
-                      ],
-                      opacity: currentPhase >= 3 ? 0.4 : 1,
-                    }
-                  ]}
+                <Reanimated.View
+                  style={sunOpacityStyle ? [styles.sun, sunAnimStyle, sunOpacityStyle] : [styles.sun, sunAnimStyle]}
                   pointerEvents="none"
                 >
                   <View style={styles.sunRays}>
-                    {[...Array(8)].map((_, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.sunRay,
-                          { transform: [{ rotate: `${i * 45}deg` }] }
-                        ]}
-                      />
+                    {sunRayStyles.map((rayStyle, i) => (
+                      <View key={i} style={rayStyle} />
                     ))}
                   </View>
                   <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
-                </Animated.View>
+                </Reanimated.View>
               )}
 
               {/* Moon for phase 4 */}
               {currentPhase >= 4 && (
-                <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
+                <View style={moonStyle} pointerEvents="none">
                   <Text style={styles.sunEmoji}>🌑</Text>
                 </View>
               )}
@@ -1014,7 +1047,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                           <View key={i} style={styles.shingle} />
                         ))}
                       </View>
-                      <View style={[styles.shingleRow, { marginLeft: 10 }]}>
+                      <View style={[styles.shingleRow, shingleRow2Style]}>
                         {[...Array(7)].map((_, i) => (
                           <View key={i} style={styles.shingle} />
                         ))}
@@ -1034,7 +1067,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
                   {/* Render rooms from top to bottom (highest row number first) */}
                   {sortedRooms.map((room, index) => {
-                    const roomAnimal = getAnimalForRoom(room.id);
+                    const roomAnimal = animalByRoom.get(room.id) || null;
                     const roomUnlockCost = (!room.isUnlocked && nextUnlock?.type === 'room' && nextUnlock.targetId === room.id)
                       ? nextUnlock.cost
                       : null;
@@ -1073,7 +1106,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     );
                   })}
 
-                  {displayRooms.length === 0 && (
+                  {sortedRooms.length === 0 && (
                     <View style={styles.emptyHouse}>
                       <Text style={styles.emptyHouseText}>🏠</Text>
                       <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>
@@ -1090,12 +1123,43 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   </View>
                 </View>
               </View>
-            </Animated.View>
-        </Animated.View>
-      </PanGestureHandler>
-    </GestureHandlerRootView>
+          </Reanimated.View>
+        </Reanimated.View>
+      </GestureDetector>
+    </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparator to prevent re-renders from irrelevant prop changes.
+  // The animals array gets a new reference on every dialogue interaction
+  // (handleNextDialogue/handleCloseDialogue call setAnimals with .map()),
+  // but only unlock/cooldown status actually affects HouseWorld visuals.
+  if (prevProps.currentPhase !== nextProps.currentPhase) return false;
+  if (prevProps.amberBalance !== nextProps.amberBalance) return false;
+  if (prevProps.onAnimalPress !== nextProps.onAnimalPress) return false;
+  if (prevProps.onRoomPress !== nextProps.onRoomPress) return false;
+  if (prevProps.nextUnlock !== nextProps.nextUnlock) return false;
+  if (prevProps.purchasedUpgrades !== nextProps.purchasedUpgrades) return false;
+  if (prevProps.ritualWords !== nextProps.ritualWords) return false;
+  if (prevProps.rooms !== nextProps.rooms) return false;
+
+  // Deep-compare animals by the fields that affect HouseWorld visuals
+  const prevAnimals = prevProps.animals;
+  const nextAnimals = nextProps.animals;
+  if (prevAnimals.length !== nextAnimals.length) return false;
+  for (let i = 0; i < prevAnimals.length; i++) {
+    const pa = prevAnimals[i];
+    const na = nextAnimals[i];
+    if (pa.id !== na.id || pa.isUnlocked !== na.isUnlocked || pa.hasNewDialogue !== na.hasNewDialogue) {
+      return false;
+    }
+  }
+
+  return true;
+});
+
+// Static styles defined outside the component to avoid recreation on each render
+const moonStyle = { position: 'absolute' as const, top: 15, right: 20, zIndex: 200, alignItems: 'center' as const, justifyContent: 'center' as const, opacity: 0.8 };
+const shingleRow2Style = { marginLeft: 10 };
 
 const styles = StyleSheet.create({
   container: {
@@ -1108,10 +1172,10 @@ const styles = StyleSheet.create({
   // Sky background - moves with scene, oversized to prevent gaps during pan.
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * 0,
-    left: -SCREEN_WIDTH * 0,
-    width: SCREEN_WIDTH * 1,
-    height: SCREEN_HEIGHT * 1,
+    top: -SCREEN_HEIGHT * 0.20,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
     zIndex: -1,
   },
   // Clouds - inside transform container
@@ -1119,6 +1183,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     flexDirection: 'row',
     zIndex: 200,
+    height: 55, // Explicit height prevents native layout recalculation during animation
   },
   cloudEmoji: {
     fontSize: 45,

@@ -7,10 +7,10 @@
  */
 
 // === VICTORY FLOW ===
-export const VICTORY_ANIMATION_LOCK_MS = 1200;
-export const WHISPER_DELAY_MS = 1200;
-export const INTERJECTION_DELAY_MS = 2500;
-export const INTERJECTION_AUTODISMISS_MS = 4000;
+export const VICTORY_ANIMATION_LOCK_MS = 800;
+export const WHISPER_DELAY_MS = 800;
+export const INTERJECTION_DELAY_MS = 1800;
+export const INTERJECTION_AUTODISMISS_MS = 3000;
 
 // === VICTORY GLITCH ===
 export const VICTORY_GLITCH_DELAY_MS = 300;
@@ -29,8 +29,8 @@ export const ONBOARDING_TRANSITION_DELAY_MS = 300;
 export const ONBOARDING_PUZZLE_COMPLETE_DELAY_MS = 1000;
 
 // === SCREEN TRANSITIONS ===
-export const SCREEN_FADE_OUT_MS = 150;
-export const SCREEN_FADE_IN_MS = 200;
+export const SCREEN_FADE_OUT_MS = 80;
+export const SCREEN_FADE_IN_MS = 120;
 
 // === AUTOSAVE ===
 export const AUTOSAVE_DEBOUNCE_MS = 120;

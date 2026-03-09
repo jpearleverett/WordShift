@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 const STORAGE_KEY = 'wordshift_settings';
 
@@ -17,67 +17,42 @@ const DEFAULT_SETTINGS: GameSettings = {
   reducedMotion: false,
 };
 
-// In-memory cache for fast access
-let settingsCache: GameSettings | null = null;
-
 /**
- * Load settings from storage (or return cached)
+ * Load settings from MMKV (synchronous)
  */
-export async function getSettings(): Promise<GameSettings> {
-  if (settingsCache) return settingsCache;
-
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const loaded: GameSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
-      settingsCache = loaded;
-      return loaded;
-    }
-  } catch (err) {
-    console.warn('Failed to load settings:', err);
+export function getSettings(): GameSettings {
+  const stored = storage.getString(STORAGE_KEY);
+  if (stored !== undefined) {
+    const loaded: GameSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+    return loaded;
   }
-
-  const defaults: GameSettings = { ...DEFAULT_SETTINGS };
-  settingsCache = defaults;
-  return defaults;
+  return { ...DEFAULT_SETTINGS };
 }
 
 /**
  * Update a single setting
  */
-export async function updateSetting<K extends keyof GameSettings>(
+export function updateSetting<K extends keyof GameSettings>(
   key: K,
   value: GameSettings[K]
-): Promise<GameSettings> {
-  const current = await getSettings();
+): GameSettings {
+  const current = getSettings();
   const updated = { ...current, [key]: value };
-  settingsCache = updated;
-
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('Failed to save settings:', err);
-  }
-
+  storage.set(STORAGE_KEY, JSON.stringify(updated));
   return updated;
 }
 
 /**
- * Get all settings synchronously (must call getSettings() first to populate cache)
+ * Get all settings synchronously — now identical to getSettings()
  */
 export function getSettingsSync(): GameSettings {
-  return settingsCache || DEFAULT_SETTINGS;
+  return getSettings();
 }
 
 /**
  * Reset settings to defaults
  */
-export async function resetSettings(): Promise<GameSettings> {
-  settingsCache = { ...DEFAULT_SETTINGS };
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch (err) {
-    console.warn('Failed to clear settings:', err);
-  }
-  return settingsCache;
+export function resetSettings(): GameSettings {
+  storage.remove(STORAGE_KEY);
+  return { ...DEFAULT_SETTINGS };
 }

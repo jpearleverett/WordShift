@@ -44,21 +44,134 @@ A word puzzle game where players shift letters between words to form valid Engli
 
 ```bash
 cd mobile
-npx expo start           # Start dev server (scan QR with Expo Go)
-npx expo start --clear   # Clear cache and start
+npx expo start --dev-client          # Start Metro for dev client
+npx expo start --dev-client --clear  # Clear cache and start
 ```
 
+## Development Runtime (Dev Client)
+
+This is a **dev-client app**, not an Expo Go app. The custom development build contains native code for `react-native-reanimated`, `@shopify/react-native-skia`, `react-native-worklets`, `react-native-mmkv`, and `react-native-nitro-modules` that Expo Go cannot provide.
+
+### Two runtimes
+- **Metro bundler** runs on your machine (or Termux) and serves the JavaScript bundle.
+- A **custom development build** (Expo Dev Client) is installed on the phone/emulator. It connects to Metro like Expo Go used to, but contains the correct native modules.
+
+### Known-working dependency versions (SDK 54)
+| Package | Version |
+|---------|---------|
+| `react-native-reanimated` | ~3.16.1 |
+| `react-native-worklets` | ~0.7.4 |
+| `@shopify/react-native-skia` | ~2.4.21 |
+| `react-native-mmkv` | ^4.1.2 |
+| `react-native-nitro-modules` | ^0.33.9 |
+| `expo-dev-client` | ^6.0.20 |
+
+JS package versions and the native code inside the dev build must match. A new dev client build is required whenever a package with native code is added, removed, or updated.
+
+### Install / align dependencies
+```bash
+cd mobile
+npm install --legacy-peer-deps --ignore-scripts   # Avoids peer-dep conflicts; --ignore-scripts skips @shopify/react-native-skia's github download (safe for JS/tests, only needed for native builds)
+npx expo install --fix                             # Let Expo align what it can
+```
+
+### Build the dev client (EAS Build)
+Needed when native deps change (add/remove/update packages with native code) or when `app.json`/plugin config affects native build output.
+
+**From any machine with network access:**
+```bash
+cd mobile
+npx eas-cli build --profile development --platform android   # Android APK
+npx eas-cli build --profile development --platform ios       # iOS simulator build
+```
+
+**From Termux (Android phone):**
+```bash
+cd mobile
+export EAS_SKIP_AUTO_FINGERPRINT=1   # Required — fingerprint step fails in Termux
+npx eas-cli build --profile development --platform android
+```
+
+The build runs on EAS servers and produces a downloadable `.apk` (Android) or `.app` (iOS simulator). Install the APK on your device via `adb install` or direct download from the EAS dashboard.
+
+**Build profiles** are defined in `eas.json`:
+- `development` — Dev client with debugging, APK output (Android), simulator build (iOS)
+- `preview` — Internal distribution (ad-hoc/enterprise signing)
+- `production` — Store-ready build
+
+You do **not** need a new EAS build for normal JS/TS edits — only for native dependency changes.
+
+### Run the app (JS)
+Once the dev client APK/app is installed on the device:
+```bash
+cd mobile
+npx expo start --dev-client --clear
+```
+Then open the dev client app on the device and connect to Metro.
+
+### Termux-specific notes
+- Set `EAS_SKIP_AUTO_FINGERPRINT=1` before all EAS commands to skip the auto-fingerprint step that fails in Termux.
+- EAS builds run remotely on Expo's servers — Termux only submits the build request and downloads the artifact.
+- If `npx eas-cli` is slow to start, install globally once: `npm install -g eas-cli` then use `eas build` directly.
+
 ## Testing
+
+### Environment Setup (run once per session if `node_modules` is missing)
+
+```bash
+cd mobile
+npm install --legacy-peer-deps --ignore-scripts
+```
+
+- `--legacy-peer-deps` avoids peer-dep conflicts between Expo SDK 54 packages.
+- `--ignore-scripts` is **required** because `@shopify/react-native-skia` has a post-install script that tries to download prebuilt binaries from github.com, which is unreachable in sandboxed/CI environments. Skipping this script is safe — it only affects native builds (not needed for Jest tests or Metro bundling).
+- If `node_modules` already exists with all packages, skip this step.
+
+### Running Tests
 
 - **Run all tests**: `cd mobile && npm test -- --no-coverage`
 - **Run a single test file**: `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
-- Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
-- The full suite has 948 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has 941 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- **Known issue — test step can hang**: The Bash tool call for running tests frequently stalls/hangs in this environment. The user may need to interrupt and say "keep going" for the test command to actually execute. This is a recurring pattern, not a one-off. When running tests, be aware that the step may appear stuck and require user intervention to proceed.
 
 ## Recent Implementation Notes (2026-02)
 
+- **Dialogue flickering, cloud flicker, and pit particle flicker fix (2026-03-04)**:
+  - **FoxGuide `Animated.multiply` in render**: `Animated.multiply(slideAnim, isTop ? -1 : 1)` was called inline in both the dialogue and compact variant style arrays (lines 171 and 259), creating a new native animation node on every render — same bug class as AnimalSprite (fixed 2026-02-27) but missed in FoxGuide. Moved to stable ref: `const slideNegated = useRef(Animated.multiply(slideAnim, -1)).current`. Position style (`resolvedPositionStyle`) and animated style (`animatedStyle`) memoized with `useMemo`.
+  - **App.tsx FoxGuide anchorStyle inline object**: `anchorStyle={...}` prop on FoxGuide in the puzzle screen created a new object on every App.tsx re-render, triggering FoxGuide re-renders. Extracted to `foxPuzzleAnchorStyle` useMemo with `[isOnboarding, onboardingStep, gameState]` deps.
+  - **CloudLayer `Animated.loop` rewrite**: Cloud animations used a recursive `.start(() => animate())` callback pattern with `useNativeDriver: true`. The native animation completed on the native thread but the completion callback round-tripped through the JS thread before restarting — causing a 1-2+ frame gap where clouds sat at their off-screen position (invisible in Expo Go, visible in custom dev build). Replaced with `Animated.loop(Animated.sequence([timing, instant-reset]))` which keeps the entire loop on the native thread with zero JS round-trips. Also: explicit `Easing.linear` for constant-speed drift, `height: 55` on cloud container to prevent layout thrashing, module-level style constants instead of `useMemo`/`undefined` for phase opacity, removed dead `cloudMountedRef`.
+  - **RimParticleLayer extraction**: `setRimParticles` in OfferingPitScreen (~1/sec) triggered full screen re-renders including all flying words, ward marks, and UI. Extracted into isolated `RimParticleLayer` React.memo component with its own state and spawn useEffect.
+  - **Particle view style stabilization**: All 5 particle view components in OfferingPitScreen (`TrailParticleView`, `ImpactParticleView`, `AmberParticleView`, `RimParticleView`, `ShockwaveRingView`) had inline style objects recreated every render despite React.memo. Wrapped each in `useMemo` keyed on the particle's stable Animated.Value refs and color string.
+- **Home screen flickering and teleportation fix — third pass (2026-02-27)**:
+  - **HouseWorld React.memo bypass**: `onAnimalPress={dialogueFlow.handleAnimalTap}` and `onRoomPress={unlockFlow.handleRoomPress}` created new function references on every HomeScreen re-render (dialogue state, ambient lines, goal suggestions, etc.), bypassing HouseWorld's `React.memo` and causing full re-renders of the entire house/cloud/sky tree. Added `onAnimalPressRef`/`onRoomPressRef` pattern in HomeScreen with stable `useCallback` wrappers, same approach as AnimalSprite's `onPressRef`.
+  - **Dialogue modal `interpolate()` in render**: `dialogueFlow.dialogueSlide.interpolate({ inputRange: [0, 1], outputRange: [300, 0] })` was called inline in the modal's style, creating a new Animated interpolation node on every render (same bug class as `Animated.multiply`). Moved to a stable `useRef`.
+  - **Dialogue theme not memoized**: `getDialogueTheme(progress.currentPhase)` was called inline without memoization, returning a new object reference every render and triggering style recalculation on all dialogue/cooldown elements. Wrapped in `useMemo`.
+  - **Cloud inline styles recreated every render**: Each cloud `Animated.View` had `{ top: N, transform: [{ translateX: cloudNX }] }` and conditional `{ opacity: 0.6 }` objects created fresh on every render, causing style recalculation and visual flicker. Extracted to stable `useRef` (for static values) and `useMemo` (for phase-dependent values).
+- **Home screen flickering and teleportation fix — second pass (2026-02-27)**:
+  - **AnimalSprite `Animated.multiply` in render**: `{ scale: Animated.multiply(tapScale, breatheScale) }` was called inline in the style array, creating a new animation node on every re-render and causing scale flicker. Moved to a stable ref: `const combinedScale = useRef(Animated.multiply(tapScale, breatheScale)).current`.
+  - **AnimalSprite bounce teleport**: When `isMoving` became false, `bounceY.setValue(0)` snapped the sprite to the floor instantly from whatever mid-bounce position it was at. Replaced with `Animated.timing(bounceY, { toValue: 0, duration: 150, easing: Easing.out(Easing.ease) })` for a smooth landing.
+  - **Cooldown toast spam-tap flicker**: Rapid tapping on a cooling-down animal triggered overlapping toast animation sequences. Added 500ms debounce via `lastTapTime` ref in `handlePress` — taps within 500ms of the last are ignored.
+  - **Cloud3 center-screen flash on mount**: `cloud3X` was initialized to `SCREEN_WIDTH / 2` (visible center of screen), causing a one-frame flash before the animation moved it off-screen. Changed all cloud initial values to start securely off-screen: cloud1X → -150, cloud2X → SCREEN_WIDTH + 100, cloud3X → -150.
+  - **Shooting star too fast / too low**: 800ms duration and y-start of 20-80px made the shooting star look like a UI glitch rather than an atmospheric effect. Slowed to 2000ms, restricted y-start to 0-30px (high in sky), and smoothed fade timing (fade-in 100→400ms, fade-out 700→1600ms).
+- **Home screen flickering and teleportation fix — first pass (2026-02-27)**:
+  - **Root cause**: Cascading re-render chain — App.tsx passed inline arrow function callbacks (new references every render) through unmemoized HomeScreen → HouseWorld → RoomView → AnimalSprite. Particle system `setParticles()` every 2-4 seconds triggered full tree re-renders, restarting all sprite/cloud/particle animations mid-frame.
+  - **App.tsx**: Extracted 5 inline navigation callbacks (`onOpenSettings`, `onOpenStats`, `onOpenLedger`, `onOpenGallery`, `onOpenPit`) into `useCallback` hooks to stabilize references.
+  - **AnimalSprite**: Wrapped in `React.memo` with `onPressRef` pattern — stores `onPress` callback in a ref (updated every render) so the memo comparison ignores callback identity changes while `handlePress` always calls the latest version. Deps reduced to `[animal, currentPhase]`.
+  - **HouseWorld**: Wrapped in `React.memo` to block re-renders from HomeScreen state changes that don't affect the house.
+  - **ParticleLayer**: Extracted particle system (`particles` state, `particleIdRef`, spawn interval) into isolated `ParticleLayer` component wrapped in `React.memo`. Particle spawns now only re-render the particle layer, not the entire rooms/animals tree.
+  - **FloatingParticle**: Wrapped in `React.memo` to prevent re-rendering all particles when one is added/removed.
+  - **Cloud animation leak**: `cloudAnimRefs.current.push(anim)` grew unboundedly as each cloud loop iteration pushed a new animation ref. Replaced with fixed-size `activeAnims[index] = anim` array of 3 slots. Removed `cloudAnimRefs` ref entirely.
+  - **Cooldown toast teleportation**: `useDialogueFlow.ts` cooldown slide-in used `Animated.spring` (friction: 14, tension: 100) which caused visible overshoot/bounce. Replaced with `Animated.timing` (duration: 250ms, `Easing.out(Easing.cubic)`) for smooth deceleration without bounce.
+- **AsyncStorage → MMKV migration (2026-02-25)**:
+  - Replaced `@react-native-async-storage/async-storage` with `react-native-mmkv` V4 (via `react-native-nitro-modules`) across all 20+ service files, 5 hooks, and 4 components.
+  - All storage operations are now **synchronous** — no more `async`/`await` for reads and writes. This eliminates race conditions, simplifies control flow, and removes the need for most in-memory cache patterns.
+  - **New files**: `src/services/storage.ts` (MMKV singleton with `getObject<T>`/`setObject<T>` typed helpers), `src/services/storageMigration.ts` (one-time migration reads all AsyncStorage keys and writes them to MMKV on first launch).
+  - **AsyncStorage retained** as a dependency solely for the one-time migration — `storageMigration.ts` reads old data on first post-upgrade launch, then sets a `hasMigratedFromAsyncStorage` flag. Can be removed once all users have migrated.
+  - **Test infrastructure**: New MMKV mock (`__mocks__/mmkv.ts`) backed by a `Map<string, string>`, nitro-modules stub (`__mocks__/nitroModules.ts`), and `helpers/mockStorage.ts` factory. Jest `moduleNameMapper` redirects native module imports to mocks.
+  - **EAS build setup**: Added `expo-dev-client` dependency, `eas.json` with development/preview/production profiles, and `expo-dev-client` plugin in `app.json`. **A new dev client build is required** since `react-native-mmkv` and `react-native-nitro-modules` contain native code.
+  - Net result: 57 files changed, ~113 lines removed (2164 added, 2277 removed), all 33 test suites passing (941 tests).
 - **Bug audit and fixes — seventh pass (2026-02-21)**:
   - **Premature UI phase advance with pending transition (HIGH)**: `awardPuzzleAmber()` in `amberCurrency.ts` returned `phaseTransitionPending: phaseChanged`, which was `false` when a pending transition already existed from a prior puzzle. This caused `useGamePersistence.ts` to advance the UI phase (`setCurrentPhase`) to the transition target on the next puzzle, bypassing pit confirmation. Fixed by returning `phaseTransitionPending: phaseChanged || progress.pendingPhaseTransition != null`.
   - **Challenge mode blocks mid-step double shift undo (MEDIUM)**: The challenge mode `undosRemaining <= 0` guard in `usePuzzleGame.ts` `handleUndo` ran before the double shift mid-step undo check, blocking free mid-step undos (reverting uncommitted `drop1`) when undos were exhausted. Moved the `isDoubleShift` mid-step check before the challenge mode guard so mid-step undos are always allowed.
@@ -231,11 +344,11 @@ npx expo start --clear   # Clear cache and start
 - **Language**: TypeScript (strict)
 - **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`)
 - **State**: React useState/useEffect (no external state library)
-- **Persistence**: AsyncStorage with in-memory cache pattern
+- **Persistence**: react-native-mmkv V4 (synchronous key-value storage via Nitro Modules). AsyncStorage retained only for one-time data migration on first launch after upgrade
 - **Haptics**: expo-haptics (settings-gated)
 - **Audio**: expo-av (placeholder infrastructure, awaiting real audio assets)
 - **Testing**: Jest with ts-jest preset
-- **Target**: iOS and Android via Expo Go
+- **Target**: iOS and Android via Expo Dev Client (custom development build)
 
 ## Project Structure
 
@@ -282,7 +395,7 @@ mobile/
 │   │   ├── useAchievementQueue.ts # Achievement checking + toast queue processing
 │   │   ├── useDialogueFlow.ts   # Dialogue session state, animations, cooldown messaging. Phase 5 post-revelation routing
 │   │   ├── useUnlockFlow.ts     # Home unlock flow: in-world room/animal prompts, purchases, modal state
-│   │   └── useAutosave.ts      # Debounced mid-session puzzle state autosave to AsyncStorage
+│   │   └── useAutosave.ts      # Debounced mid-session puzzle state autosave to MMKV
 │   ├── components/
 │   │   ├── Row.tsx              # Game row with PICK/DROP badges, arc layout (React.memo'd)
 │   │   ├── LetterTile.tsx       # Animated letter tile with 3D candy styling, phase-aware springs/trails, resonant word glow (compact mode for 6+ letters)
@@ -364,10 +477,17 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
 │       ├── slotEstimation.ts     # Drag-and-drop slot position estimation: arc layout geometry → slot index mapping
+│       ├── storage.ts           # MMKV V4 storage singleton + getObject/setObject helpers
+│       ├── storageMigration.ts  # One-time AsyncStorage → MMKV data migration (runs on first launch after upgrade)
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (948 tests, 33 suites)
+├── eas.json                     # EAS Build profiles (development, preview, production)
+├── src/__tests__/               # Test suites (941 tests, 33 suites)
+│   ├── __mocks__/
+│   │   ├── mmkv.ts             # In-memory MMKV mock (Map-backed, supports getString/set/delete/clearAll)
+│   │   └── nitroModules.ts     # Stub for react-native-nitro-modules
 │   ├── helpers/
-│   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
+│   │   ├── mockAsyncStorage.ts  # Legacy AsyncStorage mock (for migration tests)
+│   │   └── mockStorage.ts      # MMKV storage mock factory — use createMockStorage()
 │   ├── achievements.test.ts
 │   ├── animalDialogueVariants.test.ts # Variant tutorial dialogue coverage across variants/animals/phases
 │   ├── amberCurrency.test.ts
@@ -1335,7 +1455,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 - **MoveDelta pattern**: Undo history uses lightweight deltas (`{rowIndex, letterIndex, letter, action}`) instead of deep-cloning entire game state
 - **Schema versioning**: Persistent data uses `dataMigration.ts` for schema versions + sequential migrations; always bump version when storage format changes
 - **Concurrent spend guard**: `amberCurrency.ts` uses `spendInProgress` flag to prevent double-spend race conditions
-- Services use AsyncStorage with in-memory cache pattern (load -> cache -> return cached)
+- Services use MMKV synchronous storage via `storage.ts` singleton (`storage.getString`, `storage.set`, `getObject<T>`, `setObject<T>`). All service functions are synchronous — **never chain `.then()`/`.catch()` on their return values** (they return plain values, not Promises — chaining `.catch()` on `void`/`undefined` throws `TypeError`). Use `try/catch` for error handling and direct assignment for return values
 - TS strict: module-level nullable caches need local variable assignment before return to avoid TS2322
 - Accessibility: interactive elements should have `accessibilityLabel` and `accessibilityRole`; progress bars use `accessibilityValue` with `min`/`max`/`now`
 - **reducedMotion**: All animations must check `getSettingsSync().reducedMotion` and either skip or set values instantly
@@ -1346,13 +1466,14 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 948 tests, 33 suites
+cd mobile && npm test -- --no-coverage  # 941 tests, 33 suites
 ```
 
 **Test patterns:**
-- Shared AsyncStorage mock factory in `src/__tests__/helpers/mockAsyncStorage.ts` — use `createMockAsyncStorage()` instead of duplicating inline mocks
+- Shared MMKV storage mock factory in `src/__tests__/helpers/mockStorage.ts` — use `createMockStorage()` instead of duplicating inline mocks. Legacy `mockAsyncStorage.ts` still exists for migration tests
+- Jest module name mappers in `jest.config.js` redirect `react-native-mmkv` and `react-native-nitro-modules` to in-memory mocks in `src/__tests__/__mocks__/`
 - Tests that import react-native modules need `jest.mock('react-native', ...)` at top
-- `beforeEach` must call both `AsyncStorage.clear()` AND service-specific clear functions
+- `beforeEach` must call `storage.clearAll()` (from mock) AND service-specific clear functions. All service functions are now synchronous — use `mockReturnValue` not `mockResolvedValue`
 - Puzzle generator tests mock `amberCurrency.getCurrentPhase` + all `wordHistory` functions
 - Hook tests (`usePuzzleGame`, `useGamePersistence`) use manual React mock with stateStore Map + index rewind pattern
 - `jest.fn(async () => ...)` infers 0 args — add typed optional params `(_d?: any, _s?: any)` for TS
@@ -1362,9 +1483,9 @@ cd mobile && npx jest --no-coverage  # 948 tests, 33 suites
 
 ### Manual Testing
 
-Test on physical device via Expo Go app:
-1. Run `npx expo start` in mobile/
-2. Scan QR code with Expo Go
+Test on physical device via Expo Dev Client:
+1. Run `npx expo start --dev-client` in mobile/
+2. Open the dev client app on the device and connect to Metro
 3. Test all three difficulty modes
 4. Verify puzzle generation doesn't hang (should complete in <3s)
 5. Test tutorial on fresh install
@@ -1797,3 +1918,229 @@ Monetization UI shifts through **visual desaturation**, not narrative voice. The
 - **Dark patterns** — no disguised ads, no tiny X buttons, no opt-out-by-default
 - **Amber bundles for cash** — breaks the earn/spend loop
 - **Guest/temporary animals** — breaks the closed cult narrative
+
+---
+
+## Victory Modal Touch Incident – 2026-02
+
+Engineering postmortem and reusable guidance for modal layering, touch delivery, and regression-safe testing on React Native / Android Fabric.
+
+---
+
+### 1. Incident Timeline
+
+#### Stage 1 — Initial bug: tutorial victory CONTINUE untappable
+- **Symptom**: During onboarding, the VictoryModal CONTINUE button was visually present but completely non-interactive on Android. Tapping anywhere on the modal had no effect.
+- **Initial hypothesis**: The `onOnboardingContinue` callback was not being wired up correctly, or the `isOnboarding` prop was not reaching `VictoryModal`.
+
+#### Stage 2 — Callback-wiring fixes that did not resolve user-facing behavior
+- Added explicit `console.log` in `handleOnboardingVictoryContinue` and the VictoryModal `onPress` handler to confirm the callbacks were present.
+- Confirmed: callbacks were correctly wired. The prop chain (`App.tsx → VictoryModal`) was intact.
+- No improvement in behavior. The button press handlers were never firing — not even `onPressIn`.
+- **Conclusion**: The callback chain was not the problem. The touch events were never reaching the component.
+
+#### Stage 3 — Logging phase and findings
+- Added `[VictoryModal]`, `[AppVictory]`, and `[OnboardingFlow]` prefixed logs to trace the full touch path.
+- Key diagnostic signal: `onPressIn` was **never logged** even when pressing directly on the CONTINUE button area.
+- **Confirmed**: Touch interception was occurring above the button in the native layer. The modal card was visible but the native touch dispatcher was routing taps to a different view.
+- The puzzle-screen `ScrollView` (game area) was identified as the interceptor — it sits later in the native view tree and claims all touch events via its gesture recognizer.
+
+#### Stage 4 — Native Modal isolation fix for the onboarding path
+- **Root fix**: Wrapped the onboarding VictoryModal in a React Native `<Modal>` (native modal). This creates a separate Android `Window` object above the host `Activity` window, giving it priority for both rendering and touch dispatch regardless of zIndex or view tree order.
+- Secondary fix (App.tsx): For onboarding, `skipToEnd()` is called immediately after `playVictorySequence()`. `skipToEnd()` calls `cancelAnimation()` on every Reanimated shared value before setting final values — closing the 1-2 frame race window where `modalOpacity=0` had already been committed to the native layer (making the subtree non-hittable).
+- Secondary fix (VictoryModal.tsx): When `isOnboarding`, the Reanimated animated style is replaced with a static `{ opacity: 1, scale: 1 }` object so Reanimated's worklet never modifies the view's alpha.
+- Also: `ScrollView` intentionally removed from the onboarding modal path (onboarding content is minimal — stars + title + one button — and never needs to scroll, eliminating scroll-gesture swallowing as a source of future regressions).
+- **Result**: CONTINUE button became reliably tappable.
+
+#### Stage 5 — Regressions introduced
+- **Regression A — Achievement popup behind modal**: After wrapping VictoryModal in a native `<Modal>`, `AchievementToast` (rendered in the puzzle screen's in-tree view hierarchy) appeared behind the Modal window and was no longer visible or tappable.
+- **Regression B — Regular (non-onboarding) victory modal untappable**: The same ScrollView touch-interception root cause applied to the non-onboarding `VictoryModal` path. Once the onboarding fix revealed the true root cause, the non-onboarding path was found to have the same problem.
+- **Regression C — Tap-to-skip overlay no longer worked**: The fullscreen `Pressable` overlay used to accelerate the victory animation (tap-to-skip) was in the in-tree view hierarchy at a zIndex above the puzzle area but below the Modal window. Once `VictoryModal` used a native Modal, the overlay was in a different window and could not intercept taps destined for the Modal.
+
+#### Stage 6 — Follow-up fixes for regressions
+- **Achievement toast fix**: Moved `AchievementToast` into its own native `<Modal>` mounted **after** `VictoryModal` in `App.tsx`'s return tree. On both iOS and Android, later-mounted Modal windows stack above earlier-mounted ones — so the achievement toast always appears above the victory modal. The Modal is only mounted when `achievementState.currentAchievement` is non-null (no layout cost otherwise).
+- **Regular victory modal fix**: Applied the same native `<Modal>` wrapper to the non-onboarding `VictoryModal` return path. Both paths now use `<Modal transparent animationType="none" statusBarTranslucent>`.
+- **Tap-to-skip fix**: Moved the tap-to-accelerate overlay inside `VictoryModal` as `isAnimating` / `onTapToSkip` props so it lives within the same native Modal window and correctly intercepts taps.
+
+---
+
+### 2. Root-Cause Analysis
+
+#### Touch interception by the ScrollView game area
+On Android Fabric, the React Native shadow thread computes `zIndex` for layout purposes, but the **native touch dispatcher** routes hit-tests by view elevation and paint order in the native view tree. A `ScrollView` (or any view with an active gesture recognizer) that is painted after the overlay in the native tree will claim touch events even when the overlay renders visually on top via `zIndex`.
+
+In this codebase, the puzzle-screen `ScrollView` wrapping the game rows is rendered before the VictoryModal overlay in `renderScreen()`. Even though the overlay used `StyleSheet.absoluteFill` + `zIndex: 500`, on Android the ScrollView's gesture recognizer intercepted all touches in its bounds before React Native's JS thread saw them.
+
+#### Pointer-events and z-order/layering conflicts
+- `pointerEvents="box-none"` on a container means the **container itself** does not receive touches but its children do. It does **not** prevent a sibling higher in the native tree from intercepting touches before they reach the children.
+- `zIndex` in React Native is a rendering/composition hint. It does not change the native hit-test order on Android Fabric.
+- `Animated.Value` opacity at `0` (set by the Reanimated worklet on the UI thread) makes the entire animated subtree non-hittable on Android, even if the JS-visible opacity value has been immediately reset to `1`. The native layer commits the `0` before the next frame's worklet correction arrives.
+
+#### Differences between onboarding and non-onboarding render paths
+- Both paths were affected by the same ScrollView interception root cause.
+- The onboarding path was discovered first because the minimal content (one button) made it obvious that nothing was tappable.
+- The non-onboarding path had more buttons, but once the game area ScrollView claimed the touch, none of them fired.
+
+#### Native Modal stacking behavior affecting popup ordering
+- React Native `<Modal>` creates a separate Android `Window` (or iOS `UIWindow`) that is always presented above the host `Activity`/`ViewController` window.
+- When multiple Modals are active simultaneously, the **later-mounted** Modal appears on top on both platforms.
+- Consequences:
+  - `AchievementToast` (previously in-tree) became invisible behind the Modal window → fix: wrap in its own Modal, mounted after `VictoryModal`.
+  - `Pressable` tap-to-skip overlays in the in-tree hierarchy cannot intercept taps within a Modal window → fix: move the overlay inside the Modal.
+
+---
+
+### 3. Engineering Guidelines / Best Practices
+
+#### Modal layering policy
+- Any full-screen interactive overlay (victory, achievement, phase transition, rules, dialogue choice) **must** be implemented as a native `<Modal>` if it appears while a `ScrollView` or gesture-handler view is active behind it.
+- Stack modals intentionally: if Modal B must appear above Modal A, mount Modal B **after** Modal A in the component tree.
+- Never rely on `zIndex` alone to place interactive UI above a ScrollView.
+
+#### Touch handling rules for absolute overlays
+- `pointerEvents="none"` — purely decorative views that must never intercept touches (overlays, glows, confetti backdrops). This is the default for all non-interactive fullscreen views.
+- `pointerEvents="box-none"` — container views whose children are interactive but the container itself should be transparent to touches. Use for modal card wrappers and decorative overlay containers.
+- Never use `pointerEvents="box-none"` and expect it to override ScrollView gesture recognition — it only affects the container, not siblings.
+- When in doubt: add `onPressIn` logging before adding `onPress` logic. If `onPressIn` does not fire, the touch is being intercepted above your component.
+
+#### When to use native `<Modal>` vs in-tree overlay
+| Use native `<Modal>` | Use in-tree overlay (`absoluteFill` + `zIndex`) |
+|---|---|
+| Interactive content shown while game area is visible | Purely decorative overlays (flash effects, glows, particles) |
+| Achievement notifications | Phase flash overlay (`pointerEvents="none"`) |
+| Victory modal | Victory glitch flash overlay |
+| Onboarding modal overlays | Screen shake / dread pulse overlays |
+| Any dialog requiring guaranteed touch delivery | Transition overlay during screen swap |
+
+#### Reanimated opacity and touch hittability
+- On Android Fabric, Reanimated runs on the native UI thread. Setting `opacity = 0` on a `SharedValue` before a frame is committed makes the view non-hittable at the native layer, even if JS code immediately resets the value.
+- For any modal that must be tappable immediately on mount:
+  - Either call `cancelAnimation()` + set final values before the modal is shown (`skipToEnd()` pattern).
+  - Or use a static style object instead of `useAnimatedStyle` for the onboarding/immediate-interaction path.
+- Do not combine Reanimated opacity animations with immediate user interaction requirements.
+
+#### Avoiding ScrollView/gesture cancellation pitfalls for CTA-only modals
+- If a modal contains only a small number of fixed-height elements that will never overflow, **omit the ScrollView**. A non-scrollable `ScrollView` is still a gesture recognizer that can swallow vertical swipes.
+- If a ScrollView is genuinely needed (long content), set `keyboardShouldPersistTaps="handled"` and `bounces={false}` to reduce unintended gesture conflicts.
+
+---
+
+### 4. Debugging Playbook
+
+#### Step 1 — Add `onPressIn` to every button under investigation
+Before investigating callback wiring, confirm the touch reaches the button:
+```typescript
+// In VictoryModal.tsx
+<Pressable
+  onPressIn={() => console.log('[VictoryModal] CONTINUE onPressIn', { ts: Date.now() })}
+  onPressOut={() => console.log('[VictoryModal] CONTINUE onPressOut', { ts: Date.now() })}
+  onPress={() => console.log('[VictoryModal] CONTINUE onPress', { ts: Date.now() })}
+  ...
+>
+```
+- **`onPressIn` fires** → touch reached the component; investigate callback logic.
+- **`onPressIn` missing** → touch intercepted above the component at the native layer; investigate overlays, ScrollViews, Modal hierarchy.
+
+#### Step 2 — Log modal visibility with consistent prefixes
+```typescript
+// App.tsx — when gameState changes to WON
+console.log('[AppVictory] gameState → WON', {
+  isOnboarding,
+  onboardingStep,
+  modalVisible,
+  victoryAnimating,
+  ts: Date.now(),
+});
+
+// VictoryModal.tsx — when visible prop changes
+console.log('[VictoryModal] visible=true', {
+  isOnboarding: !!isOnboarding,
+  hasOnboardingContinue: !!onOnboardingContinue,
+  phase,
+  ts: Date.now(),
+});
+
+// useOnboardingFlow — when step advances
+console.log('[OnboardingFlow] step advanced', {
+  from: prevStep,
+  to: nextStep,
+  ts: Date.now(),
+});
+```
+
+#### Signal interpretation
+| Log output | Meaning | Action |
+|---|---|---|
+| `[AppVictory] gameState → WON` present | Modal render triggered | Check `modalVisible` field |
+| `[VictoryModal] visible=true` present | Component received `visible=true` | Check onboarding path rendering |
+| `[VictoryModal] CONTINUE onPressIn` **missing** | Touch intercepted before React Native | Wrap in native `<Modal>` |
+| `[VictoryModal] CONTINUE onPressIn` present, `onPress` missing | Long-press threshold or gesture conflict | Check `hitSlop`, scroll gesture settings |
+| `[AppVictory] onboarding continue handler entered` missing | Callback never called despite `onPress` firing | Check prop wiring from App.tsx |
+
+#### Repro checklist — onboarding victory flow
+1. Reset all data (Settings → Reset All Data).
+2. Launch app → complete onboarding first puzzle.
+3. In Metro/Termux terminal, verify `[AppVictory] gameState → WON` log appears with `isOnboarding: true`.
+4. Verify `[VictoryModal] visible=true` log appears with `hasOnboardingContinue: true`.
+5. Tap CONTINUE button.
+6. Verify `[VictoryModal] CONTINUE onPressIn` fires within 200ms of tap.
+7. Verify `[VictoryModal] CONTINUE onPress fired` fires.
+8. Verify `[AppVictory] onboarding continue handler entered` fires.
+9. Verify navigation proceeds to pit screen.
+
+#### Repro checklist — regular (non-onboarding) victory flow
+1. Complete any puzzle (non-onboarding).
+2. Verify `[AppVictory] gameState → WON` appears with `isOnboarding: false`.
+3. Verify `[VictoryModal] visible=true` appears.
+4. Tap Next Level, Share, and Return Home buttons individually.
+5. Each should produce an `onPress` log within 200ms of tap.
+6. Tap the modal card while animation is playing — verify tap-to-skip fires `[AppVictory] skipToEnd`.
+
+#### Validation matrix
+
+| Scenario | Expected behavior | Pass signal |
+|---|---|---|
+| Onboarding CONTINUE | Modal tappable immediately, navigates to pit | `[AppVictory] onboarding continue handler entered` |
+| Regular Next Level | Tappable after animation OR tap-to-skip | `[AppVictory] handleNextLevel called` |
+| Regular Return Home | Tappable, navigates to home screen | `[AppVictory] handleReturnHome called` |
+| Achievement popup during victory | Visible and tappable above VictoryModal | Achievement toast renders above Modal window |
+| Achievement popup z-order | AchievementToast Modal mounts after VictoryModal | `currentAchievement` Modal visible above VictoryModal |
+| Tap-to-skip during animation | Accelerates animation, does not break buttons | `victoryAnimating` clears, `skipToEnd` called |
+| No regression in phase transition overlay | `pointerEvents="none"` flash overlay, non-blocking | No touch interception after flash completes |
+
+---
+
+### 5. PR Checklist Template
+
+Copy this into PR descriptions for any change touching modal visibility, layering, overlay rendering, or touch handling:
+
+```markdown
+## Modal / Touch Change Checklist
+
+- [ ] **Touch-path logs verified**: `onPressIn` fires for all interactive elements in the affected modal/overlay (tested on Android)
+- [ ] **Overlay disable conditions verified**: all `pointerEvents="none"` and `pointerEvents="box-none"` assignments are intentional and documented
+- [ ] **Native Modal ordering verified**: if multiple `<Modal>` components can be simultaneously visible, the desired stacking order matches mount order in the component tree
+- [ ] **Reanimated opacity safety**: no interactive view depends on a Reanimated `opacity` SharedValue being `1` for hittability — either use `skipToEnd()` pattern or static styles for immediate-interaction paths
+- [ ] **ScrollView non-interference**: no `ScrollView` sits above (in paint/tree order) any interactive overlay that must receive touches
+- [ ] **Tap-to-skip path**: if a tap-to-accelerate overlay exists, it is inside the same native Modal window as the animated content
+- [ ] **Onboarding path not broken**: complete onboarding repro checklist (CONTINUE button tappable, navigates to pit)
+- [ ] **Regular victory path not broken**: regular puzzle completion repro checklist (Next Level, Return Home, Share all tappable)
+- [ ] **Achievement popup z-order**: AchievementToast appears above VictoryModal (not behind it)
+- [ ] **No regressions in non-target flows**: phase transition overlay, dread pulse overlay, screen shake, and victory glitch overlays are all still `pointerEvents="none"` and non-blocking
+```
+
+---
+
+### 6. Do / Don't
+
+| ✅ Do | ❌ Don't |
+|---|---|
+| Use native `<Modal>` for any interactive overlay shown while a ScrollView is active | Use `absoluteFill + zIndex` as the sole method to layer interactive UI above a ScrollView |
+| Add `onPressIn` logging before investigating callback wiring | Assume a missing `onPress` log means callback wiring is wrong |
+| Mount achievement/notification Modals **after** VictoryModal in the tree | Mount secondary Modals before the primary Modal and expect them to appear on top |
+| Use `pointerEvents="none"` on all purely decorative absolute overlays | Leave `pointerEvents` unset on non-interactive overlays (default is `"auto"`, which intercepts touches) |
+| Call `skipToEnd()` (with `cancelAnimation()`) before requiring immediate interactivity | Set `sharedValue.value = 1` and assume the native layer will apply the change before the next touch |
+| Use static style objects (not `useAnimatedStyle`) for onboarding/immediate-interaction paths | Animate `opacity` on a view that must be tappable immediately on mount |
+| Omit ScrollView for CTA-only modals with no scrollable content | Wrap every modal in ScrollView by default |
+| Document overlay ordering intent in inline code comments | Leave the "why" of Modal vs in-tree overlay as implicit knowledge |
+| Test on a physical Android device (Fabric behavior differs from iOS/simulator) | Validate touch behavior only on iOS simulator |

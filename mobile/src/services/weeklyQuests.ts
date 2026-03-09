@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 import { Difficulty } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 
@@ -217,26 +217,24 @@ function generateQuests(weekId: string, phase: number): Quest[] {
 /**
  * Load the current weekly quest state, generating new quests if the week has changed.
  */
-export async function loadWeeklyQuests(currentPhase: number = 0): Promise<WeeklyQuestState> {
+export function loadWeeklyQuests(currentPhase: number = 0): WeeklyQuestState {
   const currentWeek = getWeekId();
 
   if (questStateCache && questStateCache.weekId === currentWeek) {
     return questStateCache;
   }
 
-  try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed: WeeklyQuestState = JSON.parse(stored);
-      if (parsed.weekId === currentWeek) {
-        if (!parsed.animalsVisitedThisWeek) {
-          parsed.animalsVisitedThisWeek = [];
-        }
-        questStateCache = parsed;
-        return parsed;
+  const stored = storage.getString(STORAGE_KEY);
+  if (stored !== undefined) {
+    const parsed: WeeklyQuestState = JSON.parse(stored);
+    if (parsed.weekId === currentWeek) {
+      if (!parsed.animalsVisitedThisWeek) {
+        parsed.animalsVisitedThisWeek = [];
       }
+      questStateCache = parsed;
+      return parsed;
     }
-  } catch {}
+  }
 
   // New week — generate fresh quests
   const newState: WeeklyQuestState = {
@@ -247,7 +245,7 @@ export async function loadWeeklyQuests(currentPhase: number = 0): Promise<Weekly
   };
 
   questStateCache = newState;
-  await saveQuestState(newState);
+  saveQuestState(newState);
   return newState;
 }
 
@@ -255,7 +253,7 @@ export async function loadWeeklyQuests(currentPhase: number = 0): Promise<Weekly
  * Update quest progress based on a completed puzzle.
  * Returns newly completed quests (for toast notifications).
  */
-export async function updateQuestProgress(event: {
+export function updateQuestProgress(event: {
   difficulty: Difficulty;
   stars: number;
   hintsUsed: number;
@@ -270,8 +268,8 @@ export async function updateQuestProgress(event: {
   dailyStreak?: number;
   /** Amber sacrificed this session (for sacrifice_amber quests) */
   amberSacrificed?: number;
-}, currentPhase: number = 0): Promise<Quest[]> {
-  const state = await loadWeeklyQuests(currentPhase);
+}, currentPhase: number = 0): Quest[] {
+  const state = loadWeeklyQuests(currentPhase);
   if (!state.animalsVisitedThisWeek) {
     state.animalsVisitedThisWeek = [];
   }
@@ -345,7 +343,7 @@ export async function updateQuestProgress(event: {
   }
 
   if (newlyCompleted.length > 0 || state.quests.some(q => q.progress > 0)) {
-    await saveQuestState(state);
+    saveQuestState(state);
   }
 
   return newlyCompleted;
@@ -355,12 +353,12 @@ export async function updateQuestProgress(event: {
  * Record that the player visited/talked to an animal this week.
  * Updates visit_animals quests without incrementing puzzle-count quests.
  */
-export async function recordAnimalVisit(
+export function recordAnimalVisit(
   animalId: string,
   currentPhase: number = 0,
   currentStreak?: number
-): Promise<Quest[]> {
-  const state = await loadWeeklyQuests(currentPhase);
+): Quest[] {
+  const state = loadWeeklyQuests(currentPhase);
   if (!state.animalsVisitedThisWeek) {
     state.animalsVisitedThisWeek = [];
   }
@@ -391,7 +389,7 @@ export async function recordAnimalVisit(
   }
 
   if (visitedCount !== beforeCount || newlyCompleted.length > 0) {
-    await saveQuestState(state);
+    saveQuestState(state);
   }
 
   return newlyCompleted;
@@ -412,13 +410,13 @@ export function getPhaseRewardMultiplier(phase: number): number {
 /**
  * Claim a completed quest reward. Returns the phase-scaled amber amount awarded.
  */
-export async function claimQuestReward(questId: string, currentPhase: number = 0): Promise<{ amber: number } | null> {
-  const state = await loadWeeklyQuests();
+export function claimQuestReward(questId: string, currentPhase: number = 0): { amber: number } | null {
+  const state = loadWeeklyQuests();
   const quest = state.quests.find(q => q.id === questId);
   if (!quest || !quest.completed || quest.claimed) return null;
 
   quest.claimed = true;
-  await saveQuestState(state);
+  saveQuestState(state);
 
   const multiplier = getPhaseRewardMultiplier(currentPhase);
   return {
@@ -470,22 +468,18 @@ export function getTimeUntilReset(): { days: number; hours: number; minutes: num
 // Internal
 // ============================================================================
 
-async function saveQuestState(state: WeeklyQuestState): Promise<void> {
+function saveQuestState(state: WeeklyQuestState): void {
   if (!state.animalsVisitedThisWeek) {
     state.animalsVisitedThisWeek = [];
   }
   questStateCache = state;
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
+  storage.set(STORAGE_KEY, JSON.stringify(state));
 }
 
 /**
  * Clear all quest data (for Settings > Reset All).
  */
-export async function clearWeeklyQuests(): Promise<void> {
+export function clearWeeklyQuests(): void {
   questStateCache = null;
-  try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {}
+  storage.remove(STORAGE_KEY);
 }

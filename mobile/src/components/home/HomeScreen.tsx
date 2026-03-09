@@ -11,6 +11,15 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  cancelAnimation,
+  Easing as REasing,
+} from 'react-native-reanimated';
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
 // (inside HouseWorld's GestureHandlerRootView) correctly use RNGH's version.
@@ -34,10 +43,8 @@ import {
   getDailyChallengeIntroLines,
   getChallengeIntroLines,
   getHouseCompletionText,
-  getWordsOfferedText,
 } from '../../services/phaseNarrative';
 import {
-  ROOMS,
   ANIMALS,
   ANIMAL_EMOJIS,
   getRoomsWithStatus,
@@ -81,7 +88,117 @@ import { getPitHomeBadgeLabel, getHomeAmbientLine, getGoalSuggestion, GoalSugges
 import { getPurchasedUpgrades } from '../../services/roomUpgrades';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const AnimatedImage = Reanimated.createAnimatedComponent(Image);
+const PORTRAIT_SWAP_MS = 260;
+
+interface DialoguePortraitProps {
+  animalType: Animal['type'];
+  animalName: string;
+  phase: number;
+  active: boolean;
+}
+
+const DialoguePortrait: React.FC<DialoguePortraitProps> = React.memo(({
+  animalType,
+  animalName,
+  phase,
+  active,
+}) => {
+  const sprites = CHARACTER_SPRITES[animalType];
+  const talkBlend = useSharedValue(0);
+  const shouldUseRobed = phase >= 4 && !!sprites?.robed;
+  const hasTalkSprite = !!sprites?.talk && !shouldUseRobed;
+
+  useEffect(() => {
+    if (!hasTalkSprite) {
+      cancelAnimation(talkBlend);
+      talkBlend.value = 0;
+      return;
+    }
+
+    if (!active) {
+      cancelAnimation(talkBlend);
+      talkBlend.value = withTiming(0, { duration: 120, easing: REasing.out(REasing.cubic) });
+      return;
+    }
+
+    if (getSettingsSync().reducedMotion) {
+      cancelAnimation(talkBlend);
+      talkBlend.value = 1;
+      return;
+    }
+
+    talkBlend.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: PORTRAIT_SWAP_MS, easing: REasing.inOut(REasing.sin) }),
+        withTiming(0, { duration: PORTRAIT_SWAP_MS, easing: REasing.inOut(REasing.sin) }),
+      ),
+      -1,
+      false,
+    );
+
+    return () => {
+      cancelAnimation(talkBlend);
+    };
+  }, [active, hasTalkSprite, talkBlend]);
+
+  const idleStyle = useAnimatedStyle(() => ({
+    opacity: hasTalkSprite ? 1 - talkBlend.value : 1,
+  }));
+
+  const talkStyle = useAnimatedStyle(() => ({
+    opacity: talkBlend.value,
+  }));
+
+  if (!sprites) {
+    return (
+      <Text style={styles.dialogueSpriteEmoji}>
+        {ANIMAL_INFO[animalType]?.emoji || '🐾'}
+      </Text>
+    );
+  }
+
+  if (shouldUseRobed) {
+    return (
+      <Image
+        source={sprites.robed!}
+        style={styles.dialogueSpriteImage}
+        resizeMode="cover"
+        accessibilityLabel={`${animalName} portrait`}
+      />
+    );
+  }
+
+  if (!hasTalkSprite) {
+    return (
+      <Image
+        source={sprites.idle}
+        style={styles.dialogueSpriteImage}
+        resizeMode="cover"
+        accessibilityLabel={`${animalName} portrait`}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.dialoguePortraitStack}>
+      <AnimatedImage
+        source={sprites.idle}
+        style={[styles.dialogueSpriteImage, styles.dialoguePortraitLayer, idleStyle]}
+        resizeMode="cover"
+        accessibilityLabel={`${animalName} portrait`}
+      />
+      <AnimatedImage
+        source={sprites.talk!}
+        style={[styles.dialogueSpriteImage, styles.dialoguePortraitLayer, talkStyle]}
+        resizeMode="cover"
+        accessibilityLabel={`${animalName} talking portrait`}
+      />
+    </View>
+  );
+});
 
 interface HomeScreenProps {
   onPlayPuzzle: (difficulty?: Difficulty) => void;
@@ -114,9 +231,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onAdvanceOnboarding,
 }) => {
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
-  const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [animals, setAnimals] = useState<Animal[]>([]);
+  const [progress, setProgress] = useState<HomeWorldProgress>(() => getFullProgress());
+  const [rooms, setRooms] = useState<Room[]>(() => getRoomsWithStatus());
+  const [animals, setAnimals] = useState<Animal[]>(() => getAnimalsWithStatus());
 
   // Decoration shop state
 
@@ -131,7 +248,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const amberPulse = useRef(new Animated.Value(1)).current;
   const playPulse = useRef(new Animated.Value(0)).current;
   const pitPulseAnim = useRef(new Animated.Value(0)).current;
+  const pitPulseScale = useRef(pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] })).current;
+  const pitPulseOpacity = useRef(pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] })).current;
+  const pitPulseStyle = useRef({
+    transform: [{ scale: pitPulseScale }],
+    opacity: pitPulseOpacity,
+  }).current;
+  const playPulseScale = useRef(playPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] })).current;
+  const playPulseStyle = useRef({
+    transform: [{ scale: playPulseScale }],
+  }).current;
   const introDialogueSlide = useRef(new Animated.Value(0)).current;
+  const introDialogueTranslateY = useRef(introDialogueSlide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+  })).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
   // Celebration state
@@ -171,7 +302,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   });
 
   // loadAllData reference for unlock hook (defined below, stable via useCallback)
-  const loadAllDataRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const loadAllDataRef = useRef<() => void>(() => {});
 
   // Unlock flow hook
   const unlockFlow = useUnlockFlow({
@@ -185,13 +316,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setShowIntroDialogue,
   });
 
-  // Load all data from storage
-  const loadAllData = useCallback(async () => {
-    const [progressData, roomsData, animalsData] = await Promise.all([
-      getFullProgress(),
-      getRoomsWithStatus(),
-      getAnimalsWithStatus(),
-    ]);
+  // Load all data from storage (synchronous — MMKV reads are sync)
+  const loadAllData = useCallback(() => {
+    const progressData = getFullProgress();
+    const roomsData = getRoomsWithStatus();
+    const animalsData = getAnimalsWithStatus();
 
     // Update puzzle count for dialogue session system
     updatePuzzleCount(progressData.puzzlesSolved);
@@ -205,26 +334,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= 10;
       const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= 10;
       if (allRoomsUnlocked && allAnimalsUnlocked) {
-        await markHouseCompleted();
+        markHouseCompleted();
         setShowHouseCompletion(true);
         setHouseCompletionTextIndex(0);
       }
     }
 
     // Refresh unlock data with fresh arrays (avoids stale state)
-    await unlockFlow.refreshUnlockData(roomsData, animalsData);
+    unlockFlow.refreshUnlockData(roomsData, animalsData);
 
     // Load pending harvest for pit badge
-    const harvestSummary = await getPendingHarvestSummary();
+    const harvestSummary = getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
 
     // Load room upgrades
-    const upgrades = await getPurchasedUpgrades();
+    const upgrades = getPurchasedUpgrades();
     setPurchasedUpgrades(upgrades);
   }, [unlockFlow.refreshUnlockData]);
 
   // Keep the ref in sync
   loadAllDataRef.current = loadAllData;
+
+  // Stable callback refs for HouseWorld — prevents React.memo bypass
+  // when dialogueFlow/unlockFlow recreate their callbacks on state changes
+  const onAnimalPressRef = useRef(dialogueFlow.handleAnimalTap);
+  onAnimalPressRef.current = dialogueFlow.handleAnimalTap;
+  const stableOnAnimalPress = useCallback((animal: Animal) => onAnimalPressRef.current(animal), []);
+
+  const onRoomPressRef = useRef(unlockFlow.handleRoomPress);
+  onRoomPressRef.current = unlockFlow.handleRoomPress;
+  const stableOnRoomPress = useCallback((room: Room) => onRoomPressRef.current(room), []);
 
   // Load data on mount
   useEffect(() => {
@@ -404,7 +543,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       // Check daily availability
       const dailyUnlocked = isDailyChallengeUnlocked(puzzles, phase as number);
-      const dailyDone = dailyUnlocked ? await isDailyCompleted() : true;
+      const dailyDone = dailyUnlocked ? isDailyCompleted() : true;
       const dailyAvailable = dailyUnlocked && !dailyDone;
 
       // Check untried difficulties
@@ -421,11 +560,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         : null;
 
       // Check weekly quests
-      let hasActiveQuests = false;
-      try {
-        const questState = await loadWeeklyQuests(phase as number);
-        hasActiveQuests = questState.quests.some(q => !q.completed);
-      } catch { /* ignore */ }
+      const questState = loadWeeklyQuests(phase as number);
+      const hasActiveQuests = questState.quests.some(q => !q.completed);
 
       if (cancelled) return;
       const suggestion = getGoalSuggestion(phase, dailyAvailable, untried, newVariant, hasActiveQuests);
@@ -475,19 +611,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       if (goalTimerRef.current) { clearTimeout(goalTimerRef.current); goalTimerRef.current = null; }
     };
   }, [isOnboarding, progress?.currentPhase, progress?.puzzlesSolved, progress?.completedDifficulties]);
-
-  // Talking animation for intro dialogue
-  const [introIsTalking, setIntroIsTalking] = useState(false);
-  useEffect(() => {
-    if (showIntroDialogue) {
-      const interval = setInterval(() => {
-        setIntroIsTalking(prev => !prev);
-      }, 300);
-      return () => clearInterval(interval);
-    } else {
-      setIntroIsTalking(false);
-    }
-  }, [showIntroDialogue]);
 
   // Slide animation for intro dialogue (matches normal dialogue)
   useEffect(() => {
@@ -696,26 +819,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return diffDays >= 1;
   }, [progress?.currentStreak, progress?.lastPlayDate]);
 
-  if (!progress || rooms.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View style={styles.loadingCard}>
-          <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-            <Text style={styles.loadingEmoji}>🏡</Text>
-          </Animated.View>
-          <Text style={styles.loadingText}>Loading your home...</Text>
-          <Text style={styles.loadingSubtext}>Placing rooms and waking friends.</Text>
-        </View>
-      </View>
-    );
-  }
-
   const phaseBgColor = {
     0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',
   }[progress.currentPhase] || '#6fb7df';
 
-  // Phase-aware dialogue theme for all modals and dialogue boxes
-  const dt = getDialogueTheme(progress.currentPhase);
+  // Phase-aware dialogue theme for all modals and dialogue boxes (memoized to prevent style object churn)
+  const dt = useMemo(() => getDialogueTheme(progress.currentPhase), [progress.currentPhase]);
+
+  // Stable interpolation for dialogue modal slide — prevents creating a new Animated node every render
+  const dialogueTranslateY = useRef(
+    dialogueFlow.dialogueSlide.interpolate({
+      inputRange: [0, 1],
+      outputRange: [300, 0],
+    })
+  ).current;
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
@@ -779,14 +896,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
           {!isOnboarding && (
           <Animated.View
-            style={highlightPlayButton ? {
-              transform: [{
-                scale: playPulse.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.06],
-                }),
-              }],
-            } : undefined}
+            style={highlightPlayButton ? playPulseStyle : undefined}
           >
             <JuicyButton
               style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
@@ -862,10 +972,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
           {onOpenPit && (
-            <Animated.View style={pitPhaseReady ? {
-              transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
-              opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
-            } : undefined}>
+            <Animated.View style={pitPhaseReady ? pitPulseStyle : undefined}>
               <TouchableOpacity
                 style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
                 onPress={() => {
@@ -902,45 +1009,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       )}
 
-      {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
-      {ambientLine && !isOnboarding && (
-        <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
-          <Text
-            style={[
-              styles.ambientLineText,
-              { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
-            ]}
-          >
-            {ambientLine}
-          </Text>
-        </Animated.View>
-      )}
-
-      {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
-      {goalSuggestion && !isOnboarding && (
-        <Animated.View style={{ opacity: goalOpacity }}>
-          <TouchableOpacity
-            style={styles.goalSuggestionContainer}
-            onPress={() => {
-              if (goalSuggestion.action === 'daily' && onStartDaily) {
-                onStartDaily('HARD' as Difficulty);
-              } else if (goalSuggestion.action === 'play') {
-                onPlayPuzzle();
-              }
-            }}
-            activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
+      {/* Ambient line + Goal suggestion — zero-height wrapper prevents layout shifts */}
+      <View style={styles.floatingTextWrapper} pointerEvents="box-none">
+        {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
+        {ambientLine && !isOnboarding && (
+          <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}
+            pointerEvents="none"
           >
             <Text
               style={[
-                styles.goalSuggestionText,
-                { color: getPhaseTheme(progress.currentPhase).modalTextColor },
+                styles.ambientLineText,
+                { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
               ]}
             >
-              {goalSuggestion.text}
+              {ambientLine}
             </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+          </Animated.View>
+        )}
+
+        {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
+        {goalSuggestion && !isOnboarding && (
+          <Animated.View style={{ opacity: goalOpacity }}>
+            <TouchableOpacity
+              style={styles.goalSuggestionContainer}
+              onPress={() => {
+                if (goalSuggestion.action === 'daily' && onStartDaily) {
+                  onStartDaily('HARD' as Difficulty);
+                } else if (goalSuggestion.action === 'play') {
+                  onPlayPuzzle();
+                }
+              }}
+              activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
+            >
+              <Text
+                style={[
+                  styles.goalSuggestionText,
+                  { color: getPhaseTheme(progress.currentPhase).modalTextColor },
+                ]}
+              >
+                {goalSuggestion.text}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </View>
 
       {/* Celebration Confetti */}
       {showCelebration && (
@@ -952,33 +1064,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         rooms={rooms}
         animals={animals}
         currentPhase={progress.currentPhase}
-        onAnimalPress={dialogueFlow.handleAnimalTap}
-        onRoomPress={unlockFlow.handleRoomPress}
+        onAnimalPress={stableOnAnimalPress}
+        onRoomPress={stableOnRoomPress}
         ritualWords={progress.ritualWords}
         nextUnlock={unlockFlow.nextUnlock}
         amberBalance={progress.amber}
         purchasedUpgrades={purchasedUpgrades}
       />
 
-      {/* Cooldown Message Toast */}
-      {Boolean(dialogueFlow.cooldownMessage) && (
-        <Animated.View
-          style={[
-            styles.cooldownToast,
-            {
-              backgroundColor: dt.cooldownBg,
-              borderColor: dt.cooldownBorder,
-              opacity: dialogueFlow.cooldownOpacity,
-              transform: [{ translateY: dialogueFlow.cooldownSlide }],
-            },
-          ]}
-          pointerEvents="none"
-          accessibilityLiveRegion="polite"
-          accessibilityLabel={dialogueFlow.cooldownMessage}
-        >
-          <Text style={styles.cooldownToastText}>{dialogueFlow.cooldownMessage}</Text>
-        </Animated.View>
-      )}
+      {/* Cooldown Message Toast — always mounted, animated in/out via opacity + translateY */}
+      <Animated.View
+        style={[
+          styles.cooldownToast,
+          {
+            backgroundColor: dt.cooldownBg,
+            borderColor: dt.cooldownBorder,
+            opacity: dialogueFlow.cooldownOpacity,
+            transform: [{ translateY: dialogueFlow.cooldownSlide }],
+          },
+        ]}
+        pointerEvents="none"
+        accessibilityLiveRegion="polite"
+        accessibilityLabel={dialogueFlow.cooldownMessage || undefined}
+      >
+        <Text style={styles.cooldownToastText}>{dialogueFlow.cooldownMessage || ''}</Text>
+      </Animated.View>
 
       {/* Dialogue Modal */}
       <Modal
@@ -1003,12 +1113,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 borderColor: dt.modalBorder,
                 shadowColor: dt.modalShadowColor,
                 transform: [
-                  {
-                    translateY: dialogueFlow.dialogueSlide.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [300, 0],
-                    }),
-                  },
+                  { translateY: dialogueTranslateY },
                 ],
                 opacity: dialogueFlow.dialogueSlide,
               },
@@ -1022,24 +1127,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.dialogueRow}>
                 {/* Sprite column - 30% width, zoomed in to fill */}
                 <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
-                  {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
-                    <Image
-                      source={
-                        progress.currentPhase >= 4 && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!
-                          : dialogueFlow.isTalking && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.idle
-                      }
-                      style={styles.dialogueSpriteImage}
-                      resizeMode="cover"
-                      accessibilityLabel={`${dialogueFlow.selectedAnimal.name} portrait`}
-                    />
-                  ) : (
-                    <Text style={styles.dialogueSpriteEmoji}>
-                      {ANIMAL_INFO[dialogueFlow.selectedAnimal.type]?.emoji || '🐾'}
-                    </Text>
-                  )}
+                  <DialoguePortrait
+                    animalType={dialogueFlow.selectedAnimal.type}
+                    animalName={dialogueFlow.selectedAnimal.name}
+                    phase={progress.currentPhase}
+                    active={dialogueFlow.showDialogue}
+                  />
                 </View>
 
                 {/* Text column - 70% width */}
@@ -1400,12 +1493,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 borderColor: dt.modalBorder,
                 shadowColor: dt.modalShadowColor,
                 transform: [
-                  {
-                    translateY: introDialogueSlide.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [300, 0],
-                    }),
-                  },
+                  { translateY: introDialogueTranslateY },
                 ],
                 opacity: introDialogueSlide,
               },
@@ -1419,24 +1507,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.dialogueRow}>
                 {/* Sprite column - 30% width, zoomed in to fill */}
                 <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
-                  {CHARACTER_SPRITES[introAnimal.type] ? (
-                    <Image
-                      source={
-                        progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[introAnimal.type]!.robed!
-                          : introIsTalking && CHARACTER_SPRITES[introAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[introAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[introAnimal.type]!.idle
-                      }
-                      style={styles.dialogueSpriteImage}
-                      resizeMode="cover"
-                      accessibilityLabel={`${introAnimal.name} portrait`}
-                    />
-                  ) : (
-                    <Text style={styles.dialogueSpriteEmoji}>
-                      {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
-                    </Text>
-                  )}
+                  <DialoguePortrait
+                    animalType={introAnimal.type}
+                    animalName={introAnimal.name}
+                    phase={progress?.currentPhase ?? 0}
+                    active={showIntroDialogue}
+                  />
                 </View>
 
                 {/* Text column - 70% width */}
@@ -1534,7 +1610,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       onAmberChange?.(spendResult.newBalance);
                       setSacrificeMessage(result.message);
                       // Track sacrifice for weekly quest progress
-                      updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase).catch(() => {});
+                      updateQuestProgress({ amberSacrificed: amount }, progress.currentPhase);
                     }}
                     accessibilityLabel={`Offer ${amount} amber`}
                     accessibilityRole="button"
@@ -1887,6 +1963,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
+  dialoguePortraitStack: {
+    width: SCREEN_WIDTH * 0.36,
+    height: SCREEN_WIDTH * 0.48,
+  },
+  dialoguePortraitLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
   dialogueSpriteImage: {
     width: SCREEN_WIDTH * 0.36,
     height: SCREEN_WIDTH * 0.48,
@@ -2182,6 +2267,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginRight: 12,
   },
+  introDialogueFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  introDialogueProgress: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  introContinueButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  introContinueButtonText: {
+    color: CandyColors.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
 
   // Dialogue choice buttons (Phase 3)
   dialogueChoiceRow: {
@@ -2236,12 +2345,17 @@ const styles = StyleSheet.create({
   },
 
   // Ambient home line
+  floatingTextWrapper: {
+    height: 0,
+    overflow: 'visible',
+    zIndex: 10,
+    alignItems: 'center',
+  },
   ambientLineContainer: {
     alignSelf: 'center',
     paddingHorizontal: 16,
     paddingVertical: 6,
     marginBottom: 2,
-    zIndex: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.20)',
     borderRadius: 10,
   },
@@ -2258,7 +2372,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
     borderRadius: 10,
-    zIndex: 10,
   },
   goalSuggestionText: {
     fontSize: 11,

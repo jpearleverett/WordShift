@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   checkAchievements,
   Achievement,
@@ -36,7 +36,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
     try {
       const progress = await getFullProgress();
       const shareCount = await getShareCount();
-      const dailyStatus = await getDailyStatus();
+      const dailyStatus = getDailyStatus();
       const state: AchievementCheckState = {
         stats: victory.cumulativeStats || {
           totalPuzzlesCompleted: 0,
@@ -85,8 +85,10 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
     setCurrentAchievement(null);
   }, []);
 
+  const actions = useMemo(() => ({ checkForAchievements, dismissAchievement }), [checkForAchievements, dismissAchievement]);
+
   return [
     { currentAchievement },
-    { checkForAchievements, dismissAchievement },
+    actions,
   ];
 }

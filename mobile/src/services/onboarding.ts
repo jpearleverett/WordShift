@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './storage';
 
 const ONBOARDING_KEY = 'wordshift_onboarding_step';
 
@@ -6,17 +6,17 @@ const ONBOARDING_KEY = 'wordshift_onboarding_step';
  * Onboarding steps for the redesigned intro flow.
  *
  * Flow:
- * 1. home_empty      → Player sees empty home, guided to invite Fox
- * 2. fox_invited     → Fox intro dialogue plays on home screen
- * 3. going_to_puzzle → Fox says "follow me!" — transitioning to puzzle
- * 4. puzzle_tutorial → Guided easy puzzle with Fox tips
- * 5. puzzle_complete → Victory shown, Fox congratulates
- * 6. going_to_pit    → Fox introduces word harvesting concept
- * 7. pit_intro       → Fox explains the Offering Pit on the pit screen
- * 8. pit_offering    → Auto-offer words, Fox reacts to amber earned
- * 9. returning_home  → Transitioning back to home screen
- * 10. unlock_explained → Fox explains amber & unlock system
- * 11. complete        → Player is free
+ * 1. home_empty      -> Player sees empty home, guided to invite Fox
+ * 2. fox_invited     -> Fox intro dialogue plays on home screen
+ * 3. going_to_puzzle -> Fox says "follow me!" — transitioning to puzzle
+ * 4. puzzle_tutorial -> Guided easy puzzle with Fox tips
+ * 5. puzzle_complete -> Victory shown, Fox congratulates
+ * 6. going_to_pit    -> Fox introduces word harvesting concept
+ * 7. pit_intro       -> Fox explains the Offering Pit on the pit screen
+ * 8. pit_offering    -> Auto-offer words, Fox reacts to amber earned
+ * 9. returning_home  -> Transitioning back to home screen
+ * 10. unlock_explained -> Fox explains amber & unlock system
+ * 11. complete        -> Player is free
  */
 export type OnboardingStep =
   | 'not_started'
@@ -32,8 +32,6 @@ export type OnboardingStep =
   | 'unlock_explained'
   | 'complete';
 
-let cachedStep: OnboardingStep | null = null;
-
 const VALID_STEPS: Set<string> = new Set([
   'not_started', 'home_empty', 'fox_invited', 'going_to_puzzle',
   'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',
@@ -41,48 +39,36 @@ const VALID_STEPS: Set<string> = new Set([
 ]);
 
 /**
- * Get the current onboarding step from storage.
+ * Get the current onboarding step from MMKV.
  */
-export async function getOnboardingStep(): Promise<OnboardingStep> {
-  if (cachedStep !== null) return cachedStep;
-  try {
-    const val = await AsyncStorage.getItem(ONBOARDING_KEY);
-    const step: OnboardingStep = (val && VALID_STEPS.has(val))
-      ? (val as OnboardingStep)
-      : 'not_started';
-    cachedStep = step;
-    return step;
-  } catch {
-    return 'not_started';
+export function getOnboardingStep(): OnboardingStep {
+  const val = storage.getString(ONBOARDING_KEY);
+  if (val !== undefined && VALID_STEPS.has(val)) {
+    return val as OnboardingStep;
   }
+  return 'not_started';
 }
 
 /**
  * Advance to the next onboarding step and persist it.
  */
-export async function setOnboardingStep(step: OnboardingStep): Promise<void> {
-  cachedStep = step;
-  try {
-    await AsyncStorage.setItem(ONBOARDING_KEY, step);
-  } catch {}
+export function setOnboardingStep(step: OnboardingStep): void {
+  storage.set(ONBOARDING_KEY, step);
 }
 
 /**
  * Check if onboarding is complete (or was previously completed).
  */
-export async function isOnboardingComplete(): Promise<boolean> {
-  const step = await getOnboardingStep();
+export function isOnboardingComplete(): boolean {
+  const step = getOnboardingStep();
   return step === 'complete';
 }
 
 /**
  * Reset onboarding state (for testing/dev).
  */
-export async function resetOnboarding(): Promise<void> {
-  cachedStep = null;
-  try {
-    await AsyncStorage.removeItem(ONBOARDING_KEY);
-  } catch {}
+export function resetOnboarding(): void {
+  storage.remove(ONBOARDING_KEY);
 }
 
 /**
@@ -133,7 +119,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   pit_intro: [
     "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
     "This is where your words end up after a puzzle.\nThey wait here until you offer them.",
-    "When you offer them, they turn into amber 💎 — that's what builds the house.",
+    "When you offer them, they turn into amber \u{1F48E} — that's what builds the house.",
     "Let's try it. Tap the floating words to offer them to the house.",
   ],
 
@@ -144,7 +130,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
 
   // Step 8: Back on home screen — explain unlocks and keep playing
   unlock_explained: [
-    "Now you know the cycle.\nSolve puzzles, offer words, earn amber 💎",
+    "Now you know the cycle.\nSolve puzzles, offer words, earn amber \u{1F48E}",
     "Amber builds rooms, and rooms let us invite more friends in.",
     "Keep playing and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],

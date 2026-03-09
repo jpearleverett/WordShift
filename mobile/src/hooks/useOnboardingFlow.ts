@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   OnboardingStep,
   getOnboardingStep,
@@ -124,36 +124,32 @@ export function useOnboardingFlow(
   // Initialization — read persisted step on mount
   // ------------------------------------------------------------------
   useEffect(() => {
-    (async () => {
-      const tutorialDone = await hasTutorialCompleted();
-      const step = await getOnboardingStep();
-      if (!mountedRef.current) return;
+    const tutorialDone = hasTutorialCompleted();
+    const step = getOnboardingStep();
 
-      if (tutorialDone && step === 'not_started') {
-        // Existing player who completed old tutorial — skip onboarding
-        await setOnboardingStep('complete');
-        if (!mountedRef.current) return;
-        setOnboardingStepState('complete');
-      } else if (step === 'not_started') {
-        // Fresh install — start onboarding
-        await setOnboardingStep('home_empty');
-        if (!mountedRef.current) return;
-        setOnboardingStepState('home_empty');
-        setOnboardingLineIndex(0);
-      } else {
-        // Resume from where they left off
-        setOnboardingStepState(step);
-        setOnboardingLineIndex(0);
-      }
-      setOnboardingReady(true);
-    })();
+    if (tutorialDone && step === 'not_started') {
+      // Existing player who completed old tutorial — skip onboarding
+      setOnboardingStep('complete');
+      setOnboardingStepState('complete');
+    } else if (step === 'not_started') {
+      // Fresh install — start onboarding
+      setOnboardingStep('home_empty');
+      setOnboardingStepState('home_empty');
+      setOnboardingLineIndex(0);
+    } else {
+      // Resume from where they left off
+      setOnboardingStepState(step);
+      setOnboardingLineIndex(0);
+    }
+    setOnboardingReady(true);
   }, []);
 
   // ------------------------------------------------------------------
   // advanceOnboarding — move to an explicit step
   // ------------------------------------------------------------------
-  const advanceOnboarding = useCallback(async (step: OnboardingStep) => {
-    await setOnboardingStep(step);
+  const advanceOnboarding = useCallback((step: OnboardingStep) => {
+    console.log('[OnboardingFlow] advanceOnboarding →', step, { ts: Date.now() });
+    setOnboardingStep(step);
     setOnboardingStepState(step);
     setOnboardingLineIndex(0);
   }, []);
@@ -161,11 +157,11 @@ export function useOnboardingFlow(
   // ------------------------------------------------------------------
   // navigateToPuzzleTutorial — shared helper for fox_invited → puzzle
   // ------------------------------------------------------------------
-  const navigateToPuzzleTutorial = useCallback(async () => {
-    await advanceOnboarding('going_to_puzzle');
-    addTimeout(async () => {
+  const navigateToPuzzleTutorial = useCallback(() => {
+    advanceOnboarding('going_to_puzzle');
+    addTimeout(() => {
       if (!mountedRef.current) return;
-      await advanceOnboarding('puzzle_tutorial');
+      advanceOnboarding('puzzle_tutorial');
       if (!mountedRef.current) return;
       callbacks.refreshStats();
       clearRitualEchoWords();
@@ -179,7 +175,7 @@ export function useOnboardingFlow(
   // ------------------------------------------------------------------
   // handleOnboardingContinue — main FoxGuide "Next" handler
   // ------------------------------------------------------------------
-  const handleOnboardingContinue = useCallback(async () => {
+  const handleOnboardingContinue = useCallback(() => {
     switch (onboardingStep) {
       case 'home_empty':
         // Handled by HomeScreen — tapping the den triggers fox_invited
@@ -190,7 +186,7 @@ export function useOnboardingFlow(
         if (onboardingLineIndex < lines.length - 1) {
           setOnboardingLineIndex(prev => prev + 1);
         } else {
-          await navigateToPuzzleTutorial();
+          navigateToPuzzleTutorial();
         }
         break;
       }
@@ -209,15 +205,15 @@ export function useOnboardingFlow(
           setOnboardingLineIndex(prev => prev + 1);
         } else {
           // Navigate to pit for harvest introduction
-          await advanceOnboarding('going_to_pit');
+          advanceOnboarding('going_to_pit');
           hapticLight();
           callbacks.setShowConfetti(false);
           callbacks.resetVictory();
           clearRitualEchoWords();
           setPitOfferDone(false);
-          addTimeout(async () => {
+          addTimeout(() => {
             if (!mountedRef.current) return;
-            await advanceOnboarding('pit_intro');
+            advanceOnboarding('pit_intro');
             if (!mountedRef.current) return;
             callbacks.transitionTo('pit', () => {
               callbacks.setGameState('IDLE');
@@ -232,7 +228,7 @@ export function useOnboardingFlow(
         if (onboardingLineIndex < pitLines.length - 1) {
           setOnboardingLineIndex(prev => prev + 1);
         } else {
-          await advanceOnboarding('pit_offering');
+          advanceOnboarding('pit_offering');
         }
         break;
       }
@@ -242,10 +238,10 @@ export function useOnboardingFlow(
         if (onboardingLineIndex < offerLines.length - 1) {
           setOnboardingLineIndex(prev => prev + 1);
         } else {
-          await advanceOnboarding('returning_home');
+          advanceOnboarding('returning_home');
           hapticLight();
-          callbacks.transitionTo('home', async () => {
-            await advanceOnboarding('unlock_explained');
+          callbacks.transitionTo('home', () => {
+            advanceOnboarding('unlock_explained');
           });
         }
         break;
@@ -256,9 +252,9 @@ export function useOnboardingFlow(
         if (onboardingLineIndex < lines.length - 1) {
           setOnboardingLineIndex(prev => prev + 1);
         } else {
-          await markTutorialCompleted();
-          await markTutorialSeedsPlanted().catch(() => {});
-          await advanceOnboarding('complete');
+          markTutorialCompleted();
+          markTutorialSeedsPlanted();
+          advanceOnboarding('complete');
         }
         break;
       }
@@ -279,15 +275,15 @@ export function useOnboardingFlow(
   // ------------------------------------------------------------------
   // handleSkipOnboarding
   // ------------------------------------------------------------------
-  const handleSkipOnboarding = useCallback(async () => {
+  const handleSkipOnboarding = useCallback(() => {
     if (onboardingStep === 'fox_invited' || onboardingStep === 'home_empty') {
       // Skip dialogue but continue to tutorial puzzle
-      await navigateToPuzzleTutorial();
+      navigateToPuzzleTutorial();
     } else {
       // During/after puzzle: complete onboarding entirely
-      await markTutorialCompleted();
-      await markTutorialSeedsPlanted().catch(() => {});
-      await advanceOnboarding('complete');
+      markTutorialCompleted();
+      markTutorialSeedsPlanted();
+      advanceOnboarding('complete');
     }
   }, [onboardingStep, advanceOnboarding, navigateToPuzzleTutorial]);
 
@@ -353,7 +349,7 @@ export function useOnboardingFlow(
     isOnboarding,
   };
 
-  const actions: OnboardingFlowActions = {
+  const actions: OnboardingFlowActions = useMemo(() => ({
     handleOnboardingContinue,
     handleSkipOnboarding,
     handlePitOnboardingOfferComplete,
@@ -361,7 +357,15 @@ export function useOnboardingFlow(
     getOnboardingFoxText,
     getOnboardingButtonText,
     clearRitualEchoWords,
-  };
+  }), [
+    handleOnboardingContinue,
+    handleSkipOnboarding,
+    handlePitOnboardingOfferComplete,
+    advanceOnboarding,
+    getOnboardingFoxText,
+    getOnboardingButtonText,
+    clearRitualEchoWords,
+  ]);
 
   return [state, actions];
 }

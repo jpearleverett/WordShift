@@ -40,7 +40,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<GameSettings | null>(null);
 
   useEffect(() => {
-    getSettings().then(setSettings);
+    setSettings(getSettings());
   }, []);
 
   const handleToggle = async (key: keyof GameSettings, value: boolean) => {

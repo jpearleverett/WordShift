@@ -1,9 +1,20 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
+import React, { useEffect, memo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useDerivedValue,
+  withSpring,
+  withTiming,
+  withRepeat,
+  withSequence,
+  cancelAnimation,
+  Easing,
+} from 'react-native-reanimated';
 import { Letter } from '../types';
-import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
+import { getTileColor, CandyColors } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
-import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { TileGlowCanvas } from './TileGlowCanvas';
 
 interface LetterTileProps {
   letter: Letter;
@@ -17,6 +28,28 @@ interface LetterTileProps {
   isResonant?: boolean;
   /** Tutorial guidance highlight for the recommended tile */
   isGuided?: boolean;
+  /** Whether this tile is on the currently active (source) row — gates decorative animation loops */
+  isActiveRow?: boolean;
+}
+
+export function shouldRenderTileGlow(isSelected: boolean, isResonant: boolean): boolean {
+  return isSelected;
+}
+
+function areLetterTilePropsEqual(prev: LetterTileProps, next: LetterTileProps): boolean {
+  return (
+    prev.letter.id === next.letter.id &&
+    prev.letter.char === next.letter.char &&
+    prev.letter.isLocked === next.letter.isLocked &&
+    prev.isSelected === next.isSelected &&
+    prev.isInteractable === next.isInteractable &&
+    prev.highlight === next.highlight &&
+    prev.phase === next.phase &&
+    prev.compact === next.compact &&
+    prev.isResonant === next.isResonant &&
+    prev.isGuided === next.isGuided &&
+    prev.isActiveRow === next.isActiveRow
+  );
 }
 
 // Compact tile dimensions for 6+ letter words
@@ -26,7 +59,31 @@ const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
 const COMPACT_FONT = 21;
 
-export const LetterTile: React.FC<LetterTileProps> = ({
+// Phase-aware animation parameters for selected tiles
+function getSelectedSpringParams(phase: number) {
+  if (phase >= 4) return { damping: 9, stiffness: 100 };
+  if (phase >= 3) return { damping: 7, stiffness: 140 };
+  if (phase >= 2) return { damping: 6, stiffness: 180 };
+  return { damping: 4, stiffness: 220 };
+}
+
+function getBounceHeight(phase: number) {
+  if (phase >= 4) return -1.5;
+  if (phase >= 3) return -2;
+  if (phase >= 2) return -2.5;
+  return -3;
+}
+
+function getResonanceOverlay(phase: number): { color: string; opacity: number } | null {
+  if (phase >= 5) return { color: '#7B6B8A', opacity: 0.08 };
+  if (phase >= 4) return { color: '#8B0000', opacity: 0.12 };
+  if (phase >= 3) return { color: '#4A2080', opacity: 0.10 };
+  if (phase >= 2) return { color: '#6B5B95', opacity: 0.07 };
+  if (phase >= 1) return { color: '#DAA520', opacity: 0.05 };
+  return null;
+}
+
+export const LetterTile: React.FC<LetterTileProps> = memo(({
   letter,
   onPress,
   isSelected,
@@ -36,614 +93,168 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   compact = false,
   isResonant = false,
   isGuided = false,
+  isActiveRow = false,
 }) => {
   const settings = getSettingsSync();
+  const reducedMotion = settings.reducedMotion;
 
-  // Animation values
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const shineAnim = useRef(new Animated.Value(0)).current;
-  const wobbleAnim = useRef(new Animated.Value(0)).current;
-  const trailGlowAnim = useRef(new Animated.Value(0)).current;
-  const resonanceAnim = useRef(new Animated.Value(0)).current;
-  const guidePulseAnim = useRef(new Animated.Value(0)).current;
-
-  // Loop refs for proper cleanup (prevents memory leaks)
-  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const shineLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const wobbleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const trailGlowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const resonanceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const guideLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const trailParticleAnims = useRef(
-    Array.from({ length: 4 }, () => ({
-      opacity: new Animated.Value(0),
-      scale: new Animated.Value(0.5),
-      translateY: new Animated.Value(0),
-    }))
-  ).current;
-  const trailParticleLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-
-  // Phase-aware animation parameters for selected tiles
-  const getSelectedSpringParams = () => {
-    if (phase >= 4) return { friction: 9, tension: 80 };
-    if (phase >= 3) return { friction: 7, tension: 100 };
-    if (phase >= 2) return { friction: 5, tension: 150 };
-    return { friction: 3, tension: 200 };
-  };
-
-  const getWobbleDurations = () => {
-    if (phase >= 4) return { quarter: 400, half: 800 };
-    if (phase >= 3) return { quarter: 300, half: 600 };
-    if (phase >= 2) return { quarter: 200, half: 400 };
-    return { quarter: 150, half: 300 };
-  };
-
-  const getBounceHeight = () => {
-    if (phase >= 4) return -1.5;
-    if (phase >= 3) return -2;
-    if (phase >= 2) return -3;
-    return -4;
-  };
+  // === REANIMATED SHARED VALUES ===
+  const scaleAnim = useSharedValue(1);
+  const bounceAnim = useSharedValue(0);
+  const guidePulseAnim = useSharedValue(0);
 
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
 
-  // Idle animation for interactable tiles
+  // === SELECTED ANIMATION — one-shot pop/lift only, no continuous loops ===
   useEffect(() => {
-    if (settings.reducedMotion) return;
-    if (isInteractable && !isSelected) {
-      // Subtle pulse glow
-      const glowLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1200,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1200,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-        ])
-      );
-      glowLoopRef.current = glowLoop;
-      glowLoop.start();
-
-      // Shine sweep animation
-      const shineLoop = Animated.loop(
-        Animated.sequence([
-          Animated.delay(2000),
-          Animated.timing(shineAnim, {
-            toValue: 1,
-            duration: 600,
-            easing: Easing.inOut(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(shineAnim, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      shineLoopRef.current = shineLoop;
-      shineLoop.start();
-    } else {
-      glowAnim.setValue(0);
-      shineAnim.setValue(0);
-    }
-
-    return () => {
-      if (glowLoopRef.current) {
-        glowLoopRef.current.stop();
-        glowLoopRef.current = null;
-      }
-      if (shineLoopRef.current) {
-        shineLoopRef.current.stop();
-        shineLoopRef.current = null;
-      }
-      glowAnim.stopAnimation();
-      shineAnim.stopAnimation();
-    };
-  }, [isInteractable, isSelected, settings.reducedMotion]);
-
-  // Selected bounce animation (phase-aware: bouncy at Phase 0, heavy/ritualistic at Phase 4)
-  useEffect(() => {
-    const currentSettings = getSettingsSync();
-    if (currentSettings.reducedMotion) {
-      scaleAnim.setValue(isSelected ? 1.08 : 1);
-      bounceAnim.setValue(0);
-      wobbleAnim.setValue(0);
-      trailGlowAnim.setValue(0);
+    if (reducedMotion) {
+      scaleAnim.value = isSelected ? 1.08 : 1;
+      bounceAnim.value = isSelected ? getBounceHeight(phase) : 0;
       return;
     }
     if (isSelected) {
-      const springParams = getSelectedSpringParams();
-      const wobbleDurations = getWobbleDurations();
-      const bounceHeight = getBounceHeight();
+      const spring = getSelectedSpringParams(phase);
+      const bounceH = getBounceHeight(phase);
 
-      // Initial pop - phase-aware spring (bouncy Phase 0 → heavy Phase 4)
-      Animated.sequence([
-        Animated.spring(scaleAnim, {
-          toValue: 1.15,
-          friction: springParams.friction,
-          tension: springParams.tension,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1.08,
-          friction: springParams.friction + 1,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Continuous wobble - phase-aware speed (quick Phase 0 → very slow Phase 4)
-      const wobbleLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(wobbleAnim, {
-            toValue: 1,
-            duration: wobbleDurations.quarter,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(wobbleAnim, {
-            toValue: -1,
-            duration: wobbleDurations.half,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(wobbleAnim, {
-            toValue: 0,
-            duration: wobbleDurations.quarter,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
+      scaleAnim.value = withSequence(
+        withSpring(1.15, { damping: spring.damping, stiffness: spring.stiffness }),
+        withSpring(1.08, { damping: spring.damping + 2, stiffness: spring.stiffness }),
       );
-      wobbleLoopRef.current = wobbleLoop;
-      wobbleLoop.start();
-
-      // Floating bounce - phase-aware height (light Phase 0 → weighed down Phase 4)
-      const bounceLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(bounceAnim, {
-            toValue: bounceHeight,
-            duration: 400,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(bounceAnim, {
-            toValue: 0,
-            duration: 400,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      bounceLoopRef.current = bounceLoop;
-      bounceLoop.start();
-
-      // Trail glow effect at Phase 3+ (energy mark pulsing shadow)
-      if (phase >= 3) {
-        const trailGlowLoop = Animated.loop(
-          Animated.sequence([
-            Animated.timing(trailGlowAnim, {
-              toValue: 1,
-              duration: phase >= 4 ? 800 : 600,
-              easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false, // shadowRadius cannot use native driver
-            }),
-            Animated.timing(trailGlowAnim, {
-              toValue: 0,
-              duration: phase >= 4 ? 800 : 600,
-              easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
-            }),
-          ])
-        );
-        trailGlowLoopRef.current = trailGlowLoop;
-        trailGlowLoop.start();
-      }
+      bounceAnim.value = withSpring(bounceH, { damping: 14, stiffness: 180 });
     } else {
-      scaleAnim.setValue(1);
-      bounceAnim.setValue(0);
-      wobbleAnim.setValue(0);
-      trailGlowAnim.setValue(0);
+      scaleAnim.value = withTiming(1, { duration: 150 });
+      bounceAnim.value = withTiming(0, { duration: 150 });
     }
 
     return () => {
-      if (wobbleLoopRef.current) {
-        wobbleLoopRef.current.stop();
-        wobbleLoopRef.current = null;
-      }
-      if (bounceLoopRef.current) {
-        bounceLoopRef.current.stop();
-        bounceLoopRef.current = null;
-      }
-      if (trailGlowLoopRef.current) {
-        trailGlowLoopRef.current.stop();
-        trailGlowLoopRef.current = null;
-      }
-      scaleAnim.stopAnimation();
-      bounceAnim.stopAnimation();
-      wobbleAnim.stopAnimation();
-      trailGlowAnim.stopAnimation();
+      cancelAnimation(scaleAnim);
+      cancelAnimation(bounceAnim);
     };
   }, [isSelected, phase]);
 
-  // Resonance glow — phase-aware inner light for dread/ritual words.
-  // Phase 1: subliminal shimmer. Phase 2: faint pulse. Phase 3: visible aura.
-  // Phase 4: crimson breathing. Phase 5: ghostly settled glow.
-  useEffect(() => {
-    if (!isResonant || phase < 1) {
-      resonanceAnim.setValue(0);
-      return;
-    }
-
-    if (settings.reducedMotion || shouldSimplifyAnimations()) {
-      // Static resonance glow (no animation)
-      resonanceAnim.setValue(0.5);
-      return () => { resonanceAnim.setValue(0); };
-    }
-
-    // Phase 1: very slow, barely perceptible shimmer
-    // Phase 2-3: moderate pulse
-    // Phase 4: faster breathing
-    const cycleDuration = phase >= 4 ? 2000 : phase >= 3 ? 2500 : phase >= 2 ? 3000 : 4000;
-
-    const resonanceLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(resonanceAnim, {
-          toValue: 1,
-          duration: cycleDuration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(resonanceAnim, {
-          toValue: 0,
-          duration: cycleDuration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    resonanceLoopRef.current = resonanceLoop;
-    resonanceLoop.start();
-
-    return () => {
-      if (resonanceLoopRef.current) {
-        resonanceLoopRef.current.stop();
-        resonanceLoopRef.current = null;
-      }
-      resonanceAnim.stopAnimation();
-    };
-  }, [isResonant, phase, settings.reducedMotion]);
-
-  // Tutorial guidance pulse for the exact recommended tile.
+  // === TUTORIAL GUIDANCE PULSE ===
   useEffect(() => {
     if (!isGuided) {
-      guidePulseAnim.setValue(0);
+      guidePulseAnim.value = 0;
       return;
     }
-
-    if (settings.reducedMotion) {
-      guidePulseAnim.setValue(1);
+    if (reducedMotion) {
+      guidePulseAnim.value = 1;
       return;
     }
-
-    const guideLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(guidePulseAnim, {
-          toValue: 1,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(guidePulseAnim, {
-          toValue: 0,
-          duration: 700,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    guideLoopRef.current = guideLoop;
-    guideLoop.start();
-
-    return () => {
-      if (guideLoopRef.current) {
-        guideLoopRef.current.stop();
-        guideLoopRef.current = null;
-      }
-      guidePulseAnim.stopAnimation();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- guidePulseAnim is a stable ref
-  }, [isGuided, settings.reducedMotion]);
-
-  // Particle trail for selected tiles
-  useEffect(() => {
-    if (!isSelected || settings.reducedMotion || shouldSimplifyAnimations()) {
-      // Reset particles
-      trailParticleAnims.forEach(p => {
-        p.opacity.setValue(0);
-        p.scale.setValue(0.5);
-        p.translateY.setValue(0);
-      });
-      if (trailParticleLoopRef.current) {
-        trailParticleLoopRef.current.stop();
-        trailParticleLoopRef.current = null;
-      }
-      return;
-    }
-
-    const particleAnimations = trailParticleAnims.map((p, i) =>
-      Animated.sequence([
-        Animated.delay(i * 150),
-        Animated.parallel([
-          Animated.timing(p.opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-          Animated.timing(p.scale, { toValue: 1.5, duration: 600, useNativeDriver: true }),
-          Animated.timing(p.translateY, { toValue: -25, duration: 600, useNativeDriver: true }),
-        ]),
-        Animated.timing(p.opacity, { toValue: 0, duration: 100, useNativeDriver: true }),
-        Animated.parallel([
-          Animated.timing(p.scale, { toValue: 0.5, duration: 0, useNativeDriver: true }),
-          Animated.timing(p.translateY, { toValue: 0, duration: 0, useNativeDriver: true }),
-        ]),
-      ])
+    guidePulseAnim.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 700, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 700, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
     );
 
-    const loop = Animated.loop(Animated.stagger(150, particleAnimations));
-    trailParticleLoopRef.current = loop;
-    loop.start();
+    return () => { cancelAnimation(guidePulseAnim); };
+  }, [isGuided, reducedMotion]);
 
-    return () => {
-      loop.stop();
-      trailParticleAnims.forEach(p => {
-        p.opacity.stopAnimation();
-        p.scale.stopAnimation();
-        p.translateY.stopAnimation();
-      });
-    };
-  }, [isSelected]);
-
-  // Resonance visual config — color and opacity range per phase
-  const getResonanceConfig = () => {
-    if (phase >= 5) return { color: '#7B6B8A', minOpacity: 0.06, maxOpacity: 0.10 };   // Ghostly mauve
-    if (phase >= 4) return { color: '#8B0000', minOpacity: 0.12, maxOpacity: 0.28 };   // Crimson
-    if (phase >= 3) return { color: '#4A2080', minOpacity: 0.08, maxOpacity: 0.20 };   // Dark purple
-    if (phase >= 2) return { color: '#6B5B95', minOpacity: 0.04, maxOpacity: 0.12 };   // Purple-blue
-    return { color: '#DAA520', minOpacity: 0.02, maxOpacity: 0.05 };                   // Warm gold (Phase 1)
-  };
-  const resonanceConfig = isResonant && phase >= 1 ? getResonanceConfig() : null;
-  const resonanceOpacity = resonanceConfig ? resonanceAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [resonanceConfig.minOpacity, resonanceConfig.maxOpacity],
-  }) : null;
-
+  // === PRESS HANDLERS ===
   const handlePressIn = () => {
-    if (settings.reducedMotion) return;
+    if (reducedMotion) return;
     if (isInteractable || isSelected) {
-      Animated.spring(scaleAnim, {
-        toValue: 0.92,
-        friction: 5,
-        tension: 300,
-        useNativeDriver: true,
-      }).start();
+      scaleAnim.value = withSpring(0.92, { damping: 12, stiffness: 300 });
     }
   };
 
   const handlePressOut = () => {
-    if (settings.reducedMotion) return;
+    if (reducedMotion) return;
     if (isInteractable || isSelected) {
-      Animated.spring(scaleAnim, {
-        toValue: isSelected ? 1.08 : 1,
-        friction: 3,
-        tension: 200,
-        useNativeDriver: true,
-      }).start();
+      scaleAnim.value = withSpring(isSelected ? 1.08 : 1, { damping: 8, stiffness: 200 });
     }
   };
 
+  // === STYLES ===
   const getStyles = () => {
     if (highlight === 'locked') {
       if (phase >= 5) {
-        return {
-          bgColor: '#2E2A40',        // Muted purple-gray — eerie calm
-          borderColor: '#3A3555',
-          textColor: '#706890',       // Soft ghostly purple
-          shadowColor: '#2E2A40',
-        };
+        return { bgColor: '#2E2A40', borderColor: '#3A3555', textColor: '#706890', shadowColor: '#2E2A40' };
       }
       if (phase >= 4) {
-        return {
-          bgColor: CandyColors.gray[700],
-          borderColor: CandyColors.gray[800],
-          textColor: CandyColors.gray[500],
-          shadowColor: CandyColors.gray[800],
-        };
+        return { bgColor: CandyColors.gray[700], borderColor: CandyColors.gray[800], textColor: CandyColors.gray[500], shadowColor: CandyColors.gray[800] };
       }
       if (phase >= 3) {
-        return {
-          bgColor: CandyColors.gray[500],
-          borderColor: CandyColors.gray[600],
-          textColor: CandyColors.gray[700],
-          shadowColor: CandyColors.gray[600],
-        };
+        return { bgColor: CandyColors.gray[500], borderColor: CandyColors.gray[600], textColor: CandyColors.gray[700], shadowColor: CandyColors.gray[600] };
       }
-      return {
-        bgColor: CandyColors.gray[300],
-        borderColor: CandyColors.gray[400],
-        textColor: CandyColors.gray[500],
-        shadowColor: CandyColors.gray[400],
-      };
+      return { bgColor: CandyColors.gray[300], borderColor: CandyColors.gray[400], textColor: CandyColors.gray[500], shadowColor: CandyColors.gray[400] };
     }
     if (isSelected) {
       if (phase >= 5) {
-        // Muted purple — peaceful, not aggressive
-        return {
-          bgColor: '#504580',
-          borderColor: '#3A3060',
-          textColor: '#D0C8E8',       // Soft lavender text
-          shadowColor: '#504580',
-        };
+        return { bgColor: '#504580', borderColor: '#3A3060', textColor: '#D0C8E8', shadowColor: '#504580' };
       }
       if (phase >= 4) {
-        // Deep purple instead of pink at phase 4
-        return {
-          bgColor: CandyColors.purple.dark,
-          borderColor: CandyColors.purple.shadow,
-          textColor: CandyColors.gray[200],
-          shadowColor: CandyColors.purple.dark,
-        };
+        return { bgColor: CandyColors.purple.dark, borderColor: CandyColors.purple.shadow, textColor: CandyColors.gray[200], shadowColor: CandyColors.purple.dark };
       }
       if (phase >= 3) {
-        // Darker pink/purple at phase 3
-        return {
-          bgColor: CandyColors.pink.dark,
-          borderColor: CandyColors.pink.shadow,
-          textColor: CandyColors.gray[100],
-          shadowColor: CandyColors.pink.dark,
-        };
+        return { bgColor: CandyColors.pink.dark, borderColor: CandyColors.pink.shadow, textColor: CandyColors.gray[100], shadowColor: CandyColors.pink.dark };
       }
-      return {
-        bgColor: CandyColors.pink.main,
-        borderColor: CandyColors.pink.shadow,
-        textColor: CandyColors.white,
-        shadowColor: CandyColors.pink.main,
-      };
+      return { bgColor: CandyColors.pink.main, borderColor: CandyColors.pink.shadow, textColor: CandyColors.white, shadowColor: CandyColors.pink.main };
     }
     if (isInteractable && highlight === 'source') {
-      return {
-        bgColor: tileColor.bg,
-        borderColor: tileColor.border,
-        textColor: CandyColors.white,
-        shadowColor: tileColor.bg,
-      };
+      return { bgColor: tileColor.bg, borderColor: tileColor.border, textColor: CandyColors.white, shadowColor: tileColor.bg };
     }
-    // Default (non-interactable, non-selected)
     if (phase >= 5) {
-      return {
-        bgColor: '#3A3550',      // Muted purple-gray instead of dark gray
-        borderColor: '#4A4565',
-        textColor: '#9990B0',     // Soft purple text
-        shadowColor: '#3A3550',
-      };
+      return { bgColor: '#3A3550', borderColor: '#4A4565', textColor: '#9990B0', shadowColor: '#3A3550' };
     }
     if (phase >= 4) {
-      return {
-        bgColor: CandyColors.gray[600],
-        borderColor: CandyColors.gray[700],
-        textColor: CandyColors.gray[300],
-        shadowColor: CandyColors.gray[700],
-      };
+      return { bgColor: CandyColors.gray[600], borderColor: CandyColors.gray[700], textColor: CandyColors.gray[300], shadowColor: CandyColors.gray[700] };
     }
     if (phase >= 3) {
-      return {
-        bgColor: CandyColors.gray[200],
-        borderColor: CandyColors.gray[400],
-        textColor: CandyColors.gray[500],
-        shadowColor: CandyColors.gray[400],
-      };
+      return { bgColor: CandyColors.gray[200], borderColor: CandyColors.gray[400], textColor: CandyColors.gray[500], shadowColor: CandyColors.gray[400] };
     }
     if (phase >= 2) {
-      return {
-        bgColor: CandyColors.gray[100],
-        borderColor: CandyColors.gray[300],
-        textColor: CandyColors.gray[600],
-        shadowColor: CandyColors.gray[400],
-      };
+      return { bgColor: CandyColors.gray[100], borderColor: CandyColors.gray[300], textColor: CandyColors.gray[600], shadowColor: CandyColors.gray[400] };
     }
-    return {
-      bgColor: CandyColors.white,
-      borderColor: CandyColors.gray[300],
-      textColor: CandyColors.gray[600],
-      shadowColor: CandyColors.gray[400],
-    };
+    return { bgColor: CandyColors.white, borderColor: CandyColors.gray[300], textColor: CandyColors.gray[600], shadowColor: CandyColors.gray[400] };
   };
 
   const tileStyles = getStyles();
   const isClickable = (isInteractable || isSelected) && onPress;
-  const trailColor = phase >= 4 ? '#C03050' : phase >= 3 ? '#9050B0' : '#FFD700';
 
-  // Animated glow intensity
-  const glowOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
-
-  // Shine sweep position
-  const shineTranslate = shineAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-60, 60],
-  });
-
-  // Wobble rotation
-  const wobbleRotate = wobbleAnim.interpolate({
-    inputRange: [-1, 0, 1],
-    outputRange: ['-3deg', '0deg', '3deg'],
-  });
-
-  // Trail glow interpolations for Phase 3+ energy mark effect
-  const trailGlowRadius = trailGlowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [6, phase >= 4 ? 24 : 16],
-  });
-  const trailGlowOpacity = trailGlowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, phase >= 4 ? 0.7 : 0.55],
-  });
+  // Trail glow color (static shadow tint; animated glow is via TileGlowCanvas)
   const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
-  const guideRingScale = guidePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.18],
-  });
-  const guideRingOpacity = guidePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.6, 1.0],
-  });
+  const resonanceOverlay = isResonant && !isSelected ? getResonanceOverlay(phase) : null;
+  const glowOuterOpacity = isSelected ? 0.58 : isActiveRow && isInteractable ? 0.20 : 0.12;
+
+  const guideRingScaleVal = useDerivedValue(() => 1 + guidePulseAnim.value * 0.18);
+  const guideRingOpacityVal = useDerivedValue(() => 0.6 + guidePulseAnim.value * 0.4);
+
+  // Main tile transform (scale + bounce + wobble)
+  const tileAnimStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scaleAnim.value },
+      { translateY: bounceAnim.value },
+    ],
+  }));
+
+  // Guide ring
+  const guideRingAnimStyle = useAnimatedStyle(() => ({
+    opacity: guideRingOpacityVal.value,
+    transform: [{ scale: guideRingScaleVal.value }],
+  }));
 
   const content = (
     <Animated.View
       style={[
         styles.tileOuter,
         compact && { width: COMPACT_OUTER_W, height: COMPACT_OUTER_H, marginHorizontal: 2 },
-        {
-          transform: [
-            { scale: scaleAnim },
-            { translateY: bounceAnim },
-            { rotate: isSelected ? wobbleRotate : '0deg' },
-          ],
-        },
+        tileAnimStyle,
       ]}
     >
-      {isSelected && !settings.reducedMotion && !shouldSimplifyAnimations() && (
-        <View style={trailStyles.container} pointerEvents="none">
-          {trailParticleAnims.map((anim, i) => (
-            <Animated.View
-              key={i}
-              style={{
-                position: 'absolute',
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: trailColor,
-                opacity: anim.opacity,
-                transform: [
-                  { scale: anim.scale },
-                  { translateY: anim.translateY },
-                  { translateX: (i - 1.5) * 12 },
-                ],
-                top: -5,
-              }}
-            />
-          ))}
-        </View>
+      {/* Skip idle glow canvases entirely to keep the board light while not selected/resonant. */}
+      {shouldRenderTileGlow(!!isSelected, isResonant) && (
+        <TileGlowCanvas
+          isSelected={!!isSelected}
+          phase={phase}
+          isResonant={isResonant}
+          compact={compact}
+          isActiveRow={isActiveRow}
+        />
       )}
 
       {/* Outer glow for interactable/selected */}
@@ -651,29 +262,21 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         <Animated.View
           style={[
             styles.glowOuter,
-            {
-              backgroundColor: tileStyles.shadowColor,
-              opacity: isSelected ? 0.6 : glowOpacity,
-            },
+            { backgroundColor: tileStyles.shadowColor },
+            { opacity: glowOuterOpacity },
           ]}
         />
       )}
 
       {isGuided && (
         <Animated.View
-          style={[
-            styles.guideRing,
-            {
-              opacity: guideRingOpacity,
-              transform: [{ scale: guideRingScale }],
-            },
-          ]}
+          style={[styles.guideRing, guideRingAnimStyle]}
           pointerEvents="none"
         />
       )}
 
       {/* Main tile body */}
-      <Animated.View
+      <View
         style={[
           styles.tileBody,
           compact && { width: COMPACT_BODY_W, height: COMPACT_BODY_H, borderRadius: 12 },
@@ -685,11 +288,6 @@ export const LetterTile: React.FC<LetterTileProps> = ({
           isGuided && styles.tileBodyGuided,
           isSelected && styles.tileBodySelected,
           highlight === 'locked' && styles.tileBodyLocked,
-          // Trail glow effect: pulsing shadow at Phase 3+
-          (isSelected && phase >= 3) && {
-            shadowRadius: trailGlowRadius,
-            shadowOpacity: trailGlowOpacity,
-          },
         ]}
       >
         {/* Top highlight (bevel effect) */}
@@ -698,17 +296,12 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         {/* Glossy shine overlay */}
         <View style={styles.glossyShine} />
 
-        {/* Resonance glow — inner light for dread/ritual words */}
-        {resonanceConfig && (
-          <Animated.View
+        {resonanceOverlay && (
+          <View
             style={[
               styles.resonanceOverlay,
-              {
-                backgroundColor: resonanceConfig.color,
-                opacity: resonanceOpacity!,
-              },
+              { backgroundColor: resonanceOverlay.color, opacity: resonanceOverlay.opacity },
             ]}
-            pointerEvents="none"
           />
         )}
 
@@ -729,23 +322,11 @@ export const LetterTile: React.FC<LetterTileProps> = ({
           <View style={styles.specularDot} />
         )}
 
-        {/* Moving shine effect */}
-        {isInteractable && !isSelected && (
-          <Animated.View
-            style={[
-              styles.shineSweep,
-              {
-                transform: [{ translateX: shineTranslate }],
-              },
-            ]}
-          />
-        )}
-
         {/* Subtle lock overlay for locked tiles */}
         {highlight === 'locked' && (
           <View style={styles.lockOverlay} />
         )}
-      </Animated.View>
+      </View>
 
       {/* 3D bottom edge */}
       <View
@@ -774,7 +355,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   }
 
   return content;
-};
+}, areLetterTilePropsEqual);
 
 const styles = StyleSheet.create({
   tileOuter: {
@@ -890,32 +471,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
     borderRadius: 4,
   },
-  shineSweep: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-    transform: [{ skewX: '-20deg' }],
-  },
-  lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.08)',
-  },
   resonanceOverlay: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 14,
   },
-});
-
-const trailStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 20,
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
 });
 

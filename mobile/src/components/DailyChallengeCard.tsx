@@ -1,11 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  cancelAnimation,
+  Easing,
+} from 'react-native-reanimated';
 import { CandyColors } from '../theme/colors';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
@@ -30,85 +38,53 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   const [difficulty, setDifficulty] = useState<Difficulty>('HARD');
   const [stars, setStars] = useState(0);
   const [streak, setStreak] = useState(0);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0.3)).current;
-  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
-  const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const pulseAnim = useSharedValue(1);
+  const glowAnim = useSharedValue(0.3);
 
   useEffect(() => {
     loadStatus();
   }, []);
 
   useEffect(() => {
-    // Stop any existing loops
-    if (pulseLoopRef.current) {
-      pulseLoopRef.current.stop();
-      pulseLoopRef.current = null;
-    }
-    if (glowLoopRef.current) {
-      glowLoopRef.current.stop();
-      glowLoopRef.current = null;
-    }
-
     if (getSettingsSync().reducedMotion) {
-      pulseAnim.setValue(1);
-      glowAnim.setValue(isCompleted ? 0 : 0.6);
+      cancelAnimation(pulseAnim);
+      cancelAnimation(glowAnim);
+      pulseAnim.value = 1;
+      glowAnim.value = isCompleted ? 0 : 0.6;
       return;
     }
 
     if (!isCompleted) {
-      pulseLoopRef.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.08,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-        ])
+      pulseAnim.value = withRepeat(
+        withSequence(
+          withTiming(1.08, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
+          withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
       );
-      pulseLoopRef.current.start();
 
-      glowLoopRef.current = Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 0.8,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0.3,
-            duration: 1200,
-            useNativeDriver: true,
-          }),
-        ])
+      glowAnim.value = withRepeat(
+        withSequence(
+          withTiming(0.8, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
+          withTiming(0.3, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
       );
-      glowLoopRef.current.start();
     } else {
-      pulseAnim.setValue(1);
-      glowAnim.setValue(0);
+      cancelAnimation(pulseAnim);
+      cancelAnimation(glowAnim);
+      pulseAnim.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
+      glowAnim.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.cubic) });
     }
 
     return () => {
-      if (pulseLoopRef.current) {
-        pulseLoopRef.current.stop();
-        pulseLoopRef.current = null;
-      }
-      if (glowLoopRef.current) {
-        glowLoopRef.current.stop();
-        glowLoopRef.current = null;
-      }
-      pulseAnim.stopAnimation();
-      glowAnim.stopAnimation();
+      cancelAnimation(pulseAnim);
+      cancelAnimation(glowAnim);
     };
-  }, [isCompleted]);
+  }, [isCompleted, glowAnim, pulseAnim]);
 
-  const loadStatus = async () => {
-    const status = await getDailyStatus();
+  const loadStatus = () => {
+    const status = getDailyStatus();
     setIsCompleted(status.isCompleted);
     setDifficulty(status.difficulty);
     setStreak(status.streak);
@@ -137,8 +113,16 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
       ? 'rgba(160, 140, 60, 0.5)'
       : 'rgba(255, 200, 60, 0.5)';
 
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowAnim.value,
+  }));
+
   return (
-    <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+    <Animated.View style={pulseStyle}>
       <TouchableOpacity
         style={[styles.button, { backgroundColor: btnBg }]}
         onPress={handlePress}
@@ -155,7 +139,8 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
           <Animated.View
             style={[
               styles.glowRing,
-              { borderColor: glowColor, opacity: glowAnim },
+              { borderColor: glowColor },
+              glowStyle,
             ]}
             pointerEvents="none"
           />
