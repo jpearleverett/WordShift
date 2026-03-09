@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SPEED_TIMER_INTERVAL_MS } from '../constants/timing';
 
 export interface SpeedTimerState {
@@ -71,6 +71,6 @@ export function useSpeedTimer(
   }, [clearTimer]);
 
   const state: SpeedTimerState = { speedTimeRemaining };
-  const actions: SpeedTimerActions = useMemo(() => ({ startSpeedTimer, stopSpeedTimer }), [startSpeedTimer, stopSpeedTimer]);
+  const actions: SpeedTimerActions = { startSpeedTimer, stopSpeedTimer };
   return [state, actions];
 }

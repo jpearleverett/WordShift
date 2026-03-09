@@ -1,5 +1,4 @@
 import { DialoguePhase, PHASE_DESCRIPTIONS } from '../types/homeWorld';
-import { storage } from './storage';
 
 /**
  * Phase-aware narrative text for the puzzle screen.
@@ -1053,47 +1052,62 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
 };
 
-/** MMKV key for tracking consumed micro-beats */
+/** AsyncStorage key for tracking consumed micro-beats */
 const MICRO_BEATS_SEEN_KEY = 'wordshift_micro_beats_seen';
 
 let microBeatsSeen: Set<number> | null = null;
 
-function loadMicroBeatsSeen(): Set<number> {
+async function loadMicroBeatsSeen(): Promise<Set<number>> {
   if (microBeatsSeen) return microBeatsSeen;
-  const raw = storage.getString(MICRO_BEATS_SEEN_KEY);
-  microBeatsSeen = raw !== undefined ? new Set(JSON.parse(raw)) : new Set();
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    const raw = await AsyncStorage.getItem(MICRO_BEATS_SEEN_KEY);
+    microBeatsSeen = raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    microBeatsSeen = new Set();
+  }
   return microBeatsSeen;
 }
 
-function markMicroBeatSeen(puzzleCount: number): void {
-  const seen = loadMicroBeatsSeen();
+async function markMicroBeatSeen(puzzleCount: number): Promise<void> {
+  const seen = await loadMicroBeatsSeen();
   seen.add(puzzleCount);
-  storage.set(MICRO_BEATS_SEEN_KEY, JSON.stringify([...seen]));
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.setItem(MICRO_BEATS_SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    // Silently fail — non-critical
+  }
 }
 
 /**
  * Check if a narrative micro-beat should fire at this puzzle count.
  * Returns the beat config (and marks it as consumed) or null.
  */
-export function checkNarrativeMicroBeat(
+export async function checkNarrativeMicroBeat(
   puzzlesSolved: number,
-): NarrativeMicroBeat | null {
+): Promise<NarrativeMicroBeat | null> {
   const beat = MICRO_BEATS[puzzlesSolved];
   if (!beat) return null;
 
-  const seen = loadMicroBeatsSeen();
+  const seen = await loadMicroBeatsSeen();
   if (seen.has(puzzlesSolved)) return null;
 
-  markMicroBeatSeen(puzzlesSolved);
+  await markMicroBeatSeen(puzzlesSolved);
   return beat;
 }
 
 /**
  * Reset micro-beats tracking (for Reset All Data).
  */
-export function resetMicroBeats(): void {
+export async function resetMicroBeats(): Promise<void> {
   microBeatsSeen = null;
-  storage.remove(MICRO_BEATS_SEEN_KEY);
+  try {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    await AsyncStorage.removeItem(MICRO_BEATS_SEEN_KEY);
+  } catch {
+    // Silently fail — non-critical
+  }
 }
 
 // ============================================================================

@@ -10,8 +10,6 @@ import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
 import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../../services/puzzleVariety';
-import Reanimated, { FadeIn } from 'react-native-reanimated';
-import { getSettingsSync } from '../../services/settings';
 
 interface DifficultyMenuProps {
   visible: boolean;
@@ -26,7 +24,7 @@ interface DifficultyMenuProps {
   onToggleChallengeMode: () => void;
 }
 
-export const DifficultyMenu: React.FC<DifficultyMenuProps> = React.memo(({
+export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   visible,
   currentDifficulty,
   gameMode,
@@ -40,7 +38,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = React.memo(({
 }) => {
   if (!visible) return null;
 
-  const reducedMotion = getSettingsSync().reducedMotion;
   const phaseTheme = getPhaseTheme(phase);
   const isDark = phase >= 3;
   const title = phase >= 3 ? 'ARRANGEMENT SETUP' : 'PUZZLE SETUP';
@@ -92,13 +89,10 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = React.memo(({
   };
 
   return (
-    <Reanimated.View
-      entering={reducedMotion ? undefined : FadeIn.duration(200)}
-      style={[styles.difficultyMenu, !hasNonStandardVariants && styles.difficultyMenuCompact, isDark && {
-        backgroundColor: phaseTheme.modalBgColor,
-        shadowColor: '#000',
-      }]}
-    >
+    <View style={[styles.difficultyMenu, !hasNonStandardVariants && styles.difficultyMenuCompact, isDark && {
+      backgroundColor: phaseTheme.modalBgColor,
+      shadowColor: '#000',
+    }]}>
       <Text style={[
         styles.menuTitle,
         isDark && { color: phaseTheme.modalTextColor },
@@ -227,9 +221,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = React.memo(({
           </View>
         </TouchableOpacity>
       </ScrollView>
-    </Reanimated.View>
+    </View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   difficultyMenu: {

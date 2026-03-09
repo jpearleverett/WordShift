@@ -1,4 +1,4 @@
-import { storage } from './storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 
 /**
@@ -95,9 +95,10 @@ const REENGAGEMENT_MESSAGES: Record<number, string[]> = {
 };
 
 // ============================================================================
-// Lazy-loaded expo-notifications module
+// In-memory cache
 // ============================================================================
 
+let prefsCache: NotificationPreferences | null = null;
 let notificationsModule: any = null;
 
 function getDefaultPrefs(): NotificationPreferences {
@@ -140,24 +141,31 @@ async function requestPermissions(): Promise<boolean> {
 // ============================================================================
 
 /**
- * Load notification preferences from MMKV (synchronous).
+ * Load notification preferences from storage.
  */
-export function getNotificationPrefs(): NotificationPreferences {
-  const stored = storage.getString(STORAGE_KEY);
-  if (stored !== undefined) {
-    return JSON.parse(stored);
-  }
-  return getDefaultPrefs();
+export async function getNotificationPrefs(): Promise<NotificationPreferences> {
+  if (prefsCache) return prefsCache;
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      prefsCache = JSON.parse(stored);
+      return prefsCache!;
+    }
+  } catch {}
+  prefsCache = getDefaultPrefs();
+  return prefsCache;
 }
 
 /**
  * Save notification preferences.
- * Stays async because it re-schedules notifications (expo-notifications is async).
  */
 export async function setNotificationPrefs(prefs: Partial<NotificationPreferences>): Promise<void> {
-  const current = getNotificationPrefs();
+  const current = await getNotificationPrefs();
   const updated = { ...current, ...prefs };
-  storage.set(STORAGE_KEY, JSON.stringify(updated));
+  prefsCache = updated;
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch {}
 
   // Re-schedule notifications based on new prefs
   await scheduleAllNotifications(0);
@@ -168,7 +176,7 @@ export async function setNotificationPrefs(prefs: Partial<NotificationPreference
  * Called on app launch and after puzzle completion.
  */
 export async function scheduleAllNotifications(currentPhase: number): Promise<void> {
-  const prefs = getNotificationPrefs();
+  const prefs = await getNotificationPrefs();
   if (!prefs.enabled) {
     await cancelAllNotifications();
     return;
@@ -274,6 +282,9 @@ async function scheduleReengagement(
 /**
  * Reset notification preferences (for Settings > Reset All).
  */
-export function resetNotificationPrefs(): void {
-  storage.remove(STORAGE_KEY);
+export async function resetNotificationPrefs(): Promise<void> {
+  prefsCache = null;
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch {}
 }

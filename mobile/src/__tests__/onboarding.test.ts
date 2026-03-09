@@ -1,8 +1,4 @@
-jest.mock('../services/storage', () =>
-  require('./helpers/mockStorage').createMockStorage()
-);
-
-import { storage } from '../services/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   OnboardingStep,
   getOnboardingStep,
@@ -12,63 +8,68 @@ import {
   ONBOARDING_FOX_LINES,
 } from '../services/onboarding';
 
+// Mock AsyncStorage
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+);
+
 describe('onboarding', () => {
-  beforeEach(() => {
-    (storage as any).clearAll();
-    resetOnboarding();
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await resetOnboarding();
   });
 
   describe('step persistence', () => {
-    test('returns not_started initially', () => {
-      const step = getOnboardingStep();
+    test('returns not_started initially', async () => {
+      const step = await getOnboardingStep();
       expect(step).toBe('not_started');
     });
 
-    test('set and get round-trip all step values', () => {
+    test('set and get round-trip all step values', async () => {
       const steps: OnboardingStep[] = [
         'not_started', 'home_empty', 'fox_invited', 'going_to_puzzle',
         'puzzle_tutorial', 'puzzle_complete', 'going_to_pit', 'pit_intro',
         'pit_offering', 'returning_home', 'unlock_explained', 'complete',
       ];
       for (const step of steps) {
-        setOnboardingStep(step);
-        const retrieved = getOnboardingStep();
+        await setOnboardingStep(step);
+        const retrieved = await getOnboardingStep();
         expect(retrieved).toBe(step);
       }
     });
 
-    test('isOnboardingComplete returns true only for complete', () => {
-      expect(isOnboardingComplete()).toBe(false);
+    test('isOnboardingComplete returns true only for complete', async () => {
+      expect(await isOnboardingComplete()).toBe(false);
 
-      setOnboardingStep('pit_intro');
-      expect(isOnboardingComplete()).toBe(false);
+      await setOnboardingStep('pit_intro');
+      expect(await isOnboardingComplete()).toBe(false);
 
-      setOnboardingStep('complete');
-      expect(isOnboardingComplete()).toBe(true);
+      await setOnboardingStep('complete');
+      expect(await isOnboardingComplete()).toBe(true);
     });
 
-    test('resetOnboarding clears state', () => {
-      setOnboardingStep('pit_intro');
-      resetOnboarding();
-      const step = getOnboardingStep();
+    test('resetOnboarding clears state', async () => {
+      await setOnboardingStep('pit_intro');
+      await resetOnboarding();
+      const step = await getOnboardingStep();
       expect(step).toBe('not_started');
     });
   });
 
   describe('pit onboarding steps', () => {
-    test('going_to_pit step type is valid', () => {
-      setOnboardingStep('going_to_pit');
-      expect(getOnboardingStep()).toBe('going_to_pit');
+    test('going_to_pit step type is valid', async () => {
+      await setOnboardingStep('going_to_pit');
+      expect(await getOnboardingStep()).toBe('going_to_pit');
     });
 
-    test('pit_intro step type is valid', () => {
-      setOnboardingStep('pit_intro');
-      expect(getOnboardingStep()).toBe('pit_intro');
+    test('pit_intro step type is valid', async () => {
+      await setOnboardingStep('pit_intro');
+      expect(await getOnboardingStep()).toBe('pit_intro');
     });
 
-    test('pit_offering step type is valid', () => {
-      setOnboardingStep('pit_offering');
-      expect(getOnboardingStep()).toBe('pit_offering');
+    test('pit_offering step type is valid', async () => {
+      await setOnboardingStep('pit_offering');
+      expect(await getOnboardingStep()).toBe('pit_offering');
     });
   });
 

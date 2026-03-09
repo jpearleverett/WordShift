@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import {
@@ -87,9 +87,9 @@ export interface PersistenceActions {
     completedWords?: string[],
     variant?: PuzzleVariant,
     isDaily?: boolean
-  ) => VictoryData;
+  ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
-  refreshStats: () => void;
+  refreshStats: () => Promise<void>;
 }
 
 export function useGamePersistence(): [PersistenceState, PersistenceActions] {
@@ -101,13 +101,34 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
   const recordInProgress = useRef(false);
 
   useEffect(() => {
-    // Initialize all services synchronously (MMKV-backed)
-    const stats = getCumulativeStats();
-    const balance = getAmberBalance();
-    const phase = getCurrentPhase();
-    const fraction = getPhaseProgressFraction();
-    const pending = getPendingPhaseTransition();
-    const postRev = isPostRevelation();
+    // Initialize all services concurrently with proper error handling
+    Promise.all([
+      getCumulativeStats(),
+      getAmberBalance(),
+      getCurrentPhase(),
+      getPhaseProgressFraction(),
+      getPendingPhaseTransition(),
+      isPostRevelation(),
+    ]).then(([stats, balance, phase, fraction, pending, postRev]) => {
+      setCumulativeStats(stats);
+      setAmberBalance(balance);
+      setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
+      setPhaseProgressFraction(fraction);
+      setPendingPhaseTransition(pending);
+    }).catch(err => {
+      console.warn('Failed to initialize persistence:', err);
+    });
+  }, []);
+
+  const refreshStats = useCallback(async () => {
+    const [stats, balance, phase, fraction, pending, postRev] = await Promise.all([
+      getCumulativeStats(),
+      getAmberBalance(),
+      getCurrentPhase(),
+      getPhaseProgressFraction(),
+      getPendingPhaseTransition(),
+      isPostRevelation(),
+    ]);
     setCumulativeStats(stats);
     setAmberBalance(balance);
     setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
@@ -115,21 +136,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     setPendingPhaseTransition(pending);
   }, []);
 
-  const refreshStats = useCallback(() => {
-    const stats = getCumulativeStats();
-    const balance = getAmberBalance();
-    const phase = getCurrentPhase();
-    const fraction = getPhaseProgressFraction();
-    const pending = getPendingPhaseTransition();
-    const postRev = isPostRevelation();
-    setCumulativeStats(stats);
-    setAmberBalance(balance);
-    setCurrentPhase(postRev ? 5 as DialoguePhase : phase);
-    setPhaseProgressFraction(fraction);
-    setPendingPhaseTransition(pending);
-  }, []);
-
-  const recordVictory = useCallback((
+  const recordVictory = useCallback(async (
     difficulty: Difficulty,
     hintsUsed: number,
     invalidAttempts: number,
@@ -137,7 +144,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     completedWords: string[] = [],
     variant: PuzzleVariant = 'standard',
     isDaily: boolean = false
-  ): VictoryData => {
+  ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
 
     // Guard against concurrent recordVictory calls
@@ -170,17 +177,17 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     recordInProgress.current = true;
     try {
       // Record star stats first so we can get the three-star rate
-      recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts);
-      const stats = getCumulativeStats();
+      await recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts);
+      const stats = await getCumulativeStats();
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
       // creditToBalance=false: amber is queued in a harvest batch, not credited yet
-      const amberResult = awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false);
+      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false);
 
       // Phase 5 (post-revelation) is set via markPostRevelation(), not phase progression.
       // calculatePhase() maxes at 4, so amberResult.newPhase can't exceed 4. If the player
       // is post-revelation, preserve phase 5 to avoid regressing the UI and dialogue phase.
-      const postRev = isPostRevelation();
+      const postRev = await isPostRevelation();
       const effectivePhase: DialoguePhase = postRev ? 5 as DialoguePhase : amberResult.newPhase;
 
       // Apply variant bonus with anti-farm decay and persistence.
@@ -190,7 +197,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       let variantAppliedMultiplier = 1.0;
       let variantRepeatDecay = 1.0;
       if (variant !== 'standard' && variantMultiplier > 1.0) {
-        const variantResult = applyVariantAmberBonus(
+        const variantResult = await applyVariantAmberBonus(
           variant,
           amberResult.amount,
           variantMultiplier,
@@ -213,7 +220,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const harvestedWords = completedWords.length > 0
         ? [...new Set(completedWords.map(w => w.toUpperCase()))]
         : [];
-      const harvestResult = enqueueHarvestBatch({
+      const harvestResult = await enqueueHarvestBatch({
         id: generateBatchId(),
         words: harvestedWords,
         amberValue: totalQueuedAmber,
@@ -225,7 +232,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         phaseAtHarvest: effectivePhase,
       });
 
-      const pendingHarvest = getPendingHarvestSummary();
+      const pendingHarvest = await getPendingHarvestSummary();
 
       setCumulativeStats(stats);
       updatePuzzleCount(amberResult.puzzlesSolved);
@@ -249,13 +256,13 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       if (completedWords.length > 0) {
         ritualEnergy = calculateRitualEnergy(completedWords, effectivePhase);
         const triggerWords = extractTriggerWords(completedWords);
-        const ritualResult = recordRitualWords(completedWords, ritualEnergy, triggerWords);
+        const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
       }
 
       // Queue a one-time variant tutorial for animal dialogue.
       if (variant && variant !== 'standard') {
-        recordVariantEncounter(variant);
+        recordVariantEncounter(variant).catch(() => {});
       }
 
       // Queue variant tutorials for any variants that just became unlocked.
@@ -264,7 +271,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         effectivePhase
       );
       for (const unlockedVariant of newlyUnlocked) {
-        recordVariantEncounter(unlockedVariant);
+        recordVariantEncounter(unlockedVariant).catch(() => {});
       }
 
       logEvent({
@@ -291,16 +298,21 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       });
 
       // Update weekly quest progress and capture newly completed quests
-      const completedQuests = updateQuestProgress({
-        difficulty,
-        stars,
-        hintsUsed,
-        isDaily,
-        isChallenge: gameMode === 'challenge',
-        amberEarned: totalQueuedAmber,
-        currentStreak: amberResult.currentStreak,
-      }, effectivePhase);
-      const questsCompleted = completedQuests.map(q => q.title);
+      let questsCompleted: string[] = [];
+      try {
+        const completedQuests = await updateQuestProgress({
+          difficulty,
+          stars,
+          hintsUsed,
+          isDaily,
+          isChallenge: gameMode === 'challenge',
+          amberEarned: totalQueuedAmber,
+          currentStreak: amberResult.currentStreak,
+        }, effectivePhase);
+        questsCompleted = completedQuests.map(q => q.title);
+      } catch (_) {
+        // Quest progress update is non-critical
+      }
 
       return {
         earnedStars: stars,
@@ -370,11 +382,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     pendingPhaseTransition,
   };
 
-  const actions: PersistenceActions = useMemo(() => ({
+  const actions: PersistenceActions = {
     recordVictory,
     setAmberBalance,
     refreshStats,
-  }), [recordVictory, setAmberBalance, refreshStats]);
+  };
 
   return [state, actions];
 }

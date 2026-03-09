@@ -1,57 +1,65 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
-  cancelAnimation,
-} from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 
-export const AnimatedLogo: React.FC = React.memo(() => {
-  const bounceY = useSharedValue(0);
-  const rotation = useSharedValue(0);
+export const AnimatedLogo: React.FC = () => {
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Subtle vertical bounce loop
-    bounceY.value = withRepeat(
-      withSequence(
-        withTiming(-3, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
-    );
+    // Subtle bounce
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: -3,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
 
-    // Very subtle rotation loop
-    rotation.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(-1, { duration: 3000, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
-    );
-
-    return () => {
-      cancelAnimation(bounceY);
-      cancelAnimation(rotation);
-    };
+    // Very subtle rotation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotateAnim, {
+          toValue: -1,
+          duration: 3000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: bounceY.value },
-      { rotate: `${rotation.value}deg` },
-    ],
-  }));
+  const rotate = rotateAnim.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-1deg', '1deg'],
+  });
 
   return (
     <Animated.View
-      style={[styles.logoContainer, animatedStyle]}
+      style={[
+        styles.logoContainer,
+        {
+          transform: [
+            { translateY: bounceAnim },
+            { rotate },
+          ],
+        },
+      ]}
       accessibilityLabel="WordShift"
       accessibilityRole="header"
     >
@@ -65,7 +73,7 @@ export const AnimatedLogo: React.FC = React.memo(() => {
       <View style={[styles.logoSparkle, styles.logoSparkle3]} />
     </Animated.View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   logoContainer: {

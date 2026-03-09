@@ -1,4 +1,4 @@
-import { storage } from './storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'wordshift_word_history';
 const MAX_HISTORY_SIZE = 100; // Track last 100 puzzles
@@ -16,6 +16,9 @@ interface WordHistoryData {
   // Timestamp of last update
   lastUpdated: number;
 }
+
+// In-memory cache
+let historyCache: WordHistoryData | null = null;
 
 /**
  * Migrate legacy flat array format to grouped format
@@ -35,45 +38,57 @@ function migrateLegacyHistory(data: { recentWords?: string[]; puzzleGroups?: str
 }
 
 /**
- * Read word history data from MMKV (internal helper)
+ * Load word history from AsyncStorage
  */
-function readHistoryData(): WordHistoryData {
-  const stored = storage.getString(STORAGE_KEY);
-  if (stored !== undefined) {
-    const raw = JSON.parse(stored);
-    return migrateLegacyHistory(raw);
-  }
-  return { puzzleGroups: [], lastUpdated: Date.now() };
-}
+export async function loadWordHistory(): Promise<Set<string>> {
+  try {
+    if (historyCache) {
+      const allWords = historyCache.puzzleGroups.flat();
+      return new Set(allWords);
+    }
 
-/**
- * Load word history from MMKV
- */
-export function loadWordHistory(): Set<string> {
-  const data = readHistoryData();
-  return new Set(data.puzzleGroups.flat());
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const raw = JSON.parse(stored);
+      historyCache = migrateLegacyHistory(raw);
+      return new Set(historyCache.puzzleGroups.flat());
+    }
+  } catch (error) {
+    console.warn('Failed to load word history:', error);
+  }
+
+  historyCache = { puzzleGroups: [], lastUpdated: Date.now() };
+  return new Set();
 }
 
 /**
  * Get the full history data with recency information
  * Returns Map of word -> puzzles ago (accurate per-puzzle grouping)
  */
-export function getWordHistoryWithRecency(): Map<string, number> {
-  const data = readHistoryData();
-  const recencyMap = new Map<string, number>();
-  const groups = data.puzzleGroups;
+export async function getWordHistoryWithRecency(): Promise<Map<string, number>> {
+  try {
+    if (!historyCache) {
+      await loadWordHistory();
+    }
 
-  // Each group index = puzzles ago (0 = most recent)
-  for (let puzzlesAgo = 0; puzzlesAgo < groups.length; puzzlesAgo++) {
-    for (const word of groups[puzzlesAgo]) {
-      // Only track the most recent occurrence
-      if (!recencyMap.has(word)) {
-        recencyMap.set(word, puzzlesAgo);
+    const recencyMap = new Map<string, number>();
+    const groups = historyCache?.puzzleGroups || [];
+
+    // Each group index = puzzles ago (0 = most recent)
+    for (let puzzlesAgo = 0; puzzlesAgo < groups.length; puzzlesAgo++) {
+      for (const word of groups[puzzlesAgo]) {
+        // Only track the most recent occurrence
+        if (!recencyMap.has(word)) {
+          recencyMap.set(word, puzzlesAgo);
+        }
       }
     }
-  }
 
-  return recencyMap;
+    return recencyMap;
+  } catch (error) {
+    console.warn('Failed to get word history with recency:', error);
+    return new Map();
+  }
 }
 
 /**
@@ -121,57 +136,72 @@ export function isInHardCooldown(
 /**
  * Record words from a completed puzzle
  */
-export function recordPuzzleWords(words: string[]): void {
-  const data = readHistoryData();
-  const puzzleGroup = words.map(w => w.toUpperCase());
-
-  // Add new puzzle group at the beginning (most recent)
-  const newGroups = [puzzleGroup, ...data.puzzleGroups];
-
-  // Trim to max puzzles
-  if (newGroups.length > MAX_HISTORY_SIZE) {
-    newGroups.length = MAX_HISTORY_SIZE;
-  }
-
-  // Also trim if total words exceed max
-  let totalWords = 0;
-  let trimIndex = newGroups.length;
-  for (let i = 0; i < newGroups.length; i++) {
-    totalWords += newGroups[i].length;
-    if (totalWords > MAX_WORDS_TRACKED) {
-      trimIndex = i + 1;
-      break;
+export async function recordPuzzleWords(words: string[]): Promise<void> {
+  try {
+    if (!historyCache) {
+      await loadWordHistory();
     }
-  }
-  if (trimIndex < newGroups.length) {
-    newGroups.length = trimIndex;
-  }
 
-  const updated: WordHistoryData = {
-    puzzleGroups: newGroups,
-    lastUpdated: Date.now()
-  };
+    const puzzleGroup = words.map(w => w.toUpperCase());
 
-  storage.set(STORAGE_KEY, JSON.stringify(updated));
+    // Add new puzzle group at the beginning (most recent)
+    const newGroups = [puzzleGroup, ...(historyCache?.puzzleGroups || [])];
+
+    // Trim to max puzzles
+    if (newGroups.length > MAX_HISTORY_SIZE) {
+      newGroups.length = MAX_HISTORY_SIZE;
+    }
+
+    // Also trim if total words exceed max
+    let totalWords = 0;
+    let trimIndex = newGroups.length;
+    for (let i = 0; i < newGroups.length; i++) {
+      totalWords += newGroups[i].length;
+      if (totalWords > MAX_WORDS_TRACKED) {
+        trimIndex = i + 1;
+        break;
+      }
+    }
+    if (trimIndex < newGroups.length) {
+      newGroups.length = trimIndex;
+    }
+
+    historyCache = {
+      puzzleGroups: newGroups,
+      lastUpdated: Date.now()
+    };
+
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(historyCache));
+  } catch (error) {
+    console.warn('Failed to record puzzle words:', error);
+  }
 }
 
 /**
  * Clear all word history (for testing/reset)
  */
-export function clearWordHistory(): void {
-  storage.remove(STORAGE_KEY);
+export async function clearWordHistory(): Promise<void> {
+  try {
+    historyCache = { puzzleGroups: [], lastUpdated: Date.now() };
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn('Failed to clear word history:', error);
+  }
 }
 
 /**
  * Get statistics about word history
  */
-export function getHistoryStats(): {
+export async function getHistoryStats(): Promise<{
   totalWordsTracked: number;
   uniqueWords: number;
   oldestPuzzlesAgo: number;
-} {
-  const data = readHistoryData();
-  const groups = data.puzzleGroups;
+}> {
+  if (!historyCache) {
+    await loadWordHistory();
+  }
+
+  const groups = historyCache?.puzzleGroups || [];
   const allWords = groups.flat();
   const uniqueWords = new Set(allWords).size;
 
