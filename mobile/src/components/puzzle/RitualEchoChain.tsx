@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { CandyColors } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
 
@@ -27,50 +28,6 @@ export const RitualEchoChain: React.FC<RitualEchoChainProps> = ({
   phase,
   visible,
 }) => {
-  // Track animated values for each word slot (max reasonable chain length)
-  const wordAnimations = useRef<Animated.Value[]>([]).current;
-  const previousCountRef = useRef(0);
-
-  // Ensure we have enough Animated.Values for all words
-  while (wordAnimations.length < words.length) {
-    wordAnimations.push(new Animated.Value(0));
-  }
-
-  // Animate newly added words
-  useEffect(() => {
-    if (!visible) return;
-
-    const prevCount = previousCountRef.current;
-    const newCount = words.length;
-
-    if (newCount > prevCount) {
-      const { reducedMotion } = getSettingsSync();
-
-      for (let i = prevCount; i < newCount; i++) {
-        if (reducedMotion) {
-          wordAnimations[i].setValue(1);
-        } else {
-          wordAnimations[i].setValue(0);
-          Animated.timing(wordAnimations[i], {
-            toValue: 1,
-            duration: FADE_IN_DURATION,
-            useNativeDriver: true,
-          }).start();
-        }
-      }
-    }
-
-    previousCountRef.current = newCount;
-  }, [words.length, visible]);
-
-  // Reset animations when visibility is lost
-  useEffect(() => {
-    if (!visible) {
-      previousCountRef.current = 0;
-      wordAnimations.forEach((anim) => anim.setValue(0));
-    }
-  }, [visible]);
-
   if (!visible || words.length === 0) return null;
 
   const containerOpacity = getContainerOpacity(phase);
@@ -79,6 +36,7 @@ export const RitualEchoChain: React.FC<RitualEchoChainProps> = ({
   const arrowChar = phase >= 3 ? '\u2193' : '\u2192'; // down arrow at Phase 3+, right arrow otherwise
   const connectorLineStyle = getConnectorLineStyle(phase);
   const showConnectorLine = phase >= 2;
+  const enteringAnimation = getSettingsSync().reducedMotion ? undefined : FadeIn.duration(FADE_IN_DURATION);
 
   return (
     <View
@@ -93,10 +51,8 @@ export const RitualEchoChain: React.FC<RitualEchoChainProps> = ({
       {words.map((word, index) => (
         <Animated.View
           key={`${index}-${word}`}
-          style={[
-            styles.wordEntry,
-            { opacity: wordAnimations[index] || 0 },
-          ]}
+          entering={enteringAnimation}
+          style={styles.wordEntry}
         >
           <Text style={[styles.wordText, wordStyle]}>
             {word}

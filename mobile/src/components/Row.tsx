@@ -15,7 +15,6 @@ import Animated, {
   withTiming,
   withSequence,
   withDelay,
-  withRepeat,
   cancelAnimation,
   Easing,
   SharedValue,
@@ -26,7 +25,6 @@ import { DraggableTile } from './DraggableTile';
 import type { DragOverlaySharedValues, DragTileSnapshot } from './DragOverlayPortal';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
-import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getWordPhaseTier } from '../services/localGenerator';
 
 const ROW_HORIZONTAL_MARGIN = 12;
@@ -73,6 +71,109 @@ interface RowProps {
   overlaySharedValues?: DragOverlaySharedValues;
   /** Called to set tile snapshot for the drag overlay */
   onSetDragSnapshot?: (snapshot: DragTileSnapshot | null) => void;
+}
+
+function isRowSource(rowIndex: number, activeRowIndex: number): boolean {
+  return rowIndex === activeRowIndex;
+}
+
+function getTargetRowIndex(activeRowIndex: number, moveDirection: 'down' | 'up'): number {
+  return activeRowIndex + (moveDirection === 'down' ? 1 : -1);
+}
+
+function isRowTarget(rowIndex: number, activeRowIndex: number, moveDirection: 'down' | 'up'): boolean {
+  return rowIndex === getTargetRowIndex(activeRowIndex, moveDirection);
+}
+
+function isRowCompleted(rowIndex: number, activeRowIndex: number, moveDirection: 'down' | 'up'): boolean {
+  return moveDirection === 'down'
+    ? rowIndex < activeRowIndex
+    : rowIndex > activeRowIndex;
+}
+
+function hasSameRowData(prev: RowData, next: RowData): boolean {
+  if (prev === next) return true;
+  if (prev.id !== next.id || prev.originalWord !== next.originalWord) return false;
+  if (prev.words.length !== next.words.length) return false;
+
+  for (let i = 0; i < prev.words.length; i++) {
+    const prevLetter = prev.words[i];
+    const nextLetter = next.words[i];
+    if (
+      prevLetter.id !== nextLetter.id ||
+      prevLetter.char !== nextLetter.char ||
+      prevLetter.isLocked !== nextLetter.isLocked
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasSameSlotPreviews(prev?: SlotPreview[], next?: SlotPreview[]): boolean {
+  if (prev === next) return true;
+  if (!prev || !next) return prev == null && next == null;
+  if (prev.length !== next.length) return false;
+
+  for (let i = 0; i < prev.length; i++) {
+    if (prev[i].word !== next[i].word || prev[i].isValid !== next[i].isValid) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function areRowPropsEqual(prev: RowProps, next: RowProps): boolean {
+  const prevIsSource = isRowSource(prev.rowIndex, prev.activeRowIndex);
+  const nextIsSource = isRowSource(next.rowIndex, next.activeRowIndex);
+  const prevIsTarget = isRowTarget(prev.rowIndex, prev.activeRowIndex, prev.moveDirection ?? 'down');
+  const nextIsTarget = isRowTarget(next.rowIndex, next.activeRowIndex, next.moveDirection ?? 'down');
+  const prevIsCompleted = isRowCompleted(prev.rowIndex, prev.activeRowIndex, prev.moveDirection ?? 'down');
+  const nextIsCompleted = isRowCompleted(next.rowIndex, next.activeRowIndex, next.moveDirection ?? 'down');
+
+  if (
+    prev.rowIndex !== next.rowIndex ||
+    prev.activeRowIndex !== next.activeRowIndex ||
+    (prev.moveDirection ?? 'down') !== (next.moveDirection ?? 'down') ||
+    prev.phase !== next.phase ||
+    prev.wordLength !== next.wordLength ||
+    prev.isProcessing !== next.isProcessing ||
+    prev.concealLetters !== next.concealLetters ||
+    prev.guidanceActive !== next.guidanceActive ||
+    prev.guidedLetterId !== next.guidedLetterId ||
+    prev.guidedSlotIndex !== next.guidedSlotIndex ||
+    prevIsSource !== nextIsSource ||
+    prevIsTarget !== nextIsTarget ||
+    prevIsCompleted !== nextIsCompleted ||
+    !hasSameRowData(prev.rowData, next.rowData)
+  ) {
+    return false;
+  }
+
+  if (prevIsSource || nextIsSource) {
+    if ((prev.selectedLetter?.id ?? null) !== (next.selectedLetter?.id ?? null)) {
+      return false;
+    }
+  }
+
+  if (prevIsTarget || nextIsTarget) {
+    if ((prev.selectedLetter?.id ?? null) !== (next.selectedLetter?.id ?? null)) {
+      return false;
+    }
+    if (!hasSameSlotPreviews(prev.slotPreviews, next.slotPreviews)) {
+      return false;
+    }
+    if ((prev.invalidDropSignal ?? 0) !== (next.invalidDropSignal ?? 0)) {
+      return false;
+    }
+    if ((prev.successDropSignal ?? 0) !== (next.successDropSignal ?? 0)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // Phase-aware row color helper
@@ -375,15 +476,44 @@ export const Row: React.FC<RowProps> = memo(({
   onSetDragSnapshot,
 }) => {
   const phaseColors = getPhaseRowColors(phase);
-  const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
-  const isSource = rowIndex === activeRowIndex;
-  const isTarget = rowIndex === targetRowIndex;
+  const targetRowIndex = getTargetRowIndex(activeRowIndex, moveDirection);
+  const isSource = isRowSource(rowIndex, activeRowIndex);
+  const isTarget = isRowTarget(rowIndex, activeRowIndex, moveDirection);
   // Drop rows compact at 6+ (need room for insertion slots); pick rows compact at 7+
   const compactTiles = isTarget ? wordLength >= 6 : wordLength >= 7;
-  const isCompleted = moveDirection === 'down'
-    ? rowIndex < activeRowIndex
-    : rowIndex > activeRowIndex;
+  const isCompleted = isRowCompleted(rowIndex, activeRowIndex, moveDirection);
   const showSlots = isTarget && selectedLetter && !isProcessing;
+
+  const onLetterPressRef = React.useRef(onLetterPress);
+  const onSlotPressRef = React.useRef(onSlotPress);
+  const onLetterDragDropRef = React.useRef(onLetterDragDrop);
+  const onDragActiveChangeRef = React.useRef(onDragActiveChange);
+  const onSetDragSnapshotRef = React.useRef(onSetDragSnapshot);
+  onLetterPressRef.current = onLetterPress;
+  onSlotPressRef.current = onSlotPress;
+  onLetterDragDropRef.current = onLetterDragDrop;
+  onDragActiveChangeRef.current = onDragActiveChange;
+  onSetDragSnapshotRef.current = onSetDragSnapshot;
+
+  const forwardLetterPress = useCallback((letter: Letter, index: number) => {
+    onLetterPressRef.current(letter, index);
+  }, []);
+
+  const forwardSlotPress = useCallback((index: number, origin?: { x: number; y: number }) => {
+    onSlotPressRef.current(index, origin);
+  }, []);
+
+  const forwardLetterDragDrop = useCallback((letter: Letter, index: number, position: { x: number; y: number }) => {
+    onLetterDragDropRef.current?.(letter, index, position);
+  }, []);
+
+  const forwardDragActiveChange = useCallback((active: boolean) => {
+    onDragActiveChangeRef.current?.(active);
+  }, []);
+
+  const forwardSetDragSnapshot = useCallback((snapshot: DragTileSnapshot | null) => {
+    onSetDragSnapshotRef.current?.(snapshot);
+  }, []);
 
   // Resonance: check if this row's word belongs to a dread tier relevant to the current phase.
   // Only visible at Phase 1+ — creates the subliminal "these words feel different" effect.
@@ -512,7 +642,7 @@ export const Row: React.FC<RowProps> = memo(({
             wrapperStyle={styles.arcSlotWrapper}
           >
             <Slot
-              onPress={(origin) => onSlotPress(slotIndex, origin)}
+              onPress={(origin) => forwardSlotPress(slotIndex, origin)}
               index={slotIndex}
               compact
               phase={phase}
@@ -584,15 +714,15 @@ export const Row: React.FC<RowProps> = memo(({
             enabled={!isProcessing}
             onDragStart={() => {
               if (!selectedLetter || selectedLetter.id !== letter.id) {
-                onLetterPress(letter, rowIndex);
+                forwardLetterPress(letter, rowIndex);
               }
             }}
-            onDragEnd={(pos) => onLetterDragDrop!(letter, rowIndex, pos)}
-            onTap={() => onLetterPress(letter, rowIndex)}
+            onDragEnd={(pos) => forwardLetterDragDrop(letter, rowIndex, pos)}
+            onTap={() => forwardLetterPress(letter, rowIndex)}
             phase={phase}
-            onDragActiveChange={onDragActiveChange}
+            onDragActiveChange={forwardDragActiveChange}
             overlaySharedValues={overlaySharedValues}
-            onSetDragSnapshot={onSetDragSnapshot}
+            onSetDragSnapshot={forwardSetDragSnapshot}
             letterChar={letter.char}
             compact={compactTiles}
           >
@@ -678,7 +808,7 @@ export const Row: React.FC<RowProps> = memo(({
       </View>
     </Animated.View>
   );
-});
+}, areRowPropsEqual);
 
 const styles = StyleSheet.create({
   rowWrapper: {

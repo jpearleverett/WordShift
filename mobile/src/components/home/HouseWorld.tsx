@@ -19,9 +19,8 @@ import Reanimated, {
   Easing as REasing,
 } from 'react-native-reanimated';
 import {
-  PanGestureHandler,
-  State,
-  PanGestureHandlerGestureEvent,
+  Gesture,
+  GestureDetector,
 } from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
@@ -788,14 +787,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
   amberBalance = 0,
   purchasedUpgrades = {},
 }) => {
-  // Animated values
-  const translateY = useRef(new Animated.Value(0)).current;
-
-  // Refs for gesture tracking
-  const panRef = useRef<PanGestureHandler>(null);
-
-  // State tracking for gestures
-  const baseTranslateY = useRef(0);
+  const translateY = useSharedValue(0);
+  const baseTranslateY = useSharedValue(0);
+  const minTranslateY = useSharedValue(0);
+  const maxTranslateY = useSharedValue(0);
 
   // Track container height via ref to avoid state-triggered re-renders.
   // Position updates are applied directly via translateY.setValue in the
@@ -815,10 +810,12 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
       const connectorH = Math.max(0, nr - 1) * 10;
       const totalH = 50 + 80 + hh + 25 + 40 + connectorH;
       const overflow = Math.max(0, totalH - height);
-      translateY.setValue(overflow);
-      baseTranslateY.current = overflow;
+      maxTranslateY.value = Math.max(0, overflow + 50);
+      minTranslateY.value = 0;
+      translateY.value = overflow;
+      baseTranslateY.value = overflow;
     }
-  }, []);
+  }, [baseTranslateY, maxTranslateY, minTranslateY, translateY]);
 
   // Memoize night star positions/sizes to prevent flicker on re-render
   const nightStars = useMemo(() =>
@@ -897,40 +894,25 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
     return map;
   }, [animals]);
 
-  // Calculate pan bounds based on content size
-  // Uses refs so gesture callbacks don't need to be recreated when these values change.
-  const getPanBoundsRef = useRef(() => ({ min: 0, max: 0 }));
-  getPanBoundsRef.current = () => {
-    const connectorHeight = Math.max(0, numRows - 1) * 10;
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
-    const overflow = Math.max(0, totalContentHeight - containerHeightRef.current);
-    return {
-      min: 0,
-      max: Math.max(0, overflow + 50),
-    };
-  };
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(10)
+        .onUpdate((event) => {
+          'worklet';
+          const nextY = baseTranslateY.value + event.translationY;
+          translateY.value = Math.max(minTranslateY.value, Math.min(maxTranslateY.value, nextY));
+        })
+        .onEnd(() => {
+          'worklet';
+          baseTranslateY.value = translateY.value;
+        }),
+    [baseTranslateY, maxTranslateY, minTranslateY, translateY]
+  );
 
-  // Stable pan gesture callbacks — use refs to avoid PanGestureHandler reconfiguration
-  const onPanGestureEvent = useCallback((event: PanGestureHandlerGestureEvent) => {
-    const { translationY: ty } = event.nativeEvent;
-    const bounds = getPanBoundsRef.current();
-    const newY = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + ty));
-    translateY.setValue(newY);
-  }, []);
-
-  const onPanHandlerStateChange = useCallback((event: PanGestureHandlerGestureEvent) => {
-    if (event.nativeEvent.state === State.END) {
-      const { translationY: ty } = event.nativeEvent;
-      const bounds = getPanBoundsRef.current();
-      baseTranslateY.current = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + ty));
-    }
-  }, []);
-
-  // Stable transform container style — translateY is an Animated.Value ref, safe to store
-  const transformStyle = useRef([
-    styles.transformContainer,
-    { transform: [{ translateY }] },
-  ]).current;
+  const transformStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   // Set initial pan position when room count changes.
   // containerHeight changes are handled directly in onContainerLayout.
@@ -939,9 +921,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
     const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
     const overflow = Math.max(0, totalContentHeight - containerHeightRef.current);
 
-    translateY.setValue(overflow);
-    baseTranslateY.current = overflow;
-  }, [numRows]);
+    maxTranslateY.value = Math.max(0, overflow + 50);
+    minTranslateY.value = 0;
+    translateY.value = overflow;
+    baseTranslateY.value = overflow;
+  }, [baseTranslateY, houseHeight, maxTranslateY, minTranslateY, numRows, translateY]);
 
   // Phase-aware container bg color — memoized to avoid inline object creation
   const containerBgStyle = useMemo(() => [
@@ -972,15 +956,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
       <ParticleLayer currentPhase={currentPhase} />
 
       {/* Pan gesture handler - vertical only */}
-      <PanGestureHandler
-        ref={panRef}
-        onGestureEvent={onPanGestureEvent}
-        onHandlerStateChange={onPanHandlerStateChange}
-        minDist={10}
-        avgTouches
-      >
-        <Animated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
-          <Animated.View style={transformStyle}>
+      <GestureDetector gesture={panGesture}>
+        <Reanimated.View style={styles.gestureContainer} onLayout={onContainerLayout}>
+          <Reanimated.View style={[styles.transformContainer, transformStyle]}>
               {/* Sky background - inside transform so it moves with the scene */}
               <Image
                 source={skySource}
@@ -1145,9 +1123,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = React.memo(({
                   </View>
                 </View>
               </View>
-            </Animated.View>
-        </Animated.View>
-      </PanGestureHandler>
+          </Reanimated.View>
+        </Reanimated.View>
+      </GestureDetector>
     </View>
   );
 }, (prevProps, nextProps) => {

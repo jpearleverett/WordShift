@@ -847,11 +847,10 @@ export default function App() {
     puzzleActions.handleLetterPress(letter, rowIndex);
   }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
 
-  // Disable puzzle ScrollView during drag to prevent scroll-vs-drag conflict.
-  // Toggled by DraggableTile via onDragActiveChange callback.
-  const [puzzleScrollEnabled, setPuzzleScrollEnabled] = useState(true);
+  // Disable puzzle ScrollView during drag without re-rendering the whole puzzle screen.
+  const puzzleScrollRef = useRef<ScrollView | null>(null);
   const handleDragActiveChange = useCallback((active: boolean) => {
-    setPuzzleScrollEnabled(!active);
+    puzzleScrollRef.current?.setNativeProps({ scrollEnabled: !active });
   }, []);
 
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
@@ -1380,9 +1379,10 @@ export default function App() {
           )}
 
           <ScrollView
+            ref={puzzleScrollRef}
             contentContainerStyle={styles.rowsContainer}
             showsVerticalScrollIndicator={false}
-            scrollEnabled={puzzleScrollEnabled}
+            scrollEnabled
             accessibilityRole="list"
             accessibilityLabel={`Puzzle with ${puzzle.rows.length} word rows`}
           >
