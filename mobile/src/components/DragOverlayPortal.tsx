@@ -29,7 +29,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Canvas, RoundedRect, BlurMask } from '@shopify/react-native-skia';
 import { getTileColor, CandyColors } from '../theme/colors';
-import { shouldSimplifyAnimations } from '../services/deviceTier';
 
 // Tile appearance snapshot set once per drag
 export interface DragTileSnapshot {
@@ -310,8 +309,8 @@ export function DragOverlayPortal({ sharedValues, snapshotStore }: DragOverlayPo
     ],
   }));
 
-  // Only render trail on capable devices
-  const showTrail = !shouldSimplifyAnimations();
+  // Disabled by default to prioritize drag responsiveness over decorative motion.
+  const showTrail = false;
 
   return (
     <>

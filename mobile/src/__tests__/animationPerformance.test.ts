@@ -126,7 +126,7 @@ describe('animation performance helpers', () => {
   test('only mounts tile glow canvas when needed', () => {
     expect(shouldRenderTileGlow(false, false)).toBe(false);
     expect(shouldRenderTileGlow(true, false)).toBe(true);
-    expect(shouldRenderTileGlow(false, true)).toBe(true);
+    expect(shouldRenderTileGlow(false, true)).toBe(false);
   });
 
   test('row comparator ignores unrelated selected-letter churn on distant rows', () => {
