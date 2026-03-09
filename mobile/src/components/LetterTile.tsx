@@ -8,15 +8,12 @@ import Animated, {
   withTiming,
   withRepeat,
   withSequence,
-  withDelay,
   cancelAnimation,
   Easing,
-  SharedValue,
 } from 'react-native-reanimated';
 import { Letter } from '../types';
-import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
+import { getTileColor, CandyColors } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
-import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { TileGlowCanvas } from './TileGlowCanvas';
 
 interface LetterTileProps {
@@ -36,7 +33,7 @@ interface LetterTileProps {
 }
 
 export function shouldRenderTileGlow(isSelected: boolean, isResonant: boolean): boolean {
-  return isSelected || isResonant;
+  return isSelected;
 }
 
 function areLetterTilePropsEqual(prev: LetterTileProps, next: LetterTileProps): boolean {
@@ -70,18 +67,20 @@ function getSelectedSpringParams(phase: number) {
   return { damping: 4, stiffness: 220 };
 }
 
-function getWobbleDurations(phase: number) {
-  if (phase >= 4) return { quarter: 250, half: 500 };
-  if (phase >= 3) return { quarter: 200, half: 400 };
-  if (phase >= 2) return { quarter: 150, half: 300 };
-  return { quarter: 150, half: 300 };
+function getBounceHeight(phase: number) {
+  if (phase >= 4) return -1.5;
+  if (phase >= 3) return -2;
+  if (phase >= 2) return -2.5;
+  return -3;
 }
 
-function getBounceHeight(phase: number) {
-  if (phase >= 4) return -2;
-  if (phase >= 3) return -2.5;
-  if (phase >= 2) return -3.5;
-  return -4;
+function getResonanceOverlay(phase: number): { color: string; opacity: number } | null {
+  if (phase >= 5) return { color: '#7B6B8A', opacity: 0.08 };
+  if (phase >= 4) return { color: '#8B0000', opacity: 0.12 };
+  if (phase >= 3) return { color: '#4A2080', opacity: 0.10 };
+  if (phase >= 2) return { color: '#6B5B95', opacity: 0.07 };
+  if (phase >= 1) return { color: '#DAA520', opacity: 0.05 };
+  return null;
 }
 
 export const LetterTile: React.FC<LetterTileProps> = memo(({
@@ -101,94 +100,36 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
 
   // === REANIMATED SHARED VALUES ===
   const scaleAnim = useSharedValue(1);
-  const glowAnim = useSharedValue(0);
   const bounceAnim = useSharedValue(0);
-  const shineAnim = useSharedValue(0);
-  const wobbleAnim = useSharedValue(0);
   const guidePulseAnim = useSharedValue(0);
 
   // Get consistent color based on letter
   const tileColor = getTileColor(letter.char);
 
-  // === IDLE ANIMATION (glow + shine) — Reanimated UI thread ===
-  // Only run continuous loops on the active (source) row to avoid saturating the UI thread.
-  useEffect(() => {
-    if (reducedMotion) return;
-    if (isActiveRow && isInteractable && !isSelected) {
-      // Pulse glow: 0→1→0 on 1800ms cycle
-      glowAnim.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }),
-          withTiming(0, { duration: 900, easing: Easing.inOut(Easing.sin) }),
-        ),
-        -1,
-      );
-      // Shine sweep: wait 2s then flash 0→1→0
-      shineAnim.value = withRepeat(
-        withSequence(
-          withDelay(2000, withTiming(1, { duration: 600, easing: Easing.inOut(Easing.quad) })),
-          withTiming(0, { duration: 1 }),
-        ),
-        -1,
-      );
-    } else {
-      glowAnim.value = 0;
-      shineAnim.value = 0;
-    }
-
-    return () => {
-      cancelAnimation(glowAnim);
-      cancelAnimation(shineAnim);
-    };
-  }, [isActiveRow, isInteractable, isSelected, reducedMotion]);
-
-  // === SELECTED ANIMATION (bounce + wobble + scale) — Reanimated UI thread ===
+  // === SELECTED ANIMATION — one-shot pop/lift only, no continuous loops ===
   useEffect(() => {
     if (reducedMotion) {
       scaleAnim.value = isSelected ? 1.08 : 1;
-      bounceAnim.value = 0;
-      wobbleAnim.value = 0;
+      bounceAnim.value = isSelected ? getBounceHeight(phase) : 0;
       return;
     }
     if (isSelected) {
       const spring = getSelectedSpringParams(phase);
-      const wobbleDur = getWobbleDurations(phase);
       const bounceH = getBounceHeight(phase);
 
-      // Initial pop — phase-aware spring
       scaleAnim.value = withSequence(
         withSpring(1.15, { damping: spring.damping, stiffness: spring.stiffness }),
         withSpring(1.08, { damping: spring.damping + 2, stiffness: spring.stiffness }),
       );
-
-      // Continuous wobble — ±3° rotation
-      wobbleAnim.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: wobbleDur.quarter, easing: Easing.inOut(Easing.sin) }),
-          withTiming(-1, { duration: wobbleDur.half, easing: Easing.inOut(Easing.sin) }),
-          withTiming(0, { duration: wobbleDur.quarter, easing: Easing.inOut(Easing.sin) }),
-        ),
-        -1,
-      );
-
-      // Floating bounce — phase-aware height
-      bounceAnim.value = withRepeat(
-        withSequence(
-          withTiming(bounceH, { duration: 400, easing: Easing.inOut(Easing.sin) }),
-          withTiming(0, { duration: 400, easing: Easing.inOut(Easing.sin) }),
-        ),
-        -1,
-      );
+      bounceAnim.value = withSpring(bounceH, { damping: 14, stiffness: 180 });
     } else {
       scaleAnim.value = withTiming(1, { duration: 150 });
       bounceAnim.value = withTiming(0, { duration: 150 });
-      wobbleAnim.value = withTiming(0, { duration: 100 });
     }
 
     return () => {
       cancelAnimation(scaleAnim);
       cancelAnimation(bounceAnim);
-      cancelAnimation(wobbleAnim);
     };
   }, [isSelected, phase]);
 
@@ -275,15 +216,10 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
   const tileStyles = getStyles();
   const isClickable = (isInteractable || isSelected) && onPress;
 
-  // === ANIMATED STYLES (all on UI thread via Reanimated) ===
-  const glowOpacity = useDerivedValue(() => 0.3 + glowAnim.value * 0.4);
-
-  const shineTranslateX = useDerivedValue(() => -60 + shineAnim.value * 120);
-
-  const wobbleRotateDeg = useDerivedValue(() => `${wobbleAnim.value * 3}deg`);
-
   // Trail glow color (static shadow tint; animated glow is via TileGlowCanvas)
   const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
+  const resonanceOverlay = isResonant && !isSelected ? getResonanceOverlay(phase) : null;
+  const glowOuterOpacity = isSelected ? 0.58 : isActiveRow && isInteractable ? 0.20 : 0.12;
 
   const guideRingScaleVal = useDerivedValue(() => 1 + guidePulseAnim.value * 0.18);
   const guideRingOpacityVal = useDerivedValue(() => 0.6 + guidePulseAnim.value * 0.4);
@@ -293,18 +229,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
     transform: [
       { scale: scaleAnim.value },
       { translateY: bounceAnim.value },
-      { rotate: wobbleRotateDeg.value },
     ],
-  }));
-
-  // Glow outer opacity
-  const glowAnimStyle = useAnimatedStyle(() => ({
-    opacity: isSelected ? 0.6 : glowOpacity.value,
-  }));
-
-  // Shine sweep transform
-  const shineAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shineTranslateX.value }],
   }));
 
   // Guide ring
@@ -338,7 +263,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
           style={[
             styles.glowOuter,
             { backgroundColor: tileStyles.shadowColor },
-            glowAnimStyle,
+            { opacity: glowOuterOpacity },
           ]}
         />
       )}
@@ -371,6 +296,15 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         {/* Glossy shine overlay */}
         <View style={styles.glossyShine} />
 
+        {resonanceOverlay && (
+          <View
+            style={[
+              styles.resonanceOverlay,
+              { backgroundColor: resonanceOverlay.color, opacity: resonanceOverlay.opacity },
+            ]}
+          />
+        )}
+
         {/* Letter text with shadow */}
         <Text
           style={[
@@ -386,13 +320,6 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
         {/* Specular highlight dot */}
         {highlight !== 'locked' && (
           <View style={styles.specularDot} />
-        )}
-
-        {/* Moving shine effect */}
-        {isInteractable && !isSelected && (
-          <Animated.View
-            style={[styles.shineSweep, shineAnimStyle]}
-          />
         )}
 
         {/* Subtle lock overlay for locked tiles */}
@@ -544,13 +471,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
     borderRadius: 4,
   },
-  shineSweep: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-    transform: [{ skewX: '-20deg' }],
+  resonanceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 14,
   },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
