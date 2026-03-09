@@ -18,7 +18,7 @@
  * and stored in a React ref — it doesn't change during the drag.
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useSyncExternalStore } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -49,6 +49,31 @@ export interface DragOverlaySharedValues {
   offsetY: SharedValue<number>;
 }
 
+export interface DragOverlaySnapshotStore {
+  getSnapshot: () => DragTileSnapshot | null;
+  setSnapshot: (snapshot: DragTileSnapshot | null) => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+function createDragOverlaySnapshotStore(): DragOverlaySnapshotStore {
+  let snapshot: DragTileSnapshot | null = null;
+  const listeners = new Set<() => void>();
+
+  return {
+    getSnapshot: () => snapshot,
+    setSnapshot: (nextSnapshot) => {
+      snapshot = nextSnapshot;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
 // Hook that creates the shared values and snapshot management
 export function useDragOverlay() {
   const translateX = useSharedValue(0);
@@ -57,14 +82,13 @@ export function useDragOverlay() {
   const opacity = useSharedValue(0);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
-
-  const snapshotRef = useRef<DragTileSnapshot | null>(null);
-  // Force re-render when snapshot changes so the overlay picks up new tile info
-  const [, setSnapshotVersion] = React.useState(0);
+  const snapshotStoreRef = useRef<DragOverlaySnapshotStore | null>(null);
+  if (!snapshotStoreRef.current) {
+    snapshotStoreRef.current = createDragOverlaySnapshotStore();
+  }
 
   const setSnapshot = useCallback((snapshot: DragTileSnapshot | null) => {
-    snapshotRef.current = snapshot;
-    setSnapshotVersion(v => v + 1);
+    snapshotStoreRef.current?.setSnapshot(snapshot);
   }, []);
 
   const sharedValues: DragOverlaySharedValues = {
@@ -76,7 +100,7 @@ export function useDragOverlay() {
     offsetY,
   };
 
-  return { sharedValues, snapshotRef, setSnapshot };
+  return { sharedValues, snapshotStore: snapshotStoreRef.current, setSnapshot };
 }
 
 // Standard tile dimensions (matches LetterTile.tsx)
@@ -267,11 +291,15 @@ function DragTrailCanvas({ sharedValues, phase }: {
 
 interface DragOverlayPortalProps {
   sharedValues: DragOverlaySharedValues;
-  snapshotRef: React.RefObject<DragTileSnapshot | null>;
+  snapshotStore: DragOverlaySnapshotStore;
 }
 
-export function DragOverlayPortal({ sharedValues, snapshotRef }: DragOverlayPortalProps) {
-  const snapshot = snapshotRef.current;
+export function DragOverlayPortal({ sharedValues, snapshotStore }: DragOverlayPortalProps) {
+  const snapshot = useSyncExternalStore(
+    snapshotStore.subscribe,
+    snapshotStore.getSnapshot,
+    snapshotStore.getSnapshot,
+  );
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: sharedValues.opacity.value,

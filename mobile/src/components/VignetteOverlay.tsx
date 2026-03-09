@@ -47,7 +47,7 @@ interface VignetteOverlayProps {
   color?: string;
 }
 
-export const VignetteOverlay: React.FC<VignetteOverlayProps> = ({
+export const VignetteOverlay: React.FC<VignetteOverlayProps> = React.memo(({
   intensity = 0.5,
   color = '#05000A',
 }) => {
@@ -89,5 +89,5 @@ export const VignetteOverlay: React.FC<VignetteOverlayProps> = ({
       </Canvas>
     </Animated.View>
   );
-};
+});
 

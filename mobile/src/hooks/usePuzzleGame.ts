@@ -1059,7 +1059,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     isEchoPuzzle,
   };
 
-  const actions: PuzzleGameActions = {
+  const actions: PuzzleGameActions = useMemo(() => ({
     initGame,
     startNewGame,
     handleLetterPress,
@@ -1078,7 +1078,26 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedVariant,
     restorePuzzleState,
     clearBoard,
-  };
+  }), [
+    initGame,
+    startNewGame,
+    handleLetterPress,
+    handleSlotPress,
+    handleUndo,
+    handleHint,
+    handleNextLevel,
+    setShowRules,
+    setShowDifficultyMenu,
+    setShowConfetti,
+    setGameState,
+    setEarnedStars,
+    setMessage,
+    setGameMode,
+    setCurrentPhase,
+    setSelectedVariant,
+    restorePuzzleState,
+    clearBoard,
+  ]);
 
   return [state, actions];
 }

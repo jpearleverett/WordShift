@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import {
   SharedValue,
   useSharedValue,
@@ -148,14 +148,21 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     phaseFlashOpacity,
   };
 
-  const actions: VictoryFlowActions = {
+  const actions: VictoryFlowActions = useMemo(() => ({
     setVictoryData,
     setProcessingVictory,
     playVictorySequence,
     playPhaseChangeFlash,
     resetVictory,
     skipToEnd,
-  };
+  }), [
+    setVictoryData,
+    setProcessingVictory,
+    playVictorySequence,
+    playPhaseChangeFlash,
+    resetVictory,
+    skipToEnd,
+  ]);
 
   return [state, actions];
 }

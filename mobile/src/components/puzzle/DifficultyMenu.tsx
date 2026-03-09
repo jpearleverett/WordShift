@@ -26,7 +26,7 @@ interface DifficultyMenuProps {
   onToggleChallengeMode: () => void;
 }
 
-export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
+export const DifficultyMenu: React.FC<DifficultyMenuProps> = React.memo(({
   visible,
   currentDifficulty,
   gameMode,
@@ -229,7 +229,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
       </ScrollView>
     </Reanimated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   difficultyMenu: {

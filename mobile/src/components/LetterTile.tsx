@@ -39,6 +39,22 @@ export function shouldRenderTileGlow(isSelected: boolean, isResonant: boolean): 
   return isSelected || isResonant;
 }
 
+function areLetterTilePropsEqual(prev: LetterTileProps, next: LetterTileProps): boolean {
+  return (
+    prev.letter.id === next.letter.id &&
+    prev.letter.char === next.letter.char &&
+    prev.letter.isLocked === next.letter.isLocked &&
+    prev.isSelected === next.isSelected &&
+    prev.isInteractable === next.isInteractable &&
+    prev.highlight === next.highlight &&
+    prev.phase === next.phase &&
+    prev.compact === next.compact &&
+    prev.isResonant === next.isResonant &&
+    prev.isGuided === next.isGuided &&
+    prev.isActiveRow === next.isActiveRow
+  );
+}
+
 // Compact tile dimensions for 6+ letter words
 const COMPACT_OUTER_W = 42;
 const COMPACT_OUTER_H = 52;
@@ -412,7 +428,7 @@ export const LetterTile: React.FC<LetterTileProps> = memo(({
   }
 
   return content;
-});
+}, areLetterTilePropsEqual);
 
 const styles = StyleSheet.create({
   tileOuter: {

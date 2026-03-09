@@ -14,7 +14,7 @@ interface ToastProps {
   isError: boolean;
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
+export const Toast: React.FC<ToastProps> = React.memo(({ message, isError }) => {
   const slideY = useSharedValue(-20);
   const opacity = useSharedValue(0);
   const shakeX = useSharedValue(0);
@@ -63,7 +63,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
       </Text>
     </Reanimated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   toast: {

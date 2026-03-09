@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   checkAchievements,
   Achievement,
@@ -85,8 +85,10 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
     setCurrentAchievement(null);
   }, []);
 
+  const actions = useMemo(() => ({ checkForAchievements, dismissAchievement }), [checkForAchievements, dismissAchievement]);
+
   return [
     { currentAchievement },
-    { checkForAchievements, dismissAchievement },
+    actions,
   ];
 }

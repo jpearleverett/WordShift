@@ -25,7 +25,7 @@ interface RulesModalProps {
   onClose: () => void;
 }
 
-export const RulesModal: React.FC<RulesModalProps> = ({
+export const RulesModal: React.FC<RulesModalProps> = React.memo(({
   visible,
   phase,
   onClose,
@@ -81,7 +81,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({
       </TouchableOpacity>
     </Modal>
   );
-};
+});
 
 const styles = StyleSheet.create({
   modalOverlay: {

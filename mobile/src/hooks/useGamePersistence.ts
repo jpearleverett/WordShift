@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import {
@@ -370,11 +370,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     pendingPhaseTransition,
   };
 
-  const actions: PersistenceActions = {
+  const actions: PersistenceActions = useMemo(() => ({
     recordVictory,
     setAmberBalance,
     refreshStats,
-  };
+  }), [recordVictory, setAmberBalance, refreshStats]);
 
   return [state, actions];
 }

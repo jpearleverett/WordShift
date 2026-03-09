@@ -135,7 +135,6 @@ export function areRowPropsEqual(prev: RowProps, next: RowProps): boolean {
 
   if (
     prev.rowIndex !== next.rowIndex ||
-    prev.activeRowIndex !== next.activeRowIndex ||
     (prev.moveDirection ?? 'down') !== (next.moveDirection ?? 'down') ||
     prev.phase !== next.phase ||
     prev.wordLength !== next.wordLength ||

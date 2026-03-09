@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   OnboardingStep,
   getOnboardingStep,
@@ -349,7 +349,7 @@ export function useOnboardingFlow(
     isOnboarding,
   };
 
-  const actions: OnboardingFlowActions = {
+  const actions: OnboardingFlowActions = useMemo(() => ({
     handleOnboardingContinue,
     handleSkipOnboarding,
     handlePitOnboardingOfferComplete,
@@ -357,7 +357,15 @@ export function useOnboardingFlow(
     getOnboardingFoxText,
     getOnboardingButtonText,
     clearRitualEchoWords,
-  };
+  }), [
+    handleOnboardingContinue,
+    handleSkipOnboarding,
+    handlePitOnboardingOfferComplete,
+    advanceOnboarding,
+    getOnboardingFoxText,
+    getOnboardingButtonText,
+    clearRitualEchoWords,
+  ]);
 
   return [state, actions];
 }

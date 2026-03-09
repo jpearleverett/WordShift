@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   getVictoryGlitch,
   checkNarrativeMicroBeat,
@@ -315,12 +315,12 @@ export function useVictoryOrchestration(): [
     completionCoda,
   };
 
-  const actions: VictoryOrchestrationActions = {
+  const actions: VictoryOrchestrationActions = useMemo(() => ({
     processVictory,
     setCompletionCoda,
     resetOrchestration,
     dismissWhisper,
-  };
+  }), [processVictory, setCompletionCoda, resetOrchestration, dismissWhisper]);
 
   return [state, actions];
 }
