@@ -156,15 +156,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   }, []);
 
   useEffect(() => {
-    const stored = getPreferredPuzzleVariant();
-    if (stored && isPuzzleVariant(stored)) {
-      setSelectedVariantState(stored);
-    }
+    let cancelled = false;
+    getPreferredPuzzleVariant()
+      .then((stored) => {
+        if (cancelled) return;
+        if (stored && isPuzzleVariant(stored)) {
+          setSelectedVariantState(stored);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setSelectedVariant = useCallback((variant: PuzzleVariant) => {
     setSelectedVariantState(variant);
-    setPreferredPuzzleVariant(variant);
+    setPreferredPuzzleVariant(variant).catch(() => {});
   }, []);
 
   const shakeError = useCallback((msg: string) => {
@@ -357,7 +365,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     try {
       // Serve curated early-game puzzles for the first few solves
       // These are hand-picked to showcase interesting letter moves
-      const progress = getFullProgress();
+      const progress = await getFullProgress();
       const puzzlesSolved = progress?.puzzlesSolved ?? 0;
       if (
         puzzlesSolved < CURATED_PUZZLE_COUNT &&
@@ -376,9 +384,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setIsEchoPuzzle(false);
       if (currentPhase === 5 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
         try {
-          const postRev = isPostRevelation();
+          const postRev = await isPostRevelation();
           if (postRev) {
-            const ritualWords = getRitualWords();
+            const ritualWords = await getRitualWords();
             // Pick words matching the target word length for this difficulty
             const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
             const candidates = ritualWords.filter(w => w.length === targetLen);
@@ -387,7 +395,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
               const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
               if (echoPuzzle) {
                 initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
-                recordPuzzleWords(echoPuzzle.words);
+                await recordPuzzleWords(echoPuzzle.words);
                 setIsEchoPuzzle(true);
                 setMessage('The words are returning. They remember you.');
                 return;
@@ -404,11 +412,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const shouldUseBank = bankVariants.includes(variant);
       if (shouldUseBank) {
         try {
-          const recencyMap = getWordHistoryWithRecency();
-          const bankPuzzle = selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap, variant);
+          const recencyMap = await getWordHistoryWithRecency();
+          const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap, variant);
           if (bankPuzzle) {
             initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
-            recordPuzzleWords(bankPuzzle.words);
+            await recordPuzzleWords(bankPuzzle.words);
             if (variant !== 'standard') {
               const config = VARIANT_CONFIGS[variant];
               setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
@@ -755,7 +763,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const maxForwardSourceIndex = rows.length - 2;
     const isReverseMode = hasVariantModifier(currentVariant, 'reverse');
 
-    const finalizePuzzleCompletion = (completedWords: string[]) => {
+    const finalizePuzzleCompletion = async (completedWords: string[]) => {
       setLastCompletedWords(completedWords);
       setLastIncantationName(getIncantationName(completedWords, currentPhase));
       setIsProcessing(false);
@@ -772,7 +780,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isReverseMode) {
       if (activeRowIndex === maxForwardSourceIndex) {
         const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
-        return finalizePuzzleCompletion(completedWords);
+        return await finalizePuzzleCompletion(completedWords);
       }
 
       setActiveRowIndex(prev => prev + 1);
@@ -1059,7 +1067,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     isEchoPuzzle,
   };
 
-  const actions: PuzzleGameActions = useMemo(() => ({
+  const actions: PuzzleGameActions = {
     initGame,
     startNewGame,
     handleLetterPress,
@@ -1078,26 +1086,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedVariant,
     restorePuzzleState,
     clearBoard,
-  }), [
-    initGame,
-    startNewGame,
-    handleLetterPress,
-    handleSlotPress,
-    handleUndo,
-    handleHint,
-    handleNextLevel,
-    setShowRules,
-    setShowDifficultyMenu,
-    setShowConfetti,
-    setGameState,
-    setEarnedStars,
-    setMessage,
-    setGameMode,
-    setCurrentPhase,
-    setSelectedVariant,
-    restorePuzzleState,
-    clearBoard,
-  ]);
+  };
 
   return [state, actions];
 }

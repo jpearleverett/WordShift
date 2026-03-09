@@ -37,7 +37,6 @@ import { awardBonusAmber } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
-import { PitGlowCanvas } from './PitGlowCanvas';
 
 // ---------------------------------------------------------------------------
 // Assets & Constants
@@ -130,7 +129,23 @@ const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: 
   4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070', core: '#1A0510' },
 };
 
-// Glow layers now rendered by PitGlowCanvas (Skia)
+// Multi-layered concentric glow — creates depth and natural radial falloff
+// Each layer is rendered as a circle then stretched with scaleX for a true ellipse
+// (football/rugby ball shape with tapered pointed ends, not a flat-edged capsule)
+const PIT_GLOW_BASE_WIDTH = SCREEN_WIDTH * 0.7;
+const PIT_GLOW_BASE_HEIGHT = 90;
+
+// Pre-computed ellipse scaleX ratios (targetWidth / circleSize) for each layer
+const GLOW_OUTER_SIZE = PIT_GLOW_BASE_HEIGHT * 1.1;     // 99px circle
+const GLOW_OUTER_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.9) / GLOW_OUTER_SIZE;
+const GLOW_MIDDLE_SIZE = PIT_GLOW_BASE_HEIGHT * 0.9;    // 81px circle
+const GLOW_MIDDLE_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.64) / GLOW_MIDDLE_SIZE;
+const GLOW_INNER_SIZE = PIT_GLOW_BASE_HEIGHT * 0.7;     // 63px circle
+const GLOW_INNER_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.4) / GLOW_INNER_SIZE;
+const GLOW_CORE_SIZE = PIT_GLOW_BASE_HEIGHT * 0.5;      // 45px circle
+const GLOW_CORE_SCALE_X = (PIT_GLOW_BASE_WIDTH * 0.28) / GLOW_CORE_SIZE;
+const GLOW_RIM_SIZE_Y = PIT_OVAL.radiusY * 2;           // rim uses PIT_OVAL dims
+const GLOW_RIM_SCALE_X = (PIT_OVAL.radiusX * 2) / GLOW_RIM_SIZE_Y;
 
 // Colors that match the pit rim glow baked into each background image
 const RIM_PARTICLE_COLORS: Record<number, string> = {
@@ -141,7 +156,25 @@ const RIM_PARTICLE_COLORS: Record<number, string> = {
   4: '#60D8C8',
 };
 
-// Breathing glow parameters now in PitGlowCanvas
+// Phase-aware breathing glow opacity [min, max]
+const BREATH_OPACITY: Record<number, [number, number]> = {
+  0: [0.03, 0.12],
+  1: [0.03, 0.12],
+  2: [0.05, 0.18],
+  3: [0.06, 0.22],
+  4: [0.08, 0.30],
+};
+
+// Phase-aware breathing glow scale [min, max]
+const BREATH_SCALE: Record<number, [number, number]> = {
+  0: [0.90, 1.05],
+  1: [0.90, 1.05],
+  2: [0.92, 1.06],
+  3: [0.93, 1.08],
+  4: [0.95, 1.10],
+};
+
+const BREATH_CYCLE_MS = 4000; // half-cycle: 4s in, 4s out = 8s full
 
 function getDevourDuration(phase: number): number {
   if (phase >= 3) return 600;
@@ -218,8 +251,6 @@ interface FlyingWord {
   isDevoured: boolean;
   floatLoopX: Animated.CompositeAnimation | null;
   floatLoopY: Animated.CompositeAnimation | null;
-  /** Timestamp when float loops started — used to compute position without __getValue() */
-  floatStartTime: number;
 }
 
 interface TrailParticle {
@@ -446,189 +477,98 @@ const chipStyles = StyleSheet.create({
 // Particle & effect renderers
 // ---------------------------------------------------------------------------
 
-const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => {
-  const style = useMemo(() => ({
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: p.color,
-    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
-    opacity: p.opacity,
-  }), [p.color, p.x, p.y, p.scale, p.opacity]);
+const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: p.color,
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+      opacity: p.opacity,
+    }}
+  />
+));
 
-  return <Animated.View pointerEvents="none" style={style} />;
-});
+const ImpactParticleView = React.memo(({ p }: { p: ImpactParticle }) => (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: p.color,
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+      opacity: p.opacity,
+    }}
+  />
+));
 
-const ImpactParticleView = React.memo(({ p }: { p: ImpactParticle }) => {
-  const style = useMemo(() => ({
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: p.color,
-    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
-    opacity: p.opacity,
-  }), [p.color, p.x, p.y, p.scale, p.opacity]);
+const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 12,
+      height: 12,
+      borderRadius: 2,
+      backgroundColor: '#FFBF00',
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }, { rotate: '45deg' }],
+      opacity: p.opacity,
+    }}
+  />
+));
 
-  return <Animated.View pointerEvents="none" style={style} />;
-});
-
-const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => {
-  const style = useMemo(() => ({
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: '#FFBF00',
-    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }, { rotate: '45deg' as const }],
-    opacity: p.opacity,
-  }), [p.x, p.y, p.scale, p.opacity]);
-
-  return <Animated.View pointerEvents="none" style={style} />;
-});
-
-const RimParticleView = React.memo(({ p }: { p: RimParticle }) => {
-  // Stable style — deps are Animated.Value refs (never change) and color (immutable per particle)
-  const style = useMemo(() => ({
-    position: 'absolute' as const,
-    top: 0,
-    left: 0,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: p.color,
-    shadowColor: p.color,
-    shadowOffset: { width: 0, height: 0 } as const,
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 3,
-    transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
-    opacity: p.opacity,
-  }), [p.color, p.x, p.y, p.scale, p.opacity]);
-
-  return <Animated.View pointerEvents="none" style={style} />;
-});
+const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
+  <Animated.View
+    pointerEvents="none"
+    style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: p.color,
+      shadowColor: p.color,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.8,
+      shadowRadius: 4,
+      elevation: 3,
+      transform: [{ translateX: p.x }, { translateY: p.y }, { scale: p.scale }],
+      opacity: p.opacity,
+    }}
+  />
+));
 
 const ShockwaveRingView = React.memo(({ ring }: { ring: ShockwaveRing }) => {
-  const style = useMemo(() => {
-    const size = PIT_OVAL.radiusX * 2.6;
-    const sizeY = PIT_OVAL.radiusY * 2.6;
-    return {
-      position: 'absolute' as const,
-      top: PIT_CENTER.y - sizeY / 2,
-      left: PIT_CENTER.x - size / 2,
-      width: size,
-      height: sizeY,
-      borderRadius: size / 2,
-      borderWidth: 2,
-      borderColor: ring.color,
-      transform: [{ scale: ring.scale }],
-      opacity: ring.opacity,
-    };
-  }, [ring.color, ring.scale, ring.opacity]);
-
-  return <Animated.View pointerEvents="none" style={style} />;
-});
-
-// ---------------------------------------------------------------------------
-// Rim Particle Layer — isolated from OfferingPitScreen to prevent setRimParticles
-// state updates (~1/sec) from re-rendering the entire screen
-// (same isolation pattern as ParticleLayer in HouseWorld.tsx)
-// ---------------------------------------------------------------------------
-
-interface RimParticleLayerProps {
-  phase: DialoguePhase;
-  reducedMotion: boolean;
-  simplify: boolean;
-}
-
-const RimParticleLayer: React.FC<RimParticleLayerProps> = React.memo(({
-  phase, reducedMotion, simplify,
-}) => {
-  const [rimParticles, setRimParticles] = useState<RimParticle[]>([]);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
-
-  useEffect(() => {
-    if (reducedMotion || simplify) return;
-
-    const maxRim = getMaxRimParticles();
-    const spawnInterval = 1000;
-    let spawnCount = 0;
-
-    const spawnRimParticle = () => {
-      if (!mountedRef.current) return;
-      const color = RIM_PARTICLE_COLORS[phase] ?? RIM_PARTICLE_COLORS[0];
-      const angle = Math.random() * Math.PI * 2;
-      const startX = PIT_CENTER.x + PIT_OVAL.radiusX * Math.cos(angle) * (0.7 + Math.random() * 0.3);
-      const startY = PIT_CENTER.y + PIT_OVAL.radiusY * Math.sin(angle) * (0.7 + Math.random() * 0.3);
-      const riseHeight = 80 + Math.random() * 100;
-      const driftX = (Math.random() - 0.5) * 40;
-      const duration = 3000 + Math.random() * 2000;
-
-      const p: RimParticle = {
-        id: `rim_${Date.now()}_${spawnCount++}`,
-        x: new Animated.Value(startX),
-        y: new Animated.Value(startY),
-        opacity: new Animated.Value(0),
-        scale: new Animated.Value(0.3 + Math.random() * 0.4),
-        color,
-      };
-
-      setRimParticles(prev => {
-        const capped = prev.length >= maxRim * 2 ? prev.slice(-maxRim) : prev;
-        return [...capped, p];
-      });
-
-      Animated.parallel([
-        Animated.timing(p.y, {
-          toValue: startY - riseHeight,
-          duration,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(p.x, {
-          toValue: startX + driftX,
-          duration,
-          useNativeDriver: true,
-        }),
-        Animated.sequence([
-          Animated.timing(p.opacity, { toValue: 0.7 + Math.random() * 0.3, duration: duration * 0.2, useNativeDriver: true }),
-          Animated.delay(duration * 0.4),
-          Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
-        ]),
-        Animated.sequence([
-          Animated.timing(p.scale, { toValue: 0.8 + Math.random() * 0.4, duration: duration * 0.5, useNativeDriver: true }),
-          Animated.timing(p.scale, { toValue: 0, duration: duration * 0.5, useNativeDriver: true }),
-        ]),
-      ]).start(() => {
-        if (mountedRef.current) setRimParticles(prev => prev.filter(rp => rp.id !== p.id));
-      });
-    };
-
-    for (let i = 0; i < maxRim; i++) {
-      setTimeout(() => spawnRimParticle(), i * (spawnInterval / maxRim));
-    }
-
-    const interval = setInterval(spawnRimParticle, spawnInterval);
-    return () => clearInterval(interval);
-  }, [phase, reducedMotion, simplify]);
-
+  const size = PIT_OVAL.radiusX * 2.6;
+  const sizeY = PIT_OVAL.radiusY * 2.6;
   return (
-    <>
-      {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
-    </>
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: PIT_CENTER.y - sizeY / 2,
+        left: PIT_CENTER.x - size / 2,
+        width: size,
+        height: sizeY,
+        borderRadius: size / 2,
+        borderWidth: 2,
+        borderColor: ring.color,
+        transform: [{ scale: ring.scale }],
+        opacity: ring.opacity,
+      }}
+    />
   );
 });
 
@@ -680,7 +620,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [trailParticles, setTrailParticles] = useState<TrailParticle[]>([]);
   const [impactParticles, setImpactParticles] = useState<ImpactParticle[]>([]);
   const [amberParticles, setAmberParticles] = useState<AmberParticle[]>([]);
-  // rimParticles state moved into isolated RimParticleLayer component
+  const [rimParticles, setRimParticles] = useState<RimParticle[]>([]);
   const [shockwaveRings, setShockwaveRings] = useState<ShockwaveRing[]>([]);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isOffering, setIsOffering] = useState(false);
@@ -693,9 +633,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const batchWordCounts = useRef<Map<string, number>>(new Map());
   const finalizingBatches = useRef<Set<string>>(new Set());
 
-  // Signal counters for PitGlowCanvas surge/inhale triggers
-  const [surgeSignal, setSurgeSignal] = useState(0);
-  const [inhaleSignal, setInhaleSignal] = useState(0);
+  // Surge glow — flashes on devour impact / inhale
+  const pitSurgeOpacity = useRef(new Animated.Value(0)).current;
+  const pitSurgeScale = useRef(new Animated.Value(0.8)).current;
+
+  // Breathing glow — continuous ambient pulse
+  const pitBreathProgress = useRef(new Animated.Value(0)).current;
+  const breathLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Glow intensity — dims when no words are floating (0.35 = quiet, 1.0 = full)
+  const glowIntensity = useRef(new Animated.Value(0.35)).current;
+  const glowIntensityAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const resultOpacity = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
@@ -839,12 +787,161 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
   }, [pendingPhaseTransition, ceremonyStatus, harvestState, isOnboarding, startCeremony]);
 
-  // Derive pitIsActive for PitGlowCanvas intensity tracking
+  // ---- Ambient breathing glow loop ----
+  useEffect(() => {
+    if (reducedMotion) {
+      // Static mid-value glow for reduced motion
+      pitBreathProgress.setValue(0.5);
+      return;
+    }
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pitBreathProgress, {
+          toValue: 1,
+          duration: BREATH_CYCLE_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pitBreathProgress, {
+          toValue: 0,
+          duration: BREATH_CYCLE_MS,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    breathLoopRef.current = loop;
+    loop.start();
+
+    return () => {
+      loop.stop();
+      breathLoopRef.current = null;
+    };
+  }, [reducedMotion, pitBreathProgress]);
+
+  // Animate glow intensity based on floating word presence
   const hasActiveWords = flyingWords.some(w => !w.isDevoured);
   const hasPendingBatches = harvestState != null && harvestState.pendingBatches.length > 0;
   const pitIsActive = hasActiveWords || hasPendingBatches;
+  useEffect(() => {
+    glowIntensityAnimRef.current?.stop();
+    const anim = Animated.timing(glowIntensity, {
+      toValue: pitIsActive ? 1.0 : 0.35,
+      duration: pitIsActive ? 400 : 800,
+      useNativeDriver: true,
+    });
+    glowIntensityAnimRef.current = anim;
+    anim.start(() => { glowIntensityAnimRef.current = null; });
+    return () => { anim.stop(); };
+  }, [pitIsActive, glowIntensity]);
 
-  // Rim particles are now managed by the isolated RimParticleLayer component
+  // Derive breathing opacity and scale from progress + phase
+  const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
+  const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
+
+  // Per-layer opacity interpolations for concentric glow (outer→inner: 0.4x, 0.7x, 1.0x, 2.5x of base)
+  // Each layer is multiplied by glowIntensity so the glow dims when no words are present
+  const breathOpacityOuter = Animated.multiply(
+    pitBreathProgress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [breathOpacityRange[0] * 0.4, breathOpacityRange[1] * 0.4],
+    }),
+    glowIntensity,
+  );
+  const breathOpacityMiddle = Animated.multiply(
+    pitBreathProgress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [breathOpacityRange[0] * 0.7, breathOpacityRange[1] * 0.7],
+    }),
+    glowIntensity,
+  );
+  const breathOpacityInner = Animated.multiply(
+    pitBreathProgress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [breathOpacityRange[0], breathOpacityRange[1]],
+    }),
+    glowIntensity,
+  );
+  const breathOpacityCore = Animated.multiply(
+    pitBreathProgress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [Math.min(breathOpacityRange[0] * 2.5, 0.7), Math.min(breathOpacityRange[1] * 2.5, 0.85)],
+    }),
+    glowIntensity,
+  );
+  const breathScale = pitBreathProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [breathScaleRange[0], breathScaleRange[1]],
+  });
+
+  // ---- Ambient rim particles (embers rising from pit edge) ----
+  useEffect(() => {
+    if (reducedMotion || simplify) return;
+
+    const maxRim = getMaxRimParticles();
+    const spawnInterval = 1000; // ms between spawns
+    let spawnCount = 0;
+
+    const spawnRimParticle = () => {
+      if (!mountedRef.current) return;
+      const color = RIM_PARTICLE_COLORS[phase] ?? RIM_PARTICLE_COLORS[0];
+      const angle = Math.random() * Math.PI * 2;
+      const startX = PIT_CENTER.x + PIT_OVAL.radiusX * Math.cos(angle) * (0.7 + Math.random() * 0.3);
+      const startY = PIT_CENTER.y + PIT_OVAL.radiusY * Math.sin(angle) * (0.7 + Math.random() * 0.3);
+      const riseHeight = 80 + Math.random() * 100;
+      const driftX = (Math.random() - 0.5) * 40;
+      const duration = 3000 + Math.random() * 2000;
+
+      const p: RimParticle = {
+        id: `rim_${Date.now()}_${spawnCount++}`,
+        x: new Animated.Value(startX),
+        y: new Animated.Value(startY),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(0.3 + Math.random() * 0.4),
+        color,
+      };
+
+      setRimParticles(prev => {
+        // Cap total rim particles
+        const capped = prev.length >= maxRim * 2 ? prev.slice(-maxRim) : prev;
+        return [...capped, p];
+      });
+
+      Animated.parallel([
+        Animated.timing(p.y, {
+          toValue: startY - riseHeight,
+          duration,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(p.x, {
+          toValue: startX + driftX,
+          duration,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(p.opacity, { toValue: 0.7 + Math.random() * 0.3, duration: duration * 0.2, useNativeDriver: true }),
+          Animated.delay(duration * 0.4),
+          Animated.timing(p.opacity, { toValue: 0, duration: duration * 0.4, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(p.scale, { toValue: 0.8 + Math.random() * 0.4, duration: duration * 0.5, useNativeDriver: true }),
+          Animated.timing(p.scale, { toValue: 0, duration: duration * 0.5, useNativeDriver: true }),
+        ]),
+      ]).start(() => {
+        if (mountedRef.current) setRimParticles(prev => prev.filter(rp => rp.id !== p.id));
+      });
+    };
+
+    // Stagger initial spawns
+    for (let i = 0; i < maxRim; i++) {
+      setTimeout(() => spawnRimParticle(), i * (spawnInterval / maxRim));
+    }
+
+    const interval = setInterval(spawnRimParticle, spawnInterval);
+    return () => clearInterval(interval);
+  }, [phase, reducedMotion, simplify]);
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
@@ -900,7 +997,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           isDevoured: false,
           floatLoopX: null,
           floatLoopY: null,
-          floatStartTime: Date.now(),
         });
       }
     }
@@ -949,7 +1045,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Smooth float loop using single linear progress → interpolated sine ----
   const startFloatLoop = useCallback((fw: FlyingWord) => {
     if (reducedMotion || simplify || fw.isDevoured) return;
-    fw.floatStartTime = Date.now();
 
     // X drift: single linear timing 0→1 looped, interpolated to sine in render
     const loopX = Animated.loop(
@@ -979,14 +1074,36 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Pit surge flash (on devour impact) ----
   const flashPitSurge = useCallback(() => {
     if (reducedMotion) return;
-    setSurgeSignal(s => s + 1);
-  }, [reducedMotion]);
+    const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
+    pitSurgeScale.setValue(0.8);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity, duration: 120, useNativeDriver: true }),
+        Animated.delay(40),
+        Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.spring(pitSurgeScale, { toValue: 1.3, friction: 4, tension: 200, useNativeDriver: true }),
+        Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [phase, pitSurgeOpacity, pitSurgeScale, reducedMotion]);
 
   // ---- Pit inhale surge (on devour START — pit "pulls" the word) ----
   const triggerInhale = useCallback(() => {
     if (reducedMotion) return;
-    setInhaleSignal(s => s + 1);
-  }, [reducedMotion]);
+    const colors = DEVOUR_COLORS[phase] ?? DEVOUR_COLORS[0];
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(pitSurgeOpacity, { toValue: colors.glowOpacity * 0.6, duration: 150, useNativeDriver: true }),
+        Animated.timing(pitSurgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(pitSurgeScale, { toValue: 1.1, duration: 150, useNativeDriver: true }),
+        Animated.timing(pitSurgeScale, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+      ]),
+    ]).start();
+  }, [phase, pitSurgeOpacity, pitSurgeScale, reducedMotion]);
 
   // ---- Spawn trail particles ----
   const spawnTrail = useCallback((startX: number, startY: number) => {
@@ -1291,12 +1408,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     tryFinalizeBatch(fw.batchId);
   }, [flashPitSurge, spawnImpactBurst, spawnShockwave, tryFinalizeBatch]);
 
-  // ---- Compute current position from elapsed time (no __getValue() hack) ----
+  // ---- Compute approximate current position from progress + phase offset ----
   const getCurrentPos = useCallback((fw: FlyingWord): { x: number; y: number } => {
     const TWO_PI = 2 * Math.PI;
-    const elapsed = Date.now() - fw.floatStartTime;
-    const driftT = (elapsed % fw.driftPeriod) / fw.driftPeriod;
-    const bobT = (elapsed % fw.bobPeriod) / fw.bobPeriod;
+    const driftT = (fw.driftProgress as any).__getValue?.() ?? 0;
+    const bobT = (fw.bobProgress as any).__getValue?.() ?? 0;
     return {
       x: fw.baseX + fw.driftAmplitude * Math.sin(TWO_PI * (driftT + fw.driftPhaseOffset)),
       y: fw.baseY + -fw.bobAmplitude * Math.sin(TWO_PI * (bobT + fw.bobPhaseOffset)),
@@ -1562,21 +1678,117 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       <Image source={getPitBackground(phase)} style={styles.backgroundImage} resizeMode="cover" />
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Skia pit glow — breathing layers + surge flash + rim */}
-      <PitGlowCanvas
-        phase={phase}
-        glowColor={glowColor}
-        coreColor={coreColor}
-        isActive={pitIsActive}
-        surgeSignal={surgeSignal}
-        inhaleSignal={inhaleSignal}
-        surgeGlowOpacity={phaseColors.glowOpacity}
-        reducedMotion={reducedMotion}
-        simplify={simplify}
+      {/* Layered breathing glow — outer halo (faintest, largest) */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
+          top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
+          width: GLOW_OUTER_SIZE,
+          height: GLOW_OUTER_SIZE,
+          borderRadius: GLOW_OUTER_SIZE / 2,
+          backgroundColor: glowColor,
+          opacity: breathOpacityOuter,
+          transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: breathScale }],
+        }}
+      />
+      {/* Middle glow */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - GLOW_MIDDLE_SIZE / 2,
+          top: PIT_CENTER.y - GLOW_MIDDLE_SIZE / 2,
+          width: GLOW_MIDDLE_SIZE,
+          height: GLOW_MIDDLE_SIZE,
+          borderRadius: GLOW_MIDDLE_SIZE / 2,
+          backgroundColor: glowColor,
+          opacity: breathOpacityMiddle,
+          transform: [{ scaleX: GLOW_MIDDLE_SCALE_X }, { scale: breathScale }],
+        }}
+      />
+      {/* Inner glow — brightest, smallest */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
+          top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
+          width: GLOW_INNER_SIZE,
+          height: GLOW_INNER_SIZE,
+          borderRadius: GLOW_INNER_SIZE / 2,
+          backgroundColor: glowColor,
+          opacity: breathOpacityInner,
+          transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: breathScale }],
+        }}
+      />
+      {/* Dark pit core — creates depth illusion */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - GLOW_CORE_SIZE / 2,
+          top: PIT_CENTER.y - GLOW_CORE_SIZE / 2,
+          width: GLOW_CORE_SIZE,
+          height: GLOW_CORE_SIZE,
+          borderRadius: GLOW_CORE_SIZE / 2,
+          backgroundColor: coreColor,
+          opacity: breathOpacityCore,
+          transform: [{ scaleX: GLOW_CORE_SCALE_X }, { scale: breathScale }],
+        }}
+      />
+      {/* Pit rim ring — subtle edge definition (circle + scaleX for true ellipse) */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - GLOW_RIM_SIZE_Y / 2,
+          top: PIT_CENTER.y - GLOW_RIM_SIZE_Y / 2,
+          width: GLOW_RIM_SIZE_Y,
+          height: GLOW_RIM_SIZE_Y,
+          borderRadius: GLOW_RIM_SIZE_Y / 2,
+          borderWidth: 1,
+          borderColor: glowColor + '25',
+          transform: [{ scaleX: GLOW_RIM_SCALE_X }],
+        }}
       />
 
-      {/* Ambient rim particles — isolated layer prevents setRimParticles from re-rendering entire screen */}
-      <RimParticleLayer phase={phase} reducedMotion={reducedMotion} simplify={simplify} />
+      {/* Pit surge glow layers — flash on devour impact / inhale */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - GLOW_OUTER_SIZE / 2,
+          top: PIT_CENTER.y - GLOW_OUTER_SIZE / 2,
+          width: GLOW_OUTER_SIZE,
+          height: GLOW_OUTER_SIZE,
+          borderRadius: GLOW_OUTER_SIZE / 2,
+          backgroundColor: glowColor,
+          opacity: pitSurgeOpacity.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 0.5],
+          }),
+          transform: [{ scaleX: GLOW_OUTER_SCALE_X }, { scale: pitSurgeScale }],
+        }}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: PIT_CENTER.x - GLOW_INNER_SIZE / 2,
+          top: PIT_CENTER.y - GLOW_INNER_SIZE / 2,
+          width: GLOW_INNER_SIZE,
+          height: GLOW_INNER_SIZE,
+          borderRadius: GLOW_INNER_SIZE / 2,
+          backgroundColor: glowColor,
+          opacity: pitSurgeOpacity,
+          transform: [{ scaleX: GLOW_INNER_SCALE_X }, { scale: pitSurgeScale }],
+        }}
+      />
+
+      {/* Ambient rim particles — embers rising from pit edge */}
+      {rimParticles.map(p => <RimParticleView key={p.id} p={p} />)}
 
       {/* Shockwave rings — expanding ripple on word impact */}
       {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}

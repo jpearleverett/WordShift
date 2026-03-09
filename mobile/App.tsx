@@ -10,12 +10,10 @@ import {
   Dimensions,
   Animated,
   Pressable,
-  Modal,
 } from 'react-native';
-import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, cancelAnimation, runOnJS } from 'react-native-reanimated';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
+import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
 import { ActionButton, AnimatedLogo, Toast, LevelDisplay, VictoryModal, RulesModal, DifficultyMenu, RitualEchoChain } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
@@ -40,7 +38,6 @@ import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
-import { DragOverlayPortal, useDragOverlay } from './src/components/DragOverlayPortal';
 import { recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettingsSync } from './src/services/settings';
@@ -81,24 +78,6 @@ type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const UNDO_BUTTON_COLORS = {
-  bg: CandyColors.yellow.main,
-  border: CandyColors.yellow.shadow,
-  glow: CandyColors.yellow.glow,
-};
-
-const HINT_BUTTON_COLORS = {
-  bg: CandyColors.blue.main,
-  border: CandyColors.blue.shadow,
-  glow: CandyColors.blue.glow,
-};
-
-const NEW_BUTTON_COLORS = {
-  bg: CandyColors.green.main,
-  border: CandyColors.green.shadow,
-  glow: CandyColors.green.glow,
-};
-
 export default function App() {
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
@@ -110,9 +89,6 @@ export default function App() {
   const [persistence, persistenceActions] = useGamePersistence();
   const [victoryFlow, victoryActions] = useVictoryFlow();
   const [achievementState, achievementActions] = useAchievementQueue();
-  const phaseFlashAnimStyle = useAnimatedStyle(() => ({
-    opacity: victoryFlow.phaseFlashOpacity.value,
-  }));
   const setPuzzleGameState = puzzleActions.setGameState;
   const setPuzzleMessage = puzzleActions.setMessage;
   const setSelectedVariant = puzzleActions.setSelectedVariant;
@@ -155,14 +131,13 @@ export default function App() {
   // Track whether the current slot press originated from a drag-drop (for haptic/effect escalation)
   const isDragDropRef = useRef(false);
   // Store drop-shake animation so it can be stopped if a new one starts before it finishes
-  // dropShakeAnimRef removed — drop shake now uses Reanimated via dreadActions.triggerDropShake()
+  const dropShakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // In-progress ritual echo chain — words formed during current puzzle
   const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
   const clearRitualEchoWords = useCallback(() => setRitualEchoWords([]), []);
 
-  // Victory animation skip-forward state (state drives render, ref for sync checks)
-  const [victoryAnimating, setVictoryAnimating] = useState(false);
+  // Victory animation skip-forward state
   const victoryAnimatingRef = useRef(false);
 
   // Track victory-flow setTimeout IDs so they can be cleared on navigation/unmount
@@ -192,31 +167,11 @@ export default function App() {
   // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
 
-  // Screen transition overlay — Reanimated shared value for flicker-free fade on UI thread.
-  // withTiming completion callback + runOnJS bridges back to React state for the screen swap.
-  const transitionOverlay = useSharedValue(0);
+  // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
+  const transitionOverlay = useRef(new Animated.Value(0)).current;
   // Dynamic background colors for smooth transitions — match overlay/root to destination screen
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
-
-  // Transition overlay animated style — computed on UI thread
-  const transitionOverlayStyle = useAnimatedStyle(() => ({
-    opacity: transitionOverlay.value,
-  }));
-
-  // Screen swap helper — called from UI thread via runOnJS after fade-in completes.
-  // Sets colors/screen state then starts fade-out.
-  const doScreenSwap = useCallback((screen: AppScreen, callback?: () => void) => {
-    const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
-    setTransitionOverlayColor(destColor);
-    setRootBgColor(destColor);
-    setCurrentScreen(screen);
-    callback?.();
-    // Wait one frame for React to render the new screen before revealing
-    requestAnimationFrame(() => {
-      transitionOverlay.value = withTiming(0, { duration: 120 });
-    });
-  }, [persistence.currentPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Animated screen transition (instant if reducedMotion)
   const transitionTo = useCallback((screen: AppScreen, callback?: () => void) => {
@@ -229,17 +184,30 @@ export default function App() {
       callback?.();
       return;
     }
-    // Cancel any in-flight transition
-    cancelAnimation(transitionOverlay);
-    // Fade overlay IN (covers old screen) — runs on UI thread
-    transitionOverlay.value = withTiming(1, { duration: 80 }, (finished) => {
-      'worklet';
-      if (finished) {
-        // Bridge back to JS thread for React state updates
-        runOnJS(doScreenSwap)(screen, callback);
-      }
+    // Fade overlay IN (covers old screen)
+    Animated.timing(transitionOverlay, {
+      toValue: 1,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => {
+      // While fully opaque: swap colors to match destination screen
+      const destColor = getScreenBackgroundColor(screen, persistence.currentPhase);
+      setTransitionOverlayColor(destColor);
+      setRootBgColor(destColor);
+
+      setCurrentScreen(screen);
+      callback?.();
+      // Wait one frame for React to render the new screen before revealing
+      requestAnimationFrame(() => {
+        // Fade overlay OUT — now blends through destination-matching color
+        Animated.timing(transitionOverlay, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }).start();
+      });
     });
-  }, [persistence.currentPhase, doScreenSwap]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [transitionOverlay, persistence.currentPhase]);
 
   // Keep root background in sync with current screen + phase (handles phase changes without transitions)
   useEffect(() => {
@@ -285,19 +253,8 @@ export default function App() {
     stopSpeedTimer,
   ]);
 
-  // Dread pulse overlay + screen shake (Reanimated — UI thread)
+  // Dread pulse overlay + screen shake
   const [dreadEffects, dreadActions] = useDreadEffects();
-
-  // Animated styles for dread effects
-  const dreadShakeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dreadEffects.screenShakeX.value }],
-  }));
-  const dreadPulseStyle = useAnimatedStyle(() => ({
-    opacity: dreadEffects.dreadPulseOpacity.value,
-  }));
-
-  // Global drag overlay — renders floating tile above all rows to fix z-index clipping
-  const { sharedValues: dragOverlayShared, snapshotStore: dragSnapshotStore, setSnapshot: setDragSnapshot } = useDragOverlay();
 
   // Post-victory orchestration: whisper, interjection, glitch, micro-beat
   const [orchestration, orchestrationActions] = useVictoryOrchestration();
@@ -368,25 +325,6 @@ export default function App() {
     }
   }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
 
-  // [AppVictory] Diagnostic: log a snapshot of the relevant state whenever the
-  // puzzle transitions to/from the WON state.  Output appears in the Metro /
-  // Termux terminal and helps confirm whether the modal is shown and whether
-  // the onboarding callback is wired up correctly.
-  useEffect(() => {
-    if (puzzle.gameState === GameState.WON) {
-      const modalVisible = !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete');
-      console.log('[AppVictory] gameState → WON', {
-        isOnboarding: onboardingFlow.isOnboarding,
-        onboardingStep: onboardingFlow.onboardingStep,
-        modalVisible,
-        victoryAnimating,
-        ts: Date.now(),
-      });
-    }
-  }, [puzzle.gameState]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Intentionally shallow: we only want one log per WON transition, not on every
-  // re-render of the dependent values while already in WON state.
-
   // Onboarding tutorial guidance: exact source letter + target slot from solver steps.
   const tutorialGuidance = useMemo(() => {
     if (onboardingFlow.onboardingStep !== 'puzzle_tutorial') return null;
@@ -446,18 +384,6 @@ export default function App() {
     puzzle.rows,
   ]);
 
-  // Stable anchor style for FoxGuide on puzzle screen — prevents new object on every render
-  const foxPuzzleAnchorStyle = useMemo(() => {
-    if (!onboardingFlow.isOnboarding) return undefined;
-    if (onboardingFlow.onboardingStep === 'puzzle_complete') {
-      return { top: Math.min(Math.max(SCREEN_HEIGHT * 0.35, 280), 380), left: 8, right: 8 };
-    }
-    if (onboardingFlow.onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.PLAYING) {
-      return { top: Math.min(Math.max(SCREEN_HEIGHT * 0.64, 470), 580), left: 8, right: 8 };
-    }
-    return undefined;
-  }, [onboardingFlow.isOnboarding, onboardingFlow.onboardingStep, puzzle.gameState]);
-
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
   // ========================================================================
@@ -491,7 +417,7 @@ export default function App() {
           data: { difficulty: saved.difficulty, isDaily: Boolean(saved.isPlayingDaily && canRestoreDaily) },
         });
       } else {
-        try { clearPuzzleState(); } catch (_e) { /* ignore */ }
+        clearPuzzleState().catch(() => {});
         puzzleActions.startNewGame(diff);
         setIsPlayingDaily(false);
         logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
@@ -529,7 +455,7 @@ export default function App() {
         return;
       }
 
-      try { clearPuzzleState(); } catch (_e) { /* ignore */ }
+      clearPuzzleState().catch(() => {});
       setIsPlayingDaily(true);
       puzzleActions.setGameState(GameState.LOADING);
       try {
@@ -552,13 +478,6 @@ export default function App() {
       puzzleActions.setShowConfetti(false);
     });
   }, [puzzleActions, transitionTo]);
-
-  // Stable navigation callbacks for HomeScreen (prevents re-render cascade)
-  const handleOpenSettings = useCallback(() => transitionTo('settings'), [transitionTo]);
-  const handleOpenStats = useCallback(() => transitionTo('stats'), [transitionTo]);
-  const handleOpenLedger = useCallback(() => transitionTo('ledger'), [transitionTo]);
-  const handleOpenGallery = useCallback(() => transitionTo('gallery'), [transitionTo]);
-  const handleOpenPit = useCallback(() => transitionTo('pit'), [transitionTo]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -590,7 +509,7 @@ export default function App() {
     if (result?.completed) {
       isDragDropRef.current = false;
       // Clear mid-puzzle save on completion
-      try { clearPuzzleState(); } catch (_e) { /* ignore */ }
+      clearPuzzleState().catch(() => {});
 
       // Lock interaction during async victory chain
       victoryActions.setProcessingVictory(true);
@@ -608,14 +527,14 @@ export default function App() {
 
       // Record daily challenge completion if applicable
       if (isPlayingDaily) {
-        const previousDailyStatus = getDailyStatus();
+        const previousDailyStatus = await getDailyStatus();
         const previousDailyStreak = previousDailyStatus.streak;
-        recordDailyCompletion(
+        await recordDailyCompletion(
           victory.earnedStars,
           result.hintsUsed,
           result.invalidAttempts
         );
-        const updatedDailyStatus = getDailyStatus();
+        const updatedDailyStatus = await getDailyStatus();
 
         // Check for daily streak milestone
         const dailyMilestone = checkDailyStreakMilestone(
@@ -631,7 +550,7 @@ export default function App() {
         }
 
         // Track daily_streak quest progress
-        updateQuestProgress({ dailyStreak: updatedDailyStatus.streak }, persistence.currentPhase);
+        updateQuestProgress({ dailyStreak: updatedDailyStatus.streak }, persistence.currentPhase).catch(() => {});
       }
 
       // Check for ritual micro-event on high-energy puzzles
@@ -676,40 +595,8 @@ export default function App() {
 
       // Play choreographed victory sequence (with skip-forward window)
       victoryAnimatingRef.current = true;
-      setVictoryAnimating(true);
       victoryActions.playVictorySequence(victory.earnedStars);
-      // -----------------------------------------------------------------------
-      // Onboarding: the CONTINUE button must be tappable from the very first
-      // frame the modal is rendered.
-      //
-      // Problem: playVictorySequence resets victoryModalOpacity→0 on the
-      // Reanimated UI thread, then schedules a withDelay(N, withTiming(1)).
-      // Even though we immediately cancel via skipToEnd(), there is a 1-2 frame
-      // race window on Android Fabric where alpha=0 has already been committed
-      // to the native layer — making the entire modal subtree non-hittable.
-      // pointerEvents="box-none" alone is not sufficient on all Android versions.
-      //
-      // Fix A (App.tsx): call skipToEnd() which uses explicit cancelAnimation()
-      //   on every shared value before setting the final values — more reliable
-      //   than direct .value = 1 assignment.
-      // Fix B (VictoryModal.tsx): when isOnboarding, the Reanimated animated
-      //   style is replaced with a static {opacity:1, scale:1} object so
-      //   Reanimated's worklet never touches the view's alpha at all.
-      // Together these guarantee the modal is fully interactive immediately.
-      // -----------------------------------------------------------------------
-      if (onboardingFlow.isOnboarding) {
-        // skipToEnd() calls cancelAnimation() on all shared values, then sets
-        // them to their final values — the most reliable reset path.
-        victoryActions.skipToEnd(victory.earnedStars);
-        victoryAnimatingRef.current = false;
-        setVictoryAnimating(false);
-        console.log('[AppVictory] Onboarding victory: skipToEnd called, victoryAnimating cleared', {
-          earnedStars: victory.earnedStars,
-          onboardingStep: onboardingFlow.onboardingStep,
-          ts: Date.now(),
-        });
-      }
-      addVictoryTimeout(() => { victoryAnimatingRef.current = false; setVictoryAnimating(false); }, 1200);
+      addVictoryTimeout(() => { victoryAnimatingRef.current = false; }, 1200);
 
       // Phase transitions are now DEFERRED to the Offering Pit.
       // When phaseTransitionPending is true, the phase change will be confirmed
@@ -763,7 +650,7 @@ export default function App() {
       scheduleAllNotifications(persistence.currentPhase).catch(() => {});
 
       // Mark cloud save as having pending changes
-      try { markPendingChanges(); } catch (_e) { /* ignore */ }
+      markPendingChanges().catch(() => {});
       uploadToCloud().catch(() => {});
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
@@ -798,8 +685,19 @@ export default function App() {
       if (wasDragDrop) {
         setSuccessDropSignal(prev => prev + 1);
 
-        // Light screen micro-shake via dread shake infrastructure (Reanimated — UI thread)
-        dreadActions.triggerDropShake(DROP_SHAKE_INTENSITY);
+        // Light screen micro-shake via existing dread shake infrastructure
+        const settings = getSettingsSync();
+        if (!settings.reducedMotion) {
+          dropShakeAnimRef.current?.stop();
+          const shakeAnim = Animated.sequence([
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: -DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY * 0.5, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: 0, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+          ]);
+          dropShakeAnimRef.current = shakeAnim;
+          shakeAnim.start(() => { dropShakeAnimRef.current = null; });
+        }
       }
 
       // Track formed word for in-puzzle ritual echo chain
@@ -863,10 +761,11 @@ export default function App() {
     puzzleActions.handleLetterPress(letter, rowIndex);
   }, [puzzleActions, onboardingFlow.onboardingStep, puzzle.gameState, puzzle.selectedLetter, tutorialGuidance]);
 
-  // Disable puzzle ScrollView during drag without re-rendering the whole puzzle screen.
-  const puzzleScrollRef = useRef<ScrollView | null>(null);
+  // Disable puzzle ScrollView during drag to prevent scroll-vs-drag conflict.
+  // Toggled by DraggableTile via onDragActiveChange callback.
+  const [puzzleScrollEnabled, setPuzzleScrollEnabled] = useState(true);
   const handleDragActiveChange = useCallback((active: boolean) => {
-    puzzleScrollRef.current?.setNativeProps({ scrollEnabled: !active });
+    setPuzzleScrollEnabled(!active);
   }, []);
 
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
@@ -912,7 +811,7 @@ export default function App() {
   const handleNextLevel = useCallback(() => {
     hapticLight();
     clearVictoryTimeouts();
-    try { clearPuzzleState(); } catch (_e) { /* ignore */ }
+    clearPuzzleState().catch(() => {});
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     setIsPlayingDaily(false);
@@ -922,24 +821,19 @@ export default function App() {
   }, [puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
   // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
-  const handleOnboardingVictoryContinue = useCallback(() => {
-    console.log('[AppVictory] onboarding continue handler entered', {
-      onboardingStep: onboardingFlow.onboardingStep,
-      gameState: puzzle.gameState,
-      ts: Date.now(),
-    });
+  const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
     clearVictoryTimeouts();
-    // Dismiss modal immediately by setting IDLE before clearing data
-    puzzleActions.setGameState(GameState.IDLE);
+    // Clean up victory state
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
     // Navigate directly to pit (skip puzzle_complete and going_to_pit steps)
-    onboardingActions.advanceOnboarding('pit_intro');
-    transitionTo('pit');
-    console.log('[AppVictory] onboarding continue handler exited');
+    await onboardingActions.advanceOnboarding('pit_intro');
+    transitionTo('pit', () => {
+      puzzleActions.setGameState(GameState.IDLE);
+    });
   }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
 
   const handleReturnHome = useCallback(() => {
@@ -991,7 +885,6 @@ export default function App() {
   const handleVictoryTapAccelerate = useCallback(() => {
     if (victoryAnimatingRef.current && victoryFlow.victoryData) {
       victoryAnimatingRef.current = false;
-      setVictoryAnimating(false);
       victoryActions.skipToEnd(victoryFlow.victoryData.earnedStars);
     }
   }, [victoryFlow.victoryData, victoryActions]);
@@ -1029,20 +922,6 @@ export default function App() {
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
     puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions]);
-
-  const handleToggleDifficultyMenu = useCallback(() => {
-    puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu);
-  }, [puzzleActions, puzzle.showDifficultyMenu]);
-
-  const handleOpenRules = useCallback(() => {
-    puzzleActions.setShowRules(true);
-  }, [puzzleActions]);
-
-  const handleStartNewPuzzle = useCallback(() => {
-    hapticLight();
-    setRitualEchoWords([]);
-    puzzleActions.startNewGame();
-  }, [puzzleActions]);
 
   // ========================================================================
   // Render
@@ -1169,11 +1048,11 @@ export default function App() {
             <HomeScreen
               onPlayPuzzle={handlePlayPuzzle}
               onAmberChange={persistenceActions.setAmberBalance}
-              onOpenSettings={handleOpenSettings}
-              onOpenStats={handleOpenStats}
-              onOpenLedger={handleOpenLedger}
-              onOpenGallery={handleOpenGallery}
-              onOpenPit={handleOpenPit}
+              onOpenSettings={() => transitionTo('settings')}
+              onOpenStats={() => transitionTo('stats')}
+              onOpenLedger={() => transitionTo('ledger')}
+              onOpenGallery={() => transitionTo('gallery')}
+              onOpenPit={() => transitionTo('pit')}
               onStartDaily={handleStartDaily}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
@@ -1220,8 +1099,11 @@ export default function App() {
         fallbackMessage="Something went wrong with the puzzle. Tap to return home."
         onReset={() => { setCurrentScreen('home'); puzzleActions.setGameState(GameState.IDLE); }}
       >
-      <Reanimated.View style={[styles.container, dreadShakeStyle]}>
+      <Animated.View style={[styles.container, { transform: [{ translateX: dreadEffects.screenShakeRef }] }]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
+        {/* Animated Background — darkens with narrative phase */}
+        <AnimatedBackground phase={persistence.currentPhase} />
 
         {/* Confetti celebration — colors shift with phase */}
         <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0} />
@@ -1230,14 +1112,17 @@ export default function App() {
         <StarBurst active={starBurst.active} x={starBurst.x} y={starBurst.y} phase={persistence.currentPhase} />
 
         {/* Phase change dramatic flash overlay */}
-        <Reanimated.View
-          style={[styles.phaseFlashOverlay, phaseFlashAnimStyle]}
+        <Animated.View
+          style={[styles.phaseFlashOverlay, { opacity: victoryFlow.phaseFlashOpacity }]}
           pointerEvents="none"
         />
 
-        {/* Achievement toast overlay — moved to a native Modal after VictoryModal
-            so it stacks above the victory Modal window on both iOS and Android.
-            See the corresponding <Modal> block below, near VictoryModal. */}
+        {/* Achievement toast overlay */}
+        <AchievementToast
+          achievement={achievementState.currentAchievement}
+          onDismiss={achievementActions.dismissAchievement}
+          phase={persistence.currentPhase}
+        />
 
         {/* Header */}
         <View style={styles.header}>
@@ -1282,7 +1167,7 @@ export default function App() {
 
           <TouchableOpacity
             style={styles.helpButton}
-            onPress={handleOpenRules}
+            onPress={() => puzzleActions.setShowRules(true)}
             accessibilityLabel="How to play"
             accessibilityRole="button"
           >
@@ -1327,7 +1212,7 @@ export default function App() {
 
           <TouchableOpacity
             style={styles.difficultyButton}
-            onPress={handleToggleDifficultyMenu}
+            onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
             accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
@@ -1343,20 +1228,18 @@ export default function App() {
             <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
           </TouchableOpacity>
 
-          {puzzle.showDifficultyMenu && (
-            <DifficultyMenu
-              visible={true}
-              currentDifficulty={puzzle.difficulty}
-              gameMode={puzzle.gameMode}
-              phase={persistence.currentPhase}
-              currentVariant={puzzle.selectedVariant}
-              activeVariant={puzzle.currentVariant}
-              variantOptions={variantSelectorOptions}
-              onSelectDifficulty={handleSelectDifficulty}
-              onToggleChallengeMode={handleToggleChallengeMode}
-              onSelectVariant={handleSelectVariant}
-            />
-          )}
+          <DifficultyMenu
+            visible={puzzle.showDifficultyMenu}
+            currentDifficulty={puzzle.difficulty}
+            gameMode={puzzle.gameMode}
+            phase={persistence.currentPhase}
+            currentVariant={puzzle.selectedVariant}
+            activeVariant={puzzle.currentVariant}
+            variantOptions={variantSelectorOptions}
+            onSelectDifficulty={handleSelectDifficulty}
+            onToggleChallengeMode={handleToggleChallengeMode}
+            onSelectVariant={handleSelectVariant}
+          />
         </View>
         )}
 
@@ -1400,10 +1283,9 @@ export default function App() {
           )}
 
           <ScrollView
-            ref={puzzleScrollRef}
             contentContainerStyle={styles.rowsContainer}
             showsVerticalScrollIndicator={false}
-            scrollEnabled
+            scrollEnabled={puzzleScrollEnabled}
             accessibilityRole="list"
             accessibilityLabel={`Puzzle with ${puzzle.rows.length} word rows`}
           >
@@ -1428,8 +1310,6 @@ export default function App() {
                 successDropSignal={successDropSignal}
                 onLetterDragDrop={handleLetterDragDrop}
                 onDragActiveChange={handleDragActiveChange}
-                overlaySharedValues={dragOverlayShared}
-                onSetDragSnapshot={setDragSnapshot}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews
@@ -1452,14 +1332,22 @@ export default function App() {
           <ActionButton
             icon="↩"
             label="UNDO"
-            colors={UNDO_BUTTON_COLORS}
+            colors={{
+              bg: CandyColors.yellow.main,
+              border: CandyColors.yellow.shadow,
+              glow: CandyColors.yellow.glow,
+            }}
             onPress={handleUndo}
             disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
           <ActionButton
             icon="💡"
             label="HINT"
-            colors={HINT_BUTTON_COLORS}
+            colors={{
+              bg: CandyColors.blue.main,
+              border: CandyColors.blue.shadow,
+              glow: CandyColors.blue.glow,
+            }}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
           />
@@ -1467,74 +1355,65 @@ export default function App() {
           <ActionButton
             icon="🔄"
             label="NEW"
-            colors={NEW_BUTTON_COLORS}
-            onPress={handleStartNewPuzzle}
+            colors={{
+              bg: CandyColors.green.main,
+              border: CandyColors.green.shadow,
+              glow: CandyColors.green.glow,
+            }}
+            onPress={() => {
+              hapticLight();
+              setRitualEchoWords([]);
+              puzzleActions.startNewGame();
+            }}
             disabled={false}
           />
           )}
         </View>
 
         {/* Rules Modal — phase-aware text */}
-        {puzzle.showRules && (
-          <RulesModal
-            visible={true}
-            phase={persistence.currentPhase}
-            onClose={() => puzzleActions.setShowRules(false)}
+        <RulesModal
+          visible={puzzle.showRules}
+          phase={persistence.currentPhase}
+          onClose={() => puzzleActions.setShowRules(false)}
+        />
+
+        {/* Tap-to-accelerate overlay for victory animation */}
+        {puzzle.gameState === GameState.WON && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleVictoryTapAccelerate}
+            pointerEvents="box-none"
           />
         )}
-
-        {/* Tap-to-accelerate overlay for victory animation — now lives INSIDE VictoryModal
-            (passed as isAnimating / onTapToSkip props) so it works within the native Modal
-            window created for guaranteed Android touch delivery.  Removed from here. */}
 
         {/* Victory Modal — shown during onboarding puzzle_tutorial (hidden during puzzle_complete when FoxGuide takes over) */}
-        {puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete') && (
-          <VictoryModal
-            visible={true}
-            earnedStars={puzzle.earnedStars}
-            level={puzzle.level}
-            difficulty={puzzle.difficulty}
-            phase={persistence.currentPhase}
-            phaseTransitionPending={persistence.pendingPhaseTransition != null}
-            isPlayingDaily={isPlayingDaily}
-            victoryData={victoryFlow.victoryData}
-            completionCoda={orchestration.completionCoda}
-            cumulativeStats={persistence.cumulativeStats}
-            completedWords={puzzle.lastCompletedWords}
-            incantationName={puzzle.lastIncantationName}
-            modalScale={victoryFlow.victoryModalScale}
-            modalOpacity={victoryFlow.victoryModalOpacity}
-            star1Scale={victoryFlow.victoryStar1}
-            star2Scale={victoryFlow.victoryStar2}
-            star3Scale={victoryFlow.victoryStar3}
-            onNextLevel={handleNextLevel}
-            onReturnHome={handleReturnHome}
-            onGoToPit={handleGoToPit}
-            onShare={handleShare}
-            isOnboarding={onboardingFlow.isOnboarding}
-            onOnboardingContinue={handleOnboardingVictoryContinue}
-            isAnimating={victoryAnimating && !onboardingFlow.isOnboarding}
-            onTapToSkip={handleVictoryTapAccelerate}
-            variant={puzzle.currentVariant}
-            gameMode={puzzle.gameMode}
-          />
-        )}
-
-        {/* Achievement toast — rendered in its own native Modal mounted AFTER VictoryModal
-            so it always stacks above the victory Modal window.  The Modal is only shown
-            when an achievement is actually present so it has no layout cost otherwise. */}
-        <Modal
-          transparent
-          animationType="none"
-          visible={!!achievementState.currentAchievement}
-          statusBarTranslucent
-        >
-          <AchievementToast
-            achievement={achievementState.currentAchievement}
-            onDismiss={achievementActions.dismissAchievement}
-            phase={persistence.currentPhase}
-          />
-        </Modal>
+        <VictoryModal
+          visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete')}
+          earnedStars={puzzle.earnedStars}
+          level={puzzle.level}
+          difficulty={puzzle.difficulty}
+          phase={persistence.currentPhase}
+          phaseTransitionPending={persistence.pendingPhaseTransition != null}
+          isPlayingDaily={isPlayingDaily}
+          victoryData={victoryFlow.victoryData}
+          completionCoda={orchestration.completionCoda}
+          cumulativeStats={persistence.cumulativeStats}
+          completedWords={puzzle.lastCompletedWords}
+          incantationName={puzzle.lastIncantationName}
+          modalScale={victoryFlow.victoryModalScale}
+          modalOpacity={victoryFlow.victoryModalOpacity}
+          star1Scale={victoryFlow.victoryStar1}
+          star2Scale={victoryFlow.victoryStar2}
+          star3Scale={victoryFlow.victoryStar3}
+          onNextLevel={handleNextLevel}
+          onReturnHome={handleReturnHome}
+          onGoToPit={handleGoToPit}
+          onShare={handleShare}
+          isOnboarding={onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_tutorial'}
+          onOnboardingContinue={handleOnboardingVictoryContinue}
+          variant={puzzle.currentVariant}
+          gameMode={puzzle.gameMode}
+        />
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
         {orchestration.showVictoryGlitch && orchestration.victoryGlitch && (
@@ -1579,8 +1458,8 @@ export default function App() {
         )}
 
         {/* Dread Pulse — subtle dark flash when a dread word is formed */}
-        <Reanimated.View
-          style={[styles.dreadPulseOverlay, dreadPulseStyle]}
+        <Animated.View
+          style={[styles.dreadPulseOverlay, { opacity: dreadEffects.dreadPulseOpacity }]}
           pointerEvents="none"
         />
 
@@ -1621,30 +1500,48 @@ export default function App() {
                 : undefined
             }
             position="bottom"
-            anchorStyle={foxPuzzleAnchorStyle}
+            anchorStyle={
+              onboardingFlow.onboardingStep === 'puzzle_complete'
+                ? {
+                    // Center the completion dialogue on screen
+                    top: Math.min(Math.max(SCREEN_HEIGHT * 0.35, 280), 380),
+                    left: 8,
+                    right: 8,
+                  }
+                : puzzle.gameState === GameState.PLAYING
+                  ? {
+                      // Position well below the 3 tutorial rows
+                      // (~50px status bar + ~80px header + 3 rows * ~90px + padding)
+                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.64, 470), 580),
+                      left: 8,
+                      right: 8,
+                    }
+                  : undefined
+            }
           />
         )}
-      </Reanimated.View>
+      </Animated.View>
       </ErrorBoundary>
     );
   };
 
   // Render screen with global overlays on top
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: rootBgColor }}>
+    <View style={{ flex: 1, backgroundColor: rootBgColor }}>
       {renderScreen()}
-      {/* Global drag overlay — renders floating tile above all rows/content */}
-      <DragOverlayPortal sharedValues={dragOverlayShared} snapshotStore={dragSnapshotStore} />
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
-      <Reanimated.View
+      <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, { backgroundColor: transitionOverlayColor }, transitionOverlayStyle]}
+        style={[StyleSheet.absoluteFill, {
+          backgroundColor: transitionOverlayColor,
+          opacity: transitionOverlay,
+        }]}
       />
       {/* Phase transition overlay — renders above ALL screens */}
       <PhaseTransitionOverlay
         event={phaseTransitionEvent}
         onComplete={() => setPhaseTransitionEvent(null)}
       />
-    </GestureHandlerRootView>
+    </View>
   );
 }

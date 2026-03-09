@@ -1,4 +1,4 @@
-import { storage } from './storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 
 const STORAGE_KEY = 'wordshift_star_stats';
@@ -46,6 +46,9 @@ export interface CumulativeStats {
   };
   lastUpdated: number;
 }
+
+// In-memory cache
+let statsCache: CumulativeStats | null = null;
 
 /**
  * Calculate star rating based on hints used and invalid attempts
@@ -98,95 +101,119 @@ function getDefaultStats(): CumulativeStats {
 }
 
 /**
- * Load cumulative stats from MMKV
+ * Load cumulative stats from AsyncStorage
  */
-export function loadStats(): CumulativeStats {
-  const stored = storage.getString(STORAGE_KEY);
-  if (stored !== undefined) {
-    const parsed = JSON.parse(stored);
-    // Backward compat: add noHintPuzzleCount if missing from old data
-    if (parsed.noHintPuzzleCount === undefined) {
-      parsed.noHintPuzzleCount = 0;
+export async function loadStats(): Promise<CumulativeStats> {
+  try {
+    if (statsCache) {
+      return statsCache;
     }
-    // Backward compat: add MEDIUM_PLUS if missing from old data
-    if (parsed.byDifficulty && !parsed.byDifficulty.MEDIUM_PLUS) {
-      parsed.byDifficulty.MEDIUM_PLUS = { completed: 0, stars: 0 };
+
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Backward compat: add noHintPuzzleCount if missing from old data
+      if (parsed.noHintPuzzleCount === undefined) {
+        parsed.noHintPuzzleCount = 0;
+      }
+      // Backward compat: add MEDIUM_PLUS if missing from old data
+      if (parsed.byDifficulty && !parsed.byDifficulty.MEDIUM_PLUS) {
+        parsed.byDifficulty.MEDIUM_PLUS = { completed: 0, stars: 0 };
+      }
+      // Backward compat: add personalBests if missing from old data
+      if (!parsed.personalBests) {
+        parsed.personalBests = {};
+      }
+      statsCache = parsed;
+      return statsCache!;
     }
-    // Backward compat: add personalBests if missing from old data
-    if (!parsed.personalBests) {
-      parsed.personalBests = {};
-    }
-    return parsed;
+  } catch (error) {
+    console.warn('Failed to load star stats:', error);
   }
 
-  return getDefaultStats();
+  statsCache = getDefaultStats();
+  return statsCache;
 }
 
 /**
  * Record stats from a completed puzzle
  */
-export function recordPuzzleCompletion(
+export async function recordPuzzleCompletion(
   difficulty: Difficulty,
   hintsUsed: number,
   invalidAttempts: number
-): PuzzleAttemptStats {
-  const stats = loadStats();
+): Promise<PuzzleAttemptStats> {
+  try {
+    if (!statsCache) {
+      await loadStats();
+    }
 
-  const starsEarned = calculateStars(hintsUsed, invalidAttempts);
+    const starsEarned = calculateStars(hintsUsed, invalidAttempts);
 
-  // Update cumulative stats
-  stats.totalPuzzlesCompleted += 1;
-  stats.totalStars += starsEarned;
-  stats.totalInvalidAttempts += invalidAttempts;
-  stats.totalHintsUsed += hintsUsed;
-  if (hintsUsed === 0) {
-    stats.noHintPuzzleCount = (stats.noHintPuzzleCount || 0) + 1;
-  }
+    // Update cumulative stats
+    statsCache!.totalPuzzlesCompleted += 1;
+    statsCache!.totalStars += starsEarned;
+    statsCache!.totalInvalidAttempts += invalidAttempts;
+    statsCache!.totalHintsUsed += hintsUsed;
+    if (hintsUsed === 0) {
+      statsCache!.noHintPuzzleCount = (statsCache!.noHintPuzzleCount || 0) + 1;
+    }
 
-  // Update star count breakdown
-  if (starsEarned === 3) {
-    stats.threeStarCount += 1;
-  } else if (starsEarned === 2) {
-    stats.twoStarCount += 1;
-  } else {
-    stats.oneStarCount += 1;
-  }
+    // Update star count breakdown
+    if (starsEarned === 3) {
+      statsCache!.threeStarCount += 1;
+    } else if (starsEarned === 2) {
+      statsCache!.twoStarCount += 1;
+    } else {
+      statsCache!.oneStarCount += 1;
+    }
 
-  // Update per-difficulty stats
-  stats.byDifficulty[difficulty].completed += 1;
-  stats.byDifficulty[difficulty].stars += starsEarned;
+    // Update per-difficulty stats
+    statsCache!.byDifficulty[difficulty].completed += 1;
+    statsCache!.byDifficulty[difficulty].stars += starsEarned;
 
-  // Update personal bests
-  if (!stats.personalBests) stats.personalBests = {};
-  const prev = stats.personalBests[difficulty];
-  if (!prev) {
-    stats.personalBests[difficulty] = {
-      fewestHints: hintsUsed,
-      fewestInvalidAttempts: invalidAttempts,
+    // Update personal bests
+    if (!statsCache!.personalBests) statsCache!.personalBests = {};
+    const prev = statsCache!.personalBests[difficulty];
+    if (!prev) {
+      statsCache!.personalBests[difficulty] = {
+        fewestHints: hintsUsed,
+        fewestInvalidAttempts: invalidAttempts,
+      };
+    } else {
+      if (hintsUsed < prev.fewestHints) prev.fewestHints = hintsUsed;
+      if (invalidAttempts < prev.fewestInvalidAttempts) prev.fewestInvalidAttempts = invalidAttempts;
+    }
+
+    statsCache!.lastUpdated = Date.now();
+
+    // Persist
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(statsCache));
+
+    return {
+      difficulty,
+      starsEarned,
+      invalidAttempts,
+      hintsUsed,
+      timestamp: Date.now(),
     };
-  } else {
-    if (hintsUsed < prev.fewestHints) prev.fewestHints = hintsUsed;
-    if (invalidAttempts < prev.fewestInvalidAttempts) prev.fewestInvalidAttempts = invalidAttempts;
+  } catch (error) {
+    console.warn('Failed to record puzzle completion:', error);
+    // Return the stats anyway even if persistence failed
+    return {
+      difficulty,
+      starsEarned: calculateStars(hintsUsed, invalidAttempts),
+      invalidAttempts,
+      hintsUsed,
+      timestamp: Date.now(),
+    };
   }
-
-  stats.lastUpdated = Date.now();
-
-  // Persist
-  storage.set(STORAGE_KEY, JSON.stringify(stats));
-
-  return {
-    difficulty,
-    starsEarned,
-    invalidAttempts,
-    hintsUsed,
-    timestamp: Date.now(),
-  };
 }
 
 /**
  * Get cumulative stats (loads from storage if needed)
  */
-export function getCumulativeStats(): CumulativeStats {
+export async function getCumulativeStats(): Promise<CumulativeStats> {
   return loadStats();
 }
 
@@ -209,6 +236,11 @@ export function getThreeStarRate(stats: CumulativeStats): number {
 /**
  * Clear all stats (for testing/reset)
  */
-export function clearStats(): void {
-  storage.remove(STORAGE_KEY);
+export async function clearStats(): Promise<void> {
+  try {
+    statsCache = getDefaultStats();
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn('Failed to clear star stats:', error);
+  }
 }

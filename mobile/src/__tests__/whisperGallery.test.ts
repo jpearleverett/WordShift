@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loadWhisperGallery,
   recordWhisper,
@@ -10,17 +11,15 @@ import {
   WhisperEntry,
 } from '../services/whisperGallery';
 
-// Mock MMKV storage using shared factory
-jest.mock('../services/storage', () =>
-  require('./helpers/mockStorage').createMockStorage()
+// Mock AsyncStorage using shared factory
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
 
-import { storage } from '../services/storage';
-
 describe('whisperGallery', () => {
-  beforeEach(() => {
-    storage.clearAll();
-    clearWhisperGallery();
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    await clearWhisperGallery();
   });
 
   // ===========================================================================
@@ -35,21 +34,21 @@ describe('whisperGallery', () => {
       expect(state.totalCollected).toBe(0);
     });
 
-    it('returns consistent state on subsequent calls', () => {
-      const state1 = loadWhisperGallery();
-      const state2 = loadWhisperGallery();
-      expect(state1).toEqual(state2);
+    it('returns cached state on subsequent calls', async () => {
+      const state1 = await loadWhisperGallery();
+      const state2 = await loadWhisperGallery();
+      expect(state1).toBe(state2);
     });
 
-    it('loads from storage after cache clear', () => {
-      recordWhisper({
+    it('loads from storage after cache clear', async () => {
+      await recordWhisper({
         animalType: 'fox',
         animalName: 'Ember',
         text: 'The fire remembers.',
         phase: 3,
         type: 'whisper',
       });
-      clearWhisperGallery();
+      await clearWhisperGallery();
 
       // Manually set storage with data
       const customState = {
@@ -59,9 +58,9 @@ describe('whisperGallery', () => {
         seenIds: ['wg_test'],
         totalCollected: 1,
       };
-      storage.set('wordshift_whisper_gallery', JSON.stringify(customState));
+      await AsyncStorage.setItem('wordshift_whisper_gallery', JSON.stringify(customState));
 
-      const state = loadWhisperGallery();
+      const state = await loadWhisperGallery();
       expect(state.entries.length).toBe(1);
       expect(state.entries[0].animalType).toBe('owl');
     });
@@ -228,8 +227,8 @@ describe('whisperGallery', () => {
       expect(state.seenIds.length).toBe(500);
     });
 
-    it('persists to storage', () => {
-      recordWhisper({
+    it('persists to storage', async () => {
+      await recordWhisper({
         animalType: 'fox',
         animalName: 'Ember',
         text: 'Persisted.',
@@ -237,7 +236,7 @@ describe('whisperGallery', () => {
         type: 'dialogue',
       });
 
-      expect(storage.set).toHaveBeenCalled();
+      expect(AsyncStorage.setItem).toHaveBeenCalled();
     });
 
     it('supports all entry types', async () => {
@@ -463,9 +462,9 @@ describe('whisperGallery', () => {
       expect(result).toBe(true);
     });
 
-    it('calls storage.remove', () => {
-      clearWhisperGallery();
-      expect(storage.remove).toHaveBeenCalledWith('wordshift_whisper_gallery');
+    it('calls AsyncStorage.removeItem', async () => {
+      await clearWhisperGallery();
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_whisper_gallery');
     });
   });
 });

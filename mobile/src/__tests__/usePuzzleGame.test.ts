@@ -84,14 +84,14 @@ jest.mock('../services/phaseNarrative', () => ({
 }));
 
 jest.mock('../services/amberCurrency', () => ({
-  getPreferredPuzzleVariant: jest.fn(() => 'standard'),
-  setPreferredPuzzleVariant: jest.fn(() => {}),
-  getFullProgress: jest.fn(() => ({ puzzlesSolved: 10 })),
+  getPreferredPuzzleVariant: jest.fn(async () => 'standard'),
+  setPreferredPuzzleVariant: jest.fn(async () => {}),
+  getFullProgress: jest.fn(async () => ({ puzzlesSolved: 10 })),
 }));
 
 // Mock puzzleBank to return null — tests exercise the generation path
 jest.mock('../services/puzzleBank', () => ({
-  selectPreGeneratedPuzzle: jest.fn(() => null),
+  selectPreGeneratedPuzzle: jest.fn(async () => null),
 }));
 
 // COMMON_WORDS needs to contain all words used in the test puzzle chain

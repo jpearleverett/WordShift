@@ -88,15 +88,14 @@ describe('Victory Flow Integration', () => {
   });
 
   test('completing enough puzzles triggers phase transition', async () => {
-    // Bring player to 19 puzzles (still phase 0)
-    // PHASE_THRESHOLDS[1]=20, MIN_PUZZLES_FOR_PHASE[1]=15
-    await devAddPuzzles(19);
+    // Bring player to 24 puzzles (still phase 0)
+    await devAddPuzzles(24);
     const phaseBefore = await getCurrentPhase();
     expect(phaseBefore).toBe(0);
 
-    // The 20th puzzle should trigger a pending phase 0 -> 1 transition
+    // The 25th puzzle should trigger a pending phase 0 -> 1 transition
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(20);
+    expect(result.puzzlesSolved).toBe(25);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(1);
 
@@ -109,24 +108,22 @@ describe('Victory Flow Integration', () => {
   });
 
   test('phase transitions happen sequentially across all boundaries', async () => {
-    // Phase 0 -> 1 at 20 puzzles (deferred, then confirmed)
-    // PHASE_THRESHOLDS = [0, 20, 65, 150, 235]
-    // MIN_PUZZLES_FOR_PHASE = [0, 15, 55, 135, 225, 300]
-    await devAddPuzzles(19);
+    // Phase 0 -> 1 at 25 puzzles (deferred, then confirmed)
+    await devAddPuzzles(24);
     let result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(1);
     await confirmPhaseTransition();
 
-    // Phase 1 -> 2 at 65 puzzles
-    await devAddPuzzles(44); // 20 + 44 = 64
+    // Phase 1 -> 2 at 75 puzzles
+    await devAddPuzzles(49); // 25 + 49 = 74
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(2);
     await confirmPhaseTransition();
 
     // Phase 2 -> 3 at 150 puzzles
-    await devAddPuzzles(84); // 65 + 84 = 149
+    await devAddPuzzles(74); // 75 + 74 = 149
     result = await awardPuzzleAmber('EASY', 1);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(3);
@@ -170,30 +167,22 @@ describe('Victory Flow Integration', () => {
 // 2. Phase Boundary Tests
 // ---------------------------------------------------------------------------
 describe('Phase Boundaries', () => {
-  // PHASE_THRESHOLDS = [0, 20, 65, 150, 235]
-  // MIN_PUZZLES_FOR_PHASE = [0, 15, 55, 135, 225, 300]
-  // devAddPuzzles sets currentPhase directly, so we use it to get "just below"
-  // the transition, then awardPuzzleAmber to cross the boundary.
-
-  test('at exactly 20 puzzles, phase transitions from 0 to 1', async () => {
-    await devAddPuzzles(19);
+  test('at exactly 25 puzzles, phase transitions from 0 to 1', async () => {
+    await devAddPuzzles(24);
     expect(await getCurrentPhase()).toBe(0);
 
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(20);
+    expect(result.puzzlesSolved).toBe(25);
     expect(result.newPhase).toBe(1);
     expect(result.phaseChanged).toBe(true);
   });
 
-  test('at exactly 65 puzzles, phase transitions from 1 to 2', async () => {
-    // devAddPuzzles(64) gives phaseProgress=64, puzzlesSolved=64
-    // calculatePhase(64, 64): 64 >= 20 → candidate 1, but 64 < 65 → not 2
-    // MIN_PUZZLES_FOR_PHASE[1]=15, 64 >= 15 → stays 1
-    await devAddPuzzles(64);
+  test('at exactly 75 puzzles, phase transitions from 1 to 2', async () => {
+    await devAddPuzzles(74);
     expect(await getCurrentPhase()).toBe(1);
 
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(65);
+    expect(result.puzzlesSolved).toBe(75);
     expect(result.newPhase).toBe(2);
     expect(result.phaseChanged).toBe(true);
   });
@@ -228,20 +217,19 @@ describe('Phase Boundaries', () => {
 
   test('phase advances at most +1 per puzzle even with maximum acceleration', async () => {
     // Get close to the phase 1 boundary with phase still 0
-    // PHASE_THRESHOLDS[1]=20, MIN_PUZZLES_FOR_PHASE[1]=15
-    await devAddPuzzles(19);
+    await devAddPuzzles(24);
     expect(await getCurrentPhase()).toBe(0);
 
-    // With max acceleration (3.0), phaseProgress goes 19 -> 22
-    // calculatePhase(22, 20) = 1 (>= 20, and 20 >= 15). Previous was 0, so +1 is fine.
+    // With max acceleration (3.0), phaseProgress goes 24 -> 27
+    // calculatePhase(27) = 1 (>= 25). Previous was 0, so +1 is fine.
     const result = await awardPuzzleAmber('HARD', 3, 'challenge', 0.8);
     expect(result.newPhase).toBe(1);
     expect(result.phaseAcceleration).toBe(3.0);
 
     // Verify phase progress advanced by the acceleration amount
     const progress = await loadProgress();
-    // devAddPuzzles set phaseProgress to 19, then awardPuzzleAmber added 3.0
-    expect(progress.phaseProgress).toBe(22);
+    // devAddPuzzles set phaseProgress to 24, then awardPuzzleAmber added 3.0
+    expect(progress.phaseProgress).toBe(27);
   });
 
   test('phase threshold gaps are larger than max acceleration, preventing skips', () => {

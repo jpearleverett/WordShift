@@ -1,16 +1,5 @@
-import React, { useEffect } from 'react';
-import { TouchableOpacity } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withRepeat,
-  withSequence,
-  withTiming,
-  Easing,
-  cancelAnimation,
-} from 'react-native-reanimated';
-import { DialoguePhase } from '../../types/homeWorld';
+import React, { useEffect, useRef } from 'react';
+import { TouchableOpacity, Animated, Easing } from 'react-native';
 
 interface JuicyButtonProps {
   onPress: () => void;
@@ -20,23 +9,6 @@ interface JuicyButtonProps {
   bounceScale?: number;
   accessibilityLabel?: string;
   accessibilityRole?: 'button' | 'link' | 'none';
-  /** Narrative phase — Phase 0-2: bouncy energetic spring; Phase 3+: heavy damped spring */
-  phase?: DialoguePhase;
-}
-
-/** Phase-aware spring config: light and bouncy early on, heavy and damped at later phases. */
-function getPressInConfig(phase: DialoguePhase) {
-  if (phase >= 3) {
-    return { damping: 18, stiffness: 120, mass: 1.4 };
-  }
-  return { damping: 10, stiffness: 300, mass: 1 };
-}
-
-function getPressOutConfig(phase: DialoguePhase) {
-  if (phase >= 3) {
-    return { damping: 14, stiffness: 100, mass: 1.2 };
-  }
-  return { damping: 6, stiffness: 200, mass: 1 };
 }
 
 export const JuicyButton: React.FC<JuicyButtonProps> = ({
@@ -47,42 +19,55 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
   bounceScale = 0.92,
   accessibilityLabel,
   accessibilityRole = 'button',
-  phase = 0,
 }) => {
-  const pressScale = useSharedValue(1);
-  const pulse = useSharedValue(1);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Subtle idle scale pulse (not opacity - keeps button fully visible)
-    pulse.value = withRepeat(
-      withSequence(
-        withTiming(1.03, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
-        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
+    // Subtle scale pulse (not opacity - keeps button fully visible)
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.03,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
     );
-    return () => {
-      cancelAnimation(pulse);
-      pulse.value = 1;
-    };
+    pulseLoop.start();
+    return () => pulseLoop.stop();
   }, []);
 
   const handlePressIn = () => {
-    pressScale.value = withSpring(bounceScale, getPressInConfig(phase));
+    Animated.spring(scaleAnim, {
+      toValue: bounceScale,
+      friction: 5,
+      tension: 300,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handlePressOut = () => {
-    pressScale.value = withSpring(1, getPressOutConfig(phase));
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 200,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pressScale.value * pulse.value }],
-    opacity: disabled ? 0.5 : 1,
-  }));
+  // Combine scale animations
+  const combinedScale = Animated.multiply(scaleAnim, pulseAnim);
 
   return (
-    <Animated.View style={animatedStyle}>
+    <Animated.View style={{ transform: [{ scale: combinedScale }], opacity: disabled ? 0.5 : 1 }}>
       <TouchableOpacity
         onPress={onPress}
         onPressIn={handlePressIn}

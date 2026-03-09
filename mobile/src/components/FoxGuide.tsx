@@ -1,20 +1,15 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Animated,
+  Easing,
   Image,
   ImageSourcePropType,
   Dimensions,
 } from 'react-native';
-import Reanimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  cancelAnimation,
-} from 'react-native-reanimated';
 import { CandyColors, getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 
@@ -76,70 +71,89 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   speaking = true,
   variant = 'compact',
 }) => {
-  // All animations use Reanimated shared values — runs on UI thread, no JS round-trips.
-  // Cancels previous animations before starting new ones to prevent overlap jank.
-  const fadeVal = useSharedValue(0);
-  const slideVal = useSharedValue(30);
-  const textFadeVal = useSharedValue(1);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const textFadeAnim = useRef(new Animated.Value(1)).current;
   const reducedMotion = getSettingsSync().reducedMotion;
   const hasInteractiveControls = Boolean(onContinue || (showSkip && onSkip));
 
   // Show/hide animation
   useEffect(() => {
     if (reducedMotion) {
-      fadeVal.value = visible ? 1 : 0;
-      slideVal.value = visible ? 0 : 30;
+      fadeAnim.setValue(visible ? 1 : 0);
+      slideAnim.setValue(visible ? 0 : 30);
       return;
     }
     if (visible) {
-      cancelAnimation(fadeVal);
-      cancelAnimation(slideVal);
-      slideVal.value = 30;
-      fadeVal.value = withTiming(1, { duration: 200 });
-      slideVal.value = withSpring(0, { damping: 14, stiffness: 160 });
+      slideAnim.setValue(30);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 60,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else {
-      cancelAnimation(fadeVal);
-      fadeVal.value = withTiming(0, { duration: 150 });
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     }
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  // Fox bounce when speaking
+  useEffect(() => {
+    if (reducedMotion || !speaking || !visible) {
+      bounceAnim.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: -4,
+          duration: 300,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [speaking, visible]);
 
   // Animate text changes
   useEffect(() => {
     if (reducedMotion) {
-      textFadeVal.value = 1;
+      textFadeAnim.setValue(1);
       return;
     }
-    cancelAnimation(textFadeVal);
-    textFadeVal.value = 0;
-    textFadeVal.value = withTiming(1, { duration: 250 });
-  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Memoize position style so it's stable across re-renders
-  const resolvedPositionStyle = useMemo(
-    () =>
-      anchorStyle ||
-      (position === 'top'
-        ? { top: Math.max(80, SCREEN_HEIGHT * 0.12) }
-        : position === 'middle'
-          ? { top: Math.max(180, SCREEN_HEIGHT * 0.25) }
-          : { bottom: Math.max(30, SCREEN_HEIGHT * 0.04) }),
-    [position, anchorStyle],
-  );
-
-  // Container animated style — combines fade + slide with position-aware direction.
-  // Negation for top position handled inline (replaces the old Animated.multiply ref).
-  const isTop = position === 'top';
-  const containerAnimStyle = useAnimatedStyle(() => ({
-    opacity: fadeVal.value,
-    transform: [{ translateY: isTop ? -slideVal.value : slideVal.value }],
-  }));
-
-  // Text fade style
-  const textAnimStyle = useAnimatedStyle(() => ({
-    opacity: textFadeVal.value,
-  }));
+    textFadeAnim.setValue(0);
+    Animated.timing(textFadeAnim, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  }, [text]);
 
   if (!visible) return null;
+
+  const isTop = position === 'top';
+  const isMiddle = position === 'middle';
+  const resolvedPositionStyle = anchorStyle || (isTop ? { top: Math.max(80, SCREEN_HEIGHT * 0.12) } : isMiddle ? { top: Math.max(180, SCREEN_HEIGHT * 0.25) } : { bottom: Math.max(30, SCREEN_HEIGHT * 0.04) });
 
   // Dialogue theme for the dialogue variant (always Phase 0 during tutorial)
   const dt = getDialogueTheme(0);
@@ -147,8 +161,15 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   if (variant === 'dialogue') {
     const foxSprite = speaking ? foxTalkSprite : foxIdleSprite;
     return (
-      <Reanimated.View
-        style={[styles.container, resolvedPositionStyle, containerAnimStyle]}
+      <Animated.View
+        style={[
+          styles.container,
+          resolvedPositionStyle,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
+          },
+        ]}
         pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       >
         <View style={[
@@ -165,16 +186,18 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           <View style={styles.dialogueRow}>
             {/* Sprite column — 28% width */}
             <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
-              {foxSprite ? (
-                <Image
-                  source={foxSprite}
-                  style={styles.dialogueSpriteImage}
-                  resizeMode="cover"
-                  accessibilityLabel="Ember portrait"
-                />
-              ) : (
-                <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
-              )}
+              <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
+                {foxSprite ? (
+                  <Image
+                    source={foxSprite}
+                    style={styles.dialogueSpriteImage}
+                    resizeMode="cover"
+                    accessibilityLabel="Ember portrait"
+                  />
+                ) : (
+                  <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
+                )}
+              </Animated.View>
             </View>
 
             {/* Text column — 72% */}
@@ -183,11 +206,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
               <View style={[styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
 
               <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
-                <Reanimated.Text
-                  style={[styles.dialogueText, { color: dt.textColor }, textAnimStyle]}
+                <Animated.Text
+                  style={[styles.dialogueText, { color: dt.textColor, opacity: textFadeAnim }]}
                 >
                   {text}
-                </Reanimated.Text>
+                </Animated.Text>
               </View>
 
               {/* Action row */}
@@ -220,14 +243,21 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
             </View>
           </View>
         </View>
-      </Reanimated.View>
+      </Animated.View>
     );
   }
 
   // Compact variant (original floating card)
   return (
-    <Reanimated.View
-      style={[styles.container, resolvedPositionStyle, containerAnimStyle]}
+    <Animated.View
+      style={[
+        styles.container,
+        resolvedPositionStyle,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
+        },
+      ]}
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       accessibilityRole="alert"
@@ -235,7 +265,12 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     >
       <View style={styles.guideCard}>
         {/* Fox sprite */}
-        <View style={styles.foxContainer}>
+        <Animated.View
+          style={[
+            styles.foxContainer,
+            { transform: [{ translateY: bounceAnim }] },
+          ]}
+        >
           {foxTalkSprite ? (
             <Image
               source={foxTalkSprite}
@@ -245,18 +280,18 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           ) : (
             <Text style={styles.foxEmoji}>🦊</Text>
           )}
-        </View>
+        </Animated.View>
 
         {/* Speech content */}
         <View style={styles.speechArea}>
           <View style={styles.speechBubble}>
             <View style={styles.speechAccentBar} />
             <View style={styles.speechShine} />
-            <Reanimated.Text
-              style={[styles.speechText, textAnimStyle]}
+            <Animated.Text
+              style={[styles.speechText, { opacity: textFadeAnim }]}
             >
               {text}
-            </Reanimated.Text>
+            </Animated.Text>
           </View>
 
           {/* Action row */}
@@ -285,7 +320,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
           </View>
         </View>
       </View>
-    </Reanimated.View>
+    </Animated.View>
   );
 };
 

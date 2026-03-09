@@ -1,4 +1,4 @@
-import { storage } from './storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AnimalType, DialoguePhase } from '../types/homeWorld';
 
 /**
@@ -177,8 +177,10 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
 };
 
 // ============================================================================
-// Storage helpers
+// In-memory cache
 // ============================================================================
+
+let choiceCache: ChoiceState | null = null;
 
 function getDefaultState(): ChoiceState {
   return {
@@ -195,30 +197,35 @@ function getDefaultState(): ChoiceState {
 /**
  * Load choice state from storage.
  */
-export function loadChoiceState(): ChoiceState {
-  const stored = storage.getString(STORAGE_KEY);
-  if (stored !== undefined) {
-    return JSON.parse(stored);
-  }
-  return getDefaultState();
+export async function loadChoiceState(): Promise<ChoiceState> {
+  if (choiceCache) return choiceCache;
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      choiceCache = JSON.parse(stored);
+      return choiceCache!;
+    }
+  } catch {}
+  choiceCache = getDefaultState();
+  return choiceCache;
 }
 
 /**
  * Check if an animal should offer a choice point during Phase 3 dialogue.
  * Returns the choice content or null.
  */
-export function getChoiceForAnimal(
+export async function getChoiceForAnimal(
   animalType: string,
   animalPhase: number,
   dialogueIndex: number
-): DialogueChoice | null {
+): Promise<DialogueChoice | null> {
   // Only trigger during Phase 3
   if (animalPhase !== 3) return null;
 
   // Only trigger mid-dialogue (around dialogue index 4-6)
   if (dialogueIndex < 4 || dialogueIndex > 6) return null;
 
-  const state = loadChoiceState();
+  const state = await loadChoiceState();
 
   // Only offer once per animal
   if (state.offeredBy.includes(animalType)) return null;
@@ -232,16 +239,16 @@ export function getChoiceForAnimal(
 /**
  * Record the player's choice for an animal.
  */
-export function recordChoice(
+export async function recordChoice(
   animalType: string,
   choice: PlayerChoice
-): { response: string; convergence: string } {
-  const state = loadChoiceState();
+): Promise<{ response: string; convergence: string }> {
+  const state = await loadChoiceState();
   state.offeredBy.push(animalType);
   state.choices[animalType] = choice;
   state.hasSeenChoice = true;
 
-  saveChoiceState(state);
+  await saveChoiceState(state);
 
   const content = ANIMAL_CHOICES[animalType];
   return {
@@ -254,24 +261,24 @@ export function recordChoice(
  * Get the player's choice for a specific animal (for Phase 4 callbacks).
  * Returns null if no choice was made.
  */
-export function getPlayerChoice(animalType: string): PlayerChoice | null {
-  const state = loadChoiceState();
+export async function getPlayerChoice(animalType: string): Promise<PlayerChoice | null> {
+  const state = await loadChoiceState();
   return state.choices[animalType] || null;
 }
 
 /**
  * Check if the player has seen any choice point yet.
  */
-export function hasSeenAnyChoice(): boolean {
-  const state = loadChoiceState();
+export async function hasSeenAnyChoice(): Promise<boolean> {
+  const state = await loadChoiceState();
   return state.hasSeenChoice;
 }
 
 /**
  * Get how many animals have offered choices.
  */
-export function getChoiceCount(): number {
-  const state = loadChoiceState();
+export async function getChoiceCount(): Promise<number> {
+  const state = await loadChoiceState();
   return state.offeredBy.length;
 }
 
@@ -335,13 +342,19 @@ export function getPhase4ChoiceCallback(
 // Internal
 // ============================================================================
 
-function saveChoiceState(state: ChoiceState): void {
-  storage.set(STORAGE_KEY, JSON.stringify(state));
+async function saveChoiceState(state: ChoiceState): Promise<void> {
+  choiceCache = state;
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
 }
 
 /**
  * Clear choice data (for Settings > Reset All).
  */
-export function clearChoiceState(): void {
-  storage.remove(STORAGE_KEY);
+export async function clearChoiceState(): Promise<void> {
+  choiceCache = null;
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch {}
 }

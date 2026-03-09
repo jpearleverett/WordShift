@@ -5,7 +5,7 @@
  * Available at Phase 2+ to maintain mid-game amber demand.
  */
 
-import { storage } from './storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 
 const STORAGE_KEY = 'wordshift_room_upgrades';
@@ -106,22 +106,36 @@ export const ROOM_UPGRADES: RoomUpgrade[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// In-memory cache
+// ---------------------------------------------------------------------------
+
+let cache: RoomUpgradeState | null = null;
+
+// ---------------------------------------------------------------------------
 // Storage
 // ---------------------------------------------------------------------------
 
-function loadState(): RoomUpgradeState {
-  const stored = storage.getString(STORAGE_KEY);
-  if (stored !== undefined) {
-    const parsed = JSON.parse(stored);
-    if (parsed && typeof parsed.purchased === 'object') {
-      return parsed;
+async function loadState(): Promise<RoomUpgradeState> {
+  if (cache) return cache;
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed.purchased === 'object') {
+        cache = parsed;
+        return cache!;
+      }
     }
-  }
-  return { purchased: {} };
+  } catch { /* ignore */ }
+  cache = { purchased: {} };
+  return cache;
 }
 
-function saveState(state: RoomUpgradeState): void {
-  storage.set(STORAGE_KEY, JSON.stringify(state));
+async function saveState(): Promise<void> {
+  if (!cache) return;
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+  } catch { /* ignore */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -134,14 +148,14 @@ export function getRoomUpgrade(roomId: string): RoomUpgrade | undefined {
 }
 
 /** Check if a specific room has been upgraded. */
-export function isRoomUpgraded(roomId: string): boolean {
-  const state = loadState();
+export async function isRoomUpgraded(roomId: string): Promise<boolean> {
+  const state = await loadState();
   return roomId in state.purchased;
 }
 
 /** Get all purchased room upgrade IDs. */
-export function getPurchasedUpgrades(): Record<string, number> {
-  const state = loadState();
+export async function getPurchasedUpgrades(): Promise<Record<string, number>> {
+  const state = await loadState();
   return { ...state.purchased };
 }
 
@@ -155,15 +169,15 @@ export function areUpgradesAvailable(phase: DialoguePhase): boolean {
  * Returns true if successful, false if already purchased or upgrade doesn't exist.
  * Does NOT handle amber spending — caller must call spendAmber first.
  */
-export function purchaseRoomUpgrade(roomId: string): boolean {
+export async function purchaseRoomUpgrade(roomId: string): Promise<boolean> {
   const upgrade = getRoomUpgrade(roomId);
   if (!upgrade) return false;
 
-  const state = loadState();
+  const state = await loadState();
   if (roomId in state.purchased) return false;
 
   state.purchased[roomId] = Date.now();
-  saveState(state);
+  await saveState();
   return true;
 }
 
@@ -178,6 +192,9 @@ export function getUpgradeDescription(roomId: string, phase: DialoguePhase): str
 }
 
 /** Clear all room upgrade data (for Reset All Data). */
-export function clearRoomUpgrades(): void {
-  storage.remove(STORAGE_KEY);
+export async function clearRoomUpgrades(): Promise<void> {
+  cache = { purchased: {} };
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch { /* ignore */ }
 }

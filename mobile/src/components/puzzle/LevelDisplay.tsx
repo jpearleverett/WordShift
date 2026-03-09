@@ -6,7 +6,7 @@ interface LevelDisplayProps {
   level: number;
 }
 
-export const LevelDisplay: React.FC<LevelDisplayProps> = React.memo(({ level }) => {
+export const LevelDisplay: React.FC<LevelDisplayProps> = ({ level }) => {
   return (
     <View style={styles.statsContainer} accessibilityLabel={`Level ${level}`}>
       <View style={styles.statBox}>
@@ -17,7 +17,7 @@ export const LevelDisplay: React.FC<LevelDisplayProps> = React.memo(({ level }) 
       </View>
     </View>
   );
-});
+};
 
 const styles = StyleSheet.create({
   statsContainer: {
