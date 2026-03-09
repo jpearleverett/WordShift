@@ -189,12 +189,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   useEffect(() => {
     if (visible) {
-      console.log('[VictoryModal] visible=true', {
-        isOnboarding: !!isOnboarding,
-        hasOnboardingContinue: !!onOnboardingContinue,
-        phase,
-        ts: Date.now(),
-      });
       // Staggered cascade: groups fade in 120ms apart, each over 250ms
       contentOpacity1.value = 0;
       contentOpacity2.value = 0;
@@ -204,40 +198,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       contentOpacity2.value = withDelay(120, withTiming(1, { duration: 250 }));
       contentOpacity3.value = withDelay(240, withTiming(1, { duration: 250 }));
       contentOpacity4.value = withDelay(360, withTiming(1, { duration: 250 }));
-    } else {
-      console.log('[VictoryModal] visible=false (hidden)', { isOnboarding: !!isOnboarding, ts: Date.now() });
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   // contentOpacity1-4 are stable shared values (never reassigned) and
   // isOnboarding does not change while the modal is visible, so [visible] is
   // the only reactive dependency this effect needs.
 
-  // ---------------------------------------------------------------------------
-  // Explicit CONTINUE press handler with step-by-step diagnostics.
-  // Logs every stage of the press so Termux / Metro output shows exactly
-  // which part of the touch chain executes (or fails to execute).
-  // ---------------------------------------------------------------------------
-  const handleContinuePressIn = useCallback(() => {
-    console.log('[VictoryModal] CONTINUE onPressIn', { ts: Date.now() });
-  }, []);
-
-  const handleContinuePressOut = useCallback(() => {
-    console.log('[VictoryModal] CONTINUE onPressOut', { ts: Date.now() });
-  }, []);
-
   const handleContinuePress = useCallback(() => {
-    console.log('[VictoryModal] CONTINUE onPress fired', {
-      hasOnboardingContinue: !!onOnboardingContinue,
-      isOnboarding: !!isOnboarding,
-      ts: Date.now(),
-    });
     if (onOnboardingContinue) {
-      console.log('[VictoryModal] CONTINUE calling onOnboardingContinue callback');
       onOnboardingContinue();
     } else {
-      // Safety fallback: if the onboarding callback is somehow missing,
-      // fall back to the normal next-level action so the player is never stuck.
-      console.warn('[VictoryModal] CONTINUE: onOnboardingContinue is undefined — falling back to onNextLevel');
       onNextLevel();
     }
   }, [onOnboardingContinue, onNextLevel]);
@@ -267,11 +237,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // scroll-gesture swallowing.
   // ---------------------------------------------------------------------------
   if (isOnboarding) {
-    console.log('[VictoryModal] onboarding native-Modal path rendering', {
-      earnedStars,
-      hasOnboardingContinue: !!onOnboardingContinue,
-      ts: Date.now(),
-    });
     return (
       <Modal
         transparent
@@ -316,8 +281,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {/* CONTINUE — Pressable with generous hitSlop for easy tapping */}
             <View style={[styles.victoryButtonRow, { width: '100%', marginTop: 20 }]}>
               <Pressable
-                onPressIn={handleContinuePressIn}
-                onPressOut={handleContinuePressOut}
                 onPress={handleContinuePress}
                 accessibilityLabel="Continue"
                 accessibilityRole="button"
@@ -703,8 +666,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <>
             {/* Next Level — full-width primary 3D candy button */}
             <TouchableOpacity
-              onPressIn={() => console.log('[VictoryModal] NEXT LEVEL onPressIn', { ts: Date.now() })}
-              onPress={() => { console.log('[VictoryModal] NEXT LEVEL onPress', { ts: Date.now() }); onNextLevel(); }}
+              onPress={onNextLevel}
               activeOpacity={0.85}
               accessibilityLabel="Next level"
               accessibilityRole="button"
@@ -729,8 +691,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <View style={styles.victoryButtonRowSecondary}>
               {/* Share — uniform secondary */}
               <TouchableOpacity
-                onPressIn={() => console.log('[VictoryModal] SHARE onPressIn', { ts: Date.now() })}
-                onPress={() => { console.log('[VictoryModal] SHARE onPress', { ts: Date.now() }); onShare(); }}
+                onPress={onShare}
                 activeOpacity={0.8}
                 accessibilityLabel="Share result"
                 accessibilityRole="button"
@@ -746,8 +707,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
               {/* Home — uniform secondary */}
               <TouchableOpacity
-                onPressIn={() => console.log('[VictoryModal] HOME onPressIn', { ts: Date.now() })}
-                onPress={() => { console.log('[VictoryModal] HOME onPress', { ts: Date.now() }); onReturnHome(); }}
+                onPress={onReturnHome}
                 activeOpacity={0.8}
                 accessibilityLabel="Return home"
                 accessibilityRole="button"

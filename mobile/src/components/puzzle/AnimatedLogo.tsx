@@ -11,7 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { CandyColors } from '../../theme/colors';
 
-export const AnimatedLogo: React.FC = () => {
+export const AnimatedLogo: React.FC = React.memo(() => {
   const bounceY = useSharedValue(0);
   const rotation = useSharedValue(0);
 
@@ -65,7 +65,7 @@ export const AnimatedLogo: React.FC = () => {
       <View style={[styles.logoSparkle, styles.logoSparkle3]} />
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   logoContainer: {

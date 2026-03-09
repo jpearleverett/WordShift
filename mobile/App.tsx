@@ -83,6 +83,24 @@ type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const UNDO_BUTTON_COLORS = {
+  bg: CandyColors.yellow.main,
+  border: CandyColors.yellow.shadow,
+  glow: CandyColors.yellow.glow,
+};
+
+const HINT_BUTTON_COLORS = {
+  bg: CandyColors.blue.main,
+  border: CandyColors.blue.shadow,
+  glow: CandyColors.blue.glow,
+};
+
+const NEW_BUTTON_COLORS = {
+  bg: CandyColors.green.main,
+  border: CandyColors.green.shadow,
+  glow: CandyColors.green.glow,
+};
+
 export default function App() {
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
@@ -281,7 +299,7 @@ export default function App() {
   }));
 
   // Global drag overlay — renders floating tile above all rows to fix z-index clipping
-  const { sharedValues: dragOverlayShared, snapshotRef: dragSnapshotRef, setSnapshot: setDragSnapshot } = useDragOverlay();
+  const { sharedValues: dragOverlayShared, snapshotStore: dragSnapshotStore, setSnapshot: setDragSnapshot } = useDragOverlay();
 
   // Post-victory orchestration: whisper, interjection, glitch, micro-beat
   const [orchestration, orchestrationActions] = useVictoryOrchestration();
@@ -1014,6 +1032,20 @@ export default function App() {
     puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions]);
 
+  const handleToggleDifficultyMenu = useCallback(() => {
+    puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu);
+  }, [puzzleActions, puzzle.showDifficultyMenu]);
+
+  const handleOpenRules = useCallback(() => {
+    puzzleActions.setShowRules(true);
+  }, [puzzleActions]);
+
+  const handleStartNewPuzzle = useCallback(() => {
+    hapticLight();
+    setRitualEchoWords([]);
+    puzzleActions.startNewGame();
+  }, [puzzleActions]);
+
   // ========================================================================
   // Render
   // ========================================================================
@@ -1263,7 +1295,7 @@ export default function App() {
 
           <TouchableOpacity
             style={styles.helpButton}
-            onPress={() => puzzleActions.setShowRules(true)}
+            onPress={handleOpenRules}
             accessibilityLabel="How to play"
             accessibilityRole="button"
           >
@@ -1308,7 +1340,7 @@ export default function App() {
 
           <TouchableOpacity
             style={styles.difficultyButton}
-            onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
+            onPress={handleToggleDifficultyMenu}
             accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
           >
@@ -1324,18 +1356,20 @@ export default function App() {
             <Text style={styles.difficultyArrow}>{'\u25BC'}</Text>
           </TouchableOpacity>
 
-          <DifficultyMenu
-            visible={puzzle.showDifficultyMenu}
-            currentDifficulty={puzzle.difficulty}
-            gameMode={puzzle.gameMode}
-            phase={persistence.currentPhase}
-            currentVariant={puzzle.selectedVariant}
-            activeVariant={puzzle.currentVariant}
-            variantOptions={variantSelectorOptions}
-            onSelectDifficulty={handleSelectDifficulty}
-            onToggleChallengeMode={handleToggleChallengeMode}
-            onSelectVariant={handleSelectVariant}
-          />
+          {puzzle.showDifficultyMenu && (
+            <DifficultyMenu
+              visible={true}
+              currentDifficulty={puzzle.difficulty}
+              gameMode={puzzle.gameMode}
+              phase={persistence.currentPhase}
+              currentVariant={puzzle.selectedVariant}
+              activeVariant={puzzle.currentVariant}
+              variantOptions={variantSelectorOptions}
+              onSelectDifficulty={handleSelectDifficulty}
+              onToggleChallengeMode={handleToggleChallengeMode}
+              onSelectVariant={handleSelectVariant}
+            />
+          )}
         </View>
         )}
 
@@ -1431,22 +1465,14 @@ export default function App() {
           <ActionButton
             icon="↩"
             label="UNDO"
-            colors={{
-              bg: CandyColors.yellow.main,
-              border: CandyColors.yellow.shadow,
-              glow: CandyColors.yellow.glow,
-            }}
+            colors={UNDO_BUTTON_COLORS}
             onPress={handleUndo}
             disabled={puzzle.history.length === 0 || puzzle.gameState !== GameState.PLAYING}
           />
           <ActionButton
             icon="💡"
             label="HINT"
-            colors={{
-              bg: CandyColors.blue.main,
-              border: CandyColors.blue.shadow,
-              glow: CandyColors.blue.glow,
-            }}
+            colors={HINT_BUTTON_COLORS}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
           />
@@ -1454,62 +1480,58 @@ export default function App() {
           <ActionButton
             icon="🔄"
             label="NEW"
-            colors={{
-              bg: CandyColors.green.main,
-              border: CandyColors.green.shadow,
-              glow: CandyColors.green.glow,
-            }}
-            onPress={() => {
-              hapticLight();
-              setRitualEchoWords([]);
-              puzzleActions.startNewGame();
-            }}
+            colors={NEW_BUTTON_COLORS}
+            onPress={handleStartNewPuzzle}
             disabled={false}
           />
           )}
         </View>
 
         {/* Rules Modal — phase-aware text */}
-        <RulesModal
-          visible={puzzle.showRules}
-          phase={persistence.currentPhase}
-          onClose={() => puzzleActions.setShowRules(false)}
-        />
+        {puzzle.showRules && (
+          <RulesModal
+            visible={true}
+            phase={persistence.currentPhase}
+            onClose={() => puzzleActions.setShowRules(false)}
+          />
+        )}
 
         {/* Tap-to-accelerate overlay for victory animation — now lives INSIDE VictoryModal
             (passed as isAnimating / onTapToSkip props) so it works within the native Modal
             window created for guaranteed Android touch delivery.  Removed from here. */}
 
         {/* Victory Modal — shown during onboarding puzzle_tutorial (hidden during puzzle_complete when FoxGuide takes over) */}
-        <VictoryModal
-          visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete')}
-          earnedStars={puzzle.earnedStars}
-          level={puzzle.level}
-          difficulty={puzzle.difficulty}
-          phase={persistence.currentPhase}
-          phaseTransitionPending={persistence.pendingPhaseTransition != null}
-          isPlayingDaily={isPlayingDaily}
-          victoryData={victoryFlow.victoryData}
-          completionCoda={orchestration.completionCoda}
-          cumulativeStats={persistence.cumulativeStats}
-          completedWords={puzzle.lastCompletedWords}
-          incantationName={puzzle.lastIncantationName}
-          modalScale={victoryFlow.victoryModalScale}
-          modalOpacity={victoryFlow.victoryModalOpacity}
-          star1Scale={victoryFlow.victoryStar1}
-          star2Scale={victoryFlow.victoryStar2}
-          star3Scale={victoryFlow.victoryStar3}
-          onNextLevel={handleNextLevel}
-          onReturnHome={handleReturnHome}
-          onGoToPit={handleGoToPit}
-          onShare={handleShare}
-          isOnboarding={onboardingFlow.isOnboarding}
-          onOnboardingContinue={handleOnboardingVictoryContinue}
-          isAnimating={victoryAnimating && !onboardingFlow.isOnboarding}
-          onTapToSkip={handleVictoryTapAccelerate}
-          variant={puzzle.currentVariant}
-          gameMode={puzzle.gameMode}
-        />
+        {puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete') && (
+          <VictoryModal
+            visible={true}
+            earnedStars={puzzle.earnedStars}
+            level={puzzle.level}
+            difficulty={puzzle.difficulty}
+            phase={persistence.currentPhase}
+            phaseTransitionPending={persistence.pendingPhaseTransition != null}
+            isPlayingDaily={isPlayingDaily}
+            victoryData={victoryFlow.victoryData}
+            completionCoda={orchestration.completionCoda}
+            cumulativeStats={persistence.cumulativeStats}
+            completedWords={puzzle.lastCompletedWords}
+            incantationName={puzzle.lastIncantationName}
+            modalScale={victoryFlow.victoryModalScale}
+            modalOpacity={victoryFlow.victoryModalOpacity}
+            star1Scale={victoryFlow.victoryStar1}
+            star2Scale={victoryFlow.victoryStar2}
+            star3Scale={victoryFlow.victoryStar3}
+            onNextLevel={handleNextLevel}
+            onReturnHome={handleReturnHome}
+            onGoToPit={handleGoToPit}
+            onShare={handleShare}
+            isOnboarding={onboardingFlow.isOnboarding}
+            onOnboardingContinue={handleOnboardingVictoryContinue}
+            isAnimating={victoryAnimating && !onboardingFlow.isOnboarding}
+            onTapToSkip={handleVictoryTapAccelerate}
+            variant={puzzle.currentVariant}
+            gameMode={puzzle.gameMode}
+          />
+        )}
 
         {/* Achievement toast — rendered in its own native Modal mounted AFTER VictoryModal
             so it always stacks above the victory Modal window.  The Modal is only shown
@@ -1625,7 +1647,7 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: rootBgColor }}>
       {renderScreen()}
       {/* Global drag overlay — renders floating tile above all rows/content */}
-      <DragOverlayPortal sharedValues={dragOverlayShared} snapshotRef={dragSnapshotRef} />
+      <DragOverlayPortal sharedValues={dragOverlayShared} snapshotStore={dragSnapshotStore} />
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Reanimated.View
         pointerEvents="none"

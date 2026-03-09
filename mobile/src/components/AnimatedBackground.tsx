@@ -167,7 +167,7 @@ interface AnimatedBackgroundProps {
   phase?: number;
 }
 
-export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 0 }) => {
+export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = React.memo(({ phase = 0 }) => {
   const reducedMotion = getSettingsSync().reducedMotion;
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
   const useBlur = !shouldSimplifyAnimations();
@@ -266,7 +266,7 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
       </Rect>
     </Canvas>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

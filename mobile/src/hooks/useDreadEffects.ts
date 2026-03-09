@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   useSharedValue,
   withTiming,
@@ -95,6 +95,6 @@ export function useDreadEffects(): [DreadEffectsState, DreadEffectsActions] {
   }, []);
 
   const state: DreadEffectsState = { dreadPulseOpacity, screenShakeX };
-  const actions: DreadEffectsActions = { triggerDreadPulse, triggerDropShake };
+  const actions: DreadEffectsActions = useMemo(() => ({ triggerDreadPulse, triggerDropShake }), [triggerDreadPulse, triggerDropShake]);
   return [state, actions];
 }
