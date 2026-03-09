@@ -16,13 +16,11 @@ import Reanimated, { useSharedValue, useAnimatedStyle, withTiming, cancelAnimati
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
-import { AnimatedBackground } from './src/components/AnimatedBackground';
-import { VignetteOverlay } from './src/components/VignetteOverlay';
 import { Confetti, StarBurst } from './src/components/Confetti';
 import { ActionButton, AnimatedLogo, Toast, LevelDisplay, VictoryModal, RulesModal, DifficultyMenu, RitualEchoChain } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { CandyColors, getPhaseTheme } from './src/theme/colors';
+import { CandyColors } from './src/theme/colors';
 import { usePuzzleGame } from './src/hooks/usePuzzleGame';
 import { useGamePersistence } from './src/hooks/useGamePersistence';
 import { useVictoryFlow } from './src/hooks/useVictoryFlow';
@@ -1224,17 +1222,6 @@ export default function App() {
       >
       <Reanimated.View style={[styles.container, dreadShakeStyle]}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-
-        {/* Animated Background — darkens with narrative phase */}
-        <AnimatedBackground phase={persistence.currentPhase} />
-
-        {/* Phase-aware vignette — darkens edges at higher phases */}
-        {persistence.currentPhase >= 2 && currentScreen === 'puzzle' && (
-          <VignetteOverlay
-            intensity={persistence.currentPhase >= 4 ? 0.5 : persistence.currentPhase >= 3 ? 0.3 : 0.15}
-            color={getPhaseTheme(persistence.currentPhase).vignetteColor}
-          />
-        )}
 
         {/* Confetti celebration — colors shift with phase */}
         <Confetti active={puzzle.showConfetti} phase={persistence.currentPhase} ritualEnergy={victoryFlow.victoryData?.ritualEnergy ?? 0} />

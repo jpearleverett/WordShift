@@ -259,24 +259,10 @@ const Slot: React.FC<{
   const phaseColors = getPhaseRowColors(phase);
 
   // All animation values on the UI thread
-  const scaleAnim = useSharedValue(settings.reducedMotion ? 1 : 0);
+  const scaleAnim = useSharedValue(1);
   const catchBounceAnim = useSharedValue(1);
-  const previewOpacity = useSharedValue(0);
-  const previewScale = useSharedValue(0.85);
 
-  // Pop-in (one-shot — no continuous loops to avoid saturating the UI thread)
   useEffect(() => {
-    if (settings.reducedMotion) {
-      scaleAnim.value = 1;
-      return;
-    }
-
-    // Pop in with stagger
-    scaleAnim.value = withDelay(
-      index * 50,
-      withSpring(1, { damping: 10, stiffness: 150 })
-    );
-
     return () => {
       cancelAnimation(scaleAnim);
       cancelAnimation(catchBounceAnim);
@@ -290,24 +276,6 @@ const Slot: React.FC<{
       catchBounceAnim.value = withSpring(1, { damping: 12, stiffness: 200 });
     }
   }, [triggerCatch, settings.reducedMotion]);
-
-  // Animate preview appearance
-  useEffect(() => {
-    if (preview) {
-      if (settings.reducedMotion) {
-        previewOpacity.value = 1;
-        previewScale.value = 1;
-        return;
-      }
-      previewOpacity.value = 0;
-      previewScale.value = 0.85;
-      previewOpacity.value = withTiming(1, { duration: 200 });
-      previewScale.value = withSpring(1, { damping: 12, stiffness: 220 });
-    } else {
-      previewOpacity.value = 0;
-      previewScale.value = 0.85;
-    }
-  }, [preview?.word, preview?.isValid]);
 
   // Static glow opacity (no continuous loop — saves 2 UI-thread animation loops per slot)
   const STATIC_GLOW_OPACITY = 0.6;
@@ -334,11 +302,6 @@ const Slot: React.FC<{
   const guidedHaloStyle = useAnimatedStyle(() => ({
     opacity: STATIC_GLOW_OPACITY,
     transform: [{ scale: 1 }],
-  }));
-
-  const previewStyle = useAnimatedStyle(() => ({
-    opacity: previewOpacity.value,
-    transform: [{ scale: previewScale.value }],
   }));
 
   return (
@@ -409,7 +372,7 @@ const Slot: React.FC<{
 
         {/* Word preview label — animated fade + scale */}
         {preview && (
-          <Animated.View style={[styles.slotPreviewContainer, previewStyle]}>
+          <View style={styles.slotPreviewContainer}>
             <Text
               style={[
                 styles.slotPreviewText,
@@ -421,7 +384,7 @@ const Slot: React.FC<{
             >
               {preview.word}
             </Text>
-          </Animated.View>
+          </View>
         )}
       </Animated.View>
     </TouchableOpacity>
@@ -474,6 +437,7 @@ export const Row: React.FC<RowProps> = memo(({
   overlaySharedValues,
   onSetDragSnapshot,
 }) => {
+  const disableMotion = getSettingsSync().reducedMotion;
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = getTargetRowIndex(activeRowIndex, moveDirection);
   const isSource = isRowSource(rowIndex, activeRowIndex);
@@ -545,6 +509,13 @@ export const Row: React.FC<RowProps> = memo(({
   }));
 
   useEffect(() => {
+    if (disableMotion) {
+      rowScale.value = isSource ? 1 : (isTarget ? 0.98 : isCompleted ? 0.92 : 0.88);
+      rowOpacity.value = isSource ? 1 : (isTarget ? 0.9 : isCompleted ? 0.4 : 0.25);
+      rowGlow.value = isSource ? 0.5 : 0;
+      rowSlide.value = isCompleted ? -8 : 0;
+      return;
+    }
     // Animate row transitions — all on UI thread
     if (isSource) {
       rowScale.value = withSpring(1, { damping: 10, stiffness: 100 });
@@ -563,27 +534,20 @@ export const Row: React.FC<RowProps> = memo(({
       rowScale.value = withTiming(0.88, { duration: 300 });
       rowOpacity.value = withTiming(0.25, { duration: 300 });
     }
-  }, [isSource, isTarget, isCompleted, guidanceActive]);
+  }, [isSource, isTarget, isCompleted, guidanceActive, disableMotion]);
 
   // Animate arc when slots appear/disappear - smooth glide effect
   useEffect(() => {
-    if (showSlots) {
-      arcProgress.value = 0;
-      arcProgress.value = withTiming(1, {
-        duration: 450,
-        easing: Easing.out(Easing.cubic),
-      });
-    } else {
-      arcProgress.value = withTiming(0, {
-        duration: 300,
-        easing: Easing.in(Easing.cubic),
-      });
-    }
+    arcProgress.value = showSlots ? 1 : 0;
   }, [showSlots]);
 
   // Micro-shake the target row on invalid drop attempts (Reanimated — UI thread).
   useEffect(() => {
     if (!isTarget || invalidDropSignal <= 0) return;
+    if (disableMotion) {
+      invalidShakeX.value = 0;
+      return;
+    }
     invalidShakeX.value = withSequence(
       withTiming(7, { duration: 45 }),
       withTiming(-7, { duration: 45 }),
@@ -591,14 +555,18 @@ export const Row: React.FC<RowProps> = memo(({
       withTiming(-5, { duration: 40 }),
       withTiming(0, { duration: 35 }),
     );
-  }, [invalidDropSignal, isTarget]);
+  }, [invalidDropSignal, isTarget, disableMotion]);
 
   // Brief scale bounce on the target row when a letter successfully lands (Reanimated — UI thread).
   useEffect(() => {
-    if (!isTarget || successDropSignal <= 0 || getSettingsSync().reducedMotion) return;
+    if (!isTarget || successDropSignal <= 0) return;
+    if (disableMotion) {
+      successBounceScale.value = 1;
+      return;
+    }
     successBounceScale.value = 1.08;
     successBounceScale.value = withSpring(1, { damping: 14, stiffness: 200 });
-  }, [successDropSignal, isTarget]);
+  }, [successDropSignal, isTarget, disableMotion]);
 
   // Calculate arc multipliers for position in sequence
   const getArcMultipliers = (index: number, totalElements: number) => {
