@@ -88,3 +88,21 @@ export function getVariantTutorialDialogue(
   const body = phase >= 3 ? script.dark : script.light;
   return `${lead} ${body}`;
 }
+
+export function getVariantTutorialIntroLines(
+  variant: string,
+  phase: number
+): string[] | null {
+  const script = VARIANT_TUTORIAL_LINES[variant];
+  if (!script) return null;
+
+  const introLead = phase >= 3
+    ? 'Something new settled into the house after that puzzle.'
+    : 'You unlocked a new kind of puzzle just now.';
+  const body = phase >= 3 ? script.dark : script.light;
+  const cta = phase >= 3
+    ? 'You can choose it from the setup button before you play. More arrangements reveal themselves with time.'
+    : 'You can choose it from the setup button before you play. More puzzle styles will appear as we keep going.';
+
+  return [introLead, body, cta];
+}

@@ -568,6 +568,28 @@ export function getFoxPostTutorialPlayPrompt(phase: number): string {
   return "Play more puzzles and gather amber, okay? I want to invite more friends and keep building this place with you.";
 }
 
+export function getFoxSetupSelectorIntroLines(phase: number): string[] {
+  if (phase >= 4) {
+    return [
+      'Before you begin, touch the setup seal. You can choose how demanding the next arrangement should be.',
+      'Some paths are short. Some are deeper. In time, stranger patterns will gather there too.',
+      'Choose the shape of this next offering, then begin.',
+    ];
+  }
+  if (phase >= 3) {
+    return [
+      'Before you start, tap the setup button for me. It lets you choose how hard the next puzzle should feel.',
+      'Short paths, deeper paths... and later, a few stranger arrangements besides.',
+      'Pick a path that feels right, then we will keep building.',
+    ];
+  }
+  return [
+    'Before you jump in, tap the setup button. It lets you choose how gentle or tricky the next puzzle will be.',
+    'Right now it changes the depth of the path. Later, a few new puzzle styles will show up there too.',
+    'Pick what sounds fun, then let us play.',
+  ];
+}
+
 // ============================================================================
 // HOUSE COMPLETION — All rooms built, all animals unlocked
 // ============================================================================

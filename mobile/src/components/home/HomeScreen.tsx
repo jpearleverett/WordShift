@@ -31,6 +31,7 @@ import {
   markChallengeIntroSeen,
   hasSeenPitNudge,
   markPitNudgeSeen,
+  consumePendingVariantTutorial,
 } from '../../services/amberCurrency';
 import {
   getDailyChallengeIntroLines,
@@ -52,6 +53,7 @@ import {
   getIntroDialogueCount,
   getCatchupIntroDialogue,
   getCatchupIntroDialogueCount,
+  getVariantTutorialIntroLines,
 } from '../../services/animalDialogue';
 import {
   loadDialogueSessions,
@@ -67,7 +69,7 @@ import { AmberSparkle } from './AmberSparkle';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
-import { isDailyChallengeUnlocked, isDailyCompleted, getDailyChallengeUnlockProgress } from '../../services/dailyChallenge';
+import { isDailyChallengeUnlocked, isDailyCompleted } from '../../services/dailyChallenge';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import {
   isSacrificeAvailable,
@@ -143,7 +145,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge' | 'variant_unlock'>('animal_intro');
+  const [dailyIntroSeen, setDailyIntroSeen] = useState(false);
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -170,6 +173,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [weeklyQuestState, setWeeklyQuestState] = useState<WeeklyQuestState | null>(null);
   const [showQuestModal, setShowQuestModal] = useState(false);
   const [questFeedback, setQuestFeedback] = useState<string | null>(null);
+  const [showJournalModal, setShowJournalModal] = useState(false);
+  const [showUtilityModal, setShowUtilityModal] = useState(false);
 
   // Ambient home line (atmospheric text when idle)
   const [ambientLine, setAmbientLine] = useState<string | null>(null);
@@ -241,6 +246,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // Load pending harvest for pit badge
     const harvestSummary = await getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
+    setDailyIntroSeen(await hasSeenDailyChallengeIntro());
 
     const unlockedAnimalCount = animalsData.filter(a => a.isUnlocked).length;
     const questState = await loadWeeklyQuests(progressData.currentPhase, {
@@ -258,11 +264,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Keep the ref in sync
   loadAllDataRef.current = loadAllData;
-
-  const dailyUnlockProgress = useMemo(() => {
-    if (!progress) return null;
-    return getDailyChallengeUnlockProgress(progress.puzzlesSolved, progress.currentPhase);
-  }, [progress]);
 
   const claimableQuestAmber = useMemo(() => {
     if (!weeklyQuestState || !progress) return 0;
@@ -286,6 +287,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => entry !== null);
   }, [rooms, purchasedUpgrades, progress]);
 
+  const isPostTutorialLightMode = useMemo(() => {
+    if (!progress || isOnboarding) return false;
+    return progress.puzzlesSolved <= 5;
+  }, [progress, isOnboarding]);
+
+  const shouldShowPitShortcut = Boolean(
+    !isOnboarding &&
+    (pitPhaseReady || (pendingHarvest?.pendingBatches ?? 0) > 0)
+  );
+
+  const shouldShowJournalButton = Boolean(
+    !isOnboarding &&
+    !isPostTutorialLightMode &&
+    (onOpenLedger || onOpenGallery || weeklyQuestState)
+  );
+
   // Load data on mount
   useEffect(() => {
     loadAllData();
@@ -301,6 +318,47 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     }
   }, [onboardingStep, progress, unlockFlow.nextUnlock]);
+
+  // Variant unlock introduction (one-time, visible, Fox-led).
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if ((progress.pendingVariantTutorials?.length ?? 0) === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      const pendingVariant = await consumePendingVariantTutorial();
+      if (!pendingVariant || cancelled) return;
+
+      const lines = getVariantTutorialIntroLines(pendingVariant, progress.currentPhase);
+      if (!lines || lines.length === 0) return;
+
+      setProgress(prev => prev ? {
+        ...prev,
+        pendingVariantTutorials: (prev.pendingVariantTutorials ?? []).slice(1),
+        seenVariantTutorials: Array.from(new Set([...(prev.seenVariantTutorials ?? []), pendingVariant])),
+      } : prev);
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(lines);
+      setIntroContext('variant_unlock');
+      setShowIntroDialogue(true);
+      setHighlightPlayButton(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    progress?.pendingVariantTutorials,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
 
   // Daily challenge unlock introduction (one-time, animal-led).
   useEffect(() => {
@@ -400,7 +458,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Ambient home line — atmospheric text when no dialogue is active
   // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
   useEffect(() => {
-    if (isOnboarding || !progress) return;
+    if (isOnboarding || !progress || isPostTutorialLightMode) return;
     if (showIntroDialogue || dialogueFlow.showDialogue) {
       setAmbientLine(null);
       ambientOpacity.setValue(0);
@@ -444,6 +502,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
   }, [
     isOnboarding,
+    isPostTutorialLightMode,
     progress?.currentPhase,
     showIntroDialogue,
     dialogueFlow.showDialogue,
@@ -452,7 +511,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Goal suggestion — contextual next-action hint below ambient line
   // Appears after a short delay (staggered from ambient line), then auto-dismisses with fade.
   useEffect(() => {
-    if (isOnboarding || !progress) {
+    if (isOnboarding || !progress || isPostTutorialLightMode) {
       setGoalSuggestion(null);
       goalOpacity.setValue(0);
       return;
@@ -540,6 +599,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
   }, [
     isOnboarding,
+    isPostTutorialLightMode,
     progress?.currentPhase,
     progress?.puzzlesSolved,
     progress?.completedDifficulties,
@@ -679,6 +739,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // Intro complete - mark as seen and close
       if (introContext === 'daily_unlock') {
         await markDailyChallengeIntroSeen();
+        setDailyIntroSeen(true);
       } else if (introContext === 'challenge_intro') {
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
@@ -700,6 +761,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // Mark intros as seen even if closed early so the player isn't forced repeatedly.
       if (introContext === 'daily_unlock') {
         await markDailyChallengeIntroSeen();
+        setDailyIntroSeen(true);
       } else if (introContext === 'challenge_intro') {
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
@@ -772,6 +834,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: upgrade.cost } });
     await loadAllData();
   }, [progress, onAmberChange, rooms, loadAllData]);
+
+  const handleOpenJournal = useCallback(() => {
+    hapticLight();
+    setShowJournalModal(true);
+  }, []);
+
+  const handleOpenUtilityMenu = useCallback(() => {
+    hapticLight();
+    setShowUtilityModal(true);
+  }, []);
 
   // Determine if catch-up dialogues should be used (animal unlocked at Phase 2+)
   const shouldUseCatchup = (): boolean => {
@@ -865,7 +937,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {!isOnboarding && <AmberSparkle />}
             </View>
           </View>
-          {progress.currentStreak > 0 && (
+          {(progress.currentStreak > 1 || isStreakAtRisk) && (
             <View
               style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
               accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
@@ -879,40 +951,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         <View style={styles.headerRight}>
-          {!isOnboarding && onStartDaily && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
+          {!isOnboarding && onStartDaily && dailyIntroSeen && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
             <DailyChallengeCard onStartDaily={(d) => { onStartDaily!(d); }} phase={progress.currentPhase} />
           )}
-          {!isOnboarding && onStartDaily && dailyUnlockProgress && !dailyUnlockProgress.unlocked && (
-            <View style={styles.dailyTeaserPill}>
-              <Text style={styles.dailyTeaserText}>
-                {'\uD83C\uDF19'} Daily in {dailyUnlockProgress.puzzlesRemaining}
-              </Text>
-            </View>
-          )}
-          {!isOnboarding && (
+          {!isOnboarding && !isPostTutorialLightMode && (
             <TouchableOpacity
               style={styles.headerIconBtn}
-              onPress={() => {
-                hapticLight();
-                onOpenStats?.();
-              }}
-              accessibilityLabel="View stats"
+              onPress={handleOpenUtilityMenu}
+              accessibilityLabel="Open utility menu"
               accessibilityRole="button"
             >
-              <Text style={styles.headerIconText}>📊</Text>
-            </TouchableOpacity>
-          )}
-          {!isOnboarding && (
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => {
-                hapticLight();
-                onOpenSettings?.();
-              }}
-              accessibilityLabel="Settings"
-              accessibilityRole="button"
-            >
-              <Text style={styles.headerIconText}>⚙️</Text>
+              <Text style={styles.headerIconText}>☰</Text>
             </TouchableOpacity>
           )}
           {!isOnboarding && (
@@ -1004,40 +1053,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
 
-          {/* Action Row — home systems surfaced after onboarding */}
-          {!isOnboarding && (
+          {/* Action Row — compact library/context controls once the player is settled */}
+          {!isOnboarding && !isPostTutorialLightMode && (shouldShowJournalButton || shouldShowPitShortcut || isSacrificeAvailable(progress.currentPhase)) && (
             <View style={styles.actionRow}>
-              {onOpenLedger && (
+              {shouldShowJournalButton && (
                 <TouchableOpacity
-                  style={styles.actionRowButton}
-                  onPress={() => {
-                    hapticLight();
-                    onOpenLedger?.();
-                  }}
-                  accessibilityLabel="Word Ledger"
+                  style={[styles.actionRowButton, styles.journalButton]}
+                  onPress={handleOpenJournal}
+                  accessibilityLabel={`Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
                   accessibilityRole="button"
                 >
                   <Text style={styles.actionRowButtonText}>
-                    📘 Ledger
+                    📚 Journal{claimableQuestAmber > 0 ? ` (+${claimableQuestAmber})` : ''}
                   </Text>
                 </TouchableOpacity>
               )}
-              {onOpenGallery && (
-                <TouchableOpacity
-                  style={styles.actionRowButton}
-                  onPress={() => {
-                    hapticLight();
-                    onOpenGallery?.();
-                  }}
-                  accessibilityLabel="Whisper Gallery"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.actionRowButtonText}>
-                    📜 {getGalleryTitle(progress.currentPhase)}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {onOpenPit && (
+              {onOpenPit && shouldShowPitShortcut && (
                 <Animated.View style={pitPhaseReady ? {
                   transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
                   opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
@@ -1059,25 +1090,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </Text>
                   </TouchableOpacity>
                 </Animated.View>
-              )}
-              {!!weeklyQuestState && (
-                <TouchableOpacity
-                  style={[styles.actionRowButton, styles.questButton]}
-                  onPress={() => {
-                    handleOpenQuestModal().catch(() => {});
-                  }}
-                  accessibilityLabel={`Weekly quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.actionRowButtonText}>
-                    🗓 Quests
-                    {claimableQuestAmber > 0
-                      ? ` (+${claimableQuestAmber})`
-                      : activeQuestCount > 0
-                        ? ` (${activeQuestCount})`
-                        : ''}
-                  </Text>
-                </TouchableOpacity>
               )}
               {isSacrificeAvailable(progress.currentPhase) && (
                 <TouchableOpacity
@@ -1285,6 +1297,146 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             )}
           </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Journal Hub Modal */}
+      <Modal
+        visible={showJournalModal}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setShowJournalModal(false)}
+      >
+        <TouchableOpacity
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
+          activeOpacity={1}
+          onPress={() => setShowJournalModal(false)}
+          accessibilityLabel="Close journal"
+          accessibilityRole="button"
+        >
+          <View
+            style={[
+              styles.compactHubModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Journal</Text>
+            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
+              Keep the house's records in one place.
+            </Text>
+            {onOpenLedger && (
+              <TouchableOpacity
+                style={styles.hubButton}
+                onPress={() => {
+                  setShowJournalModal(false);
+                  onOpenLedger?.();
+                }}
+                accessibilityLabel="Open Word Ledger"
+                accessibilityRole="button"
+              >
+                <Text style={styles.hubButtonText}>📘 Word Ledger</Text>
+              </TouchableOpacity>
+            )}
+            {onOpenGallery && (
+              <TouchableOpacity
+                style={styles.hubButton}
+                onPress={() => {
+                  setShowJournalModal(false);
+                  onOpenGallery?.();
+                }}
+                accessibilityLabel="Open Whisper Gallery"
+                accessibilityRole="button"
+              >
+                <Text style={styles.hubButtonText}>📜 {getGalleryTitle(progress.currentPhase)}</Text>
+              </TouchableOpacity>
+            )}
+            {!!weeklyQuestState && (
+              <TouchableOpacity
+                style={styles.hubButton}
+                onPress={() => {
+                  setShowJournalModal(false);
+                  handleOpenQuestModal().catch(() => {});
+                }}
+                accessibilityLabel={`Open weekly quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
+                accessibilityRole="button"
+              >
+                <Text style={styles.hubButtonText}>
+                  🗓 Weekly Quests
+                  {claimableQuestAmber > 0
+                    ? ` (+${claimableQuestAmber})`
+                    : activeQuestCount > 0
+                      ? ` (${activeQuestCount})`
+                      : ''}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Utility Hub Modal */}
+      <Modal
+        visible={showUtilityModal}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setShowUtilityModal(false)}
+      >
+        <TouchableOpacity
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
+          activeOpacity={1}
+          onPress={() => setShowUtilityModal(false)}
+          accessibilityLabel="Close utility menu"
+          accessibilityRole="button"
+        >
+          <View
+            style={[
+              styles.compactHubModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Menu</Text>
+            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
+              Everything else can stay tucked away until you need it.
+            </Text>
+            {onOpenStats && (
+              <TouchableOpacity
+                style={styles.hubButton}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onOpenStats?.();
+                }}
+                accessibilityLabel="Open statistics"
+                accessibilityRole="button"
+              >
+                <Text style={styles.hubButtonText}>📊 Statistics</Text>
+              </TouchableOpacity>
+            )}
+            {onOpenSettings && (
+              <TouchableOpacity
+                style={styles.hubButton}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onOpenSettings?.();
+                }}
+                accessibilityLabel="Open settings"
+                accessibilityRole="button"
+              >
+                <Text style={styles.hubButtonText}>⚙️ Settings</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </TouchableOpacity>
       </Modal>
 
@@ -2083,19 +2235,6 @@ const styles = StyleSheet.create({
     gap: 7,
     marginLeft: 8,
   },
-  dailyTeaserPill: {
-    backgroundColor: 'rgba(30, 20, 50, 0.45)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  dailyTeaserText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   headerIconBtn: {
     width: 34,
     height: 34,
@@ -2321,6 +2460,18 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 12,
   },
+  compactHubModal: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 32,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+  },
   shopTitle: {
     fontSize: 24,
     fontWeight: '900',
@@ -2337,6 +2488,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 12,
+  },
+  hubButton: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  hubButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '800',
   },
   nextUnlockContainer: {
     marginBottom: 24,
@@ -2630,7 +2795,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
     borderColor: 'rgba(120, 30, 60, 0.3)',
   },
-  questButton: {
+  journalButton: {
     backgroundColor: 'rgba(45, 70, 120, 0.24)',
     borderColor: 'rgba(120, 180, 255, 0.3)',
   },

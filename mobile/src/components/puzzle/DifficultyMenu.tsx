@@ -22,6 +22,9 @@ interface DifficultyMenuProps {
   onSelectDifficulty: (difficulty: Difficulty) => void;
   onSelectVariant: (variant: PuzzleVariant) => void;
   onToggleChallengeMode: () => void;
+  showChallengeToggle?: boolean;
+  introMode?: boolean;
+  introHintText?: string;
 }
 
 export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
@@ -35,6 +38,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   onSelectDifficulty,
   onSelectVariant,
   onToggleChallengeMode,
+  showChallengeToggle = true,
+  introMode = false,
+  introHintText,
 }) => {
   if (!visible) return null;
 
@@ -46,7 +52,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const coreOptions = visibleOptions.filter(option => option.group === 'core');
   const baseOptions = visibleOptions.filter(option => option.group === 'base');
   const comboOptions: VariantSelectorOption[] = [];
-  const hasNonStandardVariants = baseOptions.length > 0;
+  const hasNonStandardVariants = !introMode && baseOptions.length > 0;
 
   const renderVariantItem = (option: VariantSelectorOption) => {
     const isSelected = option.variant === currentVariant;
@@ -138,7 +144,18 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </TouchableOpacity>
         ))}
 
-        {hasNonStandardVariants ? (
+        {introMode && introHintText ? (
+          <View style={[styles.variantUnlockHint, isDark && {
+            borderColor: phaseTheme.modalSecondaryTextColor + '40',
+          }]}>
+            <Text style={[
+              styles.variantUnlockHintText,
+              isDark && { color: phaseTheme.modalSecondaryTextColor },
+            ]}>
+              {introHintText}
+            </Text>
+          </View>
+        ) : hasNonStandardVariants ? (
           <>
             <View style={[styles.challengeMenuDivider, isDark && {
               backgroundColor: phaseTheme.modalDividerColor,
@@ -188,38 +205,42 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           </View>
         )}
 
-        <View style={[styles.challengeMenuDivider, isDark && {
-          backgroundColor: phaseTheme.modalDividerColor,
-        }]} />
+        {showChallengeToggle && !introMode && (
+          <>
+            <View style={[styles.challengeMenuDivider, isDark && {
+              backgroundColor: phaseTheme.modalDividerColor,
+            }]} />
 
-        <TouchableOpacity
-          style={[
-            styles.difficultyMenuItem,
-            gameMode === 'challenge' && styles.challengeMenuItemActive,
-            gameMode === 'challenge' && isDark && {
-              backgroundColor: '#601828' + '20',
-            },
-          ]}
-          onPress={onToggleChallengeMode}
-        >
-          <Text style={styles.challengeMenuIcon}>
-            {gameMode === 'challenge' ? '\uD83D\uDD13' : '\uD83D\uDD12'}
-          </Text>
-          <View style={styles.challengeMenuContent}>
-            <Text style={[
-              styles.difficultyMenuText,
-              isDark && { color: phaseTheme.modalSecondaryTextColor },
-              gameMode === 'challenge' && styles.challengeMenuTextActive,
-            ]}>
-              CHALLENGE
-            </Text>
-            <Text style={[styles.challengeMenuDesc, isDark && {
-              color: phaseTheme.modalSecondaryTextColor,
-            }]}>
-              {gameMode === 'challenge' ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
-            </Text>
-          </View>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.difficultyMenuItem,
+                gameMode === 'challenge' && styles.challengeMenuItemActive,
+                gameMode === 'challenge' && isDark && {
+                  backgroundColor: '#601828' + '20',
+                },
+              ]}
+              onPress={onToggleChallengeMode}
+            >
+              <Text style={styles.challengeMenuIcon}>
+                {gameMode === 'challenge' ? '\uD83D\uDD13' : '\uD83D\uDD12'}
+              </Text>
+              <View style={styles.challengeMenuContent}>
+                <Text style={[
+                  styles.difficultyMenuText,
+                  isDark && { color: phaseTheme.modalSecondaryTextColor },
+                  gameMode === 'challenge' && styles.challengeMenuTextActive,
+                ]}>
+                  CHALLENGE
+                </Text>
+                <Text style={[styles.challengeMenuDesc, isDark && {
+                  color: phaseTheme.modalSecondaryTextColor,
+                }]}>
+                  {gameMode === 'challenge' ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
     </View>
   );

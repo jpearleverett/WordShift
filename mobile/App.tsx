@@ -33,7 +33,7 @@ import { logEvent } from './src/services/eventLogger';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
 import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
-import { awardBonusAmber } from './src/services/amberCurrency';
+import { awardBonusAmber, hasSeenSetupSelectorIntro, markSetupSelectorIntroSeen } from './src/services/amberCurrency';
 import { checkDailyStreakMilestone, getDailyStatus } from './src/services/dailyChallenge';
 import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
@@ -49,6 +49,7 @@ import {
   getLoadingMessage,
   getRitualMicroEvent,
   getHarvestOverflowMessage,
+  getFoxSetupSelectorIntroLines,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
@@ -169,6 +170,14 @@ export default function App() {
 
   // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
+
+  // One-time post-tutorial setup reveal
+  const [showSetupSelectorIntro, setShowSetupSelectorIntro] = useState(false);
+  const [setupSelectorIntroIndex, setSetupSelectorIntroIndex] = useState(0);
+  const setupSelectorLines = useMemo(
+    () => getFoxSetupSelectorIntroLines(persistence.currentPhase),
+    [persistence.currentPhase]
+  );
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
@@ -387,6 +396,33 @@ export default function App() {
     puzzle.rows,
   ]);
 
+  const maybeShowSetupSelectorIntro = useCallback(async () => {
+    if (onboardingFlow.isOnboarding || isPlayingDaily) return;
+    const seen = await hasSeenSetupSelectorIntro();
+    if (seen) return;
+
+    setSetupSelectorIntroIndex(0);
+    setTimeout(() => {
+      setShowSetupSelectorIntro(true);
+      puzzleActions.setShowDifficultyMenu(true);
+    }, 250);
+  }, [onboardingFlow.isOnboarding, isPlayingDaily, puzzleActions]);
+
+  const dismissSetupSelectorIntro = useCallback(async () => {
+    await markSetupSelectorIntroSeen();
+    setShowSetupSelectorIntro(false);
+  }, []);
+
+  const handleAdvanceSetupSelectorIntro = useCallback(async () => {
+    const nextIndex = setupSelectorIntroIndex + 1;
+    if (nextIndex < setupSelectorLines.length) {
+      setSetupSelectorIntroIndex(nextIndex);
+      return;
+    }
+
+    await dismissSetupSelectorIntro();
+  }, [setupSelectorIntroIndex, setupSelectorLines.length, dismissSetupSelectorIntro]);
+
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
   // ========================================================================
@@ -419,14 +455,18 @@ export default function App() {
           type: 'puzzle_restored',
           data: { difficulty: saved.difficulty, isDaily: Boolean(saved.isPlayingDaily && canRestoreDaily) },
         });
+        if (!saved.isPlayingDaily || canRestoreDaily) {
+          maybeShowSetupSelectorIntro().catch(() => {});
+        }
       } else {
         clearPuzzleState().catch(() => {});
-        puzzleActions.startNewGame(diff);
+        await puzzleActions.startNewGame(diff);
         setIsPlayingDaily(false);
         logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
+        maybeShowSetupSelectorIntro().catch(() => {});
       }
     });
-  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions]);
+  }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro]);
 
   // Start daily challenge — uses seeded generation for deterministic puzzles
   const handleStartDaily = useCallback(async (difficulty: Difficulty) => {
@@ -1286,7 +1326,10 @@ export default function App() {
           </View>
 
           <TouchableOpacity
-            style={styles.difficultyButton}
+            style={[
+              styles.difficultyButton,
+              showSetupSelectorIntro && styles.difficultyButtonHighlighted,
+            ]}
             onPress={() => puzzleActions.setShowDifficultyMenu(!puzzle.showDifficultyMenu)}
             accessibilityLabel={`Difficulty ${puzzle.difficulty}, style ${VARIANT_CONFIGS[puzzle.selectedVariant]?.title || 'Standard'}. Tap to change puzzle setup`}
             accessibilityRole="button"
@@ -1314,6 +1357,9 @@ export default function App() {
             onSelectDifficulty={handleSelectDifficulty}
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
+            showChallengeToggle={puzzlesSolvedForVariantUnlocks >= 15}
+            introMode={showSetupSelectorIntro}
+            introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />
         </View>
         )}
@@ -1593,6 +1639,23 @@ export default function App() {
                     }
                   : undefined
             }
+          />
+        )}
+        {!onboardingFlow.isOnboarding && showSetupSelectorIntro && (
+          <FoxGuide
+            visible={true}
+            variant="dialogue"
+            text={setupSelectorLines[Math.min(setupSelectorIntroIndex, setupSelectorLines.length - 1)]}
+            buttonText={setupSelectorIntroIndex < setupSelectorLines.length - 1 ? 'Next' : 'Got it'}
+            onContinue={handleAdvanceSetupSelectorIntro}
+            showSkip={true}
+            onSkip={dismissSetupSelectorIntro}
+            position="bottom"
+            anchorStyle={{
+              top: Math.min(Math.max(SCREEN_HEIGHT * 0.38, 300), 420),
+              left: 8,
+              right: 8,
+            }}
           />
         )}
       </Animated.View>
