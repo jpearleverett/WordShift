@@ -54,6 +54,13 @@ export interface WeeklyQuestState {
   animalsVisitedThisWeek: string[];
 }
 
+export interface WeeklyQuestGenerationContext {
+  puzzlesSolved?: number;
+  unlockedAnimalCount?: number;
+  dailyUnlocked?: boolean;
+  challengeUnlocked?: boolean;
+}
+
 // ============================================================================
 // Quest Templates
 // ============================================================================
@@ -144,7 +151,11 @@ export function getWeekId(date: Date = new Date()): string {
  * Generate weekly quests. Selects 4 quests from the pool using seeded
  * randomness based on the week ID for determinism.
  */
-function generateQuests(weekId: string, phase: number): Quest[] {
+function generateQuests(
+  weekId: string,
+  phase: number,
+  context?: WeeklyQuestGenerationContext
+): Quest[] {
   // Seeded PRNG based on week ID
   let seed = weekId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const seededRandom = () => {
@@ -152,9 +163,19 @@ function generateQuests(weekId: string, phase: number): Quest[] {
     return (seed >> 16) / 32768;
   };
 
-  // Filter pool by phase — sacrifice quests only available at Phase 4+
+  const dailyUnlocked = context?.dailyUnlocked ?? phase >= 1;
+  const challengeUnlocked = context?.challengeUnlocked ?? (context?.puzzlesSolved ?? 0) >= 15;
+  const unlockedAnimalCount = context?.unlockedAnimalCount ?? 10;
+
+  // Filter the pool so we only generate quests the player can reasonably act on.
   const phaseFiltered = QUEST_POOL.filter(t => {
     if (t.type === 'sacrifice_amber' && phase < 4) return false;
+    if ((t.type === 'daily_complete' || t.type === 'daily_streak') && !dailyUnlocked) return false;
+    if (t.type === 'challenge_mode' && !challengeUnlocked) return false;
+    if (t.type === 'visit_animals') {
+      if (unlockedAnimalCount < 3) return false;
+      if (t.target > unlockedAnimalCount) return false;
+    }
     return true;
   });
 
@@ -185,8 +206,8 @@ function generateQuests(weekId: string, phase: number): Quest[] {
     }
   }
 
-  // Always include a daily challenge quest if not already selected
-  if (!selected.some(s => s.type === 'daily_complete')) {
+  // Include a daily quest when it is actually unlocked.
+  if (dailyUnlocked && !selected.some(s => s.type === 'daily_complete')) {
     const dailyTemplate = QUEST_POOL.find(t => t.type === 'daily_complete')!;
     selected[selected.length - 1] = dailyTemplate;
   }
@@ -217,7 +238,10 @@ function generateQuests(weekId: string, phase: number): Quest[] {
 /**
  * Load the current weekly quest state, generating new quests if the week has changed.
  */
-export async function loadWeeklyQuests(currentPhase: number = 0): Promise<WeeklyQuestState> {
+export async function loadWeeklyQuests(
+  currentPhase: number = 0,
+  generationContext?: WeeklyQuestGenerationContext
+): Promise<WeeklyQuestState> {
   const currentWeek = getWeekId();
 
   if (questStateCache && questStateCache.weekId === currentWeek) {
@@ -241,7 +265,7 @@ export async function loadWeeklyQuests(currentPhase: number = 0): Promise<Weekly
   // New week — generate fresh quests
   const newState: WeeklyQuestState = {
     weekId: currentWeek,
-    quests: generateQuests(currentWeek, currentPhase),
+    quests: generateQuests(currentWeek, currentPhase, generationContext),
     generatedAt: Date.now(),
     animalsVisitedThisWeek: [],
   };
@@ -256,12 +280,12 @@ export async function loadWeeklyQuests(currentPhase: number = 0): Promise<Weekly
  * Returns newly completed quests (for toast notifications).
  */
 export async function updateQuestProgress(event: {
-  difficulty: Difficulty;
-  stars: number;
-  hintsUsed: number;
-  isDaily: boolean;
-  isChallenge: boolean;
-  amberEarned: number;
+  difficulty?: Difficulty;
+  stars?: number;
+  hintsUsed?: number;
+  isDaily?: boolean;
+  isChallenge?: boolean;
+  amberEarned?: number;
   /** Number of distinct animals visited this week (for visit_animals quests) */
   animalsVisited?: number;
   /** Current streak length (for streak_days quests) */
@@ -302,7 +326,7 @@ export async function updateQuestProgress(event: {
         if (event.isChallenge) progressDelta = 1;
         break;
       case 'earn_amber':
-        progressDelta = event.amberEarned;
+        progressDelta = event.amberEarned ?? 0;
         break;
       case 'visit_animals':
         // Set progress directly to the current count (not delta-based)

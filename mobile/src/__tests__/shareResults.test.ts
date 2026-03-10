@@ -54,6 +54,7 @@ describe('shareResults', () => {
     expect(text).toContain('Daily');
     expect(text).toContain('2026-02-08');
     expect(text).toContain('HARD');
+    expect(text).toContain('wordshift://challenge/daily');
   });
 
   test('generateShareText shows correct stars', () => {
@@ -131,5 +132,18 @@ describe('shareResults', () => {
       animalWhisper: 'The fire knows your name.',
     });
     expect(text).toContain('"The fire knows your name."');
+  });
+
+  test('generateShareText includes a play link for regular puzzles', () => {
+    const text = generateShareText({
+      stars: 2,
+      difficulty: 'MEDIUM',
+      level: 7,
+      hintsUsed: 1,
+      invalidAttempts: 0,
+      moveCount: 3,
+    });
+    expect(text).toContain('Play WordShift:');
+    expect(text).toContain('wordshift://home');
   });
 });

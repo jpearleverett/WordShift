@@ -95,8 +95,9 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
 
         {animalTypes.map(animalType => {
           const entries = grouped[animalType];
-          const animalName = ANIMAL_INFO[animalType]?.name || animalType;
-          const animalEmoji = ANIMAL_INFO[animalType]?.emoji || '🐾';
+          const typedAnimal = animalType as keyof typeof ANIMAL_INFO;
+          const animalName = ANIMAL_INFO[typedAnimal]?.name || animalType;
+          const animalEmoji = ANIMAL_INFO[typedAnimal]?.emoji || '🐾';
           const isExpanded = expandedAnimal === animalType;
 
           return (

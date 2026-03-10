@@ -68,7 +68,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           selectedVariant: deps.selectedVariant as any,
           moveDirection: deps.moveDirection as any,
           blindRevealedRows: [],
-          currentPhase: deps.currentPhase,
+          currentPhase: deps.currentPhase as any,
           lastFormedWord: deps.lastFormedWord,
           doubleShiftPhase: deps.doubleShiftPhase as any,
           isPlayingDaily: deps.isPlayingDaily,

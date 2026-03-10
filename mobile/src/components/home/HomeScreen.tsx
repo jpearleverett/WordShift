@@ -10,6 +10,7 @@ import {
   Platform,
   StatusBar,
   Image,
+  ScrollView,
 } from 'react-native';
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
@@ -23,6 +24,7 @@ import {
   markIntroSeen,
   markHouseCompleted,
   spendAmber,
+  awardBonusAmber,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
   hasSeenChallengeIntro,
@@ -65,7 +67,7 @@ import { AmberSparkle } from './AmberSparkle';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
-import { isDailyChallengeUnlocked, isDailyCompleted } from '../../services/dailyChallenge';
+import { isDailyChallengeUnlocked, isDailyCompleted, getDailyChallengeUnlockProgress } from '../../services/dailyChallenge';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import {
   isSacrificeAvailable,
@@ -74,12 +76,22 @@ import {
   performSacrifice,
 } from '../../services/sacrifice';
 import { getGalleryTitle } from '../../services/whisperGallery';
-import { updateQuestProgress, loadWeeklyQuests } from '../../services/weeklyQuests';
+import {
+  updateQuestProgress,
+  loadWeeklyQuests,
+  claimQuestReward,
+  getQuestDescription,
+  getTimeUntilReset,
+  getUnclaimedAmber,
+  getPhaseRewardMultiplier,
+  WeeklyQuestState,
+} from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getPitHomeBadgeLabel, getHomeAmbientLine, getGoalSuggestion, GoalSuggestion, getFoxPitNudgeLines } from '../../services/phaseNarrative';
-import { getPurchasedUpgrades } from '../../services/roomUpgrades';
+import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
 import { hapticLight, hapticSelection } from '../../services/haptics';
+import { logEvent } from '../../services/eventLogger';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -154,6 +166,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Pending harvest summary for pit badge
   const [pendingHarvest, setPendingHarvest] = useState<HarvestSummary | null>(null);
 
+  // Weekly quest hub
+  const [weeklyQuestState, setWeeklyQuestState] = useState<WeeklyQuestState | null>(null);
+  const [showQuestModal, setShowQuestModal] = useState(false);
+  const [questFeedback, setQuestFeedback] = useState<string | null>(null);
+
   // Ambient home line (atmospheric text when idle)
   const [ambientLine, setAmbientLine] = useState<string | null>(null);
   const ambientOpacity = useRef(new Animated.Value(0)).current;
@@ -168,6 +185,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
+  const [upgradeFeedback, setUpgradeFeedback] = useState<string | null>(null);
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -224,6 +242,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const harvestSummary = await getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
 
+    const unlockedAnimalCount = animalsData.filter(a => a.isUnlocked).length;
+    const questState = await loadWeeklyQuests(progressData.currentPhase, {
+      puzzlesSolved: progressData.puzzlesSolved,
+      unlockedAnimalCount,
+      dailyUnlocked: isDailyChallengeUnlocked(progressData.puzzlesSolved, progressData.currentPhase),
+      challengeUnlocked: (progressData.puzzlesSolved ?? 0) >= 15,
+    });
+    setWeeklyQuestState(questState);
+
     // Load room upgrades
     const upgrades = await getPurchasedUpgrades();
     setPurchasedUpgrades(upgrades);
@@ -231,6 +258,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Keep the ref in sync
   loadAllDataRef.current = loadAllData;
+
+  const dailyUnlockProgress = useMemo(() => {
+    if (!progress) return null;
+    return getDailyChallengeUnlockProgress(progress.puzzlesSolved, progress.currentPhase);
+  }, [progress]);
+
+  const claimableQuestAmber = useMemo(() => {
+    if (!weeklyQuestState || !progress) return 0;
+    return getUnclaimedAmber(weeklyQuestState, progress.currentPhase);
+  }, [weeklyQuestState, progress]);
+
+  const activeQuestCount = useMemo(() => {
+    if (!weeklyQuestState) return 0;
+    return weeklyQuestState.quests.filter(q => !q.claimed).length;
+  }, [weeklyQuestState]);
+
+  const availableRoomUpgrades = useMemo(() => {
+    if (!progress) return [];
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => {
+        const upgrade = getRoomUpgrade(room.id);
+        if (!upgrade || purchasedUpgrades[room.id]) return null;
+        return { room, upgrade };
+      })
+      .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => entry !== null);
+  }, [rooms, purchasedUpgrades, progress]);
 
   // Load data on mount
   useEffect(() => {
@@ -426,15 +480,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         ? nonStandard[0]
         : null;
 
-      // Check weekly quests
-      let hasActiveQuests = false;
-      try {
-        const questState = await loadWeeklyQuests(phase as number);
-        hasActiveQuests = questState.quests.some(q => !q.completed);
-      } catch { /* ignore */ }
+      const hasPendingHarvest = Boolean((pendingHarvest?.pendingBatches ?? 0) > 0);
+      const hasActiveQuests = Boolean(weeklyQuestState?.quests.some(q => !q.completed));
 
       if (cancelled) return;
-      const suggestion = getGoalSuggestion(phase, dailyAvailable, untried, newVariant, hasActiveQuests);
+      const suggestion = getGoalSuggestion(
+        phase,
+        dailyAvailable,
+        untried,
+        newVariant,
+        hasPendingHarvest,
+        claimableQuestAmber,
+        hasActiveQuests
+      );
       setGoalSuggestion(suggestion);
 
       if (!suggestion) return;
@@ -480,7 +538,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       if (goalAnimRef.current) { goalAnimRef.current.stop(); goalAnimRef.current = null; }
       if (goalTimerRef.current) { clearTimeout(goalTimerRef.current); goalTimerRef.current = null; }
     };
-  }, [isOnboarding, progress?.currentPhase, progress?.puzzlesSolved, progress?.completedDifficulties]);
+  }, [
+    isOnboarding,
+    progress?.currentPhase,
+    progress?.puzzlesSolved,
+    progress?.completedDifficulties,
+    progress?.preferredPuzzleVariant,
+    pendingHarvest?.pendingBatches,
+    weeklyQuestState,
+    claimableQuestAmber,
+  ]);
 
   // Talking animation for intro dialogue
   const [introIsTalking, setIntroIsTalking] = useState(false);
@@ -648,6 +715,64 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroContext('animal_intro');
   };
 
+  const handleOpenQuestModal = useCallback(async () => {
+    hapticLight();
+    if (progress) {
+      const refreshed = await loadWeeklyQuests(progress.currentPhase, {
+        puzzlesSolved: progress.puzzlesSolved,
+        unlockedAnimalCount: animals.filter(a => a.isUnlocked).length,
+        dailyUnlocked: isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase),
+        challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
+      });
+      setWeeklyQuestState(refreshed);
+    }
+    setQuestFeedback(null);
+    setShowQuestModal(true);
+  }, [progress, animals]);
+
+  const handleClaimQuest = useCallback(async (questId: string) => {
+    if (!progress) return;
+    const reward = await claimQuestReward(questId, progress.currentPhase);
+    if (!reward) return;
+
+    const newBalance = await awardBonusAmber(reward.amber, 'weekly_quest');
+    onAmberChange?.(newBalance);
+    setProgress(prev => prev ? { ...prev, amber: newBalance } : prev);
+    setQuestFeedback(`Claimed +${reward.amber} amber from your weekly quests.`);
+    logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber } });
+
+    const refreshed = await loadWeeklyQuests(progress.currentPhase, {
+      puzzlesSolved: progress.puzzlesSolved,
+      unlockedAnimalCount: animals.filter(a => a.isUnlocked).length,
+      dailyUnlocked: isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase),
+      challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
+    });
+    setWeeklyQuestState({ ...refreshed, quests: [...refreshed.quests] });
+  }, [progress, onAmberChange, animals]);
+
+  const handlePurchaseUpgrade = useCallback(async (roomId: string) => {
+    if (!progress) return;
+    const upgrade = getRoomUpgrade(roomId);
+    if (!upgrade) return;
+
+    const spendResult = await spendAmber(upgrade.cost, `room_upgrade_${roomId}`);
+    if (!spendResult.success) {
+      setUpgradeFeedback('Not enough amber for that room upgrade yet.');
+      return;
+    }
+
+    const purchased = await purchaseRoomUpgrade(roomId);
+    if (!purchased) {
+      setUpgradeFeedback('That upgrade is already in place.');
+      return;
+    }
+
+    onAmberChange?.(spendResult.newBalance);
+    setUpgradeFeedback(`${upgrade.name} added to ${rooms.find(r => r.id === roomId)?.name || 'the room'}.`);
+    logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: upgrade.cost } });
+    await loadAllData();
+  }, [progress, onAmberChange, rooms, loadAllData]);
+
   // Determine if catch-up dialogues should be used (animal unlocked at Phase 2+)
   const shouldUseCatchup = (): boolean => {
     if (!introAnimal || !progress) return false;
@@ -757,6 +882,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {!isOnboarding && onStartDaily && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
             <DailyChallengeCard onStartDaily={(d) => { onStartDaily!(d); }} phase={progress.currentPhase} />
           )}
+          {!isOnboarding && onStartDaily && dailyUnlockProgress && !dailyUnlockProgress.unlocked && (
+            <View style={styles.dailyTeaserPill}>
+              <Text style={styles.dailyTeaserText}>
+                {'\uD83C\uDF19'} Daily in {dailyUnlockProgress.puzzlesRemaining}
+              </Text>
+            </View>
+          )}
           {!isOnboarding && (
             <TouchableOpacity
               style={styles.headerIconBtn}
@@ -831,10 +963,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.homeOverlayColumn} pointerEvents="box-none">
           {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
           {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
-            <View
+            <TouchableOpacity
               style={styles.unlockProgressContainer}
+              activeOpacity={0.85}
+              onPress={() => {
+                hapticLight();
+                setUpgradeFeedback(null);
+                unlockFlow.setShowShop(true);
+              }}
               accessibilityLabel={`Next unlock. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
-              accessibilityRole="progressbar"
+              accessibilityRole="button"
               accessibilityValue={{
                 min: 0,
                 max: unlockFlow.nextUnlock.cost || 1,
@@ -863,12 +1001,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
 
-          {/* Action Row — Gallery + Pit (hidden during onboarding) */}
+          {/* Action Row — home systems surfaced after onboarding */}
           {!isOnboarding && (
             <View style={styles.actionRow}>
+              {onOpenLedger && (
+                <TouchableOpacity
+                  style={styles.actionRowButton}
+                  onPress={() => {
+                    hapticLight();
+                    onOpenLedger?.();
+                  }}
+                  accessibilityLabel="Word Ledger"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionRowButtonText}>
+                    📘 Ledger
+                  </Text>
+                </TouchableOpacity>
+              )}
               {onOpenGallery && (
                 <TouchableOpacity
                   style={styles.actionRowButton}
@@ -906,6 +1059,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </Text>
                   </TouchableOpacity>
                 </Animated.View>
+              )}
+              {!!weeklyQuestState && (
+                <TouchableOpacity
+                  style={[styles.actionRowButton, styles.questButton]}
+                  onPress={() => {
+                    handleOpenQuestModal().catch(() => {});
+                  }}
+                  accessibilityLabel={`Weekly quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionRowButtonText}>
+                    🗓 Quests
+                    {claimableQuestAmber > 0
+                      ? ` (+${claimableQuestAmber})`
+                      : activeQuestCount > 0
+                        ? ` (${activeQuestCount})`
+                        : ''}
+                  </Text>
+                </TouchableOpacity>
               )}
               {isSacrificeAvailable(progress.currentPhase) && (
                 <TouchableOpacity
@@ -949,9 +1121,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     onStartDaily('HARD' as Difficulty);
                   } else if (goalSuggestion.action === 'play') {
                     onPlayPuzzle();
+                  } else if (goalSuggestion.action === 'pit') {
+                    onOpenPit?.();
+                  } else if (goalSuggestion.action === 'quests') {
+                    handleOpenQuestModal().catch(() => {});
                   }
                 }}
-                activeOpacity={goalSuggestion.action === 'none' ? 1 : 0.7}
+                activeOpacity={0.7}
               >
                 <Text
                   style={[
@@ -1142,6 +1318,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
               Your Amber: 💎 {progress.amber}
             </Text>
+            {upgradeFeedback && (
+              <Text style={[styles.shopFeedbackText, { color: dt.nameColor }]}>
+                {upgradeFeedback}
+              </Text>
+            )}
 
             {/* Next unlock */}
             {unlockFlow.nextUnlock && (
@@ -1199,11 +1380,145 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             )}
 
+            {areUpgradesAvailable(progress.currentPhase) && (
+              <View style={styles.upgradeSection}>
+                <Text style={styles.nextUnlockLabel}>Room Upgrades</Text>
+                {availableRoomUpgrades.length === 0 ? (
+                  <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                    Every unlocked room already has its decorative upgrade.
+                  </Text>
+                ) : (
+                  availableRoomUpgrades.slice(0, 4).map(({ room, upgrade }) => (
+                    <View
+                      key={room.id}
+                      style={[styles.unlockItem, styles.upgradeItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                    >
+                      <View style={styles.unlockInfo}>
+                        <Text style={[styles.unlockName, { color: dt.textColor }]}>{room.name}: {upgrade.name}</Text>
+                        <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                          {getUpgradeDescription(room.id, progress.currentPhase)}
+                        </Text>
+                        <Text style={styles.unlockCost}>💎 {upgrade.cost} amber</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[
+                          styles.buyButton,
+                          progress.amber < upgrade.cost && styles.buyButtonDisabled,
+                        ]}
+                        onPress={() => {
+                          handlePurchaseUpgrade(room.id).catch(() => {});
+                        }}
+                        disabled={progress.amber < upgrade.cost}
+                        accessibilityLabel={`Upgrade ${room.name} with ${upgrade.name} for ${upgrade.cost} amber`}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.buyButtonText}>
+                          {progress.amber >= upgrade.cost ? 'Decorate' : 'Need More'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
+
             {/* Close button */}
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => unlockFlow.setShowShop(false)}
               accessibilityLabel="Close shop"
+              accessibilityRole="button"
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Weekly Quest Modal */}
+      <Modal
+        visible={showQuestModal}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setShowQuestModal(false)}
+      >
+        <TouchableOpacity
+          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
+          activeOpacity={1}
+          onPress={() => setShowQuestModal(false)}
+          accessibilityLabel="Close weekly quests"
+          accessibilityRole="button"
+        >
+          <View
+            style={[
+              styles.shopModal,
+              styles.questModal,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: dt.modalShadowColor,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Weekly Quests</Text>
+            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
+              Reset in {getTimeUntilReset().days}d {getTimeUntilReset().hours}h {getTimeUntilReset().minutes}m
+            </Text>
+            {questFeedback && (
+              <Text style={[styles.shopFeedbackText, { color: dt.nameColor }]}>
+                {questFeedback}
+              </Text>
+            )}
+            <ScrollView style={styles.questList} showsVerticalScrollIndicator={false}>
+              {weeklyQuestState?.quests.map(quest => (
+                <View
+                  key={quest.id}
+                  style={[styles.unlockItem, styles.questItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                >
+                  <View style={styles.unlockInfo}>
+                    <Text style={[styles.unlockName, { color: dt.textColor }]}>{quest.title}</Text>
+                    <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                      {getQuestDescription(quest, progress.currentPhase)}
+                    </Text>
+                    <Text style={styles.questProgressText}>
+                      {quest.completed ? 'Complete' : `${quest.progress} / ${quest.target}`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.buyButton,
+                      (!quest.completed || quest.claimed) && styles.buyButtonDisabled,
+                    ]}
+                    onPress={() => {
+                      handleClaimQuest(quest.id).catch(() => {});
+                    }}
+                    disabled={!quest.completed || quest.claimed}
+                    accessibilityLabel={
+                      quest.claimed
+                        ? `${quest.title} already claimed`
+                        : quest.completed
+                          ? `Claim ${quest.rewardAmber} amber from ${quest.title}`
+                          : `${quest.title} in progress`
+                    }
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.buyButtonText}>
+                      {quest.claimed
+                        ? 'Claimed'
+                        : quest.completed
+                          ? `Claim +${Math.round(quest.rewardAmber * getPhaseRewardMultiplier(progress.currentPhase))}`
+                          : 'In Progress'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowQuestModal(false)}
+              accessibilityLabel="Close weekly quests"
               accessibilityRole="button"
             >
               <Text style={styles.closeButtonText}>Close</Text>
@@ -1768,6 +2083,19 @@ const styles = StyleSheet.create({
     gap: 7,
     marginLeft: 8,
   },
+  dailyTeaserPill: {
+    backgroundColor: 'rgba(30, 20, 50, 0.45)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  dailyTeaserText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   headerIconBtn: {
     width: 34,
     height: 34,
@@ -2004,8 +2332,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
+  shopFeedbackText: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
   nextUnlockContainer: {
     marginBottom: 24,
+  },
+  upgradeSection: {
+    marginBottom: 16,
   },
   nextUnlockLabel: {
     fontSize: 14,
@@ -2019,6 +2356,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
+  },
+  upgradeItem: {
+    marginBottom: 10,
+  },
+  questModal: {
+    maxHeight: SCREEN_HEIGHT * 0.7,
+  },
+  questList: {
+    maxHeight: SCREEN_HEIGHT * 0.45,
+    marginBottom: 12,
+  },
+  questItem: {
+    marginBottom: 10,
   },
   unlockInfo: {
     flex: 1,
@@ -2035,6 +2385,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: CandyColors.yellow.dark,
+    marginTop: 6,
+  },
+  questProgressText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: CandyColors.orange.dark,
     marginTop: 6,
   },
   unlockBlockedText: {
@@ -2256,6 +2612,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: 16,
     marginBottom: 4,
@@ -2272,6 +2629,10 @@ const styles = StyleSheet.create({
   sacrificeButton: {
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
     borderColor: 'rgba(120, 30, 60, 0.3)',
+  },
+  questButton: {
+    backgroundColor: 'rgba(45, 70, 120, 0.24)',
+    borderColor: 'rgba(120, 180, 255, 0.3)',
   },
   pitPhaseReadyButton: {
     backgroundColor: 'rgba(180, 120, 0, 0.3)',

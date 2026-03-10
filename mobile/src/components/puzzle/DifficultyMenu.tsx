@@ -45,8 +45,8 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const visibleOptions = variantOptions.filter(option => option.unlocked);
   const coreOptions = visibleOptions.filter(option => option.group === 'core');
   const baseOptions = visibleOptions.filter(option => option.group === 'base');
-  const comboOptions = visibleOptions.filter(option => option.group === 'combo');
-  const hasNonStandardVariants = baseOptions.length > 0 || comboOptions.length > 0;
+  const comboOptions: VariantSelectorOption[] = [];
+  const hasNonStandardVariants = baseOptions.length > 0;
 
   const renderVariantItem = (option: VariantSelectorOption) => {
     const isSelected = option.variant === currentVariant;
