@@ -10,6 +10,7 @@ import {
   Dimensions,
   Animated,
   Pressable,
+  Linking,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -62,6 +63,7 @@ import { estimateSlotIndex } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
+import { offerBatch } from './src/services/wordHarvest';
 import {
   hasVariantModifier,
   getVariantTimeLimit,
@@ -470,6 +472,36 @@ export default function App() {
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions]);
 
+  const handleIncomingLink = useCallback((url: string) => {
+    if (!url.startsWith('wordshift://')) return;
+    logEvent({ type: 'deep_link_opened', data: { url } });
+
+    if (onboardingFlow.onboardingStep && onboardingFlow.onboardingStep !== 'complete') {
+      return;
+    }
+
+    if (url.includes('challenge/daily')) {
+      handleStartDaily('HARD');
+      return;
+    }
+
+    if (url.includes('home')) {
+      transitionTo('home');
+    }
+  }, [handleStartDaily, onboardingFlow.onboardingStep, transitionTo]);
+
+  useEffect(() => {
+    Linking.getInitialURL().then(url => {
+      if (url) handleIncomingLink(url);
+    }).catch(() => {});
+
+    const subscription = Linking.addEventListener('url', event => {
+      handleIncomingLink(event.url);
+    });
+
+    return () => subscription.remove();
+  }, [handleIncomingLink]);
+
   // Return to home screen
   const handleGoHome = useCallback(() => {
     hapticLight();
@@ -526,6 +558,36 @@ export default function App() {
         isPlayingDaily
       );
 
+      let finalVictory = victory;
+      const shouldAutoCollectVictory = (
+        (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete') &&
+        !victory.phaseTransitionPending &&
+        !!victory.harvestBatchId &&
+        ((victory.cumulativeStats?.totalPuzzlesCompleted ?? 0) <= 5)
+      );
+
+      if (shouldAutoCollectVictory && victory.harvestBatchId) {
+        const autoCollected = await offerBatch(victory.harvestBatchId);
+        if (autoCollected && autoCollected.amberAwarded > 0) {
+          const newBalance = await awardBonusAmber(autoCollected.amberAwarded, 'auto_word_offering');
+          persistenceActions.setAmberBalance(newBalance);
+          logEvent({
+            type: 'harvest_auto_collected',
+            data: {
+              amberAwarded: autoCollected.amberAwarded,
+              wordsOffered: autoCollected.wordsOffered,
+              puzzlesSolved: victory.cumulativeStats?.totalPuzzlesCompleted ?? 0,
+            },
+          });
+          finalVictory = {
+            ...victory,
+            amberBalance: newBalance,
+            pendingHarvest: autoCollected.remainingSummary,
+            autoCollected: true,
+          };
+        }
+      }
+
       // Record daily challenge completion if applicable
       if (isPlayingDaily) {
         const previousDailyStatus = await getDailyStatus();
@@ -581,7 +643,7 @@ export default function App() {
       }
 
       puzzleActions.setEarnedStars(victory.earnedStars);
-      victoryActions.setVictoryData(victory);
+      victoryActions.setVictoryData(finalVictory);
 
       if (victory.earnedStars === 3) {
         soundPerfect();
@@ -636,12 +698,12 @@ export default function App() {
       }
 
       // Check achievements after brief delay to not block victory display
-      addVictoryTimeout(() => achievementActions.checkForAchievements(victory), 500);
+      addVictoryTimeout(() => achievementActions.checkForAchievements(finalVictory), 500);
 
       // Post-victory orchestration: glitch, micro-beat, whisper, interjection
       orchestrationActions.processVictory({
         phase: persistence.currentPhase,
-        totalPuzzlesCompleted: victory.cumulativeStats?.totalPuzzlesCompleted ?? 1,
+        totalPuzzlesCompleted: finalVictory.cumulativeStats?.totalPuzzlesCompleted ?? 1,
         completedWords: result.completedWords,
         isOnboarding: onboardingFlow.isOnboarding,
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
@@ -867,7 +929,7 @@ export default function App() {
     if (!victoryFlow.victoryData) return;
     hapticLight();
     const moveCount = puzzle.rows.length - 1;
-    await sharePuzzleResult({
+    const shared = await sharePuzzleResult({
       stars: victoryFlow.victoryData.earnedStars,
       difficulty: puzzle.difficulty,
       level: puzzle.level,
@@ -881,6 +943,16 @@ export default function App() {
       phase: persistence.currentPhase,
       incantationName: puzzle.lastIncantationName || undefined,
     });
+    if (shared) {
+      logEvent({
+        type: 'share_completed',
+        data: {
+          difficulty: puzzle.difficulty,
+          isDaily: isPlayingDaily,
+          phase: persistence.currentPhase,
+        },
+      });
+    }
   }, [victoryFlow.victoryData, puzzle, isPlayingDaily, orchestration.whisper, persistence.currentPhase]);
 
   const handleVictoryTapAccelerate = useCallback(() => {

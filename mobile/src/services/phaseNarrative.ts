@@ -1200,7 +1200,7 @@ export function getHomeAmbientLine(phase: DialoguePhase): string {
 
 export interface GoalSuggestion {
   text: string;
-  action: 'daily' | 'play' | 'none';
+  action: 'daily' | 'play' | 'pit' | 'quests';
 }
 
 const DAILY_SUGGESTIONS: Record<DialoguePhase, string[]> = {
@@ -1287,6 +1287,24 @@ const QUEST_SUGGESTIONS: Record<DialoguePhase, string[]> = {
   5: ['The weekly threads continue.', 'Weekly patterns await completion.'],
 };
 
+const QUEST_CLAIM_SUGGESTIONS: Record<DialoguePhase, string[]> = {
+  0: ['Your weekly quests have amber ready to claim!', 'Quest rewards are waiting for you.'],
+  1: ['Unclaimed quest amber is waiting.', 'Your weekly rewards are ready to collect.'],
+  2: ['The week has already yielded amber.', 'Claim what the week has offered.'],
+  3: ['The week has prepared its reward.', 'Claim the amber the rituals produced.'],
+  4: ['The arrangement has set aside amber for you.', 'Your weekly rewards are ready to be taken.'],
+  5: ['The week has left amber in the weave.', 'Claim the threads already completed.'],
+};
+
+const PIT_SUGGESTIONS: Record<DialoguePhase, string[]> = {
+  0: ['Fresh words are waiting in the pit.', 'Offer your waiting words for amber.'],
+  1: ['The pit is holding your latest words.', 'Your newest words are ready to offer.'],
+  2: ['The pit is full of waiting arrangements.', 'Pending words linger below.'],
+  3: ['The pit waits for what you have gathered.', 'Your latest offerings have not yet been fed.'],
+  4: ['The pit is waiting. Feed it what remains.', 'The arrangement has not forgotten your stored words.'],
+  5: ['Waiting threads still drift in the pit.', 'The pit still holds what you gathered.'],
+};
+
 /**
  * Get a contextual goal suggestion for the home screen.
  * Returns the highest-priority actionable suggestion, or null if none apply.
@@ -1295,6 +1313,8 @@ const QUEST_SUGGESTIONS: Record<DialoguePhase, string[]> = {
  * @param dailyAvailable - Daily challenge unlocked AND not completed today
  * @param untriedDifficulties - Difficulty levels never completed (e.g., ['MEDIUM_PLUS', 'HARD'])
  * @param newVariant - Most recently unlocked variant not yet tried, or null
+ * @param pendingHarvest - Whether the pit currently holds unoffered words
+ * @param claimableQuestAmber - Total amber ready to claim from completed weekly quests
  * @param hasActiveQuests - Whether there are incomplete weekly quests
  */
 export function getGoalSuggestion(
@@ -1302,15 +1322,32 @@ export function getGoalSuggestion(
   dailyAvailable: boolean,
   untriedDifficulties: string[],
   newVariant: string | null,
+  pendingHarvest: boolean,
+  claimableQuestAmber: number,
   hasActiveQuests: boolean,
 ): GoalSuggestion | null {
-  // Priority 1: Uncompleted daily challenge
+  // Priority 1: Unclaimed harvest should be impossible to miss.
+  if (pendingHarvest) {
+    const lines = PIT_SUGGESTIONS[phase] ?? PIT_SUGGESTIONS[0];
+    return { text: lines[Math.floor(Math.random() * lines.length)], action: 'pit' };
+  }
+
+  // Priority 2: Claim completed weekly quest rewards.
+  if (claimableQuestAmber > 0) {
+    const lines = QUEST_CLAIM_SUGGESTIONS[phase] ?? QUEST_CLAIM_SUGGESTIONS[0];
+    return {
+      text: `${lines[Math.floor(Math.random() * lines.length)]} (+${claimableQuestAmber} amber)`,
+      action: 'quests',
+    };
+  }
+
+  // Priority 3: Uncompleted daily challenge
   if (dailyAvailable) {
     const lines = DAILY_SUGGESTIONS[phase] ?? DAILY_SUGGESTIONS[0];
     return { text: lines[Math.floor(Math.random() * lines.length)], action: 'daily' };
   }
 
-  // Priority 2: Untried difficulty
+  // Priority 4: Untried difficulty
   if (untriedDifficulties.length > 0) {
     // Suggest the easiest untried difficulty first
     const order = ['MEDIUM', 'MEDIUM_PLUS', 'HARD'];
@@ -1322,17 +1359,17 @@ export function getGoalSuggestion(
     }
   }
 
-  // Priority 3: Newly unlocked variant
+  // Priority 5: Newly unlocked variant
   if (newVariant) {
     const phaseTexts = VARIANT_SUGGESTIONS[phase] ?? VARIANT_SUGGESTIONS[0];
     const text = phaseTexts[newVariant];
     if (text) return { text, action: 'play' };
   }
 
-  // Priority 4: Active weekly quests
+  // Priority 6: Active weekly quests
   if (hasActiveQuests) {
     const lines = QUEST_SUGGESTIONS[phase] ?? QUEST_SUGGESTIONS[0];
-    return { text: lines[Math.floor(Math.random() * lines.length)], action: 'none' };
+    return { text: lines[Math.floor(Math.random() * lines.length)], action: 'quests' };
   }
 
   return null;

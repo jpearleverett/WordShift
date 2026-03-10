@@ -45,6 +45,7 @@ export interface VictoryData {
   questsCompleted?: string[];
   harvestedWords?: string[];
   pendingHarvest?: { pendingAmber: number; pendingWords: number; pendingBatches: number };
+  autoCollected?: boolean;
 }
 
 interface VictoryModalProps {
@@ -147,6 +148,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 }) => {
   const phaseTheme = getPhaseTheme(phase);
   const btn = getButtonTheme(phase);
+  const totalPuzzlesCompleted = cumulativeStats?.totalPuzzlesCompleted ?? 0;
+  const isEarlyGameVictory = totalPuzzlesCompleted > 0 && totalPuzzlesCompleted <= 5;
 
   // Cascade animation — 4 staggered content groups
   const contentOpacity1 = useRef(new Animated.Value(0)).current;
@@ -406,63 +409,76 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   backgroundColor: phaseTheme.modalStatBgColor,
                 }]}>
                   <View style={styles.bonusBreakdown}>
-                    <View style={styles.bonusRow}>
-                      <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
-                      <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>{'\uD83D\uDC8E'} {baseAmber}</Text>
-                    </View>
-                    {starBonus > 0 && (
-                      <View style={styles.bonusRow}>
-                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                          {earnedStars >= 3 ? '3\u2605 Perfect' : '2\u2605 Great'}
+                    {isEarlyGameVictory ? (
+                      <>
+                        <Text style={[styles.earlyVictoryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {victoryData.autoCollected ? 'Amber banked instantly' : 'Amber ready from this puzzle'}
                         </Text>
-                        <Text style={[styles.bonusValue, { color: earnedStars >= 3 ? '#FFD700' : '#C0C0C0' }]}>+{starBonus}</Text>
-                      </View>
-                    )}
-                    {challengeBonusAmber > 0 && (
-                      <View style={styles.bonusRow}>
-                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
-                        <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>+{challengeBonusAmber}</Text>
-                      </View>
-                    )}
-                    {variantBonusAmber > 0 && variant && variant !== 'standard' && (
-                      <View style={styles.bonusRow}>
-                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                          {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS]?.title || 'Variant'}
+                        <Text style={[styles.earlyVictoryValue, { color: phaseTheme.modalTextColor }]}>
+                          {'\uD83D\uDC8E'} {totalAmber}
                         </Text>
-                        <Text style={[styles.bonusValue, { color: '#B088D0' }]}>+{variantBonusAmber}</Text>
-                      </View>
-                    )}
-                    {streakBonusAmber > 0 && (
-                      <View style={styles.bonusRow}>
-                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                          {'\uD83D\uDD25'} {victoryData.currentStreak}-day Streak
-                        </Text>
-                        <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakBonusAmber}</Text>
-                      </View>
-                    )}
-                    {firstCompBonus > 0 && (
-                      <View style={styles.bonusRow}>
-                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                          First {difficulty} Clear
-                        </Text>
-                        <Text style={[styles.bonusValue, { color: '#50C878' }]}>+{firstCompBonus}</Text>
-                      </View>
-                    )}
-                    {milestoneAmber > 0 && (
-                      <View style={styles.bonusRow}>
-                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                          {'\uD83C\uDFC6'} Milestone
-                        </Text>
-                        <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+{milestoneAmber}</Text>
-                      </View>
-                    )}
-                    {streakMilestoneAmber > 0 && (
-                      <View style={styles.bonusRow}>
-                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                          {'\uD83D\uDD25'} Streak Milestone
-                        </Text>
-                        <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakMilestoneAmber}</Text>
-                      </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.bonusRow}>
+                          <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
+                          <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>{'\uD83D\uDC8E'} {baseAmber}</Text>
+                        </View>
+                        {starBonus > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {earnedStars >= 3 ? '3\u2605 Perfect' : '2\u2605 Great'}
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: earnedStars >= 3 ? '#FFD700' : '#C0C0C0' }]}>+{starBonus}</Text>
+                          </View>
+                        )}
+                        {challengeBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
+                            <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>+{challengeBonusAmber}</Text>
+                          </View>
+                        )}
+                        {variantBonusAmber > 0 && variant && variant !== 'standard' && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS]?.title || 'Variant'}
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: '#B088D0' }]}>+{variantBonusAmber}</Text>
+                          </View>
+                        )}
+                        {streakBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'\uD83D\uDD25'} {victoryData.currentStreak}-day Streak
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakBonusAmber}</Text>
+                          </View>
+                        )}
+                        {firstCompBonus > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              First {difficulty} Clear
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: '#50C878' }]}>+{firstCompBonus}</Text>
+                          </View>
+                        )}
+                        {milestoneAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'\uD83C\uDFC6'} Milestone
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+{milestoneAmber}</Text>
+                          </View>
+                        )}
+                        {streakMilestoneAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'\uD83D\uDD25'} Streak Milestone
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakMilestoneAmber}</Text>
+                          </View>
+                        )}
+                      </>
                     )}
                     <View style={[styles.bonusDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
                     <View style={styles.bonusRow}>
@@ -472,7 +488,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       </Text>
                     </View>
                     {/* Collect Now — compact pill inside amber stats box */}
-                    {!isOnboarding && (
+                    {!isOnboarding && !victoryData.autoCollected && (
                       <>
                       {phaseTransitionPending && (
                         <Text style={[styles.pitMandatoryText, { color: btn.harvestPill.text }]}>
@@ -536,7 +552,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             null
             ) : (
             <>
-            {/* Next Level — full-width primary 3D candy button */}
+            {/* Early wins stay focused: one strong replay CTA. */}
             <TouchableOpacity
               onPress={onNextLevel}
               activeOpacity={0.85}
@@ -560,6 +576,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </View>
             </TouchableOpacity>
 
+            {!isEarlyGameVictory && (
             <View style={styles.victoryButtonRowSecondary}>
               {/* Share — uniform secondary */}
               <TouchableOpacity
@@ -593,6 +610,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
+            )}
             </>
             )}
             </Animated.View>
@@ -702,6 +720,18 @@ const styles = StyleSheet.create({
   },
   bonusBreakdown: {
     gap: 4,
+  },
+  earlyVictoryLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  earlyVictoryValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 2,
   },
   bonusRow: {
     flexDirection: 'row',

@@ -10,10 +10,16 @@ export type EventType =
   | 'puzzle_completed'
   | 'puzzle_generation_failed'
   | 'puzzle_started'
+  | 'puzzle_restored'
   | 'unlock_purchased'
+  | 'room_upgrade_purchased'
   | 'dialogue_started'
   | 'dialogue_completed'
   | 'phase_changed'
+  | 'quest_reward_claimed'
+  | 'harvest_auto_collected'
+  | 'deep_link_opened'
+  | 'share_completed'
   | 'app_error';
 
 /**

@@ -19,6 +19,13 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 );
 
 describe('weeklyQuests', () => {
+  const unlockedQuestContext = {
+    puzzlesSolved: 25,
+    unlockedAnimalCount: 4,
+    dailyUnlocked: true,
+    challengeUnlocked: true,
+  };
+
   beforeEach(async () => {
     await AsyncStorage.clear();
     await clearWeeklyQuests();
@@ -89,10 +96,29 @@ describe('weeklyQuests', () => {
       }
     });
 
-    it('always includes a daily_complete quest', async () => {
-      const state = await loadWeeklyQuests(0);
+    it('includes a daily_complete quest when daily is unlocked', async () => {
+      const state = await loadWeeklyQuests(1, {
+        puzzlesSolved: 25,
+        unlockedAnimalCount: 4,
+        dailyUnlocked: true,
+        challengeUnlocked: true,
+      });
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete');
       expect(dailyQuest).toBeDefined();
+    });
+
+    it('filters out impossible system quests before they unlock', async () => {
+      const state = await loadWeeklyQuests(0, {
+        puzzlesSolved: 4,
+        unlockedAnimalCount: 1,
+        dailyUnlocked: false,
+        challengeUnlocked: false,
+      });
+
+      expect(state.quests.some(q => q.type === 'daily_complete')).toBe(false);
+      expect(state.quests.some(q => q.type === 'daily_streak')).toBe(false);
+      expect(state.quests.some(q => q.type === 'challenge_mode')).toBe(false);
+      expect(state.quests.some(q => q.type === 'visit_animals')).toBe(false);
     });
 
     it('generates deterministic quests for the same week', async () => {
@@ -171,7 +197,7 @@ describe('weeklyQuests', () => {
 
   describe('updateQuestProgress', () => {
     it('increments solve_count quest on any puzzle completion', async () => {
-      await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
       await updateQuestProgress({
         difficulty: 'MEDIUM',
         stars: 2,
@@ -253,8 +279,8 @@ describe('weeklyQuests', () => {
     });
 
     it('increments daily_complete quest only for daily puzzles', async () => {
-      await loadWeeklyQuests(0);
-      const state = await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
+      const state = await loadWeeklyQuests(1, unlockedQuestContext);
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
 
       await updateQuestProgress({
@@ -264,8 +290,8 @@ describe('weeklyQuests', () => {
         isDaily: false,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
-      const s1 = await loadWeeklyQuests(0);
+      }, 1);
+      const s1 = await loadWeeklyQuests(1, unlockedQuestContext);
       expect(s1.quests.find(q => q.id === dailyQuest.id)?.progress).toBe(0);
 
       await updateQuestProgress({
@@ -275,8 +301,8 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
-      const s2 = await loadWeeklyQuests(0);
+      }, 1);
+      const s2 = await loadWeeklyQuests(1, unlockedQuestContext);
       expect(s2.quests.find(q => q.id === dailyQuest.id)?.progress).toBe(1);
     });
 
@@ -360,8 +386,8 @@ describe('weeklyQuests', () => {
     });
 
     it('marks quest as completed when target is reached', async () => {
-      await loadWeeklyQuests(0);
-      const state = await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
+      const state = await loadWeeklyQuests(1, unlockedQuestContext);
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
       // daily_complete target is 1
 
@@ -372,7 +398,7 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
+      }, 1);
 
       expect(completed.length).toBeGreaterThanOrEqual(1);
       const completedDaily = completed.find(q => q.type === 'daily_complete');
@@ -381,8 +407,8 @@ describe('weeklyQuests', () => {
     });
 
     it('does not increment completed quests', async () => {
-      await loadWeeklyQuests(0);
-      const state = await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
+      const state = await loadWeeklyQuests(1, unlockedQuestContext);
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
 
       // Complete it
@@ -393,7 +419,7 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
+      }, 1);
 
       // Try again
       const completed2 = await updateQuestProgress({
@@ -451,7 +477,7 @@ describe('weeklyQuests', () => {
 
   describe('claimQuestReward', () => {
     it('returns reward for completed unclaimed quest', async () => {
-      await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
 
       // Complete the daily quest
       await updateQuestProgress({
@@ -461,9 +487,9 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
+      }, 1);
 
-      const state = await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(1, unlockedQuestContext);
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
 
       const reward = await claimQuestReward(dailyQuest.id);
@@ -479,7 +505,7 @@ describe('weeklyQuests', () => {
     });
 
     it('returns null for already claimed quest', async () => {
-      await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
 
       await updateQuestProgress({
         difficulty: 'HARD',
@@ -488,9 +514,9 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
+      }, 1);
 
-      const state = await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(1, unlockedQuestContext);
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
 
       await claimQuestReward(dailyQuest.id);
@@ -499,13 +525,13 @@ describe('weeklyQuests', () => {
     });
 
     it('returns null for non-existent quest ID', async () => {
-      await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
       const reward = await claimQuestReward('non_existent_quest');
       expect(reward).toBeNull();
     });
 
     it('marks quest as claimed after claiming', async () => {
-      await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
 
       await updateQuestProgress({
         difficulty: 'HARD',
@@ -514,13 +540,13 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
+      }, 1);
 
-      const state = await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(1, unlockedQuestContext);
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
       await claimQuestReward(dailyQuest.id);
 
-      const updatedState = await loadWeeklyQuests(0);
+      const updatedState = await loadWeeklyQuests(1, unlockedQuestContext);
       const claimed = updatedState.quests.find(q => q.id === dailyQuest.id);
       expect(claimed?.claimed).toBe(true);
     });
@@ -583,7 +609,7 @@ describe('weeklyQuests', () => {
     });
 
     it('returns amber sum for completed unclaimed quests', async () => {
-      await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
       await updateQuestProgress({
         difficulty: 'HARD',
         stars: 3,
@@ -591,16 +617,16 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: true,
         amberEarned: 200,
-      }, 0);
+      }, 1);
 
-      const state = await loadWeeklyQuests(0);
+      const state = await loadWeeklyQuests(1, unlockedQuestContext);
       const completedQuests = state.quests.filter(q => q.completed && !q.claimed);
       const expectedAmber = completedQuests.reduce((sum, q) => sum + q.rewardAmber, 0);
       expect(getUnclaimedAmber(state)).toBe(expectedAmber);
     });
 
     it('excludes claimed quests from total', async () => {
-      await loadWeeklyQuests(0);
+      await loadWeeklyQuests(1, unlockedQuestContext);
       await updateQuestProgress({
         difficulty: 'HARD',
         stars: 3,
@@ -608,14 +634,14 @@ describe('weeklyQuests', () => {
         isDaily: true,
         isChallenge: false,
         amberEarned: 20,
-      }, 0);
+      }, 1);
 
-      let state = await loadWeeklyQuests(0);
+      let state = await loadWeeklyQuests(1, unlockedQuestContext);
       const dailyQuest = state.quests.find(q => q.type === 'daily_complete')!;
       const amberBefore = getUnclaimedAmber(state);
 
       await claimQuestReward(dailyQuest.id);
-      state = await loadWeeklyQuests(0);
+      state = await loadWeeklyQuests(1, unlockedQuestContext);
       const amberAfter = getUnclaimedAmber(state);
       expect(amberAfter).toBe(amberBefore - dailyQuest.rewardAmber);
     });

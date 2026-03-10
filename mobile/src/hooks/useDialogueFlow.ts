@@ -466,11 +466,12 @@ export function useDialogueFlow({
     return animal.currentDialogueIndex < totalDialogues;
   }, [progress]);
 
-  // Handle closing dialogue (and ending session)
-  const handleCloseDialogue = useCallback(async () => {
+  // Handle closing dialogue. Manual closes keep the session warm so
+  // checking in with an animal never feels punitive.
+  const closeDialogue = useCallback(async (startCooldown: boolean) => {
     hapticLight();
     const closingAnimal = selectedAnimal;
-    if (closingAnimal) {
+    if (closingAnimal && startCooldown) {
       await endSession(closingAnimal.id);
       // Update hasNewDialogue for the animal that was talking
       setAnimals(prev =>
@@ -487,6 +488,10 @@ export function useDialogueFlow({
     setPreDialoguePages([]);
   }, [selectedAnimal, recomputeHasNewDialogue, setAnimals]);
 
+  const handleCloseDialogue = useCallback(async () => {
+    await closeDialogue(false);
+  }, [closeDialogue]);
+
   // Handle dialogue advance
   const handleNextDialogue = useCallback(async () => {
     if (!selectedAnimal || !progress) return;
@@ -502,7 +507,7 @@ export function useDialogueFlow({
     // Regular dialogue advance — check if session is still available
     const availability = await checkDialogueAvailability(selectedAnimal.id);
     if (!availability.available) {
-      handleCloseDialogue();
+      closeDialogue(true);
       setCooldownMessage(
         `${selectedAnimal.name} wants to rest now. Come back after solving some puzzles!`
       );
@@ -554,7 +559,7 @@ export function useDialogueFlow({
       );
 
       if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
-        handleCloseDialogue();
+        closeDialogue(true);
         setCooldownMessage(
           `${selectedAnimal.name} wants to rest now. Come back later for more conversation!`
         );
@@ -577,9 +582,9 @@ export function useDialogueFlow({
           return;
         }
       }
-      handleCloseDialogue();
+      closeDialogue(true);
     }
-  }, [selectedAnimal, progress, handleCloseDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {

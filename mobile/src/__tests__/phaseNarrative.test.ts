@@ -18,6 +18,7 @@ import {
   getChallengeIntroLines,
   getPitMandatoryText,
   getPitMandatoryCTA,
+  getGoalSuggestion,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -241,6 +242,19 @@ describe('getPhaseChangeNarrative', () => {
     const titles = narrativePhases.map(p => getPhaseChangeNarrative(p).title);
     const unique = new Set(titles);
     expect(unique.size).toBe(narrativePhases.length);
+  });
+});
+
+describe('getGoalSuggestion', () => {
+  test('prioritizes pending harvest over other suggestions', () => {
+    const suggestion = getGoalSuggestion(0, true, ['MEDIUM'], 'reverse', true, 0, true);
+    expect(suggestion?.action).toBe('pit');
+  });
+
+  test('returns quest action for claimable weekly rewards', () => {
+    const suggestion = getGoalSuggestion(1, false, [], null, false, 40, true);
+    expect(suggestion?.action).toBe('quests');
+    expect(suggestion?.text).toContain('+40 amber');
   });
 });
 

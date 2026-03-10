@@ -9,7 +9,7 @@ import { incrementShareCount } from './achievements';
  * for puzzle completions and daily challenges.
  */
 
-interface ShareableResult {
+export interface ShareableResult {
   stars: number;
   difficulty: Difficulty;
   level: number;
@@ -29,6 +29,19 @@ interface ShareableResult {
   incantationName?: string;
   /** Share frame style from cosmetics */
   shareFrame?: string;
+}
+
+function getChallengeLink(result: ShareableResult): string {
+  if (result.isDaily) {
+    return `wordshift://challenge/daily${result.dailyDate ? `?date=${result.dailyDate}` : ''}`;
+  }
+  return 'wordshift://home';
+}
+
+function getChallengeCTA(result: ShareableResult): string {
+  return result.isDaily
+    ? "Take today's daily challenge:"
+    : 'Play WordShift:';
 }
 
 /**
@@ -116,6 +129,7 @@ function applyFrame(lines: string[], frameStyle?: string): string[] {
  */
 export function generateShareText(result: ShareableResult): string {
   const lines: string[] = [];
+  const challengeLink = getChallengeLink(result);
 
   if (result.isDaily && result.dailyDate) {
     lines.push(`WordShift Daily ${result.dailyDate}`);
@@ -151,6 +165,10 @@ export function generateShareText(result: ShareableResult): string {
     lines.push(`"${result.animalWhisper}"`);
   }
 
+  lines.push('');
+  lines.push(getChallengeCTA(result));
+  lines.push(challengeLink);
+
   // Apply cosmetic frame
   const framed = applyFrame(lines, result.shareFrame);
   return framed.join('\n');
@@ -161,11 +179,13 @@ export function generateShareText(result: ShareableResult): string {
  */
 export async function sharePuzzleResult(result: ShareableResult): Promise<boolean> {
   const text = generateShareText(result);
+  const challengeLink = getChallengeLink(result);
 
   try {
     const shareResult = await Share.share(
       {
         message: text,
+        url: Platform.OS === 'ios' ? challengeLink : undefined,
       },
       {
         dialogTitle: 'Share your WordShift result',

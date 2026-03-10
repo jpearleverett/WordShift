@@ -1656,6 +1656,25 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const handleHarvestAllRef = useRef(handleHarvestAll);
   useEffect(() => { handleHarvestAllRef.current = handleHarvestAll; }, [handleHarvestAll]);
 
+  const onboardingAutoOfferStarted = useRef(false);
+  useEffect(() => {
+    if (onboardingStep !== 'pit_offering') {
+      onboardingAutoOfferStarted.current = false;
+      return;
+    }
+    if (onboardingAutoOfferStarted.current || isOffering) return;
+    if (!harvestState || harvestState.pendingBatches.length === 0) return;
+
+    onboardingAutoOfferStarted.current = true;
+    const timer = setTimeout(() => {
+      handleHarvestAllRef.current().catch(() => {
+        onboardingAutoOfferStarted.current = false;
+      });
+    }, reducedMotion ? 250 : 900);
+
+    return () => clearTimeout(timer);
+  }, [onboardingStep, harvestState, isOffering, reducedMotion]);
+
   // ---- Summary stats ----
   const pendingAmber = useMemo(() => {
     if (!harvestState) return 0;

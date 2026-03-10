@@ -64,6 +64,10 @@ export interface VictoryData {
   harvestedWords?: string[];
   /** Updated pending harvest summary after enqueue */
   pendingHarvest?: HarvestSummary;
+  /** Batch id created for this victory's harvest, used for early auto-collection */
+  harvestBatchId?: string;
+  /** True when the victory reward was banked immediately */
+  autoCollected?: boolean;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
   /** True when pending harvest batches hit the 200 cap and oldest were trimmed */
@@ -169,6 +173,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variant,
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
+        autoCollected: false,
         phaseTransitionPending: false,
         harvestOverflow: false,
       };
@@ -220,8 +225,9 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const harvestedWords = completedWords.length > 0
         ? [...new Set(completedWords.map(w => w.toUpperCase()))]
         : [];
+      const harvestBatchId = generateBatchId();
       const harvestResult = await enqueueHarvestBatch({
-        id: generateBatchId(),
+        id: harvestBatchId,
         words: harvestedWords,
         amberValue: totalQueuedAmber,
         createdAt: Date.now(),
@@ -339,6 +345,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         streakMilestoneMessage: amberResult.streakMilestoneMessage,
         harvestedWords,
         pendingHarvest,
+        harvestBatchId,
+        autoCollected: false,
         phaseTransitionPending: amberResult.phaseTransitionPending,
         harvestOverflow: harvestResult.overflow,
       };
@@ -366,6 +374,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         variantRepeatDecay: 1.0,
         streakMilestoneBonus: 0,
         streakMilestoneMessage: null,
+        autoCollected: false,
         phaseTransitionPending: false,
         harvestOverflow: false,
       };
