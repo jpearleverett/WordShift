@@ -1119,7 +1119,7 @@ const styles = StyleSheet.create({
     top: -SCREEN_HEIGHT * 0,
     left: -SCREEN_WIDTH * 0,
     width: SCREEN_WIDTH * 1,
-    height: SCREEN_HEIGHT * 1,
+    height: SCREEN_HEIGHT * 1.2,
     zIndex: -1,
   },
   // Clouds - inside transform container
@@ -1199,7 +1199,7 @@ const styles = StyleSheet.create({
   // House container
   houseContainer: {
     alignItems: 'center',
-    marginTop: 150,
+    marginTop: 50,
     marginBottom: 100,
   },
 
