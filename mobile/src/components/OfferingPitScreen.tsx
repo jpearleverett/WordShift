@@ -10,6 +10,7 @@ import {
   StatusBar,
   Image,
   Dimensions,
+  Modal,
 } from 'react-native';
 import { CandyColors, getPhaseTheme, getTileColor } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
@@ -628,6 +629,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [overflowCount, setOverflowCount] = useState(0);
   // Tracks amber visually consumed during harvest-all cascade (for decrementing pending display)
   const [pendingAmberOffset, setPendingAmberOffset] = useState(0);
+  const [showUtilityModal, setShowUtilityModal] = useState(false);
 
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
@@ -1937,19 +1939,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.headerIconBtn}
-              onPress={() => { hapticLight(); onOpenStats?.(); }}
-              accessibilityLabel="View stats"
+              onPress={() => { hapticLight(); setShowUtilityModal(true); }}
+              accessibilityLabel="Open utility menu"
               accessibilityRole="button"
             >
-              <Text style={styles.headerIconText}>{'\uD83D\uDCCA'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => { hapticLight(); onOpenSettings?.(); }}
-              accessibilityLabel="Settings"
-              accessibilityRole="button"
-            >
-              <Text style={styles.headerIconText}>{'\u2699\uFE0F'}</Text>
+              <Text style={styles.headerIconText}>☰</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerIconBtn}
@@ -1962,6 +1956,52 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
           </View>
         )}
       </View>
+
+      <Modal
+        visible={showUtilityModal}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setShowUtilityModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.utilityOverlay}
+          activeOpacity={1}
+          onPress={() => setShowUtilityModal(false)}
+          accessibilityLabel="Close utility menu"
+          accessibilityRole="button"
+        >
+          <View style={styles.utilityModal} onStartShouldSetResponder={() => true}>
+            <Text style={styles.utilityTitle}>Menu</Text>
+            {onOpenStats && (
+              <TouchableOpacity
+                style={styles.utilityButton}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onOpenStats?.();
+                }}
+                accessibilityLabel="View stats"
+                accessibilityRole="button"
+              >
+                <Text style={styles.utilityButtonText}>📊 Statistics</Text>
+              </TouchableOpacity>
+            )}
+            {onOpenSettings && (
+              <TouchableOpacity
+                style={styles.utilityButton}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onOpenSettings?.();
+                }}
+                accessibilityLabel="Open settings"
+                accessibilityRole="button"
+              >
+                <Text style={styles.utilityButtonText}>⚙️ Settings</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Empty state */}
       {pendingWordCount === 0 && !resultMessage && (
@@ -2112,6 +2152,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerIconText: { fontSize: 16 },
+  utilityOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(8, 8, 18, 0.45)',
+  },
+  utilityModal: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 32,
+    backgroundColor: 'rgba(20, 16, 36, 0.98)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  utilityTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: CandyColors.white,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  utilityButton: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 10,
+  },
+  utilityButtonText: {
+    color: CandyColors.white,
+    fontSize: 15,
+    fontWeight: '800',
+  },
   // ---- Pit glow (old single-oval style removed — now uses inline multi-layered glow) ----
   // ---- Content overlays ----
   emptyContainer: {
