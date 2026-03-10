@@ -18,6 +18,7 @@ import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
+import { clampHomeScenePanY, resolveHomeScenePanY } from '../../services/homeScenePan';
 
 // Environment assets
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
@@ -140,7 +141,7 @@ const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.5)).current;
   const mountedRef = useRef(true);
-  const animationRef = useRef<Animated.CompositeAnimation>();
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -225,9 +226,9 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
   const y = useRef(new Animated.Value(yPosition)).current;
   const flapRotation = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const flapAnimRef = useRef<Animated.CompositeAnimation>();
-  const moveAnimRef = useRef<Animated.CompositeAnimation>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flapAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const moveAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -308,8 +309,8 @@ const ShootingStar: React.FC = () => {
   const y = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const animationRef = useRef<Animated.CompositeAnimation>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -630,6 +631,8 @@ interface HouseWorldProps {
   nextUnlock?: Unlockable | null;
   amberBalance?: number;
   purchasedUpgrades?: Record<string, number>;
+  savedPanY?: number | null;
+  onPanYChange?: (panY: number) => void;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
@@ -642,6 +645,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   nextUnlock = null,
   amberBalance = 0,
   purchasedUpgrades = {},
+  savedPanY = null,
+  onPanYChange,
 }) => {
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
@@ -651,6 +656,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   // State tracking for gestures
   const baseTranslateY = useRef(0);
+  const currentPanYRef = useRef<number | null>(null);
 
   // Track container height for proper initial positioning
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
@@ -809,61 +815,63 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const sortedRooms = [...displayRooms].sort((a, b) => b.layoutPosition.row - a.layoutPosition.row);
   const numRows = Math.max(1, displayRooms.length);
 
-  const calculateHouseHeight = (): number => {
+  const houseHeight = useMemo(() => {
     return numRows * ROOM_HEIGHT +
-           Math.max(0, numRows - 1) * ROOM_GAP +
-           HOUSE_PADDING * 2;
-  };
+      Math.max(0, numRows - 1) * ROOM_GAP +
+      HOUSE_PADDING * 2;
+  }, [numRows]);
 
-  // Calculate pan bounds based on content size
-  // Returns asymmetric bounds: min=0 (house bottom at viewport bottom),
-  // max=overflow (house top at viewport top)
-  const getPanBounds = () => {
+  const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
     const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
-      min: 0,  // Don't allow panning below the house (prevents empty space below foundation)
-      max: Math.max(0, overflow + 50),  // Allow panning up to see the roof + small padding
+      min: 0, // Don't allow panning below the house (prevents empty space below foundation)
+      max: Math.max(0, overflow + 50), // Allow panning up to see the roof + small padding
     };
-  };
+  }, [containerHeight, houseHeight, numRows]);
+
+  const syncPanPosition = useCallback((nextPanY: number, notify = false) => {
+    const clampedPanY = clampHomeScenePanY(nextPanY, panBounds.max);
+    translateY.setValue(clampedPanY);
+    currentPanYRef.current = clampedPanY;
+    baseTranslateY.current = clampedPanY;
+    if (notify) {
+      onPanYChange?.(clampedPanY);
+    }
+  }, [onPanYChange, panBounds.max, translateY]);
 
   // Pan gesture handler - vertical only to prevent horizontal gaps
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
     const { translationY } = event.nativeEvent;
 
-    const bounds = getPanBounds();
-    const newY = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
+    const newY = clampHomeScenePanY(baseTranslateY.current + translationY, panBounds.max);
 
     translateY.setValue(newY);
+    currentPanYRef.current = newY;
   };
 
   const onPanHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
       const { translationY } = event.nativeEvent;
-      const bounds = getPanBounds();
-
-      baseTranslateY.current = Math.max(bounds.min, Math.min(bounds.max, baseTranslateY.current + translationY));
+      syncPanPosition(baseTranslateY.current + translationY, true);
     }
   };
 
-  const houseHeight = calculateHouseHeight();
-
-  // Set initial pan position so the house is properly framed.
-  // With flex-end, the house bottom is at the viewport bottom and the roof
-  // extends above when the house is taller than the viewport. A positive
-  // translateY shifts the view down, bringing the roof into view.
+  // Preserve the current viewport when the house grows or helper UI changes the
+  // available height, and restore the last viewport when the home screen remounts.
   useEffect(() => {
     if (containerHeight === null) return;
-    const connectorHeight = Math.max(0, numRows - 1) * 10;
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight;
-    const overflow = Math.max(0, totalContentHeight - containerHeight);
-
-    translateY.setValue(overflow);
-    baseTranslateY.current = overflow;
-  }, [numRows, containerHeight]);
+    const resolvedPanY = resolveHomeScenePanY({
+      currentPanY: currentPanYRef.current,
+      savedPanY,
+      maxPanY: panBounds.max,
+    });
+    const shouldNotify = currentPanYRef.current == null || currentPanYRef.current !== resolvedPanY;
+    syncPanPosition(resolvedPanY, shouldNotify);
+  }, [containerHeight, panBounds.max, savedPanY, syncPanPosition]);
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
