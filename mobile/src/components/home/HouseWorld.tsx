@@ -873,94 +873,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     syncPanPosition(resolvedPanY, shouldNotify);
   }, [containerHeight, panBounds.max, savedPanY, syncPanPosition]);
 
-  const backgroundSource =
-    currentPhase >= 4 ? SKY_SHADOW :
-    currentPhase >= 3 ? SKY_STORM :
-    currentPhase >= 2 ? SKY_DUSK :
-    SKY_DAY;
-
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
-      <View style={styles.environmentLayer} pointerEvents="none">
-        <Image
-          source={backgroundSource}
-          style={styles.skyBackground}
-          resizeMode="cover"
-        />
-
-        <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]}>
-          <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-        </Animated.View>
-        <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]}>
-          <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-          <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-        </Animated.View>
-        <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]}>
-          <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-        </Animated.View>
-
-        {currentPhase < 4 ? (
-          <Animated.View
-            style={[
-              styles.sun,
-              {
-                transform: [
-                  { scale: sunPulse },
-                  { rotate: sunRotate },
-                ],
-                opacity: currentPhase >= 3 ? 0.4 : 1,
-              },
-            ]}
-          >
-            <View style={styles.sunRays}>
-              {[...Array(8)].map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.sunRay,
-                    { transform: [{ rotate: `${i * 45}deg` }] },
-                  ]}
-                />
-              ))}
-            </View>
-            <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
-          </Animated.View>
-        ) : (
-          <View style={[styles.sun, { opacity: 0.8 }]}>
-            <Text style={styles.sunEmoji}>🌑</Text>
-          </View>
-        )}
-
-        {currentPhase >= 3 && (
-          <View style={styles.starsContainer}>
-            {nightStars.map((star) => (
-              <Text
-                key={star.id}
-                style={[
-                  styles.star,
-                  {
-                    left: star.left,
-                    top: star.top,
-                    opacity: star.opacity,
-                    fontSize: star.fontSize,
-                  },
-                ]}
-              >
-                ✦
-              </Text>
-            ))}
-          </View>
-        )}
-
-        {currentPhase >= 2 && <ShootingStar />}
-        {currentPhase >= 3 && <ShootingStar />}
-        {currentPhase >= 4 && <ShootingStar />}
-
-        <FlyingBird startDelay={0} yPosition={80} />
-        <FlyingBird startDelay={3000} yPosition={50} />
-        {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
-      </View>
-
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -986,6 +900,104 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
               },
             ]}
           >
+              {/* Sky background - inside transform so it moves with the scene.
+                  Oversized to prevent gaps at any zoom/pan combination.
+                  Top offset grows with house height so the fill color above
+                  the image seamlessly extends the sky as rooms are added. */}
+              <Image
+                source={
+                  currentPhase >= 4 ? SKY_SHADOW :
+                  currentPhase >= 3 ? SKY_STORM :
+                  currentPhase >= 2 ? SKY_DUSK :
+                  SKY_DAY
+                }
+                style={[styles.skyBackground, {
+                  top: -Math.max(SCREEN_HEIGHT * 0.20, houseHeight * 0.0),
+                }]}
+                resizeMode="cover"
+              />
+
+              {/* Animated clouds - inside transform so they move with the scene */}
+              <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+              <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+                <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+              <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
+                <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
+              </Animated.View>
+
+              {/* Sun with animated rays - hidden at phase 4 */}
+              {currentPhase < 4 && (
+                <Animated.View
+                  style={[
+                    styles.sun,
+                    {
+                      transform: [
+                        { scale: sunPulse },
+                        { rotate: sunRotate },
+                      ],
+                      opacity: currentPhase >= 3 ? 0.4 : 1,
+                    }
+                  ]}
+                  pointerEvents="none"
+                >
+                  <View style={styles.sunRays}>
+                    {[...Array(8)].map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.sunRay,
+                          { transform: [{ rotate: `${i * 45}deg` }] }
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
+                </Animated.View>
+              )}
+
+              {/* Moon for phase 4 */}
+              {currentPhase >= 4 && (
+                <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
+                  <Text style={styles.sunEmoji}>🌑</Text>
+                </View>
+              )}
+
+              {/* Stars at night (phase 3-4) */}
+              {currentPhase >= 3 && (
+                <View style={styles.starsContainer} pointerEvents="none">
+                  {nightStars.map((star) => (
+                    <Text
+                      key={star.id}
+                      style={[
+                        styles.star,
+                        {
+                          left: star.left,
+                          top: star.top,
+                          opacity: star.opacity,
+                          fontSize: star.fontSize,
+                        }
+                      ]}
+                    >
+                      ✦
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+              {/* Shooting stars (only at higher phases) */}
+              {currentPhase >= 2 && <ShootingStar />}
+              {currentPhase >= 3 && <ShootingStar />}
+              {currentPhase >= 4 && <ShootingStar />}
+
+              {/* Flying birds */}
+              <FlyingBird startDelay={0} yPosition={80} />
+              <FlyingBird startDelay={3000} yPosition={50} />
+              {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
+
               {/* House */}
               <View style={styles.houseContainer}>
                 {/* Shadow entity silhouette - grows across phases, behind the house */}
@@ -1098,33 +1110,35 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     zIndex: 1, // Keep below header (zIndex: 100)
-    backgroundColor: '#6fb7df',
+    backgroundColor: '#6fb7df', // Matches sky_day bottom edge so no gaps when zoomed out
   },
-  environmentLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 0,
-  },
-  // Sky background - fixed behind the panning house scene.
+
+  // Sky background - moves with scene, oversized to prevent gaps during pan.
   skyBackground: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: -SCREEN_HEIGHT * 0,
+    left: -SCREEN_WIDTH * 0,
+    width: SCREEN_WIDTH * 1,
+    height: SCREEN_HEIGHT * 1,
+    zIndex: -1,
   },
-  // Clouds - fixed environment layer
+  // Clouds - inside transform container
   cloud: {
     position: 'absolute',
     flexDirection: 'row',
-    zIndex: 2,
+    zIndex: 200,
   },
   cloudEmoji: {
     fontSize: 45,
     opacity: 0.9,
   },
 
-  // Sun - fixed environment layer
+  // Sun - inside transform container
   sun: {
     position: 'absolute',
     top: 15,
     right: 20,
-    zIndex: 2,
+    zIndex: 200,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1155,7 +1169,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: SCREEN_HEIGHT * 0.3,
-    zIndex: 1,
+    zIndex: 150,
   },
   star: {
     position: 'absolute',
@@ -1172,7 +1186,7 @@ const styles = StyleSheet.create({
   // Gesture container
   gestureContainer: {
     flex: 1,
-    zIndex: 5,
+    zIndex: 10,
   },
 
   // Transform container
