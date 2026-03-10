@@ -1116,7 +1116,7 @@ const styles = StyleSheet.create({
   // Sky background - moves with scene, oversized to prevent gaps during pan.
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * -0.5,
+    top: -SCREEN_HEIGHT * 0.5,
     left: -SCREEN_WIDTH * 0,
     width: SCREEN_WIDTH * 1,
     height: SCREEN_HEIGHT * 1,
