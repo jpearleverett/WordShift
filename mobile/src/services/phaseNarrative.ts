@@ -590,6 +590,28 @@ export function getFoxSetupSelectorIntroLines(phase: number): string[] {
   ];
 }
 
+export function getFoxPitHarvestIntroLines(phase: number): string[] {
+  if (phase >= 4) {
+    return [
+      'The house gathered your first few offerings on its own while you learned.',
+      'Soon it will leave those words waiting below. When that happens, use the pit button to bring the amber back yourself.',
+      'If words are waiting, the pit mark in the header will remind you.',
+    ];
+  }
+  if (phase >= 3) {
+    return [
+      'The house has been collecting your first rewards for you while you get comfortable.',
+      'In a few more puzzles, words will start waiting in the pit until you offer them yourself.',
+      'Use the pit button in the header whenever you want to gather that amber.',
+    ];
+  }
+  return [
+    'The house has been sweeping up your first few rewards for you while you learn.',
+    'Very soon, words will wait in the pit until you tap them in and gather the amber yourself.',
+    'That little pit button in the header will take you there whenever you need it.',
+  ];
+}
+
 // ============================================================================
 // HOUSE COMPLETION — All rooms built, all animals unlocked
 // ============================================================================

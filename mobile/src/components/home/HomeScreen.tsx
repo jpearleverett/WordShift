@@ -31,11 +31,14 @@ import {
   markChallengeIntroSeen,
   hasSeenPitNudge,
   markPitNudgeSeen,
+  hasSeenPitHarvestIntro,
+  markPitHarvestIntroSeen,
   consumePendingVariantTutorial,
 } from '../../services/amberCurrency';
 import {
   getDailyChallengeIntroLines,
   getChallengeIntroLines,
+  getFoxPitHarvestIntroLines,
   getHouseCompletionText,
   getWordsOfferedText,
 } from '../../services/phaseNarrative';
@@ -145,8 +148,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge' | 'variant_unlock'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge' | 'variant_unlock' | 'pit_harvest_intro'>('animal_intro');
   const [dailyIntroSeen, setDailyIntroSeen] = useState(false);
+  const [pitHarvestIntroSeen, setPitHarvestIntroSeen] = useState(false);
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -247,6 +251,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const harvestSummary = await getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
     setDailyIntroSeen(await hasSeenDailyChallengeIntro());
+    setPitHarvestIntroSeen(await hasSeenPitHarvestIntro());
 
     const unlockedAnimalCount = animalsData.filter(a => a.isUnlocked).length;
     const questState = await loadWeeklyQuests(progressData.currentPhase, {
@@ -292,15 +297,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return progress.puzzlesSolved <= 5;
   }, [progress, isOnboarding]);
 
-  const shouldShowPitShortcut = Boolean(
-    !isOnboarding &&
-    (pitPhaseReady || (pendingHarvest?.pendingBatches ?? 0) > 0)
-  );
+  const shouldShowPitShortcut = !isOnboarding;
 
   const shouldShowJournalButton = Boolean(
     !isOnboarding &&
     !isPostTutorialLightMode &&
     (onOpenLedger || onOpenGallery || weeklyQuestState)
+  );
+
+  const shouldHighlightPitButton = Boolean(
+    pitPhaseReady || (showIntroDialogue && introContext === 'pit_harvest_intro')
   );
 
   // Load data on mount
@@ -449,6 +455,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [
     pitPhaseReady,
     progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // Pit harvesting intro — explain manual collection before auto-banked rewards end.
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (pitHarvestIntroSeen) return;
+    if ((progress.puzzlesSolved ?? 0) < 3) return;
+
+    let cancelled = false;
+    (async () => {
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox || cancelled) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getFoxPitHarvestIntroLines(progress.currentPhase));
+      setIntroContext('pit_harvest_intro');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    pitHarvestIntroSeen,
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
@@ -692,9 +727,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
   }, [highlightPlayButton, playPulse]);
 
-  // Pit button pulse when phase transition is pending
+  // Pit button pulse when it needs attention.
   useEffect(() => {
-    if (!pitPhaseReady) {
+    if (!shouldHighlightPitButton) {
       pitPulseAnim.setValue(0);
       return;
     }
@@ -719,7 +754,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
     loop.start();
     return () => { loop.stop(); };
-  }, [pitPhaseReady, pitPulseAnim]);
+  }, [shouldHighlightPitButton, pitPulseAnim]);
 
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
@@ -744,6 +779,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'pit_harvest_intro') {
+        await markPitHarvestIntroSeen();
+        setPitHarvestIntroSeen(true);
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -766,6 +804,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'pit_harvest_intro') {
+        await markPitHarvestIntroSeen();
+        setPitHarvestIntroSeen(true);
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -954,6 +995,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {!isOnboarding && onStartDaily && dailyIntroSeen && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
             <DailyChallengeCard onStartDaily={(d) => { onStartDaily!(d); }} phase={progress.currentPhase} />
           )}
+          {!isOnboarding && onOpenPit && (
+            <Animated.View style={shouldHighlightPitButton ? {
+              transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+              opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
+            } : undefined}>
+              <TouchableOpacity
+                style={[styles.headerIconBtn, shouldHighlightPitButton && styles.pitHeaderIconBtn]}
+                onPress={() => {
+                  hapticLight();
+                  onOpenPit?.();
+                }}
+                accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
+                accessibilityRole="button"
+              >
+                <Text style={styles.headerIconText}>{shouldHighlightPitButton ? '🔥' : '⭕'}</Text>
+                {pendingHarvest && pendingHarvest.pendingWords > 0 && (
+                  <View style={styles.headerBadge}>
+                    <Text style={styles.headerBadgeText}>{pendingHarvest.pendingWords}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+          {shouldShowJournalButton && (
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={handleOpenJournal}
+              accessibilityLabel={`Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerIconText}>📚</Text>
+              {claimableQuestAmber > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>!</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
           {!isOnboarding && !isPostTutorialLightMode && (
             <TouchableOpacity
               style={styles.headerIconBtn}
@@ -1051,62 +1130,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
               </View>
             </TouchableOpacity>
-          )}
-
-          {/* Action Row — compact library/context controls once the player is settled */}
-          {!isOnboarding && !isPostTutorialLightMode && (shouldShowJournalButton || shouldShowPitShortcut || isSacrificeAvailable(progress.currentPhase)) && (
-            <View style={styles.actionRow}>
-              {shouldShowJournalButton && (
-                <TouchableOpacity
-                  style={[styles.actionRowButton, styles.journalButton]}
-                  onPress={handleOpenJournal}
-                  accessibilityLabel={`Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.actionRowButtonText}>
-                    📚 Journal{claimableQuestAmber > 0 ? ` (+${claimableQuestAmber})` : ''}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {onOpenPit && shouldShowPitShortcut && (
-                <Animated.View style={pitPhaseReady ? {
-                  transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
-                  opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
-                } : undefined}>
-                  <TouchableOpacity
-                    style={[styles.actionRowButton, pitPhaseReady && styles.pitPhaseReadyButton]}
-                    onPress={() => {
-                      hapticLight();
-                      onOpenPit();
-                    }}
-                    accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pitPhaseReady ? ' - phase transition ready' : ''}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
-                    accessibilityRole="button"
-                  >
-                    <Text style={[styles.actionRowButtonText, pitPhaseReady && { color: '#FFD700' }]}>
-                      {pitPhaseReady ? '🔥' : '⭕'} {getPitHomeBadgeLabel(progress.currentPhase)}
-                      {pendingHarvest && pendingHarvest.pendingBatches > 0 && (
-                        ` (${pendingHarvest.pendingWords})`
-                      )}
-                    </Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
-              {isSacrificeAvailable(progress.currentPhase) && (
-                <TouchableOpacity
-                  style={[styles.actionRowButton, styles.sacrificeButton]}
-                  onPress={() => {
-                    hapticSelection();
-                    setShowSacrificeModal(true);
-                  }}
-                  accessibilityLabel="Offer amber to the arrangement"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.actionRowButtonText}>
-                    🕯️ {getSacrificePrompt(progress.currentPhase).title}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
           )}
 
           {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
@@ -1332,7 +1355,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
             {onOpenLedger && (
               <TouchableOpacity
-                style={styles.hubButton}
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
                 onPress={() => {
                   setShowJournalModal(false);
                   onOpenLedger?.();
@@ -1340,12 +1363,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open Word Ledger"
                 accessibilityRole="button"
               >
-                <Text style={styles.hubButtonText}>📘 Word Ledger</Text>
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📘 Word Ledger</Text>
               </TouchableOpacity>
             )}
             {onOpenGallery && (
               <TouchableOpacity
-                style={styles.hubButton}
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
                 onPress={() => {
                   setShowJournalModal(false);
                   onOpenGallery?.();
@@ -1353,12 +1376,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open Whisper Gallery"
                 accessibilityRole="button"
               >
-                <Text style={styles.hubButtonText}>📜 {getGalleryTitle(progress.currentPhase)}</Text>
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📜 {getGalleryTitle(progress.currentPhase)}</Text>
               </TouchableOpacity>
             )}
             {!!weeklyQuestState && (
               <TouchableOpacity
-                style={styles.hubButton}
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
                 onPress={() => {
                   setShowJournalModal(false);
                   handleOpenQuestModal().catch(() => {});
@@ -1366,7 +1389,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel={`Open weekly quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
                 accessibilityRole="button"
               >
-                <Text style={styles.hubButtonText}>
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>
                   🗓 Weekly Quests
                   {claimableQuestAmber > 0
                     ? ` (+${claimableQuestAmber})`
@@ -1412,7 +1435,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
             {onOpenStats && (
               <TouchableOpacity
-                style={styles.hubButton}
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenStats?.();
@@ -1420,12 +1443,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open statistics"
                 accessibilityRole="button"
               >
-                <Text style={styles.hubButtonText}>📊 Statistics</Text>
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📊 Statistics</Text>
               </TouchableOpacity>
             )}
             {onOpenSettings && (
               <TouchableOpacity
-                style={styles.hubButton}
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenSettings?.();
@@ -1433,7 +1456,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Open settings"
                 accessibilityRole="button"
               >
-                <Text style={styles.hubButtonText}>⚙️ Settings</Text>
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>⚙️ Settings</Text>
+              </TouchableOpacity>
+            )}
+            {isSacrificeAvailable(progress.currentPhase) && (
+              <TouchableOpacity
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  setShowSacrificeModal(true);
+                }}
+                accessibilityLabel="Open sacrifice"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>🕯️ {getSacrificePrompt(progress.currentPhase).title}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -2242,6 +2278,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  pitHeaderIconBtn: {
+    backgroundColor: 'rgba(180, 120, 0, 0.3)',
+    borderColor: 'rgba(255, 215, 0, 0.45)',
+    borderWidth: 1.5,
+  },
+  headerBadge: {
+    position: 'absolute',
+    right: -4,
+    top: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: CandyColors.orange.main,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerBadgeText: {
+    color: CandyColors.white,
+    fontSize: 10,
+    fontWeight: '800',
   },
   headerIconText: {
     fontSize: 16,
