@@ -1200,7 +1200,7 @@ const styles = StyleSheet.create({
   houseContainer: {
     alignItems: 'center',
     marginTop: 50,
-    marginBottom: 10,
+    marginBottom: 100,
   },
 
   // Roof
