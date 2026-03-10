@@ -27,6 +27,7 @@ const DAILY_CHALLENGE_INTRO_SEEN_KEY = 'wordshift_daily_challenge_intro_seen';
 const FOX_PLAY_NUDGE_SEEN_KEY = 'wordshift_fox_play_nudge_seen';
 const CHALLENGE_INTRO_SEEN_KEY = 'wordshift_challenge_intro_seen';
 const PIT_NUDGE_SEEN_KEY = 'wordshift_pit_nudge_seen';
+const SETUP_SELECTOR_INTRO_SEEN_KEY = 'wordshift_setup_selector_intro_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -842,6 +843,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(CHALLENGE_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
     await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
+    await AsyncStorage.removeItem(SETUP_SELECTOR_INTRO_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -1344,6 +1346,22 @@ export async function hasSeenPitNudge(): Promise<boolean> {
     return value === 'true';
   } catch {
     return false;
+  }
+}
+
+export async function hasSeenSetupSelectorIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(SETUP_SELECTOR_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markSetupSelectorIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SETUP_SELECTOR_INTRO_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
   }
 }
 

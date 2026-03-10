@@ -143,6 +143,14 @@ export const appStyles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
+  difficultyButtonHighlighted: {
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
+    shadowColor: CandyColors.yellow.main,
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 6,
+  },
   difficultyButtonShine: {
     position: 'absolute',
     top: 0,
