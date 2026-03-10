@@ -901,9 +901,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             ]}
           >
               {/* Sky background - inside transform so it moves with the scene.
-                  Oversized to prevent gaps at any zoom/pan combination.
-                  Top offset grows with house height so the fill color above
-                  the image seamlessly extends the sky as rooms are added. */}
+                  Keep the same image size, but frame it slightly lower on the
+                  home screen so more of the lower artwork is visible. */}
               <Image
                 source={
                   currentPhase >= 4 ? SKY_SHADOW :
@@ -912,7 +911,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   SKY_DAY
                 }
                 style={[styles.skyBackground, {
-                  top: -Math.max(SCREEN_HEIGHT * 0.20, houseHeight * 0.0),
+                  top: 0,
                 }]}
                 resizeMode="cover"
               />
