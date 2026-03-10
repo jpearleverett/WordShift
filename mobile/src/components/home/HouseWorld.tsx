@@ -911,7 +911,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   SKY_DAY
                 }
                 style={[styles.skyBackground, {
-                  top: -Math.max(SCREEN_HEIGHT * 0.0, houseHeight * 0.0),
+                  top: -Math.max(SCREEN_HEIGHT * 0.05, houseHeight * 0.0),
                 }]}
                 resizeMode="cover"
               />
@@ -1199,7 +1199,7 @@ const styles = StyleSheet.create({
   houseContainer: {
     alignItems: 'center',
     marginTop: 50,
-    marginBottom: 50,
+    marginBottom: 30,
   },
 
   // Roof
