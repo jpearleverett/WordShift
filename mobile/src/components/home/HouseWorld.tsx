@@ -911,7 +911,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   SKY_DAY
                 }
                 style={[styles.skyBackground, {
-                  top: 0,
+                  top: 10,
                 }]}
                 resizeMode="cover"
               />
