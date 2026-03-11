@@ -3,14 +3,17 @@ import { Difficulty } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 
 /**
- * Weekly quests system for WordShift.
+ * Quest system for WordShift.
  *
- * Generates 4 quests each Monday that reset weekly.
- * Quests provide bonus amber rewards that scale with narrative phase.
+ * Two tiers:
+ * - **Daily quests** (5): Reset at midnight local time. Lighter objectives.
+ * - **Weekly challenges** (5): Reset Monday 00:00 UTC. Harder, higher rewards.
+ *
  * Quest descriptions shift tone with narrative phase.
  */
 
-const STORAGE_KEY = 'wordshift_weekly_quests';
+const DAILY_STORAGE_KEY = 'wordshift_daily_quests';
+const WEEKLY_STORAGE_KEY = 'wordshift_weekly_quests';
 
 // ============================================================================
 // Types
@@ -20,18 +23,19 @@ export type QuestType =
   | 'solve_count'       // Complete N puzzles
   | 'solve_difficulty'  // Complete N puzzles on a specific difficulty
   | 'earn_stars'        // Earn N three-star ratings
-  | 'daily_complete'    // Complete the daily challenge
   | 'no_hints'          // Complete N puzzles without hints
   | 'challenge_mode'    // Complete N puzzles in challenge mode
-  | 'earn_amber'        // Earn N total amber this week
-  | 'visit_animals'     // Talk to N different animals this week
+  | 'earn_amber'        // Earn N total amber
+  | 'visit_animals'     // Talk to N different animals
   | 'streak_days'       // Maintain a streak for N days
-  | 'sacrifice_amber'   // Offer N amber to the arrangement (Phase 4+ only)
-  | 'daily_streak';     // Complete daily challenge N days in a row
+  | 'sacrifice_amber';  // Offer N amber to the arrangement (Phase 4+ only)
+
+export type QuestTier = 'daily' | 'weekly';
 
 export interface Quest {
   id: string;
   type: QuestType;
+  tier: QuestTier;
   title: string;
   /** Phase-aware description */
   description: string;
@@ -46,13 +50,23 @@ export interface Quest {
   difficulty?: Difficulty;
 }
 
-export interface WeeklyQuestState {
-  weekId: string; // ISO week identifier (e.g., "2026-W07")
+export interface QuestState {
+  /** Date or week identifier */
+  periodId: string;
   quests: Quest[];
   generatedAt: number;
-  /** Distinct animal ids visited this week (for visit_animals quests) */
-  animalsVisitedThisWeek: string[];
+  /** Distinct animal ids visited this period (for visit_animals quests) */
+  animalsVisitedThisPeriod: string[];
 }
+
+/** Combined view of both daily and weekly quests */
+export interface CombinedQuestState {
+  daily: QuestState;
+  weekly: QuestState;
+}
+
+/** @deprecated Use CombinedQuestState. Kept for backward compat in HomeScreen. */
+export type WeeklyQuestState = CombinedQuestState;
 
 export interface WeeklyQuestGenerationContext {
   puzzlesSolved?: number;
@@ -75,59 +89,55 @@ interface QuestTemplate {
   difficulty?: Difficulty;
 }
 
-const QUEST_POOL: QuestTemplate[] = [
-  // Solve count quests — scaled up ~40-50% to feel meaningful alongside per-puzzle amber
-  { type: 'solve_count', titleTemplate: 'Puzzle Solver', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'Offer {target} arrangements to the pattern', target: 5, rewardAmber: 45 },
-  { type: 'solve_count', titleTemplate: 'Dedicated Shifter', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} more incantations for the arrangement', target: 10, rewardAmber: 85 },
-  { type: 'solve_count', titleTemplate: 'Word Marathon', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'The void hungers for {target} offerings', target: 15, rewardAmber: 140 },
+// Daily quest pool — lighter, achievable in a single session
+const DAILY_QUEST_POOL: QuestTemplate[] = [
+  { type: 'solve_count', titleTemplate: 'Daily Solver', descTemplate: 'Complete {target} puzzle(s) today', darkDescTemplate: 'Offer {target} arrangement(s) today', target: 1, rewardAmber: 10 },
+  { type: 'solve_count', titleTemplate: 'Puzzle Pair', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: '{target} incantations before the day ends', target: 2, rewardAmber: 18 },
+  { type: 'solve_count', titleTemplate: 'Triple Play', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: 'The pattern demands {target} today', target: 3, rewardAmber: 25 },
+  { type: 'earn_stars', titleTemplate: 'Shining Moment', descTemplate: 'Earn a three-star rating', darkDescTemplate: 'A flawless offering', target: 1, rewardAmber: 12 },
+  { type: 'earn_stars', titleTemplate: 'Star Collector', descTemplate: 'Earn {target} three-star ratings today', darkDescTemplate: '{target} perfect arrangements', target: 2, rewardAmber: 22 },
+  { type: 'no_hints', titleTemplate: 'On Your Own', descTemplate: 'Complete a puzzle without hints', darkDescTemplate: 'The words come unbidden', target: 1, rewardAmber: 12 },
+  { type: 'no_hints', titleTemplate: 'Clear Mind', descTemplate: 'Complete {target} puzzles without hints', darkDescTemplate: 'You no longer need guidance', target: 2, rewardAmber: 20 },
+  { type: 'solve_difficulty', titleTemplate: 'Step Up', descTemplate: 'Complete a Medium+ or harder puzzle', darkDescTemplate: 'A weightier offering', target: 1, rewardAmber: 14, difficulty: 'MEDIUM_PLUS' },
+  { type: 'solve_difficulty', titleTemplate: 'Hard Day', descTemplate: 'Complete a Hard puzzle', darkDescTemplate: 'The difficult arrangements carry more weight', target: 1, rewardAmber: 18, difficulty: 'HARD' },
+  { type: 'challenge_mode', titleTemplate: 'Daring', descTemplate: 'Complete a challenge mode puzzle', darkDescTemplate: 'The arrangement rewards the bold', target: 1, rewardAmber: 18 },
+  { type: 'visit_animals', titleTemplate: 'Say Hello', descTemplate: 'Talk to {target} animal(s)', darkDescTemplate: 'Consult a keeper', target: 1, rewardAmber: 8 },
+  { type: 'visit_animals', titleTemplate: 'Social Call', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'Consult {target} keepers', target: 2, rewardAmber: 14 },
+  { type: 'earn_amber', titleTemplate: 'Amber Scavenger', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'Gather {target} amber', target: 20, rewardAmber: 10 },
+  { type: 'earn_amber', titleTemplate: 'Amber Seeker', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'The coffers need {target} amber', target: 40, rewardAmber: 18 },
+];
 
-  // Difficulty-specific quests
-  { type: 'solve_difficulty', titleTemplate: 'Hard Challenger', descTemplate: 'Complete {target} Hard puzzles', darkDescTemplate: 'The difficult arrangements carry more weight', target: 3, rewardAmber: 55, difficulty: 'HARD' },
-  { type: 'solve_difficulty', titleTemplate: 'Medium Master', descTemplate: 'Complete {target} Medium puzzles', darkDescTemplate: 'Steady offerings sustain the pattern', target: 5, rewardAmber: 45, difficulty: 'MEDIUM' },
-  { type: 'solve_difficulty', titleTemplate: 'Rising Difficulty', descTemplate: 'Complete {target} Medium+ puzzles', darkDescTemplate: 'The pattern prefers complexity', target: 3, rewardAmber: 50, difficulty: 'MEDIUM_PLUS' },
-
-  // Star quests
-  { type: 'earn_stars', titleTemplate: 'Star Chaser', descTemplate: 'Earn {target} three-star ratings', darkDescTemplate: 'Perfection pleases the arrangement', target: 3, rewardAmber: 50 },
-  { type: 'earn_stars', titleTemplate: 'Perfectionist', descTemplate: 'Earn {target} three-star ratings', darkDescTemplate: '{target} flawless offerings', target: 5, rewardAmber: 70 },
-
-  // Daily challenge
-  { type: 'daily_complete', titleTemplate: 'Daily Devotion', descTemplate: 'Complete the daily challenge', darkDescTemplate: 'The daily ritual must be observed', target: 1, rewardAmber: 35 },
-
-  // No hints
-  { type: 'no_hints', titleTemplate: 'Independent Mind', descTemplate: 'Complete {target} puzzles without hints', darkDescTemplate: 'The words come to you unbidden', target: 3, rewardAmber: 45 },
-  { type: 'no_hints', titleTemplate: 'Unaided', descTemplate: 'Complete {target} puzzles without hints', darkDescTemplate: 'You no longer need guidance. You never did.', target: 5, rewardAmber: 70 },
-
-  // Challenge mode
-  { type: 'challenge_mode', titleTemplate: 'Challenge Accepted', descTemplate: 'Complete {target} challenge mode puzzle(s)', darkDescTemplate: 'The arrangement rewards the bold', target: 1, rewardAmber: 35 },
-  { type: 'challenge_mode', titleTemplate: 'Iron Solver', descTemplate: 'Complete {target} challenge mode puzzles', darkDescTemplate: '{target} offerings under duress', target: 3, rewardAmber: 70 },
-
-  // Amber earning
-  { type: 'earn_amber', titleTemplate: 'Amber Collector', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'Gather {target} amber for the arrangement', target: 50, rewardAmber: 30 },
-  { type: 'earn_amber', titleTemplate: 'Amber Rush', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'The coffers of the temple must be filled', target: 100, rewardAmber: 55 },
-
-  // Home engagement — encourage visiting animals
-  { type: 'visit_animals', titleTemplate: 'Social Butterfly', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'Consult {target} keepers this week', target: 3, rewardAmber: 40 },
-  { type: 'visit_animals', titleTemplate: 'Community Builder', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'The keepers require your audience', target: 5, rewardAmber: 60 },
-
-  // Streak consistency
-  { type: 'streak_days', titleTemplate: 'Consistent', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Do not break the chain for {target} days', target: 3, rewardAmber: 35 },
-
-  // Daily streak
-  { type: 'daily_streak', titleTemplate: 'Daily Devotee', descTemplate: 'Complete daily challenges {target} days in a row', darkDescTemplate: 'The daily ritual observed for {target} consecutive days', target: 3, rewardAmber: 50 },
-
-  // Sacrifice (Phase 4+ only — these are filtered out for lower phases in generateQuests)
-  { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 50, rewardAmber: 40 },
-  { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 100, rewardAmber: 75 },
+// Weekly quest pool — harder, multi-day objectives with bigger rewards
+const WEEKLY_QUEST_POOL: QuestTemplate[] = [
+  { type: 'solve_count', titleTemplate: 'Dedicated Shifter', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} incantations for the arrangement', target: 10, rewardAmber: 85 },
+  { type: 'solve_count', titleTemplate: 'Word Marathon', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'The void hungers for {target} offerings', target: 20, rewardAmber: 150 },
+  { type: 'solve_count', titleTemplate: 'Relentless', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} arrangements. No rest.', target: 30, rewardAmber: 220 },
+  { type: 'solve_difficulty', titleTemplate: 'Hard Challenger', descTemplate: 'Complete {target} Hard puzzles this week', darkDescTemplate: 'The difficult arrangements carry more weight', target: 5, rewardAmber: 90, difficulty: 'HARD' },
+  { type: 'solve_difficulty', titleTemplate: 'Medium Mastery', descTemplate: 'Complete {target} Medium+ puzzles this week', darkDescTemplate: 'The pattern prefers complexity', target: 7, rewardAmber: 75, difficulty: 'MEDIUM_PLUS' },
+  { type: 'earn_stars', titleTemplate: 'Perfectionist', descTemplate: 'Earn {target} three-star ratings this week', darkDescTemplate: '{target} flawless offerings', target: 8, rewardAmber: 100 },
+  { type: 'earn_stars', titleTemplate: 'Star Hoarder', descTemplate: 'Earn {target} three-star ratings this week', darkDescTemplate: 'Perfection, {target} times over', target: 15, rewardAmber: 160 },
+  { type: 'no_hints', titleTemplate: 'Unaided', descTemplate: 'Complete {target} puzzles without hints this week', darkDescTemplate: 'You no longer need guidance. You never did.', target: 8, rewardAmber: 90 },
+  { type: 'challenge_mode', titleTemplate: 'Iron Solver', descTemplate: 'Complete {target} challenge mode puzzles this week', darkDescTemplate: '{target} offerings under duress', target: 5, rewardAmber: 100 },
+  { type: 'earn_amber', titleTemplate: 'Amber Rush', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'The coffers of the temple must be filled', target: 150, rewardAmber: 80 },
+  { type: 'earn_amber', titleTemplate: 'Amber Hoarder', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'Fill the arrangement with {target} amber', target: 300, rewardAmber: 140 },
+  { type: 'visit_animals', titleTemplate: 'Community Builder', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'The keepers require your audience', target: 5, rewardAmber: 70 },
+  { type: 'visit_animals', titleTemplate: 'Social Butterfly', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'Every keeper has something to say', target: 8, rewardAmber: 110 },
+  { type: 'streak_days', titleTemplate: 'Consistent', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Do not break the chain for {target} days', target: 5, rewardAmber: 80 },
+  { type: 'streak_days', titleTemplate: 'Unbroken', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Seven days. The ritual deepens.', target: 7, rewardAmber: 120 },
+  // Sacrifice (Phase 4+ only)
+  { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 75, rewardAmber: 60 },
+  { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 150, rewardAmber: 110 },
 ];
 
 // ============================================================================
-// In-memory cache
+// In-memory caches
 // ============================================================================
 
-let questStateCache: WeeklyQuestState | null = null;
+let dailyQuestCache: QuestState | null = null;
+let weeklyQuestCache: QuestState | null = null;
 
 // ============================================================================
-// Week ID calculation
+// Period ID calculation
 // ============================================================================
 
 /**
@@ -143,81 +153,92 @@ export function getWeekId(date: Date = new Date()): string {
   return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Get the local date string for today (e.g., "2026-03-11").
+ * Used for daily quest period tracking.
+ */
+export function getDayId(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const d = date.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // ============================================================================
 // Quest Generation
 // ============================================================================
 
 /**
- * Generate weekly quests. Selects 4 quests from the pool using seeded
- * randomness based on the week ID for determinism.
+ * Seeded PRNG from a string seed.
  */
-function generateQuests(
-  weekId: string,
-  phase: number,
-  context?: WeeklyQuestGenerationContext
-): Quest[] {
-  // Seeded PRNG based on week ID
-  let seed = weekId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const seededRandom = () => {
+function makeSeededRandom(seedStr: string): () => number {
+  let seed = seedStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return () => {
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
     return (seed >> 16) / 32768;
   };
+}
 
-  const dailyUnlocked = context?.dailyUnlocked ?? phase >= 1;
+/**
+ * Generate quests from a template pool.
+ */
+function generateQuestsFromPool(
+  pool: QuestTemplate[],
+  count: number,
+  periodId: string,
+  tier: QuestTier,
+  phase: number,
+  context?: WeeklyQuestGenerationContext
+): Quest[] {
+  const seededRandom = makeSeededRandom(periodId + tier);
+
   const challengeUnlocked = context?.challengeUnlocked ?? (context?.puzzlesSolved ?? 0) >= 15;
   const unlockedAnimalCount = context?.unlockedAnimalCount ?? 10;
 
-  // Filter the pool so we only generate quests the player can reasonably act on.
-  const phaseFiltered = QUEST_POOL.filter(t => {
+  // Filter the pool based on player state
+  const filtered = pool.filter(t => {
     if (t.type === 'sacrifice_amber' && phase < 4) return false;
-    if ((t.type === 'daily_complete' || t.type === 'daily_streak') && !dailyUnlocked) return false;
     if (t.type === 'challenge_mode' && !challengeUnlocked) return false;
     if (t.type === 'visit_animals') {
-      if (unlockedAnimalCount < 3) return false;
+      if (unlockedAnimalCount < 2) return false;
       if (t.target > unlockedAnimalCount) return false;
     }
     return true;
   });
 
-  // Shuffle the pool deterministically
-  const shuffled = [...phaseFiltered];
+  // Shuffle deterministically
+  const shuffled = [...filtered];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(seededRandom() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
 
-  // Pick 4 quests, avoiding duplicate types
+  // Pick quests, max 2 of same type
   const selected: QuestTemplate[] = [];
   for (const template of shuffled) {
-    if (selected.length >= 4) break;
-    // Allow at most 2 of the same type
+    if (selected.length >= count) break;
     const typeCount = selected.filter(s => s.type === template.type).length;
     if (typeCount >= 2) continue;
     selected.push(template);
   }
 
-  // Fill remaining slots if we didn't reach 4 (can happen with small filtered pools)
-  if (selected.length < 4) {
+  // Fill remaining if we didn't reach target count
+  if (selected.length < count) {
     for (const template of shuffled) {
-      if (selected.length >= 4) break;
+      if (selected.length >= count) break;
       if (!selected.includes(template)) {
         selected.push(template);
       }
     }
   }
 
-  // Include a daily quest when it is actually unlocked.
-  if (dailyUnlocked && !selected.some(s => s.type === 'daily_complete')) {
-    const dailyTemplate = QUEST_POOL.find(t => t.type === 'daily_complete')!;
-    selected[selected.length - 1] = dailyTemplate;
-  }
-
   return selected.map((template, i) => {
     const desc = template.descTemplate.replace('{target}', template.target.toString());
     const darkDesc = template.darkDescTemplate?.replace('{target}', template.target.toString());
     return {
-      id: `${weekId}_quest_${i}`,
+      id: `${periodId}_${tier}_${i}`,
       type: template.type,
+      tier,
       title: template.titleTemplate,
       description: desc,
       darkDescription: darkDesc,
@@ -236,47 +257,68 @@ function generateQuests(
 // ============================================================================
 
 /**
- * Load the current weekly quest state, generating new quests if the week has changed.
+ * Load both daily and weekly quest states, generating new quests if periods have changed.
  */
 export async function loadWeeklyQuests(
   currentPhase: number = 0,
   generationContext?: WeeklyQuestGenerationContext
-): Promise<WeeklyQuestState> {
-  const currentWeek = getWeekId();
+): Promise<CombinedQuestState> {
+  const daily = await loadQuestTier('daily', currentPhase, generationContext);
+  const weekly = await loadQuestTier('weekly', currentPhase, generationContext);
+  return { daily, weekly };
+}
 
-  if (questStateCache && questStateCache.weekId === currentWeek) {
-    return questStateCache;
+async function loadQuestTier(
+  tier: QuestTier,
+  phase: number,
+  context?: WeeklyQuestGenerationContext
+): Promise<QuestState> {
+  const storageKey = tier === 'daily' ? DAILY_STORAGE_KEY : WEEKLY_STORAGE_KEY;
+  const cache = tier === 'daily' ? dailyQuestCache : weeklyQuestCache;
+  const currentPeriod = tier === 'daily' ? getDayId() : getWeekId();
+  const count = 5;
+  const pool = tier === 'daily' ? DAILY_QUEST_POOL : WEEKLY_QUEST_POOL;
+
+  if (cache && cache.periodId === currentPeriod) {
+    return cache;
   }
 
   try {
-    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    const stored = await AsyncStorage.getItem(storageKey);
     if (stored) {
-      const parsed: WeeklyQuestState = JSON.parse(stored);
-      if (parsed.weekId === currentWeek) {
-        if (!parsed.animalsVisitedThisWeek) {
-          parsed.animalsVisitedThisWeek = [];
+      const parsed: QuestState = JSON.parse(stored);
+      if (parsed.periodId === currentPeriod) {
+        if (!parsed.animalsVisitedThisPeriod) {
+          parsed.animalsVisitedThisPeriod = [];
         }
-        questStateCache = parsed;
+        // Backfill tier field for quests loaded from old storage format
+        for (const q of parsed.quests) {
+          if (!q.tier) q.tier = tier;
+        }
+        if (tier === 'daily') dailyQuestCache = parsed;
+        else weeklyQuestCache = parsed;
         return parsed;
       }
     }
   } catch {}
 
-  // New week — generate fresh quests
-  const newState: WeeklyQuestState = {
-    weekId: currentWeek,
-    quests: generateQuests(currentWeek, currentPhase, generationContext),
+  // New period — generate fresh quests
+  const newState: QuestState = {
+    periodId: currentPeriod,
+    quests: generateQuestsFromPool(pool, count, currentPeriod, tier, phase, context),
     generatedAt: Date.now(),
-    animalsVisitedThisWeek: [],
+    animalsVisitedThisPeriod: [],
   };
 
-  questStateCache = newState;
-  await saveQuestState(newState);
+  if (tier === 'daily') dailyQuestCache = newState;
+  else weeklyQuestCache = newState;
+  await saveQuestTier(tier, newState);
   return newState;
 }
 
 /**
  * Update quest progress based on a completed puzzle.
+ * Updates BOTH daily and weekly quests.
  * Returns newly completed quests (for toast notifications).
  */
 export async function updateQuestProgress(event: {
@@ -286,145 +328,137 @@ export async function updateQuestProgress(event: {
   isDaily?: boolean;
   isChallenge?: boolean;
   amberEarned?: number;
-  /** Number of distinct animals visited this week (for visit_animals quests) */
+  /** Number of distinct animals visited (for visit_animals quests) */
   animalsVisited?: number;
   /** Current streak length (for streak_days quests) */
   currentStreak?: number;
-  /** Current daily challenge streak (for daily_streak quests) */
-  dailyStreak?: number;
   /** Amber sacrificed this session (for sacrifice_amber quests) */
   amberSacrificed?: number;
 }, currentPhase: number = 0): Promise<Quest[]> {
-  const state = await loadWeeklyQuests(currentPhase);
-  if (!state.animalsVisitedThisWeek) {
-    state.animalsVisitedThisWeek = [];
-  }
-  const newlyCompleted: Quest[] = [];
+  const combined = await loadWeeklyQuests(currentPhase);
+  const allNewlyCompleted: Quest[] = [];
 
-  for (const quest of state.quests) {
-    if (quest.completed) continue;
-
-    let progressDelta = 0;
-
-    switch (quest.type) {
-      case 'solve_count':
-        progressDelta = 1;
-        break;
-      case 'solve_difficulty':
-        if (event.difficulty === quest.difficulty) progressDelta = 1;
-        break;
-      case 'earn_stars':
-        if (event.stars === 3) progressDelta = 1;
-        break;
-      case 'daily_complete':
-        if (event.isDaily) progressDelta = 1;
-        break;
-      case 'no_hints':
-        if (event.hintsUsed === 0) progressDelta = 1;
-        break;
-      case 'challenge_mode':
-        if (event.isChallenge) progressDelta = 1;
-        break;
-      case 'earn_amber':
-        progressDelta = event.amberEarned ?? 0;
-        break;
-      case 'visit_animals':
-        // Set progress directly to the current count (not delta-based)
-        if (event.animalsVisited !== undefined) {
-          quest.progress = Math.min(event.animalsVisited, quest.target);
-        }
-        progressDelta = 0; // Handled above via direct assignment
-        break;
-      case 'streak_days':
-        // Set progress directly to current streak length
-        if (event.currentStreak !== undefined) {
-          quest.progress = Math.min(event.currentStreak, quest.target);
-        }
-        progressDelta = 0; // Handled above via direct assignment
-        break;
-      case 'daily_streak':
-        // Set progress directly to current daily streak length
-        if (event.dailyStreak !== undefined) {
-          quest.progress = Math.min(event.dailyStreak, quest.target);
-        }
-        progressDelta = 0;
-        break;
-      case 'sacrifice_amber':
-        // Increment by amount sacrificed
-        if (event.amberSacrificed !== undefined && event.amberSacrificed > 0) {
-          progressDelta = event.amberSacrificed;
-        }
-        break;
+  for (const state of [combined.daily, combined.weekly]) {
+    if (!state.animalsVisitedThisPeriod) {
+      state.animalsVisitedThisPeriod = [];
     }
 
-    if (progressDelta > 0) {
-      quest.progress = Math.min(quest.progress + progressDelta, quest.target);
-    }
+    for (const quest of state.quests) {
+      if (quest.completed) continue;
 
-    // Check for completion (handles both delta-based and direct-assignment quests)
-    if (quest.progress >= quest.target && !quest.completed) {
-      quest.completed = true;
-      newlyCompleted.push(quest);
+      let progressDelta = 0;
+
+      switch (quest.type) {
+        case 'solve_count':
+          progressDelta = 1;
+          break;
+        case 'solve_difficulty':
+          if (quest.difficulty === 'MEDIUM_PLUS') {
+            // Medium+ quest accepts MEDIUM_PLUS and HARD
+            if (event.difficulty === 'MEDIUM_PLUS' || event.difficulty === 'HARD') progressDelta = 1;
+          } else if (event.difficulty === quest.difficulty) {
+            progressDelta = 1;
+          }
+          break;
+        case 'earn_stars':
+          if (event.stars === 3) progressDelta = 1;
+          break;
+        case 'no_hints':
+          if (event.hintsUsed === 0) progressDelta = 1;
+          break;
+        case 'challenge_mode':
+          if (event.isChallenge) progressDelta = 1;
+          break;
+        case 'earn_amber':
+          progressDelta = event.amberEarned ?? 0;
+          break;
+        case 'visit_animals':
+          if (event.animalsVisited !== undefined) {
+            quest.progress = Math.min(event.animalsVisited, quest.target);
+          }
+          progressDelta = 0;
+          break;
+        case 'streak_days':
+          if (event.currentStreak !== undefined) {
+            quest.progress = Math.min(event.currentStreak, quest.target);
+          }
+          progressDelta = 0;
+          break;
+        case 'sacrifice_amber':
+          if (event.amberSacrificed !== undefined && event.amberSacrificed > 0) {
+            progressDelta = event.amberSacrificed;
+          }
+          break;
+      }
+
+      if (progressDelta > 0) {
+        quest.progress = Math.min(quest.progress + progressDelta, quest.target);
+      }
+
+      if (quest.progress >= quest.target && !quest.completed) {
+        quest.completed = true;
+        allNewlyCompleted.push(quest);
+      }
     }
   }
 
-  if (newlyCompleted.length > 0 || state.quests.some(q => q.progress > 0)) {
-    await saveQuestState(state);
-  }
+  // Save both tiers
+  await saveQuestTier('daily', combined.daily);
+  await saveQuestTier('weekly', combined.weekly);
 
-  return newlyCompleted;
+  return allNewlyCompleted;
 }
 
 /**
- * Record that the player visited/talked to an animal this week.
- * Updates visit_animals quests without incrementing puzzle-count quests.
+ * Record that the player visited/talked to an animal.
+ * Updates visit_animals quests in both daily and weekly tiers.
  */
 export async function recordAnimalVisit(
   animalId: string,
   currentPhase: number = 0,
   currentStreak?: number
 ): Promise<Quest[]> {
-  const state = await loadWeeklyQuests(currentPhase);
-  if (!state.animalsVisitedThisWeek) {
-    state.animalsVisitedThisWeek = [];
-  }
+  const combined = await loadWeeklyQuests(currentPhase);
+  const allNewlyCompleted: Quest[] = [];
 
-  const beforeCount = state.animalsVisitedThisWeek.length;
-  if (!state.animalsVisitedThisWeek.includes(animalId)) {
-    state.animalsVisitedThisWeek.push(animalId);
-  }
-
-  const visitedCount = state.animalsVisitedThisWeek.length;
-  const newlyCompleted: Quest[] = [];
-
-  for (const quest of state.quests) {
-    if (quest.completed) continue;
-
-    if (quest.type === 'visit_animals') {
-      quest.progress = Math.min(visitedCount, quest.target);
-    } else if (quest.type === 'streak_days' && currentStreak !== undefined) {
-      quest.progress = Math.min(currentStreak, quest.target);
-    } else {
-      continue;
+  for (const state of [combined.daily, combined.weekly]) {
+    if (!state.animalsVisitedThisPeriod) {
+      state.animalsVisitedThisPeriod = [];
     }
 
-    if (quest.progress >= quest.target && !quest.completed) {
-      quest.completed = true;
-      newlyCompleted.push(quest);
+    if (!state.animalsVisitedThisPeriod.includes(animalId)) {
+      state.animalsVisitedThisPeriod.push(animalId);
+    }
+
+    const visitedCount = state.animalsVisitedThisPeriod.length;
+
+    for (const quest of state.quests) {
+      if (quest.completed) continue;
+
+      if (quest.type === 'visit_animals') {
+        quest.progress = Math.min(visitedCount, quest.target);
+      } else if (quest.type === 'streak_days' && currentStreak !== undefined) {
+        quest.progress = Math.min(currentStreak, quest.target);
+      } else {
+        continue;
+      }
+
+      if (quest.progress >= quest.target && !quest.completed) {
+        quest.completed = true;
+        allNewlyCompleted.push(quest);
+      }
     }
   }
 
-  if (visitedCount !== beforeCount || newlyCompleted.length > 0) {
-    await saveQuestState(state);
-  }
+  await saveQuestTier('daily', combined.daily);
+  await saveQuestTier('weekly', combined.weekly);
 
-  return newlyCompleted;
+  return allNewlyCompleted;
 }
 
 /**
  * Get the phase-based reward multiplier for quest rewards.
- * Higher phases = higher quest rewards to maintain quest relevance
- * as base amber income grows with harder puzzles and streaks.
+ * Higher phases = higher quest rewards to maintain quest relevance.
  */
 export function getPhaseRewardMultiplier(phase: number): number {
   if (phase >= 4) return 2.0;
@@ -437,17 +471,24 @@ export function getPhaseRewardMultiplier(phase: number): number {
  * Claim a completed quest reward. Returns the phase-scaled amber amount awarded.
  */
 export async function claimQuestReward(questId: string, currentPhase: number = 0): Promise<{ amber: number } | null> {
-  const state = await loadWeeklyQuests();
-  const quest = state.quests.find(q => q.id === questId);
-  if (!quest || !quest.completed || quest.claimed) return null;
+  const combined = await loadWeeklyQuests(currentPhase);
 
-  quest.claimed = true;
-  await saveQuestState(state);
+  // Search both tiers
+  for (const tier of ['daily', 'weekly'] as const) {
+    const state = combined[tier];
+    const quest = state.quests.find(q => q.id === questId);
+    if (!quest || !quest.completed || quest.claimed) continue;
 
-  const multiplier = getPhaseRewardMultiplier(currentPhase);
-  return {
-    amber: Math.round(quest.rewardAmber * multiplier),
-  };
+    quest.claimed = true;
+    await saveQuestTier(tier, state);
+
+    const multiplier = getPhaseRewardMultiplier(currentPhase);
+    return {
+      amber: Math.round(quest.rewardAmber * multiplier),
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -459,17 +500,32 @@ export function getQuestDescription(quest: Quest, phase: number): string {
 }
 
 /**
- * Get total unclaimed amber from completed quests (phase-scaled).
+ * Get total unclaimed amber from completed quests across both tiers (phase-scaled).
  */
-export function getUnclaimedAmber(state: WeeklyQuestState, currentPhase: number = 0): number {
+export function getUnclaimedAmber(state: CombinedQuestState, currentPhase: number = 0): number {
   const multiplier = getPhaseRewardMultiplier(currentPhase);
-  return state.quests
+  const allQuests = [...state.daily.quests, ...state.weekly.quests];
+  return allQuests
     .filter(q => q.completed && !q.claimed)
     .reduce((sum, q) => sum + Math.round(q.rewardAmber * multiplier), 0);
 }
 
 /**
- * Get time remaining until quest reset (next Monday 00:00 UTC).
+ * Get time remaining until daily quest reset (next midnight local time).
+ */
+export function getTimeUntilDailyReset(): { hours: number; minutes: number } {
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0);
+  const msRemaining = tomorrow.getTime() - now.getTime();
+  const totalMinutes = Math.floor(msRemaining / 60000);
+  return {
+    hours: Math.floor(totalMinutes / 60),
+    minutes: totalMinutes % 60,
+  };
+}
+
+/**
+ * Get time remaining until weekly quest reset (next Monday 00:00 UTC).
  */
 export function getTimeUntilReset(): { days: number; hours: number; minutes: number } {
   const now = new Date();
@@ -494,13 +550,15 @@ export function getTimeUntilReset(): { days: number; hours: number; minutes: num
 // Internal
 // ============================================================================
 
-async function saveQuestState(state: WeeklyQuestState): Promise<void> {
-  if (!state.animalsVisitedThisWeek) {
-    state.animalsVisitedThisWeek = [];
+async function saveQuestTier(tier: QuestTier, state: QuestState): Promise<void> {
+  const storageKey = tier === 'daily' ? DAILY_STORAGE_KEY : WEEKLY_STORAGE_KEY;
+  if (!state.animalsVisitedThisPeriod) {
+    state.animalsVisitedThisPeriod = [];
   }
-  questStateCache = state;
+  if (tier === 'daily') dailyQuestCache = state;
+  else weeklyQuestCache = state;
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    await AsyncStorage.setItem(storageKey, JSON.stringify(state));
   } catch {}
 }
 
@@ -508,8 +566,10 @@ async function saveQuestState(state: WeeklyQuestState): Promise<void> {
  * Clear all quest data (for Settings > Reset All).
  */
 export async function clearWeeklyQuests(): Promise<void> {
-  questStateCache = null;
+  dailyQuestCache = null;
+  weeklyQuestCache = null;
   try {
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    await AsyncStorage.removeItem(DAILY_STORAGE_KEY);
+    await AsyncStorage.removeItem(WEEKLY_STORAGE_KEY);
   } catch {}
 }

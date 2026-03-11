@@ -597,7 +597,38 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         );
       }
     } else {
-      setMessage(getHintFallback(currentPhase));
+      // Off solution path — try to find any valid move from the current board state
+      const sourceLetters = rows[activeRowIndex].words;
+      const targetWord = currentTargetWord;
+      let foundMove: { letter: string; resultWord: string } | null = null;
+
+      for (let i = 0; i < sourceLetters.length; i++) {
+        if (sourceLetters[i].isLocked) continue;
+        const letter = sourceLetters[i].char;
+        // Check if removing this letter leaves a valid word
+        const remaining = sourceLetters
+          .filter((_, idx) => idx !== i)
+          .map(l => l.char)
+          .join('');
+        if (!validWordsCache.current.has(remaining)) continue;
+
+        // Check if inserting this letter into any position in the target creates a valid word
+        for (let j = 0; j <= targetWord.length; j++) {
+          const candidate = targetWord.slice(0, j) + letter + targetWord.slice(j);
+          if (validWordsCache.current.has(candidate)) {
+            foundMove = { letter, resultWord: candidate };
+            break;
+          }
+        }
+        if (foundMove) break;
+      }
+
+      if (foundMove) {
+        setHintsUsed(prev => prev + 1);
+        setMessage(getHintMessage(foundMove.letter, foundMove.resultWord, currentPhase));
+      } else {
+        setMessage(getHintFallback(currentPhase));
+      }
     }
   }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode]);
 

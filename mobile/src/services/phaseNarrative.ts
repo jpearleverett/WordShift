@@ -661,9 +661,9 @@ export function getFoxPitHarvestIntroLines(phase: number): string[] {
     ];
   }
   return [
-    'The house has been sweeping up your first few rewards for you while you learn.',
-    'From here on, words will wait in the pit until you tap them in and gather the amber yourself. The little pit button in the header will take you there.',
-    'And I moved our records into the Journal, with the rest tucked inside the Menu. The house feels better when every tool has its place.',
+    'The house has been sweeping up your first few rewards for you while you learned.',
+    'From now on, words will wait in the pit until you offer them yourself. The pit button in the header will take you there.',
+    'I sometimes wonder where the words go after the pit takes them. Somewhere deep, I think.\nAnyway — I also moved our records into the Journal and tucked the rest into the Menu.',
   ];
 }
 
@@ -1821,15 +1821,15 @@ export function getVictoryPitHint(targetPhase: DialoguePhase): string | null {
  */
 const FOX_PIT_NUDGE_LINES: Record<number, string[]> = {
   1: [
-    'Something is ready in the pit.',
-    'The marks are glowing. You should go see.',
+    'Something is ready in the pit. I can feel it from here — a kind of warmth.',
+    'The marks along the edge are glowing. They weren\'t doing that before.\nYou should go see what your words woke up.',
   ],
   2: [
-    'The pit has changed. Can you feel it?',
+    'The pit has changed. Can you feel it? The air is thicker down there now.',
     'Your words grew heavy enough to wake something. Go see what the marks have to say.',
   ],
   3: [
-    'The dark stirs below. The pit is calling.',
+    'The dark stirs below. The pit is calling — not with sound, but with... pull.',
     'The marks burn. They need you there.',
   ],
   4: [

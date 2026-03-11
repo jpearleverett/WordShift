@@ -41,12 +41,10 @@ import {
   markPitHarvestIntroSeen,
   consumePendingVariantTutorial,
 } from './src/services/amberCurrency';
-import { checkDailyStreakMilestone, getDailyStatus } from './src/services/dailyChallenge';
 import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
-import { recordDailyCompletion, getTodayString, generateDailyPuzzle } from './src/services/dailyChallenge';
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
@@ -101,8 +99,6 @@ export default function App() {
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
   const [homePanY, setHomePanY] = useState<number | null>(null);
-  // Daily challenge state
-  const [isPlayingDaily, setIsPlayingDaily] = useState(false);
 
   // Custom hooks - game logic & persistence separated from UI
   const [puzzle, puzzleActions] = usePuzzleGame();
@@ -306,7 +302,7 @@ export default function App() {
   // Auto-save puzzle state during active play
   useAutosave({
     currentScreen,
-    isPlayingDaily,
+    isPlayingDaily: false,
     rows: puzzle.rows,
     activeRowIndex: puzzle.activeRowIndex,
     selectedLetter: puzzle.selectedLetter,
@@ -417,7 +413,7 @@ export default function App() {
   ]);
 
   const maybeShowSetupSelectorIntro = useCallback(async () => {
-    if (onboardingFlow.isOnboarding || isPlayingDaily) return;
+    if (onboardingFlow.isOnboarding) return;
     const seen = await hasSeenSetupSelectorIntro();
     if (seen) return;
 
@@ -426,7 +422,7 @@ export default function App() {
       setShowSetupSelectorIntro(true);
       puzzleActions.setShowDifficultyMenu(true);
     }, 250);
-  }, [onboardingFlow.isOnboarding, isPlayingDaily, puzzleActions]);
+  }, [onboardingFlow.isOnboarding, puzzleActions]);
 
   const dismissSetupSelectorIntro = useCallback(async () => {
     await markSetupSelectorIntroSeen();
@@ -487,7 +483,6 @@ export default function App() {
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
-    setIsPlayingDaily(false);
 
     if (queuedPostVictoryIntrosRef.current.length > 0) {
       pendingPostVictoryActionRef.current = action;
@@ -518,78 +513,26 @@ export default function App() {
     transitionTo('puzzle', async () => {
       // Check for saved in-progress puzzle
       const saved = await loadPuzzleState();
-      const today = getTodayString();
-      const canRestoreDaily = Boolean(
-        saved?.isPlayingDaily && (!saved.dailyDate || saved.dailyDate === today)
-      );
-      if (saved && saved.gameState === 'PLAYING' && (!saved.isPlayingDaily || canRestoreDaily)) {
+      if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily) {
         puzzleActions.restorePuzzleState(saved);
         // Restore speed timer from saved expiry timestamp
         if (saved.speedTimerExpireAt != null) {
           const remaining = Math.max(0, Math.floor((saved.speedTimerExpireAt - Date.now()) / 1000));
           restoredSpeedTimeRef.current = remaining;
         }
-        setIsPlayingDaily(Boolean(saved.isPlayingDaily && canRestoreDaily));
         logEvent({
           type: 'puzzle_restored',
-          data: { difficulty: saved.difficulty, isDaily: Boolean(saved.isPlayingDaily && canRestoreDaily) },
+          data: { difficulty: saved.difficulty },
         });
-        if (!saved.isPlayingDaily || canRestoreDaily) {
-          maybeShowSetupSelectorIntro().catch(() => {});
-        }
+        maybeShowSetupSelectorIntro().catch(() => {});
       } else {
         clearPuzzleState().catch(() => {});
         await puzzleActions.startNewGame(diff);
-        setIsPlayingDaily(false);
         logEvent({ type: 'puzzle_started', data: { difficulty: diff } });
         maybeShowSetupSelectorIntro().catch(() => {});
       }
     });
   }, [puzzle.difficulty, puzzleActions, transitionTo, persistenceActions, orchestrationActions, maybeShowSetupSelectorIntro]);
-
-  // Start daily challenge — uses seeded generation for deterministic puzzles
-  const handleStartDaily = useCallback(async (difficulty: Difficulty) => {
-    hapticMedium();
-    soundTap();
-    // Refresh persistence data (phase, stats) before starting puzzle
-    persistenceActions.refreshStats();
-    setRitualEchoWords([]);
-    orchestrationActions.setCompletionCoda(null);
-    transitionTo('puzzle', async () => {
-      const saved = await loadPuzzleState();
-      const today = getTodayString();
-      const canRestoreDaily = Boolean(
-        saved
-        && saved.gameState === 'PLAYING'
-        && saved.isPlayingDaily
-        && (!saved.dailyDate || saved.dailyDate === today)
-      );
-
-      if (canRestoreDaily && saved) {
-        puzzleActions.restorePuzzleState(saved);
-        // Restore speed timer from saved expiry timestamp
-        if (saved.speedTimerExpireAt != null) {
-          const remaining = Math.max(0, Math.floor((saved.speedTimerExpireAt - Date.now()) / 1000));
-          restoredSpeedTimeRef.current = remaining;
-        }
-        setIsPlayingDaily(true);
-        logEvent({ type: 'puzzle_restored', data: { difficulty: saved.difficulty, isDaily: true } });
-        return;
-      }
-
-      clearPuzzleState().catch(() => {});
-      setIsPlayingDaily(true);
-      puzzleActions.setGameState(GameState.LOADING);
-      try {
-        const daily = await generateDailyPuzzle();
-        puzzleActions.initGame(daily.words, daily.hint, undefined, daily.wordLength);
-      } catch (err) {
-        console.warn('Daily puzzle generation failed, using random:', err);
-        puzzleActions.startNewGame(difficulty);
-      }
-      logEvent({ type: 'puzzle_started', data: { difficulty, isDaily: true } });
-    });
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions]);
 
   const handleIncomingLink = useCallback((url: string) => {
     if (!url.startsWith('wordshift://')) return;
@@ -599,15 +542,10 @@ export default function App() {
       return;
     }
 
-    if (url.includes('challenge/daily')) {
-      handleStartDaily('HARD');
-      return;
-    }
-
     if (url.includes('home')) {
       transitionTo('home');
     }
-  }, [handleStartDaily, onboardingFlow.onboardingStep, transitionTo]);
+  }, [onboardingFlow.onboardingStep, transitionTo]);
 
   useEffect(() => {
     Linking.getInitialURL().then(url => {
@@ -674,7 +612,7 @@ export default function App() {
         result.gameMode,
         result.completedWords,
         result.variant || 'standard',
-        isPlayingDaily
+        false
       );
 
       let finalVictory = victory;
@@ -726,34 +664,6 @@ export default function App() {
         });
       }
       queuedPostVictoryIntrosRef.current = immediateIntros;
-
-      // Record daily challenge completion if applicable
-      if (isPlayingDaily) {
-        const previousDailyStatus = await getDailyStatus();
-        const previousDailyStreak = previousDailyStatus.streak;
-        await recordDailyCompletion(
-          victory.earnedStars,
-          result.hintsUsed,
-          result.invalidAttempts
-        );
-        const updatedDailyStatus = await getDailyStatus();
-
-        // Check for daily streak milestone
-        const dailyMilestone = checkDailyStreakMilestone(
-          updatedDailyStatus.streak,
-          previousDailyStreak,
-          persistence.currentPhase
-        );
-        if (dailyMilestone) {
-          await awardBonusAmber(dailyMilestone.amber, 'daily_streak_milestone');
-          addVictoryTimeout(() => {
-            puzzleActions.setMessage(`${dailyMilestone.message} (+${dailyMilestone.amber} amber)`);
-          }, 1200);
-        }
-
-        // Track daily_streak quest progress
-        updateQuestProgress({ dailyStreak: updatedDailyStatus.streak }, persistence.currentPhase).catch(() => {});
-      }
 
       // Check for ritual micro-event on high-energy puzzles
       if (victory.ritualEnergy && victory.ritualEnergy >= 7) {
@@ -919,7 +829,6 @@ export default function App() {
     puzzle.gameState,
     persistenceActions,
     persistence.currentPhase,
-    isPlayingDaily,
     victoryFlow.isProcessingVictory,
     victoryActions,
     achievementActions,
@@ -1063,8 +972,7 @@ export default function App() {
         level: puzzle.level,
         hintsUsed: puzzle.hintsUsed,
         invalidAttempts: puzzle.invalidAttempts,
-        isDaily: isPlayingDaily,
-        dailyDate: isPlayingDaily ? getTodayString() : undefined,
+        isDaily: false,
         moveCount,
         wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
         animalWhisper: orchestration.whisper?.text,
@@ -1076,14 +984,13 @@ export default function App() {
             type: 'share_completed',
             data: {
               difficulty: puzzle.difficulty,
-              isDaily: isPlayingDaily,
               phase: persistence.currentPhase,
             },
           });
         }
       });
     });
-  }, [victoryFlow.victoryData, puzzle, isPlayingDaily, orchestration.whisper, persistence.currentPhase, startVictoryExitFlow]);
+  }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, startVictoryExitFlow]);
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (victoryAnimatingRef.current && victoryFlow.victoryData) {
@@ -1256,7 +1163,6 @@ export default function App() {
               onOpenLedger={() => transitionTo('ledger')}
               onOpenGallery={() => transitionTo('gallery')}
               onOpenPit={() => transitionTo('pit')}
-              onStartDaily={handleStartDaily}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
               pitPhaseReady={persistence.pendingPhaseTransition != null}
@@ -1346,13 +1252,7 @@ export default function App() {
           )}
 
           <View style={styles.headerTitleArea}>
-            {isPlayingDaily ? (
-              <View style={styles.dailyBadge}>
-                <Text style={styles.dailyBadgeText}>DAILY</Text>
-              </View>
-            ) : (
-              <AnimatedLogo />
-            )}
+            <AnimatedLogo />
             {/* Phase indicator badge */}
             {persistence.currentPhase > 0 && (
               <View style={[
@@ -1565,7 +1465,7 @@ export default function App() {
           {!onboardingFlow.isOnboarding && (
           <ActionButton
             icon="🔄"
-            label="NEW"
+            label={puzzle.gameState === GameState.PLAYING ? "RESTART" : "NEW"}
             colors={{
               bg: CandyColors.green.main,
               border: CandyColors.green.shadow,
@@ -1605,7 +1505,7 @@ export default function App() {
           difficulty={puzzle.difficulty}
           phase={persistence.currentPhase}
           phaseTransitionPending={persistence.pendingPhaseTransition != null}
-          isPlayingDaily={isPlayingDaily}
+          isPlayingDaily={false}
           victoryData={victoryFlow.victoryData}
           completionCoda={orchestration.completionCoda}
           cumulativeStats={persistence.cumulativeStats}
