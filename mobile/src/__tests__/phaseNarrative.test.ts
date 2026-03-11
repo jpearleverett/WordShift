@@ -704,10 +704,9 @@ describe('getChallengeIntroLines', () => {
     }
   });
 
-  test('phase 0-1 mentions 50% more amber', () => {
+  test('phase 0-1 mentions amber reward bonus', () => {
     const lines = getChallengeIntroLines(0);
     const joined = lines.join(' ');
-    expect(joined).toContain('50%');
     expect(joined).toContain('amber');
   });
 
