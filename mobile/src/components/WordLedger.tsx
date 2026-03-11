@@ -162,7 +162,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
   },
   header: {
     paddingHorizontal: 20,

@@ -76,7 +76,7 @@ const PIT_OVAL = {
 };
 
 const STATUS_BAR_HEIGHT =
-  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50;
+  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60;
 
 const FLOAT_ZONE = {
   top: STATUS_BAR_HEIGHT + 60,

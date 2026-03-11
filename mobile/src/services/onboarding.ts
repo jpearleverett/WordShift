@@ -114,13 +114,13 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Good. Now drop it into the glowing slot below.",
   ],
   puzzle_tutorial_valid_move: [
-    "You did it! Keep going until you reach the end!",
+    "There it is — that little click when a word falls into place.\nKeep going, all the way down.",
   ],
   puzzle_tutorial_invalid: [
-    "Hmm, that didn't make a real word.\nTry undoing and picking a different spot!",
+    "Hmm, that didn't land quite right.\nTry undoing and picking a different spot.",
   ],
   puzzle_tutorial_complete: [
-    "Perfect. You felt that click, right? That's how we build this place.",
+    "Perfect. Feel how the house settled just a little? That's what your words do.",
     "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
   ],
 
@@ -131,10 +131,10 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
 
   // Step 6: On pit screen — Fox explains the Offering Pit
   pit_intro: [
-    "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
-    "This is where your words end up after a puzzle.\nThey wait here until you offer them.",
-    "When you offer them, they turn into amber 💎 — that's what builds the house.",
-    "Watch closely. I'll show you how the house takes them in.",
+    "Here we are. This is the pit — where all your words end up after a puzzle.",
+    "They drift around down here, waiting.\nWhen you offer them, they turn into amber 💎",
+    "Amber is what builds the house. Every word you shift feeds it a little more.",
+    "Watch closely. Tap the words and see what happens.",
   ],
 
   // Step 7: After auto-offer completes on pit screen

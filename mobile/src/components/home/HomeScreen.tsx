@@ -31,12 +31,15 @@ import {
   markChallengeIntroSeen,
   hasSeenPitNudge,
   markPitNudgeSeen,
+  hasSeenJournalIntro,
+  markJournalIntroSeen,
 } from '../../services/amberCurrency';
 import {
   getDailyChallengeIntroLines,
   getChallengeIntroLines,
   getHouseCompletionText,
   getWordsOfferedText,
+  getJournalIntroLines,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -143,7 +146,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge' | 'journal_intro'>('animal_intro');
   const [dailyIntroSeen, setDailyIntroSeen] = useState(false);
 
   // Animations
@@ -406,6 +409,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => { cancelled = true; };
   }, [
     pitPhaseReady,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // Journal intro (one-time, Fox-led, when journal becomes available)
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!shouldShowJournalButton) return;
+
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenJournalIntro();
+      if (seen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getJournalIntroLines(progress.currentPhase));
+      setIntroContext('journal_intro');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    shouldShowJournalButton,
     progress?.currentPhase,
     isOnboarding,
     showIntroDialogue,
@@ -702,6 +735,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'journal_intro') {
+        await markJournalIntroSeen();
+        // Auto-open journal modal after Fox finishes the walkthrough
+        setShowJournalModal(true);
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -724,6 +761,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'journal_intro') {
+        await markJournalIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -2124,7 +2163,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
     paddingBottom: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 100,

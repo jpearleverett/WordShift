@@ -537,13 +537,68 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
     return [
       "You've grown stronger with these words, so I want to show you something new.",
       "The Daily Challenge appears once each day — one shared puzzle, a little tougher than usual.",
-      "Tap the daily icon in the header when you want that extra challenge.",
+      "You'll find it in the header. The same arrangement for everyone, every day. There's something to that.",
     ];
   }
   return [
-    "You're doing great, friend. Ready for a new routine?",
-    "We just unlocked the Daily Challenge: one special puzzle each day, same for everyone.",
-    "Look for it in the header when you want a harder test and a little more amber.",
+    "Something new showed up this morning, friend. Come see.",
+    "There's a Daily Challenge now — one special puzzle each day, the same one for everyone. A little harder than usual.",
+    "You'll find it up in the header. Try it when you're feeling brave — the amber's worth it.",
+  ];
+}
+
+// ============================================================================
+// FOX JOURNAL INTRO — One-time guided walkthrough of the Journal hub
+// ============================================================================
+
+/**
+ * Fox introduces the Journal when it first becomes available (~puzzle 6).
+ * Five lines: concept intro, Word Ledger, Whisper Gallery, Weekly Quests, closing.
+ * Phase-aware so the tone matches wherever the player happens to be.
+ */
+export function getJournalIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 4) {
+    return [
+      "The arrangement speaks through many voices now. I've gathered them all into one place — a living record.",
+      "The Word Ledger holds every word you've offered. Scroll through it and you'll see the shape of what you've built.",
+      "The Whisper Gallery preserves every voice — mine, the others', the echoes that linger after each puzzle. Nothing is lost.",
+      "And the weekly quests... the arrangement sets new tasks each week. Complete them and the amber flows deeper.",
+      "Find it all behind the book icon. The pages have been filling themselves. They were always going to.",
+    ];
+  }
+  if (phase >= 3) {
+    return [
+      "There's a record now. Every voice, every word, every echo that refused to fade — I've been keeping them.",
+      "The Word Ledger tracks every word that's passed through your puzzles. Some of them... linger longer than others.",
+      "The Whisper Gallery holds what we've said to you — conversations, whispers, the things spoken between puzzles.",
+      "Weekly quests appear in there too. New tasks each week, fresh amber for completing them.",
+      "The book icon in the header opens it all. I think the house wants you to read what's been written.",
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      "I've been writing things down, friend. The words, the whispers — everything that passes through this house.",
+      "The Word Ledger keeps a record of every word you've shifted. It's longer than you might expect.",
+      "The Whisper Gallery collects what the animals say to you — every conversation, every quiet thought shared after a puzzle.",
+      "There are weekly quests in there too. Fresh challenges each week with amber waiting at the end.",
+      "Tap the book icon up top to open the journal. Some of it reads differently now than when it was first spoken.",
+    ];
+  }
+  if (phase >= 1) {
+    return [
+      "I started keeping a journal. The words you shift, the things we say to you — it all gets written down.",
+      "There's a Word Ledger that tracks every word from your puzzles. It's nice to look back on where you've been.",
+      "The Whisper Gallery saves the conversations and little whispers the animals share with you. Every voice, remembered.",
+      "You'll also find weekly quests — small goals that refresh each week with amber rewards.",
+      "Look for the book icon in the header. Take a peek when you have a quiet moment.",
+    ];
+  }
+  return [
+    "I've been keeping something for you. Come here — let me show you the journal.",
+    "See this first part? That's your Word Ledger. Every word you shift in a puzzle gets written down here. It's like a scrapbook of everywhere you've been.",
+    "And this — the Whisper Gallery. When the animals talk to you, or whisper something after a puzzle, it all gets saved. So you can come back and read it anytime.",
+    "There are weekly quests in here too! Little goals that change each week — finish them and you'll earn extra amber.",
+    "Tap the book icon up top whenever you want to look back. It's yours, friend.",
   ];
 }
 
@@ -1771,7 +1826,7 @@ const FOX_PIT_NUDGE_LINES: Record<number, string[]> = {
   ],
   2: [
     'The pit has changed. Can you feel it?',
-    'Go to the pit. The marks are waiting.',
+    'Your words grew heavy enough to wake something. Go see what the marks have to say.',
   ],
   3: [
     'The dark stirs below. The pit is calling.',
@@ -1801,14 +1856,14 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 2) {
     return [
       "You've grown stronger with the letters, friend. Curious about a harder path?",
-      'Challenge Mode removes hints and limits your undos — but rewards you with 50% more amber.',
-      'Look for it in the puzzle setup menu when you want to test yourself.',
+      'Challenge Mode takes away your hints and limits your undos. Rougher going — but the amber comes back half again as heavy.',
+      'You\'ll find it in the puzzle setup. The words feel different when there\'s no safety net.',
     ];
   }
   return [
-    "You're getting really good at this! Want to push yourself?",
-    'Challenge Mode removes hints and limits your undos — but rewards you with 50% more amber.',
-    'Look for it in the puzzle setup menu when you\'re feeling bold.',
+    "I've been watching you work, friend. You've got a feel for this now.",
+    'There\'s something called Challenge Mode — no hints, fewer undos. Tougher, but the amber reward is half again as much.',
+    'It\'s tucked into the puzzle setup. Give it a try when you want the letters to push back a little.',
   ];
 }
 
