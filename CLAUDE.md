@@ -875,7 +875,7 @@ Not all animals realize the truth at the same time. Defined in `ANIMAL_AWARENESS
 
 ### Cross-Animal References
 
-Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~10%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a sequential conversation page within the animal's dialogue flow — the player taps "Next" to naturally progress from cross-animal reference to regular dialogue (no separate chat boxes or overlaid text).
+Animals reference other animals in dialogue with phase-scaled frequency (Phase 0-1: ~20%, Phase 2: ~25%, Phase 3: ~45%, Phase 4: ~60%), creating the feeling of growing coordination among the cult. Defined in `CROSS_ANIMAL_REFERENCES` in `animalDialogue.ts` (phase-keyed lines per animal, filtered to only mention unlocked animals). Wired via `getCrossAnimalReference()` in `useDialogueFlow.ts`, displayed as a sequential conversation page within the animal's dialogue flow — the player taps "Next" to naturally progress from cross-animal reference to regular dialogue (no separate chat boxes or overlaid text).
 
 **Guaranteed First Cross-Reference**: Vanguard animals (Fox/Owl) get a forced cross-reference the first time they're tapped at each new phase (Phase 1+), ensuring players see inter-animal coordination early. Tracked via `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` in `amberCurrency.ts`. Bypasses the random roll in `useDialogueFlow.ts`.
 
@@ -1720,8 +1720,8 @@ Edit `AMBER_REWARDS` in `types/homeWorld.ts`:
 
 ### Home Screen - Adjusting dialogue phases
 Edit `PHASE_THRESHOLDS` in `constants/gameBalance.ts` (re-exported via `types/homeWorld.ts`):
-- Default: [0, 25, 75, 150, 235] weighted progress for phases 0-4
-- `MIN_PUZZLES_FOR_PHASE` in `constants/gameBalance.ts` sets minimum real puzzles per phase: [0, 20, 65, 135, 225, 300]
+- Default: [0, 20, 65, 150, 235] weighted progress for phases 0-4
+- `MIN_PUZZLES_FOR_PHASE` in `constants/gameBalance.ts` sets minimum real puzzles per phase: [0, 15, 55, 135, 225, 300]
 
 ### Home Screen - Adjusting dialogue sessions
 Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
