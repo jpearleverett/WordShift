@@ -55,10 +55,14 @@ npx expo start --clear   # Clear cache and start
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
-- The full suite has 948 tests across 33 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has 951 tests across 34 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
-## Recent Implementation Notes (2026-02)
+## Recent Implementation Notes (2026-02/03)
 
+- **Header overlap fix + Fox journal intro (2026-03-11)**:
+  - **Header overlap with status bar**: Increased `paddingTop` from `(StatusBar.currentHeight || 24) + 10 : 50` to `+ 16 : 60` across all 7 screens (appStyles, HomeScreen, WhisperGallery, WordLedger, StatsScreen, SettingsScreen, OfferingPitScreen).
+  - **Fox journal intro walkthrough**: When journal (📚) becomes available after puzzle 6, Fox introduces it with a 5-line phase-aware guided walkthrough covering Word Ledger, Whisper Gallery, and Weekly Quests. Auto-opens journal modal after dialogue. `getJournalIntroLines(phase)` in `phaseNarrative.ts`, tracked by `hasSeenJournalIntro()` / `markJournalIntroSeen()` in `amberCurrency.ts`. Intro context: `'journal_intro'` in HomeScreen.tsx.
+  - **Dialogue quality audit**: Improved generic/tutorial-like dialogue in Daily Challenge intro, Challenge Mode intro, Pit Nudge, and onboarding Fox lines to be more lore-friendly with Fox's fireside voice.
 - **Bug audit and fixes — seventh pass (2026-02-21)**:
   - **Premature UI phase advance with pending transition (HIGH)**: `awardPuzzleAmber()` in `amberCurrency.ts` returned `phaseTransitionPending: phaseChanged`, which was `false` when a pending transition already existed from a prior puzzle. This caused `useGamePersistence.ts` to advance the UI phase (`setCurrentPhase`) to the transition target on the next puzzle, bypassing pit confirmation. Fixed by returning `phaseTransitionPending: phaseChanged || progress.pendingPhaseTransition != null`.
   - **Challenge mode blocks mid-step double shift undo (MEDIUM)**: The challenge mode `undosRemaining <= 0` guard in `usePuzzleGame.ts` `handleUndo` ran before the double shift mid-step undo check, blocking free mid-step undos (reverting uncommitted `drop1`) when undos were exhausted. Moved the `isDoubleShift` mid-step check before the challenge mode guard so mid-step undos are always allowed.
@@ -162,10 +166,11 @@ npx expo start --clear   # Clear cache and start
   - Data migration v3 initializes new fields. `useGamePersistence.ts` VictoryData includes `phaseTransitionPending`.
 - **Phase secrecy reinforcement**: The puzzle header now uses an icon-only atmosphere badge (no textual phase labels) to keep progression implicit.
 - **Mid-session restore fidelity upgraded**:
-  - Autosave now persists the full active puzzle snapshot while playing (not just move-count checkpoints).
+  - Autosave now persists the full active puzzle snapshot via `puzzleSaveState.ts` (`savePuzzleState`, `loadPuzzleState`, `clearPuzzleState`) — `SavedPuzzleState` includes rows, selected letter, game state, solution, move history, hints/undos, variant, phase, speed timer, double shift phase, daily date.
   - `selectedLetter` is restored when valid, so players can return exactly where they left off.
   - Daily saves store `dailyDate` and can resume same-day daily runs.
   - Speed timer saves `speedTimerExpireAt` (absolute timestamp) so time continues to elapse while the player is away; on restore, remaining seconds are recomputed from the current time.
+  - Handles `undosRemaining: Infinity` serialization (stored as null, restored as Infinity).
 - **Weekly quest wiring completed**:
   - `recordVictory(...)` now passes `isDaily` through to quest progress updates.
   - Animal conversations now record weekly unique animal visits via `recordAnimalVisit(...)` for `visit_animals` quests.
@@ -241,7 +246,7 @@ npx expo start --clear   # Clear cache and start
 
 ```
 mobile/
-├── App.tsx                      # Main app: screen routing, onboarding orchestration, wires hooks together
+├── App.tsx                      # Main app (~1792 lines): screen routing, onboarding orchestration, post-victory intros (variant_unlock, home_tools, setup_selector, pit_harvest, journal), puzzle scroll, wires hooks together
 ├── assets/                      # Image assets (see Asset System below)
 │   ├── characters/              # Animal character sprites
 │   ├── rooms/                   # Room background images
@@ -312,8 +317,8 @@ mobile/
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive screen (phase-aware)
 │   │   ├── WordLedger.tsx       # Scrollable ritual word history screen (phase-aware styling)
 │   │   └── home/
-│   │       ├── HomeScreen.tsx   # Main home screen with animal house, in-world unlock prompts, unlock progress
-│   │       ├── HouseWorld.tsx   # Pannable house view (vertical pan only)
+│   │       ├── HomeScreen.tsx   # Main home screen with animal house, in-world unlock prompts, unlock progress, journal hub modal, Fox intros (challenge/daily/pit_nudge/journal), ambient home lines, goal suggestions, difficulty upgrade prompts, post-tutorial light mode
+│   │       ├── HouseWorld.tsx   # Pannable house view (vertical pan only, saved pan Y position)
 │   │       ├── RoomView.tsx     # Individual room rendering
 │   │       ├── AnimalSprite.tsx # Animated animal characters with movement + emotions
 │   │       ├── JuicyButton.tsx  # Bouncy animated button with pulse
@@ -324,7 +329,7 @@ mobile/
 │   ├── theme/
 │   │   └── colors.ts            # CandyColors palette, tile colors, PhaseTheme system
 │   ├── styles/
-│   │   └── appStyles.ts         # Extracted App.tsx StyleSheet (~400 lines)
+│   │   └── appStyles.ts         # Extracted App.tsx StyleSheet (~400 lines), getScreenBackgroundColor()
 │   └── services/
 │       ├── localGenerator.ts    # Puzzle generation with DFS, pre-computed adjacency/removal indices, quality scoring, phase-tiered dread words, reverse-first chain generator, reverse-solvable validation, resonance tier export
 │       ├── puzzleBank.ts        # Pre-generated puzzle bank selection: registry pattern, phase-aware scoring, word freshness, recycling, played-ID tracking
@@ -364,8 +369,11 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning with sequential migrations
 │       ├── wordHarvest.ts       # Offering Pit harvest batches: enqueue, offer, state, summary
 │       ├── slotEstimation.ts     # Drag-and-drop slot position estimation: arc layout geometry → slot index mapping
+│       ├── homeScenePan.ts      # Home scene pan Y position clamping and resolution utilities
+│       ├── puzzleSaveState.ts   # Mid-puzzle autosave/restore: full puzzle snapshot persistence via AsyncStorage
+│       ├── roomUpgrades.ts      # Room upgrade amber sink: one cosmetic enhancement per room (Phase 2+), phase-aware descriptions
 │       └── errorReporting.ts    # Error reporting infrastructure (breadcrumbs, context)
-├── src/__tests__/               # Test suites (948 tests, 33 suites)
+├── src/__tests__/               # Test suites (951 tests, 34 suites)
 │   ├── helpers/
 │   │   └── mockAsyncStorage.ts  # Shared AsyncStorage mock factory
 │   ├── achievements.test.ts
@@ -396,7 +404,11 @@ mobile/
 │   ├── weeklyQuests.test.ts     # Weekly quest generation, progress, rewards
 │   ├── whisperGallery.test.ts   # Whisper recording, dedup, gallery stats
 │   ├── wordHarvest.test.ts       # Offering Pit: enqueue, offer, summary, economy parity
+│   ├── doubleShift.test.ts       # Double shift puzzle generation: locking, path validation, solution steps
 │   ├── dragDrop.test.ts          # Drag-and-drop slot estimation: position→index mapping, closest valid slot search
+│   ├── homeScenePan.test.ts     # Home scene pan Y clamping and resolution
+│   ├── puzzleBank.test.ts       # Puzzle bank selection: phase scoring, recycling, word freshness
+│   ├── puzzleSaveState.test.ts  # Puzzle save/restore: snapshot persistence, Infinity handling
 │   └── wordHistory.test.ts
 ├── scripts/
 │   ├── generatePuzzleBankEasy.test.ts  # Generator script for standard EASY puzzle bank (500 puzzles)
@@ -899,6 +911,33 @@ Animals have conversation sessions with puzzle-based cooldowns to pace interacti
 - Sleeping Z's overlay shown on animal sprite during cooldown
 - Session/cooldown state persists via AsyncStorage
 
+### Journal Hub Modal (HomeScreen)
+
+The journal hub (📚 icon in header) groups three screens behind a single modal: Word Ledger, Whisper Gallery, and Weekly Quests. Gated by `shouldShowJournalButton` — hidden during onboarding and post-tutorial light mode (`puzzlesSolved <= 5`).
+
+**Fox Journal Intro**: When the journal first becomes available (after puzzle 6), Fox introduces it with a 5-line phase-aware walkthrough (`getJournalIntroLines(phase)` in `phaseNarrative.ts`). Covers: journal concept, Word Ledger, Whisper Gallery, Weekly Quests, and closing line. After the final dialogue line, the journal modal auto-opens via `setShowJournalModal(true)`. Tracked by `hasSeenJournalIntro()` / `markJournalIntroSeen()` in `amberCurrency.ts`. Uses the `journal_intro` context in the intro dialogue system.
+
+**Post-Tutorial Light Mode**: When `puzzlesSolved <= 5`, the home screen hides advanced features (journal, gallery, pit, difficulty prompts) to avoid overwhelming new players. The journal button, ambient lines, and goal suggestions are suppressed.
+
+### Ambient Home Lines & Goal Suggestions (HomeScreen)
+
+**Ambient Home Lines**: Phase-aware atmospheric text displayed on the home screen when no other prompts are active. `getHomeAmbientLine(phase, puzzlesSolved)` in `phaseNarrative.ts` returns lines like "The fire crackles softly" (Phase 0) → "The walls remember every word" (Phase 4).
+
+**Goal Suggestions**: After early puzzles, the home screen shows contextual goal suggestions via `getGoalSuggestion(progress, phase)` in `phaseNarrative.ts` — e.g., "Try a harder difficulty" or "Talk to the animals."
+
+### Difficulty Upgrade Prompt (HomeScreen)
+
+After solving several puzzles at one difficulty, HomeScreen shows a one-time prompt suggesting the player try a harder difficulty level — phase-aware messaging encouraging progression.
+
+### Fox Post-Victory Intros (App.tsx)
+
+App.tsx orchestrates several one-time Fox intro sequences triggered after puzzle victories:
+- **`variant_unlock`**: When a new variant is unlocked, Fox introduces it with phase-aware dialogue
+- **`home_tools`**: Fox introduces home screen features (gallery, pit)
+- **`setup_selector`**: Fox introduces the puzzle setup selector (`getFoxSetupSelectorIntroLines(phase)` in `phaseNarrative.ts`, tracked by `hasSeenSetupSelectorIntro()` / `markSeenSetupSelectorIntro()`)
+- **`pit_harvest`**: Fox introduces the pit harvest system (`getFoxPitHarvestIntroLines(phase)`, tracked by `hasSeenPitHarvestIntro()` / `markSeenPitHarvestIntro()`)
+- **`journal_intro`**: Fox introduces the journal (triggered from HomeScreen, not App.tsx)
+
 ### House Building System (Bottom-Up)
 
 The house is built from the ground up, one room at a time. What begins as "building a cozy home for your animal friends" is gradually revealed to be constructing a temple — each room a chamber, each animal a cultist taking their position:
@@ -984,6 +1023,8 @@ Milestone bonuses at key puzzle counts use phase-aware messages. Each `MILESTONE
 - **Arrangement pattern** (Phase 2+): Visual sigil lines connecting rooms. Phase 2: thin purple. Phase 3: thicker with nodes. Phase 4: crimson pulsing. Accepts `ritualWords` prop for room word echoes
 - **Room word echoes** (Phase 2+): Faint text of recent puzzle words scattered across room backgrounds in `RoomView.tsx`. Opacity/density/color scales with phase
 - **Shadow Presence** (Phase 2+): `ShadowPresence` internal component in `HouseWorld.tsx` renders a dark silhouette above the house roof. Phase 2: barely visible (opacity 0.06, 60% scale). Phase 3: growing (0.15, 80%). Phase 4: full presence (0.30, 100%) with crimson "eyes". Provides a looming visual before `shadow_figure.png` asset is created
+- **Saved pan position**: Pan Y position persisted via `homeScenePan.ts` utilities (`clampHomeScenePanY`, `resolveHomeScenePanY`). HomeScreen passes `initialHousePanY` and `onHousePanChange` props. App.tsx stores the saved value so returning to home preserves scroll position
+- **Room upgrades**: Accepts `purchasedUpgrades` prop (record of upgraded room IDs) to render cosmetic enhancements
 
 ### Word Theme Evolution
 
@@ -1034,6 +1075,7 @@ The setup dropdown adapts to the narrative phase:
 - Combo styles are progressively disclosed (section appears only after at least one combo unlocks; otherwise a generic “more combinations later” message is shown)
 - **Phase 0-2**: Bright menu styling and lighter copy tone
 - **Phase 3+**: Dark background, phase-themed text colors from `getPhaseTheme()`, darker ritualized copy tone
+- **Intro mode**: Accepts `introMode` and `introHintText` props for Fox-guided setup selector intro — highlights the menu with instructional text
 
 ### Letter Tile Animation Evolution (`LetterTile.tsx`)
 Letter tiles physically change behavior across phases to make puzzles *feel* different:
@@ -1072,6 +1114,13 @@ All player-facing text shifts tone with phase:
 - `getAnimalWhisper(phase, unlockedAnimals, triggerWords?)` — Random ambient whisper from unlocked animal after puzzle completion (150+ lines across 5 phases × 10 animals)
 - `getAnimalInterjection(phase, unlockedAnimals, puzzlesSolved)` — Post-victory animal interjection pulling player to home screen (30% trigger rate, phase-aware messages)
 - `getRitualMicroEvent(ritualEnergy, phase, completedWords)` — Toast message when high-ritual-energy puzzle connects words to the house (Phase 2+, 60% trigger)
+- `getJournalIntroLines(phase)` — 5-line Fox-guided journal walkthrough (covers journal concept, Word Ledger, Whisper Gallery, Weekly Quests, closing)
+- `getFoxSetupSelectorIntroLines(phase)` — Fox intro for the puzzle setup selector
+- `getFoxPitHarvestIntroLines(phase)` — Fox intro for the pit harvest system
+- `getHomeAmbientLine(phase, puzzlesSolved)` — Atmospheric text for home screen idle state
+- `getGoalSuggestion(progress, phase)` — Contextual goal suggestions for home screen
+- `getPersonalizedPhase5Whisper(animalType, phase)` — Personalized Phase 5 whisper for specific animals
+- `getHintFallback(phase)` — Phase-aware fallback hint when player is off solution path
 
 ### Challenge Mode
 Optional harder mode for experienced players (`GameMode = 'standard' | 'challenge'`):
@@ -1187,6 +1236,10 @@ Manages amber balance, streak, and phase progression:
 - `markTutorialSeedsPlanted()` / `wereTutorialSeedsPlanted()` - Tutorial callback tracking for Fox at Phase 4
 - `hasSeenDailyChallengeIntro()` / `markDailyChallengeIntroSeen()` - One-time Daily Challenge intro tracking
 - `hasSeenFoxPlayNudge()` / `markFoxPlayNudgeSeen()` - One-time post-tutorial Fox "play more" nudge tracking
+- `hasSeenSetupSelectorIntro()` / `markSeenSetupSelectorIntro()` - One-time setup selector intro tracking
+- `hasSeenPitHarvestIntro()` / `markSeenPitHarvestIntro()` - One-time pit harvest intro tracking
+- `hasSeenJournalIntro()` / `markJournalIntroSeen()` - One-time journal intro tracking
+- `getTotalRitualEnergy()` - Returns accumulated ritual energy from progress
 - `recordConsumedCoordinatedEvent(theme)` / `getConsumedCoordinatedEvents()` - Track consumed coordinated dialogue events
 - `hasSeenGuaranteedCrossRef(phase)` / `markGuaranteedCrossRefSeen(phase)` - Track guaranteed first cross-reference for Vanguard animals at each phase
 - `clearProgress()` - Full reset (includes guaranteed cross-ref keys)
@@ -1346,7 +1399,7 @@ New players experience a guided multi-screen onboarding flow instead of a popup 
 ### Automated Tests
 
 ```bash
-cd mobile && npx jest --no-coverage  # 948 tests, 33 suites
+cd mobile && npx jest --no-coverage  # 951 tests, 34 suites
 ```
 
 **Test patterns:**
@@ -1458,6 +1511,19 @@ Phase 4+ feature: players can voluntarily "offer" amber to the arrangement:
 - **Wired in**: `HomeScreen.tsx` renders a sacrifice modal (Phase 4+ only) with amount selection buttons, amber deduction via `spendAmber()`, and response display. Accessible via "Sacrifice" button in the action row
 
 **Animals React to Sacrifices**: At Phase 4+, animals acknowledge the player's offerings. `SACRIFICE_REACTIONS` in `animalDialogue.ts` defines per-animal reactions — each animal has 1 first-sacrifice line and 3 subsequent lines reflecting their personality (e.g., Fox speaks of flames consuming the offering, Owl references ancient texts about sacrifice). `getSacrificeReaction(animalType, sacrificeCount, phase)` in `animalDialogue.ts` selects the appropriate line. Wired into `useDialogueFlow.ts` as a pre-dialogue page (shown between trigger word reactions and word threshold dialogues), so the animal naturally comments on the player's sacrifice before continuing regular dialogue.
+
+### Room Upgrades (`roomUpgrades.ts`)
+
+Phase 2+ amber sink: one cosmetic enhancement per room (10 total). Costs range 75-150 amber.
+- `ROOM_UPGRADES` — 10 upgrade definitions: Hearthstone (Den), Copper Pots (Kitchen), Gilded Globe (Study), Bioluminescent Coral (Aquarium), Hanging Vines (Jungle), Star Map (Desert), Standing Lamp (Office), Crystal Formation (Burrow), Wind Chimes (Garden), Paper Lanterns (Bamboo Attic)
+- `getRoomUpgrade(roomId)` — Lookup upgrade definition
+- `isRoomUpgraded(roomId)` — Check if purchased
+- `getPurchasedUpgrades()` — All purchased upgrade IDs with timestamps
+- `areUpgradesAvailable(phase)` — True if phase >= 2
+- `purchaseRoomUpgrade(roomId)` — Mark as purchased (caller spends amber separately)
+- `getUpgradeDescription(roomId, phase)` — Returns `darkDescription` at Phase 3+, normal otherwise
+- `clearRoomUpgrades()` — Reset (used by Reset All Data)
+- **Wired in**: `HomeScreen.tsx` renders upgrade options in room detail modal. `HouseWorld.tsx` accepts `purchasedUpgrades` prop. `SettingsScreen.tsx` calls `clearRoomUpgrades()` on reset.
 
 ### Push Notifications (`notifications.ts`)
 
@@ -1630,7 +1696,7 @@ Edit `calculateStars()` function in `starRating.ts`:
 - Color palette: `theme/colors.ts`
 - Game container: `App.tsx` styles object
 - Room dimensions: `ROOM_WIDTH` (250) and `ROOM_HEIGHT` (~123) in `HouseWorld.tsx`
-- Status bar: `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 50`
+- Status bar: `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60`
 
 ### Adding new tile colors
 Add to `tileColors` array in `theme/colors.ts`
