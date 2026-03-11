@@ -33,7 +33,14 @@ import { logEvent } from './src/services/eventLogger';
 import { SettingsScreen } from './src/components/SettingsScreen';
 import { FoxGuide } from './src/components/FoxGuide';
 import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
-import { awardBonusAmber, hasSeenSetupSelectorIntro, markSetupSelectorIntroSeen } from './src/services/amberCurrency';
+import {
+  awardBonusAmber,
+  hasSeenSetupSelectorIntro,
+  markSetupSelectorIntroSeen,
+  hasSeenPitHarvestIntro,
+  markPitHarvestIntroSeen,
+  consumePendingVariantTutorial,
+} from './src/services/amberCurrency';
 import { checkDailyStreakMilestone, getDailyStatus } from './src/services/dailyChallenge';
 import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
@@ -44,12 +51,14 @@ import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticError, hapticSelection } from './src/services/haptics';
+import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getPhaseIndicator,
   getLoadingMessage,
   getRitualMicroEvent,
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
+  getFoxPitHarvestIntroLines,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
@@ -67,6 +76,7 @@ import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveStat
 import { offerBatch } from './src/services/wordHarvest';
 import {
   hasVariantModifier,
+  getNewlyUnlockedVariants,
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
@@ -78,6 +88,12 @@ import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appS
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit';
+
+type PostVictoryIntroKind = 'variant_unlock' | 'home_tools';
+interface PostVictoryIntro {
+  kind: PostVictoryIntroKind;
+  lines: string[];
+}
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -178,6 +194,10 @@ export default function App() {
     () => getFoxSetupSelectorIntroLines(persistence.currentPhase),
     [persistence.currentPhase]
   );
+  const [postVictoryIntro, setPostVictoryIntro] = useState<PostVictoryIntro | null>(null);
+  const [postVictoryIntroIndex, setPostVictoryIntroIndex] = useState(0);
+  const queuedPostVictoryIntrosRef = useRef<PostVictoryIntro[]>([]);
+  const pendingPostVictoryActionRef = useRef<(() => void) | null>(null);
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
@@ -423,6 +443,65 @@ export default function App() {
     await dismissSetupSelectorIntro();
   }, [setupSelectorIntroIndex, setupSelectorLines.length, dismissSetupSelectorIntro]);
 
+  const advanceQueuedPostVictoryIntro = useCallback(async () => {
+    const nextIntro = queuedPostVictoryIntrosRef.current.shift() ?? null;
+
+    if (!nextIntro) {
+      setPostVictoryIntro(null);
+      const action = pendingPostVictoryActionRef.current;
+      pendingPostVictoryActionRef.current = null;
+      action?.();
+      return;
+    }
+
+    if (nextIntro.kind === 'variant_unlock') {
+      await consumePendingVariantTutorial();
+    }
+
+    setPostVictoryIntroIndex(0);
+    setPostVictoryIntro(nextIntro);
+  }, []);
+
+  const dismissPostVictoryIntro = useCallback(async () => {
+    if (postVictoryIntro?.kind === 'home_tools') {
+      await markPitHarvestIntroSeen();
+    }
+    setPostVictoryIntro(null);
+    await advanceQueuedPostVictoryIntro();
+  }, [postVictoryIntro, advanceQueuedPostVictoryIntro]);
+
+  const handleAdvancePostVictoryIntro = useCallback(async () => {
+    if (!postVictoryIntro) return;
+    const nextIndex = postVictoryIntroIndex + 1;
+    if (nextIndex < postVictoryIntro.lines.length) {
+      setPostVictoryIntroIndex(nextIndex);
+      return;
+    }
+
+    await dismissPostVictoryIntro();
+  }, [postVictoryIntro, postVictoryIntroIndex, dismissPostVictoryIntro]);
+
+  const startVictoryExitFlow = useCallback((action: () => void) => {
+    clearVictoryTimeouts();
+    puzzleActions.setShowConfetti(false);
+    victoryActions.resetVictory();
+    orchestrationActions.resetOrchestration();
+    setRitualEchoWords([]);
+    setIsPlayingDaily(false);
+
+    if (queuedPostVictoryIntrosRef.current.length > 0) {
+      pendingPostVictoryActionRef.current = action;
+      advanceQueuedPostVictoryIntro().catch(() => {
+        const pendingAction = pendingPostVictoryActionRef.current;
+        pendingPostVictoryActionRef.current = null;
+        pendingAction?.();
+      });
+      return;
+    }
+
+    action();
+  }, [clearVictoryTimeouts, puzzleActions, victoryActions, orchestrationActions, advanceQueuedPostVictoryIntro]);
+
   // ========================================================================
   // Navigation & puzzle lifecycle handlers
   // ========================================================================
@@ -627,6 +706,26 @@ export default function App() {
           };
         }
       }
+
+      const completedTotal = finalVictory.cumulativeStats?.totalPuzzlesCompleted ?? 0;
+      const immediateIntros: PostVictoryIntro[] = [];
+      const newlyUnlockedVariants = getNewlyUnlockedVariants(completedTotal, finalVictory.newPhase);
+      if (newlyUnlockedVariants.length > 0) {
+        const lines = getVariantTutorialIntroLines(newlyUnlockedVariants[0], finalVictory.newPhase);
+        if (lines && lines.length > 0) {
+          immediateIntros.push({
+            kind: 'variant_unlock',
+            lines,
+          });
+        }
+      }
+      if (completedTotal === 5 && !(await hasSeenPitHarvestIntro())) {
+        immediateIntros.push({
+          kind: 'home_tools',
+          lines: getFoxPitHarvestIntroLines(finalVictory.newPhase),
+        });
+      }
+      queuedPostVictoryIntrosRef.current = immediateIntros;
 
       // Record daily challenge completion if applicable
       if (isPlayingDaily) {
@@ -913,15 +1012,11 @@ export default function App() {
 
   const handleNextLevel = useCallback(() => {
     hapticLight();
-    clearVictoryTimeouts();
-    clearPuzzleState().catch(() => {});
-    puzzleActions.setShowConfetti(false);
-    victoryActions.resetVictory();
-    setIsPlayingDaily(false);
-    orchestrationActions.resetOrchestration();
-    setRitualEchoWords([]);
-    puzzleActions.handleNextLevel();
-  }, [puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
+    startVictoryExitFlow(() => {
+      clearPuzzleState().catch(() => {});
+      puzzleActions.handleNextLevel();
+    });
+  }, [puzzleActions, startVictoryExitFlow]);
 
   // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
   const handleOnboardingVictoryContinue = useCallback(async () => {
@@ -941,59 +1036,54 @@ export default function App() {
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
-    clearVictoryTimeouts();
-    puzzlesSinceHomeVisit.current = 0;
-    puzzleActions.setShowConfetti(false);
-    victoryActions.resetVictory();
-    setIsPlayingDaily(false);
-    orchestrationActions.resetOrchestration();
-    setRitualEchoWords([]);
-    puzzleActions.clearBoard();
-    transitionTo('home');
-  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions, clearVictoryTimeouts]);
+    startVictoryExitFlow(() => {
+      puzzlesSinceHomeVisit.current = 0;
+      puzzleActions.clearBoard();
+      transitionTo('home');
+    });
+  }, [puzzleActions, transitionTo, startVictoryExitFlow]);
 
   const handleGoToPit = useCallback(() => {
     hapticLight();
-    clearVictoryTimeouts();
-    puzzlesSinceHomeVisit.current = 0;
-    puzzleActions.setShowConfetti(false);
-    victoryActions.resetVictory();
-    setIsPlayingDaily(false);
-    orchestrationActions.resetOrchestration();
-    setRitualEchoWords([]);
-    puzzleActions.clearBoard();
-    transitionTo('pit');
-  }, [puzzleActions, transitionTo, victoryActions, orchestrationActions, clearVictoryTimeouts]);
+    startVictoryExitFlow(() => {
+      puzzlesSinceHomeVisit.current = 0;
+      puzzleActions.clearBoard();
+      transitionTo('pit');
+    });
+  }, [puzzleActions, transitionTo, startVictoryExitFlow]);
 
   const handleShare = useCallback(async () => {
     if (!victoryFlow.victoryData) return;
     hapticLight();
-    const moveCount = puzzle.rows.length - 1;
-    const shared = await sharePuzzleResult({
-      stars: victoryFlow.victoryData.earnedStars,
-      difficulty: puzzle.difficulty,
-      level: puzzle.level,
-      hintsUsed: puzzle.hintsUsed,
-      invalidAttempts: puzzle.invalidAttempts,
-      isDaily: isPlayingDaily,
-      dailyDate: isPlayingDaily ? getTodayString() : undefined,
-      moveCount,
-      wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
-      animalWhisper: orchestration.whisper?.text,
-      phase: persistence.currentPhase,
-      incantationName: puzzle.lastIncantationName || undefined,
-    });
-    if (shared) {
-      logEvent({
-        type: 'share_completed',
-        data: {
-          difficulty: puzzle.difficulty,
-          isDaily: isPlayingDaily,
-          phase: persistence.currentPhase,
-        },
+    startVictoryExitFlow(() => {
+      const moveCount = puzzle.rows.length - 1;
+      sharePuzzleResult({
+        stars: victoryFlow.victoryData!.earnedStars,
+        difficulty: puzzle.difficulty,
+        level: puzzle.level,
+        hintsUsed: puzzle.hintsUsed,
+        invalidAttempts: puzzle.invalidAttempts,
+        isDaily: isPlayingDaily,
+        dailyDate: isPlayingDaily ? getTodayString() : undefined,
+        moveCount,
+        wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
+        animalWhisper: orchestration.whisper?.text,
+        phase: persistence.currentPhase,
+        incantationName: puzzle.lastIncantationName || undefined,
+      }).then(shared => {
+        if (shared) {
+          logEvent({
+            type: 'share_completed',
+            data: {
+              difficulty: puzzle.difficulty,
+              isDaily: isPlayingDaily,
+              phase: persistence.currentPhase,
+            },
+          });
+        }
       });
-    }
-  }, [victoryFlow.victoryData, puzzle, isPlayingDaily, orchestration.whisper, persistence.currentPhase]);
+    });
+  }, [victoryFlow.victoryData, puzzle, isPlayingDaily, orchestration.whisper, persistence.currentPhase, startVictoryExitFlow]);
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (victoryAnimatingRef.current && victoryFlow.victoryData) {
@@ -1650,6 +1740,23 @@ export default function App() {
             onContinue={handleAdvanceSetupSelectorIntro}
             showSkip={true}
             onSkip={dismissSetupSelectorIntro}
+            position="bottom"
+            anchorStyle={{
+              top: Math.min(Math.max(SCREEN_HEIGHT * 0.38, 300), 420),
+              left: 8,
+              right: 8,
+            }}
+          />
+        )}
+        {!onboardingFlow.isOnboarding && postVictoryIntro && (
+          <FoxGuide
+            visible={true}
+            variant="dialogue"
+            text={postVictoryIntro.lines[Math.min(postVictoryIntroIndex, postVictoryIntro.lines.length - 1)]}
+            buttonText={postVictoryIntroIndex < postVictoryIntro.lines.length - 1 ? 'Next' : 'Continue'}
+            onContinue={handleAdvancePostVictoryIntro}
+            showSkip={true}
+            onSkip={dismissPostVictoryIntro}
             position="bottom"
             anchorStyle={{
               top: Math.min(Math.max(SCREEN_HEIGHT * 0.38, 300), 420),

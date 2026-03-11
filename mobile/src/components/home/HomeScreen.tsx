@@ -31,14 +31,10 @@ import {
   markChallengeIntroSeen,
   hasSeenPitNudge,
   markPitNudgeSeen,
-  hasSeenPitHarvestIntro,
-  markPitHarvestIntroSeen,
-  consumePendingVariantTutorial,
 } from '../../services/amberCurrency';
 import {
   getDailyChallengeIntroLines,
   getChallengeIntroLines,
-  getFoxPitHarvestIntroLines,
   getHouseCompletionText,
   getWordsOfferedText,
 } from '../../services/phaseNarrative';
@@ -56,7 +52,6 @@ import {
   getIntroDialogueCount,
   getCatchupIntroDialogue,
   getCatchupIntroDialogueCount,
-  getVariantTutorialIntroLines,
 } from '../../services/animalDialogue';
 import {
   loadDialogueSessions,
@@ -148,9 +143,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge' | 'variant_unlock' | 'pit_harvest_intro'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
   const [dailyIntroSeen, setDailyIntroSeen] = useState(false);
-  const [pitHarvestIntroSeen, setPitHarvestIntroSeen] = useState(false);
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -251,7 +245,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const harvestSummary = await getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
     setDailyIntroSeen(await hasSeenDailyChallengeIntro());
-    setPitHarvestIntroSeen(await hasSeenPitHarvestIntro());
 
     const unlockedAnimalCount = animalsData.filter(a => a.isUnlocked).length;
     const questState = await loadWeeklyQuests(progressData.currentPhase, {
@@ -306,7 +299,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   );
 
   const shouldHighlightPitButton = Boolean(
-    pitPhaseReady || (showIntroDialogue && introContext === 'pit_harvest_intro')
+    pitPhaseReady
   );
 
   // Load data on mount
@@ -324,47 +317,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     }
   }, [onboardingStep, progress, unlockFlow.nextUnlock]);
-
-  // Variant unlock introduction (one-time, visible, Fox-led).
-  useEffect(() => {
-    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
-    if ((progress.pendingVariantTutorials?.length ?? 0) === 0) return;
-
-    let cancelled = false;
-    (async () => {
-      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
-      if (!fox) return;
-
-      const pendingVariant = await consumePendingVariantTutorial();
-      if (!pendingVariant || cancelled) return;
-
-      const lines = getVariantTutorialIntroLines(pendingVariant, progress.currentPhase);
-      if (!lines || lines.length === 0) return;
-
-      setProgress(prev => prev ? {
-        ...prev,
-        pendingVariantTutorials: (prev.pendingVariantTutorials ?? []).slice(1),
-        seenVariantTutorials: Array.from(new Set([...(prev.seenVariantTutorials ?? []), pendingVariant])),
-      } : prev);
-      setIntroAnimal(fox);
-      setIntroDialogueIndex(0);
-      setIntroOverrideLines(lines);
-      setIntroContext('variant_unlock');
-      setShowIntroDialogue(true);
-      setHighlightPlayButton(true);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    progress?.pendingVariantTutorials,
-    progress?.currentPhase,
-    isOnboarding,
-    showIntroDialogue,
-    introOverrideLines,
-    animals,
-  ]);
 
   // Daily challenge unlock introduction (one-time, animal-led).
   useEffect(() => {
@@ -455,35 +407,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [
     pitPhaseReady,
     progress?.currentPhase,
-    isOnboarding,
-    showIntroDialogue,
-    introOverrideLines,
-    animals,
-  ]);
-
-  // Pit harvesting intro — explain manual collection before auto-banked rewards end.
-  useEffect(() => {
-    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
-    if (pitHarvestIntroSeen) return;
-    if ((progress.puzzlesSolved ?? 0) < 3) return;
-
-    let cancelled = false;
-    (async () => {
-      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
-      if (!fox || cancelled) return;
-
-      setIntroAnimal(fox);
-      setIntroDialogueIndex(0);
-      setIntroOverrideLines(getFoxPitHarvestIntroLines(progress.currentPhase));
-      setIntroContext('pit_harvest_intro');
-      setShowIntroDialogue(true);
-    })();
-
-    return () => { cancelled = true; };
-  }, [
-    progress?.puzzlesSolved,
-    progress?.currentPhase,
-    pitHarvestIntroSeen,
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
@@ -779,9 +702,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
-      } else if (introContext === 'pit_harvest_intro') {
-        await markPitHarvestIntroSeen();
-        setPitHarvestIntroSeen(true);
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -804,9 +724,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
-      } else if (introContext === 'pit_harvest_intro') {
-        await markPitHarvestIntroSeen();
-        setPitHarvestIntroSeen(true);
       } else {
         await markIntroSeen(introAnimal.id);
       }
