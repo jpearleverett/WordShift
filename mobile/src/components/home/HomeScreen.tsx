@@ -2116,7 +2116,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <View style={styles.journalSpotlightBackdrop} pointerEvents="auto">
             {/* Fox dialogue bubble near the top of the screen, close to the journal icon */}
             <View style={styles.journalSpotlightBubble}>
-              <Text style={styles.journalSpotlightEmoji}>🦊</Text>
+              {CHARACTER_SPRITES.fox ? (
+                <Image
+                  source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
+                  style={styles.journalSpotlightSpriteImage}
+                  resizeMode="cover"
+                  accessibilityLabel="Fox portrait"
+                />
+              ) : (
+                <Text style={styles.journalSpotlightEmoji}>🦊</Text>
+              )}
               <View style={styles.journalSpotlightTextBox}>
                 <Text style={styles.journalSpotlightText}>
                   {journalSpotlightLines[journalSpotlightIndex]}
@@ -2129,9 +2138,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Text style={styles.journalSpotlightButtonText}>Next</Text>
                   </TouchableOpacity>
                 ) : (
-                  <View style={styles.journalSpotlightHintRow}>
-                    <Text style={styles.journalSpotlightHintText}>Tap the 📚 icon above to open it</Text>
-                  </View>
+                  <TouchableOpacity
+                    style={styles.journalSpotlightButton}
+                    onPress={async () => {
+                      await markJournalIntroSeen();
+                      setJournalSpotlightActive(false);
+                      setShowJournalModal(true);
+                    }}
+                  >
+                    <Text style={styles.journalSpotlightButtonText}>Open Journal</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             </View>
@@ -3043,6 +3059,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
+  },
+  journalSpotlightSpriteImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 10,
+    marginTop: 2,
   },
   journalSpotlightEmoji: {
     fontSize: 28,
