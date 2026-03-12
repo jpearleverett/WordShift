@@ -25,8 +25,6 @@ import {
   markHouseCompleted,
   spendAmber,
   awardBonusAmber,
-  hasSeenDailyChallengeIntro,
-  markDailyChallengeIntroSeen,
   hasSeenChallengeIntro,
   markChallengeIntroSeen,
   hasSeenPitNudge,
@@ -35,7 +33,6 @@ import {
   markJournalIntroSeen,
 } from '../../services/amberCurrency';
 import {
-  getDailyChallengeIntroLines,
   getChallengeIntroLines,
   getHouseCompletionText,
   getWordsOfferedText,
@@ -67,10 +64,8 @@ import { useUnlockFlow } from '../../hooks/useUnlockFlow';
 import { JuicyButton } from './JuicyButton';
 import { CelebrationConfetti } from './CelebrationConfetti';
 import { AmberSparkle } from './AmberSparkle';
-import { DailyChallengeCard } from '../DailyChallengeCard';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
-import { isDailyChallengeUnlocked, isDailyCompleted } from '../../services/dailyChallenge';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import {
   isSacrificeAvailable,
@@ -85,9 +80,10 @@ import {
   claimQuestReward,
   getQuestDescription,
   getTimeUntilReset,
+  getTimeUntilDailyReset,
   getUnclaimedAmber,
   getPhaseRewardMultiplier,
-  WeeklyQuestState,
+  CombinedQuestState,
 } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
@@ -106,7 +102,6 @@ interface HomeScreenProps {
   onOpenLedger?: () => void;
   onOpenGallery?: () => void;
   onOpenPit?: () => void;
-  onStartDaily?: (difficulty: Difficulty) => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
   /** Advance onboarding to next step */
@@ -128,7 +123,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenGallery,
   onOpenPit,
   pitPhaseReady,
-  onStartDaily,
   onboardingStep,
   onAdvanceOnboarding,
   initialHousePanY = null,
@@ -146,8 +140,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'daily_unlock' | 'challenge_intro' | 'pit_nudge' | 'journal_intro'>('animal_intro');
-  const [dailyIntroSeen, setDailyIntroSeen] = useState(false);
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
+  // Journal spotlight intro state
+  const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
+  const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
+  const [journalSpotlightLines, setJournalSpotlightLines] = useState<string[]>([]);
 
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
@@ -171,7 +168,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [pendingHarvest, setPendingHarvest] = useState<HarvestSummary | null>(null);
 
   // Weekly quest hub
-  const [weeklyQuestState, setWeeklyQuestState] = useState<WeeklyQuestState | null>(null);
+  const [weeklyQuestState, setWeeklyQuestState] = useState<CombinedQuestState | null>(null);
   const [showQuestModal, setShowQuestModal] = useState(false);
   const [questFeedback, setQuestFeedback] = useState<string | null>(null);
   const [showJournalModal, setShowJournalModal] = useState(false);
@@ -247,13 +244,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // Load pending harvest for pit badge
     const harvestSummary = await getPendingHarvestSummary();
     setPendingHarvest(harvestSummary);
-    setDailyIntroSeen(await hasSeenDailyChallengeIntro());
 
     const unlockedAnimalCount = animalsData.filter(a => a.isUnlocked).length;
     const questState = await loadWeeklyQuests(progressData.currentPhase, {
       puzzlesSolved: progressData.puzzlesSolved,
       unlockedAnimalCount,
-      dailyUnlocked: isDailyChallengeUnlocked(progressData.puzzlesSolved, progressData.currentPhase),
+      dailyUnlocked: false,
       challengeUnlocked: (progressData.puzzlesSolved ?? 0) >= 15,
     });
     setWeeklyQuestState(questState);
@@ -273,7 +269,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const activeQuestCount = useMemo(() => {
     if (!weeklyQuestState) return 0;
-    return weeklyQuestState.quests.filter(q => !q.claimed).length;
+    const allQuests = [...weeklyQuestState.daily.quests, ...weeklyQuestState.weekly.quests];
+    return allQuests.filter(q => !q.claimed).length;
   }, [weeklyQuestState]);
 
   const availableRoomUpgrades = useMemo(() => {
@@ -320,38 +317,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     }
   }, [onboardingStep, progress, unlockFlow.nextUnlock]);
-
-  // Daily challenge unlock introduction (one-time, animal-led).
-  useEffect(() => {
-    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
-    if (!isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase)) return;
-
-    let cancelled = false;
-    (async () => {
-      const seen = await hasSeenDailyChallengeIntro();
-      if (seen || cancelled) return;
-
-      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
-      if (!fox) return;
-
-      setIntroAnimal(fox);
-      setIntroDialogueIndex(0);
-      setIntroOverrideLines(getDailyChallengeIntroLines(progress.currentPhase));
-      setIntroContext('daily_unlock');
-      setShowIntroDialogue(true);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    progress?.puzzlesSolved,
-    progress?.currentPhase,
-    isOnboarding,
-    showIntroDialogue,
-    introOverrideLines,
-    animals,
-  ]);
 
   // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
   useEffect(() => {
@@ -416,24 +381,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     animals,
   ]);
 
-  // Journal intro (one-time, Fox-led, when journal becomes available)
+  // Journal intro (one-time, Fox-led spotlight, when journal becomes available)
   useEffect(() => {
     if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
-    if (!shouldShowJournalButton) return;
+    if (!shouldShowJournalButton || journalSpotlightActive) return;
 
     let cancelled = false;
     (async () => {
       const seen = await hasSeenJournalIntro();
       if (seen || cancelled) return;
 
-      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
-      if (!fox) return;
-
-      setIntroAnimal(fox);
-      setIntroDialogueIndex(0);
-      setIntroOverrideLines(getJournalIntroLines(progress.currentPhase));
-      setIntroContext('journal_intro');
-      setShowIntroDialogue(true);
+      const lines = getJournalIntroLines(progress.currentPhase);
+      setJournalSpotlightLines(lines);
+      setJournalSpotlightIndex(0);
+      setJournalSpotlightActive(true);
     })();
 
     return () => { cancelled = true; };
@@ -443,7 +404,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
-    animals,
+    journalSpotlightActive,
   ]);
 
   // Ambient home line — atmospheric text when no dialogue is active
@@ -512,11 +473,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const phase = progress.currentPhase;
       const puzzles = progress.puzzlesSolved ?? 0;
 
-      // Check daily availability
-      const dailyUnlocked = isDailyChallengeUnlocked(puzzles, phase as number);
-      const dailyDone = dailyUnlocked ? await isDailyCompleted() : true;
-      const dailyAvailable = dailyUnlocked && !dailyDone;
-
       // Check untried difficulties
       const completed = progress.completedDifficulties ?? [];
       const allDiffs = ['MEDIUM', 'MEDIUM_PLUS', 'HARD'];
@@ -536,7 +492,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       if (cancelled) return;
       const suggestion = getGoalSuggestion(
         phase,
-        dailyAvailable,
+        false,
         untried,
         newVariant,
         hasPendingHarvest,
@@ -728,17 +684,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setIntroDialogueIndex(nextIndex);
     } else {
       // Intro complete - mark as seen and close
-      if (introContext === 'daily_unlock') {
-        await markDailyChallengeIntroSeen();
-        setDailyIntroSeen(true);
-      } else if (introContext === 'challenge_intro') {
+      if (introContext === 'challenge_intro') {
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
-      } else if (introContext === 'journal_intro') {
-        await markJournalIntroSeen();
-        // Auto-open journal modal after Fox finishes the walkthrough
-        setShowJournalModal(true);
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -754,15 +703,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleCloseIntroDialogue = async () => {
     if (introAnimal) {
       // Mark intros as seen even if closed early so the player isn't forced repeatedly.
-      if (introContext === 'daily_unlock') {
-        await markDailyChallengeIntroSeen();
-        setDailyIntroSeen(true);
-      } else if (introContext === 'challenge_intro') {
+      if (introContext === 'challenge_intro') {
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
-      } else if (introContext === 'journal_intro') {
-        await markJournalIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -780,7 +724,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const refreshed = await loadWeeklyQuests(progress.currentPhase, {
         puzzlesSolved: progress.puzzlesSolved,
         unlockedAnimalCount: animals.filter(a => a.isUnlocked).length,
-        dailyUnlocked: isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase),
+        dailyUnlocked: false,
         challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
       });
       setWeeklyQuestState(refreshed);
@@ -794,19 +738,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const reward = await claimQuestReward(questId, progress.currentPhase);
     if (!reward) return;
 
-    const newBalance = await awardBonusAmber(reward.amber, 'weekly_quest');
+    const newBalance = await awardBonusAmber(reward.amber, 'quest_reward');
     onAmberChange?.(newBalance);
     setProgress(prev => prev ? { ...prev, amber: newBalance } : prev);
-    setQuestFeedback(`Claimed +${reward.amber} amber from your weekly quests.`);
+    setQuestFeedback(`Claimed +${reward.amber} amber!`);
     logEvent({ type: 'quest_reward_claimed', data: { questId, amber: reward.amber } });
 
     const refreshed = await loadWeeklyQuests(progress.currentPhase, {
       puzzlesSolved: progress.puzzlesSolved,
       unlockedAnimalCount: animals.filter(a => a.isUnlocked).length,
-      dailyUnlocked: isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase),
+      dailyUnlocked: false,
       challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
     });
-    setWeeklyQuestState({ ...refreshed, quests: [...refreshed.quests] });
+    setWeeklyQuestState({ ...refreshed });
   }, [progress, onAmberChange, animals]);
 
   const handlePurchaseUpgrade = useCallback(async (roomId: string) => {
@@ -948,9 +892,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         <View style={styles.headerRight}>
-          {!isOnboarding && onStartDaily && dailyIntroSeen && isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
-            <DailyChallengeCard onStartDaily={(d) => { onStartDaily!(d); }} phase={progress.currentPhase} />
-          )}
           {!isOnboarding && onOpenPit && (
             <Animated.View style={shouldHighlightPitButton ? {
               transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
@@ -976,13 +917,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
           {shouldShowJournalButton && (
             <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={handleOpenJournal}
-              accessibilityLabel={`Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
+              style={[
+                styles.headerIconBtn,
+                journalSpotlightActive && styles.journalSpotlightIcon,
+              ]}
+              onPress={journalSpotlightActive ? async () => {
+                // Spotlight: tapping icon advances to journal modal
+                await markJournalIntroSeen();
+                setJournalSpotlightActive(false);
+                setShowJournalModal(true);
+              } : handleOpenJournal}
+              accessibilityLabel={journalSpotlightActive ? 'Tap to open journal' : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
               accessibilityRole="button"
             >
               <Text style={styles.headerIconText}>📚</Text>
-              {claimableQuestAmber > 0 && (
+              {!journalSpotlightActive && claimableQuestAmber > 0 && (
                 <View style={styles.headerBadge}>
                   <Text style={styles.headerBadgeText}>!</Text>
                 </View>
@@ -1108,9 +1057,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <TouchableOpacity
                 style={styles.goalSuggestionContainer}
                 onPress={() => {
-                  if (goalSuggestion.action === 'daily' && onStartDaily) {
-                    onStartDaily('HARD' as Difficulty);
-                  } else if (goalSuggestion.action === 'play') {
+                  if (goalSuggestion.action === 'play') {
                     onPlayPuzzle();
                   } else if (goalSuggestion.action === 'pit') {
                     onOpenPit?.();
@@ -1342,11 +1289,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   setShowJournalModal(false);
                   handleOpenQuestModal().catch(() => {});
                 }}
-                accessibilityLabel={`Open weekly quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
+                accessibilityLabel={`Open quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
                 accessibilityRole="button"
               >
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>
-                  🗓 Weekly Quests
+                  🗓 Quests
                   {claimableQuestAmber > 0
                     ? ` (+${claimableQuestAmber})`
                     : activeQuestCount > 0
@@ -1579,7 +1526,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </TouchableOpacity>
       </Modal>
 
-      {/* Weekly Quest Modal */}
+      {/* Quest Modal (Daily + Weekly) */}
       <Modal
         visible={showQuestModal}
         transparent
@@ -1591,7 +1538,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
           activeOpacity={1}
           onPress={() => setShowQuestModal(false)}
-          accessibilityLabel="Close weekly quests"
+          accessibilityLabel="Close quests"
           accessibilityRole="button"
         >
           <View
@@ -1606,17 +1553,71 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             ]}
             onStartShouldSetResponder={() => true}
           >
-            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Weekly Quests</Text>
-            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
-              Reset in {getTimeUntilReset().days}d {getTimeUntilReset().hours}h {getTimeUntilReset().minutes}m
-            </Text>
+            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Quests</Text>
             {questFeedback && (
               <Text style={[styles.shopFeedbackText, { color: dt.nameColor }]}>
                 {questFeedback}
               </Text>
             )}
             <ScrollView style={styles.questList} showsVerticalScrollIndicator={false}>
-              {weeklyQuestState?.quests.map(quest => (
+              {/* Daily Quests Section */}
+              <View style={styles.questSectionHeader}>
+                <Text style={[styles.questSectionTitle, { color: dt.nameColor }]}>Daily</Text>
+                <Text style={[styles.questSectionTimer, { color: dt.subtitleColor }]}>
+                  Resets in {getTimeUntilDailyReset().hours}h {getTimeUntilDailyReset().minutes}m
+                </Text>
+              </View>
+              {weeklyQuestState?.daily.quests.map(quest => (
+                <View
+                  key={quest.id}
+                  style={[styles.unlockItem, styles.questItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                >
+                  <View style={styles.unlockInfo}>
+                    <Text style={[styles.unlockName, { color: dt.textColor }]}>{quest.title}</Text>
+                    <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                      {getQuestDescription(quest, progress.currentPhase)}
+                    </Text>
+                    <Text style={styles.questProgressText}>
+                      {quest.completed ? 'Complete' : `${quest.progress} / ${quest.target}`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.buyButton,
+                      (!quest.completed || quest.claimed) && styles.buyButtonDisabled,
+                    ]}
+                    onPress={() => {
+                      handleClaimQuest(quest.id).catch(() => {});
+                    }}
+                    disabled={!quest.completed || quest.claimed}
+                    accessibilityLabel={
+                      quest.claimed
+                        ? `${quest.title} already claimed`
+                        : quest.completed
+                          ? `Claim ${quest.rewardAmber} amber from ${quest.title}`
+                          : `${quest.title} in progress`
+                    }
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.buyButtonText}>
+                      {quest.claimed
+                        ? 'Claimed'
+                        : quest.completed
+                          ? `Claim +${Math.round(quest.rewardAmber * getPhaseRewardMultiplier(progress.currentPhase))}`
+                          : 'In Progress'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+
+              {/* Weekly Challenges Section */}
+              <View style={[styles.questSectionHeader, { marginTop: 16 }]}>
+                <Text style={[styles.questSectionTitle, { color: dt.nameColor }]}>Weekly Challenges</Text>
+                <Text style={[styles.questSectionTimer, { color: dt.subtitleColor }]}>
+                  Resets in {getTimeUntilReset().days}d {getTimeUntilReset().hours}h
+                </Text>
+              </View>
+              {weeklyQuestState?.weekly.quests.map(quest => (
                 <View
                   key={quest.id}
                   style={[styles.unlockItem, styles.questItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
@@ -1662,7 +1663,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <TouchableOpacity
               style={styles.closeButton}
               onPress={() => setShowQuestModal(false)}
-              accessibilityLabel="Close weekly quests"
+              accessibilityLabel="Close quests"
               accessibilityRole="button"
             >
               <Text style={styles.closeButtonText}>Close</Text>
@@ -2107,6 +2108,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Journal Spotlight Intro Overlay */}
+      {journalSpotlightActive && journalSpotlightLines.length > 0 && (
+        <View style={styles.journalSpotlightOverlay} pointerEvents="box-none">
+          {/* Dark backdrop — blocks interaction with everything except the journal icon */}
+          <View style={styles.journalSpotlightBackdrop} pointerEvents="auto">
+            {/* Fox dialogue bubble near the top of the screen, close to the journal icon */}
+            <View style={styles.journalSpotlightBubble}>
+              <Text style={styles.journalSpotlightEmoji}>🦊</Text>
+              <View style={styles.journalSpotlightTextBox}>
+                <Text style={styles.journalSpotlightText}>
+                  {journalSpotlightLines[journalSpotlightIndex]}
+                </Text>
+                {journalSpotlightIndex < journalSpotlightLines.length - 1 ? (
+                  <TouchableOpacity
+                    style={styles.journalSpotlightButton}
+                    onPress={() => setJournalSpotlightIndex(prev => prev + 1)}
+                  >
+                    <Text style={styles.journalSpotlightButtonText}>Next</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.journalSpotlightHintRow}>
+                    <Text style={styles.journalSpotlightHintText}>Tap the 📚 icon above to open it</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -2540,10 +2571,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   questModal: {
-    maxHeight: SCREEN_HEIGHT * 0.7,
+    maxHeight: SCREEN_HEIGHT * 0.8,
   },
   questList: {
-    maxHeight: SCREEN_HEIGHT * 0.45,
+    maxHeight: SCREEN_HEIGHT * 0.6,
     marginBottom: 12,
   },
   questItem: {
@@ -2571,6 +2602,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: CandyColors.orange.dark,
     marginTop: 6,
+  },
+  questSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  questSectionTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  questSectionTimer: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   unlockBlockedText: {
     fontSize: 12,
@@ -2967,6 +3014,85 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     paddingHorizontal: 10,
     letterSpacing: 0.1,
+  },
+
+  // Journal spotlight intro overlay styles
+  journalSpotlightOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+  },
+  journalSpotlightBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 90 : 130,
+  },
+  journalSpotlightBubble: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(30, 25, 50, 0.95)',
+    borderRadius: 16,
+    padding: 14,
+    marginHorizontal: 24,
+    maxWidth: 340,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 180, 80, 0.35)',
+    shadowColor: '#FFB040',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  journalSpotlightEmoji: {
+    fontSize: 28,
+    marginRight: 10,
+    marginTop: 2,
+  },
+  journalSpotlightTextBox: {
+    flex: 1,
+  },
+  journalSpotlightText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: 'rgba(255, 255, 255, 0.92)',
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  journalSpotlightButton: {
+    marginTop: 10,
+    alignSelf: 'flex-end',
+    backgroundColor: 'rgba(255, 180, 80, 0.2)',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 180, 80, 0.4)',
+  },
+  journalSpotlightButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFB858',
+  },
+  journalSpotlightHintRow: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  journalSpotlightHintText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 200, 100, 0.8)',
+    fontStyle: 'italic',
+  },
+  journalSpotlightIcon: {
+    backgroundColor: 'rgba(255, 200, 80, 0.35)',
+    borderColor: '#FFB858',
+    borderWidth: 2,
+    shadowColor: '#FFB858',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 10,
   },
 });
 

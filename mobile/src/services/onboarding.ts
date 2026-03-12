@@ -133,13 +133,13 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   pit_intro: [
     "Here we are. This is the pit — where all your words end up after a puzzle.",
     "They drift around down here, waiting.\nWhen you offer them, they turn into amber 💎",
-    "Amber is what builds the house. Every word you shift feeds it a little more.",
-    "Watch closely. Tap the words and see what happens.",
+    "Amber is what builds the house. Every word you shift feeds it a little more.\nThe pit is... always hungry for more.",
+    "Go ahead. Tap the words and give them to it.",
   ],
 
   // Step 7: After auto-offer completes on pit screen
   pit_offering_complete: [
-    "See? Amber, from the words you formed.\nEvery puzzle feeds the house a little more.",
+    "See? Amber, from the words you formed.\nThe pit takes the words and gives back what the house needs.\n...It always does.",
   ],
 
   // Step 8: Back on home screen — explain unlocks and keep playing

@@ -281,9 +281,10 @@ export const appStyles = StyleSheet.create({
     letterSpacing: 1,
   },
   challengeUndoText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
   speedTimerContainer: {
     alignSelf: 'center',

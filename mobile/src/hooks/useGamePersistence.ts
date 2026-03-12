@@ -303,7 +303,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         },
       });
 
-      // Update weekly quest progress and capture newly completed quests
+      // Update daily + weekly quest progress and capture newly completed quests
       let questsCompleted: string[] = [];
       try {
         const completedQuests = await updateQuestProgress({

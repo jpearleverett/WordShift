@@ -64,6 +64,7 @@ const SYNC_KEYS = [
   'wordshift_tutorial_completed',
   'wordshift_schema_version',
   'wordshift_weekly_quests',
+  'wordshift_daily_quests',
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
   'wordshift_notification_prefs',
