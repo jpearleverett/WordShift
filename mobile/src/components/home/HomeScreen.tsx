@@ -392,6 +392,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       if (seen || cancelled) return;
 
       const lines = getJournalIntroLines(progress.currentPhase);
+      setShowJournalModal(true);
       setJournalSpotlightLines(lines);
       setJournalSpotlightIndex(0);
       setJournalSpotlightActive(true);
@@ -1232,12 +1233,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         transparent
         statusBarTranslucent
         animationType="fade"
-        onRequestClose={() => setShowJournalModal(false)}
+        onRequestClose={() => { if (!journalSpotlightActive) setShowJournalModal(false); }}
       >
         <TouchableOpacity
           style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
           activeOpacity={1}
-          onPress={() => setShowJournalModal(false)}
+          onPress={() => { if (!journalSpotlightActive) setShowJournalModal(false); }}
           accessibilityLabel="Close journal"
           accessibilityRole="button"
         >
@@ -1559,7 +1560,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {questFeedback}
               </Text>
             )}
-            <ScrollView style={styles.questList} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.questList} showsVerticalScrollIndicator={true}>
               {/* Daily Quests Section */}
               <View style={styles.questSectionHeader}>
                 <Text style={[styles.questSectionTitle, { color: dt.nameColor }]}>Daily</Text>
@@ -2109,51 +2110,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
       </Modal>
 
-      {/* Journal Spotlight Intro Overlay */}
-      {journalSpotlightActive && journalSpotlightLines.length > 0 && (
-        <View style={styles.journalSpotlightOverlay} pointerEvents="box-none">
-          {/* Dark backdrop — blocks interaction with everything except the journal icon */}
-          <View style={styles.journalSpotlightBackdrop} pointerEvents="auto">
-            {/* Fox dialogue bubble near the top of the screen, close to the journal icon */}
-            <View style={styles.journalSpotlightBubble}>
-              {CHARACTER_SPRITES.fox ? (
-                <Image
-                  source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
-                  style={styles.journalSpotlightSpriteImage}
-                  resizeMode="cover"
-                  accessibilityLabel="Fox portrait"
-                />
-              ) : (
-                <Text style={styles.journalSpotlightEmoji}>🦊</Text>
-              )}
-              <View style={styles.journalSpotlightTextBox}>
-                <Text style={styles.journalSpotlightText}>
-                  {journalSpotlightLines[journalSpotlightIndex]}
-                </Text>
-                {journalSpotlightIndex < journalSpotlightLines.length - 1 ? (
-                  <TouchableOpacity
-                    style={styles.journalSpotlightButton}
-                    onPress={() => setJournalSpotlightIndex(prev => prev + 1)}
-                  >
-                    <Text style={styles.journalSpotlightButtonText}>Next</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.journalSpotlightButton}
-                    onPress={async () => {
-                      await markJournalIntroSeen();
-                      setJournalSpotlightActive(false);
-                      setShowJournalModal(true);
-                    }}
-                  >
-                    <Text style={styles.journalSpotlightButtonText}>Open Journal</Text>
-                  </TouchableOpacity>
-                )}
+      {/* Journal Spotlight Intro — Modal so it renders above the journal hub Modal */}
+      <Modal
+        visible={journalSpotlightActive && journalSpotlightLines.length > 0}
+        transparent
+        statusBarTranslucent
+        animationType="none"
+      >
+        <View style={[styles.journalSpotlightBackdrop, { backgroundColor: dt.overlayBg }]}>
+          <View style={[styles.journalSpotlightBubble, {
+            backgroundColor: dt.modalBg,
+            borderColor: dt.modalBorder,
+            shadowColor: dt.modalShadowColor,
+          }]}>
+            {CHARACTER_SPRITES.fox ? (
+              <Image
+                source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
+                style={styles.journalSpotlightSpriteImage}
+                resizeMode="cover"
+                accessibilityLabel="Fox portrait"
+              />
+            ) : (
+              <Text style={styles.journalSpotlightEmoji}>🦊</Text>
+            )}
+            <View style={styles.journalSpotlightTextBox}>
+              <Text style={[styles.journalIntroName, { color: dt.nameColor }]}>
+                {ANIMAL_INFO.fox?.name || 'Ember'}
+              </Text>
+              <Text style={[styles.journalSpotlightText, { color: dt.textColor }]}>
+                {journalSpotlightLines[journalSpotlightIndex]}
+              </Text>
+              <View style={styles.journalIntroFooter}>
+                <TouchableOpacity
+                  style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
+                  onPress={journalSpotlightIndex < journalSpotlightLines.length - 1
+                    ? () => setJournalSpotlightIndex(prev => prev + 1)
+                    : async () => {
+                        await markJournalIntroSeen();
+                        setJournalSpotlightActive(false);
+                      }
+                  }
+                  accessibilityLabel={journalSpotlightIndex < journalSpotlightLines.length - 1 ? 'Continue journal intro' : 'Close journal intro'}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.dialogueButtonShine} />
+                  <Text style={styles.continueButtonText}>
+                    {journalSpotlightIndex < journalSpotlightLines.length - 1 ? 'Next' : 'Got it!'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 };
@@ -2590,7 +2599,7 @@ const styles = StyleSheet.create({
     maxHeight: SCREEN_HEIGHT * 0.8,
   },
   questList: {
-    maxHeight: SCREEN_HEIGHT * 0.6,
+    flex: 1,
     marginBottom: 12,
   },
   questItem: {
@@ -3032,14 +3041,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 
-  // Journal spotlight intro overlay styles
-  journalSpotlightOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 9999,
-  },
+  // Journal spotlight intro styles (rendered as a Modal above the journal hub)
   journalSpotlightBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 90 : 130,
@@ -3047,65 +3051,46 @@ const styles = StyleSheet.create({
   journalSpotlightBubble: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(30, 25, 50, 0.95)',
-    borderRadius: 16,
-    padding: 14,
-    marginHorizontal: 24,
-    maxWidth: 340,
+    borderRadius: 20,
+    padding: 16,
+    marginHorizontal: 20,
+    maxWidth: 380,
     borderWidth: 1,
-    borderColor: 'rgba(255, 180, 80, 0.35)',
-    shadowColor: '#FFB040',
-    shadowOffset: { width: 0, height: 0 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
   },
   journalSpotlightSpriteImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 10,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 12,
     marginTop: 2,
   },
   journalSpotlightEmoji: {
-    fontSize: 28,
-    marginRight: 10,
+    fontSize: 32,
+    marginRight: 12,
     marginTop: 2,
   },
   journalSpotlightTextBox: {
     flex: 1,
   },
   journalSpotlightText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: 'rgba(255, 255, 255, 0.92)',
+    fontSize: 15,
+    lineHeight: 22,
     fontWeight: '500',
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
-  journalSpotlightButton: {
-    marginTop: 10,
-    alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255, 180, 80, 0.2)',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 180, 80, 0.4)',
+  journalIntroName: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
   },
-  journalSpotlightButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFB858',
-  },
-  journalSpotlightHintRow: {
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  journalSpotlightHintText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255, 200, 100, 0.8)',
-    fontStyle: 'italic',
+  journalIntroFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 12,
   },
   journalSpotlightIcon: {
     backgroundColor: 'rgba(255, 200, 80, 0.35)',
