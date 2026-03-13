@@ -2620,7 +2620,7 @@ const styles = StyleSheet.create({
     maxHeight: SCREEN_HEIGHT * 0.8,
   },
   questList: {
-    flex: 1,
+    maxHeight: SCREEN_HEIGHT * 0.65,
     marginBottom: 12,
   },
   questItem: {
@@ -3066,7 +3066,7 @@ const styles = StyleSheet.create({
   journalSpotlightBackdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    paddingBottom: 220,
+    paddingBottom: 250,
   },
   journalSpotlightIcon: {
     backgroundColor: 'rgba(255, 200, 80, 0.35)',
