@@ -594,7 +594,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
     ];
   }
   return [
-    "I've been keeping something for you. Come here — let me show you the journal.",
+    "I've been keeping something for you — a journal! Let me show you what's inside.",
     "See this first part? That's your Word Ledger. Every word you shift in a puzzle gets written down here. It's like a scrapbook of everywhere you've been.",
     "And this — the Whisper Gallery. When the animals talk to you, or whisper something after a puzzle, it all gets saved. So you can come back and read it anytime.",
     "There are weekly quests in here too! Little goals that change each week — finish them and you'll earn extra amber.",
