@@ -1274,7 +1274,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               }).start();
             }, delay);
             textTimers.push(showTimer);
-            delay += 1200;
+            delay += 2500;
           }
           ceremonyTimers.current.push(...textTimers);
 
@@ -1298,7 +1298,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               }).start();
               setCeremonyStatus('idle');
             }
-          }, delay + 400);
+          }, delay + 1500);
           ceremonyTimers.current.push(completeTimer);
         }, 800);
         ceremonyTimers.current.push(textTimer);

@@ -171,6 +171,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [weeklyQuestState, setWeeklyQuestState] = useState<CombinedQuestState | null>(null);
   const [showQuestModal, setShowQuestModal] = useState(false);
   const [questFeedback, setQuestFeedback] = useState<string | null>(null);
+  const [questTab, setQuestTab] = useState<'daily' | 'weekly'>('daily');
   const [showJournalModal, setShowJournalModal] = useState(false);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
 
@@ -1560,65 +1561,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {questFeedback}
               </Text>
             )}
-            <ScrollView style={styles.questList} showsVerticalScrollIndicator={true}>
-              {/* Daily Quests Section */}
-              <View style={styles.questSectionHeader}>
-                <Text style={[styles.questSectionTitle, { color: dt.nameColor }]}>Daily</Text>
-                <Text style={[styles.questSectionTimer, { color: dt.subtitleColor }]}>
-                  Resets in {getTimeUntilDailyReset().hours}h {getTimeUntilDailyReset().minutes}m
+            {/* Tab Bar */}
+            <View style={styles.questTabBar}>
+              <TouchableOpacity
+                style={[
+                  styles.questTab,
+                  questTab === 'daily' && [styles.questTabActive, { borderBottomColor: dt.nameColor }],
+                ]}
+                onPress={() => setQuestTab('daily')}
+                accessibilityLabel="Daily quests tab"
+                accessibilityRole="tab"
+              >
+                <Text style={[styles.questTabText, { color: questTab === 'daily' ? dt.nameColor : dt.subtitleColor }]}>Daily</Text>
+                <Text style={[styles.questTabTimer, { color: dt.subtitleColor }]}>
+                  {getTimeUntilDailyReset().hours}h {getTimeUntilDailyReset().minutes}m
                 </Text>
-              </View>
-              {weeklyQuestState?.daily.quests.map(quest => (
-                <View
-                  key={quest.id}
-                  style={[styles.unlockItem, styles.questItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
-                >
-                  <View style={styles.unlockInfo}>
-                    <Text style={[styles.unlockName, { color: dt.textColor }]}>{quest.title}</Text>
-                    <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
-                      {getQuestDescription(quest, progress.currentPhase)}
-                    </Text>
-                    <Text style={styles.questProgressText}>
-                      {quest.completed ? 'Complete' : `${quest.progress} / ${quest.target}`}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.buyButton,
-                      (!quest.completed || quest.claimed) && styles.buyButtonDisabled,
-                    ]}
-                    onPress={() => {
-                      handleClaimQuest(quest.id).catch(() => {});
-                    }}
-                    disabled={!quest.completed || quest.claimed}
-                    accessibilityLabel={
-                      quest.claimed
-                        ? `${quest.title} already claimed`
-                        : quest.completed
-                          ? `Claim ${quest.rewardAmber} amber from ${quest.title}`
-                          : `${quest.title} in progress`
-                    }
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.buyButtonText}>
-                      {quest.claimed
-                        ? 'Claimed'
-                        : quest.completed
-                          ? `Claim +${Math.round(quest.rewardAmber * getPhaseRewardMultiplier(progress.currentPhase))}`
-                          : 'In Progress'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {/* Weekly Challenges Section */}
-              <View style={[styles.questSectionHeader, { marginTop: 16 }]}>
-                <Text style={[styles.questSectionTitle, { color: dt.nameColor }]}>Weekly Challenges</Text>
-                <Text style={[styles.questSectionTimer, { color: dt.subtitleColor }]}>
-                  Resets in {getTimeUntilReset().days}d {getTimeUntilReset().hours}h
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.questTab,
+                  questTab === 'weekly' && [styles.questTabActive, { borderBottomColor: dt.nameColor }],
+                ]}
+                onPress={() => setQuestTab('weekly')}
+                accessibilityLabel="Weekly quests tab"
+                accessibilityRole="tab"
+              >
+                <Text style={[styles.questTabText, { color: questTab === 'weekly' ? dt.nameColor : dt.subtitleColor }]}>Weekly</Text>
+                <Text style={[styles.questTabTimer, { color: dt.subtitleColor }]}>
+                  {getTimeUntilReset().days}d {getTimeUntilReset().hours}h
                 </Text>
-              </View>
-              {weeklyQuestState?.weekly.quests.map(quest => (
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.questList} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+              {(questTab === 'daily' ? weeklyQuestState?.daily.quests : weeklyQuestState?.weekly.quests)?.map(quest => (
                 <View
                   key={quest.id}
                   style={[styles.unlockItem, styles.questItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
@@ -1708,23 +1683,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
                 <Text style={styles.amberBalance}>Your Amber: 💎 {progress.amber}</Text>
 
-                {unlockFlow.nextUnlock && unlockFlow.nextUnlock.targetId === unlockFlow.showRoomUnlock.id && (
-                  <TouchableOpacity
-                    style={[
-                      styles.buyButton,
-                      styles.buyButtonLarge,
-                      progress.amber < unlockFlow.nextUnlock.cost && styles.buyButtonDisabled,
-                    ]}
-                    onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
-                    disabled={progress.amber < unlockFlow.nextUnlock.cost}
-                    accessibilityLabel={`Unlock room for ${unlockFlow.nextUnlock.cost} amber`}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.buyButtonText}>
-                      Unlock for 💎 {unlockFlow.nextUnlock.cost}
-                    </Text>
-                  </TouchableOpacity>
+                {unlockFlow.purchaseError && (
+                  <Text style={[styles.shopSubtitle, { color: '#E85050', marginTop: 8, fontWeight: '600' }]}>
+                    {unlockFlow.purchaseError}
+                  </Text>
                 )}
+
+                {unlockFlow.nextUnlock && unlockFlow.nextUnlock.targetId === unlockFlow.showRoomUnlock.id && (() => {
+                  const isGated = unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
+                    && unlockFlow.unlockAvailability.reason && !unlockFlow.unlockAvailability.reason.startsWith('Already');
+                  const cantAfford = progress.amber < unlockFlow.nextUnlock.cost;
+                  const isDisabled = cantAfford || !!isGated;
+                  return (
+                    <>
+                      {isGated && (
+                        <Text style={[styles.shopSubtitle, { color: dt.subtitleColor, marginTop: 8, fontStyle: 'italic' }]}>
+                          {unlockFlow.unlockAvailability!.reason}
+                        </Text>
+                      )}
+                      <TouchableOpacity
+                        style={[
+                          styles.buyButton,
+                          styles.buyButtonLarge,
+                          isDisabled && styles.buyButtonDisabled,
+                        ]}
+                        onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
+                        disabled={isDisabled}
+                        accessibilityLabel={`Unlock room for ${unlockFlow.nextUnlock!.cost} amber`}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.buyButtonText}>
+                          Unlock for 💎 {unlockFlow.nextUnlock!.cost}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  );
+                })()}
 
                 <TouchableOpacity
                   style={styles.closeButton}
@@ -2619,8 +2613,32 @@ const styles = StyleSheet.create({
   questModal: {
     maxHeight: SCREEN_HEIGHT * 0.8,
   },
+  questTabBar: {
+    flexDirection: 'row' as const,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  questTab: {
+    flex: 1,
+    alignItems: 'center' as const,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  questTabActive: {
+    borderBottomWidth: 2,
+  },
+  questTabText: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+  },
+  questTabTimer: {
+    fontSize: 10,
+    marginTop: 2,
+  },
   questList: {
-    maxHeight: SCREEN_HEIGHT * 0.65,
+    maxHeight: SCREEN_HEIGHT * 0.55,
     marginBottom: 12,
   },
   questItem: {

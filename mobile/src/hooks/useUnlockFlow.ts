@@ -25,6 +25,7 @@ interface UseUnlockFlowReturn {
   showRoomUnlock: Room | null;
   showInvitePrompt: boolean;
   unlockAvailability: { available: boolean; reason?: string } | null;
+  purchaseError: string | null;
   nextUnlock: Unlockable | null;
   allUnlocks: Unlockable[];
   handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
@@ -62,6 +63,7 @@ export function useUnlockFlow({
     available: boolean;
     reason?: string;
   } | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const introTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup intro timeout on unmount
@@ -106,8 +108,15 @@ export function useUnlockFlow({
   // Handle room tap (for locked rooms or rooms needing animals)
   const handleRoomPress = useCallback((room: Room) => {
     hapticLight();
+    setPurchaseError(null);
     if (!room.isUnlocked) {
       setShowRoomUnlock(room);
+      // Re-check availability when modal opens so puzzle gate info is fresh
+      if (nextUnlock && nextUnlock.targetId === room.id) {
+        isUnlockAvailable(nextUnlock.id).then(avail => {
+          setUnlockAvailability(avail);
+        });
+      }
       return;
     }
 
@@ -148,6 +157,7 @@ export function useUnlockFlow({
       }
     } else {
       hapticError();
+      setPurchaseError(result.error || 'Unable to unlock. Try again later.');
     }
   }, [progress, loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
@@ -156,6 +166,7 @@ export function useUnlockFlow({
     showRoomUnlock,
     showInvitePrompt,
     unlockAvailability,
+    purchaseError,
     nextUnlock,
     allUnlocks,
     handlePurchase,
