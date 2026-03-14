@@ -89,44 +89,44 @@ interface QuestTemplate {
   difficulty?: Difficulty;
 }
 
-// Daily quest pool — lighter, achievable in a single session
+// Daily quest pool — achievable in a dedicated single session
 const DAILY_QUEST_POOL: QuestTemplate[] = [
-  { type: 'solve_count', titleTemplate: 'Daily Solver', descTemplate: 'Complete {target} puzzle(s) today', darkDescTemplate: 'Offer {target} arrangement(s) today', target: 1, rewardAmber: 10 },
-  { type: 'solve_count', titleTemplate: 'Puzzle Pair', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: '{target} incantations before the day ends', target: 2, rewardAmber: 18 },
-  { type: 'solve_count', titleTemplate: 'Triple Play', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: 'The pattern demands {target} today', target: 3, rewardAmber: 25 },
+  { type: 'solve_count', titleTemplate: 'Daily Solver', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: 'Offer {target} arrangements today', target: 2, rewardAmber: 10 },
+  { type: 'solve_count', titleTemplate: 'Puzzle Trio', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: '{target} incantations before the day ends', target: 3, rewardAmber: 18 },
+  { type: 'solve_count', titleTemplate: 'Five-Fold', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: 'The pattern demands {target} today', target: 5, rewardAmber: 25 },
   { type: 'earn_stars', titleTemplate: 'Shining Moment', descTemplate: 'Earn a three-star rating', darkDescTemplate: 'A flawless offering', target: 1, rewardAmber: 12 },
-  { type: 'earn_stars', titleTemplate: 'Star Collector', descTemplate: 'Earn {target} three-star ratings today', darkDescTemplate: '{target} perfect arrangements', target: 2, rewardAmber: 22 },
+  { type: 'earn_stars', titleTemplate: 'Star Collector', descTemplate: 'Earn {target} three-star ratings today', darkDescTemplate: '{target} perfect arrangements', target: 3, rewardAmber: 22 },
   { type: 'no_hints', titleTemplate: 'On Your Own', descTemplate: 'Complete a puzzle without hints', darkDescTemplate: 'The words come unbidden', target: 1, rewardAmber: 12 },
-  { type: 'no_hints', titleTemplate: 'Clear Mind', descTemplate: 'Complete {target} puzzles without hints', darkDescTemplate: 'You no longer need guidance', target: 2, rewardAmber: 20 },
+  { type: 'no_hints', titleTemplate: 'Clear Mind', descTemplate: 'Complete {target} puzzles without hints', darkDescTemplate: 'You no longer need guidance', target: 3, rewardAmber: 20 },
   { type: 'solve_difficulty', titleTemplate: 'Step Up', descTemplate: 'Complete a Medium+ or harder puzzle', darkDescTemplate: 'A weightier offering', target: 1, rewardAmber: 14, difficulty: 'MEDIUM_PLUS' },
   { type: 'solve_difficulty', titleTemplate: 'Hard Day', descTemplate: 'Complete a Hard puzzle', darkDescTemplate: 'The difficult arrangements carry more weight', target: 1, rewardAmber: 18, difficulty: 'HARD' },
   { type: 'challenge_mode', titleTemplate: 'Daring', descTemplate: 'Complete a challenge mode puzzle', darkDescTemplate: 'The arrangement rewards the bold', target: 1, rewardAmber: 18 },
   { type: 'visit_animals', titleTemplate: 'Say Hello', descTemplate: 'Talk to {target} animal(s)', darkDescTemplate: 'Consult a keeper', target: 1, rewardAmber: 8 },
   { type: 'visit_animals', titleTemplate: 'Social Call', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'Consult {target} keepers', target: 2, rewardAmber: 14 },
-  { type: 'earn_amber', titleTemplate: 'Amber Scavenger', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'Gather {target} amber', target: 20, rewardAmber: 10 },
-  { type: 'earn_amber', titleTemplate: 'Amber Seeker', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'The coffers need {target} amber', target: 40, rewardAmber: 18 },
+  { type: 'earn_amber', titleTemplate: 'Amber Scavenger', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'Gather {target} amber', target: 30, rewardAmber: 10 },
+  { type: 'earn_amber', titleTemplate: 'Amber Seeker', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'The coffers need {target} amber', target: 60, rewardAmber: 18 },
 ];
 
 // Weekly quest pool — harder, multi-day objectives with bigger rewards
 const WEEKLY_QUEST_POOL: QuestTemplate[] = [
-  { type: 'solve_count', titleTemplate: 'Dedicated Shifter', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} incantations for the arrangement', target: 10, rewardAmber: 85 },
-  { type: 'solve_count', titleTemplate: 'Word Marathon', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'The void hungers for {target} offerings', target: 20, rewardAmber: 150 },
-  { type: 'solve_count', titleTemplate: 'Relentless', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} arrangements. No rest.', target: 30, rewardAmber: 220 },
-  { type: 'solve_difficulty', titleTemplate: 'Hard Challenger', descTemplate: 'Complete {target} Hard puzzles this week', darkDescTemplate: 'The difficult arrangements carry more weight', target: 5, rewardAmber: 90, difficulty: 'HARD' },
-  { type: 'solve_difficulty', titleTemplate: 'Medium Mastery', descTemplate: 'Complete {target} Medium+ puzzles this week', darkDescTemplate: 'The pattern prefers complexity', target: 7, rewardAmber: 75, difficulty: 'MEDIUM_PLUS' },
-  { type: 'earn_stars', titleTemplate: 'Perfectionist', descTemplate: 'Earn {target} three-star ratings this week', darkDescTemplate: '{target} flawless offerings', target: 8, rewardAmber: 100 },
-  { type: 'earn_stars', titleTemplate: 'Star Hoarder', descTemplate: 'Earn {target} three-star ratings this week', darkDescTemplate: 'Perfection, {target} times over', target: 15, rewardAmber: 160 },
-  { type: 'no_hints', titleTemplate: 'Unaided', descTemplate: 'Complete {target} puzzles without hints this week', darkDescTemplate: 'You no longer need guidance. You never did.', target: 8, rewardAmber: 90 },
-  { type: 'challenge_mode', titleTemplate: 'Iron Solver', descTemplate: 'Complete {target} challenge mode puzzles this week', darkDescTemplate: '{target} offerings under duress', target: 5, rewardAmber: 100 },
-  { type: 'earn_amber', titleTemplate: 'Amber Rush', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'The coffers of the temple must be filled', target: 150, rewardAmber: 80 },
-  { type: 'earn_amber', titleTemplate: 'Amber Hoarder', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'Fill the arrangement with {target} amber', target: 300, rewardAmber: 140 },
-  { type: 'visit_animals', titleTemplate: 'Community Builder', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'The keepers require your audience', target: 5, rewardAmber: 70 },
-  { type: 'visit_animals', titleTemplate: 'Social Butterfly', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'Every keeper has something to say', target: 8, rewardAmber: 110 },
+  { type: 'solve_count', titleTemplate: 'Dedicated Shifter', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} incantations for the arrangement', target: 15, rewardAmber: 85 },
+  { type: 'solve_count', titleTemplate: 'Word Marathon', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'The void hungers for {target} offerings', target: 28, rewardAmber: 150 },
+  { type: 'solve_count', titleTemplate: 'Relentless', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} arrangements. No rest.', target: 40, rewardAmber: 220 },
+  { type: 'solve_difficulty', titleTemplate: 'Hard Challenger', descTemplate: 'Complete {target} Hard puzzles this week', darkDescTemplate: 'The difficult arrangements carry more weight', target: 7, rewardAmber: 90, difficulty: 'HARD' },
+  { type: 'solve_difficulty', titleTemplate: 'Medium Mastery', descTemplate: 'Complete {target} Medium+ puzzles this week', darkDescTemplate: 'The pattern prefers complexity', target: 10, rewardAmber: 75, difficulty: 'MEDIUM_PLUS' },
+  { type: 'earn_stars', titleTemplate: 'Perfectionist', descTemplate: 'Earn {target} three-star ratings this week', darkDescTemplate: '{target} flawless offerings', target: 12, rewardAmber: 100 },
+  { type: 'earn_stars', titleTemplate: 'Star Hoarder', descTemplate: 'Earn {target} three-star ratings this week', darkDescTemplate: 'Perfection, {target} times over', target: 20, rewardAmber: 160 },
+  { type: 'no_hints', titleTemplate: 'Unaided', descTemplate: 'Complete {target} puzzles without hints this week', darkDescTemplate: 'You no longer need guidance. You never did.', target: 12, rewardAmber: 90 },
+  { type: 'challenge_mode', titleTemplate: 'Iron Solver', descTemplate: 'Complete {target} challenge mode puzzles this week', darkDescTemplate: '{target} offerings under duress', target: 7, rewardAmber: 100 },
+  { type: 'earn_amber', titleTemplate: 'Amber Rush', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'The coffers of the temple must be filled', target: 200, rewardAmber: 80 },
+  { type: 'earn_amber', titleTemplate: 'Amber Hoarder', descTemplate: 'Earn {target} amber this week', darkDescTemplate: 'Fill the arrangement with {target} amber', target: 400, rewardAmber: 140 },
+  { type: 'visit_animals', titleTemplate: 'Community Builder', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'The keepers require your audience', target: 6, rewardAmber: 70 },
+  { type: 'visit_animals', titleTemplate: 'Social Butterfly', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'Every keeper has something to say', target: 9, rewardAmber: 110 },
   { type: 'streak_days', titleTemplate: 'Consistent', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Do not break the chain for {target} days', target: 5, rewardAmber: 80 },
   { type: 'streak_days', titleTemplate: 'Unbroken', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Seven days. The ritual deepens.', target: 7, rewardAmber: 120 },
   // Sacrifice (Phase 4+ only)
-  { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 75, rewardAmber: 60 },
-  { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 150, rewardAmber: 110 },
+  { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 100, rewardAmber: 60 },
+  { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 200, rewardAmber: 110 },
 ];
 
 // ============================================================================
