@@ -37,6 +37,7 @@ import {
   getHouseCompletionText,
   getWordsOfferedText,
   getJournalIntroLines,
+  getJournalSpotlightSteps,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -489,7 +490,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         : null;
 
       const hasPendingHarvest = Boolean((pendingHarvest?.pendingBatches ?? 0) > 0);
-      const hasActiveQuests = Boolean(weeklyQuestState?.quests.some(q => !q.completed));
+      const hasActiveQuests = Boolean(
+        [...(weeklyQuestState?.daily?.quests ?? []), ...(weeklyQuestState?.weekly?.quests ?? [])]
+          .some(quest => !quest.completed)
+      );
 
       if (cancelled) return;
       const suggestion = getGoalSuggestion(
@@ -862,6 +866,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Phase-aware dialogue theme for all modals and dialogue boxes
   const dt = getDialogueTheme(progress.currentPhase);
+  const phaseTheme = getPhaseTheme(progress.currentPhase);
+  const journalSpotlightStepMeta = useMemo(
+    () => getJournalSpotlightSteps(progress.currentPhase, getGalleryTitle(progress.currentPhase)),
+    [progress.currentPhase]
+  );
+  const journalSpotlightPreviewCards = useMemo(
+    () => journalSpotlightStepMeta.filter(step => step.showInPreview),
+    [journalSpotlightStepMeta]
+  );
+  const currentJournalSpotlightStep = journalSpotlightStepMeta[
+    Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
@@ -2114,7 +2130,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={[styles.journalSpotlightBackdrop, { backgroundColor: dt.overlayBg }]}>
           <View
             style={[
-              styles.dialogueModal,
+              styles.journalSpotlightPointer,
+              {
+                backgroundColor: dt.modalBg,
+                borderColor: dt.modalBorder,
+                shadowColor: phaseTheme.victoryGlowColor,
+              },
+            ]}
+            pointerEvents="none"
+          >
+            <Text style={[styles.journalSpotlightPointerText, { color: dt.nameColor }]}>
+              {currentJournalSpotlightStep.pointerText}
+            </Text>
+            <View
+              style={[
+                styles.journalSpotlightPointerTail,
+                {
+                  borderTopColor: dt.modalBg,
+                  borderRightColor: dt.modalBg,
+                  shadowColor: phaseTheme.victoryGlowColor,
+                },
+              ]}
+            />
+          </View>
+
+          <View
+            style={[
+              styles.journalSpotlightPanel,
               {
                 backgroundColor: dt.modalBg,
                 borderColor: dt.modalBorder,
@@ -2122,16 +2164,83 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               },
             ]}
           >
-            {/* Decorative accent line at top of modal */}
             <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
 
-            <View style={styles.dialogueRow}>
-              {/* Sprite column - 30% width, matching normal dialogue */}
-              <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
+            <View style={styles.journalSpotlightHeroRow}>
+              <View
+                style={[
+                  styles.journalSpotlightHeroBadge,
+                  {
+                    backgroundColor: phaseTheme.modalStatBgColor,
+                    borderColor: dt.bubbleBorder,
+                    shadowColor: phaseTheme.victoryGlowColor,
+                  },
+                ]}
+              >
+                <Text style={styles.journalSpotlightHeroBadgeText}>{currentJournalSpotlightStep.icon}</Text>
+              </View>
+
+              <View style={styles.journalSpotlightHeroText}>
+                <Text style={[styles.journalSpotlightEyebrow, { color: dt.progressColor }]}>
+                  {currentJournalSpotlightStep.eyebrow}
+                </Text>
+                <Text style={[styles.journalSpotlightTitle, { color: dt.nameColor }]}>
+                  {currentJournalSpotlightStep.title}
+                </Text>
+                <Text style={[styles.journalSpotlightSubtitle, { color: dt.subtitleColor }]}>
+                  {currentJournalSpotlightStep.preview}
+                </Text>
+              </View>
+
+              <Text style={[styles.journalSpotlightCounter, { color: dt.progressColor }]}>
+                {journalSpotlightIndex + 1}/{journalSpotlightStepMeta.length}
+              </Text>
+            </View>
+
+            <View style={styles.journalSpotlightCardGrid}>
+              {journalSpotlightPreviewCards.map((step) => {
+                const isActive = currentJournalSpotlightStep.id === step.id;
+                return (
+                  <View
+                    key={step.id}
+                    style={[
+                      styles.journalSpotlightCard,
+                      {
+                        backgroundColor: isActive ? phaseTheme.modalStatBgColor : dt.bubbleBg,
+                        borderColor: isActive ? dt.accentLine : dt.bubbleBorder,
+                        shadowColor: isActive ? phaseTheme.victoryGlowColor : 'transparent',
+                      },
+                      isActive && styles.journalSpotlightCardActive,
+                    ]}
+                  >
+                    <Text style={styles.journalSpotlightCardIcon}>{step.icon}</Text>
+                    <Text
+                      style={[
+                        styles.journalSpotlightCardTitle,
+                        { color: isActive ? dt.nameColor : dt.textColor },
+                      ]}
+                    >
+                      {step.title}
+                    </Text>
+                    <Text style={[styles.journalSpotlightCardIndex, { color: dt.progressColor }]}>
+                      {step.cardLabel}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.journalSpotlightDialogueRow}>
+              <View
+                style={[
+                  styles.journalSpotlightSpriteCol,
+                  { backgroundColor: dt.spriteBg, borderColor: dt.bubbleBorder },
+                ]}
+              >
                 {CHARACTER_SPRITES.fox ? (
                   <Image
                     source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
-                    style={styles.dialogueSpriteImage}
+                    style={styles.journalSpotlightSpriteImage}
                     resizeMode="cover"
                     accessibilityLabel="Fox portrait"
                   />
@@ -2140,23 +2249,48 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 )}
               </View>
 
-              {/* Text column - 70% width */}
-              <View style={styles.dialogueTextCol}>
-                <Text style={[styles.dialogueAnimalName, { color: dt.nameColor }]}>
+              <View style={styles.journalSpotlightDialogueCol}>
+                <Text style={[styles.journalSpotlightSpeaker, { color: dt.nameColor }]}>
                   {ANIMAL_INFO.fox?.name || 'Ember'}
                 </Text>
-                {/* Decorative separator under name */}
                 <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
 
-                <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+                <View
+                  style={[
+                    styles.journalSpotlightBubble,
+                    { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder },
+                  ]}
+                >
                   <Text style={[styles.dialogueText, { color: dt.textColor }]}>
                     {journalSpotlightLines[journalSpotlightIndex]}
                   </Text>
                 </View>
 
-                <View style={styles.dialogueFooter}>
+                <View style={styles.journalSpotlightFooter}>
+                  <View style={styles.journalSpotlightProgressDots}>
+                    {journalSpotlightLines.map((_, index) => {
+                      const isActive = index === journalSpotlightIndex;
+                      return (
+                        <View
+                          key={index}
+                          style={[
+                            styles.journalSpotlightDot,
+                            {
+                              backgroundColor: isActive ? dt.accentLine : dt.bubbleBorder,
+                              opacity: isActive ? 1 : 0.6,
+                              transform: [{ scale: isActive ? 1.1 : 1 }],
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+
                   <TouchableOpacity
-                    style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
+                    style={[
+                      styles.continueButton,
+                      { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
+                    ]}
                     onPress={journalSpotlightIndex < journalSpotlightLines.length - 1
                       ? () => setJournalSpotlightIndex(prev => prev + 1)
                       : async () => {
@@ -2169,7 +2303,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   >
                     <View style={styles.dialogueButtonShine} />
                     <Text style={styles.continueButtonText}>
-                      {journalSpotlightIndex < journalSpotlightLines.length - 1 ? 'Next' : 'Got it!'}
+                      {journalSpotlightIndex < journalSpotlightLines.length - 1
+                        ? 'Next'
+                        : currentJournalSpotlightStep.finalCtaLabel}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -3084,7 +3220,8 @@ const styles = StyleSheet.create({
   journalSpotlightBackdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    paddingBottom: 250,
+    paddingBottom: 18,
+    paddingHorizontal: 14,
   },
   journalSpotlightIcon: {
     backgroundColor: 'rgba(255, 200, 80, 0.35)',
@@ -3095,6 +3232,185 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 10,
+  },
+  journalSpotlightPointer: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 26 : 60,
+    right: 50,
+    maxWidth: 180,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  journalSpotlightPointerText: {
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+  },
+  journalSpotlightPointerTail: {
+    position: 'absolute',
+    right: 18,
+    bottom: -7,
+    width: 14,
+    height: 14,
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    transform: [{ rotate: '135deg' }],
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  journalSpotlightPanel: {
+    borderRadius: 28,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 18,
+    elevation: 12,
+    overflow: 'hidden',
+  },
+  journalSpotlightHeroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 14,
+    gap: 12,
+  },
+  journalSpotlightHeroBadge: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  journalSpotlightHeroBadgeText: {
+    fontSize: 28,
+  },
+  journalSpotlightHeroText: {
+    flex: 1,
+  },
+  journalSpotlightEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  journalSpotlightTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
+  journalSpotlightSubtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  journalSpotlightCounter: {
+    fontSize: 12,
+    fontWeight: '700',
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  journalSpotlightCardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+  },
+  journalSpotlightCard: {
+    width: '48%',
+    minHeight: 84,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+  },
+  journalSpotlightCardActive: {
+    transform: [{ translateY: -1 }],
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  journalSpotlightCardIcon: {
+    fontSize: 18,
+    marginBottom: 8,
+  },
+  journalSpotlightCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  journalSpotlightCardIndex: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  journalSpotlightDialogueRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 18,
+    paddingBottom: 22,
+    gap: 12,
+  },
+  journalSpotlightSpriteCol: {
+    width: 92,
+    borderRadius: 20,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  journalSpotlightSpriteImage: {
+    width: 118,
+    height: 140,
+  },
+  journalSpotlightDialogueCol: {
+    flex: 1,
+    paddingTop: 6,
+  },
+  journalSpotlightSpeaker: {
+    fontSize: 21,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  journalSpotlightBubble: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 14,
+    borderWidth: 1,
+  },
+  journalSpotlightFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  journalSpotlightProgressDots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+    flex: 1,
+  },
+  journalSpotlightDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });
 

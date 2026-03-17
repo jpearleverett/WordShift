@@ -16,6 +16,8 @@ import {
   getHomescreenNudge,
   getHarvestOverflowMessage,
   getChallengeIntroLines,
+  getJournalIntroLines,
+  getJournalSpotlightSteps,
   getPitMandatoryText,
   getPitMandatoryCTA,
   getGoalSuggestion,
@@ -728,6 +730,80 @@ describe('getChallengeIntroLines', () => {
     const p3 = getChallengeIntroLines(3).join('');
     expect(p0).not.toBe(p2);
     expect(p2).not.toBe(p3);
+  });
+});
+
+describe('getJournalIntroLines', () => {
+  test('returns exactly 5 lines for all phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const lines = getJournalIntroLines(phase);
+      expect(Array.isArray(lines)).toBe(true);
+      expect(lines).toHaveLength(5);
+    }
+  });
+
+  test('all lines are non-empty strings', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const lines = getJournalIntroLines(phase);
+      for (const line of lines) {
+        expect(typeof line).toBe('string');
+        expect(line.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  test('phase 0 keeps the tone warm and welcoming', () => {
+    const joined = getJournalIntroLines(0).join(' ');
+    expect(joined).toContain('journal');
+    expect(joined).toContain('scrapbook');
+  });
+
+  test('phase 2 references the house and recorded whispers', () => {
+    const joined = getJournalIntroLines(2).join(' ');
+    expect(joined).toContain('house');
+    expect(joined).toContain('whispers');
+  });
+
+  test('phase 4 uses arrangement language', () => {
+    const joined = getJournalIntroLines(4).join(' ');
+    expect(joined).toContain('arrangement');
+    expect(joined).toContain('offered');
+  });
+
+  test('different phase ranges produce different content', () => {
+    const p0 = getJournalIntroLines(0).join('');
+    const p2 = getJournalIntroLines(2).join('');
+    const p4 = getJournalIntroLines(4).join('');
+    expect(p0).not.toBe(p2);
+    expect(p2).not.toBe(p4);
+    expect(p0).not.toBe(p4);
+  });
+});
+
+describe('getJournalSpotlightSteps', () => {
+  test('returns exactly 5 steps for all phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const steps = getJournalSpotlightSteps(phase, 'Whisper Gallery');
+      expect(steps).toHaveLength(5);
+    }
+  });
+
+  test('marks only the first 4 steps as preview cards', () => {
+    const steps = getJournalSpotlightSteps(0, 'Whisper Gallery');
+    expect(steps.filter(step => step.showInPreview)).toHaveLength(4);
+    expect(steps[4].showInPreview).toBe(false);
+  });
+
+  test('uses a warm CTA in phase 0 and darker CTA in phase 4', () => {
+    const phase0 = getJournalSpotlightSteps(0, 'Whisper Gallery');
+    const phase4 = getJournalSpotlightSteps(4, 'Whisper Gallery');
+    expect(phase0[4].finalCtaLabel).toBe('Take a Look');
+    expect(phase4[4].finalCtaLabel).toBe('Enter the Record');
+  });
+
+  test('preserves the provided gallery title', () => {
+    const steps = getJournalSpotlightSteps(2, 'Voices in the Walls');
+    expect(steps[2].title).toBe('Voices in the Walls');
   });
 });
 
