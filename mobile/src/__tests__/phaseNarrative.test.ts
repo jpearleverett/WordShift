@@ -17,6 +17,7 @@ import {
   getHarvestOverflowMessage,
   getChallengeIntroLines,
   getJournalIntroLines,
+  getJournalSpotlightSteps,
   getPitMandatoryText,
   getPitMandatoryCTA,
   getGoalSuggestion,
@@ -776,6 +777,33 @@ describe('getJournalIntroLines', () => {
     expect(p0).not.toBe(p2);
     expect(p2).not.toBe(p4);
     expect(p0).not.toBe(p4);
+  });
+});
+
+describe('getJournalSpotlightSteps', () => {
+  test('returns exactly 5 steps for all phases', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5] as const) {
+      const steps = getJournalSpotlightSteps(phase, 'Whisper Gallery');
+      expect(steps).toHaveLength(5);
+    }
+  });
+
+  test('marks only the first 4 steps as preview cards', () => {
+    const steps = getJournalSpotlightSteps(0, 'Whisper Gallery');
+    expect(steps.filter(step => step.showInPreview)).toHaveLength(4);
+    expect(steps[4].showInPreview).toBe(false);
+  });
+
+  test('uses a warm CTA in phase 0 and darker CTA in phase 4', () => {
+    const phase0 = getJournalSpotlightSteps(0, 'Whisper Gallery');
+    const phase4 = getJournalSpotlightSteps(4, 'Whisper Gallery');
+    expect(phase0[4].finalCtaLabel).toBe('Take a Look');
+    expect(phase4[4].finalCtaLabel).toBe('Enter the Record');
+  });
+
+  test('preserves the provided gallery title', () => {
+    const steps = getJournalSpotlightSteps(2, 'Voices in the Walls');
+    expect(steps[2].title).toBe('Voices in the Walls');
   });
 });
 

@@ -602,6 +602,201 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
   ];
 }
 
+export interface JournalSpotlightStep {
+  id: 'cover' | 'ledger' | 'gallery' | 'quests' | 'open';
+  icon: string;
+  title: string;
+  eyebrow: string;
+  preview: string;
+  pointerText: string;
+  cardLabel: string;
+  showInPreview: boolean;
+  finalCtaLabel: string;
+}
+
+export function getJournalSpotlightSteps(
+  phase: DialoguePhase,
+  galleryTitle: string
+): JournalSpotlightStep[] {
+  if (phase >= 4) {
+    return [
+      {
+        id: 'cover',
+        icon: '📚',
+        title: 'Journal',
+        eyebrow: 'THE RECORD OPENS',
+        preview: 'A single place for every word, voice, and task the arrangement keeps.',
+        pointerText: 'The marked book up top opens all of this.',
+        cardLabel: 'Begin here',
+        showInPreview: true,
+        finalCtaLabel: 'Enter the Record',
+      },
+      {
+        id: 'ledger',
+        icon: '📘',
+        title: 'Word Ledger',
+        eyebrow: 'THE WORDS',
+        preview: 'Every offered word is written down and left to linger.',
+        pointerText: 'The marked book up top opens all of this.',
+        cardLabel: 'Words',
+        showInPreview: true,
+        finalCtaLabel: 'Enter the Record',
+      },
+      {
+        id: 'gallery',
+        icon: '📜',
+        title: galleryTitle,
+        eyebrow: 'THE VOICES',
+        preview: 'Conversations, whispers, and echoes remain waiting inside.',
+        pointerText: 'The marked book up top opens all of this.',
+        cardLabel: 'Voices',
+        showInPreview: true,
+        finalCtaLabel: 'Enter the Record',
+      },
+      {
+        id: 'quests',
+        icon: '🗓',
+        title: 'Weekly Quests',
+        eyebrow: 'THE TASKS',
+        preview: 'Fresh work arrives each week, with amber left at the end.',
+        pointerText: 'The marked book up top opens all of this.',
+        cardLabel: 'Tasks',
+        showInPreview: true,
+        finalCtaLabel: 'Enter the Record',
+      },
+      {
+        id: 'open',
+        icon: '✨',
+        title: 'Open It From Here',
+        eyebrow: 'READY',
+        preview: 'The glowing book in the header is your way back in.',
+        pointerText: 'The journal lives here.',
+        cardLabel: 'Return anytime',
+        showInPreview: false,
+        finalCtaLabel: 'Enter the Record',
+      },
+    ];
+  }
+
+  if (phase >= 2) {
+    return [
+      {
+        id: 'cover',
+        icon: '📚',
+        title: 'Journal',
+        eyebrow: 'NOW KEEPING WATCH',
+        preview: 'Your words, whispers, and weekly tasks all have a place here now.',
+        pointerText: 'The book up top opens all of this.',
+        cardLabel: 'Start here',
+        showInPreview: true,
+        finalCtaLabel: 'Open the Journal',
+      },
+      {
+        id: 'ledger',
+        icon: '📘',
+        title: 'Word Ledger',
+        eyebrow: 'THE WORDS',
+        preview: 'Every shifted word is saved, ready to be revisited.',
+        pointerText: 'The book up top opens all of this.',
+        cardLabel: 'Words',
+        showInPreview: true,
+        finalCtaLabel: 'Open the Journal',
+      },
+      {
+        id: 'gallery',
+        icon: '📜',
+        title: galleryTitle,
+        eyebrow: 'THE VOICES',
+        preview: 'Conversations and post-puzzle whispers stay with you.',
+        pointerText: 'The book up top opens all of this.',
+        cardLabel: 'Voices',
+        showInPreview: true,
+        finalCtaLabel: 'Open the Journal',
+      },
+      {
+        id: 'quests',
+        icon: '🗓',
+        title: 'Weekly Quests',
+        eyebrow: 'FRESH EACH WEEK',
+        preview: 'Short goals, rotating challenges, and amber rewards.',
+        pointerText: 'The book up top opens all of this.',
+        cardLabel: 'Goals',
+        showInPreview: true,
+        finalCtaLabel: 'Open the Journal',
+      },
+      {
+        id: 'open',
+        icon: '✨',
+        title: 'Open It From Here',
+        eyebrow: 'READY',
+        preview: 'The glowing book in the header is your shortcut back.',
+        pointerText: 'The journal lives here.',
+        cardLabel: 'Return anytime',
+        showInPreview: false,
+        finalCtaLabel: 'Open the Journal',
+      },
+    ];
+  }
+
+  return [
+    {
+      id: 'cover',
+      icon: '📚',
+      title: 'Journal',
+      eyebrow: 'NEW IN THE HOUSE',
+      preview: 'One place for your words, whispers, and weekly tasks.',
+      pointerText: 'The book up top opens all of this.',
+      cardLabel: 'Start here',
+      showInPreview: true,
+      finalCtaLabel: 'Take a Look',
+    },
+    {
+      id: 'ledger',
+      icon: '📘',
+      title: 'Word Ledger',
+      eyebrow: 'RECORD',
+      preview: 'Every shifted word gets written down here.',
+      pointerText: 'The book up top opens all of this.',
+      cardLabel: 'Words',
+      showInPreview: true,
+      finalCtaLabel: 'Take a Look',
+    },
+    {
+      id: 'gallery',
+      icon: '📜',
+      title: galleryTitle,
+      eyebrow: 'VOICES',
+      preview: 'Conversations and post-puzzle whispers stay with you.',
+      pointerText: 'The book up top opens all of this.',
+      cardLabel: 'Voices',
+      showInPreview: true,
+      finalCtaLabel: 'Take a Look',
+    },
+    {
+      id: 'quests',
+      icon: '🗓',
+      title: 'Weekly Quests',
+      eyebrow: 'FRESH EACH WEEK',
+      preview: 'Short goals, rotating challenges, and amber rewards.',
+      pointerText: 'The book up top opens all of this.',
+      cardLabel: 'Goals',
+      showInPreview: true,
+      finalCtaLabel: 'Take a Look',
+    },
+    {
+      id: 'open',
+      icon: '✨',
+      title: 'Open It From Here',
+      eyebrow: 'READY',
+      preview: 'The glowing book in the header is your shortcut back.',
+      pointerText: 'The journal lives here.',
+      cardLabel: 'Return anytime',
+      showInPreview: false,
+      finalCtaLabel: 'Take a Look',
+    },
+  ];
+}
+
 // ============================================================================
 // FOX POST-TUTORIAL NUDGE — First session end CTA
 // ============================================================================

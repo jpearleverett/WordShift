@@ -37,6 +37,7 @@ import {
   getHouseCompletionText,
   getWordsOfferedText,
   getJournalIntroLines,
+  getJournalSpotlightSteps,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -490,7 +491,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       const hasPendingHarvest = Boolean((pendingHarvest?.pendingBatches ?? 0) > 0);
       const hasActiveQuests = Boolean(
-        weeklyQuestState && [...weeklyQuestState.daily.quests, ...weeklyQuestState.weekly.quests]
+        [...(weeklyQuestState?.daily?.quests ?? []), ...(weeklyQuestState?.weekly?.quests ?? [])]
           .some(quest => !quest.completed)
       );
 
@@ -866,46 +867,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Phase-aware dialogue theme for all modals and dialogue boxes
   const dt = getDialogueTheme(progress.currentPhase);
   const phaseTheme = getPhaseTheme(progress.currentPhase);
-  const journalSpotlightStepMeta = [
-    {
-      id: 'cover',
-      icon: '📚',
-      title: 'Journal',
-      eyebrow: 'NEW IN THE HOUSE',
-      preview: 'One place for your words, whispers, and weekly tasks.',
-    },
-    {
-      id: 'ledger',
-      icon: '📘',
-      title: 'Word Ledger',
-      eyebrow: 'RECORD',
-      preview: 'Every shifted word gets written down here.',
-    },
-    {
-      id: 'gallery',
-      icon: '📜',
-      title: getGalleryTitle(progress.currentPhase),
-      eyebrow: 'VOICES',
-      preview: 'Conversations and post-puzzle whispers stay with you.',
-    },
-    {
-      id: 'quests',
-      icon: '🗓',
-      title: 'Weekly Quests',
-      eyebrow: 'FRESH EACH WEEK',
-      preview: 'Short goals, rotating challenges, and amber rewards.',
-    },
-    {
-      id: 'open',
-      icon: '✨',
-      title: 'Open It From Here',
-      eyebrow: 'READY',
-      preview: 'The glowing book in the header is your shortcut back.',
-    },
-  ] as const;
+  const journalSpotlightStepMeta = useMemo(
+    () => getJournalSpotlightSteps(progress.currentPhase, getGalleryTitle(progress.currentPhase)),
+    [progress.currentPhase]
+  );
+  const journalSpotlightPreviewCards = useMemo(
+    () => journalSpotlightStepMeta.filter(step => step.showInPreview),
+    [journalSpotlightStepMeta]
+  );
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
-    Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1)
-  ] ?? journalSpotlightStepMeta[0];
+    Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
@@ -2168,7 +2140,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             pointerEvents="none"
           >
             <Text style={[styles.journalSpotlightPointerText, { color: dt.nameColor }]}>
-              {currentJournalSpotlightStep.id === 'open' ? 'The journal lives here.' : 'The book up top opens all of this.'}
+              {currentJournalSpotlightStep.pointerText}
             </Text>
             <View
               style={[
@@ -2221,12 +2193,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
 
               <Text style={[styles.journalSpotlightCounter, { color: dt.progressColor }]}>
-                {journalSpotlightIndex + 1}/{journalSpotlightLines.length}
+                {journalSpotlightIndex + 1}/{journalSpotlightStepMeta.length}
               </Text>
             </View>
 
             <View style={styles.journalSpotlightCardGrid}>
-              {journalSpotlightStepMeta.slice(0, 4).map((step, index) => {
+              {journalSpotlightPreviewCards.map((step) => {
                 const isActive = currentJournalSpotlightStep.id === step.id;
                 return (
                   <View
@@ -2251,7 +2223,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       {step.title}
                     </Text>
                     <Text style={[styles.journalSpotlightCardIndex, { color: dt.progressColor }]}>
-                      {index === 0 ? 'Start here' : index === 1 ? 'Words' : index === 2 ? 'Voices' : 'Goals'}
+                      {step.cardLabel}
                     </Text>
                   </View>
                 );
@@ -2300,7 +2272,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       const isActive = index === journalSpotlightIndex;
                       return (
                         <View
-                          key={`journal-spotlight-dot-${index}`}
+                          key={index}
                           style={[
                             styles.journalSpotlightDot,
                             {
@@ -2331,7 +2303,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   >
                     <View style={styles.dialogueButtonShine} />
                     <Text style={styles.continueButtonText}>
-                      {journalSpotlightIndex < journalSpotlightLines.length - 1 ? 'Next' : 'Open Journal'}
+                      {journalSpotlightIndex < journalSpotlightLines.length - 1
+                        ? 'Next'
+                        : currentJournalSpotlightStep.finalCtaLabel}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -3261,7 +3235,7 @@ const styles = StyleSheet.create({
   },
   journalSpotlightPointer: {
     position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 26 : 72,
+    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 26 : 60,
     right: 50,
     maxWidth: 180,
     borderRadius: 16,
