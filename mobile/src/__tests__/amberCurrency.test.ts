@@ -28,6 +28,8 @@ import {
   STREAK_MILESTONES,
   hasSeenChallengeIntro,
   markChallengeIntroSeen,
+  hasSeenJournalIntro,
+  markJournalIntroSeen,
 } from '../services/amberCurrency';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -545,5 +547,23 @@ describe('challenge intro tracking', () => {
     expect(await hasSeenChallengeIntro()).toBe(true);
     await clearProgress();
     expect(await hasSeenChallengeIntro()).toBe(false);
+  });
+});
+
+describe('journal intro tracking', () => {
+  test('hasSeenJournalIntro returns false initially', async () => {
+    expect(await hasSeenJournalIntro()).toBe(false);
+  });
+
+  test('markJournalIntroSeen persists the flag', async () => {
+    await markJournalIntroSeen();
+    expect(await hasSeenJournalIntro()).toBe(true);
+  });
+
+  test('clearProgress resets journal intro flag', async () => {
+    await markJournalIntroSeen();
+    expect(await hasSeenJournalIntro()).toBe(true);
+    await clearProgress();
+    expect(await hasSeenJournalIntro()).toBe(false);
   });
 });
