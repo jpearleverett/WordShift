@@ -41,7 +41,6 @@ export interface PuzzleGameState {
   showRules: boolean;
   showDifficultyMenu: boolean;
   showConfetti: boolean;
-  level: number;
   invalidAttempts: number;
   hintsUsed: number;
   earnedStars: number;
@@ -125,7 +124,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [showRules, setShowRules] = useState(false);
   const [showDifficultyMenu, setShowDifficultyMenu] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [level, setLevel] = useState(1);
   const [invalidAttempts, setInvalidAttempts] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [earnedStars, setEarnedStars] = useState(0);
@@ -955,7 +953,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
   const handleNextLevel = useCallback(() => {
     setShowConfetti(false);
-    setLevel(prev => prev + 1);
     startNewGame();
   }, [startNewGame]);
 
@@ -1080,7 +1077,6 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     showRules,
     showDifficultyMenu,
     showConfetti,
-    level,
     invalidAttempts,
     hintsUsed,
     earnedStars,

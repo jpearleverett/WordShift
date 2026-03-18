@@ -26,16 +26,15 @@ jest.mock('@react-native-async-storage/async-storage', () => {
 import { generateShareText } from '../services/shareResults';
 
 describe('shareResults', () => {
-  test('generateShareText includes level for regular puzzles', () => {
+  test('generateShareText includes WordShift header for regular puzzles', () => {
     const text = generateShareText({
       stars: 3,
       difficulty: 'MEDIUM',
-      level: 5,
       hintsUsed: 0,
       invalidAttempts: 0,
       moveCount: 3,
     });
-    expect(text).toContain('Lv.5');
+    expect(text).toContain('WordShift');
     expect(text).toContain('MEDIUM');
     expect(text).toContain('No hints, no mistakes');
   });
@@ -44,7 +43,6 @@ describe('shareResults', () => {
     const text = generateShareText({
       stars: 2,
       difficulty: 'HARD',
-      level: 10,
       hintsUsed: 1,
       invalidAttempts: 0,
       isDaily: true,
@@ -61,7 +59,6 @@ describe('shareResults', () => {
     const text3 = generateShareText({
       stars: 3,
       difficulty: 'EASY',
-      level: 1,
       hintsUsed: 0,
       invalidAttempts: 0,
       moveCount: 2,
@@ -72,7 +69,6 @@ describe('shareResults', () => {
     const text1 = generateShareText({
       stars: 1,
       difficulty: 'EASY',
-      level: 1,
       hintsUsed: 2,
       invalidAttempts: 3,
       moveCount: 2,
@@ -85,7 +81,6 @@ describe('shareResults', () => {
     const text = generateShareText({
       stars: 2,
       difficulty: 'MEDIUM',
-      level: 3,
       hintsUsed: 0,
       invalidAttempts: 1,
       moveCount: 3,
@@ -97,7 +92,6 @@ describe('shareResults', () => {
     const text = generateShareText({
       stars: 3,
       difficulty: 'MEDIUM',
-      level: 5,
       hintsUsed: 0,
       invalidAttempts: 0,
       moveCount: 3,
@@ -112,7 +106,6 @@ describe('shareResults', () => {
     const text = generateShareText({
       stars: 3,
       difficulty: 'MEDIUM',
-      level: 5,
       hintsUsed: 0,
       invalidAttempts: 0,
       moveCount: 3,
@@ -125,7 +118,6 @@ describe('shareResults', () => {
     const text = generateShareText({
       stars: 2,
       difficulty: 'HARD',
-      level: 10,
       hintsUsed: 0,
       invalidAttempts: 1,
       moveCount: 4,
@@ -138,7 +130,6 @@ describe('shareResults', () => {
     const text = generateShareText({
       stars: 2,
       difficulty: 'MEDIUM',
-      level: 7,
       hintsUsed: 1,
       invalidAttempts: 0,
       moveCount: 3,

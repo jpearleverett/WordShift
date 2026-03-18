@@ -51,7 +51,6 @@ export interface VictoryData {
 interface VictoryModalProps {
   visible: boolean;
   earnedStars: number;
-  level: number;
   difficulty: string;
   phase: DialoguePhase;
   /** True when a phase transition is waiting to be confirmed in the pit */
@@ -122,7 +121,6 @@ function getButtonTheme(phase: DialoguePhase) {
 export const VictoryModal: React.FC<VictoryModalProps> = ({
   visible,
   earnedStars,
-  level,
   difficulty,
   phase,
   phaseTransitionPending,
@@ -228,7 +226,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <Text style={[styles.victorySubtitle, {
               color: phaseTheme.modalSecondaryTextColor,
             }]}>
-              {isPlayingDaily ? 'Daily Challenge Complete' : `Level ${level} Complete`}
+              {isPlayingDaily ? 'Daily Challenge Complete' : 'Puzzle Complete'}
             </Text>
 
             {/* Group 1: Harvest, bonuses, streak, milestone */}
