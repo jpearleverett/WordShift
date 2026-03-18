@@ -67,7 +67,6 @@ import { CelebrationConfetti } from './CelebrationConfetti';
 import { AmberSparkle } from './AmberSparkle';
 import { Difficulty } from '../../types';
 import { OnboardingStep } from '../../services/onboarding';
-import { getUnlockedVariants } from '../../services/puzzleVariety';
 import {
   isSacrificeAvailable,
   getSacrificeAmounts,
@@ -88,7 +87,7 @@ import {
 } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
-import { getPitHomeBadgeLabel, getHomeAmbientLine, getGoalSuggestion, GoalSuggestion, getFoxPitNudgeLines } from '../../services/phaseNarrative';
+import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines } from '../../services/phaseNarrative';
 import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
@@ -183,10 +182,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const ambientAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Goal suggestion (contextual next-action hint)
-  const [goalSuggestion, setGoalSuggestion] = useState<GoalSuggestion | null>(null);
-  const goalOpacity = useRef(new Animated.Value(0)).current;
-  const goalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const goalAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
@@ -463,104 +458,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     dialogueFlow.showDialogue,
   ]);
 
-  // Goal suggestion — contextual next-action hint below ambient line
-  // Appears after a short delay (staggered from ambient line), then auto-dismisses with fade.
-  useEffect(() => {
-    if (isOnboarding || !progress || isPostTutorialLightMode) {
-      setGoalSuggestion(null);
-      goalOpacity.setValue(0);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const phase = progress.currentPhase;
-      const puzzles = progress.puzzlesSolved ?? 0;
-
-      // Check untried difficulties
-      const completed = progress.completedDifficulties ?? [];
-      const allDiffs = ['MEDIUM', 'MEDIUM_PLUS', 'HARD'];
-      const untried = allDiffs.filter(d => !completed.includes(d));
-
-      // Check unlocked variants for any not yet tried
-      const unlocked = getUnlockedVariants(puzzles, phase as number);
-      const preferred = progress.preferredPuzzleVariant;
-      const nonStandard = unlocked.filter(v => v !== 'standard');
-      const newVariant = nonStandard.length > 0 && !preferred
-        ? nonStandard[0]
-        : null;
-
-      const hasPendingHarvest = Boolean((pendingHarvest?.pendingBatches ?? 0) > 0);
-      const hasActiveQuests = Boolean(
-        [...(weeklyQuestState?.daily?.quests ?? []), ...(weeklyQuestState?.weekly?.quests ?? [])]
-          .some(quest => !quest.completed)
-      );
-
-      if (cancelled) return;
-      const suggestion = getGoalSuggestion(
-        phase,
-        false,
-        untried,
-        newVariant,
-        hasPendingHarvest,
-        claimableQuestAmber,
-        hasActiveQuests
-      );
-      setGoalSuggestion(suggestion);
-
-      if (!suggestion) return;
-
-      const { reducedMotion } = getSettingsSync();
-      const appearDelay = 2000; // 2s stagger after ambient line
-
-      if (reducedMotion) {
-        goalTimerRef.current = setTimeout(() => {
-          if (cancelled) return;
-          goalOpacity.setValue(1);
-          goalTimerRef.current = setTimeout(() => {
-            if (cancelled) return;
-            goalOpacity.setValue(0);
-            setGoalSuggestion(null);
-          }, 6000);
-        }, appearDelay);
-      } else {
-        goalTimerRef.current = setTimeout(() => {
-          if (cancelled) return;
-          goalOpacity.setValue(0);
-          const fadeIn = Animated.timing(goalOpacity, { toValue: 1, duration: 400, useNativeDriver: true });
-          goalAnimRef.current = fadeIn;
-          fadeIn.start(({ finished }) => {
-            if (!finished || cancelled) return;
-            goalAnimRef.current = null;
-            goalTimerRef.current = setTimeout(() => {
-              if (cancelled) return;
-              const fadeOut = Animated.timing(goalOpacity, { toValue: 0, duration: 600, useNativeDriver: true });
-              goalAnimRef.current = fadeOut;
-              fadeOut.start(({ finished: fadeOutFinished }) => {
-                if (!fadeOutFinished || cancelled) return;
-                goalAnimRef.current = null;
-                setGoalSuggestion(null);
-              });
-            }, 6000);
-          });
-        }, appearDelay);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (goalAnimRef.current) { goalAnimRef.current.stop(); goalAnimRef.current = null; }
-      if (goalTimerRef.current) { clearTimeout(goalTimerRef.current); goalTimerRef.current = null; }
-    };
-  }, [
-    isOnboarding,
-    isPostTutorialLightMode,
-    progress?.currentPhase,
-    progress?.puzzlesSolved,
-    progress?.completedDifficulties,
-    progress?.preferredPuzzleVariant,
-    pendingHarvest?.pendingBatches,
-    weeklyQuestState,
-    claimableQuestAmber,
-  ]);
 
   // Talking animation for intro dialogue
   const [introIsTalking, setIntroIsTalking] = useState(false);
@@ -1071,33 +968,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Animated.View>
           )}
 
-          {/* Goal suggestion — contextual next-action hint (auto-dismiss with fade) */}
-          {goalSuggestion && !isOnboarding && (
-            <Animated.View style={{ opacity: goalOpacity }}>
-              <TouchableOpacity
-                style={styles.goalSuggestionContainer}
-                onPress={() => {
-                  if (goalSuggestion.action === 'play') {
-                    onPlayPuzzle();
-                  } else if (goalSuggestion.action === 'pit') {
-                    onOpenPit?.();
-                  } else if (goalSuggestion.action === 'quests') {
-                    handleOpenQuestModal().catch(() => {});
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.goalSuggestionText,
-                    { color: getPhaseTheme(progress.currentPhase).modalTextColor },
-                  ]}
-                >
-                  {goalSuggestion.text}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
         </View>
 
         {/* Celebration Confetti */}
@@ -1554,13 +1424,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={() => setShowQuestModal(false)}
       >
-        <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
-          activeOpacity={1}
-          onPress={() => setShowQuestModal(false)}
-          accessibilityLabel="Close quests"
-          accessibilityRole="button"
-        >
+        <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowQuestModal(false)}
+            accessibilityLabel="Close quests"
+            accessibilityRole="button"
+          />
           <View
             style={[
               styles.shopModal,
@@ -1571,7 +1442,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 shadowColor: dt.modalShadowColor,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Quests</Text>
             {questFeedback && (
@@ -1663,7 +1533,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Room Unlock Modal */}
@@ -2776,6 +2646,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   questList: {
+    flex: 1,
     maxHeight: SCREEN_HEIGHT * 0.55,
     marginBottom: 12,
   },
@@ -3088,22 +2959,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     letterSpacing: 0.3,
-  },
-  goalSuggestionContainer: {
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    marginBottom: 2,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderRadius: 10,
-    zIndex: 10,
-  },
-  goalSuggestionText: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-    opacity: 0.85,
   },
 
   // Sacrifice modal

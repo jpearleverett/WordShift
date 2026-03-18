@@ -16,7 +16,7 @@ import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
-import { ActionButton, AnimatedLogo, Toast, LevelDisplay, VictoryModal, RulesModal, DifficultyMenu, RitualEchoChain } from './src/components/puzzle';
+import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu, RitualEchoChain } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { CandyColors } from './src/theme/colors';
@@ -275,7 +275,6 @@ export default function App() {
   }, [
     puzzle.currentVariant,
     puzzle.gameState,
-    puzzle.level,
     puzzle.difficulty,
     startSpeedTimer,
     stopSpeedTimer,
@@ -969,7 +968,6 @@ export default function App() {
       sharePuzzleResult({
         stars: victoryFlow.victoryData!.earnedStars,
         difficulty: puzzle.difficulty,
-        level: puzzle.level,
         hintsUsed: puzzle.hintsUsed,
         invalidAttempts: puzzle.invalidAttempts,
         isDaily: false,
@@ -1285,7 +1283,6 @@ export default function App() {
         {onboardingFlow.isOnboarding ? null : (
         <View style={styles.statsRow}>
           <View style={styles.leftStatsGroup}>
-            <LevelDisplay level={puzzle.level} />
             {/* Challenge Mode Badge */}
             {puzzle.gameMode === 'challenge' && (
               <View style={styles.challengeBadge}>
@@ -1501,7 +1498,6 @@ export default function App() {
         <VictoryModal
           visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete')}
           earnedStars={puzzle.earnedStars}
-          level={puzzle.level}
           difficulty={puzzle.difficulty}
           phase={persistence.currentPhase}
           phaseTransitionPending={persistence.pendingPhaseTransition != null}

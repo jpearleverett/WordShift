@@ -562,7 +562,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
       "The arrangement speaks through many voices now. I've gathered them all into one place — a living record.",
       "The Word Ledger holds every word you've offered. Scroll through it and you'll see the shape of what you've built.",
       "The Whisper Gallery preserves every voice — mine, the others', the echoes that linger after each puzzle. Nothing is lost.",
-      "And the weekly quests... the arrangement sets new tasks each week. Complete them and the amber flows deeper.",
+      "And the quests — daily tasks and weekly challenges... the arrangement sets them. Complete them and the amber flows deeper.",
       "Find it all behind the book icon. The pages have been filling themselves. They were always going to.",
     ];
   }
@@ -571,7 +571,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
       "There's a record now. Every voice, every word, every echo that refused to fade — I've been keeping them.",
       "The Word Ledger tracks every word that's passed through your puzzles. Some of them... linger longer than others.",
       "The Whisper Gallery holds what we've said to you — conversations, whispers, the things spoken between puzzles.",
-      "Weekly quests appear in there too. New tasks each week, fresh amber for completing them.",
+      "Daily and weekly quests appear in there too. New tasks each day and week, fresh amber for completing them.",
       "The book icon in the header opens it all. I think the house wants you to read what's been written.",
     ];
   }
@@ -580,7 +580,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
       "I've been writing things down, friend. The words, the whispers — everything that passes through this house.",
       "The Word Ledger keeps a record of every word you've shifted. It's longer than you might expect.",
       "The Whisper Gallery collects what the animals say to you — every conversation, every quiet thought shared after a puzzle.",
-      "There are weekly quests in there too. Fresh challenges each week with amber waiting at the end.",
+      "There are daily and weekly quests in there too. Fresh challenges each day and week with amber waiting at the end.",
       "Tap the book icon up top to open the journal. Some of it reads differently now than when it was first spoken.",
     ];
   }
@@ -589,7 +589,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
       "I started keeping a journal. The words you shift, the things we say to you — it all gets written down.",
       "There's a Word Ledger that tracks every word from your puzzles. It's nice to look back on where you've been.",
       "The Whisper Gallery saves the conversations and little whispers the animals share with you. Every voice, remembered.",
-      "You'll also find weekly quests — small goals that refresh each week with amber rewards.",
+      "You'll also find daily and weekly quests — small goals that refresh each day and week with amber rewards.",
       "Look for the book icon in the header. Take a peek when you have a quiet moment.",
     ];
   }
@@ -597,7 +597,7 @@ export function getJournalIntroLines(phase: DialoguePhase): string[] {
     "I've been keeping something for you — a journal! Let me show you what's inside.",
     "See this first part? That's your Word Ledger. Every word you shift in a puzzle gets written down here. It's like a scrapbook of everywhere you've been.",
     "And this — the Whisper Gallery. When the animals talk to you, or whisper something after a puzzle, it all gets saved. So you can come back and read it anytime.",
-    "There are weekly quests in here too! Little goals that change each week — finish them and you'll earn extra amber.",
+    "There are daily and weekly quests in here too! Little goals that refresh each day and week — finish them and you'll earn extra amber.",
     "Tap the book icon up top whenever you want to look back. It's yours, friend.",
   ];
 }

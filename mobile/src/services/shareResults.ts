@@ -12,7 +12,6 @@ import { incrementShareCount } from './achievements';
 export interface ShareableResult {
   stars: number;
   difficulty: Difficulty;
-  level: number;
   hintsUsed: number;
   invalidAttempts: number;
   isDaily?: boolean;
@@ -134,7 +133,7 @@ export function generateShareText(result: ShareableResult): string {
   if (result.isDaily && result.dailyDate) {
     lines.push(`WordShift Daily ${result.dailyDate}`);
   } else {
-    lines.push(`WordShift Lv.${result.level}`);
+    lines.push('WordShift');
   }
 
   const challengeTag = result.isChallenge ? ' 🔒' : '';

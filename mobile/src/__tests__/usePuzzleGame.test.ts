@@ -530,7 +530,6 @@ describe('usePuzzleGame', () => {
       expect(state.difficulty).toBe('MEDIUM');
       expect(state.showRules).toBe(false);
       expect(state.showConfetti).toBe(false);
-      expect(state.level).toBe(1);
     });
   });
 
