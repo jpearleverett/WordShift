@@ -2006,7 +2006,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {/* Empty state */}
       {pendingWordCount === 0 && !resultMessage && (
         <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: phaseTheme.modalSecondaryTextColor }]}>
+          <Text style={[styles.emptyText, { color: phaseTheme.modalTextColor }]}>
             {getPitEmptyMessage(phase)}
           </Text>
         </View>
@@ -2192,15 +2192,21 @@ const styles = StyleSheet.create({
   emptyContainer: {
     position: 'absolute',
     top: FLOAT_ZONE.top + 40,
-    left: 30, right: 30,
+    left: 24, right: 24,
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   emptyText: {
-    fontSize: 16, fontWeight: '600',
-    textAlign: 'center', lineHeight: 24,
-    textShadowColor: 'rgba(0,0,0,0.3)',
+    fontSize: 17, fontWeight: '700',
+    textAlign: 'center', lineHeight: 26,
+    textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 4,
   },
   overflowContainer: {
     position: 'absolute',
@@ -2265,16 +2271,22 @@ const styles = StyleSheet.create({
   wardHintContainer: {
     position: 'absolute',
     top: PIT_CENTER.y - PIT_OVAL.radiusY * 4.5,
-    left: 30, right: 30,
+    left: 24, right: 24,
     alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.40)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   wardHintText: {
-    fontWeight: '600',
+    fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 5,
   },
   ceremonyOverlay: {
     position: 'absolute',

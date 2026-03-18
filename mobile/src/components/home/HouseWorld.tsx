@@ -45,11 +45,11 @@ interface Particle {
 
 const PARTICLE_EMOJIS_BY_PHASE: Record<number, string[]> = {
   0: ['✨', '🌸', '🍃', '💛', '⭐'],
-  1: ['✨', '🍂', '🌙', '💫'],
-  2: ['🍂', '🌙', '💭', '🌫️'],
-  3: ['🌙', '👁️', '🌫️', '💀'],
-  4: ['💀', '👁️', '🌑', '⚫', '🔮'],
-  5: ['✨', '🌙', '💜'],
+  1: ['✨', '🍂', '💫', '⭐'],
+  2: ['🍂', '💭', '🌫️', '💫'],
+  3: ['👁️', '🌫️', '💀', '🔮'],
+  4: ['💀', '👁️', '⚫', '🔮'],
+  5: ['✨', '💜', '💫'],
 };
 
 const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
@@ -683,8 +683,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const particleIdRef = useRef(0);
 
   // Sun animation
-  const sunPulse = useRef(new Animated.Value(1)).current;
-  const sunRotation = useRef(new Animated.Value(0)).current;
 
   // Cloud animations
   const cloud1X = useRef(new Animated.Value(-100)).current;
@@ -717,44 +715,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     return () => clearInterval(interval);
   }, [currentPhase]);
 
-  // Sun pulsing animation
-  useEffect(() => {
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(sunPulse, {
-          toValue: 1.15,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(sunPulse, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-
-    const rotateAnimation = Animated.loop(
-      Animated.timing(sunRotation, {
-        toValue: 360,
-        duration: 60000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-
-    if (currentPhase < 3) {
-      pulseAnimation.start();
-      rotateAnimation.start();
-    }
-
-    return () => {
-      pulseAnimation.stop();
-      rotateAnimation.stop();
-    };
-  }, [currentPhase]);
 
   // Cloud animations
   const cloudMountedRef = useRef(true);
@@ -792,10 +752,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     };
   }, []);
 
-  const sunRotate = sunRotation.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
-  });
 
   // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
   // This allows players to tap the house itself to build, instead of using header controls.
@@ -928,42 +884,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
               </Animated.View>
 
-              {/* Sun with animated rays - hidden at phase 4 */}
-              {currentPhase < 4 && (
-                <Animated.View
-                  style={[
-                    styles.sun,
-                    {
-                      transform: [
-                        { scale: sunPulse },
-                        { rotate: sunRotate },
-                      ],
-                      opacity: currentPhase >= 3 ? 0.4 : 1,
-                    }
-                  ]}
-                  pointerEvents="none"
-                >
-                  <View style={styles.sunRays}>
-                    {[...Array(8)].map((_, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.sunRay,
-                          { transform: [{ rotate: `${i * 45}deg` }] }
-                        ]}
-                      />
-                    ))}
-                  </View>
-                  <Text style={styles.sunEmoji}>{currentPhase >= 3 ? '🌙' : '☀️'}</Text>
-                </Animated.View>
-              )}
-
-              {/* Moon for phase 4 */}
-              {currentPhase >= 4 && (
-                <View style={[styles.sun, { opacity: 0.8 }]} pointerEvents="none">
-                  <Text style={styles.sunEmoji}>🌑</Text>
-                </View>
-              )}
 
               {/* Stars at night (phase 3-4) */}
               {currentPhase >= 3 && (
@@ -1130,35 +1050,6 @@ const styles = StyleSheet.create({
   cloudEmoji: {
     fontSize: 45,
     opacity: 0.9,
-  },
-
-  // Sun - inside transform container
-  sun: {
-    position: 'absolute',
-    top: 15,
-    right: 20,
-    zIndex: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sunEmoji: {
-    fontSize: 50,
-    zIndex: 2,
-  },
-  sunRays: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sunRay: {
-    position: 'absolute',
-    width: 3,
-    height: 40,
-    backgroundColor: '#FFD700',
-    opacity: 0.4,
-    borderRadius: 2,
   },
 
   // Stars for night sky
