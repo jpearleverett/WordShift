@@ -846,6 +846,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return diffDays >= 1;
   }, [progress?.currentStreak, progress?.lastPlayDate]);
 
+  const currentPhase = progress?.currentPhase ?? 0;
+  const journalSpotlightStepMeta = useMemo(
+    () => getJournalSpotlightSteps(currentPhase, getGalleryTitle(currentPhase)),
+    [currentPhase]
+  );
+  const journalSpotlightPreviewCards = useMemo(
+    () => journalSpotlightStepMeta.filter(step => step.showInPreview),
+    [journalSpotlightStepMeta]
+  );
+
   if (!progress || rooms.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -867,14 +877,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Phase-aware dialogue theme for all modals and dialogue boxes
   const dt = getDialogueTheme(progress.currentPhase);
   const phaseTheme = getPhaseTheme(progress.currentPhase);
-  const journalSpotlightStepMeta = useMemo(
-    () => getJournalSpotlightSteps(progress.currentPhase, getGalleryTitle(progress.currentPhase)),
-    [progress.currentPhase]
-  );
-  const journalSpotlightPreviewCards = useMemo(
-    () => journalSpotlightStepMeta.filter(step => step.showInPreview),
-    [journalSpotlightStepMeta]
-  );
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
     Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
   ];
