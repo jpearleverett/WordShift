@@ -540,4 +540,73 @@ export function getDialogueTheme(phase: number): DialogueTheme {
   }
 }
 
+// ============================================================================
+// OVERLAY BANNER THEMING
+// Phase-aware styling for floating text banners over scenic backgrounds.
+// Uses white/near-white text for guaranteed readability; phase character
+// expressed through container borders, shadow tints, and subtle color shifts.
+// ============================================================================
+
+export interface OverlayBannerTheme {
+  textColor: string;
+  secondaryTextColor: string;
+  containerBg: string;
+  borderColor: string;
+  textShadowColor: string;
+}
+
+export function getOverlayBannerTheme(phase: number): OverlayBannerTheme {
+  switch (phase) {
+    case 0:
+      return {
+        textColor: '#FFFFFF',
+        secondaryTextColor: 'rgba(255, 255, 255, 0.72)',
+        containerBg: 'rgba(20, 10, 40, 0.55)',
+        borderColor: 'rgba(168, 85, 247, 0.22)',
+        textShadowColor: 'rgba(80, 30, 120, 0.8)',
+      };
+    case 1:
+      return {
+        textColor: '#FFF8F0',
+        secondaryTextColor: 'rgba(255, 248, 240, 0.70)',
+        containerBg: 'rgba(20, 12, 35, 0.55)',
+        borderColor: 'rgba(200, 160, 80, 0.22)',
+        textShadowColor: 'rgba(60, 30, 80, 0.8)',
+      };
+    case 2:
+      return {
+        textColor: '#E8E0F0',
+        secondaryTextColor: 'rgba(232, 224, 240, 0.68)',
+        containerBg: 'rgba(15, 10, 30, 0.60)',
+        borderColor: 'rgba(90, 70, 140, 0.25)',
+        textShadowColor: 'rgba(20, 10, 40, 0.8)',
+      };
+    case 3:
+      return {
+        textColor: '#D8D0E8',
+        secondaryTextColor: 'rgba(216, 208, 232, 0.65)',
+        containerBg: 'rgba(8, 5, 18, 0.65)',
+        borderColor: 'rgba(80, 40, 100, 0.28)',
+        textShadowColor: 'rgba(10, 5, 20, 0.9)',
+      };
+    case 4:
+      return {
+        textColor: '#D0C8E0',
+        secondaryTextColor: 'rgba(208, 200, 224, 0.62)',
+        containerBg: 'rgba(5, 3, 12, 0.70)',
+        borderColor: 'rgba(140, 40, 50, 0.28)',
+        textShadowColor: 'rgba(5, 2, 10, 0.9)',
+      };
+    case 5:
+    default:
+      return {
+        textColor: '#D0C8D8',
+        secondaryTextColor: 'rgba(208, 200, 216, 0.60)',
+        containerBg: 'rgba(8, 5, 15, 0.65)',
+        borderColor: 'rgba(100, 80, 140, 0.22)',
+        textShadowColor: 'rgba(8, 4, 16, 0.9)',
+      };
+  }
+}
+
 export default CandyColors;

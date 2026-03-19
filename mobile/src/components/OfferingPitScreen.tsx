@@ -12,7 +12,7 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
-import { CandyColors, getPhaseTheme, getTileColor } from '../theme/colors';
+import { CandyColors, getOverlayBannerTheme, getPhaseTheme, getTileColor } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   getPitOfferAllLabel,
@@ -1888,7 +1888,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         <View style={styles.wardHintContainer} pointerEvents="none">
           <Text style={[styles.wardHintText, {
             color: pendingPhaseTransition != null ? wardColors.pendingPulse : wardColors.lit,
-            fontSize: pendingPhaseTransition != null ? 16 : 13,
+            fontSize: pendingPhaseTransition != null ? 18 : 15,
           }]}>
             {wardHintText}
           </Text>
@@ -2006,18 +2006,27 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       </Modal>
 
       {/* Empty state */}
-      {pendingWordCount === 0 && !resultMessage && (
-        <View style={styles.emptyContainer}>
-          <Text style={[styles.emptyText, { color: phaseTheme.modalTextColor }]}>
-            {getPitEmptyMessage(phase)}
-          </Text>
-        </View>
-      )}
+      {pendingWordCount === 0 && !resultMessage && (() => {
+        const bt = getOverlayBannerTheme(phase);
+        return (
+          <View style={[styles.emptyContainer, {
+            backgroundColor: bt.containerBg,
+            borderColor: bt.borderColor,
+          }]}>
+            <Text style={[styles.emptyText, {
+              color: bt.textColor,
+              textShadowColor: bt.textShadowColor,
+            }]}>
+              {getPitEmptyMessage(phase)}
+            </Text>
+          </View>
+        );
+      })()}
 
       {/* Overflow indicator */}
       {overflowCount > 0 && (
         <View style={styles.overflowContainer}>
-          <Text style={[styles.overflowText, { color: phaseTheme.modalSecondaryTextColor }]}>
+          <Text style={[styles.overflowText, { color: getOverlayBannerTheme(phase).secondaryTextColor }]}>
             {getPitOverflowText(phase as DialoguePhase, overflowCount)}
           </Text>
         </View>
@@ -2039,25 +2048,31 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {/* Bottom panel — hidden during onboarding (FoxGuide occupies this space) */}
       {!isOnboarding && (
         <View style={styles.bottomPanel}>
-          <View style={[styles.summaryRow, {
-            backgroundColor: phase >= 3 ? 'rgba(10, 5, 20, 0.8)' : 'rgba(40, 20, 80, 0.7)',
-          }]}>
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>
-                {'\uD83D\uDC8E'} {Math.max(0, pendingAmber - pendingAmberOffset)}
-              </Text>
-              <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                {getPitPendingAmberLabel(phase)}
-              </Text>
-            </View>
-            <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, { color: phaseTheme.modalTextColor }]}>{harvestState.totalWordsOffered}</Text>
-              <Text style={[styles.summaryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
-                Lifetime {getPitHarvestLabel(phase)}
-              </Text>
-            </View>
-          </View>
+          {(() => {
+            const bt = getOverlayBannerTheme(phase);
+            return (
+              <View style={[styles.summaryRow, {
+                backgroundColor: phase >= 3 ? 'rgba(8, 4, 16, 0.82)' : 'rgba(20, 12, 45, 0.72)',
+                borderColor: bt.borderColor,
+              }]}>
+                <View style={styles.summaryItem}>
+                  <Text style={[styles.summaryValue, { color: bt.textColor, textShadowColor: bt.textShadowColor }]}>
+                    {'\uD83D\uDC8E'} {Math.max(0, pendingAmber - pendingAmberOffset)}
+                  </Text>
+                  <Text style={[styles.summaryLabel, { color: bt.secondaryTextColor }]}>
+                    {getPitPendingAmberLabel(phase)}
+                  </Text>
+                </View>
+                <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
+                <View style={styles.summaryItem}>
+                  <Text style={[styles.summaryValue, { color: bt.textColor, textShadowColor: bt.textShadowColor }]}>{harvestState.totalWordsOffered}</Text>
+                  <Text style={[styles.summaryLabel, { color: bt.secondaryTextColor }]}>
+                    Lifetime {getPitHarvestLabel(phase)}
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
 
           {pendingWordCount > 0 && pendingAmber - pendingAmberOffset > 0 && (
             <TouchableOpacity
@@ -2196,19 +2211,22 @@ const styles = StyleSheet.create({
     top: FLOAT_ZONE.top + 40,
     left: 24, right: 24,
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 6,
   },
   emptyText: {
-    fontSize: 17, fontWeight: '700',
+    fontSize: 17, fontWeight: '600',
     textAlign: 'center', lineHeight: 26,
-    textShadowColor: 'rgba(0,0,0,0.6)',
+    letterSpacing: 0.3,
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 8,
   },
   overflowContainer: {
     position: 'absolute',
@@ -2245,14 +2263,31 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     marginBottom: 10,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
   summaryItem: { flex: 1, alignItems: 'center' },
-  summaryValue: { fontSize: 16, fontWeight: '900' },
-  summaryLabel: { fontSize: 9, fontWeight: '600', marginTop: 2, textAlign: 'center' },
+  summaryValue: {
+    fontSize: 18, fontWeight: '900',
+    letterSpacing: 0.3,
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  summaryLabel: {
+    fontSize: 10.5, fontWeight: '700', marginTop: 2, textAlign: 'center',
+    letterSpacing: 0.4,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
   summaryDivider: { width: 1, height: 28, borderRadius: 1 },
   harvestAllButton: {
     borderRadius: 22,
@@ -2275,20 +2310,27 @@ const styles = StyleSheet.create({
     top: PIT_CENTER.y - PIT_OVAL.radiusY * 4.5,
     left: 24, right: 24,
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.40)',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.50)',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
   wardHintText: {
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.6)',
+    letterSpacing: 0.5,
+    lineHeight: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 5,
+    textShadowRadius: 8,
   },
   ceremonyOverlay: {
     position: 'absolute',
