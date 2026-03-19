@@ -11,6 +11,7 @@ import {
   StatusBar,
   Image,
   ScrollView,
+  Pressable,
 } from 'react-native';
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
@@ -960,7 +961,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text
                 style={[
                   styles.ambientLineText,
-                  { color: getPhaseTheme(progress.currentPhase).modalSecondaryTextColor },
+                  { color: getPhaseTheme(progress.currentPhase).modalTextColor },
                 ]}
               >
                 {ambientLine}
@@ -1425,9 +1426,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => setShowQuestModal(false)}
       >
         <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}>
-          <TouchableOpacity
+          <Pressable
             style={StyleSheet.absoluteFill}
-            activeOpacity={1}
             onPress={() => setShowQuestModal(false)}
             accessibilityLabel="Close quests"
             accessibilityRole="button"
@@ -1480,8 +1480,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.questList} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
-              {(questTab === 'daily' ? weeklyQuestState?.daily.quests : weeklyQuestState?.weekly.quests)?.map(quest => (
+            <ScrollView
+              style={styles.questList}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.questListContent}
+            >
+              {(questTab === 'daily' ? weeklyQuestState?.daily?.quests : weeklyQuestState?.weekly?.quests)?.map(quest => (
                 <View
                   key={quest.id}
                   style={[styles.unlockItem, styles.questItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
@@ -2646,9 +2652,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   questList: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 1,
     maxHeight: SCREEN_HEIGHT * 0.55,
     marginBottom: 12,
+  },
+  questListContent: {
+    paddingBottom: 4,
   },
   questItem: {
     marginBottom: 10,
@@ -2947,18 +2957,23 @@ const styles = StyleSheet.create({
   // Ambient home line
   ambientLineContainer: {
     alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    marginBottom: 2,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    marginBottom: 4,
     zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.20)',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   ambientLineText: {
-    fontSize: 12,
+    fontSize: 14,
     fontStyle: 'italic',
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: 0.4,
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 
   // Sacrifice modal
