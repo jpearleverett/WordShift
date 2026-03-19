@@ -769,7 +769,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }
 
   const phaseBgColor = {
-    0: '#6fb7df', 1: '#5a9a68', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',
+    0: '#6fb7df', 1: '#104c83', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',
   }[progress.currentPhase] || '#6fb7df';
 
   // Phase-aware dialogue theme for all modals and dialogue boxes
