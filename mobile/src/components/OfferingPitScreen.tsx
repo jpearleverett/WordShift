@@ -44,6 +44,7 @@ import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier'
 // ---------------------------------------------------------------------------
 
 const PIT_DAY = require('../../assets/environment/pitt_day.png');
+const PIT_AFTERNOON = require('../../assets/environment/pitt_afternoon.png');
 const PIT_DUSK = require('../../assets/environment/pitt_dusk.png');
 const PIT_NIGHT = require('../../assets/environment/pitt_night.png');
 
@@ -51,7 +52,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const PIT_BG_COLORS: Record<number, string> = {
   0: '#6fb7df',
-  1: '#6fb7df',
+  1: '#5a9a68',
   2: '#514378',
   3: '#060612',
   4: '#1a122a',
@@ -60,6 +61,7 @@ const PIT_BG_COLORS: Record<number, string> = {
 function getPitBackground(phase: number) {
   if (phase >= 3) return PIT_NIGHT;
   if (phase >= 2) return PIT_DUSK;
+  if (phase >= 1) return PIT_AFTERNOON;
   return PIT_DAY;
 }
 

@@ -22,6 +22,7 @@ import { clampHomeScenePanY, resolveHomeScenePanY } from '../../services/homeSce
 
 // Environment assets
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
+const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.png');
 const SKY_DUSK = require('../../../assets/environment/sky_dusk.png');
 const SKY_STORM = require('../../../assets/environment/sky_storm.png');
 const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
@@ -382,7 +383,7 @@ const ShootingStar: React.FC = () => {
 // Phase-aware background colors (blends with each sky image's edges)
 const PHASE_BG_COLORS: Record<number, string> = {
   0: '#6fb7df',
-  1: '#6fb7df',
+  1: '#5a9a68',
   2: '#514378',
   3: '#060612',
   4: '#1a122a',
@@ -864,6 +865,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   currentPhase >= 4 ? SKY_SHADOW :
                   currentPhase >= 3 ? SKY_STORM :
                   currentPhase >= 2 ? SKY_DUSK :
+                  currentPhase >= 1 ? SKY_AFTERNOON :
                   SKY_DAY
                 }
                 style={[styles.skyBackground, {

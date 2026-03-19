@@ -9,14 +9,14 @@ import { CandyColors, getPhaseTheme } from '../theme/colors';
 export function getScreenBackgroundColor(screen: string, phase: number): string {
   switch (screen) {
     case 'home':
-      return { 0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830' }[phase] ?? '#6fb7df';
+      return { 0: '#6fb7df', 1: '#5a9a68', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830' }[phase] ?? '#6fb7df';
     case 'puzzle':
       return getPhaseTheme(phase as any).bgPrimary;
     case 'settings':
     case 'stats':
       return CandyColors.purple.main;
     case 'pit':
-      return { 0: '#6fb7df', 1: '#6fb7df', 2: '#514378', 3: '#060612', 4: '#1a122a' }[phase] ?? '#6fb7df';
+      return { 0: '#6fb7df', 1: '#5a9a68', 2: '#514378', 3: '#060612', 4: '#1a122a' }[phase] ?? '#6fb7df';
     case 'ledger':
       return phase <= 1 ? CandyColors.purple.main : phase === 2 ? '#3A3060' : phase === 3 ? '#1A1530' : '#0F0818';
     case 'gallery':
