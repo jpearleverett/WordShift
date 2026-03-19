@@ -52,7 +52,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const PIT_BG_COLORS: Record<number, string> = {
   0: '#6fb7df',
-  1: '#5a9a68',
+  1: '#104c83',
   2: '#514378',
   3: '#060612',
   4: '#1a122a',
