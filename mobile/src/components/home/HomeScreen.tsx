@@ -19,7 +19,7 @@ import {
 import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
-import { CandyColors, getDialogueTheme, getPhaseTheme } from '../../theme/colors';
+import { CandyColors, getDialogueTheme, getOverlayBannerTheme, getPhaseTheme } from '../../theme/colors';
 import {
   getFullProgress,
   markIntroSeen,
@@ -915,7 +915,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
           {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
             <TouchableOpacity
-              style={styles.unlockProgressContainer}
+              style={[styles.unlockProgressContainer, {
+                backgroundColor: progress.currentPhase >= 3
+                  ? 'rgba(15, 10, 25, 0.80)'
+                  : progress.currentPhase >= 2
+                    ? 'rgba(15, 15, 25, 0.78)'
+                    : 'rgba(15, 25, 15, 0.75)',
+              }]}
               activeOpacity={0.85}
               onPress={() => {
                 hapticLight();
@@ -956,18 +962,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
 
           {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
-          {ambientLine && !isOnboarding && (
-            <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
-              <Text
-                style={[
-                  styles.ambientLineText,
-                  { color: getPhaseTheme(progress.currentPhase).modalTextColor },
-                ]}
-              >
-                {ambientLine}
-              </Text>
-            </Animated.View>
-          )}
+          {ambientLine && !isOnboarding && (() => {
+            const bannerTheme = getOverlayBannerTheme(progress.currentPhase);
+            return (
+              <Animated.View style={[styles.ambientLineContainer, {
+                opacity: ambientOpacity,
+                backgroundColor: bannerTheme.containerBg,
+                borderColor: bannerTheme.borderColor,
+              }]}>
+                <Text
+                  style={[
+                    styles.ambientLineText,
+                    {
+                      color: bannerTheme.textColor,
+                      textShadowColor: bannerTheme.textShadowColor,
+                    },
+                  ]}
+                >
+                  {ambientLine}
+                </Text>
+              </Animated.View>
+            );
+          })()}
 
         </View>
 
@@ -2401,12 +2417,16 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 4,
     marginBottom: 4,
-    backgroundColor: 'rgba(30, 60, 30, 0.85)',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 14,
+    padding: 12,
     zIndex: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   unlockProgressInner: {
     flexDirection: 'row',
@@ -2416,26 +2436,40 @@ const styles = StyleSheet.create({
   },
   unlockProgressLabel: {
     color: CandyColors.white,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 12.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
     flex: 1,
   },
   unlockProgressText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 11,
-    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   unlockProgressBarBg: {
     flex: 2,
-    height: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: 4,
+    height: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderRadius: 5,
     overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   unlockProgressBarFill: {
     height: '100%',
     backgroundColor: CandyColors.yellow.main,
-    borderRadius: 4,
+    borderRadius: 5,
+    shadowColor: CandyColors.yellow.light,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
   },
 
   // Modal styles
@@ -2957,23 +2991,27 @@ const styles = StyleSheet.create({
   // Ambient home line
   ambientLineContainer: {
     alignSelf: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     marginBottom: 4,
     zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
   },
   ambientLineText: {
-    fontSize: 14,
+    fontSize: 15,
+    fontWeight: '500',
     fontStyle: 'italic',
     textAlign: 'center',
-    letterSpacing: 0.4,
-    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    letterSpacing: 0.5,
+    lineHeight: 22,
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
 
   // Sacrifice modal
