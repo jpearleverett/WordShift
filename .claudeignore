@@ -1,0 +1,4 @@
+# Large data files that don't need AI context
+mobile/src/data/puzzleBank*.ts
+mobile/src/dictionary.ts
+mobile/package-lock.json
