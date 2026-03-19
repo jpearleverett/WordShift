@@ -383,7 +383,7 @@ const ShootingStar: React.FC = () => {
 // Phase-aware background colors (blends with each sky image's edges)
 const PHASE_BG_COLORS: Record<number, string> = {
   0: '#6fb7df',
-  1: '#5a9a68',
+  1: '#104c83',
   2: '#514378',
   3: '#060612',
   4: '#1a122a',
