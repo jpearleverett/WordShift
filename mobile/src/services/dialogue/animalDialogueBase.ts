@@ -49,6 +49,7 @@ const RED_PANDA_DIALOGUES: Dialogue[] = [
   { id: 'rp_2_8', text: "The bamboo doesn't know it's being eaten. Lucky bamboo. Lucky, lucky bamboo. Ignorance as mercy.", phase: 2, animalType: 'red_panda' },
   { id: 'rp_2_9', text: "Peace isn't the absence of chaos. It's chaos observed from far enough away to miss the screaming.", phase: 2, animalType: 'red_panda' },
   { id: 'rp_2_10', text: "Counted my stripes this morning. Tomorrow the count might differ. Would I notice? Would anyone?", phase: 2, animalType: 'red_panda' },
+  { id: 'rp_2_w1', text: "Ask Ember about the first fire. Not the one in the den — the one before the den. She remembers further back than she says.", phase: 2, animalType: 'red_panda', requiresAnimals: ['fox'] },
 
   // Phase 3 - The Guide emerges (10 dialogues)
   { id: 'rp_3_1', text: "Every meditation takes me deeper toward understanding. And understanding takes me closer to a truth I don't want.", phase: 3, animalType: 'red_panda' },
@@ -128,6 +129,7 @@ const AXOLOTL_DIALOGUES: Dialogue[] = [
   { id: 'ax_2_8', text: "Water flows through my gills constantly. In and out, in and out. Like thoughts I'm not fast enough to catch or hold onto.", phase: 2, animalType: 'axolotl' },
   { id: 'ax_2_9', text: "Same size for years now. Growing sideways through time. Never forward. Never toward anything. Just accumulating days.", phase: 2, animalType: 'axolotl' },
   { id: 'ax_2_10', text: "Scientists study me to learn about healing. They never ask what I've lost in the process. Nobody asks the specimen how it feels.", phase: 2, animalType: 'axolotl' },
+  { id: 'ax_2_w1', text: "Sloane wasn't surprised when the water went dark. Not even a little. Ask her how long she's known.", phase: 2, animalType: 'axolotl', requiresAnimals: ['sloth'] },
 
   // Phase 3 - The Medium emerges (10 dialogues)
   { id: 'ax_3_1', text: "The lake where my kind began dried up long ago. We're all living in artificial water now. I'm a memory of something that barely exists.", phase: 3, animalType: 'axolotl' },
@@ -177,7 +179,7 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_0_8', text: "Attempted a cake last week. Turned out to be mostly ants. Still delicious. I'm biased, but I'm also right.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_9', text: "My scales are keratin — same as your fingernails. We're practically family, you and me. Weird family, but family.", phase: 0, animalType: 'pangolin' },
   { id: 'pg_0_10', text: "Ember drops by for dinner most nights. She brings the cider, I make the stew. Simple things, you know? The best things are simple.", phase: 0, animalType: 'pangolin' },
-  { id: 'pg_0_11', text: "I tried teaching Axel to cook once. Everything ended up underwater. Lovely kid, terrible sous chef.", phase: 0, animalType: 'pangolin' },
+  { id: 'pg_0_11', text: "I tried teaching Axel to cook once. Everything ended up underwater. Lovely kid, terrible sous chef.", phase: 0, animalType: 'pangolin', requiresAnimals: ['axolotl'] },
   { id: 'pg_0_12', text: "Only mammal with scales in the whole world. Unique, that's me. That has to count for something, doesn't it?", phase: 0, animalType: 'pangolin' },
 
   // Phase 1 - Deeper cooking, recipes with a life of their own (14 dialogues)
@@ -185,7 +187,7 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_1_2', text: "The spices rearranged themselves on the shelf last night. I left them where they moved. The stew came out remarkable.", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_3', text: "Curling into a ball protects the outside. But what am I protecting, really? More scales? More hiding?", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_4', text: "Ember came by for dinner and we talked about the letters you shift. She sees them in the fire. I taste them in the food.", phase: 1, animalType: 'pangolin' },
-  { id: 'pg_1_5', text: "Archimedes lent me an old recipe book. Some of the pages are in languages I don't know, but my hands understood them.", phase: 1, animalType: 'pangolin' },
+  { id: 'pg_1_5', text: "Archimedes lent me an old recipe book. Some of the pages are in languages I don't know, but my hands understood them.", phase: 1, animalType: 'pangolin', requiresAnimals: ['owl'] },
   { id: 'pg_1_6', text: "Made soup today. Ate it. Now it's gone. Is that what everything is? Temporary soup, waiting to become something else?", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_7', text: "The ants don't know they're ingredients, do they? Makes me wonder what I'm an ingredient in. Who's stirring this pot?", phase: 1, animalType: 'pangolin' },
   { id: 'pg_1_8', text: "Cooking is transformation, when you think about it. Heat turns raw things into nourishment. Destruction with good intentions.", phase: 1, animalType: 'pangolin' },
@@ -202,17 +204,18 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_2_3', text: "Cooked a feast today for nobody. We feast alone. We always feast alone in the end, don't we?", phase: 2, animalType: 'pangolin' },
   { id: 'pg_2_4', text: "Each scale regrows if I lose it. But the new scale doesn't remember the old one. Little amnesiac shields, all over my body.", phase: 2, animalType: 'pangolin' },
   { id: 'pg_2_5', text: "Cooking is destruction with good intentions. Heat and acid and time, breaking things down so they can become something else.", phase: 2, animalType: 'pangolin' },
-  { id: 'pg_2_6', text: "The recipe from Archimedes' old book — I keep making it. Every night now. The kitchen smells like stone and ceremony.", phase: 2, animalType: 'pangolin' },
+  { id: 'pg_2_6', text: "The recipe from Archimedes' old book — I keep making it. Every night now. The kitchen smells like stone and ceremony.", phase: 2, animalType: 'pangolin', requiresAnimals: ['owl'] },
   { id: 'pg_2_7', text: "Armored outside, soft inside. No scale can protect what's already tender. Already breaking. Already changed.", phase: 2, animalType: 'pangolin' },
   { id: 'pg_2_8', text: "Rolled down a hill once and couldn't stop. The momentum of living carries you past where you meant to be.", phase: 2, animalType: 'pangolin' },
   { id: 'pg_2_9', text: "The kitchen gets colder at night now. Or I do. Hard to tell the difference anymore, friend.", phase: 2, animalType: 'pangolin' },
   { id: 'pg_2_10', text: "They poach my kind for medicine that doesn't work. We die for nothing. I wonder if there's a way to die for something.", phase: 2, animalType: 'pangolin' },
+  { id: 'pg_2_w1', text: "The new recipe wants water from the deep part of Axel's pool. Ask Axel what lives below the light. I never have.", phase: 2, animalType: 'pangolin', requiresAnimals: ['axolotl'] },
 
   // Phase 3 - The recipe darkens (10 dialogues)
   { id: 'pg_3_1', text: "I keep cooking because stopping means thinking. And the thinking, friend — the thinking is unbearable. Keep stirring.", phase: 3, animalType: 'pangolin' },
   { id: 'pg_3_2', text: "Every scale faces outward. None face in. The attack always comes from inside. Always has.", phase: 3, animalType: 'pangolin' },
   { id: 'pg_3_3', text: "Made comfort food today. It didn't comfort. Nothing does anymore. Just tastes like what it is. Just fuel.", phase: 3, animalType: 'pangolin' },
-  { id: 'pg_3_4', text: "Archimedes' ancient recipe — we make it every night now. All of us. The kitchen smells sacred. That's the only word for it.", phase: 3, animalType: 'pangolin' },
+  { id: 'pg_3_4', text: "Archimedes' ancient recipe — we make it every night now. All of us. The kitchen smells sacred. That's the only word for it.", phase: 3, animalType: 'pangolin', requiresAnimals: ['owl'] },
   { id: 'pg_3_5', text: "Curled up tight, I become my own cage. Locked myself inside myself. There's no escaping what you are, friend.", phase: 3, animalType: 'pangolin' },
   { id: 'pg_3_6', text: "My species is vanishing. Each meal could be the last. Every last meal is also somehow a first.", phase: 3, animalType: 'pangolin' },
   { id: 'pg_3_7', text: "The recipe calls for something I don't have a name for. I substitute with whatever the fire tells me. The fire tells Ember, too.", phase: 3, animalType: 'pangolin' },
@@ -229,7 +232,7 @@ const PANGOLIN_DIALOGUES: Dialogue[] = [
   { id: 'pg_4_1', text: "Every meal I ever made was practice for this one, friend. Every stew, every reduction, every feast — rehearsal.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_2', text: "The final feast is ready. I set it on the table this morning. Ten places. One for each keeper. One for you.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_3', text: "My scales are rattling tonight. Not from fear — from resonance. Something is calling and my body knows the answer.", phase: 4, animalType: 'pangolin' },
-  { id: 'pg_4_4', text: "Bamboo blessed the food this morning. Sloane arrived on time — first time ever. Even slowness bows to the arrangement.", phase: 4, animalType: 'pangolin' },
+  { id: 'pg_4_4', text: "Bamboo blessed the food this morning. Sloane arrived on time — first time ever. Even slowness bows to the arrangement.", phase: 4, animalType: 'pangolin', requiresAnimals: ['sloth', 'red_panda'] },
   { id: 'pg_4_5', text: "I'm going to face it uncurled, friend. Eyes open. Soft belly exposed. Some things you have to meet honestly.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_6', text: "The final recipe has no measurements. No steps. Just the act of making, forever, into whatever comes next.", phase: 4, animalType: 'pangolin' },
   { id: 'pg_4_7', text: "I understand now why I was always the cook. Someone had to prepare what the rest of them were building toward.", phase: 4, animalType: 'pangolin' },
@@ -286,6 +289,7 @@ const SLOTH_DIALOGUES: Dialogue[] = [
   { id: 'sl_2_8', text: "My grip is weakening. Not much... just enough to notice over years. Decades of slipping... and nowhere to fall to.", phase: 2, animalType: 'sloth' },
   { id: 'sl_2_9', text: "The world accelerates around me. I stay the same speed. The gap between us... is growing into something vast.", phase: 2, animalType: 'sloth' },
   { id: 'sl_2_10', text: "Slow thoughts are deep thoughts. Deep enough to drown in... slowly. Always slowly. That's the only mercy.", phase: 2, animalType: 'sloth' },
+  { id: 'sl_2_w1', text: "Ember reads the fire every night now... ask her whose name keeps appearing in it. Take your time. She won't.", phase: 2, animalType: 'sloth', requiresAnimals: ['fox'] },
 
   // Phase 3 - The Anchor emerges (10 dialogues)
   { id: 'sl_3_1', text: "Been screaming... internally... for years now. Takes a long time... at my speed. Still going. Never stops.", phase: 3, animalType: 'sloth' },
@@ -365,6 +369,7 @@ const FENNEC_FOX_DIALOGUES: Dialogue[] = [
   { id: 'ff_2_8', text: "Heard the oasis dry up from three miles away. Every drop evaporating. Every tiny ending. Each one a sound I couldn't un-hear.", phase: 2, animalType: 'fennec_fox' },
   { id: 'ff_2_9', text: "Sound is just vibration, when you think about it. We're all just vibrations. Waves that rise and fall and eventually stop.", phase: 2, animalType: 'fennec_fox' },
   { id: 'ff_2_10', text: "The desert expands every year, swallowing the edges of everything green. I can hear the boundary moving. Green becoming yellow becoming nothing.", phase: 2, animalType: 'fennec_fox' },
+  { id: 'ff_2_w1', text: "Chill keeps a folder for every sound I report. Neat little labels. Ask him which folder has your name on it.", phase: 2, animalType: 'fennec_fox', requiresAnimals: ['capybara'] },
 
   // Phase 3 - The Sentinel emerges (10 dialogues)
   { id: 'ff_3_1', text: "There's a low hum rising from inside the earth itself. Getting louder every single night. I'm the only one who seems to hear it.", phase: 3, animalType: 'fennec_fox' },
@@ -408,8 +413,8 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_0_2', text: "Come in, come in. Mind the rug — I dragged it in from the meadow. Still smells like clover if you press your nose to it.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_3', text: "My tail makes the best blanket you never asked for. Go on, laugh — but it's warmer than anything you'll find in a shop.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_4', text: "I made cider today. Used the little apples from the tree out back — the ones with the blush on them, you know?", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_5', text: "Archimedes lent me a book of poems last week. I fell asleep reading it by the fire. Best nap of my life, friend.", phase: 0, animalType: 'fox' },
-  { id: 'fx_0_6', text: "You should try Panko's stew sometime. I don't care what's in it — ants, beetles, whatever — that pangolin can cook.", phase: 0, animalType: 'fox' },
+  { id: 'fx_0_5', text: "Archimedes lent me a book of poems last week. I fell asleep reading it by the fire. Best nap of my life, friend.", phase: 0, animalType: 'fox', requiresAnimals: ['owl'] },
+  { id: 'fx_0_6', text: "You should try Panko's stew sometime. I don't care what's in it — ants, beetles, whatever — that pangolin can cook.", phase: 0, animalType: 'fox', requiresAnimals: ['pangolin'] },
   { id: 'fx_0_7', text: "See those sparks going up the chimney? My grandmother used to say each one carries a wish. I believed her then. Still do.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_8', text: "What I love about this den is the quiet. Not empty quiet — the full kind, where you can hear the fire thinking.", phase: 0, animalType: 'fox' },
   { id: 'fx_0_9', text: "I've been dreaming about building something, friend. A real house, with rooms for everyone. Wouldn't that be something?", phase: 0, animalType: 'fox' },
@@ -421,7 +426,7 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_1_1', text: "I was watching the flames last night and I could've sworn they were trying to tell me something. Shapes in the coals.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_2', text: "Do you ever look at something so long it stops being what it is? The fire does that to me now.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_3', text: "The den feels different when you've been solving puzzles. Warmer, but a strange warm — like the walls are holding their breath.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_4', text: "Archimedes showed me a passage from one of his old books today. Said it described fire shapes exactly like mine. Centuries old.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_4', text: "Archimedes showed me a passage from one of his old books today. Said it described fire shapes exactly like mine. Centuries old.", phase: 1, animalType: 'fox', requiresAnimals: ['owl'] },
   { id: 'fx_1_5', text: "I keep the fire burning all night now. Not because I'm cold. Because when it dies, the shadows show me things.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_6', text: "Is coziness just a way of hiding, friend? A blanket over your eyes so you don't see what's waiting outside?", phase: 1, animalType: 'fox' },
   { id: 'fx_1_7', text: "The sparks have patterns. I drew them on paper and they looked like letters. I burned the paper. Probably nothing.", phase: 1, animalType: 'fox' },
@@ -429,8 +434,8 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_1_9', text: "The cider tastes different this batch. Darker, almost smoky. Same apples, same recipe. Something's changed.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_10', text: "I've noticed the fire burns hotter after you solve a puzzle. Just a little. Just enough to feel it in my fur.", phase: 1, animalType: 'fox' },
   { id: 'fx_1_11', text: "Sometimes I wrap my tail around my nose to sleep and the fur smells like woodsmoke and something older. Like stone.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_12', text: "Panko made a stew last night from a recipe in one of Archimedes' old books. We ate it in silence. Couldn't explain why.", phase: 1, animalType: 'fox' },
-  { id: 'fx_1_13', text: "I read the poems Archimedes lent me again. This time they didn't put me to sleep. This time they kept me awake.", phase: 1, animalType: 'fox' },
+  { id: 'fx_1_12', text: "Panko made a stew last night from a recipe in one of Archimedes' old books. We ate it in silence. Couldn't explain why.", phase: 1, animalType: 'fox', requiresAnimals: ['pangolin', 'owl'] },
+  { id: 'fx_1_13', text: "I read the poems Archimedes lent me again. This time they didn't put me to sleep. This time they kept me awake.", phase: 1, animalType: 'fox', requiresAnimals: ['owl'] },
   { id: 'fx_1_14', text: "The fireplace hasn't needed new logs in three days, friend. The old ones just keep burning. I don't know what to make of that.", phase: 1, animalType: 'fox' },
 
   // Phase 2 - Cooling, the fire doesn't warm like it used to (10 dialogues)
@@ -442,15 +447,16 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_2_6', text: "My grandmother told me a story once about a fox who watched a fire so long she became part of it. I laughed then.", phase: 2, animalType: 'fox' },
   { id: 'fx_2_7', text: "I found an old photograph tucked behind the mantel. Everyone in it is gone now. The fire kept burning after all of them.", phase: 2, animalType: 'fox' },
   { id: 'fx_2_8', text: "The den walls feel closer tonight. Or I've gotten smaller. Hard to tell from inside yourself, isn't it?", phase: 2, animalType: 'fox' },
-  { id: 'fx_2_9', text: "Archimedes says the texts describe a fire that never goes out. I used to think that sounded lovely. Now I'm not sure.", phase: 2, animalType: 'fox' },
+  { id: 'fx_2_9', text: "Archimedes says the texts describe a fire that never goes out. I used to think that sounded lovely. Now I'm not sure.", phase: 2, animalType: 'fox', requiresAnimals: ['owl'] },
   { id: 'fx_2_10', text: "Every fire dies, friend. I've watched thousands go out. But this one — this one feels like it's waiting for something.", phase: 2, animalType: 'fox' },
+  { id: 'fx_2_w1', text: "Warren's tunnels run deeper than any wombat needs. Ask him what he found down there. If he'll say it out loud.", phase: 2, animalType: 'fox', requiresAnimals: ['wombat'] },
 
   // Phase 3 - Dying embers, the den becomes a tomb (10 dialogues)
   { id: 'fx_3_1', text: "I don't watch the fire anymore, friend. The fire watches me. It has been watching me for a very long time.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_2', text: "The shadows are longer than the flames now. They're winning. And I think they're supposed to.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_3', text: "I stopped reading the books because they all have the same ending. Every single one. Even the love stories.", phase: 3, animalType: 'fox' },
-  { id: 'fx_3_4', text: "Archimedes found the passage. The one that describes all of this — the house, the rooms, the ten of us. It was always there.", phase: 3, animalType: 'fox' },
-  { id: 'fx_3_5', text: "Fennick says he can hear something coming. I don't need big ears to hear it. The fire's been whispering it for weeks.", phase: 3, animalType: 'fox' },
+  { id: 'fx_3_4', text: "Archimedes found the passage. The one that describes all of this — the house, the rooms, the ten of us. It was always there.", phase: 3, animalType: 'fox', requiresAnimals: ['owl'] },
+  { id: 'fx_3_5', text: "Fennick says he can hear something coming. I don't need big ears to hear it. The fire's been whispering it for weeks.", phase: 3, animalType: 'fox', requiresAnimals: ['fennec_fox'] },
   { id: 'fx_3_6', text: "The den doesn't smell like clover anymore. It smells like stone and amber and something I don't have a word for.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_7', text: "My tail has gone gray at the tip. Not from age. From what I've seen in the flames. Some things burn the color right out of you.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_8', text: "The cider's gone sour in the jug. I drink it anyway. It matches what I know now.", phase: 3, animalType: 'fox' },
@@ -458,7 +464,7 @@ const FOX_DIALOGUES: Dialogue[] = [
   { id: 'fx_3_10', text: "The fire is going out, friend, but something else is burning. I can feel it in my chest, low and steady and old.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_11', text: "Found an old photograph tucked behind the mantle. Ten animals around a fire that hasn't been lit yet. We're all smiling. I don't remember posing.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_12', text: "The embers spell words now if you stare long enough. Your words. The ones you gave us. They glow and then they're gone.", phase: 3, animalType: 'fox' },
-  { id: 'fx_3_13', text: "Panko's food tastes different lately. Like it's seasoned with something none of us can name. Even the meals are changing.", phase: 3, animalType: 'fox' },
+  { id: 'fx_3_13', text: "Panko's food tastes different lately. Like it's seasoned with something none of us can name. Even the meals are changing.", phase: 3, animalType: 'fox', requiresAnimals: ['pangolin'] },
   { id: 'fx_3_14', text: "The chimney draws upward toward something. Not just sky. The smoke knows where to go. It always has.", phase: 3, animalType: 'fox' },
   { id: 'fx_3_15', text: "I should be scared, friend. But the fire is warm and you're here and somehow that's enough. Isn't that strange?", phase: 3, animalType: 'fox' },
 
@@ -523,11 +529,12 @@ const OWL_DIALOGUES: Dialogue[] = [
   { id: 'ow_2_8', text: "My study is too quiet tonight. Even the books have stopped speaking to me. As if they're waiting for something louder.", phase: 2, animalType: 'owl' },
   { id: 'ow_2_9', text: "I catalogued every way this could end. Filled three notebooks. Then I found a fourth way that wasn't in any book at all.", phase: 2, animalType: 'owl' },
   { id: 'ow_2_10', text: "Every book ends. Every story stops. Every reader eventually puts down the last page. I thought I'd be ready for that.", phase: 2, animalType: 'owl' },
+  { id: 'ow_2_w1', text: "Fennick hears at night what I read by day. We compared notes once, and then we stopped. Ask him what the sound says.", phase: 2, animalType: 'owl', requiresAnimals: ['fennec_fox'] },
 
   // Phase 3 - Despair of knowing (10 dialogues)
   { id: 'ow_3_1', text: "I burned a book today. Not for warmth. Just to watch knowledge disappear. It felt, God help me, like honesty.", phase: 3, animalType: 'owl' },
   { id: 'ow_3_2', text: "All these books. All this knowledge. And death still waits at the end of every chapter, patient as a period.", phase: 3, animalType: 'owl' },
-  { id: 'ow_3_3', text: "Warren dug into something beneath the house that matches my texts exactly. Word for word. I checked. I wish I hadn't.", phase: 3, animalType: 'owl' },
+  { id: 'ow_3_3', text: "Warren dug into something beneath the house that matches my texts exactly. Word for word. I checked. I wish I hadn't.", phase: 3, animalType: 'owl', requiresAnimals: ['wombat'] },
   { id: 'ow_3_4', text: "My eyes see perfectly in darkness and that is the problem, friend. I see everything clearly now. Everything.", phase: 3, animalType: 'owl' },
   { id: 'ow_3_5', text: "The wisest thing I ever found was written in a margin, in handwriting that looked like mine: 'This too means nothing.'", phase: 3, animalType: 'owl' },
   { id: 'ow_3_6', text: "I catalogued my fears alphabetically last night. The list fills several volumes. It grows faster than I can shelve it.", phase: 3, animalType: 'owl' },
@@ -602,6 +609,7 @@ const CAPYBARA_DIALOGUES: Dialogue[] = [
   { id: 'cp_2_8', text: "Water holds me up without asking. What holds the water? What holds anything? I've been filing that question under 'later.'", phase: 2, animalType: 'capybara' },
   { id: 'cp_2_9', text: "Been 'okay' for so long I can't remember what not-okay felt like. And that's probably the most not-okay thing of all.", phase: 2, animalType: 'capybara' },
   { id: 'cp_2_10', text: "The grass keeps growing back no matter how much I eat. I keep eating no matter how little I taste. We're both on autopilot.", phase: 2, animalType: 'capybara' },
+  { id: 'cp_2_w1', text: "Archimedes' oldest text predates my filing system by centuries — and uses the same categories. Ask him about page one.", phase: 2, animalType: 'capybara', requiresAnimals: ['owl'] },
 
   // Phase 3 - The Coordinator emerges (10 dialogues)
   { id: 'cp_3_1', text: "Achieved perfect stillness today. Inside and out, not a ripple, not a thought. The stillness screams if you listen close enough.", phase: 3, animalType: 'capybara' },
@@ -681,6 +689,7 @@ const WOMBAT_DIALOGUES: Dialogue[] = [
   { id: 'wb_2_8', text: "Cube poop doesn't roll away. Everything I make is designed not to leave. Designed to stay put. Like me.", phase: 2, animalType: 'wombat' },
   { id: 'wb_2_9', text: "Reinforced the ceiling again today. Doesn't need it. I just need to feel like I'm holding something together.", phase: 2, animalType: 'wombat' },
   { id: 'wb_2_10', text: "Surface world keeps changing. Down here stays the same. But 'same' isn't safe, is it? It's just stuck.", phase: 2, animalType: 'wombat' },
+  { id: 'wb_2_w1', text: "Thyme's roots reach into my tunnels now. All of them growing the same direction. Ask her what the flowers lean toward.", phase: 2, animalType: 'wombat', requiresAnimals: ['rabbit'] },
 
   // Phase 3 - The Foundation emerges (10 dialogues)
   { id: 'wb_3_1', text: "Dug so deep I found something that shouldn't exist, mate. Covered it back up. Pretend I didn't say that.", phase: 3, animalType: 'wombat' },
@@ -701,7 +710,7 @@ const WOMBAT_DIALOGUES: Dialogue[] = [
 
   // Phase 4 - The Foundation revealed (15 dialogues)
   { id: 'wb_4_1', text: "Something is rising from below, mate. All my digging and it was already there the whole time, waiting for us.", phase: 4, animalType: 'wombat' },
-  { id: 'wb_4_2', text: "The tunnels connect to everything now — Axel's water, Ember's fire, Bamboo's sky. Earth, water, fire, air. Complete.", phase: 4, animalType: 'wombat' },
+  { id: 'wb_4_2', text: "The tunnels connect to everything now — Axel's water, Ember's fire, Bamboo's sky. Earth, water, fire, air. Complete.", phase: 4, animalType: 'wombat', requiresAnimals: ['red_panda'] },
   { id: 'wb_4_3', text: "I built the foundation. You built the house on top of it. Together we built what the arrangement requires.", phase: 4, animalType: 'wombat' },
   { id: 'wb_4_4', text: "Finally dug deep enough to understand. The bottom isn't empty, mate. The bottom is full. Terribly full.", phase: 4, animalType: 'wombat' },
   { id: 'wb_4_5', text: "Whole life I ran from the surface into the earth. Turns out the earth had plans of her own.", phase: 4, animalType: 'wombat' },
@@ -760,6 +769,7 @@ const RABBIT_DIALOGUES: Dialogue[] = [
   { id: 'rb_2_8', text: "Stopped sleeping. Sleep is when they get you. Unconscious, vulnerable, defenseless. I can't afford that anymore.", phase: 2, animalType: 'rabbit' },
   { id: 'rb_2_9', text: "My heart can't beat any faster. A hundred and fifty is the limit. But the fear keeps growing past it.", phase: 2, animalType: 'rabbit' },
   { id: 'rb_2_10', text: "I watch the sky constantly now. Not for beauty anymore. For shadows. For the shape of what's coming.", phase: 2, animalType: 'rabbit' },
+  { id: 'rb_2_w1', text: "Bamboo isn't afraid. Of any of it. That's the part that keeps me up at night. Ask them why. Actually — don't.", phase: 2, animalType: 'rabbit', requiresAnimals: ['red_panda'] },
 
   // Phase 3 - The Witness emerges (10 dialogues)
   { id: 'rb_3_1', text: "That shadow overhead hasn't moved in days. It's not a cloud. Clouds move. This just... watches.", phase: 3, animalType: 'rabbit' },
@@ -819,6 +829,28 @@ export function getDialoguesForAnimal(
   return ALL_DIALOGUES.filter(
     d => d.animalType === animalType && d.phase <= maxPhase
   );
+}
+
+/**
+ * Resolve a dialogue index to the first line at or after it that doesn't
+ * reference a still-locked animal. Indices at or beyond the end of the pool
+ * pass through unchanged (Phase 5 cycles rely on out-of-range indices).
+ */
+export function resolveDialogueIndex(
+  animalType: AnimalType,
+  index: number,
+  maxPhase: DialoguePhase,
+  unlockedTypes: Set<AnimalType>
+): number {
+  const dialogues = getDialoguesForAnimal(animalType, maxPhase);
+  let i = Math.max(0, index);
+  while (
+    i < dialogues.length &&
+    dialogues[i].requiresAnimals?.some(t => !unlockedTypes.has(t))
+  ) {
+    i++;
+  }
+  return i;
 }
 
 /**

@@ -7,6 +7,7 @@ import {
   hasSeenAnyChoice,
   getChoiceCount,
   getPhase4ChoiceCallback,
+  getPhase5ChoiceCallback,
   clearChoiceState,
   ANIMAL_CHOICES,
   PlayerChoice,
@@ -389,5 +390,27 @@ describe('dialogueChoices', () => {
       await clearChoiceState();
       expect(AsyncStorage.removeItem).toHaveBeenCalledWith('wordshift_dialogue_choices');
     });
+  });
+});
+
+describe('getPhase5ChoiceCallback', () => {
+  const allAnimals = ['fox', 'pangolin', 'owl', 'axolotl', 'capybara', 'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda'];
+
+  test('returns a serene callback for every animal and both choices', () => {
+    for (const animal of allAnimals) {
+      for (const choice of ['ask', 'refuse'] as const) {
+        const text = getPhase5ChoiceCallback(animal, choice);
+        expect(text).not.toBeNull();
+        expect((text as string).length).toBeGreaterThan(10);
+      }
+    }
+  });
+
+  test('returns null when no choice was made', () => {
+    expect(getPhase5ChoiceCallback('fox', null)).toBeNull();
+  });
+
+  test('ask and refuse produce different lines', () => {
+    expect(getPhase5ChoiceCallback('owl', 'ask')).not.toBe(getPhase5ChoiceCallback('owl', 'refuse'));
   });
 });

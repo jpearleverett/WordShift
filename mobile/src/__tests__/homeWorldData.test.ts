@@ -202,3 +202,51 @@ describe('late-unlock dialogue fast-forward', () => {
     expect(all[idx].phase).toBe(2);
   });
 });
+
+describe('resolveDialogueIndex (locked-animal forward references)', () => {
+  const { resolveDialogueIndex, getDialoguesForAnimal } =
+    require('../services/dialogue/animalDialogueBase');
+  const ALL = new Set(['fox', 'pangolin', 'owl', 'axolotl', 'sloth', 'fennec_fox', 'capybara', 'wombat', 'rabbit', 'red_panda']);
+
+  test('passes through untagged lines unchanged', () => {
+    expect(resolveDialogueIndex('fox', 0, 4, ALL)).toBe(0);
+  });
+
+  test('skips a line that names a locked animal', () => {
+    const foxLines = getDialoguesForAnimal('fox', 4);
+    const blocked = foxLines.findIndex((d: { id: string }) => d.id === 'fx_0_5'); // mentions Archimedes
+    expect(blocked).toBeGreaterThan(-1);
+    const onlyFox = new Set(['fox']);
+    const resolved = resolveDialogueIndex('fox', blocked, 4, onlyFox);
+    expect(resolved).toBeGreaterThan(blocked);
+    // The resolved line must not require any locked animal
+    const line = foxLines[resolved];
+    for (const req of line.requiresAnimals ?? []) {
+      expect(onlyFox.has(req)).toBe(true);
+    }
+  });
+
+  test('does not skip when the referenced animal is unlocked', () => {
+    const foxLines = getDialoguesForAnimal('fox', 4);
+    const blocked = foxLines.findIndex((d: { id: string }) => d.id === 'fx_0_5');
+    expect(resolveDialogueIndex('fox', blocked, 4, ALL)).toBe(blocked);
+  });
+
+  test('indices beyond the pool pass through (phase 5 cycling)', () => {
+    const total = getDialoguesForAnimal('fox', 4).length;
+    expect(resolveDialogueIndex('fox', total + 7, 4, new Set(['fox']))).toBe(total + 7);
+  });
+
+  test('every question-web line is tagged with its target', () => {
+    for (const [animal, target] of [
+      ['fox', 'wombat'], ['pangolin', 'axolotl'], ['owl', 'fennec_fox'],
+      ['axolotl', 'sloth'], ['fennec_fox', 'capybara'], ['wombat', 'rabbit'],
+      ['rabbit', 'red_panda'],
+    ] as const) {
+      const lines = getDialoguesForAnimal(animal, 2);
+      const web = lines.find((d: { id: string }) => d.id.endsWith('_2_w1'));
+      expect(web).toBeDefined();
+      expect(web.requiresAnimals).toContain(target);
+    }
+  });
+});

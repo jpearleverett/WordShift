@@ -339,15 +339,16 @@ Late unlocks have puzzle-count gates to prevent amber surplus outrunning narrati
 **Session mechanics**: Max dialogues per session phase-aware (3-6). Cooldown: 2-5 puzzles between sessions. Grace period for newly unlocked animals.
 
 **Rich interaction layers**:
-- **Cross-animal references**: Phase-scaled frequency (20% → 60%). Vanguard animals get guaranteed first ref at each new phase.
+- **Cross-animal references**: Phase-scaled frequency (20% → 60%). Vanguard animals get guaranteed first ref at each new phase. Dynamic refs filter by `unlockedAnimals`; static base lines that name another animal carry `requiresAnimals` tags and are skipped by `resolveDialogueIndex()` until that animal is unlocked — no animal is ever mentioned before the player has met them.
+- **Question web** (Phase 2): each animal has one `*_2_w1` hook line pointing the player at another animal's mystery ("Ask Warren what he found"), gated on that animal being unlocked.
 - **Trigger word reactions**: Puzzle words (FLAME, VOID, etc.) queue per-animal, consumed on visit.
 - **Sacrifice reactions** (Phase 4+): Animals comment on amber offerings.
 - **Coordinated events**: At puzzle milestones (80, 100, 120, 160, 200, 230), all animals share thematically linked dialogue.
 - **Word threshold dialogues**: Reactions at 100/250/500/750 total words.
-- **Catch-up dialogue**: Late-unlocked animals (Phase 2+) get compressed intro arcs, AND their `lastDialogueRead` index fast-forwards to the start of their previous phase's block (`fastForwardLateUnlockDialogue` in homeWorldData.ts + `getPhaseStartIndex` in animalDialogueBase.ts) — they arrive with a little personal history to share but never replay bright-days small talk under a dark sky.
+- **Catch-up dialogue**: Late-unlocked animals (Phase 2+) get compressed intro arcs, AND their catch-up arc opens with how their recruiter (the previous animal in unlock order) called them to the house, and their `lastDialogueRead` index fast-forwards to the start of their previous phase's block (`fastForwardLateUnlockDialogue` in homeWorldData.ts + `getPhaseStartIndex` in animalDialogueBase.ts) — they arrive with a little personal history to share but never replay bright-days small talk under a dark sky.
 - **Tutorial callback**: Fox at Phase 4 recontextualizes innocent tutorial lines as cult recruitment.
 - **Narrative seeds**: Phase 0 seed lines → Phase 4 callbacks for all 10 animals.
-- **Player choice points** (Phase 3): Each animal offers one binary choice. Both paths converge. Phase 4 callbacks reference the choice.
+- **Player choice points** (Phase 3): Each animal offers one binary choice. Both paths converge. Phase 4 delivers a one-time pre-dialogue callback recontextualizing the choice (`getAndMarkPhase4CallbackPage`), and Phase 5 weaves a serene choice callback into each animal's post-revelation cycle (`getPhase5ChoiceCallback`).
 
 ### Journal Hub Modal
 📚 icon in header groups Word Ledger, Whisper Gallery, and Weekly Quests. Gated until puzzle 6. Fox introduces with 5-line walkthrough.

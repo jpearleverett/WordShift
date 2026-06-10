@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Animated } from 'react-native';
-import { Animal, HomeWorldProgress, getAnimalPhase, DialoguePhase, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
+import { Animal, AnimalType, HomeWorldProgress, getAnimalPhase, DialoguePhase, ANIMAL_AWARENESS_TIERS } from '../types/homeWorld';
 import {
   getCurrentDialogue,
   hasMoreDialogues,
+  resolveDialogueIndex,
   getCrossAnimalReference,
   getTriggerWordReaction,
   getVariantTutorialDialogue,
@@ -36,7 +37,15 @@ import {
   markFoxPlayNudgeSeen,
 } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
-import { getChoiceForAnimal, recordChoice, PlayerChoice, DialogueChoice } from '../services/dialogueChoices';
+import {
+  getChoiceForAnimal,
+  recordChoice,
+  PlayerChoice,
+  DialogueChoice,
+  loadChoiceState,
+  getAndMarkPhase4CallbackPage,
+  getPhase5ChoiceCallback,
+} from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
 import { getFoxPostTutorialPlayPrompt } from '../services/phaseNarrative';
 import { recordAnimalVisit } from '../services/weeklyQuests';
@@ -99,6 +108,20 @@ export function useDialogueFlow({
   const [preDialoguePages, setPreDialoguePages] = useState<string[]>([]);
   // Active dialogue choice (Phase 3 choice points)
   const [activeChoice, setActiveChoice] = useState<DialogueChoice | null>(null);
+  // Recorded Phase 3 choices (loaded once; refreshed when a choice is made) —
+  // used synchronously by the Phase 5 post-revelation dialogue cycle.
+  const [playerChoices, setPlayerChoices] = useState<Record<string, PlayerChoice>>({});
+
+  useEffect(() => {
+    loadChoiceState()
+      .then(state => setPlayerChoices(state.choices ?? {}))
+      .catch(() => {});
+  }, []);
+
+  // Animal types currently unlocked — lines tagged with `requiresAnimals`
+  // are skipped while any of their referenced animals is still locked.
+  const getUnlockedTypes = (): Set<AnimalType> =>
+    new Set((progress?.unlockedAnimals ?? []) as AnimalType[]);
 
   // Track last-seen sacrifice count per animal to detect new sacrifices
   const lastSeenSacrificeCount = useRef<Record<string, number>>({});
@@ -204,20 +227,29 @@ export function useDialogueFlow({
     if (animalPhase === 5) {
       const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
       if (selectedAnimal.currentDialogueIndex >= totalRegular) {
-        // Regular dialogues exhausted — use post-revelation dialogues
+        // Regular dialogues exhausted — cycle the post-revelation lines,
+        // plus one extra slot for the player's Phase 3 choice callback.
         const prCount = getPostRevelationDialogueCount(selectedAnimal.type);
+        const choiceCallback = getPhase5ChoiceCallback(
+          selectedAnimal.type,
+          playerChoices[selectedAnimal.type] ?? null
+        );
+        const cycleLen = prCount + (choiceCallback ? 1 : 0);
         // Safe modulo that handles negative values in JS: ((x % n) + n) % n
         const rawIndex = selectedAnimal.currentDialogueIndex - totalRegular;
-        const postRevIndex = prCount > 0
-          ? ((rawIndex % prCount) + prCount) % prCount
+        const postRevIndex = cycleLen > 0
+          ? ((rawIndex % cycleLen) + cycleLen) % cycleLen
           : 0;
+        if (choiceCallback && postRevIndex === prCount) {
+          return choiceCallback;
+        }
         const postRevDialogue = getPostRevelationDialogue(selectedAnimal.type, postRevIndex);
         return postRevDialogue || 'The pattern holds.';
       }
       // Still within regular Phase 4 dialogues
       const regularDialogue = getCurrentDialogue(
         selectedAnimal.type,
-        selectedAnimal.currentDialogueIndex,
+        resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, 4, getUnlockedTypes()),
         4
       );
       return regularDialogue?.text || 'The pattern holds.';
@@ -225,7 +257,7 @@ export function useDialogueFlow({
 
     const dialogue = getCurrentDialogue(
       selectedAnimal.type,
-      selectedAnimal.currentDialogueIndex,
+      resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase, getUnlockedTypes()),
       animalPhase
     );
     return dialogue?.text || 'Hello, friend!';
@@ -242,7 +274,10 @@ export function useDialogueFlow({
     // Phase 5: post-revelation dialogues always cycle (never truly exhausted)
     if (animalPhase === 5) return true;
 
-    return hasMoreDialogues(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase);
+    const unlocked = getUnlockedTypes();
+    const cur = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase, unlocked);
+    const next = resolveDialogueIndex(selectedAnimal.type, cur + 1, animalPhase, unlocked);
+    return next < getTotalDialogueCount(selectedAnimal.type, animalPhase);
   };
 
   // Handle animal tap
@@ -272,6 +307,17 @@ export function useDialogueFlow({
 
     if (progress) {
       recordAnimalVisit(animal.id, progress.currentPhase, progress.currentStreak).catch(() => {});
+
+      // Skip past any lines that reference still-locked animals so the
+      // stored read position never points at a blocked line.
+      const tapPhase = getAnimalPhase(progress.currentPhase, animal.type);
+      const tapResolvePhase = (tapPhase === 5 ? 4 : tapPhase) as DialoguePhase;
+      const resolved = resolveDialogueIndex(animal.type, animal.currentDialogueIndex, tapResolvePhase, getUnlockedTypes());
+      if (resolved !== animal.currentDialogueIndex) {
+        markDialogueRead(animal.id, resolved).catch(() => {});
+        setAnimals(prev => prev.map(a => (a.id === animal.id ? { ...a, currentDialogueIndex: resolved } : a)));
+        animal = { ...animal, currentDialogueIndex: resolved };
+      }
     }
 
     setSelectedAnimal(animal);
@@ -420,6 +466,19 @@ export function useDialogueFlow({
       }
     }
 
+    // 8a. Phase 4+: one-time callback recontextualizing the player's
+    // Phase 3 choice now that the cult is revealed.
+    if (animalPhase >= 4) {
+      try {
+        const choiceCallback = await getAndMarkPhase4CallbackPage(animal.type);
+        if (choiceCallback) {
+          pages.push(choiceCallback);
+        }
+      } catch {
+        // Choice callbacks are non-critical
+      }
+    }
+
     // 8. Dialogue choice point (Phase 3 only) — illusion of agency
     if (animalPhase === 3) {
       try {
@@ -463,7 +522,9 @@ export function useDialogueFlow({
     if (isOnCooldown(animal.id)) return false;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
-    return animal.currentDialogueIndex < totalDialogues;
+    if (animalPhase === 5) return true;
+    const resolved = resolveDialogueIndex(animal.type, animal.currentDialogueIndex, animalPhase, getUnlockedTypes());
+    return resolved < totalDialogues;
   }, [progress]);
 
   // Handle closing dialogue. Manual closes keep the session warm so
@@ -540,7 +601,10 @@ export function useDialogueFlow({
       const status = getSessionStatus(selectedAnimal.id);
       setSessionInfo(status);
 
-      const newIndex = selectedAnimal.currentDialogueIndex + 1;
+      const resolvePhase = (animalPhase === 5 ? 4 : animalPhase) as DialoguePhase;
+      const unlocked = getUnlockedTypes();
+      const cur = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, resolvePhase, unlocked);
+      const newIndex = resolveDialogueIndex(selectedAnimal.type, cur + 1, resolvePhase, unlocked);
       await markDialogueRead(selectedAnimal.id, newIndex);
 
       const updatedAnimal = { ...selectedAnimal, currentDialogueIndex: newIndex };
@@ -592,6 +656,7 @@ export function useDialogueFlow({
     hapticSelection();
     try {
       const result = await recordChoice(selectedAnimal.type, choice);
+      setPlayerChoices(prev => ({ ...prev, [selectedAnimal.type]: choice }));
       // Replace the current pre-dialogue page with the response, then convergence
       setPreDialoguePages([result.response, result.convergence]);
       setActiveChoice(null);
