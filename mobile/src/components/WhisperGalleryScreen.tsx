@@ -19,6 +19,7 @@ import {
   WhisperEntry,
 } from '../services/whisperGallery';
 import { ANIMAL_INFO } from '../services/animalDialogue';
+import { getWhisperGalleryEmptyText } from '../services/phaseNarrative';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -98,9 +99,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
         {!loading && animalTypes.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: textColor }]}>
-              {phase >= 3
-                ? 'The walls are quiet... for now.'
-                : 'No whispers collected yet. Play puzzles and talk to your animal friends!'}
+              {getWhisperGalleryEmptyText(phase)}
             </Text>
           </View>
         )}

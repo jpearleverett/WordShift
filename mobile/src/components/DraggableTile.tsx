@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
+import { getDragShadowColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
 import { DROP_IMPACT_POP_MS, DROP_IMPACT_COLLAPSE_MS } from '../constants/timing';
@@ -202,9 +203,7 @@ export function DraggableTile({
     })
   ).current;
 
-  const shadowColor = phase >= 5 ? '#7B6B8A80'   // ghostly mauve (terrible peace)
-    : phase >= 3 ? '#8030508C'                    // crimson (cult/dread)
-    : '#FFD70050';                                // golden (bright days)
+  const shadowColor = getDragShadowColor(phase);
 
   return (
     <View style={styles.wrapper}>

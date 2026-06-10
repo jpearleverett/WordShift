@@ -612,4 +612,58 @@ export function getOverlayBannerTheme(phase: number): OverlayBannerTheme {
   }
 }
 
+// ============================================================================
+// PHASE-AWARE COMPONENT PALETTES
+// Color tokens extracted from individual components (LetterTile, DraggableTile,
+// OfferingPitScreen) so all phase-aware color values live in the theme layer.
+// ============================================================================
+
+/**
+ * Resonance glow visual config for dread-tier letter tiles — color and
+ * opacity range per phase (used by LetterTile).
+ */
+export function getResonanceConfig(phase: number): { color: string; minOpacity: number; maxOpacity: number } {
+  if (phase >= 5) return { color: '#7B6B8A', minOpacity: 0.06, maxOpacity: 0.10 };   // Ghostly mauve
+  if (phase >= 4) return { color: '#8B0000', minOpacity: 0.12, maxOpacity: 0.28 };   // Crimson
+  if (phase >= 3) return { color: '#4A2080', minOpacity: 0.08, maxOpacity: 0.20 };   // Dark purple
+  if (phase >= 2) return { color: '#6B5B95', minOpacity: 0.04, maxOpacity: 0.12 };   // Purple-blue
+  return { color: '#DAA520', minOpacity: 0.02, maxOpacity: 0.05 };                   // Warm gold (Phase 1)
+}
+
+/**
+ * Shadow color for the floating drag copy of a letter tile (DraggableTile).
+ */
+export function getDragShadowColor(phase: number): string {
+  return phase >= 5 ? '#7B6B8A80'   // ghostly mauve (terrible peace)
+    : phase >= 3 ? '#8030508C'      // crimson (cult/dread)
+    : '#FFD70050';                  // golden (bright days)
+}
+
+/**
+ * Offering Pit screen background color per phase — shown behind the
+ * pit background image (OfferingPitScreen).
+ */
+export const PIT_BACKGROUND_COLORS: Record<number, string> = {
+  0: '#6fb7df',
+  1: '#104c83',
+  2: '#514378',
+  3: '#060612',
+  4: '#1a122a',
+  5: '#1d1830', // post-revelation: settled, muted purple
+};
+
+/**
+ * Offering Pit devour effect colors per phase — word trail, pit glow,
+ * impact burst, and dark pit core (OfferingPitScreen).
+ */
+export const PIT_DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: number; burst: string; core: string }> = {
+  0: { trail: '#FFD700', glow: '#FFD700', glowOpacity: 0.35, burst: '#FFE680', core: '#1A1500' },
+  1: { trail: '#F0C050', glow: '#F0C050', glowOpacity: 0.30, burst: '#F5D88A', core: '#1A1500' },
+  2: { trail: '#B088D0', glow: '#9060C0', glowOpacity: 0.25, burst: '#C8A8E8', core: '#0E0520' },
+  3: { trail: '#5A2080', glow: '#3A1060', glowOpacity: 0.20, burst: '#7040A0', core: '#08020F' },
+  4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070', core: '#1A0510' },
+  // Phase 5: terrible peace — ghostly mauve, no urgency left in the light
+  5: { trail: '#9B8CB8', glow: '#8A7AA8', glowOpacity: 0.22, burst: '#C0B4D8', core: '#171322' },
+};
+
 export default CandyColors;
