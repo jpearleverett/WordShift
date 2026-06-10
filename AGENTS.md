@@ -17,11 +17,11 @@ WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase 
 - See `CLAUDE.md` for the full test commands. Key: always use `npm test` (not `npx jest`).
 - **Run all tests:** `cd mobile && npm test -- --no-coverage`
 - **Run a single file:** `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
-- 11 tests in 3 suites (`integration`, `puzzleVariety`, `amberCurrency`) have pre-existing failures unrelated to environment setup.
+- The suite is expected green (~1,006 tests across 35 suites). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
 
 ### TypeScript
 
-- `npx tsc --noEmit` (or `npm run typecheck`) in `mobile/` will show pre-existing type errors in several files (App.tsx, HomeScreen.tsx, HouseWorld.tsx, etc.). These are known and not blocking for development.
+- `npx tsc --noEmit` (or `npm run typecheck`) in `mobile/` is expected clean. Note: `pointerEvents` belongs in the `style` object for `Image`/`Animated.Image` (it is not a prop there in RN 0.81's types).
 - Lint: `npm run lint` (ESLint 9 flat config via `eslint-config-expo`, see `mobile/eslint.config.js`). Generated data files (`src/data/puzzleBank*.ts`, `src/dictionary.ts`) are excluded.
 
 ### Gotchas

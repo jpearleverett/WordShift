@@ -91,10 +91,10 @@ describe('awardPuzzleAmber', () => {
   });
 
   test('tracks phase transitions', async () => {
-    // Solve enough puzzles to reach phase 1 (25 puzzles)
-    await devAddPuzzles(24);
+    // Solve enough puzzles to reach phase 1 (PHASE_THRESHOLDS[1] = 20 puzzles)
+    await devAddPuzzles(19);
     const result = await awardPuzzleAmber('EASY', 1);
-    expect(result.puzzlesSolved).toBe(25);
+    expect(result.puzzlesSolved).toBe(20);
     expect(result.phaseChanged).toBe(true);
     expect(result.newPhase).toBe(1);
   });
@@ -220,9 +220,9 @@ describe('getCurrentPhase', () => {
 });
 
 describe('getPuzzlesUntilNextPhase', () => {
-  test('returns 25 initially (to reach phase 1)', async () => {
+  test('returns 20 initially (to reach phase 1)', async () => {
     const remaining = await getPuzzlesUntilNextPhase();
-    expect(remaining).toBe(25);
+    expect(remaining).toBe(20);
   });
 
   test('returns null at max phase', async () => {
@@ -234,7 +234,7 @@ describe('getPuzzlesUntilNextPhase', () => {
   test('decreases as puzzles are solved', async () => {
     await devAddPuzzles(10);
     const remaining = await getPuzzlesUntilNextPhase();
-    expect(remaining).toBe(15); // 25 - 10
+    expect(remaining).toBe(10); // 20 - 10
   });
 
   test('uses phaseProgress for accelerated players', async () => {
@@ -242,30 +242,30 @@ describe('getPuzzlesUntilNextPhase', () => {
     // both puzzlesSolved and phaseProgress are 10
     await devAddPuzzles(10);
     const remaining = await getPuzzlesUntilNextPhase();
-    expect(remaining).toBe(15);
+    expect(remaining).toBe(10);
   });
 
   test('never returns negative values', async () => {
     // At phase boundary, should be 0 not negative
-    await devAddPuzzles(25);
-    // Now at phase 1, puzzles until phase 2 threshold (75)
+    await devAddPuzzles(20);
+    // Now at phase 1, puzzles until phase 2 threshold (65)
     const remaining = await getPuzzlesUntilNextPhase();
     expect(remaining).toBeGreaterThanOrEqual(0);
   });
 
   test('returns correct value at each phase boundary', async () => {
-    // Phase 0 -> 1: threshold is 25
-    expect(await getPuzzlesUntilNextPhase()).toBe(25);
+    // Phase 0 -> 1: threshold is 20
+    expect(await getPuzzlesUntilNextPhase()).toBe(20);
 
-    await devAddPuzzles(25); // Now at phase 1
-    // Phase 1 -> 2: threshold is 75
-    expect(await getPuzzlesUntilNextPhase()).toBe(50); // 75 - 25
+    await devAddPuzzles(20); // Now at phase 1
+    // Phase 1 -> 2: threshold is 65
+    expect(await getPuzzlesUntilNextPhase()).toBe(45); // 65 - 20
 
-    await devAddPuzzles(50); // Now at phase 2 (75 total)
+    await devAddPuzzles(45); // Now at phase 2 (65 total)
     // Phase 2 -> 3: threshold is 150
-    expect(await getPuzzlesUntilNextPhase()).toBe(75); // 150 - 75
+    expect(await getPuzzlesUntilNextPhase()).toBe(85); // 150 - 65
 
-    await devAddPuzzles(75); // Now at phase 3 (150 total)
+    await devAddPuzzles(85); // Now at phase 3 (150 total)
     // Phase 3 -> 4: threshold is 235
     expect(await getPuzzlesUntilNextPhase()).toBe(85); // 235 - 150
 

@@ -736,6 +736,42 @@ const styles = StyleSheet.create({
   victoryStarEmpty: {
     opacity: 0.3,
   },
+  victoryStarImage: {
+    width: 38,
+    height: 38,
+    marginHorizontal: 4,
+  },
+  victoryStarImageBig: {
+    width: 52,
+    height: 52,
+    marginBottom: 4,
+  },
+  streakMilestoneHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  earlyVictoryValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  amberIconLarge: {
+    width: 26,
+    height: 26,
+  },
+  amberValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  amberIcon: {
+    width: 15,
+    height: 15,
+  },
   victoryTitle: {
     fontSize: 42,
     fontWeight: '900',

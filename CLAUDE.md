@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
-- The full suite has ~880 tests across 36 suites (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,000 tests across 35 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -170,7 +170,7 @@ mobile/
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
 │       ├── homeScenePan.ts, shareResults.ts
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~880 tests, 36 suites
+├── src/__tests__/               # ~1,000 tests, 35 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles (development/preview/production)
@@ -543,6 +543,9 @@ mobile/assets/
 - `DialoguePhase` is `0|1|2|3|4|5` literal — mock return values need `as number` cast
 - Component tests use `jest.mock('react-native', ...)` stubs (Node env, no renderer)
 - Performance monitor tests mock `requestAnimationFrame`, `cancelAnimationFrame`, `performance.now`
+- Date-sensitive tests must build dates from local components (`new Date(2026, 1, 9)`), never ISO strings (`new Date('2026-02-09')` parses as UTC midnight → previous local day in timezones behind UTC)
+- Tests whose code path calls `logEvent` should `jest.mock('../services/eventLogger')` so the 5s debounced flush timer can't fire after teardown
+- Phase-threshold tests must use `PHASE_THRESHOLDS` values from `constants/gameBalance.ts` ([0, 20, 65, 150, 235]) — don't hardcode stale balance numbers
 
 ## Common Tasks
 

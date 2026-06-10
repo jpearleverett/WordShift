@@ -38,29 +38,32 @@ describe('weeklyQuests', () => {
   // ===========================================================================
 
   describe('getWeekId', () => {
+    // NOTE: dates are built with local components — new Date('YYYY-MM-DD')
+    // parses as UTC midnight, which is the previous local day in timezones
+    // behind UTC and made these tests environment-dependent.
     it('returns a string in ISO week format', () => {
-      const id = getWeekId(new Date('2026-02-14'));
+      const id = getWeekId(new Date(2026, 1, 14));
       expect(id).toMatch(/^\d{4}-W\d{2}$/);
     });
 
     it('returns the same week ID for dates in the same week', () => {
-      const monday = getWeekId(new Date('2026-02-09'));
-      const wednesday = getWeekId(new Date('2026-02-11'));
-      const friday = getWeekId(new Date('2026-02-13'));
-      const sunday = getWeekId(new Date('2026-02-15'));
+      const monday = getWeekId(new Date(2026, 1, 9));
+      const wednesday = getWeekId(new Date(2026, 1, 11));
+      const friday = getWeekId(new Date(2026, 1, 13));
+      const sunday = getWeekId(new Date(2026, 1, 15));
       expect(monday).toBe(wednesday);
       expect(wednesday).toBe(friday);
       expect(friday).toBe(sunday);
     });
 
     it('returns different week IDs for dates in different weeks', () => {
-      const week1 = getWeekId(new Date('2026-02-09'));
-      const week2 = getWeekId(new Date('2026-02-16'));
+      const week1 = getWeekId(new Date(2026, 1, 9));
+      const week2 = getWeekId(new Date(2026, 1, 16));
       expect(week1).not.toBe(week2);
     });
 
     it('handles year boundary correctly', () => {
-      const id = getWeekId(new Date('2026-01-01'));
+      const id = getWeekId(new Date(2026, 0, 1));
       expect(id).toMatch(/^\d{4}-W\d{2}$/);
     });
 
@@ -76,12 +79,12 @@ describe('weeklyQuests', () => {
 
   describe('getDayId', () => {
     it('returns a string in YYYY-MM-DD format', () => {
-      const id = getDayId(new Date('2026-03-11'));
+      const id = getDayId(new Date(2026, 2, 11));
       expect(id).toBe('2026-03-11');
     });
 
     it('pads single-digit month and day', () => {
-      const id = getDayId(new Date('2026-01-05'));
+      const id = getDayId(new Date(2026, 0, 5));
       expect(id).toBe('2026-01-05');
     });
 

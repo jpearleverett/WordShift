@@ -20,6 +20,7 @@ import {
 } from '../services/whisperGallery';
 import { ANIMAL_INFO } from '../services/animalDialogue';
 import { getWhisperGalleryEmptyText } from '../services/phaseNarrative';
+import { DialoguePhase } from '../types/homeWorld';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -99,7 +100,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
         {!loading && animalTypes.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: textColor }]}>
-              {getWhisperGalleryEmptyText(phase)}
+              {getWhisperGalleryEmptyText(phase as DialoguePhase)}
             </Text>
           </View>
         )}

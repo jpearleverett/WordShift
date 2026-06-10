@@ -62,6 +62,8 @@ export function logEvent(event: GameEvent): void {
       flushEvents();
       flushTimer = null;
     }, 5000);
+    // In Node (tests), don't let the debounce timer hold the process open.
+    (flushTimer as { unref?: () => void }).unref?.();
   }
 }
 

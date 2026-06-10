@@ -239,7 +239,7 @@ All actionable findings were implemented on this branch (commits `03224ff`…`e1
 | `installGlobalErrorHandler()` never called | **Fixed** — installed at App.tsx module load |
 | app.json/eas.json incomplete | **Fixed** — buildNumber, versionCode, notifications plugin, infoPlist, privacy manifest; eas.json added |
 | Sound toggle with no audio | **Fixed** — real 14-sound WAV pack wired through audio.ts (silent-mode-friendly, settings-gated) |
-| Known-red test/tsc baseline | **Open** — cannot be reproduced in this environment (deps uninstallable); must be driven green locally |
+| Known-red test/tsc baseline | **Fixed** — all 14 test failures (stale phase thresholds, timezone-fragile date tests, variant offer-gate misuse, leaked flush timer) and all 17 tsc errors (missing VictoryModal styles, Image `pointerEvents` placement, missing cast) resolved against a real device run; suite expected green |
 
 High-priority items also implemented: contextual notification permission flow (no cold-launch prompt; latent module-loading bug fixed — notifications were previously dead code), daily challenge unlock 20→5, pit auto-collect window 5→15 with the Fox intro retimed, telemetry uploader (disabled by default) + `app_open`/permission-result events, lazy-loaded puzzle banks, color-blind-safe ✓/✗ previews, DraggableTile/LetterTile screen-reader labels, WCAG AA dark-phase text contrast, Android back handling, stuck detection with phase-aware messaging, haptic gaps, glow-loop gating, slot hitSlop, Settings version/reminders, WhisperGallery loading state, ~6.5MB image downscaling, ESLint config, storage-read hardening, and doc corrections (CLAUDE.md/AGENTS.md). Chain Shift remains design-only by choice; docs now say so explicitly.
 

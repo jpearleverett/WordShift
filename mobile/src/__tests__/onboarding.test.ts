@@ -13,6 +13,12 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
 
+// setOnboardingStep logs FTUE funnel events; mock the logger so its 5s
+// debounced flush timer can't fire after this suite's environment is gone.
+jest.mock('../services/eventLogger', () => ({
+  logEvent: jest.fn(),
+}));
+
 describe('onboarding', () => {
   beforeEach(async () => {
     (AsyncStorage.clear as jest.Mock)();
