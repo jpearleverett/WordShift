@@ -11,6 +11,8 @@ import {
   Animated,
   Pressable,
   Linking,
+  BackHandler,
+  Alert,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -57,6 +59,7 @@ import {
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
   getFoxPitHarvestIntroLines,
+  getNotificationPromptText,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
@@ -65,7 +68,16 @@ import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
 import { isDreadWord, validateWord } from './src/services/localGenerator';
-import { scheduleAllNotifications } from './src/services/notifications';
+import {
+  scheduleAllNotifications,
+  getNotificationPermissionStatus,
+  requestNotificationPermission,
+  hasPromptedForNotifications,
+  markPromptedForNotifications,
+} from './src/services/notifications';
+import { runMigrations } from './src/services/dataMigration';
+import { installGlobalErrorHandler } from './src/services/errorReporting';
+import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
 import { estimateSlotIndex } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY } from './src/constants/timing';
@@ -95,7 +107,11 @@ interface PostVictoryIntro {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export default function App() {
+// Install the global error handler at module load so it catches errors as
+// early as possible — including errors thrown during the first render.
+installGlobalErrorHandler();
+
+function MainApp() {
   // Screen navigation
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
   const [homePanY, setHomePanY] = useState<number | null>(null);
@@ -337,6 +353,29 @@ export default function App() {
     scheduleAllNotifications(0).catch(() => {});
     uploadToCloud().catch(() => {});
   }, []);
+
+  // Android hardware back button: sub-screens navigate home; home exits the app.
+  // Swallowed during onboarding so back can't break the guided flow.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (onboardingFlow.isOnboarding) {
+        return true;
+      }
+      if (currentScreen !== 'home') {
+        // Mirror the in-UI home button: reset transient puzzle UI state
+        // (mid-puzzle progress itself is preserved by autosave).
+        transitionTo('home', () => {
+          if (currentScreen === 'puzzle') {
+            puzzleActions.setGameState(GameState.IDLE);
+            puzzleActions.setShowConfetti(false);
+          }
+        });
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions]);
 
   // Resume pit screen if onboarding was interrupted during pit flow (initial mount only)
   useEffect(() => {
@@ -619,7 +658,7 @@ export default function App() {
         (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete') &&
         !victory.phaseTransitionPending &&
         !!victory.harvestBatchId &&
-        ((victory.cumulativeStats?.totalPuzzlesCompleted ?? 0) <= 5)
+        ((victory.cumulativeStats?.totalPuzzlesCompleted ?? 0) <= AUTO_COLLECT_PUZZLE_LIMIT)
       );
 
       if (shouldAutoCollectVictory && victory.harvestBatchId) {
@@ -656,7 +695,9 @@ export default function App() {
           });
         }
       }
-      if (completedTotal === 5 && !(await hasSeenPitHarvestIntro())) {
+      // Fox explains manual harvesting exactly when the auto-collect window
+      // closes (the NEXT puzzle's amber will queue in the pit).
+      if (completedTotal === AUTO_COLLECT_PUZZLE_LIMIT && !(await hasSeenPitHarvestIntro())) {
         immediateIntros.push({
           kind: 'home_tools',
           lines: getFoxPitHarvestIntroLines(finalVictory.newPhase),
@@ -918,13 +959,59 @@ export default function App() {
     puzzleActions.handleHint();
   }, [puzzleActions]);
 
+  // One-time contextual notification prompt — shown after dismissing the
+  // victory modal once the player has finished 3+ puzzles. The OS permission
+  // dialog is only triggered if the player accepts the in-app prompt.
+  const notificationPromptInFlightRef = useRef(false);
+  const maybePromptForNotifications = useCallback(async () => {
+    if (notificationPromptInFlightRef.current) return;
+    notificationPromptInFlightRef.current = true;
+    try {
+      if (onboardingFlow.isOnboarding) return;
+      if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return;
+      if (await hasPromptedForNotifications()) return;
+      if ((await getNotificationPermissionStatus()) === 'granted') return;
+      await markPromptedForNotifications();
+
+      const { title, body, accept, decline } = getNotificationPromptText(persistence.currentPhase);
+      Alert.alert(title, body, [
+        {
+          text: decline,
+          style: 'cancel',
+          onPress: () => {
+            logEvent({
+              type: 'notification_permission_result',
+              data: { granted: false, prompted: true },
+            });
+          },
+        },
+        {
+          text: accept,
+          onPress: async () => {
+            const granted = await requestNotificationPermission();
+            logEvent({
+              type: 'notification_permission_result',
+              data: { granted },
+            });
+            if (granted) {
+              scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+            }
+          },
+        },
+      ]);
+    } finally {
+      notificationPromptInFlightRef.current = false;
+    }
+  }, [onboardingFlow.isOnboarding, persistence.cumulativeStats, persistence.currentPhase]);
+
   const handleNextLevel = useCallback(() => {
     hapticLight();
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
-  }, [puzzleActions, startVictoryExitFlow]);
+    maybePromptForNotifications().catch(() => {});
+  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications]);
 
   // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
   const handleOnboardingVictoryContinue = useCallback(async () => {
@@ -949,7 +1036,8 @@ export default function App() {
       puzzleActions.clearBoard();
       transitionTo('home');
     });
-  }, [puzzleActions, transitionTo, startVictoryExitFlow]);
+    maybePromptForNotifications().catch(() => {});
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications]);
 
   const handleGoToPit = useCallback(() => {
     hapticLight();
@@ -1685,4 +1773,36 @@ export default function App() {
       />
     </View>
   );
+}
+
+/**
+ * Bootstrap gate: runs data migrations BEFORE MainApp mounts so that all
+ * service caches read migrated data. Never blocks forever — the app renders
+ * even if migrations fail (failures are logged, not fatal).
+ */
+export default function App() {
+  const [bootReady, setBootReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    logEvent({ type: 'app_open' });
+    (async () => {
+      try {
+        await runMigrations();
+      } catch (error) {
+        console.warn('Data migration failed:', error);
+      } finally {
+        if (!cancelled) setBootReady(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Plain dark view while booting — matches the root default background
+  // so there's no flash before MainApp renders.
+  if (!bootReady) {
+    return <View style={{ flex: 1, backgroundColor: '#1A1A2E' }} />;
+  }
+
+  return <MainApp />;
 }

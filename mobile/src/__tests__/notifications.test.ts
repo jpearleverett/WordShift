@@ -6,6 +6,10 @@ import {
   resetNotificationPrefs,
   scheduleAllNotifications,
   cancelAllNotifications,
+  getNotificationPermissionStatus,
+  requestNotificationPermission,
+  hasPromptedForNotifications,
+  markPromptedForNotifications,
   NotificationPreferences,
 } from '../services/notifications';
 
@@ -302,6 +306,44 @@ describe('notifications', () => {
   });
 
   // ===========================================================================
+  // Permission status & prompt flag
+  // ===========================================================================
+
+  describe('getNotificationPermissionStatus', () => {
+    it('returns undetermined when expo-notifications is unavailable', async () => {
+      expect(await getNotificationPermissionStatus()).toBe('undetermined');
+    });
+  });
+
+  describe('requestNotificationPermission', () => {
+    it('returns false when expo-notifications is unavailable', async () => {
+      expect(await requestNotificationPermission()).toBe(false);
+    });
+  });
+
+  describe('prompted-for-notifications flag', () => {
+    it('defaults to false', async () => {
+      expect(await hasPromptedForNotifications()).toBe(false);
+    });
+
+    it('round-trips after marking', async () => {
+      await markPromptedForNotifications();
+      expect(await hasPromptedForNotifications()).toBe(true);
+    });
+
+    it('persists to storage', async () => {
+      await markPromptedForNotifications();
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith('wordshift_notification_prompted', 'true');
+    });
+
+    it('is cleared by resetNotificationPrefs', async () => {
+      await markPromptedForNotifications();
+      await resetNotificationPrefs();
+      expect(await hasPromptedForNotifications()).toBe(false);
+    });
+  });
+
+  // ===========================================================================
   // cancelAllNotifications
   // ===========================================================================
 
@@ -343,6 +385,78 @@ describe('notifications', () => {
       expect(prefs.dailyReminderEnabled).toBe(true);
       expect(prefs.dailyReminderHour).toBe(9);
       expect(prefs.reengagementEnabled).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // Permission flow with a working expo-notifications module
+  // ===========================================================================
+  // These tests re-require the service with a functional expo-notifications
+  // mock (the top-level mock throws to simulate the module being missing).
+  // Re-requiring also resets the service's lazy module cache.
+
+  describe('permission flow (expo-notifications available)', () => {
+    function createExpoMock(status: string) {
+      return {
+        getPermissionsAsync: jest.fn(() => Promise.resolve({ status })),
+        requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+        cancelAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve()),
+        scheduleNotificationAsync: jest.fn(() => Promise.resolve('notification-id')),
+      };
+    }
+
+    let expoMock: ReturnType<typeof createExpoMock>;
+
+    function loadWithStatus(status: string): typeof import('../services/notifications') {
+      expoMock = createExpoMock(status);
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      return require('../services/notifications');
+    }
+
+    afterEach(() => {
+      jest.dontMock('expo-notifications');
+      jest.resetModules();
+    });
+
+    it('scheduleAllNotifications schedules when permission already granted', async () => {
+      const svc = loadWithStatus('granted');
+      await svc.scheduleAllNotifications(0);
+      expect(expoMock.getPermissionsAsync).toHaveBeenCalled();
+      expect(expoMock.scheduleNotificationAsync).toHaveBeenCalled();
+    });
+
+    it('scheduleAllNotifications never calls requestPermissionsAsync', async () => {
+      const svc = loadWithStatus('granted');
+      await svc.scheduleAllNotifications(0);
+      expect(expoMock.requestPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('scheduleAllNotifications does not schedule when permission denied', async () => {
+      const svc = loadWithStatus('denied');
+      await svc.scheduleAllNotifications(0);
+      expect(expoMock.scheduleNotificationAsync).not.toHaveBeenCalled();
+      expect(expoMock.requestPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('scheduleAllNotifications does not schedule when permission undetermined', async () => {
+      const svc = loadWithStatus('undetermined');
+      await svc.scheduleAllNotifications(0);
+      expect(expoMock.scheduleNotificationAsync).not.toHaveBeenCalled();
+      expect(expoMock.requestPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('getNotificationPermissionStatus reports OS status without requesting', async () => {
+      const svc = loadWithStatus('denied');
+      expect(await svc.getNotificationPermissionStatus()).toBe('denied');
+      expect(expoMock.requestPermissionsAsync).not.toHaveBeenCalled();
+    });
+
+    it('requestNotificationPermission calls requestPermissionsAsync', async () => {
+      const svc = loadWithStatus('undetermined');
+      const granted = await svc.requestNotificationPermission();
+      expect(granted).toBe(true);
+      expect(expoMock.requestPermissionsAsync).toHaveBeenCalled();
     });
   });
 });
