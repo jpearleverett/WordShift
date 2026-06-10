@@ -33,11 +33,9 @@ const SKY_STORM = require('../../../assets/environment/sky_storm.png');
 const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
 const CLOUD_1 = require('../../../assets/environment/cloud_1.png');
 const CLOUD_2 = require('../../../assets/environment/cloud_2.png');
-const GROUND_IMG = require('../../../assets/environment/ground.png');
 const ROOF_IMG = require('../../../assets/environment/roof.png');
 const FOUNDATION_IMG = require('../../../assets/environment/foundation.png');
 const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
-const TREE_IMG = require('../../../assets/environment/tree.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -630,8 +628,6 @@ const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 const ROOF_WIDTH = HOUSE_WIDTH + 30; // Rendered roof width (slight overhang)
 const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (312 / 792)); // roof.png aspect
 const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (84 / 792)); // foundation.png aspect
-const GROUND_WIDTH = ROOM_WIDTH * 1.6;
-const GROUND_HEIGHT = GROUND_WIDTH * (240 / 1024); // ground.png aspect
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
 
@@ -754,14 +750,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + (ROOF_RENDER_HEIGHT - 6) + houseHeight + FOUNDATION_RENDER_HEIGHT + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
+    const totalContentHeight = 50 + (ROOF_RENDER_HEIGHT - 6) + houseHeight + FOUNDATION_RENDER_HEIGHT + (onPitPress ? 95 : 0) + 40 + connectorHeight; // marginTop + roof + body + foundation + pit + marginBottom + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
       min: 0, // Don't allow panning below the house (prevents empty space below foundation)
       max: Math.max(0, overflow + 50), // Allow panning up to see the roof + small padding
     };
-  }, [containerHeight, houseHeight, numRows]);
+  }, [containerHeight, houseHeight, numRows, onPitPress]);
 
   const syncPanPosition = useCallback((nextPanY: number, notify = false) => {
     const clampedPanY = clampHomeScenePanY(nextPanY, panBounds.max);
@@ -895,53 +891,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {/* The unnamed entity - invisible until Phase 3, then looming behind the house */}
                 <ShadowFigure phase={currentPhase} />
 
-                {/* Grassy hill under the house - darkens as the world does */}
-                <Image
-                  source={GROUND_IMG}
-                  resizeMode="stretch"
-                  style={{
-                                position: 'absolute',
-                    bottom: -GROUND_HEIGHT * 0.45,
-                    alignSelf: 'center',
-                    width: GROUND_WIDTH,
-                    height: GROUND_HEIGHT,
-                    zIndex: -2,
-                    opacity: currentPhase >= 4 ? 0.3 : currentPhase >= 3 ? 0.5 : 1,
-                  }}
-                />
-
-                {/* Candy trees flanking the house - fading away as the phases darken */}
-                {currentPhase <= 3 && (
-                  <>
-                    <Image
-                      source={TREE_IMG}
-                      resizeMode="contain"
-                      style={{
-                                        position: 'absolute',
-                        bottom: -6,
-                        left: -64,
-                        width: 68,
-                        height: 92,
-                        zIndex: -1,
-                        opacity: currentPhase >= 3 ? 0.4 : 1,
-                      }}
-                    />
-                    <Image
-                      source={TREE_IMG}
-                      resizeMode="contain"
-                      style={{
-                                        position: 'absolute',
-                        bottom: -4,
-                        right: -50,
-                        width: 50,
-                        height: 68,
-                        zIndex: -1,
-                        opacity: currentPhase >= 3 ? 0.4 : 1,
-                        transform: [{ scaleX: -1 }],
-                      }}
-                    />
-                  </>
-                )}
 
                 {/* Roof — pixel art (chimney + attic window baked into the asset) */}
                 <View style={styles.roof}>
@@ -1010,7 +959,8 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {/* Foundation — pixel stone courses */}
                 <Image source={FOUNDATION_IMG} style={styles.foundationImage} resizeMode="stretch" />
 
-                {/* The Offering Pit's mouth, sunk into the grass beside the house */}
+                {/* The Offering Pit's mouth in the front yard, a stone path
+                    connecting it to the house */}
                 {onPitPress && (
                   <TouchableOpacity
                     style={styles.pitEntrance}
@@ -1120,11 +1070,10 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
   pitEntrance: {
-    position: 'absolute',
-    right: -96,
-    bottom: -GROUND_HEIGHT * 0.18,
-    width: 104,
-    height: 65, // pit_entrance.png aspect (480x300)
+    alignSelf: 'center',
+    marginTop: -4, // path tucks under the foundation edge
+    width: 132,
+    height: 99, // pit_entrance.png aspect (480x360)
   },
   pitEntranceImage: {
     width: '100%',

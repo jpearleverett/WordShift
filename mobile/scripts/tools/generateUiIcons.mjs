@@ -104,34 +104,34 @@ fs.mkdirSync(UI, { recursive: true });
 // === journal.png (256) — book for the journal hub ============================
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  roundRect(cv, c, c + 14, 150, 168, 22, '#5B4890', 0.45);                 // drop shadow
-  roundRect(cv, c - 6, c, 150, 168, 20, '#8B5CF6', 1, '#6D3FD4');          // cover
-  roundRect(cv, c + 118, c, 26, 168, 10, '#5B2DB8');                       // spine edge
-  roundRect(cv, c - 24, c, 116, 150, 12, '#F7F3FF', 1, '#E4DCF7');         // pages
+  roundRect(cv, c, c + 14, 150, 168, 22, '#2A2040', 0.4);                  // drop shadow
+  roundRect(cv, c - 6, c, 150, 168, 20, '#A98BFF', 1, '#8257EA');          // cover
+  roundRect(cv, c + 118, c, 26, 168, 10, '#6B3FD0');                       // spine edge
+  roundRect(cv, c - 24, c, 116, 150, 12, '#FFFFFF', 1, '#F0EBFC');         // pages
   for (const dy of [-86, -38, 10, 58]) {                                   // page lines
-    roundRect(cv, c - 24, c + dy, 86, 7, 3, '#C9BCE8');
+    roundRect(cv, c - 24, c + dy, 86, 8, 4, '#B9A8E4');
   }
-  roundRect(cv, c - 96, c - 110, 22, 34, 8, '#FFD166', 1, '#F0B429');      // bookmark
-  roundRect(cv, c - 6, c - 152, 150, 16, 8, '#FFFFFF', 0.28);              // top sheen
+  roundRect(cv, c - 96, c - 112, 24, 36, 8, '#FFD968', 1, '#F5B82E');      // bookmark
+  roundRect(cv, c - 6, c - 152, 150, 16, 8, '#FFFFFF', 0.4);               // top sheen
   savePNG(path.join(UI, 'journal.png'), W, W, down2(cv, W, W));
 }
 
 // === pit.png (256) — the Offering Pit mouth ==================================
 {
   const W = 256, cv = C(W * 2, W * 2), c = W;
-  ellipse(cv, c, c + 60, 190, 86, '#736C8E');                    // outer stone rim
-  ellipse(cv, c, c + 48, 178, 78, '#9C95B5');                    // rim top light
+  ellipse(cv, c, c + 60, 190, 86, '#9A93B6');                    // outer stone rim
+  ellipse(cv, c, c + 48, 178, 78, '#CFC9E2');                    // rim top light
   for (let a = 0; a < 12; a++) {                                  // chunky rim stones
     const ang = (a / 12) * Math.PI * 2;
     const x = c + Math.cos(ang) * 160, y = c + 52 + Math.sin(ang) * 66;
-    ellipse(cv, x, y, 30, 20, a % 2 ? '#B5AECB' : '#8D86A8');
+    ellipse(cv, x, y, 30, 20, a % 2 ? '#E2DDF0' : '#B8B1CF');
   }
-  ellipse(cv, c, c + 52, 138, 56, '#1E1240');                    // mouth
-  ellipse(cv, c, c + 58, 116, 44, '#120A24');                    // depths
-  ellipse(cv, c, c + 36, 110, 26, '#3FD9C0', 0.5, 30);           // teal glow
-  ellipse(cv, c, c + 30, 70, 14, '#7FF2DE', 0.65, 18);
-  for (const [dx, dy, r] of [[-44, -60, 9], [10, -110, 11], [52, -40, 8], [-12, -160, 7]]) {
-    ellipse(cv, c + dx, c + dy, r, r, '#3FD9C0', 0.9, 4);        // rising motes
+  ellipse(cv, c, c + 52, 138, 56, '#241852');                    // mouth
+  ellipse(cv, c, c + 58, 116, 44, '#140C2E');                    // depths
+  ellipse(cv, c, c + 36, 112, 28, '#4FF0D4', 0.75, 26);          // teal glow
+  ellipse(cv, c, c + 30, 72, 15, '#A8FFEE', 0.9, 14);
+  for (const [dx, dy, r] of [[-44, -60, 11], [10, -110, 13], [52, -40, 10], [-12, -160, 9]]) {
+    ellipse(cv, c + dx, c + dy, r, r, '#5FF6DC', 1, 4);          // rising motes
   }
   savePNG(path.join(UI, 'pit.png'), W, W, down2(cv, W, W));
 }

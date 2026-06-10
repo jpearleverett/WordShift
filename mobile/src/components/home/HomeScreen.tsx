@@ -2375,12 +2375,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   headerIconImage: {
-    width: 22,
-    height: 22,
+    width: 25,
+    height: 25,
   },
   amberIconImage: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
   },
   streakBadgeIcon: {
     width: 15,

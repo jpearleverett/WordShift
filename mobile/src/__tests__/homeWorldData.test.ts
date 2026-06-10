@@ -180,3 +180,25 @@ describe('getRoomsWithStatus', () => {
     expect(unlocked[0].id).toBe('cozy_den');
   });
 });
+
+describe('late-unlock dialogue fast-forward', () => {
+  const { getPhaseStartIndex, getDialoguesForAnimal } =
+    require('../services/dialogue/animalDialogueBase');
+
+  test('phase 0 start index is 0 for every animal', () => {
+    for (const type of ['fox', 'owl', 'sloth', 'rabbit']) {
+      expect(getPhaseStartIndex(type, 0)).toBe(0);
+    }
+  });
+
+  test('start index equals the count of earlier-phase lines', () => {
+    const owlPhase0and1 = getDialoguesForAnimal('owl', 1).length;
+    expect(getPhaseStartIndex('owl', 2)).toBe(owlPhase0and1);
+  });
+
+  test('start index points at a line of the requested phase', () => {
+    const idx = getPhaseStartIndex('pangolin', 2);
+    const all = getDialoguesForAnimal('pangolin', 4);
+    expect(all[idx].phase).toBe(2);
+  });
+});

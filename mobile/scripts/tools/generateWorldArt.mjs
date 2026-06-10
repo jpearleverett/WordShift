@@ -288,13 +288,13 @@ function starPts(cx, cy, rOut, rIn, rot = -Math.PI / 2) {
   const pts = [];
   for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 3; pts.push([c + Math.cos(a) * 112, c + Math.sin(a) * 112]); }
   polygon(cv, pts.map(([x, y]) => [x, y + 10]), '#8A5A00', 0.45);
-  polygon(cv, pts, '#E8920A');
+  polygon(cv, pts, '#FFA518');
   const inner = pts.map(([x, y]) => [c + (x - c) * 0.82, c + (y - c) * 0.82]);
-  polygon(cv, inner, '#FFB938');
-  triangle(cv, c, c - 92, c - 80, c - 46, c + 80, c - 46, '#FFD97A', 0.9);  // top facet
-  triangle(cv, c - 80, c - 46, c, c + 92, c, c - 10, '#F0A722', 0.8);       // left facet
-  ellipse(cv, c + 30, c + 18, 16, 24, '#7A4E0A', 0.5, 8);                    // the trapped fleck
-  ellipse(cv, c - 38, c - 52, 13, 13, '#FFF2CC', 0.95, 6);
+  polygon(cv, inner, '#FFC84E');
+  triangle(cv, c, c - 92, c - 80, c - 46, c + 80, c - 46, '#FFE9A8', 0.95); // top facet
+  triangle(cv, c - 80, c - 46, c, c + 92, c, c - 10, '#FFB832', 0.85);      // left facet
+  ellipse(cv, c + 30, c + 18, 16, 24, '#8A5A0A', 0.45, 8);                   // the trapped fleck
+  ellipse(cv, c - 38, c - 52, 16, 16, '#FFFFFF', 0.95, 6);
   savePNG(path.join(UI, 'amber.png'), W, W, down2(cv, W, W));
 }
 

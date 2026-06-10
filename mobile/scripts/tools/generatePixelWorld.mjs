@@ -217,32 +217,39 @@ cloud([[14, 23, 9, 6], [28, 18, 12, 9], [44, 22, 11, 7], [55, 25, 6, 4]], 'cloud
   save(g, 6, 'foundation.png');
 }
 
-// === pit entrance (96x60 grid, x5 = 480x300) =================================
-// Home-screen doorway to the Offering Pit: stone-ringed hole with a glow.
+// === pit entrance (96x72 grid, x5 = 480x360) =================================
+// Home-screen doorway to the Offering Pit: stone-ringed hole with a glow and
+// a short stone path that meets the house foundation above it.
 {
-  const g = G(96, 60);
+  const g = G(96, 72);
   const HOLE = '#120A24', DEEP = '#1E1240', GLOW1 = '#3FD9C0', GLOW2 = '#2BA897', RIM1 = '#8D86A8', RIM2 = '#736C8E', RIM3 = '#B5AECB', GRASS = '#6FBE63';
+  const oy = 12; // everything below shifts down to make room for the path
+  // stone path from the house down to the pit mouth
+  for (const [px, py, w] of [[44, 0, 8], [42, 4, 9], [45, 8, 8], [43, 12, 9], [44, 16, 8]]) {
+    box(g, px, py, px + w, py + 2, RIM1);
+    box(g, px, py, px + w, py, RIM3);
+  }
   // mound shadow
-  disc(g, 48, 40, 38, 14, '#3E7E42');
-  disc(g, 48, 38, 36, 13, GRASS);
+  disc(g, 48, 40 + oy, 38, 14, '#3E7E42');
+  disc(g, 48, 38 + oy, 36, 13, GRASS);
   // stone rim (ellipse ring) — chunky stones around the mouth
-  disc(g, 48, 34, 31, 11, RIM2);
-  disc(g, 48, 32, 29, 10, RIM1);
+  disc(g, 48, 34 + oy, 31, 11, RIM2);
+  disc(g, 48, 32 + oy, 29, 10, RIM1);
   for (let a = 0; a < 16; a++) {
     const ang = (a / 16) * Math.PI * 2;
-    const x = 48 + Math.cos(ang) * 27, y = 32 + Math.sin(ang) * 9.4;
+    const x = 48 + Math.cos(ang) * 27, y = 32 + oy + Math.sin(ang) * 9.4;
     box(g, x - 2, y - 1, x + 2, y + 1, a % 2 ? RIM1 : RIM3);
   }
   // the mouth
-  disc(g, 48, 33, 24, 7.5, DEEP);
-  disc(g, 48, 34, 21, 6, HOLE);
+  disc(g, 48, 33 + oy, 24, 7.5, DEEP);
+  disc(g, 48, 34 + oy, 21, 6, HOLE);
   // inner glow ring + rising wisps
-  for (let x = 30; x <= 66; x++) if (((x * 7) % 3) !== 0) put(g, x, 37, GLOW2);
-  for (let x = 34; x <= 62; x++) if (((x * 5) % 4) < 2) put(g, x, 36, GLOW1);
+  for (let x = 30; x <= 66; x++) if (((x * 7) % 3) !== 0) put(g, x, 37 + oy, GLOW2);
+  for (let x = 34; x <= 62; x++) if (((x * 5) % 4) < 2) put(g, x, 36 + oy, GLOW1);
   for (const [wx, len] of [[38, 6], [48, 9], [58, 5], [43, 4], [53, 6]]) {
-    for (let i = 0; i < len; i++) put(g, wx + (i % 2 ? 1 : 0), 33 - i * 2, i < 2 ? GLOW1 : (i < 4 ? GLOW2 : '#1E6E63'));
+    for (let i = 0; i < len; i++) put(g, wx + (i % 2 ? 1 : 0), 33 + oy - i * 2, i < 2 ? GLOW1 : (i < 4 ? GLOW2 : '#1E6E63'));
   }
   // tiny floating motes
-  for (const [x, y] of [[33, 22], [62, 18], [50, 14], [41, 12], [68, 26]]) put(g, x, y, GLOW1);
+  for (const [x, y] of [[33, 22 + oy], [62, 18 + oy], [50, 14 + oy], [41, 10 + oy], [68, 26 + oy]]) put(g, x, y, GLOW1);
   save(g, 5, 'pit_entrance.png');
 }

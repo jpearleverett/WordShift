@@ -822,6 +822,20 @@ export function getDialoguesForAnimal(
 }
 
 /**
+ * Index of the first dialogue belonging to `phase` for an animal — i.e. how
+ * many of its lines belong to earlier phases. Used to fast-forward animals
+ * unlocked late so they don't replay bright-days small talk under a dark sky.
+ */
+export function getPhaseStartIndex(
+  animalType: AnimalType,
+  phase: DialoguePhase
+): number {
+  return ALL_DIALOGUES.filter(
+    d => d.animalType === animalType && d.phase < phase
+  ).length;
+}
+
+/**
  * Get the next unread dialogue for an animal
  */
 export function getNextDialogue(
