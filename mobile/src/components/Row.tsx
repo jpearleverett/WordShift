@@ -14,6 +14,7 @@ import { DraggableTile } from './DraggableTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
+import { hapticMedium, hapticError } from '../services/haptics';
 import { getWordPhaseTier } from '../services/localGenerator';
 
 const ROW_HORIZONTAL_MARGIN = 12;
@@ -298,6 +299,7 @@ const Slot: React.FC<{
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
+      hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
       accessibilityLabel={isGuided ? `Guided drop zone ${index + 1}` : `Drop zone ${index + 1}`}
       accessibilityRole="button"
     >
@@ -382,8 +384,9 @@ const Slot: React.FC<{
                 preview.isValid && styles.slotPreviewValidBold,
               ]}
               numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
             >
-              {preview.word}
+              {preview.isValid ? '✓ ' : '✗ '}{preview.word}
             </Text>
           </Animated.View>
         )}
@@ -456,8 +459,10 @@ export const Row: React.FC<RowProps> = memo(({
         }),
       ]).start();
 
-      // Glow pulse for active row (skip on low-end devices)
-      if (!shouldSimplifyAnimations()) {
+      // Glow pulse for active row (skip on low-end devices / reduced motion)
+      if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+        glowAnim.setValue(0.5);
+      } else {
         glowLoopRef.current = Animated.loop(
           Animated.sequence([
             Animated.timing(glowAnim, {
@@ -556,6 +561,7 @@ export const Row: React.FC<RowProps> = memo(({
   // Micro-shake the target row on invalid drop attempts.
   useEffect(() => {
     if (!isTarget || invalidDropSignal <= 0) return;
+    hapticError();
     invalidShakeX.setValue(0);
     Animated.sequence([
       Animated.timing(invalidShakeX, { toValue: 7, duration: 45, useNativeDriver: true }),
@@ -568,7 +574,9 @@ export const Row: React.FC<RowProps> = memo(({
 
   // Brief scale bounce on the target row when a letter successfully lands.
   useEffect(() => {
-    if (!isTarget || successDropSignal <= 0 || getSettingsSync().reducedMotion) return;
+    if (!isTarget || successDropSignal <= 0) return;
+    hapticMedium();
+    if (getSettingsSync().reducedMotion) return;
     successBounceScale.setValue(1.08);
     Animated.spring(successBounceScale, {
       toValue: 1,
@@ -697,6 +705,7 @@ export const Row: React.FC<RowProps> = memo(({
           <DraggableTile
             key={letter.id}
             enabled={!isProcessing}
+            letterChar={displayLetter.char}
             onDragStart={() => {
               if (!selectedLetter || selectedLetter.id !== letter.id) {
                 onLetterPress(letter, rowIndex);

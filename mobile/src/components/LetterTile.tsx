@@ -93,7 +93,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   // Idle animation for interactable tiles
   useEffect(() => {
-    if (settings.reducedMotion) return;
+    if (settings.reducedMotion || shouldSimplifyAnimations()) return;
     if (isInteractable && !isSelected) {
       // Subtle pulse glow
       const glowLoop = Animated.loop(
@@ -610,6 +610,10 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
   const content = (
     <Animated.View
+      // Non-clickable tiles carry their own accessibility info; clickable tiles
+      // are labeled by the wrapping TouchableOpacity below.
+      accessible={!isClickable}
+      accessibilityLabel={!isClickable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
       style={[
         styles.tileOuter,
         compact && { width: COMPACT_OUTER_W, height: COMPACT_OUTER_H, marginHorizontal: 2 },
@@ -714,6 +718,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
         {/* Letter text with shadow */}
         <Text
+          maxFontSizeMultiplier={1.2}
           style={[
             styles.letterText,
             compact && { fontSize: COMPACT_FONT },
@@ -767,6 +772,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         activeOpacity={1}
         accessibilityLabel={`Letter ${letter.char}${letter.isLocked ? ', locked' : ''}`}
         accessibilityRole="button"
+        accessibilityState={{ selected: !!isSelected, disabled: !!letter.isLocked }}
       >
         {content}
       </TouchableOpacity>

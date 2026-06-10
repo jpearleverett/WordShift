@@ -15,6 +15,8 @@ interface DraggableTileProps {
   onTap: () => void;
   /** Whether this tile can be interacted with */
   enabled: boolean;
+  /** Letter character for the accessibility label */
+  letterChar?: string;
   /** Phase for styling the drag shadow */
   phase?: number;
   /** Called when drag activation state changes — used to disable parent ScrollView during drag */
@@ -42,6 +44,7 @@ export function DraggableTile({
   onDragEnd,
   onTap,
   enabled,
+  letterChar,
   phase = 0,
   onDragActiveChange,
 }: DraggableTileProps) {
@@ -206,7 +209,15 @@ export function DraggableTile({
   return (
     <View style={styles.wrapper}>
       {/* Source tile (dims during drag) */}
-      <Animated.View style={{ opacity: sourceOpacity }} {...panResponder.panHandlers}>
+      <Animated.View
+        style={{ opacity: sourceOpacity }}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={letterChar ? `Letter ${letterChar}` : 'Letter'}
+        accessibilityHint="Double tap to pick up this letter, then choose a drop slot"
+        accessibilityState={{ disabled: !enabled }}
+        {...panResponder.panHandlers}
+      >
         {children}
       </Animated.View>
 

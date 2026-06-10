@@ -24,6 +24,7 @@ import {
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS } from '../../constants/gameBalance';
+import { hapticSuccess } from '../../services/haptics';
 
 export interface VictoryData {
   earnedStars: number;
@@ -157,6 +158,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   useEffect(() => {
     if (visible) {
+      hapticSuccess();
       contentOpacity1.setValue(0);
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
@@ -193,7 +195,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <View style={styles.modalShine} />
 
             {/* Stars — choreographed pop-in */}
-            <View style={styles.starsContainer}>
+            <View
+              style={styles.starsContainer}
+              accessible
+              accessibilityLabel={`${earnedStars} of 3 stars`}
+            >
               <Animated.Text style={[
                 styles.victoryStar,
                 earnedStars < 1 && styles.victoryStarEmpty,
@@ -246,7 +252,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Streak display */}
             {victoryData && victoryData.currentStreak > 1 && (
-              <View style={styles.winStreakContainer}>
+              <View
+                style={styles.winStreakContainer}
+                accessible
+                accessibilityLabel={`${victoryData.currentStreak} day streak`}
+              >
                 <Text style={styles.winStreakEmoji}>{'\uD83D\uDD25'}</Text>
                 <Text style={styles.winStreakText}>{victoryData.currentStreak} Day Streak!</Text>
               </View>
@@ -254,7 +264,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Milestone bonus */}
             {victoryData && victoryData.milestoneBonus > 0 && Boolean(victoryData.milestoneMessage) && (
-              <View style={styles.milestoneContainer}>
+              <View
+                style={styles.milestoneContainer}
+                accessible
+                accessibilityLabel={`Milestone: ${victoryData.milestoneMessage}`}
+              >
                 <Text style={styles.milestoneEmoji}>{'\uD83C\uDFC6'}</Text>
                 <Text style={styles.milestoneMessage}>{victoryData.milestoneMessage}</Text>
               </View>
@@ -262,7 +276,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
             {/* Quest completion badges */}
             {victoryData?.questsCompleted && victoryData.questsCompleted.length > 0 && (
-              <View style={styles.questCompletedContainer}>
+              <View
+                style={styles.questCompletedContainer}
+                accessible
+                accessibilityLabel={`Quests completed: ${victoryData.questsCompleted.join(', ')}`}
+              >
                 {victoryData.questsCompleted.map((title, i) => (
                   <View key={i} style={[styles.questBadge, { borderColor: phaseTheme.victoryTitleColor + '40' }]}>
                     <Text style={styles.questBadgeIcon}>{'\uD83D\uDCCB'}</Text>
@@ -278,9 +296,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {victoryData?.phaseChanged && (() => {
               const phaseNarrative = getPhaseChangeNarrative(victoryData!.newPhase as DialoguePhase);
               return (
-                <View style={[styles.phaseChangeContainer,
-                  victoryData!.newPhase >= 3 && styles.phaseChangeContainerDark,
-                ]}>
+                <View
+                  style={[styles.phaseChangeContainer,
+                    victoryData!.newPhase >= 3 && styles.phaseChangeContainerDark,
+                  ]}
+                  accessible
+                  accessibilityLabel={`${phaseNarrative.title}. ${phaseNarrative.body}`}
+                >
                   <Text style={styles.phaseChangeEmoji}>{phaseNarrative.emoji}</Text>
                   <Text style={styles.phaseChangeTitle}>{phaseNarrative.title}</Text>
                   <Text style={styles.phaseChangeText}>{phaseNarrative.body}</Text>
@@ -495,7 +517,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       )}
                       <TouchableOpacity
                         onPress={onGoToPit}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                         accessibilityLabel={phaseTransitionPending ? 'Visit the pit to continue' : 'Collect amber in the pit'}
                         accessibilityRole="button"
                         style={[styles.collectNowPill, {

@@ -8,6 +8,7 @@ import {
   Platform,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
 import {
@@ -33,15 +34,20 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
   const [grouped, setGrouped] = useState<Record<string, WhisperEntry[]>>({});
   const [totalCollected, setTotalCollected] = useState(0);
   const [expandedAnimal, setExpandedAnimal] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
-      const [entries, stats] = await Promise.all([
-        getGroupedEntries(),
-        getGalleryStats(),
-      ]);
-      setGrouped(entries);
-      setTotalCollected(stats.totalCollected);
+      try {
+        const [entries, stats] = await Promise.all([
+          getGroupedEntries(),
+          getGalleryStats(),
+        ]);
+        setGrouped(entries);
+        setTotalCollected(stats.totalCollected);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -83,7 +89,13 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {animalTypes.length === 0 && (
+        {loading && (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="large" color={textColor} />
+          </View>
+        )}
+
+        {!loading && animalTypes.length === 0 && (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: textColor }]}>
               {phase >= 3
