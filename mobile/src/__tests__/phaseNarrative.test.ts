@@ -11,6 +11,8 @@ import {
   getRulesText,
   getInvalidWordMessage,
   getLockedLetterMessage,
+  getNoValidMovesMessage,
+  getNotificationPromptText,
   checkNarrativeMicroBeat,
   resetMicroBeats,
   getHomescreenNudge,
@@ -437,6 +439,63 @@ describe('getLockedLetterMessage', () => {
     const messages = ALL_PHASES.map(p => getLockedLetterMessage(p));
     const unique = new Set(messages);
     expect(unique.size).toBe(5);
+  });
+});
+
+describe('getNoValidMovesMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test.each(allSixPhases)('returns a non-empty string for phase %i', (phase) => {
+    const msg = getNoValidMovesMessage(phase);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('phase 0 tells the player to undo or clear', () => {
+    const msg = getNoValidMovesMessage(0).toLowerCase();
+    expect(msg).toContain('undo');
+    expect(msg).toContain('clear');
+  });
+
+  test('phase 4 reflects the ritual tone', () => {
+    expect(getNoValidMovesMessage(4)).toContain('arrangement');
+  });
+
+  test('each phase produces a unique message', () => {
+    const messages = allSixPhases.map(p => getNoValidMovesMessage(p));
+    const unique = new Set(messages);
+    expect(unique.size).toBe(6);
+  });
+});
+
+describe('getNotificationPromptText', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test.each(allSixPhases)('returns complete prompt copy for phase %i', (phase) => {
+    const prompt = getNotificationPromptText(phase);
+    expect(prompt.title.length).toBeGreaterThan(0);
+    expect(prompt.body.length).toBeGreaterThan(0);
+    expect(prompt.accept.length).toBeGreaterThan(0);
+    expect(prompt.decline.length).toBeGreaterThan(0);
+  });
+
+  test('phase 0 copy is friendly', () => {
+    const prompt = getNotificationPromptText(0);
+    expect(prompt.title).toBe('Daily reminder?');
+    expect(prompt.accept).toBe('Sounds good');
+    expect(prompt.decline).toBe('Not now');
+  });
+
+  test('all phases stay honest — body mentions Settings', () => {
+    for (const phase of allSixPhases) {
+      expect(getNotificationPromptText(phase).body).toContain('Settings');
+    }
+  });
+
+  test('each phase produces a unique title', () => {
+    const titles = allSixPhases.map(p => getNotificationPromptText(p).title);
+    const unique = new Set(titles);
+    expect(unique.size).toBe(6);
   });
 });
 

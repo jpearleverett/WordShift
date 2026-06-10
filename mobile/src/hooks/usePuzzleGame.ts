@@ -6,7 +6,7 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getNoValidMovesMessage } from '../services/phaseNarrative';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords, isPostRevelation } from '../services/amberCurrency';
 import {
   getVariantOverrides,
@@ -23,6 +23,54 @@ import {
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
 const generateId = () => `id_${Date.now()}_${idCounter++}`;
+
+/**
+ * Pure stuck-detection helper: does ANY legal single-shift move remain
+ * from the current source row into its target row?
+ *
+ * Mirrors the hook's move validation exactly: an unlocked letter can be
+ * picked from the source row only if the remaining source letters form a
+ * valid word, and it can be dropped at any position of the target row
+ * only if the resulting word is valid. Locked letters in the source row
+ * cannot be picked; target insertion positions are unrestricted (matching
+ * handleSlotPress).
+ *
+ * Only meaningful for variants where one pick+drop is a full move
+ * (i.e., NOT double_shift).
+ */
+export function hasAnyValidMove(
+  rows: RowData[],
+  activeRowIndex: number,
+  moveDirection: 'down' | 'up',
+  isWordValid: (word: string) => boolean
+): boolean {
+  if (activeRowIndex < 0 || activeRowIndex >= rows.length) return false;
+  const targetRowIndex = moveDirection === 'down' ? activeRowIndex + 1 : activeRowIndex - 1;
+  if (targetRowIndex < 0 || targetRowIndex >= rows.length) return false;
+
+  const sourceLetters = rows[activeRowIndex].words;
+  const targetChars = rows[targetRowIndex].words.map(l => l.char);
+
+  for (let i = 0; i < sourceLetters.length; i++) {
+    if (sourceLetters[i].isLocked) continue;
+    const letter = sourceLetters[i].char;
+
+    // Removing this letter must leave a valid source word
+    const remaining = sourceLetters
+      .filter((_, idx) => idx !== i)
+      .map(l => l.char)
+      .join('');
+    if (!isWordValid(remaining)) continue;
+
+    // Inserting it at any target position must form a valid word
+    for (let j = 0; j <= targetChars.length; j++) {
+      const candidate = targetChars.slice(0, j).join('') + letter + targetChars.slice(j).join('');
+      if (isWordValid(candidate)) return true;
+    }
+  }
+
+  return false;
+}
 
 export interface PuzzleGameState {
   rows: RowData[];
@@ -813,7 +861,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
 
       setActiveRowIndex(prev => prev + 1);
-      setMessage(getMoveMessage(currentPhase));
+      // Stuck detection: only for variants where one pick+drop is a full move
+      if (!isDoubleShift && !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation)) {
+        setMessage(getNoValidMovesMessage(currentPhase));
+      } else {
+        setMessage(getMoveMessage(currentPhase));
+      }
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
       return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
@@ -824,14 +877,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (activeRowIndex === maxForwardSourceIndex) {
         setMoveDirection('up');
         setActiveRowIndex(rows.length - 1);
-        setMessage(
-          currentPhase >= 3
-            ? 'The descent is complete. Return every letter to the beginning.'
-            : 'Great! Now shift letters back up to the first word.'
-        );
+        if (!hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation)) {
+          setMessage(getNoValidMovesMessage(currentPhase));
+        } else {
+          setMessage(
+            currentPhase >= 3
+              ? 'The descent is complete. Return every letter to the beginning.'
+              : 'Great! Now shift letters back up to the first word.'
+          );
+        }
       } else {
         setActiveRowIndex(prev => prev + 1);
-        setMessage(getMoveMessage(currentPhase));
+        setMessage(
+          hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation)
+            ? getMoveMessage(currentPhase)
+            : getNoValidMovesMessage(currentPhase)
+        );
       }
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
@@ -845,7 +906,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     }
 
     setActiveRowIndex(prev => prev - 1);
-    setMessage(getMoveMessage(currentPhase));
+    setMessage(
+      hasAnyValidMove(newRows, activeRowIndex - 1, 'up', checkValidation)
+        ? getMoveMessage(currentPhase)
+        : getNoValidMovesMessage(currentPhase)
+    );
     setLastFormedWord(targetWordStr);
     setIsProcessing(false);
     return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };

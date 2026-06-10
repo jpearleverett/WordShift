@@ -81,6 +81,7 @@ jest.mock('../services/phaseNarrative', () => ({
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
+  getNoValidMovesMessage: jest.fn((_p: number) => 'No words fit from here! Undo a move or clear the board to try a fresh path.'),
 }));
 
 jest.mock('../services/amberCurrency', () => ({
@@ -120,7 +121,7 @@ jest.mock('../constants', () => ({
   },
 }));
 
-import { usePuzzleGame, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
+import { usePuzzleGame, hasAnyValidMove, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
 
 /**
  * Helper: call usePuzzleGame with fresh hook indices (simulates a re-render).
@@ -530,6 +531,56 @@ describe('usePuzzleGame', () => {
       expect(state.difficulty).toBe('MEDIUM');
       expect(state.showRules).toBe(false);
       expect(state.showConfetti).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // Stuck detection (pure helper)
+  // =========================================================================
+
+  describe('hasAnyValidMove', () => {
+    const makeRow = (word: string, lockedIndices: number[] = []) => ({
+      id: `row_${word}`,
+      originalWord: word,
+      words: word.split('').map((char, i) => ({
+        id: `${word}_${i}`,
+        char,
+        isLocked: lockedIndices.includes(i),
+      })),
+    });
+
+    const validator = (words: string[]) => {
+      const set = new Set(words);
+      return (w: string) => set.has(w);
+    };
+
+    test('returns true when a letter can shift down to form valid words', () => {
+      // Moving M from TIME leaves TIE (valid) and inserting into TIED forms TIMED (valid)
+      const rows = [makeRow('TIME'), makeRow('TIED')];
+      expect(hasAnyValidMove(rows, 0, 'down', validator(['TIE', 'TIMED']))).toBe(true);
+    });
+
+    test('returns false when no target insertion forms a valid word', () => {
+      // TIE is a valid source remainder, but no insertion of M into TIED is valid
+      const rows = [makeRow('TIME'), makeRow('TIED')];
+      expect(hasAnyValidMove(rows, 0, 'down', validator(['TIE', 'TIM', 'IME', 'TME']))).toBe(false);
+    });
+
+    test('returns false when the only workable letter is locked', () => {
+      // M (index 2) would yield TIE + TIMED, but it is locked
+      const rows = [makeRow('TIME', [2]), makeRow('TIED')];
+      expect(hasAnyValidMove(rows, 0, 'down', validator(['TIE', 'TIMED']))).toBe(false);
+    });
+
+    test('checks the row above when moving up', () => {
+      // Up leg: source TIMED (row 1), target TIE (row 0); M removal gives TIED + TIME
+      const rows = [makeRow('TIE'), makeRow('TIMED')];
+      expect(hasAnyValidMove(rows, 1, 'up', validator(['TIED', 'TIME']))).toBe(true);
+    });
+
+    test('returns false when the target row is out of bounds', () => {
+      const rows = [makeRow('TIME'), makeRow('TIED')];
+      expect(hasAnyValidMove(rows, 1, 'down', validator(['TIE', 'TIMED']))).toBe(false);
     });
   });
 

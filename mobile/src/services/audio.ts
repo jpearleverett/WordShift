@@ -4,18 +4,42 @@ import { getSettings } from './settings';
 /**
  * Sound effects system for WordShift
  *
- * Uses expo-av with procedurally-defined tones.
- * All sounds are synthesized at runtime - no asset files needed.
- * Each sound checks the user's sound preference before playing.
+ * Plays short WAV assets from assets/sounds/ via expo-av.
+ * Sounds are lazily loaded on first play and cached for instant replay;
+ * hot-path sounds are preloaded during initAudio().
+ * Each sound checks the user's sound preference before playing, and all
+ * errors are swallowed — sounds must never crash gameplay.
  */
 
-// We can't procedurally generate tones easily in expo-av without asset files.
-// Instead, we use a lightweight approach: create short silent sounds as stubs,
-// and use haptics as the primary feedback. When real audio assets are added,
-// this service is ready to use them.
-//
-// For now, this service provides the API contract and placeholder infrastructure
-// so that all call sites are wired up and ready for real audio assets.
+// Sound name → bundled asset source
+const SOUND_SOURCES: Record<string, any> = {
+  tap: require('../../assets/sounds/tap.wav'),
+  letter_select: require('../../assets/sounds/letter_select.wav'),
+  valid_move: require('../../assets/sounds/valid_move.wav'),
+  invalid_move: require('../../assets/sounds/invalid_move.wav'),
+  undo: require('../../assets/sounds/undo.wav'),
+  hint: require('../../assets/sounds/hint.wav'),
+  victory: require('../../assets/sounds/victory.wav'),
+  perfect: require('../../assets/sounds/perfect.wav'),
+  amber_earn: require('../../assets/sounds/amber_earn.wav'),
+  achievement: require('../../assets/sounds/achievement.wav'),
+  unlock: require('../../assets/sounds/unlock.wav'),
+  dialogue: require('../../assets/sounds/dialogue.wav'),
+  phase_change: require('../../assets/sounds/phase_change.wav'),
+  daily_ready: require('../../assets/sounds/daily_ready.wav'),
+};
+
+// Hot-path sounds preloaded at init for latency-free first playback
+const PRELOAD_SOUND_NAMES = [
+  'tap',
+  'letter_select',
+  'valid_move',
+  'invalid_move',
+  'victory',
+  'amber_earn',
+];
+
+const SOUND_VOLUME = 0.8;
 
 let audioInitialized = false;
 
@@ -26,13 +50,18 @@ export async function initAudio(): Promise<void> {
   if (audioInitialized) return;
   try {
     await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: false,
+      playsInSilentModeIOS: true,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
     });
     audioInitialized = true;
   } catch (err) {
     console.warn('Failed to initialize audio:', err);
+  }
+
+  // Preload hot-path sounds (fire-and-forget — failures are non-critical)
+  for (const name of PRELOAD_SOUND_NAMES) {
+    loadSound(name).catch(() => {});
   }
 }
 
@@ -41,27 +70,52 @@ async function isEnabled(): Promise<boolean> {
   return settings.soundEnabled;
 }
 
-// Sound cache for preloaded sounds
+// Sound cache for loaded sounds
 const soundCache: Map<string, Audio.Sound> = new Map();
 
+// Guards against concurrent first-loads of the same sound
+const loadingSounds: Map<string, Promise<Audio.Sound | null>> = new Map();
+
 /**
- * Play a sound from the assets/sounds/ directory
- * Falls back silently if the asset doesn't exist
+ * Get a sound from the cache, lazily loading it on first access.
+ * Returns null (never throws) when the sound can't be loaded.
+ */
+async function loadSound(name: string): Promise<Audio.Sound | null> {
+  const cached = soundCache.get(name);
+  if (cached) return cached;
+
+  const inFlight = loadingSounds.get(name);
+  if (inFlight) return inFlight;
+
+  const source = SOUND_SOURCES[name];
+  if (!source) return null;
+
+  const loadPromise = Audio.Sound.createAsync(source, { volume: SOUND_VOLUME })
+    .then(({ sound }) => {
+      soundCache.set(name, sound);
+      return sound;
+    })
+    .catch(() => null)
+    .finally(() => {
+      loadingSounds.delete(name);
+    });
+
+  loadingSounds.set(name, loadPromise);
+  return loadPromise;
+}
+
+/**
+ * Play a sound from the assets/sounds/ directory.
+ * Fails silently — sounds must never crash gameplay.
  */
 async function playSound(name: string): Promise<void> {
   if (!(await isEnabled())) return;
 
   try {
-    // Check cache first
-    const cached = soundCache.get(name);
-    if (cached) {
-      await cached.setPositionAsync(0);
-      await cached.playAsync();
-      return;
-    }
-
-    // Sound assets will be loaded when they exist
-    // For now, this is a no-op placeholder that's fully wired up
+    const sound = await loadSound(name);
+    if (!sound) return;
+    await sound.setPositionAsync(0);
+    await sound.playAsync();
   } catch (err) {
     // Sound not available - fail silently
   }
@@ -72,7 +126,7 @@ async function playSound(name: string): Promise<void> {
  */
 export async function preloadSound(name: string, source: any): Promise<void> {
   try {
-    const { sound } = await Audio.Sound.createAsync(source);
+    const { sound } = await Audio.Sound.createAsync(source, { volume: SOUND_VOLUME });
     soundCache.set(name, sound);
   } catch (err) {
     console.warn(`Failed to preload sound ${name}:`, err);
@@ -89,12 +143,12 @@ export async function unloadAllSounds(): Promise<void> {
     } catch {}
   }
   soundCache.clear();
+  loadingSounds.clear();
 }
 
 // ===== Game Sound Effects =====
 // These are the API entry points that get called from game code.
-// Each one is wired into the game flow. When audio assets are added,
-// update each function to call playSound() with the right asset name.
+// Each one maps to a WAV asset in assets/sounds/.
 
 /** Letter tile selected */
 export async function soundLetterSelect(): Promise<void> {

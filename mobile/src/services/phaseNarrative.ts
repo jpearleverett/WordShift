@@ -238,6 +238,23 @@ export function getLockedLetterMessage(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// NO VALID MOVES — Shown when no legal move remains from the current board
+// ============================================================================
+
+const NO_VALID_MOVES_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'No words fit from here! Undo a move or clear the board to try a fresh path.',
+  1: 'Hmm — no word works from here. Undo a move, or clear the board and try another way.',
+  2: 'The letters refuse every path from here. Undo, or clear the board and begin anew.',
+  3: 'No word can form from this arrangement. Unmake a move, or clear it all away.',
+  4: 'The arrangement admits no further words. Unmake your moves, or begin again.',
+  5: 'The weave has closed around this path. Undo a thread, or clear it and start once more.',
+};
+
+export function getNoValidMovesMessage(phase: DialoguePhase): string {
+  return NO_VALID_MOVES_MESSAGES[phase];
+}
+
+// ============================================================================
 // LOADING MESSAGES — What shows during puzzle generation
 // ============================================================================
 
@@ -2077,4 +2094,61 @@ export function getPitMandatoryText(phase: DialoguePhase): string {
 export function getPitMandatoryCTA(phase: DialoguePhase): string {
   if (phase >= 3) return 'The pit demands your presence';
   return 'Visit the Pit';
+}
+
+// ============================================================================
+// NOTIFICATION PRE-PERMISSION PROMPT — In-app card shown before the system
+// permission dialog, asking to enable the daily puzzle reminder.
+// Tone shifts with phase but stays functional and honest — never deceptive
+// about what is being enabled.
+// ============================================================================
+
+interface NotificationPromptText {
+  title: string;
+  body: string;
+  accept: string;
+  decline: string;
+}
+
+const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = {
+  0: {
+    title: 'Daily reminder?',
+    body: 'Want a gentle nudge when a fresh puzzle is ready? You can change this anytime in Settings.',
+    accept: 'Sounds good',
+    decline: 'Not now',
+  },
+  1: {
+    title: 'A daily reminder?',
+    body: 'We could let you know when a new puzzle is waiting for you. You can change this anytime in Settings.',
+    accept: 'Yes, please',
+    decline: 'Not now',
+  },
+  2: {
+    title: 'Shall we call for you?',
+    body: 'A quiet reminder when the day\'s puzzle is ready — nothing more. You can turn this off anytime in Settings.',
+    accept: 'Remind me',
+    decline: 'Not now',
+  },
+  3: {
+    title: 'A reminder, each day',
+    body: 'The puzzles continue whether you arrive or not. We can remind you when one is ready. Settings can silence this whenever you wish.',
+    accept: 'Remind me',
+    decline: 'Not yet',
+  },
+  4: {
+    title: 'The arrangement keeps its hours',
+    body: 'Each day, a puzzle is prepared. We can tell you when it is ready — that is all this enables. Settings can end it at any time.',
+    accept: 'Tell me',
+    decline: 'Not now',
+  },
+  5: {
+    title: 'The pattern continues',
+    body: 'A new puzzle settles into place each day. We can let you know, if you like. You can change this anytime in Settings.',
+    accept: 'Let me know',
+    decline: 'Not now',
+  },
+};
+
+export function getNotificationPromptText(phase: DialoguePhase): NotificationPromptText {
+  return NOTIFICATION_PROMPT_TEXT[phase];
 }
