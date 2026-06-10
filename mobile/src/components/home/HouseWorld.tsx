@@ -30,8 +30,6 @@ const SKY_STORM = require('../../../assets/environment/sky_storm.png');
 const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
 const CLOUD_1 = require('../../../assets/environment/cloud_1.png');
 const CLOUD_2 = require('../../../assets/environment/cloud_2.png');
-const ROOF_IMG = require('../../../assets/environment/roof.png');
-const FOUNDATION_IMG = require('../../../assets/environment/foundation.png');
 const GROUND_IMG = require('../../../assets/environment/ground.png');
 const TREE_IMG = require('../../../assets/environment/tree.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
@@ -625,11 +623,7 @@ const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
 // House structure art (roof.png 1024x420, foundation.png 1024x160,
 // ground.png 1024x300, tree.png 480x640, shadow_figure.png 600x1200)
-const ROOF_WIDTH = HOUSE_WIDTH + 20; // Slight overhang past the walls
-const ROOF_HEIGHT = ROOF_WIDTH * 0.41;
-const ROOF_TUCK = 10; // Overlap over the top room so there's no gap
-const FOUNDATION_WIDTH = HOUSE_WIDTH + 12;
-const FOUNDATION_HEIGHT = FOUNDATION_WIDTH * 0.16;
+const ROOF_WIDTH = HOUSE_WIDTH + 20; // Reference width for the shadow figure's scale
 const GROUND_WIDTH = ROOM_WIDTH * 1.6;
 const GROUND_HEIGHT = GROUND_WIDTH * (300 / 1024);
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
@@ -751,7 +745,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + (ROOF_HEIGHT - ROOF_TUCK) + houseHeight + FOUNDATION_HEIGHT + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
+    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
@@ -889,8 +883,59 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
               {/* House */}
               <View style={styles.houseContainer}>
-                {/* Shadow entity silhouette - grows across phases, behind the house */}
-                <ShadowPresence phase={currentPhase} />
+                {/* The unnamed entity - invisible until Phase 3, then looming behind the house */}
+                <ShadowFigure phase={currentPhase} />
+
+                {/* Grassy hill under the house - darkens as the world does */}
+                <Image
+                  source={GROUND_IMG}
+                  pointerEvents="none"
+                  resizeMode="stretch"
+                  style={{
+                    position: 'absolute',
+                    bottom: -GROUND_HEIGHT * 0.45,
+                    alignSelf: 'center',
+                    width: GROUND_WIDTH,
+                    height: GROUND_HEIGHT,
+                    zIndex: -2,
+                    opacity: currentPhase >= 4 ? 0.3 : currentPhase >= 3 ? 0.5 : 1,
+                  }}
+                />
+
+                {/* Candy trees flanking the house - fading away as the phases darken */}
+                {currentPhase <= 3 && (
+                  <>
+                    <Image
+                      source={TREE_IMG}
+                      pointerEvents="none"
+                      resizeMode="contain"
+                      style={{
+                        position: 'absolute',
+                        bottom: -6,
+                        left: -62,
+                        width: 68,
+                        height: 90,
+                        zIndex: -1,
+                        opacity: currentPhase >= 3 ? 0.4 : 1,
+                      }}
+                    />
+                    <Image
+                      source={TREE_IMG}
+                      pointerEvents="none"
+                      resizeMode="contain"
+                      style={{
+                        position: 'absolute',
+                        bottom: -4,
+                        right: -48,
+                        width: 50,
+                        height: 66,
+                        zIndex: -1,
+                        opacity: currentPhase >= 3 ? 0.4 : 1,
+                        transform: [{ scaleX: -1 }],
+                      }}
+                    />
+                  </>
+                )}
 
                 {/* Roof */}
                 <View style={styles.roof}>

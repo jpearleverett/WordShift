@@ -33,6 +33,7 @@ import {
   hasSeenJournalIntro,
   markJournalIntroSeen,
 } from '../../services/amberCurrency';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -464,9 +465,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introIsTalking, setIntroIsTalking] = useState(false);
   useEffect(() => {
     if (showIntroDialogue) {
+      // Slower mouth-flap cadence on low-end devices
       const interval = setInterval(() => {
         setIntroIsTalking(prev => !prev);
-      }, 300);
+      }, shouldSimplifyAnimations() ? 600 : 300);
       return () => clearInterval(interval);
     } else {
       setIntroIsTalking(false);

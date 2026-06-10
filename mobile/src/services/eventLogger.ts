@@ -22,6 +22,9 @@ export type EventType =
   | 'share_completed'
   | 'app_open'
   | 'notification_permission_result'
+  | 'onboarding_step'
+  | 'onboarding_complete'
+  | 'pit_offer'
   | 'app_error';
 
 /**

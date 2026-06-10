@@ -43,6 +43,10 @@ export interface SavedPuzzleState {
   dailyDate?: string | null;
   /** Absolute timestamp (ms) when the speed timer expires. Null for non-speed variants. */
   speedTimerExpireAt?: number | null;
+  /** Remaining speed-timer seconds at save time. Preferred over
+   *  speedTimerExpireAt on restore so backgrounding/relaunch pauses the
+   *  clock instead of expiring it (expireAt kept for old saves). */
+  speedTimeRemainingSec?: number | null;
   savedAt: number;
 }
 

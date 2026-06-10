@@ -13,6 +13,9 @@ import {
   getLockedLetterMessage,
   getNoValidMovesMessage,
   getNotificationPromptText,
+  getSpeedTimeUpMessage,
+  getWhisperGalleryEmptyText,
+  getNextStreakMilestoneText,
   checkNarrativeMicroBeat,
   resetMicroBeats,
   getHomescreenNudge,
@@ -923,5 +926,50 @@ describe('getPitMandatoryCTA', () => {
   test('phase 3+ is more demanding', () => {
     expect(getPitMandatoryCTA(3)).toContain('demands');
     expect(getPitMandatoryCTA(4)).toContain('demands');
+  });
+});
+
+describe('getSpeedTimeUpMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test('returns a non-empty string for every phase', () => {
+    for (const phase of allSixPhases) {
+      expect(getSpeedTimeUpMessage(phase).length).toBeGreaterThan(0);
+    }
+  });
+
+  test('messages are distinct across phases', () => {
+    const messages = allSixPhases.map(p => getSpeedTimeUpMessage(p));
+    expect(new Set(messages).size).toBe(messages.length);
+  });
+});
+
+describe('getWhisperGalleryEmptyText', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test('returns a non-empty string for every phase', () => {
+    for (const phase of allSixPhases) {
+      expect(getWhisperGalleryEmptyText(phase).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('getNextStreakMilestoneText', () => {
+  test('returns progress text below the top milestone', () => {
+    const text = getNextStreakMilestoneText(0, 2);
+    expect(text).not.toBeNull();
+    // next milestone after 2 days is 3 days -> +15 amber
+    expect(text).toContain('15');
+  });
+
+  test('returns null at or above the top milestone', () => {
+    expect(getNextStreakMilestoneText(0, 30)).toBeNull();
+    expect(getNextStreakMilestoneText(0, 45)).toBeNull();
+  });
+
+  test('returns a string for darker phases too', () => {
+    const text = getNextStreakMilestoneText(4, 5);
+    expect(typeof text).toBe('string');
+    expect((text as string).length).toBeGreaterThan(0);
   });
 });

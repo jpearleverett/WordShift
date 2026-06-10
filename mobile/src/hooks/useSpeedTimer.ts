@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState } from 'react-native';
 import { SPEED_TIMER_INTERVAL_MS } from '../constants/timing';
 
 export interface SpeedTimerState {
@@ -63,6 +64,40 @@ export function useSpeedTimer(
   const stopSpeedTimer = useCallback(() => {
     clearTimer();
     setSpeedTimeRemaining(null);
+  }, [clearTimer]);
+
+  // Pause while backgrounded: a phone call or app switch must not eat the
+  // clock. On background we bank the remaining seconds and stop ticking;
+  // on return we restart the countdown from the banked value.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        if (intervalRef.current !== null) {
+          const elapsed = Math.floor((Date.now() - startedAtRef.current) / 1000);
+          limitRef.current = Math.max(0, limitRef.current - elapsed);
+          clearTimer();
+        }
+      } else if (nextState === 'active') {
+        // Resume only if a run was in progress (remaining state still set)
+        setSpeedTimeRemaining((current) => {
+          if (current !== null && intervalRef.current === null && limitRef.current > 0) {
+            startedAtRef.current = Date.now();
+            intervalRef.current = setInterval(() => {
+              const elapsed = Math.floor((Date.now() - startedAtRef.current) / 1000);
+              const remaining = Math.max(0, limitRef.current - elapsed);
+              setSpeedTimeRemaining(remaining);
+              if (remaining <= 0) {
+                clearTimer();
+                onTimeUpRef.current();
+              }
+            }, SPEED_TIMER_INTERVAL_MS);
+            return limitRef.current;
+          }
+          return current;
+        });
+      }
+    });
+    return () => subscription.remove();
   }, [clearTimer]);
 
   // Cleanup on unmount.

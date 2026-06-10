@@ -76,6 +76,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           speedTimerExpireAt: deps.speedTimeRemaining != null
             ? Date.now() + deps.speedTimeRemaining * 1000
             : null,
+          speedTimeRemainingSec: deps.speedTimeRemaining,
           savedAt: Date.now(),
         };
         savePuzzleState(saveData as SavedPuzzleState).catch(() => {});
