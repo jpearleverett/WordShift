@@ -223,3 +223,24 @@ No monetization code exists (no IAP/ads SDKs in `package.json`, no paywall UI �
 ### 6. Final verdict
 
 **FIX BLOCKERS THEN SHIP.** The game itself — mechanics, fairness, content depth, and a narrative system that is genuinely the best retention asset on this list — is in better shape than most titles that reach submission; what's missing is almost entirely the *product shell*: store assets, legal links, build config, observability, two unwired init calls, an audio decision, and a profanity purge that requires regenerating the puzzle banks. None of the blockers is architecturally hard, but there are eight of them plus a mandatory device-QA pass on real low-end hardware, and the verification suite must be run green outside this environment first. Honest estimate: **3-5 focused weeks** to a submittable, defensible 1.0 — two weeks for the blocker list, one for performance/accessibility quick wins, and one-plus for device QA, store listing, and a soft-launch with crash reporting watching.
+
+---
+
+## Remediation log (2026-06-10, same day)
+
+All actionable findings were implemented on this branch (commits `03224ff`…`e19ff1f`):
+
+| Blocker | Status |
+|---|---|
+| 1×1 placeholder icon/splash | **Fixed** — generated real 1024×1024 icon, adaptive icon, splash + Android notification icon (`scripts/tools/generateAppIcons.mjs`) |
+| Profanity in banks/dictionary | **Fixed** — 30 words purged from both dictionaries, 212 affected puzzles dropped from the 12 banks (`scripts/tools/purgeProfanity.mjs`, now part of the bank-regen workflow) |
+| No privacy/terms/support | **Fixed** — docs/privacy-policy.md + docs/terms.md (GitHub Pages-ready), linked from Settings with support mailto |
+| `runMigrations()` never called | **Fixed** — bootstrap gate in App.tsx awaits migrations before MainApp mounts |
+| `installGlobalErrorHandler()` never called | **Fixed** — installed at App.tsx module load |
+| app.json/eas.json incomplete | **Fixed** — buildNumber, versionCode, notifications plugin, infoPlist, privacy manifest; eas.json added |
+| Sound toggle with no audio | **Fixed** — real 14-sound WAV pack wired through audio.ts (silent-mode-friendly, settings-gated) |
+| Known-red test/tsc baseline | **Open** — cannot be reproduced in this environment (deps uninstallable); must be driven green locally |
+
+High-priority items also implemented: contextual notification permission flow (no cold-launch prompt; latent module-loading bug fixed — notifications were previously dead code), daily challenge unlock 20→5, pit auto-collect window 5→15 with the Fox intro retimed, telemetry uploader (disabled by default) + `app_open`/permission-result events, lazy-loaded puzzle banks, color-blind-safe ✓/✗ previews, DraggableTile/LetterTile screen-reader labels, WCAG AA dark-phase text contrast, Android back handling, stuck detection with phase-aware messaging, haptic gaps, glow-loop gating, slot hitSlop, Settings version/reminders, WhisperGallery loading state, ~6.5MB image downscaling, ESLint config, storage-read hardening, and doc corrections (CLAUDE.md/AGENTS.md). Chain Shift remains design-only by choice; docs now say so explicitly.
+
+**Still requires work outside this environment:** run `npm install && npm test && npm run typecheck` and fix the 11 pre-existing failures + known tsc errors; real-device QA pass (see "Needs manual device testing"); enable GitHub Pages for /docs so the legal URLs resolve; optionally set `TELEMETRY_ENDPOINT` and commission final art/audio to replace the generated set.
