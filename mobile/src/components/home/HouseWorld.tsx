@@ -532,7 +532,6 @@ const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
       source={SHADOW_FIGURE_IMG}
       resizeMode="contain"
       style={{
-        pointerEvents: 'none',
         position: 'absolute',
         // Rise well above the roofline; the base dissolves behind the house.
         top: -height * 0.55,
@@ -600,7 +599,6 @@ const DriftingCloud: React.FC<{
       source={source}
       resizeMode="contain"
       style={{
-        pointerEvents: 'none',
         position: 'absolute',
         left: 0,
         top,
@@ -891,8 +889,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   source={GROUND_IMG}
                   resizeMode="stretch"
                   style={{
-                    pointerEvents: 'none',
-                    position: 'absolute',
+                                position: 'absolute',
                     bottom: -GROUND_HEIGHT * 0.45,
                     alignSelf: 'center',
                     width: GROUND_WIDTH,
@@ -909,8 +906,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       source={TREE_IMG}
                       resizeMode="contain"
                       style={{
-                        pointerEvents: 'none',
-                        position: 'absolute',
+                                        position: 'absolute',
                         bottom: -6,
                         left: -62,
                         width: 68,
@@ -923,8 +919,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       source={TREE_IMG}
                       resizeMode="contain"
                       style={{
-                        pointerEvents: 'none',
-                        position: 'absolute',
+                                        position: 'absolute',
                         bottom: -4,
                         right: -48,
                         width: 50,

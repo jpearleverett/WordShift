@@ -21,7 +21,7 @@ WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase 
 
 ### TypeScript
 
-- `npx tsc --noEmit` (or `npm run typecheck`) in `mobile/` is expected clean. Note: `pointerEvents` belongs in the `style` object for `Image`/`Animated.Image` (it is not a prop there in RN 0.81's types).
+- `npx tsc --noEmit` (or `npm run typecheck`) in `mobile/` is expected clean. Note: RN 0.81's types accept `pointerEvents` only on View-typed components — `Image`/`Animated.Image` type neither the prop nor the style key. Decorative images that render behind interactive content don't need it (hit-testing favors later siblings / higher zIndex); if an image must block or pass touches, wrap it in a `<View pointerEvents=...>`.
 - Lint: `npm run lint` (ESLint 9 flat config via `eslint-config-expo`, see `mobile/eslint.config.js`). Generated data files (`src/data/puzzleBank*.ts`, `src/dictionary.ts`) are excluded.
 
 ### Gotchas
