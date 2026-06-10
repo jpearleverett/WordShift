@@ -8,6 +8,9 @@ A word puzzle game where players shift letters between words to form valid Engli
 cd mobile
 npx expo start           # Start dev server (scan QR with Expo Go)
 npx expo start --clear   # Clear cache and start
+npm run typecheck        # tsc --noEmit
+npm run lint             # ESLint 9 flat config (eslint-config-expo)
+npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure Node)
 ```
 
 ## Testing
@@ -17,7 +20,7 @@ npx expo start --clear   # Clear cache and start
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
-- The full suite has 951 tests across 34 suites. **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~880 tests across 36 suites (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -27,7 +30,8 @@ npx expo start --clear   # Clear cache and start
 - **State**: React useState/useEffect (no external state library)
 - **Persistence**: AsyncStorage with in-memory cache pattern
 - **Haptics**: expo-haptics (settings-gated)
-- **Audio**: expo-av (placeholder infrastructure, awaiting real audio assets)
+- **Audio**: expo-av playing a bundled 14-sound WAV SFX pack (`assets/sounds/`, settings-gated, plays in iOS silent mode). Music is still future work.
+- **Analytics/crash**: local event log (`eventLogger.ts`) + global error handler installed at startup; optional remote upload via `telemetry.ts` (disabled until an endpoint is configured)
 - **Testing**: Jest with ts-jest preset
 - **Target**: iOS and Android via Expo Go
 
@@ -50,7 +54,7 @@ npx expo start --clear   # Clear cache and start
 - **Animal sprites**: Cute idle poses → robed cult figures
 - **Letter tiles**: Bouncy, fast wobble → heavy, ponderous movement with trailing glow
 - **Shadow figure**: Invisible → faint silhouette → full presence with crimson eyes above house
-- **Music/sound** (future): Cheerful chimes → droning, dissonant ambience
+- **Music/sound**: SFX shipped (cheerful candy chimes + a low `phase_change` swell); phase-darkened SFX variants and music are future work
 
 **Key narrative rules:**
 1. Never break the fourth wall. The animals don't know they're in a game.
@@ -73,7 +77,7 @@ npx expo start --clear   # Clear cache and start
 
 ```
 mobile/
-├── App.tsx                      # Main app (~1792 lines): screen routing, onboarding, post-victory intros, puzzle scroll
+├── App.tsx                      # Bootstrap gate (migrations + error handler) wrapping MainApp (~1850 lines): screen routing, onboarding, post-victory intros, Android back handling
 ├── assets/                      # Image assets (characters/, rooms/, house/, environment/)
 ├── src/
 │   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
@@ -82,8 +86,8 @@ mobile/
 │   ├── constants/               # Centralized game balance and timing constants
 │   │   ├── gameBalance.ts       # Phase thresholds, amber rewards, streak config, puzzle gen timeouts
 │   │   └── timing.ts            # Animation/interaction timing constants
-│   ├── dictionary.ts            # 11500+ word dictionary (3-7 letter words)
-│   ├── data/                    # Pre-generated puzzle banks (12 banks × 500 puzzles each)
+│   ├── dictionary.ts            # 11,504-word dictionary (3-7 letters, profanity-filtered)
+│   ├── data/                    # Pre-generated puzzle banks (12 banks, ~480 puzzles each after profanity purge; lazy-loaded)
 │   │   ├── puzzleBankTypes.ts   # PreGeneratedPuzzle interface
 │   │   ├── puzzleBankEasy.ts .. puzzleBankHard.ts           # Standard banks
 │   │   ├── puzzleBankReverseEasy.ts .. puzzleBankReverseHard.ts  # Reverse banks
@@ -108,7 +112,7 @@ mobile/
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst
 │   │   ├── FoxGuide.tsx         # Floating Fox speech bubble (onboarding)
-│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion toggles + Reset All
+│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, legal links, support contact, Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
 │   │   ├── DailyChallengeCard.tsx # Compact daily challenge button (header)
@@ -161,12 +165,16 @@ mobile/
 │       ├── onboarding.ts        # Onboarding state machine + persistence
 │       ├── dataMigration.ts     # Schema versioning + migrations (v3)
 │       ├── configValidation.ts  # Configuration data validation
+│       ├── telemetry.ts         # Optional remote event/crash uploader (disabled by default)
 │       ├── settings.ts, haptics.ts, audio.ts, eventLogger.ts
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
 │       ├── homeScenePan.ts, shareResults.ts
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # 951 tests, 34 suites
-└── scripts/                     # Puzzle bank generator scripts (12 generators)
+├── src/__tests__/               # ~880 tests, 36 suites
+├── scripts/                     # Puzzle bank generator scripts (12 generators)
+├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
+├── eas.json                     # EAS build profiles (development/preview/production)
+└── eslint.config.js             # ESLint 9 flat config
 ```
 
 ## Game Mechanics
@@ -179,7 +187,7 @@ mobile/
 5. Progress through all rows to win
 
 ### Word Preview Mechanic
-When a letter is selected, ghost previews show what word would form at each slot position. Valid words green, invalid red/dimmed. Computed via `useMemo` in `usePuzzleGame.ts`, passed to `Row.tsx` as `slotPreviews`.
+When a letter is selected, ghost previews show what word would form at each slot position. Valid words green with a "✓ " prefix, invalid red/dimmed with "✗ " (validity is never conveyed by color alone). Computed via `useMemo` in `usePuzzleGame.ts`, passed to `Row.tsx` as `slotPreviews`.
 
 ### Difficulty Levels
 
@@ -194,14 +202,14 @@ When a letter is selected, ghost previews show what word would form at each slot
 
 Player-selected from the setup menu. Persisted as preferred variant.
 
-- **Reverse Shift** (unlock: 10 puzzles): Play down then back up. Forward-pass letters stay locked (cumulative locking). All served from pre-generated banks with `reverseSolution` for hints.
-- **Double Shift** (unlock: 40 puzzles): Move 2 letters per step. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. All words are 5 letters (W=5). Difficulty by row count: EASY=3, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. 1.65x amber multiplier.
-- **Speed Shift** (unlock: 52 puzzles): Timed run with difficulty-aware timers (EASY 65s → HARD 48s). Timer persists across navigation via `speedTimerExpireAt` in autosave.
-- **Chain Shift** (unlock: 85 puzzles): 3 linked puzzles where each final word becomes the next starting word. (Planned, not yet implemented.)
+- **Reverse Shift** (unlock: 8 puzzles): Play down then back up. Forward-pass letters stay locked (cumulative locking). All served from pre-generated banks with `reverseSolution` for hints.
+- **Double Shift** (unlock: 25 puzzles): Move 2 letters per step. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. All words are 5 letters (W=5). Difficulty by row count: EASY=3, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. 1.65x amber multiplier.
+- **Speed Shift** (unlock: 35 puzzles): Timed run with difficulty-aware timers (EASY 65s → HARD 48s). Timer persists across navigation via `speedTimerExpireAt` in autosave.
+- **Chain Shift** (design idea, NOT implemented): 3 linked puzzles where each final word becomes the next starting word. No type, config, or unlock exists in code.
 
 ### Pre-Generated Puzzle Banks
 
-12 banks × 500 puzzles each = 6000 pre-validated puzzles. Standard, reverse, and double-shift variants at all 4 difficulties. Phase-aware selection scores by dread tier proximity. Word freshness cross-references with `wordHistory.ts`. Top-5 random pick for variety. Recycling when exhausted. Graceful fallback to on-device generation.
+12 banks of ~480 puzzles each (~5,800 total) — generated at 500 each, then filtered by `scripts/tools/purgeProfanity.mjs`. Banks are **lazy-loaded** on first use via `require()` thunks in `puzzleBank.ts` (keeps ~5.7MB of data out of cold start). Standard, reverse, and double-shift variants at all 4 difficulties. Phase-aware selection scores by dread tier proximity. Word freshness cross-references with `wordHistory.ts`. Top-5 random pick for variety. Recycling when exhausted. Graceful fallback to on-device generation.
 
 ### Curated Early Puzzles
 First 3 post-onboarding puzzles are hand-picked (`CURATED_EARLY_PUZZLES` in `constants.ts`) for a compelling first session.
@@ -215,13 +223,13 @@ First 3 post-onboarding puzzles are hand-picked (`CURATED_EARLY_PUZZLES` in `con
 Optional harder mode: difficulty-aware undo limit (EASY/MEDIUM=2, MEDIUM_PLUS/HARD=1), no hints. 1.5x amber. Challenge completions count 2x toward phase progression.
 
 ### Daily Challenge
-Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tracking with 2-day grace period. Unlocked at 20 puzzles or Phase 1+. One-time Fox intro.
+Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tracking with 2-day grace period. Unlocked at 5 puzzles or Phase 1+ (early unlock is the Day-1 retention hook). One-time Fox intro.
 
 ## App Architecture
 
 ### Custom Hooks
 
-**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic.
+**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection and surfaces `getNoValidMovesMessage()` when no legal move remains.
 
 **`useGamePersistence()`** — Persistence: amber, stats, phases, streak. Key: `recordVictory()` returns VictoryData (includes `phaseTransitionPending`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus`). `refreshStats()` reloads from storage. Reports phase 5 when post-revelation.
 
@@ -243,6 +251,13 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 **`useAutosave()`** — Debounced mid-session puzzle state autosave.
 
+### App Bootstrap & Reliability
+
+- `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log.
+- The default export `App` is a bootstrap gate: it awaits `runMigrations()` (dataMigration.ts) **before** mounting `MainApp`, so service caches always read migrated data. Renders a quiet dark view while booting; migration failures log and never block launch.
+- Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
+- `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Disabled by default** (`TELEMETRY_ENDPOINT = ''`); set an HTTPS collector URL to enable before a data-informed launch, and update the privacy policy when doing so.
+
 ### Screen Navigation
 
 State-based routing in `App.tsx`. Screen transitions use an opaque overlay pattern: overlay fades IN (120ms), screen swaps while hidden, overlay fades OUT (180ms). Overlay/root `backgroundColor` dynamically matches destination via `getScreenBackgroundColor()`. Instant when `reducedMotion` enabled.
@@ -261,6 +276,8 @@ State-based routing in `App.tsx`. Screen transitions use an opaque overlay patte
 Puzzle completion queues amber in harvest batches instead of crediting directly. Player must offer batches in the Offering Pit to convert to spendable amber.
 
 **Flow**: Puzzle complete → `enqueueHarvestBatch()` → VictoryModal shows "Collect Now" → pit screen → tap floating words to devour → `offerBatch()` credits amber.
+
+**Auto-collect window**: through the first `AUTO_COLLECT_PUZZLE_LIMIT` (15, `gameBalance.ts`) puzzles, amber auto-credits without a pit visit; Fox's `pit_harvest` intro fires when the window closes and manual harvesting begins.
 
 **Pit Features**: Flying mini candy-tile words, tap-to-devour spiral animation, multi-layered pit glow (4 concentric ovals), ward marks (7 circles showing phase progress), ward ignition ceremony for phase transitions, phase-aware background images.
 
@@ -374,7 +391,8 @@ ALL player-facing text shifts with phase. Key functions:
 - `getLoadingMessage()`, `getStartMessage()`, `getRulesText()`, `getPhaseChangeNarrative()`
 - `getRitualEchoHeader/Footer()`, `getIncantationName()`, `getWordsOfferedText()`
 - `getAnimalWhisper()`, `getAnimalInterjection()`, `getRitualMicroEvent()`
-- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`
+- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`, `getNoValidMovesMessage()`
+- `getNotificationPromptText()` — phase-aware copy for the one-time in-app notification pre-permission prompt
 - Pit functions: `getPitScreenTitle/Subtitle()`, `getPitButtonLabel()`, `getPitOfferAllLabel()`, etc.
 - Ward functions: `getPitWardHint()`, `getPitTransitionReadyText/CeremonyText()`, `getWardMarkColors()`
 
@@ -411,7 +429,7 @@ One-time Fox sequences triggered after victories in App.tsx:
 - `variant_unlock`: New variant unlocked
 - `home_tools`: Home screen features
 - `setup_selector`: Puzzle setup selector
-- `pit_harvest`: Pit harvest system
+- `pit_harvest`: Pit harvest system (fires at puzzle 15, when the auto-collect window closes)
 - `challenge_intro`: Challenge Mode (after 15 puzzles)
 - `journal_intro`: Journal hub (from HomeScreen after puzzle 6)
 - `daily_challenge_intro`: Daily Challenge on unlock
@@ -458,16 +476,20 @@ Phase 2+: one cosmetic enhancement per room (10 total, 75-150 amber). Phase-awar
 ### Notifications (`notifications.ts`)
 Local push: daily reminders (phase-aware morning messages) + re-engagement (2-day inactivity). Phase 5 has distinct serene tone.
 
+**Permission flow**: `scheduleAllNotifications()` never prompts — it only schedules when permission is already granted. The OS dialog is triggered solely by `requestNotificationPermission()`, reached two ways: the one-time contextual prompt after the player's 3rd+ victory (App.tsx `maybePromptForNotifications`, copy from `getNotificationPromptText()`), or the Daily Reminders toggle in Settings. The prompt result is logged as a `notification_permission_result` event.
+
 ### Cloud Save (`cloudSave.ts`)
 Client-side sync layer with pluggable `CloudProvider` interface. Currently `NoOpProvider`. `collectLocalSaveData()` / `restoreFromCloudData()`.
 
 ## Asset System
 
 ### Current State
+- **Store assets are real**: 1024×1024 icon.png, adaptive-icon.png, splash.png, and the Android notification-icon.png are generated by `scripts/tools/generateAppIcons.mjs` / `generateNotificationIcon.mjs` (`npm run generate:assets`)
+- **SFX pack**: 14 WAV chimes in `assets/sounds/`, generated by `scripts/tools/generateSounds.mjs`
 - **All 10 character sprites** wired up: idle.png, talk.png, robed.png per animal
 - **All 10 room backgrounds** wired up in RoomView.tsx
-- **Environment**: sky_day/dusk/storm/shadow.png (phase-aware), pitt_day/dusk/night.png (pit backgrounds)
-- **Not yet created**: shadow_figure.png, ground.png, house structure elements, tree/cloud/bird sprites
+- **Environment**: sky_day/dusk/storm/shadow.png (phase-aware), pitt_day/dusk/night.png (pit backgrounds). Oversized backgrounds were downscaled for mobile via `scripts/tools/downscaleImages.mjs` (skies 1080px wide, aquarium 1456px)
+- **Not yet created**: shadow_figure.png, ground.png, house structure elements, tree/cloud/bird sprites; replacing the generated icon/SFX with commissioned art/audio is optional polish
 
 ### Asset Directories
 ```
@@ -505,7 +527,8 @@ mobile/assets/
 - `reducedMotion`: All animations must check and skip/set-instantly
 - **Narrative consistency**: Any new feature must respect current phase. Cheerful-only-at-Phase-0.
 - **No over-engineering**: Only make directly requested changes. Don't add features, refactoring, or docstrings beyond what's asked.
-- Accessibility: `accessibilityLabel` and `accessibilityRole` on interactive elements
+- Accessibility: `accessibilityLabel` and `accessibilityRole` on interactive elements; never convey information by color alone (see the ✓/✗ slot-preview prefixes); dark-phase text colors must hold ≥4.5:1 contrast against their backgrounds
+- Store/legal: privacy policy + terms live in `docs/` (GitHub Pages); Settings links route through `src/constants/links.ts`
 
 ## Testing Patterns
 
@@ -561,9 +584,14 @@ Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
 - `getPuzzlesBetweenSessions(phase)` — Phase 0=2, Phase 1=3, Phase 2=4, Phase 3-4=5
 
 ### Adding sound effects
-1. Add file to `assets/sounds/`
-2. Register in `audio.ts`
+1. Add file to `assets/sounds/` (or regenerate the synth pack: `node scripts/tools/generateSounds.mjs`)
+2. Register in `SOUND_SOURCES` in `audio.ts` (add to `PRELOAD_SOUND_NAMES` if hot-path)
 3. Call from relevant component (auto-checks `settings.soundEnabled`)
+
+### Regenerating puzzle banks
+1. `npm run generate:puzzles` (long-running jest generators in `scripts/`)
+2. **Always** run `node scripts/tools/purgeProfanity.mjs` afterwards — the generator does not filter offensive words; the purge script removes them from both dictionaries and drops affected bank puzzles
+3. The blocklist lives in `scripts/tools/purgeProfanity.mjs` (`BLOCKED_WORDS`)
 
 ## Narrative Acceleration
 
@@ -575,7 +603,7 @@ Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250:
 
 ## Known Constraints
 
-- Standard/reverse/double_shift at ALL difficulties from pre-generated banks; speed/chain generate on-device
+- Standard/reverse/double_shift at ALL difficulties from pre-generated banks (lazy-loaded); speed generates on-device
 - On-device timeout: 2.5s standard, 25s reverse, 5s double-shift. Wrapper: 4s/30s
 - Fallback pool: 15 pre-validated puzzles across 3 tiers
 - Dictionary: common English only (no proper nouns), 3-7 letters
@@ -584,7 +612,6 @@ Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250:
 - House view: `react-native-gesture-handler` (vertical pan only)
 - TouchableOpacity in home components from `react-native-gesture-handler`; HomeScreen modals use react-native's
 - Daily challenge uses Math.random override (concurrency-guarded)
-- Sound system is placeholder (API wired, awaiting assets)
 - Victory flow: `isProcessingVictory` lock
 - AnimatedBackground: opacity overlay (native driver compatible)
 - Device tier detection is heuristic (PixelRatio + screen size)

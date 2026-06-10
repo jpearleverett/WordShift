@@ -21,11 +21,12 @@ WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase 
 
 ### TypeScript
 
-- `npx tsc --noEmit` in `mobile/` will show pre-existing type errors in several files (App.tsx, HomeScreen.tsx, HouseWorld.tsx, etc.). These are known and not blocking for development.
-- There is no separate lint command (`eslint` is not configured). TypeScript checking via `tsc` is the primary static analysis tool.
+- `npx tsc --noEmit` (or `npm run typecheck`) in `mobile/` will show pre-existing type errors in several files (App.tsx, HomeScreen.tsx, HouseWorld.tsx, etc.). These are known and not blocking for development.
+- Lint: `npm run lint` (ESLint 9 flat config via `eslint-config-expo`, see `mobile/eslint.config.js`). Generated data files (`src/data/puzzleBank*.ts`, `src/dictionary.ts`) are excluded.
 
 ### Gotchas
 
 - `package-lock.json` is present — use `npm` (not pnpm/yarn) for dependency management.
 - The `tsconfig.json` extends `expo/tsconfig.base` — this is resolved from `node_modules` after install.
-- Puzzle bank `.ts` files in `src/data/` are auto-generated and large (500 puzzles each, 12 files). Do not manually edit these.
+- Puzzle bank `.ts` files in `src/data/` are auto-generated and large (~480 puzzles each after the profanity filter pass, 12 files). Do not manually edit these — regenerate with `npm run generate:puzzles`, then run `node scripts/tools/purgeProfanity.mjs`.
+- App icons, splash, notification icon, and the SFX pack are generated: `npm run generate:assets` (pure-Node scripts in `mobile/scripts/tools/`).
