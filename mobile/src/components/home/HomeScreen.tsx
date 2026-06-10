@@ -34,6 +34,13 @@ import {
   markJournalIntroSeen,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { AmberInline } from '../AmberInline';
+
+// Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
+const AMBER_ICON = require('../../../assets/ui/amber.png');
+const FLAME_ICON = require('../../../assets/ui/flame.png');
+const JOURNAL_ICON = require('../../../assets/ui/journal.png');
+const PIT_ICON = require('../../../assets/ui/pit.png');
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -792,7 +799,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             <View style={styles.amberInner}>
               <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-                <Text style={styles.amberEmoji}>💎</Text>
+                <Image source={AMBER_ICON} style={styles.amberIconImage} />
               </Animated.View>
               <Text style={styles.amberCount}>{progress.amber}</Text>
               {!isOnboarding && <AmberSparkle />}
@@ -803,7 +810,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
               accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
             >
-              <Text style={styles.streakBadgeEmoji}>{'\uD83D\uDD25'}</Text>
+              <Image source={FLAME_ICON} style={styles.streakBadgeIcon} />
               <Text style={[styles.streakBadgeCount, isStreakAtRisk && styles.streakAtRiskCount]}>
                 {progress.currentStreak}
               </Text>
@@ -826,7 +833,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
                 accessibilityRole="button"
               >
-                <Text style={styles.headerIconText}>{shouldHighlightPitButton ? '🔥' : '⭕'}</Text>
+                <Image source={PIT_ICON} style={styles.headerIconImage} />
                 {pendingHarvest && pendingHarvest.pendingWords > 0 && (
                   <View style={styles.headerBadge}>
                     <Text style={styles.headerBadgeText}>{pendingHarvest.pendingWords}</Text>
@@ -850,7 +857,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               accessibilityLabel={journalSpotlightActive ? 'Tap to open journal' : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
               accessibilityRole="button"
             >
-              <Text style={styles.headerIconText}>📚</Text>
+              <Image source={JOURNAL_ICON} style={styles.headerIconImage} />
               {!journalSpotlightActive && claimableQuestAmber > 0 && (
                 <View style={styles.headerBadge}>
                   <Text style={styles.headerBadgeText}>!</Text>
@@ -911,6 +918,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           purchasedUpgrades={purchasedUpgrades}
           savedPanY={initialHousePanY}
           onPanYChange={onHousePanChange}
+          onPitPress={!isOnboarding && onOpenPit ? () => {
+            hapticLight();
+            onOpenPit();
+          } : undefined}
         />
 
         <View style={styles.homeOverlayColumn} pointerEvents="box-none">
@@ -957,7 +968,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.unlockProgressText}>
                   {unlockFlow.nextUnlock.cost === 0
                     ? 'FREE'
-                    : `💎 ${progress.amber} / ${unlockFlow.nextUnlock.cost}`}
+                    : <><AmberInline /> {progress.amber} / {unlockFlow.nextUnlock.cost}</>}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -1316,7 +1327,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Unlock Progress</Text>
             <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
-              Your Amber: 💎 {progress.amber}
+              Your Amber: <AmberInline /> {progress.amber}
             </Text>
             {upgradeFeedback && (
               <Text style={[styles.shopFeedbackText, { color: dt.nameColor }]}>
@@ -1337,7 +1348,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         : unlockFlow.nextUnlock.description}
                     </Text>
                     <Text style={styles.unlockCost}>
-                      💎 {unlockFlow.nextUnlock.cost} amber
+                      <AmberInline /> {unlockFlow.nextUnlock.cost} amber
                     </Text>
                     {unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available && (
                       <Text style={styles.unlockBlockedText}>
@@ -1398,7 +1409,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
                           {getUpgradeDescription(room.id, progress.currentPhase)}
                         </Text>
-                        <Text style={styles.unlockCost}>💎 {upgrade.cost} amber</Text>
+                        <Text style={styles.unlockCost}><AmberInline /> {upgrade.cost} amber</Text>
                       </View>
                       <TouchableOpacity
                         style={[
@@ -1593,7 +1604,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
                   Play more puzzles to earn amber and unlock this room!
                 </Text>
-                <Text style={styles.amberBalance}>Your Amber: 💎 {progress.amber}</Text>
+                <Text style={styles.amberBalance}>Your Amber: <AmberInline /> {progress.amber}</Text>
 
                 {unlockFlow.purchaseError && (
                   <Text style={[styles.shopSubtitle, { color: '#E85050', marginTop: 8, fontWeight: '600' }]}>
@@ -1625,7 +1636,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         accessibilityRole="button"
                       >
                         <Text style={styles.buyButtonText}>
-                          Unlock for 💎 {unlockFlow.nextUnlock!.cost}
+                          Unlock for <AmberInline /> {unlockFlow.nextUnlock!.cost}
                         </Text>
                       </TouchableOpacity>
                     </>
@@ -1699,7 +1710,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                   {unlockFlow.nextUnlock!.cost > 0 && (
                     <Text style={styles.inviteCost}>
-                      Cost: 💎 {unlockFlow.nextUnlock!.cost} amber
+                      Cost: <AmberInline /> {unlockFlow.nextUnlock!.cost} amber
                     </Text>
                   )}
 
@@ -1881,7 +1892,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {getSacrificePrompt(progress.currentPhase).subtitle}
             </Text>
             <Text style={[styles.sacrificeBalance, { color: dt.textColor }]}>
-              Your Amber: 💎 {progress.amber}
+              Your Amber: <AmberInline /> {progress.amber}
             </Text>
 
             {sacrificeMessage ? (
@@ -1919,7 +1930,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     accessibilityRole="button"
                   >
                     <Text style={[styles.sacrificeAmountText, { color: dt.textColor }]}>
-                      💎 {amount}
+                      <AmberInline /> {amount}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -2362,6 +2373,18 @@ const styles = StyleSheet.create({
   },
   headerIconText: {
     fontSize: 16,
+  },
+  headerIconImage: {
+    width: 22,
+    height: 22,
+  },
+  amberIconImage: {
+    width: 20,
+    height: 20,
+  },
+  streakBadgeIcon: {
+    width: 15,
+    height: 15,
   },
   playButton: {
     backgroundColor: CandyColors.green.main,

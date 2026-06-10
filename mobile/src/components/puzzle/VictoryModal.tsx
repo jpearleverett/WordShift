@@ -32,6 +32,7 @@ import { hapticSuccess } from '../../services/haptics';
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../../assets/ui/star_empty.png');
 const AMBER_ICON = require('../../../assets/ui/amber.png');
+const FLAME_ICON = require('../../../assets/ui/flame.png');
 
 export interface VictoryData {
   earnedStars: number;
@@ -270,7 +271,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     accessible
                     accessibilityLabel={`${victoryData.currentStreak} day streak`}
                   >
-                    <Text style={styles.winStreakEmoji}>{'\uD83D\uDD25'}</Text>
+                    <Image source={FLAME_ICON} style={styles.winStreakIcon} />
                     <Text style={styles.winStreakText}>{victoryData.currentStreak} Day Streak!</Text>
                   </View>
                   {Boolean(nextMilestoneText) && (
@@ -1034,6 +1035,11 @@ const styles = StyleSheet.create({
   winStreakEmoji: {
     fontSize: 20,
     marginRight: 6,
+  },
+  winStreakIcon: {
+    width: 17,
+    height: 17,
+    marginRight: 4,
   },
   winStreakText: {
     fontSize: 14,

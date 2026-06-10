@@ -12,10 +12,10 @@ const MAX_USED_TRACKED = 500;
 // the general wordHistory hard cooldown (15 puzzles) has expired.
 const BANK_RECENT_THRESHOLD = 50;   // Strong penalty window
 const BANK_MEDIUM_THRESHOLD = 150;  // Moderate penalty window
-const BANK_RECENT_PENALTY = -12;    // Per word seen within BANK_RECENT_THRESHOLD
-const BANK_MEDIUM_PENALTY = -6;     // Per word seen within BANK_MEDIUM_THRESHOLD
-const BANK_NOVEL_BONUS_FULL = 15;   // All words never seen from this bank
-const BANK_NOVEL_BONUS_MOST = 8;    // 3+ novel words out of ~5
+const BANK_RECENT_PENALTY = -18;    // Per word seen within BANK_RECENT_THRESHOLD
+const BANK_MEDIUM_PENALTY = -9;     // Per word seen within BANK_MEDIUM_THRESHOLD
+const BANK_NOVEL_BONUS_FULL = 25;   // All words never seen from this bank
+const BANK_NOVEL_BONUS_MOST = 12;    // 3+ novel words out of ~5
 const BANK_NOVEL_BONUS_SOME = 3;    // 1-2 novel words
 
 // ---------------------------------------------------------------------------
@@ -59,6 +59,25 @@ function getBank(bankKey: string): PreGeneratedPuzzle[] {
     entry.bankData = entry.loadBank();
   }
   return entry.bankData;
+}
+
+// Per-bank word frequency — the generator's adjacency bias makes "hub" words
+// (MATER, CATER, LATER...) appear in dozens of puzzles per bank. Selection
+// penalizes them so the long tail of vocabulary actually surfaces.
+const bankWordFrequency = new Map<string, Map<string, number>>();
+
+function getBankWordFrequency(bankKey: string): Map<string, number> {
+  let freq = bankWordFrequency.get(bankKey);
+  if (!freq) {
+    freq = new Map();
+    for (const puzzle of getBank(bankKey)) {
+      for (const word of puzzle.allWords) {
+        freq.set(word, (freq.get(word) ?? 0) + 1);
+      }
+    }
+    bankWordFrequency.set(bankKey, freq);
+  }
+  return freq;
 }
 
 /**
@@ -233,7 +252,8 @@ function scorePuzzleForContext(
   phase: DialoguePhase,
   usedSet: Set<string>,
   recencyMap: Map<string, number>,
-  bankWordRecency: Map<string, number>
+  bankWordRecency: Map<string, number>,
+  wordFrequency: Map<string, number>
 ): number {
   let score = 0;
 
@@ -292,6 +312,15 @@ function scorePuzzleForContext(
     score += BANK_NOVEL_BONUS_MOST;
   } else if (novelWords >= 1) {
     score += BANK_NOVEL_BONUS_SOME;
+  }
+
+  // Hub-word penalty: words the generator over-used across this bank cost
+  // score regardless of play history, so the vocabulary long tail surfaces.
+  for (const word of puzzle.allWords) {
+    const freq = wordFrequency.get(word) ?? 0;
+    if (freq >= 30) score -= 14;
+    else if (freq >= 18) score -= 9;
+    else if (freq >= 10) score -= 4;
   }
 
   // Random jitter (prevents deterministic ordering)
@@ -362,14 +391,14 @@ export async function selectPreGeneratedPuzzle(
   // Score all available puzzles for current context
   const scored = available.map(p => ({
     puzzle: p,
-    score: scorePuzzleForContext(p, phase, usedSet, recencyMap, bankWordRecency),
+    score: scorePuzzleForContext(p, phase, usedSet, recencyMap, bankWordRecency, getBankWordFrequency(bankKey)),
   }));
 
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // Pick randomly from top 5 (for variety)
-  const topN = Math.min(5, scored.length);
+  // Pick randomly from the top 10 (wider pool = more vocabulary variety)
+  const topN = Math.min(10, scored.length);
   const selected = scored[Math.floor(Math.random() * topN)];
 
   // Mark as played

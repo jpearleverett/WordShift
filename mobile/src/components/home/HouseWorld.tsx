@@ -13,6 +13,9 @@ import {
   PanGestureHandler,
   State,
   PanGestureHandlerGestureEvent,
+  // Touchables inside the pannable house view must come from
+  // react-native-gesture-handler to coexist with the pan gesture
+  TouchableOpacity,
 } from 'react-native-gesture-handler';
 import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
@@ -31,6 +34,9 @@ const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
 const CLOUD_1 = require('../../../assets/environment/cloud_1.png');
 const CLOUD_2 = require('../../../assets/environment/cloud_2.png');
 const GROUND_IMG = require('../../../assets/environment/ground.png');
+const ROOF_IMG = require('../../../assets/environment/roof.png');
+const FOUNDATION_IMG = require('../../../assets/environment/foundation.png');
+const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
 const TREE_IMG = require('../../../assets/environment/tree.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
 
@@ -621,9 +627,11 @@ const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
 // House structure art (roof.png 1024x420, foundation.png 1024x160,
 // ground.png 1024x300, tree.png 480x640, shadow_figure.png 600x1200)
-const ROOF_WIDTH = HOUSE_WIDTH + 20; // Reference width for the shadow figure's scale
+const ROOF_WIDTH = HOUSE_WIDTH + 30; // Rendered roof width (slight overhang)
+const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (312 / 792)); // roof.png aspect
+const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (84 / 792)); // foundation.png aspect
 const GROUND_WIDTH = ROOM_WIDTH * 1.6;
-const GROUND_HEIGHT = GROUND_WIDTH * (300 / 1024);
+const GROUND_HEIGHT = GROUND_WIDTH * (240 / 1024); // ground.png aspect
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
 
@@ -639,6 +647,8 @@ interface HouseWorldProps {
   purchasedUpgrades?: Record<string, number>;
   savedPanY?: number | null;
   onPanYChange?: (panY: number) => void;
+  /** Tapping the in-world pit entrance opens the Offering Pit. */
+  onPitPress?: () => void;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
@@ -653,6 +663,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   purchasedUpgrades = {},
   savedPanY = null,
   onPanYChange,
+  onPitPress,
 }) => {
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
@@ -743,7 +754,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
+    const totalContentHeight = 50 + (ROOF_RENDER_HEIGHT - 6) + houseHeight + FOUNDATION_RENDER_HEIGHT + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
@@ -908,9 +919,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       style={{
                                         position: 'absolute',
                         bottom: -6,
-                        left: -62,
+                        left: -64,
                         width: 68,
-                        height: 90,
+                        height: 92,
                         zIndex: -1,
                         opacity: currentPhase >= 3 ? 0.4 : 1,
                       }}
@@ -921,9 +932,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       style={{
                                         position: 'absolute',
                         bottom: -4,
-                        right: -48,
+                        right: -50,
                         width: 50,
-                        height: 66,
+                        height: 68,
                         zIndex: -1,
                         opacity: currentPhase >= 3 ? 0.4 : 1,
                         transform: [{ scaleX: -1 }],
@@ -932,36 +943,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   </>
                 )}
 
-                {/* Roof */}
+                {/* Roof — pixel art (chimney + attic window baked into the asset) */}
                 <View style={styles.roof}>
-                  <View style={styles.chimney}>
-                    <View style={styles.chimneyBody} />
-                    <View style={styles.chimneyTop} />
-                    {/* Animated smoke puffs */}
-                    <View style={styles.smokeContainer}>
-                      <SmokePuff delay={0} />
-                      <SmokePuff delay={1000} />
-                      <SmokePuff delay={2000} />
-                    </View>
-                  </View>
-                  <View style={styles.roofMain}>
-                    <View style={styles.roofPattern}>
-                      <View style={styles.shingleRow}>
-                        {[...Array(8)].map((_, i) => (
-                          <View key={i} style={styles.shingle} />
-                        ))}
-                      </View>
-                      <View style={[styles.shingleRow, { marginLeft: 10 }]}>
-                        {[...Array(7)].map((_, i) => (
-                          <View key={i} style={styles.shingle} />
-                        ))}
-                      </View>
-                    </View>
-                  </View>
-                  <View style={styles.roofTrim} />
-                  <View style={styles.atticWindow}>
-                    <View style={styles.atticWindowGlass} />
-                    <View style={styles.atticWindowFrame} />
+                  <Image source={ROOF_IMG} style={styles.roofImage} resizeMode="stretch" />
+                  {/* Animated smoke puffs rising from the baked-in chimney */}
+                  <View style={styles.smokeContainer}>
+                    <SmokePuff delay={0} />
+                    <SmokePuff delay={1000} />
+                    <SmokePuff delay={2000} />
                   </View>
                 </View>
 
@@ -1018,14 +1007,25 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   )}
                 </View>
 
-                {/* Foundation */}
-                <View style={styles.foundation}>
-                  <View style={styles.stoneRow}>
-                    {[...Array(6)].map((_, i) => (
-                      <View key={i} style={styles.stone} />
-                    ))}
-                  </View>
-                </View>
+                {/* Foundation — pixel stone courses */}
+                <Image source={FOUNDATION_IMG} style={styles.foundationImage} resizeMode="stretch" />
+
+                {/* The Offering Pit's mouth, sunk into the grass beside the house */}
+                {onPitPress && (
+                  <TouchableOpacity
+                    style={styles.pitEntrance}
+                    onPress={onPitPress}
+                    accessibilityLabel="Enter the Offering Pit"
+                    accessibilityRole="button"
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={PIT_ENTRANCE_IMG}
+                      style={styles.pitEntranceImage}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
               </View>
             </Animated.View>
         </Animated.View>
@@ -1079,8 +1079,8 @@ const styles = StyleSheet.create({
   // Smoke container
   smokeContainer: {
     position: 'absolute',
-    top: -20,
-    left: 5,
+    top: -16,
+    left: ROOF_WIDTH * 0.24,
   },
 
   // Gesture container
@@ -1105,99 +1105,36 @@ const styles = StyleSheet.create({
 
   // Roof
   roof: {
-    width: HOUSE_WIDTH + 30,
-    height: 80,
-    marginBottom: -5,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    width: ROOF_WIDTH,
+    height: ROOF_RENDER_HEIGHT,
+    marginBottom: -6,
     position: 'relative',
   },
-  chimney: {
-    position: 'absolute',
-    top: -20,
-    right: 60,
-    alignItems: 'center',
-    zIndex: 10,
+  roofImage: {
+    width: '100%',
+    height: '100%',
   },
-  chimneyBody: {
-    width: 25,
-    height: 40,
-    backgroundColor: '#8B4513',
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
-  },
-  chimneyTop: {
-    width: 32,
-    height: 8,
-    backgroundColor: '#5D4037',
-    borderRadius: 2,
+  foundationImage: {
+    width: HOUSE_WIDTH,
+    height: FOUNDATION_RENDER_HEIGHT,
     marginTop: -2,
+  },
+  pitEntrance: {
+    position: 'absolute',
+    right: -96,
+    bottom: -GROUND_HEIGHT * 0.18,
+    width: 104,
+    height: 65, // pit_entrance.png aspect (480x300)
+  },
+  pitEntranceImage: {
+    width: '100%',
+    height: '100%',
   },
   smokeEmoji: {
     fontSize: 18,
     position: 'absolute',
     top: -25,
     opacity: 0.6,
-  },
-  roofMain: {
-    width: '100%',
-    height: 60,
-    backgroundColor: '#5D4037',
-    borderTopLeftRadius: 120,
-    borderTopRightRadius: 120,
-    overflow: 'hidden',
-  },
-  roofPattern: {
-    flex: 1,
-    paddingTop: 15,
-    paddingHorizontal: 20,
-  },
-  shingleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 5,
-  },
-  shingle: {
-    width: 30,
-    height: 15,
-    backgroundColor: '#4E342E',
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  roofTrim: {
-    position: 'absolute',
-    bottom: 0,
-    width: '110%',
-    height: 15,
-    backgroundColor: '#3E2723',
-    borderRadius: 5,
-  },
-  atticWindow: {
-    position: 'absolute',
-    top: 20,
-    width: 35,
-    height: 30,
-    borderRadius: 20,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
-    overflow: 'hidden',
-  },
-  atticWindowGlass: {
-    flex: 1,
-    backgroundColor: '#FFE4B5',
-    opacity: 0.8,
-  },
-  atticWindowFrame: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderWidth: 3,
-    borderColor: '#5D4037',
-    borderRadius: 20,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
   },
 
   // House body
@@ -1239,26 +1176,6 @@ const styles = StyleSheet.create({
   },
 
   // Foundation
-  foundation: {
-    width: HOUSE_WIDTH,
-    height: 25,
-    backgroundColor: '#6D4C41',
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stoneRow: {
-    flexDirection: 'row',
-    gap: 5,
-  },
-  stone: {
-    width: 50,
-    height: 15,
-    backgroundColor: '#5D4037',
-    borderRadius: 3,
-  },
 });
 
 export default HouseWorld;

@@ -66,7 +66,7 @@ export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
 // ============================================================================
 
 /** Pit amber auto-collects through this many puzzles before manual harvest begins. */
-export const AUTO_COLLECT_PUZZLE_LIMIT = 15;
+export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 
 // ============================================================================
 // STREAK

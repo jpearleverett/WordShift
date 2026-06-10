@@ -516,6 +516,8 @@ function MainApp() {
 
   const startVictoryExitFlow = useCallback((action: () => void) => {
     clearVictoryTimeouts();
+    // The completed puzzle's autosave must never be resumable from Play
+    clearPuzzleState().catch(() => {});
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();

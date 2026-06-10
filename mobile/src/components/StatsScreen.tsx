@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { AmberInline } from './AmberInline';
 import { CumulativeStats, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
 import { getDailyStatus } from '../services/dailyChallenge';
@@ -198,7 +199,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               <View style={styles.rowDivider} />
               <View style={styles.journeyRow}>
                 <Text style={styles.journeyLabel}>Amber Balance</Text>
-                <Text style={styles.journeyValue}>💎 {amberBalance}</Text>
+                <Text style={styles.journeyValue}><AmberInline /> {amberBalance}</Text>
               </View>
               <View style={styles.rowDivider} />
               <View style={styles.journeyRow}>
