@@ -37,19 +37,20 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
         glowAnim.setValue(0.5);
       } else {
+        // Drives only the glow overlay's opacity (native driver)
         Animated.loop(
           Animated.sequence([
             Animated.timing(glowAnim, {
               toValue: 1,
               duration: 1500,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
+              useNativeDriver: true,
             }),
             Animated.timing(glowAnim, {
               toValue: 0,
               duration: 1500,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
+              useNativeDriver: true,
             }),
           ])
         ).start();

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   Animated,
+  Image,
 } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { CumulativeStats } from '../../services/starRating';
@@ -20,11 +21,17 @@ import {
   getVictoryPitHint,
   getPitMandatoryText,
   getPitMandatoryCTA,
+  getNextStreakMilestoneText,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS } from '../../constants/gameBalance';
 import { hapticSuccess } from '../../services/haptics';
+
+// Candy-styled UI sprite icons (replace emoji for critical info)
+const STAR_FILLED = require('../../../assets/ui/star_filled.png');
+const STAR_EMPTY = require('../../../assets/ui/star_empty.png');
+const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 export interface VictoryData {
   earnedStars: number;
@@ -200,28 +207,31 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               accessible
               accessibilityLabel={`${earnedStars} of 3 stars`}
             >
-              <Animated.Text style={[
-                styles.victoryStar,
-                earnedStars < 1 && styles.victoryStarEmpty,
-                { transform: [{ scale: star1Scale }] },
-              ]}>
-                {earnedStars >= 1 ? '\u2B50' : '\u2606'}
-              </Animated.Text>
-              <Animated.Text style={[
-                styles.victoryStar,
-                styles.victoryStarBig,
-                earnedStars < 2 && styles.victoryStarEmpty,
-                { transform: [{ scale: star2Scale }] },
-              ]}>
-                {earnedStars >= 2 ? '\u2B50' : '\u2606'}
-              </Animated.Text>
-              <Animated.Text style={[
-                styles.victoryStar,
-                earnedStars < 3 && styles.victoryStarEmpty,
-                { transform: [{ scale: star3Scale }] },
-              ]}>
-                {earnedStars >= 3 ? '\u2B50' : '\u2606'}
-              </Animated.Text>
+              <Animated.Image
+                source={earnedStars >= 1 ? STAR_FILLED : STAR_EMPTY}
+                style={[
+                  styles.victoryStarImage,
+                  earnedStars < 1 && styles.victoryStarEmpty,
+                  { transform: [{ scale: star1Scale }] },
+                ]}
+              />
+              <Animated.Image
+                source={earnedStars >= 2 ? STAR_FILLED : STAR_EMPTY}
+                style={[
+                  styles.victoryStarImage,
+                  styles.victoryStarImageBig,
+                  earnedStars < 2 && styles.victoryStarEmpty,
+                  { transform: [{ scale: star2Scale }] },
+                ]}
+              />
+              <Animated.Image
+                source={earnedStars >= 3 ? STAR_FILLED : STAR_EMPTY}
+                style={[
+                  styles.victoryStarImage,
+                  earnedStars < 3 && styles.victoryStarEmpty,
+                  { transform: [{ scale: star3Scale }] },
+                ]}
+              />
             </View>
 
             <Text style={[styles.victoryTitle, {
@@ -251,16 +261,26 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             )}
 
             {/* Streak display */}
-            {victoryData && victoryData.currentStreak > 1 && (
-              <View
-                style={styles.winStreakContainer}
-                accessible
-                accessibilityLabel={`${victoryData.currentStreak} day streak`}
-              >
-                <Text style={styles.winStreakEmoji}>{'\uD83D\uDD25'}</Text>
-                <Text style={styles.winStreakText}>{victoryData.currentStreak} Day Streak!</Text>
-              </View>
-            )}
+            {victoryData && victoryData.currentStreak > 1 && (() => {
+              const nextMilestoneText = getNextStreakMilestoneText(phase, victoryData.currentStreak);
+              return (
+                <>
+                  <View
+                    style={styles.winStreakContainer}
+                    accessible
+                    accessibilityLabel={`${victoryData.currentStreak} day streak`}
+                  >
+                    <Text style={styles.winStreakEmoji}>{'\uD83D\uDD25'}</Text>
+                    <Text style={styles.winStreakText}>{victoryData.currentStreak} Day Streak!</Text>
+                  </View>
+                  {Boolean(nextMilestoneText) && (
+                    <Text style={[styles.streakMilestoneHint, { color: phaseTheme.modalSecondaryTextColor }]}>
+                      {nextMilestoneText}
+                    </Text>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Milestone bonus */}
             {victoryData && victoryData.milestoneBonus > 0 && Boolean(victoryData.milestoneMessage) && (
@@ -434,15 +454,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         <Text style={[styles.earlyVictoryLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                           {victoryData.autoCollected ? 'Amber banked instantly' : 'Amber ready from this puzzle'}
                         </Text>
-                        <Text style={[styles.earlyVictoryValue, { color: phaseTheme.modalTextColor }]}>
-                          {'\uD83D\uDC8E'} {totalAmber}
-                        </Text>
+                        <View style={styles.earlyVictoryValueRow}>
+                          <Image source={AMBER_ICON} style={styles.amberIconLarge} />
+                          <Text style={[styles.earlyVictoryValue, { color: phaseTheme.modalTextColor }]}>
+                            {totalAmber}
+                          </Text>
+                        </View>
                       </>
                     ) : (
                       <>
                         <View style={styles.bonusRow}>
                           <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>{difficulty}</Text>
-                          <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>{'\uD83D\uDC8E'} {baseAmber}</Text>
+                          <View style={styles.amberValueRow}>
+                            <Image source={AMBER_ICON} style={styles.amberIcon} />
+                            <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor }]}>{baseAmber}</Text>
+                          </View>
                         </View>
                         {starBonus > 0 && (
                           <View style={styles.bonusRow}>
@@ -503,9 +529,12 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     <View style={[styles.bonusDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
                     <View style={styles.bonusRow}>
                       <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>Total</Text>
-                      <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 15, fontWeight: '900' }]}>
-                        {'\uD83D\uDC8E'} {totalAmber}
-                      </Text>
+                      <View style={styles.amberValueRow}>
+                        <Image source={AMBER_ICON} style={styles.amberIcon} />
+                        <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 15, fontWeight: '900' }]}>
+                          {totalAmber}
+                        </Text>
+                      </View>
                     </View>
                     {/* Collect Now — compact pill inside amber stats box */}
                     {!isOnboarding && !victoryData.autoCollected && (

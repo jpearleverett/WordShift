@@ -1,4 +1,5 @@
 import { DialoguePhase, PHASE_DESCRIPTIONS } from '../types/homeWorld';
+import { STREAK_MILESTONES } from '../constants/gameBalance';
 
 /**
  * Phase-aware narrative text for the puzzle screen.
@@ -286,6 +287,76 @@ const START_MESSAGES: Record<DialoguePhase, string> = {
 
 export function getStartMessage(phase: DialoguePhase): string {
   return START_MESSAGES[phase];
+}
+
+// ============================================================================
+// SPEED TIMER FAILURE — Shown when the speed-variant countdown hits zero
+// ============================================================================
+
+const SPEED_TIME_UP_MESSAGES: Record<DialoguePhase, string> = {
+  0: "Time's up! Shake it off — a fresh puzzle awaits.",
+  1: 'Time slipped away! Another puzzle is ready whenever you are.',
+  2: 'The clock ran dry. The letters scattered before you finished.',
+  3: 'Time collapsed. The arrangement closed this path.',
+  4: 'The hour was consumed. The arrangement does not wait. Offer again.',
+  5: 'Time settled where it fell. The threads rest. Begin again, gently.',
+};
+
+export function getSpeedTimeUpMessage(phase: DialoguePhase): string {
+  return SPEED_TIME_UP_MESSAGES[phase];
+}
+
+// ============================================================================
+// WHISPER GALLERY EMPTY STATE — Shown when no whispers are collected yet
+// ============================================================================
+
+const WHISPER_GALLERY_EMPTY_TEXT: Record<DialoguePhase, string> = {
+  0: 'No whispers collected yet. Play puzzles and talk to your animal friends!',
+  1: 'No whispers collected yet. Play puzzles and visit your friends — they have things to say.',
+  2: 'Nothing collected yet. The house is listening for your words.',
+  3: 'The walls are quiet... for now.',
+  4: 'The walls are quiet... for now.',
+  5: 'The walls are quiet now. Every voice rests in its place.',
+};
+
+export function getWhisperGalleryEmptyText(phase: DialoguePhase): string {
+  return WHISPER_GALLERY_EMPTY_TEXT[phase];
+}
+
+// ============================================================================
+// NEXT STREAK MILESTONE — One-line nudge toward the next streak reward
+// ============================================================================
+
+/**
+ * Get a short, phase-toned line describing how far the player is from the
+ * next streak milestone (3/7/14/21/30 days). Returns null once the top
+ * milestone has been reached.
+ */
+export function getNextStreakMilestoneText(
+  phase: DialoguePhase,
+  currentStreak: number,
+): string | null {
+  const next = STREAK_MILESTONES.find(m => m.streak > currentStreak);
+  if (!next) return null;
+
+  const daysLeft = next.streak - currentStreak;
+  const dayWord = daysLeft === 1 ? 'day' : 'days';
+
+  switch (phase) {
+    case 0:
+      return `${daysLeft} more ${dayWord} → +${next.amber} amber!`;
+    case 1:
+      return `${daysLeft} more ${dayWord} to a +${next.amber} amber streak bonus.`;
+    case 2:
+      return `${daysLeft} more ${dayWord}. ${next.amber} amber waits at day ${next.streak}.`;
+    case 3:
+      return `${daysLeft} more ${dayWord}. The pattern counts toward ${next.streak}.`;
+    case 4:
+      return `${daysLeft} more ${dayWord}. The chain wants ${next.streak}.`;
+    case 5:
+    default:
+      return `The chain continues. Day ${next.streak} will come, in time.`;
+  }
 }
 
 // ============================================================================

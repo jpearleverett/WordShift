@@ -463,19 +463,20 @@ export const Row: React.FC<RowProps> = memo(({
       if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
         glowAnim.setValue(0.5);
       } else {
+        // Drives only the row glow overlay's opacity (native driver)
         glowLoopRef.current = Animated.loop(
           Animated.sequence([
             Animated.timing(glowAnim, {
               toValue: 1,
               duration: 1500,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
+              useNativeDriver: true,
             }),
             Animated.timing(glowAnim, {
               toValue: 0,
               duration: 1500,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
+              useNativeDriver: true,
             }),
           ])
         );

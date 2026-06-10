@@ -19,6 +19,8 @@ import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
 import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
 import { clampHomeScenePanY, resolveHomeScenePanY } from '../../services/homeScenePan';
+import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
 // Environment assets
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
@@ -26,6 +28,13 @@ const SKY_AFTERNOON = require('../../../assets/environment/sky_afternoon.png');
 const SKY_DUSK = require('../../../assets/environment/sky_dusk.png');
 const SKY_STORM = require('../../../assets/environment/sky_storm.png');
 const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
+const CLOUD_1 = require('../../../assets/environment/cloud_1.png');
+const CLOUD_2 = require('../../../assets/environment/cloud_2.png');
+const ROOF_IMG = require('../../../assets/environment/roof.png');
+const FOUNDATION_IMG = require('../../../assets/environment/foundation.png');
+const GROUND_IMG = require('../../../assets/environment/ground.png');
+const TREE_IMG = require('../../../assets/environment/tree.png');
+const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -467,149 +476,142 @@ const arrangementStyles = StyleSheet.create({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SHADOW PRESENCE - A growing dark silhouette behind the house
+// SHADOW FIGURE - The entity. It is never named, never explained.
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * ShadowPresence — A growing dark silhouette behind the house.
- * Invisible at Phase 0-1. Faint at Phase 2. Prominent at Phase 4.
- * Represents the entity being summoned, visible before any animal mentions it.
+ * ShadowFigure — the towering presence behind the house.
+ * Invisible until Phase 3. Faint silhouette at Phase 3. Full presence at
+ * Phase 4 — looming above the roofline, crimson eyes. Settled at Phase 5.
  *
- * Enhanced: Animated breathing (scale pulse), wispy tendrils at Phase 3+,
- * pulsing crimson eyes at Phase 4 with glow effect.
+ * Layers behind the house rooms but in front of the sky (negative zIndex
+ * inside houseContainer). Very slow opacity "breathing" (~8s cycle); static
+ * under reducedMotion / simplified animations.
  */
-const ShadowPresence: React.FC<{ phase: number }> = ({ phase }) => {
-  const breatheAnim = React.useRef(new Animated.Value(0)).current;
-  const eyePulseAnim = React.useRef(new Animated.Value(0)).current;
+const ShadowFigure: React.FC<{ phase: number }> = ({ phase }) => {
+  const breatheAnim = useRef(new Animated.Value(0)).current;
+  const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+  const visible = phase >= 3;
 
-  React.useEffect(() => {
-    if (phase < 2) return;
-
-    // Breathing animation — slow scale pulse
-    const breatheDuration = phase === 5 ? 6000 : phase >= 4 ? 3000 : 4000;
-    const breatheLoop = Animated.loop(
+  useEffect(() => {
+    if (!visible || isStatic) return;
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(breatheAnim, { toValue: 1, duration: breatheDuration, useNativeDriver: true }),
-        Animated.timing(breatheAnim, { toValue: 0, duration: breatheDuration, useNativeDriver: true }),
+        Animated.timing(breatheAnim, {
+          toValue: 1,
+          duration: 4000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(breatheAnim, {
+          toValue: 0,
+          duration: 4000,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
       ])
     );
-    breatheLoop.start();
+    loop.start();
+    return () => loop.stop();
+  }, [visible, isStatic, breatheAnim]);
 
-    // Eye pulse at Phase 4+
-    let eyeLoop: Animated.CompositeAnimation | undefined;
-    if (phase >= 4) {
-      eyeLoop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(eyePulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-          Animated.timing(eyePulseAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
-        ])
-      );
-      eyeLoop.start();
-    }
+  if (!visible) return null;
 
-    return () => {
-      breatheLoop.stop();
-      eyeLoop?.stop();
-    };
-  }, [phase]);
+  // Phase 3: faint silhouette. Phase 4: full presence. Phase 5: settled, calmer.
+  const baseOpacity = phase >= 5 ? 0.35 : phase >= 4 ? 0.5 : 0.18;
+  const height = phase >= 4 ? ROOM_WIDTH * 2 : ROOF_WIDTH * 1.6;
+  const width = height * SHADOW_FIGURE_ASPECT;
 
-  if (phase < 2) return null;
-
-  const opacity = phase === 2 ? 0.06 : phase === 3 ? 0.15 : phase === 5 ? 0.20 : 0.30;
-  const scaleVal = phase === 2 ? 0.6 : phase === 3 ? 0.8 : 1.0;
-  const height = 180 * scaleVal;
-  const width = 100 * scaleVal;
-
-  const breatheScale = breatheAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.0, phase >= 4 ? 1.06 : 1.03],
-  });
-
-  const eyeOpacity = phase >= 4 ? eyePulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.5, 1.0],
-  }) : 0.7;
+  const opacity = isStatic
+    ? baseOpacity
+    : breatheAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [baseOpacity - 0.05, baseOpacity + 0.05],
+      });
 
   return (
-    <Animated.View style={{
-      position: 'absolute',
-      top: -height * 0.3,
-      alignSelf: 'center',
-      width: width,
-      height: height,
-      opacity: opacity,
-      zIndex: -1,
-      transform: [{ scale: breatheScale }],
-    }}>
-      {/* Central body - tall dark oval */}
-      <View style={{
-        flex: 1,
-        backgroundColor: phase === 5 ? 'rgba(40, 20, 50, 0.9)' : phase >= 4 ? 'rgba(80, 10, 30, 0.9)' : 'rgba(20, 5, 30, 0.9)',
-        borderTopLeftRadius: width * 0.4,
-        borderTopRightRadius: width * 0.4,
-        borderBottomLeftRadius: width * 0.15,
-        borderBottomRightRadius: width * 0.15,
-      }} />
-      {/* Wispy tendrils at Phase 3+ — narrower extensions on sides */}
-      {phase >= 3 && (
-        <>
-          <View style={{
-            position: 'absolute',
-            bottom: height * 0.1,
-            left: -width * 0.15,
-            width: width * 0.2,
-            height: height * 0.4,
-            backgroundColor: 'rgba(20, 5, 30, 0.5)',
-            borderRadius: width * 0.1,
-            transform: [{ rotate: '-15deg' }],
-          }} />
-          <View style={{
-            position: 'absolute',
-            bottom: height * 0.1,
-            right: -width * 0.15,
-            width: width * 0.2,
-            height: height * 0.4,
-            backgroundColor: 'rgba(20, 5, 30, 0.5)',
-            borderRadius: width * 0.1,
-            transform: [{ rotate: '15deg' }],
-          }} />
-        </>
-      )}
-      {/* "Eyes" at Phase 4+ - pulsing dots with glow (crimson at Phase 4, soft purple at Phase 5) */}
-      {phase >= 4 && (
-        <Animated.View style={{
-          position: 'absolute',
-          top: height * 0.25,
-          left: 0,
-          right: 0,
-          flexDirection: 'row',
-          justifyContent: 'center',
-          gap: width * 0.2,
-          opacity: eyeOpacity,
-        }}>
-          <View style={{
-            width: 8,
-            height: 5,
-            borderRadius: 4,
-            backgroundColor: phase === 5 ? '#7B6B8A' : 'rgba(200, 40, 60, 0.9)',
-            shadowColor: phase === 5 ? '#7B6B8A' : '#FF0000',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: phase === 5 ? 0.5 : 0.8,
-            shadowRadius: 6,
-          }} />
-          <View style={{
-            width: 8,
-            height: 5,
-            borderRadius: 4,
-            backgroundColor: phase === 5 ? '#7B6B8A' : 'rgba(200, 40, 60, 0.9)',
-            shadowColor: phase === 5 ? '#7B6B8A' : '#FF0000',
-            shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: phase === 5 ? 0.5 : 0.8,
-            shadowRadius: 6,
-          }} />
-        </Animated.View>
-      )}
-    </Animated.View>
+    <Animated.Image
+      source={SHADOW_FIGURE_IMG}
+      pointerEvents="none"
+      resizeMode="contain"
+      style={{
+        position: 'absolute',
+        // Rise well above the roofline; the base dissolves behind the house.
+        top: -height * 0.55,
+        alignSelf: 'center',
+        width,
+        height,
+        opacity,
+        zIndex: -3, // Behind ground (-2) and trees (-1), in front of the sky
+        transform: [{ translateX: 14 }], // Slight off-center for composition
+      }}
+    />
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DRIFTING CLOUD - Soft cloud sprites crossing the sky (Phase 0-2 only)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DriftingCloud: React.FC<{
+  source: number;
+  width: number;
+  top: number;
+  /** Full screen-traverse duration in ms */
+  duration: number;
+  /** 0..1 starting position across the sky */
+  initialProgress: number;
+  opacity: number;
+}> = ({ source, width, top, duration, initialProgress, opacity }) => {
+  const travel = SCREEN_WIDTH + width;
+  const x = useRef(new Animated.Value(-width + travel * initialProgress)).current;
+  const mountedRef = useRef(true);
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
+  const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+
+  useEffect(() => {
+    if (isStatic) return; // Static cloud position under reduced motion / low-end devices
+    mountedRef.current = true;
+
+    const drift = (fromX: number) => {
+      if (!mountedRef.current) return;
+      x.setValue(fromX);
+      const remaining = (SCREEN_WIDTH - fromX) / travel;
+      const anim = Animated.timing(x, {
+        toValue: SCREEN_WIDTH,
+        duration: Math.max(1000, duration * remaining),
+        easing: Easing.linear,
+        useNativeDriver: true,
+      });
+      animRef.current = anim;
+      anim.start(({ finished }) => {
+        if (finished && mountedRef.current) drift(-width);
+      });
+    };
+
+    drift(-width + travel * initialProgress);
+
+    return () => {
+      mountedRef.current = false;
+      animRef.current?.stop();
+    };
+  }, []);
+
+  return (
+    <Animated.Image
+      source={source}
+      pointerEvents="none"
+      resizeMode="contain"
+      style={{
+        position: 'absolute',
+        left: 0,
+        top,
+        width,
+        height: width / 2, // cloud PNGs are 512x256
+        opacity,
+        transform: [{ translateX: x }],
+      }}
+    />
   );
 };
 
@@ -620,6 +622,17 @@ const ROOM_HEIGHT = ROOM_WIDTH * 0.493865; // Maintains ~2:1 aspect ratio of roo
 const ROOM_GAP = 6;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
+
+// House structure art (roof.png 1024x420, foundation.png 1024x160,
+// ground.png 1024x300, tree.png 480x640, shadow_figure.png 600x1200)
+const ROOF_WIDTH = HOUSE_WIDTH + 20; // Slight overhang past the walls
+const ROOF_HEIGHT = ROOF_WIDTH * 0.41;
+const ROOF_TUCK = 10; // Overlap over the top room so there's no gap
+const FOUNDATION_WIDTH = HOUSE_WIDTH + 12;
+const FOUNDATION_HEIGHT = FOUNDATION_WIDTH * 0.16;
+const GROUND_WIDTH = ROOM_WIDTH * 1.6;
+const GROUND_HEIGHT = GROUND_WIDTH * (300 / 1024);
+const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
 
 interface HouseWorldProps {
@@ -683,13 +696,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(0);
 
-  // Sun animation
-
-  // Cloud animations
-  const cloud1X = useRef(new Animated.Value(-100)).current;
-  const cloud2X = useRef(new Animated.Value(SCREEN_WIDTH + 50)).current;
-  const cloud3X = useRef(new Animated.Value(SCREEN_WIDTH / 2)).current;
-
   // Spawn particles based on phase
   useEffect(() => {
     const spawnParticle = () => {
@@ -716,42 +722,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     return () => clearInterval(interval);
   }, [currentPhase]);
 
-
-  // Cloud animations
-  const cloudMountedRef = useRef(true);
-  const cloudAnimRefs = useRef<Animated.CompositeAnimation[]>([]);
-
-  useEffect(() => {
-    cloudMountedRef.current = true;
-    cloudAnimRefs.current = [];
-
-    const animateCloud = (cloudAnim: Animated.Value, startX: number, duration: number) => {
-      const animate = () => {
-        if (!cloudMountedRef.current) return;
-        cloudAnim.setValue(startX > SCREEN_WIDTH / 2 ? SCREEN_WIDTH + 100 : -150);
-        const anim = Animated.timing(cloudAnim, {
-          toValue: startX > SCREEN_WIDTH / 2 ? -150 : SCREEN_WIDTH + 100,
-          duration,
-          useNativeDriver: true,
-        });
-        cloudAnimRefs.current.push(anim);
-        anim.start(() => {
-          if (cloudMountedRef.current) animate();
-        });
-      };
-      animate();
-    };
-
-    animateCloud(cloud1X, -100, 45000);
-    animateCloud(cloud2X, SCREEN_WIDTH + 50, 38000);
-    animateCloud(cloud3X, SCREEN_WIDTH / 2, 52000);
-
-    return () => {
-      cloudMountedRef.current = false;
-      cloudAnimRefs.current.forEach(anim => anim.stop());
-      cloudAnimRefs.current = [];
-    };
-  }, []);
 
 
   // Get unlocked rooms plus a single "next room" preview (if the next unlock is a room).
@@ -781,7 +751,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + 80 + houseHeight + 25 + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
+    const totalContentHeight = 50 + (ROOF_HEIGHT - ROOF_TUCK) + houseHeight + FOUNDATION_HEIGHT + 40 + connectorHeight; // marginTop + roof + body + foundation + marginBottom + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
@@ -874,17 +844,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 resizeMode="cover"
               />
 
-              {/* Animated clouds - inside transform so they move with the scene */}
-              <Animated.View style={[styles.cloud, { top: 20, transform: [{ translateX: cloud1X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-              </Animated.View>
-              <Animated.View style={[styles.cloud, { top: 70, transform: [{ translateX: cloud2X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-                <Text style={[styles.cloudEmoji, { marginLeft: 25 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-              </Animated.View>
-              <Animated.View style={[styles.cloud, { top: 45, transform: [{ translateX: cloud3X }] }]} pointerEvents="none">
-                <Text style={[styles.cloudEmoji, { fontSize: 38 }, currentPhase >= 3 && { opacity: 0.6 }]}>☁️</Text>
-              </Animated.View>
+              {/* Drifting clouds - Phase 0-2 only; the storm sky takes over at Phase 3.
+                  Rendered before the house so they layer behind the shadow figure. */}
+              {currentPhase <= 2 && (
+                <>
+                  <DriftingCloud source={CLOUD_1} width={170} top={26} duration={80000} initialProgress={0.15} opacity={currentPhase >= 2 ? 0.4 : 0.85} />
+                  <DriftingCloud source={CLOUD_2} width={130} top={88} duration={105000} initialProgress={0.55} opacity={currentPhase >= 2 ? 0.4 : 0.85} />
+                  <DriftingCloud source={CLOUD_1} width={120} top={58} duration={65000} initialProgress={0.8} opacity={currentPhase >= 2 ? 0.35 : 0.75} />
+                </>
+              )}
 
 
               {/* Stars at night (phase 3-4) */}

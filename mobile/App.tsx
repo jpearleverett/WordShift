@@ -50,7 +50,7 @@ import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay'
 import { sharePuzzleResult } from './src/services/shareResults';
 import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
-import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticError, hapticSelection } from './src/services/haptics';
+import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getPhaseIndicator,
@@ -60,6 +60,7 @@ import {
   getFoxSetupSelectorIntroLines,
   getFoxPitHarvestIntroLines,
   getNotificationPromptText,
+  getSpeedTimeUpMessage,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
@@ -265,11 +266,9 @@ function MainApp() {
   // Speed timer for speed-variant puzzles
   const onSpeedTimeUp = useCallback(() => {
     setPuzzleGameState(GameState.GAME_OVER);
-    setPuzzleMessage(
-      persistence.currentPhase >= 3
-        ? 'Time collapsed. The arrangement closed this path.'
-        : 'Time is up! Start a new puzzle and try again.'
-    );
+    hapticWarning();
+    soundInvalidMove();
+    setPuzzleMessage(getSpeedTimeUpMessage(persistence.currentPhase));
   }, [setPuzzleGameState, setPuzzleMessage, persistence.currentPhase]);
 
   const [speedTimer, speedTimerActions] = useSpeedTimer(onSpeedTimeUp);
@@ -553,10 +552,13 @@ function MainApp() {
       const saved = await loadPuzzleState();
       if (saved && saved.gameState === 'PLAYING' && !saved.isPlayingDaily) {
         puzzleActions.restorePuzzleState(saved);
-        // Restore speed timer from saved expiry timestamp
-        if (saved.speedTimerExpireAt != null) {
-          const remaining = Math.max(0, Math.floor((saved.speedTimerExpireAt - Date.now()) / 1000));
-          restoredSpeedTimeRef.current = remaining;
+        // Restore speed timer from the saved remaining seconds so a kill/
+        // relaunch resumes the countdown instead of expiring it. Legacy
+        // saves without the field fall back to the absolute expiry timestamp.
+        if (saved.speedTimeRemainingSec != null) {
+          restoredSpeedTimeRef.current = Math.max(0, saved.speedTimeRemainingSec);
+        } else if (saved.speedTimerExpireAt != null) {
+          restoredSpeedTimeRef.current = Math.max(0, Math.floor((saved.speedTimerExpireAt - Date.now()) / 1000));
         }
         logEvent({
           type: 'puzzle_restored',

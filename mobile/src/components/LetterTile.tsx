@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { Letter } from '../types';
-import { getTileColor, CandyColors, getPhaseTheme } from '../theme/colors';
+import { getTileColor, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 
@@ -95,20 +95,20 @@ export const LetterTile: React.FC<LetterTileProps> = ({
   useEffect(() => {
     if (settings.reducedMotion || shouldSimplifyAnimations()) return;
     if (isInteractable && !isSelected) {
-      // Subtle pulse glow
+      // Subtle pulse glow — drives only the glow overlay's opacity (native driver)
       const glowLoop = Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
             duration: 1200,
             easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0,
             duration: 1200,
             easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ])
       );
@@ -229,21 +229,23 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       bounceLoopRef.current = bounceLoop;
       bounceLoop.start();
 
-      // Trail glow effect at Phase 3+ (energy mark pulsing shadow)
-      if (phase >= 3) {
+      // Trail glow effect at Phase 3+ (energy mark pulsing glow overlay).
+      // Drives only the pre-styled overlay's opacity — native driver safe.
+      // Skipped entirely on low-end devices.
+      if (phase >= 3 && !shouldSimplifyAnimations()) {
         const trailGlowLoop = Animated.loop(
           Animated.sequence([
             Animated.timing(trailGlowAnim, {
               toValue: 1,
               duration: phase >= 4 ? 800 : 600,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false, // shadowRadius cannot use native driver
+              useNativeDriver: true,
             }),
             Animated.timing(trailGlowAnim, {
               toValue: 0,
               duration: phase >= 4 ? 800 : 600,
               easing: Easing.inOut(Easing.sin),
-              useNativeDriver: false,
+              useNativeDriver: true,
             }),
           ])
         );
@@ -412,15 +414,8 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     };
   }, [isSelected]);
 
-  // Resonance visual config — color and opacity range per phase
-  const getResonanceConfig = () => {
-    if (phase >= 5) return { color: '#7B6B8A', minOpacity: 0.06, maxOpacity: 0.10 };   // Ghostly mauve
-    if (phase >= 4) return { color: '#8B0000', minOpacity: 0.12, maxOpacity: 0.28 };   // Crimson
-    if (phase >= 3) return { color: '#4A2080', minOpacity: 0.08, maxOpacity: 0.20 };   // Dark purple
-    if (phase >= 2) return { color: '#6B5B95', minOpacity: 0.04, maxOpacity: 0.12 };   // Purple-blue
-    return { color: '#DAA520', minOpacity: 0.02, maxOpacity: 0.05 };                   // Warm gold (Phase 1)
-  };
-  const resonanceConfig = isResonant && phase >= 1 ? getResonanceConfig() : null;
+  // Resonance visual config — color and opacity range per phase (from theme)
+  const resonanceConfig = isResonant && phase >= 1 ? getResonanceConfig(phase) : null;
   const resonanceOpacity = resonanceConfig ? resonanceAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [resonanceConfig.minOpacity, resonanceConfig.maxOpacity],
@@ -589,16 +584,14 @@ export const LetterTile: React.FC<LetterTileProps> = ({
     outputRange: ['-3deg', '0deg', '3deg'],
   });
 
-  // Trail glow interpolations for Phase 3+ energy mark effect
-  const trailGlowRadius = trailGlowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [6, phase >= 4 ? 24 : 16],
-  });
+  // Trail glow interpolation for Phase 3+ energy mark effect — drives the
+  // pre-styled glow overlay's opacity (shadow/radius are fixed at max intensity)
   const trailGlowOpacity = trailGlowAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0.3, phase >= 4 ? 0.7 : 0.55],
   });
   const trailGlowColor = phase >= 4 ? '#9B1B30' : '#7B2FBE';
+  const showTrailGlow = isSelected && phase >= 3 && !shouldSimplifyAnimations();
   const guideRingScale = guidePulseAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.18],
@@ -676,6 +669,24 @@ export const LetterTile: React.FC<LetterTileProps> = ({
         />
       )}
 
+      {/* Trail glow at Phase 3+ — pre-styled shadow layer behind the tile,
+          opacity driven natively by trailGlowAnim */}
+      {showTrailGlow && (
+        <Animated.View
+          style={[
+            styles.trailGlowOverlay,
+            compact && { height: COMPACT_BODY_H, borderRadius: 12 },
+            {
+              backgroundColor: trailGlowColor,
+              shadowColor: trailGlowColor,
+              shadowRadius: phase >= 4 ? 24 : 16,
+              opacity: trailGlowOpacity,
+            },
+          ]}
+          pointerEvents="none"
+        />
+      )}
+
       {/* Main tile body */}
       <Animated.View
         style={[
@@ -684,16 +695,11 @@ export const LetterTile: React.FC<LetterTileProps> = ({
           {
             backgroundColor: tileStyles.bgColor,
             borderBottomColor: tileStyles.borderColor,
-            shadowColor: (isSelected && phase >= 3) ? trailGlowColor : tileStyles.shadowColor,
+            shadowColor: tileStyles.shadowColor,
           },
           isGuided && styles.tileBodyGuided,
           isSelected && styles.tileBodySelected,
           highlight === 'locked' && styles.tileBodyLocked,
-          // Trail glow effect: pulsing shadow at Phase 3+
-          (isSelected && phase >= 3) && {
-            shadowRadius: trailGlowRadius,
-            shadowOpacity: trailGlowOpacity,
-          },
         ]}
       >
         {/* Top highlight (bevel effect) */}
@@ -797,6 +803,19 @@ const styles = StyleSheet.create({
     bottom: 6,
     borderRadius: 14,
     transform: [{ scale: 1.15 }],
+  },
+  trailGlowOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 56,
+    borderRadius: 14,
+    transform: [{ scale: 1.15 }],
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 16,
+    elevation: 8,
   },
   guideRing: {
     position: 'absolute',
