@@ -331,7 +331,9 @@ Late unlocks have puzzle-count gates to prevent amber surplus outrunning narrati
 | Rabbit | Thyme | Anxious, garden patio | Anxious because they understand | Lagging (-1) |
 | Red Panda | Bamboo | Zen, bamboo attic | Spiritual leader, at peace | Lagging (-1) |
 
-**Awareness tiers**: Vanguard animals are +1 phase ahead, Lagging are -1 behind. `getAnimalPhase(globalPhase, animalType)` applies offset.
+**Awareness tiers**: Vanguard animals are +1 phase ahead, Lagging are -1 behind. `getAnimalPhase(globalPhase, animalType)` applies offset. Narratively the lagging tier lags *publicly, not privately* — Sloane and Bamboo have always known; they simply speak late.
+
+**Canon pronouns** (established by in-dialogue references — keep consistent): Ember she/her, Panko she/her, Archimedes he/him, Axel he/him, Chill he/him, Fennick he/him, Sloane she/her, Warren he/him, Thyme she/her, Bamboo they/them.
 
 ### Dialogue System
 
@@ -342,7 +344,7 @@ Late unlocks have puzzle-count gates to prevent amber surplus outrunning narrati
 **Session mechanics**: Max dialogues per session phase-aware (3-6). Cooldown: 2-5 puzzles between sessions. Grace period for newly unlocked animals.
 
 **Rich interaction layers**:
-- **Cross-animal references**: Phase-scaled frequency (20% → 60%). Vanguard animals get guaranteed first ref at each new phase. Dynamic refs filter by `unlockedAnimals`; static base lines that name another animal carry `requiresAnimals` tags and are skipped by `resolveDialogueIndex()` until that animal is unlocked — no animal is ever mentioned before the player has met them.
+- **Cross-animal references**: Phase-scaled frequency (20% → 60%). Vanguard animals get guaranteed first ref at each new phase. Dynamic refs filter by `unlockedAnimals` (multi-name lines must set `mentions` to the *latest-unlocking* animal named — sequential unlocks guarantee the rest); static base lines that name another animal carry `requiresAnimals` tags and are skipped by `resolveDialogueIndex()` until that animal is unlocked; coordinated event lines are name-scanned against `unlockedAnimals` at delivery time (`getCoordinatedEventLine`). All of these invariants are enforced by `dialogueGating.test.ts` — no animal is ever mentioned before the player has met them.
 - **Question web** (Phase 2): each animal has one `*_2_w1` hook line pointing the player at another animal's mystery ("Ask Warren what he found"), gated on that animal being unlocked.
 - **Trigger word reactions**: Puzzle words (FLAME, VOID, etc.) queue per-animal, consumed on visit.
 - **Sacrifice reactions** (Phase 4+): Animals comment on amber offerings.

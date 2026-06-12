@@ -27,7 +27,7 @@ const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, s
       FIRE: "The hearth surged the moment you formed that word. Fed by it somehow, like kindling made of letters.",
       EMBER: "You spelled my name in the letters. I felt it in my chest. The fire felt it too.",
       BURN: "BURN. The word itself carries heat. Can you feel it lingering in the air between us?",
-      WARM: "Warmth where there should be cold. Your words carry temperature now. That is new. That is troubling.",
+      WARM: "Warmth where there should be cold. Your words carry temperature now. The fire has noticed. So have I.",
       _default: "The fire responds to your puzzles now. It listens when you arrange the letters. I wish I could say it didn't.",
     },
     3: {
@@ -464,7 +464,7 @@ const SACRIFICE_REACTIONS: Record<string, { first: string; subsequent: string[] 
     subsequent: [
       'Every offering warms the fire. Not with heat. With something older.',
       'You give willingly. That\'s what makes it sacred. The fire knows the difference.',
-      'Ember thanks you. Not me. The fire. It has its own gratitude.',
+      'The fire thanks you. Not me. It has its own gratitude. I just tend it.',
     ],
   },
   pangolin: {

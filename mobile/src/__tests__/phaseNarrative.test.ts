@@ -113,7 +113,7 @@ describe('getMoveMessage', () => {
   });
 
   test('phase 4 messages are dark', () => {
-    const phase4Words = ['void', 'dissolve', 'Nothing', 'matter', 'shift', '...', 'silence'];
+    const phase4Words = ['void', 'dissolve', 'Nothing', 'matter', 'shift', '...', 'silence', 'arrangement', 'verse', 'deeper', 'going', 'listening'];
     for (let i = 0; i < 50; i++) {
       const msg = getMoveMessage(4);
       expect(phase4Words.some(w => msg.includes(w))).toBe(true);

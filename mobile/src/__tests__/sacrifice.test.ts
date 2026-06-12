@@ -165,12 +165,23 @@ describe('sacrifice', () => {
     });
 
     it('returns non-milestone message for counts between milestones', async () => {
-      // First sacrifice is milestone (count=1)
+      // Counts 1-3 and 5 are milestones; the 4th sacrifice is not
       await performSacrifice(5, 4);
-      // Second sacrifice is not
+      await performSacrifice(5, 4);
+      await performSacrifice(5, 4);
       const result = await performSacrifice(5, 4);
       expect(result.isMilestone).toBe(false);
       expect(result.message.length).toBeGreaterThan(0);
+    });
+
+    it('returns early milestone messages at counts 2 and 3', async () => {
+      await performSacrifice(5, 4);
+      const second = await performSacrifice(5, 4);
+      expect(second.isMilestone).toBe(true);
+      expect(second.message).toContain('Twice');
+      const third = await performSacrifice(5, 4);
+      expect(third.isMilestone).toBe(true);
+      expect(third.message).toContain('Three');
     });
 
     it('accumulates total amber sacrificed', async () => {
