@@ -186,4 +186,45 @@ describe('achievements', () => {
     await clearAchievements();
     expect(await getUnlockedCount()).toBe(0);
   });
+
+  // ===== Amber rewards =====
+
+  test('every achievement defines a positive amber reward', () => {
+    for (const a of ACHIEVEMENTS) {
+      expect(a.rewardAmber).toBeGreaterThan(0);
+    }
+  });
+
+  test('checkAchievements credits unlocked rewards as bonus amber', async () => {
+    const { getFullProgress, clearProgress } = require('../services/amberCurrency');
+    await clearProgress();
+
+    const state = {
+      ...defaultState,
+      stats: { ...defaultState.stats, totalPuzzlesCompleted: 1 },
+    };
+    const unlocked = await checkAchievements(state);
+    const expected = unlocked.reduce((sum: number, a: { rewardAmber: number }) => sum + a.rewardAmber, 0);
+    expect(expected).toBeGreaterThan(0);
+
+    const progress = await getFullProgress();
+    expect(progress.amber).toBe(expected);
+    expect(progress.totalAmberEarned).toBe(expected);
+  });
+
+  test('re-checking does not double-credit amber', async () => {
+    const { getFullProgress, clearProgress } = require('../services/amberCurrency');
+    await clearProgress();
+
+    const state = {
+      ...defaultState,
+      stats: { ...defaultState.stats, totalPuzzlesCompleted: 1 },
+    };
+    const unlocked = await checkAchievements(state);
+    const expected = unlocked.reduce((sum: number, a: { rewardAmber: number }) => sum + a.rewardAmber, 0);
+    await checkAchievements(state);
+
+    const progress = await getFullProgress();
+    expect(progress.amber).toBe(expected);
+  });
 });

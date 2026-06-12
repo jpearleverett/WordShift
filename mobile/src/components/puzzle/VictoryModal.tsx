@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS } from '../../constants/gameBalance';
 import { hapticSuccess } from '../../services/haptics';
+import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -157,6 +158,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const btn = getButtonTheme(phase);
   const totalPuzzlesCompleted = cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const isEarlyGameVictory = totalPuzzlesCompleted > 0 && totalPuzzlesCompleted <= 5;
+
+  // First share of the day earns a small amber bonus — hint it on the button
+  const [shareBonusAvailable, setShareBonusAvailable] = useState(false);
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    isDailyShareBonusAvailable().then(available => {
+      if (!cancelled) setShareBonusAvailable(available);
+    });
+    return () => { cancelled = true; };
+  }, [visible]);
 
   // Cascade animation — 4 staggered content groups
   const contentOpacity1 = useRef(new Animated.Value(0)).current;
@@ -632,7 +644,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <TouchableOpacity
                 onPress={onShare}
                 activeOpacity={0.8}
-                accessibilityLabel="Share result"
+                accessibilityLabel={shareBonusAvailable
+                  ? `Share result, earns ${DAILY_SHARE_BONUS_AMBER} amber for the first share today`
+                  : 'Share result'}
                 accessibilityRole="button"
                 style={{ flex: 1 }}
               >
@@ -640,7 +654,15 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   backgroundColor: btn.share.bg,
                   borderColor: btn.share.edge,
                 }]}>
-                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>{'\uD83D\uDCE4'} Share</Text>
+                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>
+                    {'\uD83D\uDCE4'} Share{shareBonusAvailable ? ` +${DAILY_SHARE_BONUS_AMBER}` : ''}
+                    {shareBonusAvailable && (
+                      <>
+                        {' '}
+                        <Image source={AMBER_ICON} style={styles.shareBonusIcon} accessibilityLabel="amber" />
+                      </>
+                    )}
+                  </Text>
                 </View>
               </TouchableOpacity>
 
@@ -979,6 +1001,10 @@ const styles = StyleSheet.create({
   btnFlatUniform: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  shareBonusIcon: {
+    width: 12,
+    height: 12,
   },
 
   // Collect Now pill (inside amber stats box)

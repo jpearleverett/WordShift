@@ -13,4 +13,16 @@ module.exports = defineConfig([
       'scripts/tools/*.mjs',
     ],
   },
+  {
+    // Node-environment build/generator scripts (CommonJS globals)
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      globals: {
+        __dirname: 'readonly',
+        require: 'readonly',
+        module: 'writable',
+        process: 'readonly',
+      },
+    },
+  },
 ]);

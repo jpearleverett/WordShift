@@ -423,7 +423,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
             <SpeechBubble text={`Every puzzle you solve helps us build the house. The others are going to love you.\nThere's so much more to discover... together.`} />
             <TouchableOpacity style={[styles.continueBtn, styles.continueBtnFinal]} onPress={handleComplete} accessibilityLabel="Start playing" accessibilityRole="button">
               <View style={styles.continueBtnShine} />
-              <Text style={styles.continueBtnText}>Let's play!</Text>
+              <Text style={styles.continueBtnText}>Let&apos;s play!</Text>
             </TouchableOpacity>
           </View>
         );

@@ -597,7 +597,8 @@ describe('weeklyQuests', () => {
         }, 0);
         const s1 = await loadWeeklyQuests(0);
         const allQ1 = [...s1.daily.quests, ...s1.weekly.quests];
-        expect(allQ1.find(q => q.id === visitQuest.id)?.progress).toBe(2);
+        // Progress clamps to the quest target, which varies with the date-seeded pool
+        expect(allQ1.find(q => q.id === visitQuest.id)?.progress).toBe(Math.min(2, visitQuest.target));
       }
     });
 
@@ -617,7 +618,8 @@ describe('weeklyQuests', () => {
         }, 0);
         const s1 = await loadWeeklyQuests(0);
         const allQ1 = [...s1.daily.quests, ...s1.weekly.quests];
-        expect(allQ1.find(q => q.id === streakQuest.id)?.progress).toBe(2);
+        // Progress clamps to the quest target, which varies with the date-seeded pool
+        expect(allQ1.find(q => q.id === streakQuest.id)?.progress).toBe(Math.min(2, streakQuest.target));
       }
     });
 

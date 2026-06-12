@@ -23,7 +23,11 @@ jest.mock('@react-native-async-storage/async-storage', () => {
   };
 });
 
-import { generateShareText } from '../services/shareResults';
+import {
+  generateShareText,
+  maybeAwardDailyShareBonus,
+  DAILY_SHARE_BONUS_AMBER,
+} from '../services/shareResults';
 
 describe('shareResults', () => {
   test('generateShareText includes WordShift header for regular puzzles', () => {
@@ -136,5 +140,19 @@ describe('shareResults', () => {
     });
     expect(text).toContain('Play WordShift:');
     expect(text).toContain('wordshift://home');
+  });
+
+  test('daily share bonus is awarded once per day', async () => {
+    const { getFullProgress, clearProgress } = require('../services/amberCurrency');
+    await clearProgress();
+
+    const first = await maybeAwardDailyShareBonus();
+    expect(first).toBe(DAILY_SHARE_BONUS_AMBER);
+
+    const second = await maybeAwardDailyShareBonus();
+    expect(second).toBe(0);
+
+    const progress = await getFullProgress();
+    expect(progress.amber).toBe(DAILY_SHARE_BONUS_AMBER);
   });
 });

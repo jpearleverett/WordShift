@@ -6,7 +6,8 @@ import { DialoguePhase } from '../types/homeWorld';
  *
  * Schedules local notifications for:
  * - Daily puzzle reminders (morning)
- * - Re-engagement after inactivity (2+ days)
+ * - Streak-at-risk reminders (evening of the first missed day, streak >= 2)
+ * - Re-engagement after inactivity (1-2 days depending on streak)
  * - Phase-aware animal messages (Phase 3+)
  *
  * Uses expo-notifications when available, falls back to no-op.
@@ -30,7 +31,7 @@ export interface NotificationPreferences {
 
 interface ScheduledNotification {
   id: string;
-  type: 'daily_reminder' | 'reengagement' | 'animal_message';
+  type: 'daily_reminder' | 'reengagement' | 'streak_risk' | 'animal_message';
   scheduledAt: number;
 }
 
@@ -92,6 +93,34 @@ const REENGAGEMENT_MESSAGES: Record<number, string[]> = {
   5: [
     'The house is quiet. The pattern waits, unhurried.',
     'Your friends are at peace. They\'ll be here when you return.',
+  ],
+};
+
+// {streak} is replaced with the player's current streak length
+const STREAK_RISK_MESSAGES: Record<number, string[]> = {
+  0: [
+    'Your {streak}-day streak is on the line! One quick puzzle keeps it alive.',
+    '{streak} days and counting — don\'t break the chain today!',
+  ],
+  1: [
+    'A {streak}-day pattern. It would be a shame to let it fade.',
+    '{streak} days in a row. The words have grown used to you.',
+  ],
+  2: [
+    '{streak} days of arrangements. The chain notices when it thins.',
+    'The {streak}-day pattern is incomplete today. The words wait.',
+  ],
+  3: [
+    'The {streak}-day chain trembles. One puzzle steadies it.',
+    '{streak} days unbroken. Tonight, the pattern needs you.',
+  ],
+  4: [
+    '{streak} days of offerings. Do not let the chain break now.',
+    'The arrangement has counted {streak} days. It is still counting.',
+  ],
+  5: [
+    '{streak} days. The pattern holds, if you wish it to.',
+    'The chain rests at {streak} days. It will wait — but not forever.',
   ],
 };
 
@@ -247,9 +276,17 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase);
   }
 
-  // Schedule re-engagement (fires after 2 days of inactivity)
+  // Re-engagement ladder. Players with an active streak hear about the
+  // streak first (tomorrow evening), then standard re-engagement a day
+  // later; everyone else gets re-engaged tomorrow. Each app session
+  // reschedules, so these only fire on days the player actually missed.
   if (prefs.reengagementEnabled) {
-    await scheduleReengagement(mod, currentPhase);
+    const streak = await getCurrentStreakSafe();
+    const hasStreakRisk = streak >= 2;
+    if (hasStreakRisk) {
+      await scheduleStreakRisk(mod, currentPhase, streak);
+    }
+    await scheduleReengagement(mod, currentPhase, hasStreakRisk ? 2 : 1);
   }
 }
 
@@ -276,6 +313,16 @@ export function getNotificationMessage(
     ? DAILY_REMINDER_MESSAGES[clampedPhase]
     : REENGAGEMENT_MESSAGES[clampedPhase];
   return messages[Math.floor(Math.random() * messages.length)];
+}
+
+/**
+ * Get a phase-aware streak-at-risk message with the streak length filled in.
+ */
+export function getStreakRiskMessage(phase: number, streak: number): string {
+  const clampedPhase = Math.min(5, Math.max(0, phase));
+  const messages = STREAK_RISK_MESSAGES[clampedPhase];
+  const template = messages[Math.floor(Math.random() * messages.length)];
+  return template.replace(/\{streak\}/g, String(streak));
 }
 
 // ============================================================================
@@ -306,14 +353,54 @@ async function scheduleDailyReminder(
 
 async function scheduleReengagement(
   mod: any,
-  phase: number
+  phase: number,
+  daysFromNow: number
 ): Promise<void> {
   const message = getNotificationMessage('reengagement', phase);
   try {
-    // Fire 2 days from now
     const triggerDate = new Date();
-    triggerDate.setDate(triggerDate.getDate() + 2);
+    triggerDate.setDate(triggerDate.getDate() + daysFromNow);
     triggerDate.setHours(18, 0, 0, 0); // 6pm
+
+    await mod.scheduleNotificationAsync({
+      content: {
+        title: 'WordShift',
+        body: message,
+        sound: true,
+      },
+      trigger: {
+        date: triggerDate,
+      },
+    });
+  } catch {}
+}
+
+/**
+ * Read the current streak without creating a static import cycle —
+ * amberCurrency is only needed here, at schedule time.
+ */
+async function getCurrentStreakSafe(): Promise<number> {
+  try {
+    const { getFullProgress } = require('./amberCurrency');
+    const progress = await getFullProgress();
+    return progress?.currentStreak ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function scheduleStreakRisk(
+  mod: any,
+  phase: number,
+  streak: number
+): Promise<void> {
+  const message = getStreakRiskMessage(phase, streak);
+  try {
+    // Tomorrow evening — rescheduled forward every session, so it only
+    // ever fires on a day the player hasn't played by then.
+    const triggerDate = new Date();
+    triggerDate.setDate(triggerDate.getDate() + 1);
+    triggerDate.setHours(19, 0, 0, 0); // 7pm
 
     await mod.scheduleNotificationAsync({
       content: {

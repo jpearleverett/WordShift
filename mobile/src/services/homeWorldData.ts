@@ -3,6 +3,7 @@ import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead } f
 import { getPhaseStartIndex } from './dialogue/animalDialogueBase';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
+import { logEvent } from './eventLogger';
 
 // ============================================================================
 // PHASE-AWARE ROOM DESCRIPTIONS
@@ -818,6 +819,18 @@ export async function purchaseUnlock(unlockId: string): Promise<{
     }
   } else {
     success = await unlockRoom(unlock.targetId, unlock.cost);
+  }
+
+  if (success) {
+    logEvent({
+      type: 'unlock_purchased',
+      data: {
+        unlockId: unlock.id,
+        unlockType: unlock.type,
+        targetId: unlock.targetId,
+        cost: unlock.cost,
+      },
+    });
   }
 
   return { success };

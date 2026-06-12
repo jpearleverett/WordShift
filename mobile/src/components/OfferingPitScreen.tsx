@@ -311,6 +311,7 @@ const MiniCandyTile = React.memo(({ char }: { char: string }) => {
     </View>
   );
 });
+MiniCandyTile.displayName = 'MiniCandyTile';
 
 const tileStyles = StyleSheet.create({
   outer: {
@@ -450,6 +451,7 @@ const FloatingWordChip = React.memo(({
     </Animated.View>
   );
 });
+FloatingWordChip.displayName = 'FloatingWordChip';
 
 const chipStyles = StyleSheet.create({
   wrapper: {
@@ -488,6 +490,7 @@ const TrailParticleView = React.memo(({ p }: { p: TrailParticle }) => (
     }}
   />
 ));
+TrailParticleView.displayName = 'TrailParticleView';
 
 const ImpactParticleView = React.memo(({ p }: { p: ImpactParticle }) => (
   <Animated.View
@@ -505,6 +508,7 @@ const ImpactParticleView = React.memo(({ p }: { p: ImpactParticle }) => (
     }}
   />
 ));
+ImpactParticleView.displayName = 'ImpactParticleView';
 
 const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
   <Animated.View
@@ -522,6 +526,7 @@ const AmberParticleView = React.memo(({ p }: { p: AmberParticle }) => (
     }}
   />
 ));
+AmberParticleView.displayName = 'AmberParticleView';
 
 const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
   <Animated.View
@@ -544,6 +549,7 @@ const RimParticleView = React.memo(({ p }: { p: RimParticle }) => (
     }}
   />
 ));
+RimParticleView.displayName = 'RimParticleView';
 
 const ShockwaveRingView = React.memo(({ ring }: { ring: ShockwaveRing }) => {
   const size = PIT_OVAL.radiusX * 2.6;
@@ -566,6 +572,7 @@ const ShockwaveRingView = React.memo(({ ring }: { ring: ShockwaveRing }) => {
     />
   );
 });
+ShockwaveRingView.displayName = 'ShockwaveRingView';
 
 // ---------------------------------------------------------------------------
 // Main component

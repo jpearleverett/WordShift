@@ -13,6 +13,8 @@ export interface Achievement {
   description: string;
   icon: string;
   category: AchievementCategory;
+  /** One-time amber credited when the achievement unlocks */
+  rewardAmber: number;
   /** Check function returns true if unlocked based on current state */
   check: (state: AchievementCheckState) => boolean;
 }
@@ -52,6 +54,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Puzzle achievements
   {
     id: 'first_puzzle',
+    rewardAmber: 10,
     title: 'First Words',
     description: 'Complete your first puzzle',
     icon: '🎯',
@@ -60,6 +63,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'puzzle_10',
+    rewardAmber: 15,
     title: 'Getting Started',
     description: 'Complete 10 puzzles',
     icon: '📝',
@@ -68,6 +72,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'puzzle_25',
+    rewardAmber: 20,
     title: 'Word Enthusiast',
     description: 'Complete 25 puzzles',
     icon: '📖',
@@ -76,6 +81,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'puzzle_35',
+    rewardAmber: 20,
     title: 'Pattern Seeker',
     description: 'Complete 35 puzzles',
     icon: '🔍',
@@ -84,6 +90,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'puzzle_50',
+    rewardAmber: 25,
     title: 'Puzzle Addict',
     description: 'Complete 50 puzzles',
     icon: '🧩',
@@ -92,6 +99,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'puzzle_100',
+    rewardAmber: 40,
     title: 'Century Club',
     description: 'Complete 100 puzzles',
     icon: '💯',
@@ -100,6 +108,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'puzzle_250',
+    rewardAmber: 60,
     title: 'Wordsmith',
     description: 'Complete 250 puzzles',
     icon: '🏛️',
@@ -110,6 +119,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Mastery achievements
   {
     id: 'first_perfect',
+    rewardAmber: 10,
     title: 'Flawless',
     description: 'Get 3 stars on a puzzle',
     icon: '⭐',
@@ -118,6 +128,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'perfect_10',
+    rewardAmber: 25,
     title: 'Star Collector',
     description: 'Get 3 stars on 10 puzzles',
     icon: '🌟',
@@ -126,6 +137,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'perfect_25',
+    rewardAmber: 40,
     title: 'Perfectionist',
     description: 'Get 3 stars on 25 puzzles',
     icon: '✨',
@@ -134,6 +146,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'all_difficulties',
+    rewardAmber: 25,
     title: 'Well-Rounded',
     description: 'Complete a puzzle on every difficulty',
     icon: '🎨',
@@ -146,6 +159,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'hard_10',
+    rewardAmber: 25,
     title: 'Fearless',
     description: 'Complete 10 hard puzzles',
     icon: '🔥',
@@ -154,6 +168,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'no_hints_10',
+    rewardAmber: 25,
     title: 'Independent Thinker',
     description: 'Complete 10 puzzles without using hints',
     icon: '🧠',
@@ -164,6 +179,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Streak achievements
   {
     id: 'streak_3',
+    rewardAmber: 15,
     title: 'On a Roll',
     description: 'Maintain a 3-day play streak',
     icon: '🔥',
@@ -172,6 +188,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'streak_7',
+    rewardAmber: 25,
     title: 'Weekly Warrior',
     description: 'Maintain a 7-day play streak',
     icon: '📅',
@@ -180,6 +197,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'streak_14',
+    rewardAmber: 40,
     title: 'Fortnight Focus',
     description: 'Maintain a 14-day play streak',
     icon: '💪',
@@ -188,6 +206,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'streak_30',
+    rewardAmber: 60,
     title: 'Monthly Master',
     description: 'Maintain a 30-day play streak',
     icon: '🏆',
@@ -198,6 +217,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Collection achievements
   {
     id: 'first_animal',
+    rewardAmber: 10,
     title: 'First Friend',
     description: 'Invite your first animal',
     icon: '🐾',
@@ -206,6 +226,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'animals_5',
+    rewardAmber: 25,
     title: 'Growing Family',
     description: 'Invite 5 animals',
     icon: '🏠',
@@ -214,6 +235,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'all_animals',
+    rewardAmber: 75,
     title: 'Full House',
     description: 'Invite all 10 animals',
     icon: '👑',
@@ -222,6 +244,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'all_rooms',
+    rewardAmber: 75,
     title: 'Master Builder',
     description: 'Build all rooms',
     icon: '🏗️',
@@ -230,6 +253,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'amber_1000',
+    rewardAmber: 50,
     title: 'Amber Hoarder',
     description: 'Earn 1,000 total amber',
     icon: '💎',
@@ -240,6 +264,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Journey achievements
   {
     id: 'phase_1',
+    rewardAmber: 20,
     title: 'Curious Thoughts',
     description: 'Reach Phase 2 of the journey',
     icon: '💭',
@@ -248,6 +273,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'phase_2',
+    rewardAmber: 25,
     title: 'Deeper Questions',
     description: 'Reach Phase 3 of the journey',
     icon: '🌙',
@@ -256,6 +282,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'phase_3',
+    rewardAmber: 30,
     title: 'Growing Shadows',
     description: 'Reach Phase 4 of the journey',
     icon: '👁️',
@@ -264,6 +291,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'phase_4',
+    rewardAmber: 50,
     title: 'The Horizon',
     description: 'Reach the final phase',
     icon: '🌑',
@@ -272,6 +300,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'daily_first',
+    rewardAmber: 15,
     title: 'Daily Challenger',
     description: 'Complete your first daily challenge',
     icon: '📰',
@@ -280,6 +309,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'daily_7',
+    rewardAmber: 30,
     title: 'Daily Devotion',
     description: 'Complete 7 daily challenges',
     icon: '🗓️',
@@ -288,6 +318,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'shared_first',
+    rewardAmber: 10,
     title: 'Show Off',
     description: 'Share a puzzle result',
     icon: '📤',
@@ -298,6 +329,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Challenge mode achievements
   {
     id: 'challenge_first',
+    rewardAmber: 15,
     title: 'Challenger',
     description: 'Complete your first puzzle in Challenge Mode',
     icon: '🔒',
@@ -306,6 +338,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'challenge_10',
+    rewardAmber: 30,
     title: 'Fearless Champion',
     description: 'Complete 10 puzzles in Challenge Mode',
     icon: '🛡️',
@@ -314,6 +347,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'challenge_25',
+    rewardAmber: 50,
     title: 'Iron Will',
     description: 'Complete 25 puzzles in Challenge Mode',
     icon: '⚔️',
@@ -324,6 +358,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Extended streak achievements
   {
     id: 'streak_60',
+    rewardAmber: 100,
     title: 'Unbreakable',
     description: 'Maintain a 60-day play streak',
     icon: '💫',
@@ -334,6 +369,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   // Extended puzzle count
   {
     id: 'puzzle_500',
+    rewardAmber: 100,
     title: 'Word Legend',
     description: 'Complete 500 puzzles',
     icon: '🌟',
@@ -402,6 +438,17 @@ export async function checkAchievements(
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
     } catch (err) {
       console.warn('Failed to save achievements:', err);
+    }
+
+    // Credit one-time amber rewards (never blocks the unlock itself)
+    const totalReward = newlyUnlocked.reduce((sum, a) => sum + a.rewardAmber, 0);
+    if (totalReward > 0) {
+      try {
+        const { awardBonusAmber } = require('./amberCurrency');
+        await awardBonusAmber(totalReward, 'achievement');
+      } catch (err) {
+        console.warn('Failed to credit achievement amber:', err);
+      }
     }
   }
 
