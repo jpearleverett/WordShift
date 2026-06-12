@@ -7,6 +7,7 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import { TouchableOpacity } from 'react-native-gesture-handler';
+import { AmberInline } from '../AmberInline';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
@@ -94,7 +95,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           <Text style={styles.lockedText}>{room.name}</Text>
           {unlockCost !== null ? (
             <>
-              <Text style={styles.lockedCost}>Build: 💎 {unlockCost}</Text>
+              <Text style={styles.lockedCost}>Build: <AmberInline /> {unlockCost}</Text>
               <Text
                 style={[
                   styles.lockedSubtext,
@@ -103,7 +104,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
               >
                 {amberBalance >= unlockCost
                   ? 'Tap to build this room'
-                  : `💎 ${amberBalance} / ${unlockCost}`}
+                  : <><AmberInline /> {amberBalance} / {unlockCost}</>}
               </Text>
             </>
           ) : (
@@ -171,12 +172,12 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
                 ? 'Tap to Invite'
                 : inviteCost === 0
                   ? 'Invite (FREE)'
-                  : `Invite 💎 ${inviteCost}`
+                  : <>Invite <AmberInline /> {inviteCost}</>
               }
             </Text>
             {inviteCost !== null && inviteCost > 0 && (
               <Text style={styles.inviteAnimalCostSubtext}>
-                {amberBalance >= inviteCost ? 'Tap to welcome' : `You: 💎 ${amberBalance}`}
+                {amberBalance >= inviteCost ? 'Tap to welcome' : <>You: <AmberInline /> {amberBalance}</>}
               </Text>
             )}
           </View>

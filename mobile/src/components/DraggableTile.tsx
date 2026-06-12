@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { Animated, PanResponder, Easing, StyleSheet, View } from 'react-native';
+import { getDragShadowColor } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { hapticSelection } from '../services/haptics';
 import { DROP_IMPACT_POP_MS, DROP_IMPACT_COLLAPSE_MS } from '../constants/timing';
@@ -15,6 +16,8 @@ interface DraggableTileProps {
   onTap: () => void;
   /** Whether this tile can be interacted with */
   enabled: boolean;
+  /** Letter character for the accessibility label */
+  letterChar?: string;
   /** Phase for styling the drag shadow */
   phase?: number;
   /** Called when drag activation state changes — used to disable parent ScrollView during drag */
@@ -42,6 +45,7 @@ export function DraggableTile({
   onDragEnd,
   onTap,
   enabled,
+  letterChar,
   phase = 0,
   onDragActiveChange,
 }: DraggableTileProps) {
@@ -199,14 +203,20 @@ export function DraggableTile({
     })
   ).current;
 
-  const shadowColor = phase >= 5 ? '#7B6B8A80'   // ghostly mauve (terrible peace)
-    : phase >= 3 ? '#8030508C'                    // crimson (cult/dread)
-    : '#FFD70050';                                // golden (bright days)
+  const shadowColor = getDragShadowColor(phase);
 
   return (
     <View style={styles.wrapper}>
       {/* Source tile (dims during drag) */}
-      <Animated.View style={{ opacity: sourceOpacity }} {...panResponder.panHandlers}>
+      <Animated.View
+        style={{ opacity: sourceOpacity }}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={letterChar ? `Letter ${letterChar}` : 'Letter'}
+        accessibilityHint="Double tap to pick up this letter, then choose a drop slot"
+        accessibilityState={{ disabled: !enabled }}
+        {...panResponder.panHandlers}
+      >
         {children}
       </Animated.View>
 

@@ -17,15 +17,16 @@ WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase 
 - See `CLAUDE.md` for the full test commands. Key: always use `npm test` (not `npx jest`).
 - **Run all tests:** `cd mobile && npm test -- --no-coverage`
 - **Run a single file:** `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
-- 11 tests in 3 suites (`integration`, `puzzleVariety`, `amberCurrency`) have pre-existing failures unrelated to environment setup.
+- The suite is expected green (~1,006 tests across 35 suites). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
 
 ### TypeScript
 
-- `npx tsc --noEmit` in `mobile/` will show pre-existing type errors in several files (App.tsx, HomeScreen.tsx, HouseWorld.tsx, etc.). These are known and not blocking for development.
-- There is no separate lint command (`eslint` is not configured). TypeScript checking via `tsc` is the primary static analysis tool.
+- `npx tsc --noEmit` (or `npm run typecheck`) in `mobile/` is expected clean. Note: RN 0.81's types accept `pointerEvents` only on View-typed components — `Image`/`Animated.Image` type neither the prop nor the style key. Decorative images that render behind interactive content don't need it (hit-testing favors later siblings / higher zIndex); if an image must block or pass touches, wrap it in a `<View pointerEvents=...>`.
+- Lint: `npm run lint` (ESLint 9 flat config via `eslint-config-expo`, see `mobile/eslint.config.js`). Generated data files (`src/data/puzzleBank*.ts`, `src/dictionary.ts`) are excluded.
 
 ### Gotchas
 
 - `package-lock.json` is present — use `npm` (not pnpm/yarn) for dependency management.
 - The `tsconfig.json` extends `expo/tsconfig.base` — this is resolved from `node_modules` after install.
-- Puzzle bank `.ts` files in `src/data/` are auto-generated and large (500 puzzles each, 12 files). Do not manually edit these.
+- Puzzle bank `.ts` files in `src/data/` are auto-generated and large (~480 puzzles each after the profanity filter pass, 12 files). Do not manually edit these — regenerate with `npm run generate:puzzles`, then run `node scripts/tools/purgeProfanity.mjs`.
+- App icons, splash, notification icon, and the SFX pack are generated: `npm run generate:assets` (pure-Node scripts in `mobile/scripts/tools/`).

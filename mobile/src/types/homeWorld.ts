@@ -129,6 +129,8 @@ export interface Dialogue {
   text: string;
   phase: DialoguePhase;
   animalType: AnimalType;
+  /** Line mentions these animals by name — it is skipped until ALL are unlocked. */
+  requiresAnimals?: AnimalType[];
 }
 
 /**

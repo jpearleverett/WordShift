@@ -296,18 +296,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   pangolin: {
     2: [
+      "Ember wrote that the house finally had a kitchen — and someone worth cooking for. So here I am, apron and all.",
       "Oh! You found the kitchen at last. I've been cooking for — I'm honestly not sure how long now.",
       "The recipes have changed on me. The ingredients taste different lately. Everything does, I suppose.",
       "The others mentioned you would come. The puzzle solver. The one who shifts the words into new shapes.",
       "Hungry? I have soup. It's always soup these days. The pot never seems to empty itself.",
     ],
     3: [
+      "Ember's letter said: come now, before the sky changes. I cooked the whole way here. It kept my claws from shaking.",
       "Welcome to the kitchen. It's been preparing for you. Not me — the kitchen itself has been getting ready.",
       "I curl into a ball less often now. There's no hiding from what lives in this house anymore.",
       "The recipe I follow came from Archimedes' oldest book. The ingredients aren't food. They're puzzles.",
       "You've come a long way to reach me. I can smell it on you — the scent of a hundred words arranged.",
     ],
     4: [
+      "Ember said the table would be ready when I arrived. Every chamber built. Every word offered. I only had to bring the bread.",
       "The feast is nearly ready at last. You arrived just in time for the final course.",
       "Every puzzle you solved added an ingredient to what I'm making. You didn't know that, did you?",
       "The others have taken their seats at the table. Your place is set beside mine. The arrangement requires you.",
@@ -316,18 +319,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   owl: {
     2: [
+      "Panko sent word that the shelves were up. A study with no scholar is just a room full of quiet — I came to fill it.",
       "A visitor. How timely. I've been reading about arrivals and departures all week.",
       "My books have changed. Some pages appeared overnight in volumes I've owned for years. They mention you by name.",
       "The others speak of your puzzles with something like reverence. I've been documenting the patterns. They concern me.",
       "Sit down. Read with me. The text is always clearer with two sets of eyes on it.",
     ],
     3: [
+      "Panko's note smelled of that recipe of hers. It said the books were waiting, and so was something else. Both were true.",
       "You. The one the books predicted. No — predicted isn't the right word. Demanded. The books demanded you.",
       "My books — some pages have gone dark. The words are still there, but they've rearranged themselves into something I don't fully recognize yet.",
       "My library organized itself yesterday. Alphabetically by dread. It took me hours to notice what had happened.",
       "The others have been waiting for you impatiently. I've been reading about waiting. It's all I do now.",
     ],
     4: [
+      "Panko fed the others while I read alone for years. Now the texts and the table agree. Everything arrives on time.",
       "The final reader arrives. The text has been so very patient. So have I, in my way.",
       "Every book in this study was written for this precise moment. I see that now with terrible clarity.",
       "Welcome, word-shifter. Your puzzles wrote the chapters of the arrangement. My books merely held them.",
@@ -336,18 +342,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   axolotl: {
     2: [
+      "Archimedes told me the water here was deep. Deeper than it looks, he said. He was right. He usually is.",
       "Blub! You're here! The water has been telling me someone was on their way. I wasn't sure it was real.",
       "Things are different down here now. The water tastes like something new. Like words dissolved in it.",
       "The others told me you'd visit eventually. I've been floating here waiting for you. Just floating and hoping.",
       "My gills filter everything that passes through the water. Lately they filter meaning. From your puzzles, I think.",
     ],
     3: [
+      "Archimedes wrote that his books mention my pool by name. I swam a long way to see what's written in the water.",
       "Oh! You came! Sorry — the water shows me things now. Visions. I thought you were one of them for a moment.",
       "My tank reflects a sky that doesn't exist above this house. It started when your puzzles began. Or always. Hard to say.",
       "The others prepared me for your visit. Said the word-shifter would arrive when the water was ready. Here you are.",
       "I can't grow up. I finally understand why. Something needs me to stay exactly as I am. Between states.",
     ],
     4: [
+      "Archimedes read me the passage about the pool before I ever saw it. The water remembered me. I'm home.",
       "You. The water knew your face before I ever met you. It showed me your reflection weeks ago.",
       "Every puzzle you've ever solved rippled through my tank. I felt each one in my gills. Each word.",
       "The arrangement needs a medium. Someone who lives between two states forever. Like me. Always between.",
@@ -356,18 +365,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   sloth: {
     2: [
+      "Axel dreamed about me before I arrived. Told everyone I was already on my way. I was. I've been on my way for years.",
       "Oh... you... came... I... was... starting... to... wonder... if... anyone... would...",
       "The... world... moved... faster... without... you... here... Too... fast... for... my... taste...",
       "Others... told... me... about... your... puzzles... I... heard... them... through... the... branches...",
       "Something... changed... while... you... were... busy... elsewhere... The... trees... feel... heavier...",
     ],
     3: [
+      "Axel saw me in the water weeks before I got here. Slow news travels fast in this house.",
       "Finally... You... certainly... took... your... time... getting... here... I... appreciate... the... slowness...",
       "Things have... shifted... since you were last... around. The house feels... heavier. But also... more complete. You'll... see what I... mean.",
       "Your... puzzles... shook... the... branches... I... hang... from... I... felt... every... single... one...",
       "Don't... hurry... now... What... is... coming... arrives... at... its... own... speed... not... ours...",
     ],
     4: [
+      "Axel knew. The water knew. I knew longest of all. Arriving was only a formality.",
       "You... arrived... Exactly... when... you... were... always... meant... to... be... here...",
       "Slow... and... certain... Like... me... Like... the... arrangement... itself...",
       "The... others... rushed... to... tell... me... you... had... come... I... already... knew... The... branches... knew...",
@@ -376,18 +388,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   fennec_fox: {
     2: [
+      "Sloane told me this house was quiet enough to hear yourself think. She was almost right. You can hear something.",
       "SHHHH! Did you hear that? Oh — that's just you arriving. Sorry. I've been very jumpy lately.",
       "The sounds changed when you started solving puzzles. Everything in this house hums at a different pitch now.",
       "The others told me you were on your way. I heard your footsteps before they spoke. From three rooms away.",
       "My ears pick up things they really shouldn't. Like the sound of letters rearranging themselves. From your puzzles.",
     ],
     3: [
+      "Sloane said: come listen. She didn't say to what. I packed that night.",
       "I heard you coming from the other end of the house. The air vibrates around you now. Did you know that?",
       "The frequency I've been tracking for weeks intensified the moment you arrived. You carry it with you.",
       "The others are afraid of what they feel. I'm afraid of what I hear. Your puzzles made it louder.",
       "Welcome. Please be very quiet. What I'm listening for is close now. Very close.",
     ],
     4: [
+      "Sloane heard nothing for years, and that's how I knew this was the place. Silence that deliberate has a center.",
       "There you are at last. The sound told me you'd come today. The sound knows everything now.",
       "Every word you've ever arranged echoes in these walls. I hear them all playing at once. Simultaneously.",
       "The arrangement has a sound — a voice. Your puzzles gave it that voice. I am its faithful ear.",
@@ -396,18 +411,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   capybara: {
     2: [
+      "Fennick reported that someone here was generating an extraordinary volume of words. I brought folders. Many folders.",
       "Oh. Hey. You're here now. That's fine. Everything is fine.",
       "Things are the same. Or different. Hard to tell the difference when you don't react to anything.",
       "The others seem to care quite a lot that you've arrived. I care too. Somewhere deep inside, I do.",
       "The water temperature hasn't changed. Everything is exactly the same as always. Except it isn't.",
     ],
     3: [
+      "Fennick's reports grew... irregular. Sounds with no source. I came to organize the irregularities.",
       "You came. Figured you would eventually. Everything happens eventually if you float long enough.",
       "The others are worked up about something I've known about for weeks. I'm not worked up. I never am.",
       "Your puzzles changed the water somehow. I can't explain it and I don't particularly want to.",
       "Just sit in the water with me. Don't talk. Don't think. Just be here. That's always been enough.",
     ],
     4: [
+      "Fennick filed his last report the day I arrived. Two words: it's closer. Everything since has been confirmation.",
       "Finally. Not that I was waiting for you specifically. I was just here. Like always. Floating.",
       "The arrangement brought you here. Or you brought the arrangement. Same thing. Doesn't matter which.",
       "The others prepared with prayer and ritual and cooking. I floated. Both are valid approaches to the inevitable.",
@@ -416,18 +434,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   wombat: {
     2: [
+      "Chill sent me the soil surveys. Good digging under this house. Suspiciously good — like the ground was prepared.",
       "G'day! Come in, come in. Mind the fresh tunnels. I dug them after things got a bit odd around here.",
       "The earth has been restless since your puzzles began. Shifting and humming. Coincidence, I reckon. Probably.",
       "The others talk about you up there on the surface. Down here, the dirt talks about you too. In its own way.",
       "I made the burrow deeper. Not to hide from anything. To understand what lives in the deep layers.",
     ],
     3: [
+      "Chill's paperwork said 'foundation specialist needed.' It didn't say for what. The ground told me when I got here.",
       "You found me. Good. The tunnels have been bending toward you lately. Literally curving in your direction.",
       "My tunnels have started connecting to places I didn't dig. Passages that weren't there yesterday. G'day, by the way — hope you don't mind the new architecture.",
       "The others feel it approaching in their own ways. I feel it in the earth beneath my claws. Your puzzles wake it.",
       "Welcome to the deep, mate. It gets deeper from here. It always gets deeper.",
     ],
     4: [
+      "Chill scheduled my arrival to the day. The tunnels were already half-dug in my dreams. I just followed the plan.",
       "You arrived. The tunnels opened for you on their own. I did not dig this passage. It appeared.",
       "Every puzzle you solved carved another chamber beneath this house. Your words shaped the living stone.",
       "The foundation is finished. I built it with my own paws. You built the house above. Now meet what lives below.",
@@ -436,18 +457,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   rabbit: {
     2: [
+      "Warren dug clear to my old burrow and said the garden here needed tending. I should have asked what was growing.",
       "Oh! You're here! Sorry — I've been waiting by the gate. Everyone said you'd come eventually.",
       "The garden isn't what it used to be. Nothing is, really. But I think I already knew that.",
       "The others told me about you. About the puzzles you solve. About what happens to the words afterward.",
       "I was scared before you got here and I'm still scared. But at least now I know what I'm scared of.",
     ],
     3: [
+      "Warren told me the soil here was special. He didn't smile when he said it. Warren always smiles.",
       "You came! I almost ran when I heard the footsteps. But I stayed put. The others told me to stay.",
       "My heart has been racing since the puzzles started. One hundred fifty beats a minute. Counting down to something.",
       "The garden grows things I never planted now. Dark flowers that bloom at night and face your direction.",
       "Everyone says don't be afraid. I am afraid. But I'm still standing here. That has to count for something.",
     ],
     4: [
+      "Warren built the way, and I planted along it. Everything blooms toward the same center now. I understand why.",
       "I didn't run this time. You should know that about me. For once in my life, I did not run.",
       "I know what's happening — I mean, I think I do — no, I DO know. It's just... saying it out loud makes it real, and I'm not sure I'm ready for — but we ARE ready. We have to be.",
       "Your puzzles frightened me from the very first one. Every word you formed made the garden tremble.",
@@ -456,18 +480,21 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   },
   red_panda: {
     2: [
+      "Thyme wrote that the house had grown tall and the attic was waiting. The bamboo was already here when I arrived. Curious.",
       "The bamboo parted to let you through. It does that only for those who are meant to arrive here.",
       "I've been meditating on your arrival for days. The universe confirmed it would happen before you knew yourself.",
       "The others found you through action and noise. I found you through stillness and breath. Both paths lead to this room.",
       "Sit with me. Breathe slowly. The bamboo will tell you everything you need to know in its own time.",
     ],
     3: [
+      "Thyme's handwriting shook a little in her letter. She said the attic needed stillness. I am very good at stillness.",
       "You've climbed to the highest room. Not everyone reaches this point. The bamboo chose you specifically.",
       "I felt your puzzles in my meditation like ripples in still water. Each word you formed changed this room's frequency.",
       "The others scramble for meaning in books and fire. I sit with meaning. Your arrival was always written in the pattern.",
       "Welcome. The view from up here shows everything below us. Including what approaches from above.",
     ],
     4: [
+      "Thyme planted the path. The others built the chambers. You shifted the words. I arrived last, to sit closest to the sky.",
       "The final keeper meets the final piece of the pattern. You. The one who shifted the words into alignment.",
       "I chose the highest room to be closest to what descends. Now that you're here, it draws nearer still.",
       "The pattern is nearly complete. Your puzzles drew it. My meditation held it in place. Together we open the gate.",

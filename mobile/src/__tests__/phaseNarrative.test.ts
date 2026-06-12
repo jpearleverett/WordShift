@@ -11,6 +11,11 @@ import {
   getRulesText,
   getInvalidWordMessage,
   getLockedLetterMessage,
+  getNoValidMovesMessage,
+  getNotificationPromptText,
+  getSpeedTimeUpMessage,
+  getWhisperGalleryEmptyText,
+  getNextStreakMilestoneText,
   checkNarrativeMicroBeat,
   resetMicroBeats,
   getHomescreenNudge,
@@ -440,6 +445,63 @@ describe('getLockedLetterMessage', () => {
   });
 });
 
+describe('getNoValidMovesMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test.each(allSixPhases)('returns a non-empty string for phase %i', (phase) => {
+    const msg = getNoValidMovesMessage(phase);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('phase 0 tells the player to undo or clear', () => {
+    const msg = getNoValidMovesMessage(0).toLowerCase();
+    expect(msg).toContain('undo');
+    expect(msg).toContain('clear');
+  });
+
+  test('phase 4 reflects the ritual tone', () => {
+    expect(getNoValidMovesMessage(4)).toContain('arrangement');
+  });
+
+  test('each phase produces a unique message', () => {
+    const messages = allSixPhases.map(p => getNoValidMovesMessage(p));
+    const unique = new Set(messages);
+    expect(unique.size).toBe(6);
+  });
+});
+
+describe('getNotificationPromptText', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test.each(allSixPhases)('returns complete prompt copy for phase %i', (phase) => {
+    const prompt = getNotificationPromptText(phase);
+    expect(prompt.title.length).toBeGreaterThan(0);
+    expect(prompt.body.length).toBeGreaterThan(0);
+    expect(prompt.accept.length).toBeGreaterThan(0);
+    expect(prompt.decline.length).toBeGreaterThan(0);
+  });
+
+  test('phase 0 copy is friendly', () => {
+    const prompt = getNotificationPromptText(0);
+    expect(prompt.title).toBe('Daily reminder?');
+    expect(prompt.accept).toBe('Sounds good');
+    expect(prompt.decline).toBe('Not now');
+  });
+
+  test('all phases stay honest — body mentions Settings', () => {
+    for (const phase of allSixPhases) {
+      expect(getNotificationPromptText(phase).body).toContain('Settings');
+    }
+  });
+
+  test('each phase produces a unique title', () => {
+    const titles = allSixPhases.map(p => getNotificationPromptText(p).title);
+    const unique = new Set(titles);
+    expect(unique.size).toBe(6);
+  });
+});
+
 // ============================================================================
 // Narrative Micro-Beats (B3)
 // ============================================================================
@@ -864,5 +926,50 @@ describe('getPitMandatoryCTA', () => {
   test('phase 3+ is more demanding', () => {
     expect(getPitMandatoryCTA(3)).toContain('demands');
     expect(getPitMandatoryCTA(4)).toContain('demands');
+  });
+});
+
+describe('getSpeedTimeUpMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test('returns a non-empty string for every phase', () => {
+    for (const phase of allSixPhases) {
+      expect(getSpeedTimeUpMessage(phase).length).toBeGreaterThan(0);
+    }
+  });
+
+  test('messages are distinct across phases', () => {
+    const messages = allSixPhases.map(p => getSpeedTimeUpMessage(p));
+    expect(new Set(messages).size).toBe(messages.length);
+  });
+});
+
+describe('getWhisperGalleryEmptyText', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test('returns a non-empty string for every phase', () => {
+    for (const phase of allSixPhases) {
+      expect(getWhisperGalleryEmptyText(phase).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('getNextStreakMilestoneText', () => {
+  test('returns progress text below the top milestone', () => {
+    const text = getNextStreakMilestoneText(0, 2);
+    expect(text).not.toBeNull();
+    // next milestone after 2 days is 3 days -> +15 amber
+    expect(text).toContain('15');
+  });
+
+  test('returns null at or above the top milestone', () => {
+    expect(getNextStreakMilestoneText(0, 30)).toBeNull();
+    expect(getNextStreakMilestoneText(0, 45)).toBeNull();
+  });
+
+  test('returns a string for darker phases too', () => {
+    const text = getNextStreakMilestoneText(4, 5);
+    expect(typeof text).toBe('string');
+    expect((text as string).length).toBeGreaterThan(0);
   });
 });

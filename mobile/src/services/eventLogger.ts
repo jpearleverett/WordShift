@@ -20,6 +20,11 @@ export type EventType =
   | 'harvest_auto_collected'
   | 'deep_link_opened'
   | 'share_completed'
+  | 'app_open'
+  | 'notification_permission_result'
+  | 'onboarding_step'
+  | 'onboarding_complete'
+  | 'pit_offer'
   | 'app_error';
 
 /**
@@ -31,7 +36,7 @@ export interface GameEvent {
   timestamp?: number;
 }
 
-interface StoredEvent extends GameEvent {
+export interface StoredEvent extends GameEvent {
   timestamp: number;
 }
 
@@ -57,6 +62,8 @@ export function logEvent(event: GameEvent): void {
       flushEvents();
       flushTimer = null;
     }, 5000);
+    // In Node (tests), don't let the debounce timer hold the process open.
+    (flushTimer as { unref?: () => void }).unref?.();
   }
 }
 
@@ -71,7 +78,8 @@ async function flushEvents(): Promise<void> {
 
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    const existing: StoredEvent[] = stored ? JSON.parse(stored) : [];
+    const parsed = stored ? JSON.parse(stored) : [];
+    const existing: StoredEvent[] = Array.isArray(parsed) ? parsed : [];
 
     const combined = [...existing, ...eventsToFlush];
 
@@ -85,6 +93,17 @@ async function flushEvents(): Promise<void> {
     console.warn('Failed to flush events:', error);
     // Put events back in buffer so they're not lost
     eventBuffer = [...eventsToFlush, ...eventBuffer];
+    return;
+  }
+
+  // Fire-and-forget telemetry sync. Lazy require avoids a static
+  // import cycle (eventLogger ↔ telemetry). No-op when telemetry
+  // is disabled (the default).
+  try {
+    const { syncTelemetry } = require('./telemetry') as typeof import('./telemetry');
+    syncTelemetry().catch(() => {});
+  } catch {
+    // Telemetry unavailable — non-critical
   }
 }
 
@@ -97,10 +116,36 @@ export async function getEvents(): Promise<StoredEvent[]> {
     await flushEvents();
 
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
     console.warn('Failed to load events:', error);
     return [];
+  }
+}
+
+/**
+ * Get all stored events (for the telemetry uploader).
+ * Flushes any pending buffered events first.
+ */
+export async function getAllStoredEvents(): Promise<StoredEvent[]> {
+  return getEvents();
+}
+
+/**
+ * Remove the oldest N stored events (called by the telemetry uploader
+ * after a successful upload).
+ */
+export async function removeOldestEvents(count: number): Promise<void> {
+  if (count <= 0) return;
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    const parsed = stored ? JSON.parse(stored) : [];
+    const existing: StoredEvent[] = Array.isArray(parsed) ? parsed : [];
+    const remaining = existing.slice(count);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+  } catch (error) {
+    console.warn('Failed to remove oldest events:', error);
   }
 }
 

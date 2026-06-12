@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'wordshift_word_history';
-const MAX_HISTORY_SIZE = 100; // Track last 100 puzzles
+const MAX_HISTORY_SIZE = 150; // Track last 150 puzzles
 const MAX_WORDS_TRACKED = 500; // Upper bound on total words tracked
 
 // Cooldown periods (in puzzle count)
-const HARD_COOLDOWN = 15; // Word can't appear at all in next 15 puzzles
-const SOFT_COOLDOWN = 40; // Word gets penalty between 15-40 puzzles ago
+const HARD_COOLDOWN = 25; // Word can't appear at all in next 25 puzzles
+const SOFT_COOLDOWN = 60; // Word gets penalty between 25-60 puzzles ago
 
 interface WordHistoryData {
   // Array of puzzle word groups, most recent first. Each entry = one puzzle's words.

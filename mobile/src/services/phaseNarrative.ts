@@ -1,4 +1,5 @@
 import { DialoguePhase, PHASE_DESCRIPTIONS } from '../types/homeWorld';
+import { STREAK_MILESTONES } from '../constants/gameBalance';
 
 /**
  * Phase-aware narrative text for the puzzle screen.
@@ -238,6 +239,23 @@ export function getLockedLetterMessage(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// NO VALID MOVES — Shown when no legal move remains from the current board
+// ============================================================================
+
+const NO_VALID_MOVES_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'No words fit from here! Undo a move or clear the board to try a fresh path.',
+  1: 'Hmm — no word works from here. Undo a move, or clear the board and try another way.',
+  2: 'The letters refuse every path from here. Undo, or clear the board and begin anew.',
+  3: 'No word can form from this arrangement. Unmake a move, or clear it all away.',
+  4: 'The arrangement admits no further words. Unmake your moves, or begin again.',
+  5: 'The weave has closed around this path. Undo a thread, or clear it and start once more.',
+};
+
+export function getNoValidMovesMessage(phase: DialoguePhase): string {
+  return NO_VALID_MOVES_MESSAGES[phase];
+}
+
+// ============================================================================
 // LOADING MESSAGES — What shows during puzzle generation
 // ============================================================================
 
@@ -269,6 +287,76 @@ const START_MESSAGES: Record<DialoguePhase, string> = {
 
 export function getStartMessage(phase: DialoguePhase): string {
   return START_MESSAGES[phase];
+}
+
+// ============================================================================
+// SPEED TIMER FAILURE — Shown when the speed-variant countdown hits zero
+// ============================================================================
+
+const SPEED_TIME_UP_MESSAGES: Record<DialoguePhase, string> = {
+  0: "Time's up! Shake it off — a fresh puzzle awaits.",
+  1: 'Time slipped away! Another puzzle is ready whenever you are.',
+  2: 'The clock ran dry. The letters scattered before you finished.',
+  3: 'Time collapsed. The arrangement closed this path.',
+  4: 'The hour was consumed. The arrangement does not wait. Offer again.',
+  5: 'Time settled where it fell. The threads rest. Begin again, gently.',
+};
+
+export function getSpeedTimeUpMessage(phase: DialoguePhase): string {
+  return SPEED_TIME_UP_MESSAGES[phase];
+}
+
+// ============================================================================
+// WHISPER GALLERY EMPTY STATE — Shown when no whispers are collected yet
+// ============================================================================
+
+const WHISPER_GALLERY_EMPTY_TEXT: Record<DialoguePhase, string> = {
+  0: 'No whispers collected yet. Play puzzles and talk to your animal friends!',
+  1: 'No whispers collected yet. Play puzzles and visit your friends — they have things to say.',
+  2: 'Nothing collected yet. The house is listening for your words.',
+  3: 'The walls are quiet... for now.',
+  4: 'The walls are quiet... for now.',
+  5: 'The walls are quiet now. Every voice rests in its place.',
+};
+
+export function getWhisperGalleryEmptyText(phase: DialoguePhase): string {
+  return WHISPER_GALLERY_EMPTY_TEXT[phase];
+}
+
+// ============================================================================
+// NEXT STREAK MILESTONE — One-line nudge toward the next streak reward
+// ============================================================================
+
+/**
+ * Get a short, phase-toned line describing how far the player is from the
+ * next streak milestone (3/7/14/21/30 days). Returns null once the top
+ * milestone has been reached.
+ */
+export function getNextStreakMilestoneText(
+  phase: DialoguePhase,
+  currentStreak: number,
+): string | null {
+  const next = STREAK_MILESTONES.find(m => m.streak > currentStreak);
+  if (!next) return null;
+
+  const daysLeft = next.streak - currentStreak;
+  const dayWord = daysLeft === 1 ? 'day' : 'days';
+
+  switch (phase) {
+    case 0:
+      return `${daysLeft} more ${dayWord} → +${next.amber} amber!`;
+    case 1:
+      return `${daysLeft} more ${dayWord} to a +${next.amber} amber streak bonus.`;
+    case 2:
+      return `${daysLeft} more ${dayWord}. ${next.amber} amber waits at day ${next.streak}.`;
+    case 3:
+      return `${daysLeft} more ${dayWord}. The pattern counts toward ${next.streak}.`;
+    case 4:
+      return `${daysLeft} more ${dayWord}. The chain wants ${next.streak}.`;
+    case 5:
+    default:
+      return `The chain continues. Day ${next.streak} will come, in time.`;
+  }
 }
 
 // ============================================================================
@@ -2077,4 +2165,61 @@ export function getPitMandatoryText(phase: DialoguePhase): string {
 export function getPitMandatoryCTA(phase: DialoguePhase): string {
   if (phase >= 3) return 'The pit demands your presence';
   return 'Visit the Pit';
+}
+
+// ============================================================================
+// NOTIFICATION PRE-PERMISSION PROMPT — In-app card shown before the system
+// permission dialog, asking to enable the daily puzzle reminder.
+// Tone shifts with phase but stays functional and honest — never deceptive
+// about what is being enabled.
+// ============================================================================
+
+interface NotificationPromptText {
+  title: string;
+  body: string;
+  accept: string;
+  decline: string;
+}
+
+const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = {
+  0: {
+    title: 'Daily reminder?',
+    body: 'Want a gentle nudge when a fresh puzzle is ready? You can change this anytime in Settings.',
+    accept: 'Sounds good',
+    decline: 'Not now',
+  },
+  1: {
+    title: 'A daily reminder?',
+    body: 'We could let you know when a new puzzle is waiting for you. You can change this anytime in Settings.',
+    accept: 'Yes, please',
+    decline: 'Not now',
+  },
+  2: {
+    title: 'Shall we call for you?',
+    body: 'A quiet reminder when the day\'s puzzle is ready — nothing more. You can turn this off anytime in Settings.',
+    accept: 'Remind me',
+    decline: 'Not now',
+  },
+  3: {
+    title: 'A reminder, each day',
+    body: 'The puzzles continue whether you arrive or not. We can remind you when one is ready. Settings can silence this whenever you wish.',
+    accept: 'Remind me',
+    decline: 'Not yet',
+  },
+  4: {
+    title: 'The arrangement keeps its hours',
+    body: 'Each day, a puzzle is prepared. We can tell you when it is ready — that is all this enables. Settings can end it at any time.',
+    accept: 'Tell me',
+    decline: 'Not now',
+  },
+  5: {
+    title: 'The pattern continues',
+    body: 'A new puzzle settles into place each day. We can let you know, if you like. You can change this anytime in Settings.',
+    accept: 'Let me know',
+    decline: 'Not now',
+  },
+};
+
+export function getNotificationPromptText(phase: DialoguePhase): NotificationPromptText {
+  return NOTIFICATION_PROMPT_TEXT[phase];
 }

@@ -15,6 +15,7 @@ import { DialoguePhase } from '../types/homeWorld';
  */
 
 const STORAGE_KEY = 'wordshift_notification_prefs';
+const PROMPTED_KEY = 'wordshift_notification_prompted';
 
 // ============================================================================
 // Types
@@ -99,7 +100,8 @@ const REENGAGEMENT_MESSAGES: Record<number, string[]> = {
 // ============================================================================
 
 let prefsCache: NotificationPreferences | null = null;
-let notificationsModule: any = null;
+let promptedCache: boolean | null = null;
+let notificationsModule: any = undefined;
 
 function getDefaultPrefs(): NotificationPreferences {
   return {
@@ -125,7 +127,29 @@ async function getNotificationsModule(): Promise<any> {
   }
 }
 
-async function requestPermissions(): Promise<boolean> {
+/**
+ * Check the current OS notification permission status WITHOUT prompting.
+ * Returns 'undetermined' if the module is missing or the check fails.
+ */
+export async function getNotificationPermissionStatus(): Promise<'granted' | 'denied' | 'undetermined'> {
+  const mod = await getNotificationsModule();
+  if (!mod) return 'undetermined';
+  try {
+    const { status } = await mod.getPermissionsAsync();
+    if (status === 'granted') return 'granted';
+    if (status === 'denied') return 'denied';
+    return 'undetermined';
+  } catch {
+    return 'undetermined';
+  }
+}
+
+/**
+ * Request notification permission from the OS.
+ * This is the ONLY function that triggers the system permission dialog —
+ * call it from an in-app contextual prompt, never at cold launch.
+ */
+export async function requestNotificationPermission(): Promise<boolean> {
   const mod = await getNotificationsModule();
   if (!mod) return false;
   try {
@@ -134,6 +158,30 @@ async function requestPermissions(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether the in-app notification pre-permission prompt has been shown.
+ */
+export async function hasPromptedForNotifications(): Promise<boolean> {
+  if (promptedCache !== null) return promptedCache;
+  try {
+    const stored = await AsyncStorage.getItem(PROMPTED_KEY);
+    promptedCache = stored === 'true';
+  } catch {
+    promptedCache = false;
+  }
+  return promptedCache;
+}
+
+/**
+ * Mark the in-app notification pre-permission prompt as shown (one-time).
+ */
+export async function markPromptedForNotifications(): Promise<void> {
+  promptedCache = true;
+  try {
+    await AsyncStorage.setItem(PROMPTED_KEY, 'true');
+  } catch {}
 }
 
 // ============================================================================
@@ -182,8 +230,9 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     return;
   }
 
-  const hasPermission = await requestPermissions();
-  if (!hasPermission) return;
+  // Only schedule if permission was already granted — never prompt from here.
+  const permissionStatus = await getNotificationPermissionStatus();
+  if (permissionStatus !== 'granted') return;
 
   const mod = await getNotificationsModule();
   if (!mod) return;
@@ -284,7 +333,9 @@ async function scheduleReengagement(
  */
 export async function resetNotificationPrefs(): Promise<void> {
   prefsCache = null;
+  promptedCache = null;
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
+    await AsyncStorage.removeItem(PROMPTED_KEY);
   } catch {}
 }

@@ -1,17 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PuzzleConfig, Difficulty } from '../types';
-import { PreGeneratedPuzzle, PUZZLE_BANK_HARD } from '../data/puzzleBankHard';
-import { PUZZLE_BANK_REVERSE_HARD } from '../data/puzzleBankReverseHard';
-import { PUZZLE_BANK_REVERSE_MEDIUM_PLUS } from '../data/puzzleBankReverseMediumPlus';
-import { PUZZLE_BANK_REVERSE_EASY } from '../data/puzzleBankReverseEasy';
-import { PUZZLE_BANK_REVERSE_MEDIUM } from '../data/puzzleBankReverseMedium';
-import { PUZZLE_BANK_MEDIUM_PLUS } from '../data/puzzleBankMediumPlus';
-import { PUZZLE_BANK_MEDIUM } from '../data/puzzleBankMedium';
-import { PUZZLE_BANK_EASY } from '../data/puzzleBankEasy';
-import { PUZZLE_BANK_DOUBLE_SHIFT_EASY } from '../data/puzzleBankDoubleShiftEasy';
-import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM } from '../data/puzzleBankDoubleShiftMedium';
-import { PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS } from '../data/puzzleBankDoubleShiftMediumPlus';
-import { PUZZLE_BANK_DOUBLE_SHIFT_HARD } from '../data/puzzleBankDoubleShiftHard';
+import type { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
@@ -23,37 +12,73 @@ const MAX_USED_TRACKED = 500;
 // the general wordHistory hard cooldown (15 puzzles) has expired.
 const BANK_RECENT_THRESHOLD = 50;   // Strong penalty window
 const BANK_MEDIUM_THRESHOLD = 150;  // Moderate penalty window
-const BANK_RECENT_PENALTY = -12;    // Per word seen within BANK_RECENT_THRESHOLD
-const BANK_MEDIUM_PENALTY = -6;     // Per word seen within BANK_MEDIUM_THRESHOLD
-const BANK_NOVEL_BONUS_FULL = 15;   // All words never seen from this bank
-const BANK_NOVEL_BONUS_MOST = 8;    // 3+ novel words out of ~5
+const BANK_RECENT_PENALTY = -18;    // Per word seen within BANK_RECENT_THRESHOLD
+const BANK_MEDIUM_PENALTY = -9;     // Per word seen within BANK_MEDIUM_THRESHOLD
+const BANK_NOVEL_BONUS_FULL = 25;   // All words never seen from this bank
+const BANK_NOVEL_BONUS_MOST = 12;    // 3+ novel words out of ~5
 const BANK_NOVEL_BONUS_SOME = 3;    // 1-2 novel words
 
 // ---------------------------------------------------------------------------
 // Bank Registry — single source of truth for all 12 puzzle banks
+//
+// Bank data is lazily loaded via require() thunks so the ~5.7MB of
+// pre-generated puzzles is parsed only when a bank is first used,
+// not at app startup. require() is synchronous in Metro/Node, so
+// existing synchronous call paths keep working.
 // ---------------------------------------------------------------------------
 
 interface BankRegistryEntry {
   storageKey: string;
-  bank: PreGeneratedPuzzle[];
+  loadBank: () => PreGeneratedPuzzle[];
+  bankData: PreGeneratedPuzzle[] | null;
   cache: string[] | null;
   idToWords: Map<string, string[]> | null;
 }
 
 const BANK_REGISTRY: Record<string, BankRegistryEntry> = {
-  standard:       { storageKey: 'wordshift_played_puzzle_ids',              bank: PUZZLE_BANK_HARD,                 cache: null, idToWords: null },
-  std_easy:       { storageKey: 'wordshift_played_std_easy_puzzle_ids',     bank: PUZZLE_BANK_EASY,                 cache: null, idToWords: null },
-  std_medium:     { storageKey: 'wordshift_played_std_medium_puzzle_ids',   bank: PUZZLE_BANK_MEDIUM,               cache: null, idToWords: null },
-  std_mp:         { storageKey: 'wordshift_played_std_mp_puzzle_ids',       bank: PUZZLE_BANK_MEDIUM_PLUS,          cache: null, idToWords: null },
-  reverse:        { storageKey: 'wordshift_played_reverse_puzzle_ids',      bank: PUZZLE_BANK_REVERSE_HARD,         cache: null, idToWords: null },
-  reverse_easy:   { storageKey: 'wordshift_played_reverse_easy_puzzle_ids', bank: PUZZLE_BANK_REVERSE_EASY,         cache: null, idToWords: null },
-  reverse_medium: { storageKey: 'wordshift_played_reverse_medium_puzzle_ids', bank: PUZZLE_BANK_REVERSE_MEDIUM,     cache: null, idToWords: null },
-  reverse_mp:     { storageKey: 'wordshift_played_reverse_mp_puzzle_ids',   bank: PUZZLE_BANK_REVERSE_MEDIUM_PLUS,  cache: null, idToWords: null },
-  ds_easy:        { storageKey: 'wordshift_played_ds_easy_puzzle_ids',      bank: PUZZLE_BANK_DOUBLE_SHIFT_EASY,    cache: null, idToWords: null },
-  ds_medium:      { storageKey: 'wordshift_played_ds_medium_puzzle_ids',    bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM,  cache: null, idToWords: null },
-  ds_mp:          { storageKey: 'wordshift_played_ds_mp_puzzle_ids',        bank: PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, cache: null, idToWords: null },
-  ds_hard:        { storageKey: 'wordshift_played_ds_hard_puzzle_ids',      bank: PUZZLE_BANK_DOUBLE_SHIFT_HARD,    cache: null, idToWords: null },
+  standard:       { storageKey: 'wordshift_played_puzzle_ids',              loadBank: () => require('../data/puzzleBankHard').PUZZLE_BANK_HARD,                              bankData: null, cache: null, idToWords: null },
+  std_easy:       { storageKey: 'wordshift_played_std_easy_puzzle_ids',     loadBank: () => require('../data/puzzleBankEasy').PUZZLE_BANK_EASY,                              bankData: null, cache: null, idToWords: null },
+  std_medium:     { storageKey: 'wordshift_played_std_medium_puzzle_ids',   loadBank: () => require('../data/puzzleBankMedium').PUZZLE_BANK_MEDIUM,                          bankData: null, cache: null, idToWords: null },
+  std_mp:         { storageKey: 'wordshift_played_std_mp_puzzle_ids',       loadBank: () => require('../data/puzzleBankMediumPlus').PUZZLE_BANK_MEDIUM_PLUS,                 bankData: null, cache: null, idToWords: null },
+  reverse:        { storageKey: 'wordshift_played_reverse_puzzle_ids',      loadBank: () => require('../data/puzzleBankReverseHard').PUZZLE_BANK_REVERSE_HARD,               bankData: null, cache: null, idToWords: null },
+  reverse_easy:   { storageKey: 'wordshift_played_reverse_easy_puzzle_ids', loadBank: () => require('../data/puzzleBankReverseEasy').PUZZLE_BANK_REVERSE_EASY,               bankData: null, cache: null, idToWords: null },
+  reverse_medium: { storageKey: 'wordshift_played_reverse_medium_puzzle_ids', loadBank: () => require('../data/puzzleBankReverseMedium').PUZZLE_BANK_REVERSE_MEDIUM,         bankData: null, cache: null, idToWords: null },
+  reverse_mp:     { storageKey: 'wordshift_played_reverse_mp_puzzle_ids',   loadBank: () => require('../data/puzzleBankReverseMediumPlus').PUZZLE_BANK_REVERSE_MEDIUM_PLUS,  bankData: null, cache: null, idToWords: null },
+  ds_easy:        { storageKey: 'wordshift_played_ds_easy_puzzle_ids',      loadBank: () => require('../data/puzzleBankDoubleShiftEasy').PUZZLE_BANK_DOUBLE_SHIFT_EASY,      bankData: null, cache: null, idToWords: null },
+  ds_medium:      { storageKey: 'wordshift_played_ds_medium_puzzle_ids',    loadBank: () => require('../data/puzzleBankDoubleShiftMedium').PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM,  bankData: null, cache: null, idToWords: null },
+  ds_mp:          { storageKey: 'wordshift_played_ds_mp_puzzle_ids',        loadBank: () => require('../data/puzzleBankDoubleShiftMediumPlus').PUZZLE_BANK_DOUBLE_SHIFT_MEDIUM_PLUS, bankData: null, cache: null, idToWords: null },
+  ds_hard:        { storageKey: 'wordshift_played_ds_hard_puzzle_ids',      loadBank: () => require('../data/puzzleBankDoubleShiftHard').PUZZLE_BANK_DOUBLE_SHIFT_HARD,      bankData: null, cache: null, idToWords: null },
 };
+
+/**
+ * Get the puzzle data for a bank, loading it on first access.
+ */
+function getBank(bankKey: string): PreGeneratedPuzzle[] {
+  const entry = BANK_REGISTRY[bankKey] ?? BANK_REGISTRY['standard'];
+  if (!entry.bankData) {
+    entry.bankData = entry.loadBank();
+  }
+  return entry.bankData;
+}
+
+// Per-bank word frequency — the generator's adjacency bias makes "hub" words
+// (MATER, CATER, LATER...) appear in dozens of puzzles per bank. Selection
+// penalizes them so the long tail of vocabulary actually surfaces.
+const bankWordFrequency = new Map<string, Map<string, number>>();
+
+function getBankWordFrequency(bankKey: string): Map<string, number> {
+  let freq = bankWordFrequency.get(bankKey);
+  if (!freq) {
+    freq = new Map();
+    for (const puzzle of getBank(bankKey)) {
+      for (const word of puzzle.allWords) {
+        freq.set(word, (freq.get(word) ?? 0) + 1);
+      }
+    }
+    bankWordFrequency.set(bankKey, freq);
+  }
+  return freq;
+}
 
 /**
  * Derive a "bank key" from difficulty + variant to route to the correct
@@ -104,13 +129,13 @@ function getStorageConfig(bankKey: string): {
 
 /**
  * Get or build the ID→allWords lookup map for a bank.
- * Built lazily from static bank data on first access.
+ * Built lazily from bank data on first access.
  */
 function getIdToWordsMap(bankKey: string): Map<string, string[]> {
   const entry = BANK_REGISTRY[bankKey] ?? BANK_REGISTRY['standard'];
   if (!entry.idToWords) {
     entry.idToWords = new Map();
-    for (const p of entry.bank) {
+    for (const p of getBank(bankKey)) {
       entry.idToWords.set(p.id, p.allWords);
     }
   }
@@ -156,8 +181,11 @@ async function loadUsedPuzzles(bankKey: string = 'standard'): Promise<string[]> 
     const stored = await AsyncStorage.getItem(config.key);
     if (stored) {
       const parsed = JSON.parse(stored);
-      config.setCache(parsed);
-      return parsed;
+      // Corrupted storage must not poison the played-puzzle tracking
+      if (Array.isArray(parsed)) {
+        config.setCache(parsed);
+        return parsed;
+      }
     }
   } catch {
     // Fall through to empty
@@ -200,13 +228,13 @@ async function markPuzzlePlayed(puzzleId: string, bankKey: string = 'standard'):
  */
 function getBankForSelection(difficulty: Difficulty, variant: PuzzleVariant): PreGeneratedPuzzle[] | null {
   // Only standard, reverse, and double_shift variants have pre-generated banks.
-  // Speed and chain variants generate on-device in real-time.
+  // Speed variant generates on-device in real-time.
   if (variant !== 'standard' && variant !== 'reverse' && variant !== 'double_shift') return null;
 
   const bankKey = getBankKey(difficulty, variant);
-  const entry = BANK_REGISTRY[bankKey];
-  if (!entry) return null;
-  return entry.bank.length > 0 ? entry.bank : null;
+  if (!BANK_REGISTRY[bankKey]) return null;
+  const bank = getBank(bankKey);
+  return bank.length > 0 ? bank : null;
 }
 
 /**
@@ -224,7 +252,8 @@ function scorePuzzleForContext(
   phase: DialoguePhase,
   usedSet: Set<string>,
   recencyMap: Map<string, number>,
-  bankWordRecency: Map<string, number>
+  bankWordRecency: Map<string, number>,
+  wordFrequency: Map<string, number>
 ): number {
   let score = 0;
 
@@ -283,6 +312,15 @@ function scorePuzzleForContext(
     score += BANK_NOVEL_BONUS_MOST;
   } else if (novelWords >= 1) {
     score += BANK_NOVEL_BONUS_SOME;
+  }
+
+  // Hub-word penalty: words the generator over-used across this bank cost
+  // score regardless of play history, so the vocabulary long tail surfaces.
+  for (const word of puzzle.allWords) {
+    const freq = wordFrequency.get(word) ?? 0;
+    if (freq >= 30) score -= 14;
+    else if (freq >= 18) score -= 9;
+    else if (freq >= 10) score -= 4;
   }
 
   // Random jitter (prevents deterministic ordering)
@@ -353,14 +391,14 @@ export async function selectPreGeneratedPuzzle(
   // Score all available puzzles for current context
   const scored = available.map(p => ({
     puzzle: p,
-    score: scorePuzzleForContext(p, phase, usedSet, recencyMap, bankWordRecency),
+    score: scorePuzzleForContext(p, phase, usedSet, recencyMap, bankWordRecency, getBankWordFrequency(bankKey)),
   }));
 
   // Sort by score descending
   scored.sort((a, b) => b.score - a.score);
 
-  // Pick randomly from top 5 (for variety)
-  const topN = Math.min(5, scored.length);
+  // Pick randomly from the top 10 (wider pool = more vocabulary variety)
+  const topN = Math.min(10, scored.length);
   const selected = scored[Math.floor(Math.random() * topN)];
 
   // Mark as played

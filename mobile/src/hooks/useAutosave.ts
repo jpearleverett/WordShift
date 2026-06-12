@@ -39,6 +39,11 @@ export interface AutosaveDeps {
  */
 export function useAutosave(deps: AutosaveDeps): void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Live snapshot so the debounce callback can verify the game is STILL in
+  // progress when it fires — otherwise a save scheduled one render before a
+  // victory could re-write the cleared save with a stale PLAYING board.
+  const depsRef = useRef(deps);
+  depsRef.current = deps;
 
   useEffect(() => {
     if (timerRef.current) {
@@ -48,6 +53,11 @@ export function useAutosave(deps: AutosaveDeps): void {
 
     if (deps.gameState === GameState.PLAYING && deps.currentScreen === 'puzzle') {
       timerRef.current = setTimeout(() => {
+        // Re-check at fire time: the puzzle may have completed (or the player
+        // left the screen) since this save was scheduled.
+        if (depsRef.current.gameState !== GameState.PLAYING || depsRef.current.currentScreen !== 'puzzle') {
+          return;
+        }
         const saveData: Partial<SavedPuzzleState> = {
           rows: deps.rows,
           activeRowIndex: deps.activeRowIndex,
@@ -76,6 +86,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           speedTimerExpireAt: deps.speedTimeRemaining != null
             ? Date.now() + deps.speedTimeRemaining * 1000
             : null,
+          speedTimeRemainingSec: deps.speedTimeRemaining,
           savedAt: Date.now(),
         };
         savePuzzleState(saveData as SavedPuzzleState).catch(() => {});

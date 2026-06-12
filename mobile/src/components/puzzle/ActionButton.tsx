@@ -7,6 +7,8 @@ import {
   Animated,
   Easing,
 } from 'react-native';
+import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
 interface ActionButtonProps {
   icon: string;
@@ -30,22 +32,29 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
 
   useEffect(() => {
     if (!disabled) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0,
-            duration: 1500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
+      // Skip the continuous loop under reduced motion / low-end devices —
+      // hold a static mid-value glow instead.
+      if (getSettingsSync().reducedMotion || shouldSimplifyAnimations()) {
+        glowAnim.setValue(0.5);
+      } else {
+        // Drives only the glow overlay's opacity (native driver)
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(glowAnim, {
+              toValue: 1,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(glowAnim, {
+              toValue: 0,
+              duration: 1500,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+      }
     }
     return () => glowAnim.stopAnimation();
   }, [disabled]);

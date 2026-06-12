@@ -68,8 +68,10 @@ describe('puzzleVariety', () => {
     it('unlocks additional variants by progression bands', () => {
       const origRandom = Math.random;
 
+      // Use a multiple of 10 so the offer gate is guaranteed regardless of
+      // the mocked Math.random (the 12% chance check uses the same mock).
       Math.random = () => 0.99;
-      expect(['reverse', 'double_shift']).toContain(shouldOfferVariant(25, 0)!.variant);
+      expect(['reverse', 'double_shift']).toContain(shouldOfferVariant(30, 0)!.variant);
 
       Math.random = () => 0.9;
       expect(['reverse', 'speed', 'double_shift']).toContain(shouldOfferVariant(60, 0)!.variant);

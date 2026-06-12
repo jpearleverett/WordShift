@@ -12,7 +12,14 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
-import { CandyColors, getOverlayBannerTheme, getPhaseTheme, getTileColor } from '../theme/colors';
+import {
+  CandyColors,
+  getOverlayBannerTheme,
+  getPhaseTheme,
+  getTileColor,
+  PIT_BACKGROUND_COLORS as PIT_BG_COLORS,
+  PIT_DEVOUR_COLORS as DEVOUR_COLORS,
+} from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   getPitOfferAllLabel,
@@ -36,6 +43,7 @@ import {
 } from '../services/wordHarvest';
 import { awardBonusAmber } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
+import { logEvent } from '../services/eventLogger';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
 
@@ -49,14 +57,6 @@ const PIT_DUSK = require('../../assets/environment/pitt_dusk.png');
 const PIT_NIGHT = require('../../assets/environment/pitt_night.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-const PIT_BG_COLORS: Record<number, string> = {
-  0: '#6fb7df',
-  1: '#104c83',
-  2: '#514378',
-  3: '#060612',
-  4: '#1a122a',
-};
 
 function getPitBackground(phase: number) {
   if (phase >= 3) return PIT_NIGHT;
@@ -123,14 +123,6 @@ function getMaxRimParticles(): number {
     case 'high': return 6;
   }
 }
-
-const DEVOUR_COLORS: Record<number, { trail: string; glow: string; glowOpacity: number; burst: string; core: string }> = {
-  0: { trail: '#FFD700', glow: '#FFD700', glowOpacity: 0.35, burst: '#FFE680', core: '#1A1500' },
-  1: { trail: '#F0C050', glow: '#F0C050', glowOpacity: 0.30, burst: '#F5D88A', core: '#1A1500' },
-  2: { trail: '#B088D0', glow: '#9060C0', glowOpacity: 0.25, burst: '#C8A8E8', core: '#0E0520' },
-  3: { trail: '#5A2080', glow: '#3A1060', glowOpacity: 0.20, burst: '#7040A0', core: '#08020F' },
-  4: { trail: '#C03050', glow: '#C03050', glowOpacity: 0.45, burst: '#E05070', core: '#1A0510' },
-};
 
 // Multi-layered concentric glow — creates depth and natural radial falloff
 // Each layer is rendered as a circle then stretched with scaleX for a true ellipse
@@ -1362,6 +1354,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     try {
       const result = await offerBatch(batchId);
       if (!result) return;
+      logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) {
         setDisplayBalance(newBalance);
@@ -1536,6 +1529,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     // Offer all batches atomically first
     const result = await offerAllBatches();
+    logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
     if (result.amberAwarded > 0) {
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) onAmberChange?.(newBalance);

@@ -62,6 +62,13 @@ export const FIRST_COMPLETION_BONUS: { EASY: number; MEDIUM: number; MEDIUM_PLUS
 export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
 
 // ============================================================================
+// OFFERING PIT
+// ============================================================================
+
+/** Pit amber auto-collects through this many puzzles before manual harvest begins. */
+export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
+
+// ============================================================================
 // STREAK
 // ============================================================================
 
@@ -238,7 +245,7 @@ export const MAX_USED_TRACKED = 500;
 // ============================================================================
 
 /** Minimum puzzles solved before daily challenge is unlocked. */
-export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 20;
+export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 5;
 
 // ============================================================================
 // WEEKLY QUESTS

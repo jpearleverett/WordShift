@@ -9,8 +9,11 @@ import {
   Platform,
   StatusBar,
   Alert,
+  Linking,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { CandyColors } from '../theme/colors';
+import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
 import { clearStats } from '../services/starRating';
 import { clearAchievements } from '../services/achievements';
@@ -29,24 +32,55 @@ import { clearWeeklyQuests } from '../services/weeklyQuests';
 import { clearWhisperGallery } from '../services/whisperGallery';
 import { clearChoiceState } from '../services/dialogueChoices';
 import { resetMicroBeats } from '../services/phaseNarrative';
-import { resetNotificationPrefs } from '../services/notifications';
+import {
+  resetNotificationPrefs,
+  getNotificationPrefs,
+  setNotificationPrefs,
+  requestNotificationPermission,
+} from '../services/notifications';
 import { clearRoomUpgrades } from '../services/roomUpgrades';
 
 interface SettingsScreenProps {
   onClose: () => void;
 }
 
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<GameSettings | null>(null);
+  const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
 
   useEffect(() => {
     getSettings().then(setSettings);
+    getNotificationPrefs().then((prefs) => {
+      setDailyRemindersOn(prefs.enabled && prefs.dailyReminderEnabled);
+    });
   }, []);
 
   const handleToggle = async (key: keyof GameSettings, value: boolean) => {
     hapticLight();
     const updated = await updateSetting(key, value);
     setSettings(updated);
+  };
+
+  const handleDailyReminderToggle = async (value: boolean) => {
+    hapticLight();
+    if (value) {
+      setDailyRemindersOn(true);
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        await setNotificationPrefs({ enabled: true, dailyReminderEnabled: true });
+      } else {
+        setDailyRemindersOn(false);
+      }
+    } else {
+      setDailyRemindersOn(false);
+      await setNotificationPrefs({ dailyReminderEnabled: false });
+    }
+  };
+
+  const openLink = (url: string) => {
+    Linking.openURL(url).catch(() => {});
   };
 
   const handleResetData = () => {
@@ -82,6 +116,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             ]);
             const fresh = await getSettings();
             setSettings(fresh);
+            const freshPrefs = await getNotificationPrefs();
+            setDailyRemindersOn(freshPrefs.enabled && freshPrefs.dailyReminderEnabled);
             Alert.alert('Done', 'All data has been reset.');
           },
         },
@@ -157,6 +193,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           </View>
         </View>
 
+        {/* Notifications */}
+        <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
+        <View style={styles.section}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Daily Reminders</Text>
+              <Text style={styles.settingDescription}>Daily puzzle reminder</Text>
+            </View>
+            <Switch
+              value={dailyRemindersOn}
+              onValueChange={handleDailyReminderToggle}
+              trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
+              thumbColor={dailyRemindersOn ? CandyColors.purple.main : CandyColors.gray[100]}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: dailyRemindersOn }}
+            />
+          </View>
+        </View>
+
         {/* Data */}
         <Text style={styles.sectionTitle}>DATA</Text>
         <View style={styles.section}>
@@ -171,9 +226,39 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
         {/* About */}
         <Text style={styles.sectionTitle}>ABOUT</Text>
         <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.aboutRow}
+            onPress={() => openLink(EXTERNAL_LINKS.privacyPolicy)}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy Policy"
+          >
+            <Text style={styles.linkText}>Privacy Policy</Text>
+            <Text style={styles.linkChevron}>{'>'}</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.aboutRow}
+            onPress={() => openLink(EXTERNAL_LINKS.termsOfService)}
+            accessibilityRole="link"
+            accessibilityLabel="Terms of Service"
+          >
+            <Text style={styles.linkText}>Terms of Service</Text>
+            <Text style={styles.linkChevron}>{'>'}</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.aboutRow}
+            onPress={() => openLink(getSupportMailto(APP_VERSION))}
+            accessibilityRole="button"
+            accessibilityLabel="Contact Support"
+          >
+            <Text style={styles.linkText}>Contact Support</Text>
+            <Text style={styles.linkChevron}>{'>'}</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
           <View style={styles.aboutRow}>
             <Text style={styles.aboutLabel}>WordShift</Text>
-            <Text style={styles.aboutValue}>v1.0.0</Text>
+            <Text style={styles.aboutValue}>{`v${APP_VERSION}`}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.aboutRow}>
@@ -288,6 +373,16 @@ const styles = StyleSheet.create({
   },
   aboutValue: {
     fontSize: 14,
+    color: CandyColors.gray[400],
+  },
+  linkText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: CandyColors.purple.main,
+  },
+  linkChevron: {
+    fontSize: 14,
+    fontWeight: '700',
     color: CandyColors.gray[400],
   },
   bottomSpacer: {

@@ -113,9 +113,11 @@ export function useUnlockFlow({
       setShowRoomUnlock(room);
       // Re-check availability when modal opens so puzzle gate info is fresh
       if (nextUnlock && nextUnlock.targetId === room.id) {
-        isUnlockAvailable(nextUnlock.id).then(avail => {
-          setUnlockAvailability(avail);
-        });
+        isUnlockAvailable(nextUnlock.id)
+          .then(avail => {
+            setUnlockAvailability(avail);
+          })
+          .catch(() => {});
       }
       return;
     }

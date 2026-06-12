@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { logEvent } from './eventLogger';
 
 const ONBOARDING_KEY = 'wordshift_onboarding_step';
 
@@ -62,6 +63,12 @@ export async function getOnboardingStep(): Promise<OnboardingStep> {
  */
 export async function setOnboardingStep(step: OnboardingStep): Promise<void> {
   cachedStep = step;
+  // FTUE funnel analytics — fire-and-forget, never blocks the flow
+  logEvent(
+    step === 'complete'
+      ? { type: 'onboarding_complete' }
+      : { type: 'onboarding_step', data: { step } }
+  );
   try {
     await AsyncStorage.setItem(ONBOARDING_KEY, step);
   } catch {}
@@ -98,7 +105,6 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 2: Fox just invited — intro dialogue
   fox_invited: [
     "You opened the door for me. Thank you.\nI'm Ember.",
-    "Now that we're properly met, let me show you what this place is built on.",
     "Words shift. Patterns form. The house grows with every puzzle.",
     "Come on — one quick puzzle together, then we build.",
   ],

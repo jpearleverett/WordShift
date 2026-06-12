@@ -66,9 +66,9 @@ const DAILY_STREAK_GRACE_DAYS = 2;
 
 /**
  * Daily challenge unlock pacing.
- * Hidden until players are settled into the core loop.
+ * Unlocks early (Day-1 retention hook) once the core loop has been tasted.
  */
-export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 20;
+export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 5;
 
 /**
  * Daily challenge unlock condition.

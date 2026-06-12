@@ -1,5 +1,6 @@
 import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
-import { loadProgress, unlockAnimal, unlockRoom, canAfford } from './amberCurrency';
+import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead } from './amberCurrency';
+import { getPhaseStartIndex } from './dialogue/animalDialogueBase';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
 
@@ -767,6 +768,28 @@ export async function isUnlockAvailable(unlockId: string): Promise<{
 /**
  * Attempt to purchase an unlock
  */
+
+/**
+ * Animals unlocked at Phase 2+ skip ahead to their previous phase's dialogue
+ * block: the catch-up intro arc covers their backstory, then their regular
+ * conversation starts one phase behind the present (a little history for
+ * texture) instead of replaying months of bright-days small talk that no
+ * longer matches the world. Never rewinds an existing read position.
+ */
+async function fastForwardLateUnlockDialogue(animalId: string): Promise<void> {
+  const progress = await loadProgress();
+  if (progress.currentPhase < 2) return;
+
+  const animalType = animalId as AnimalType;
+  const animalPhase = getAnimalPhase(progress.currentPhase, animalType);
+  const startPhase = Math.max(0, animalPhase - 1) as DialoguePhase;
+  const startIndex = getPhaseStartIndex(animalType, startPhase);
+  const existing = progress.lastDialogueRead[animalId] ?? 0;
+  if (startIndex > existing) {
+    await markDialogueRead(animalId, startIndex);
+  }
+}
+
 export async function purchaseUnlock(unlockId: string): Promise<{
   success: boolean;
   error?: string;
@@ -790,6 +813,9 @@ export async function purchaseUnlock(unlockId: string): Promise<{
   let success: boolean;
   if (unlock.type === 'character') {
     success = await unlockAnimal(unlock.targetId, unlock.cost);
+    if (success) {
+      await fastForwardLateUnlockDialogue(unlock.targetId);
+    }
   } else {
     success = await unlockRoom(unlock.targetId, unlock.cost);
   }

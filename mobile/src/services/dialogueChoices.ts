@@ -47,6 +47,8 @@ export interface ChoiceState {
   choices: Record<string, PlayerChoice>;
   /** Whether the player has seen ANY choice point */
   hasSeenChoice: boolean;
+  /** Animals whose Phase 4 choice callback has already been shown */
+  phase4CallbackShown?: string[];
 }
 
 // ============================================================================
@@ -352,6 +354,83 @@ async function saveChoiceState(state: ChoiceState): Promise<void> {
 /**
  * Clear choice data (for Settings > Reset All).
  */
+/**
+ * One-time Phase 4 pre-dialogue page: the animal recontextualizes the
+ * player's Phase 3 choice now that the cult is revealed. Marks itself
+ * shown so it never repeats. Returns null when there's nothing to say.
+ */
+export async function getAndMarkPhase4CallbackPage(
+  animalType: string
+): Promise<string | null> {
+  const state = await loadChoiceState();
+  const choice = state.choices[animalType] ?? null;
+  if (!choice) return null;
+  const shown = state.phase4CallbackShown ?? [];
+  if (shown.includes(animalType)) return null;
+  const text = getPhase4ChoiceCallback(animalType, choice);
+  if (!text) return null;
+  state.phase4CallbackShown = [...shown, animalType];
+  await saveChoiceState(state);
+  return text;
+}
+
+/**
+ * Phase 5 (post-revelation) choice callback — woven into each animal's
+ * post-revelation dialogue cycle. Serene, settled; the choice no longer
+ * matters and that is precisely the point.
+ */
+export function getPhase5ChoiceCallback(
+  animalType: string,
+  choice: PlayerChoice | null
+): string | null {
+  if (!choice) return null;
+
+  const callbacks: Record<string, Record<PlayerChoice, string>> = {
+    fox: {
+      ask: 'You asked, once, when asking still felt dangerous. The fire remembers your courage fondly.',
+      refuse: 'You didn\'t want to know, once. The fire holds no grudge. It knew you\'d warm to it.',
+    },
+    pangolin: {
+      ask: 'You asked what was in the recipe. Now you\'ve tasted the finished dish. Was it everything I promised?',
+      refuse: 'You never asked what you were eating. Wise. Some meals are better met with trust.',
+    },
+    owl: {
+      ask: 'You asked about the text. Now you\'re written into it. The cleanest kind of answer.',
+      refuse: 'You closed the book when I offered it. It didn\'t matter. You were already the final chapter.',
+    },
+    axolotl: {
+      ask: 'You asked what swam below. It surfaced. You\'ve met. The water is calm now.',
+      refuse: 'You wouldn\'t look into the deep water. It looked at you anyway, and found you lovely.',
+    },
+    capybara: {
+      ask: 'You requested your file, and I gave it to you complete — even the last page, which was blank then. It isn\'t now.',
+      refuse: 'You declined to read your file. Procedurally irrelevant. You wrote it either way.',
+    },
+    fennec_fox: {
+      ask: 'You asked what I heard coming. Now we both hear it everywhere. Like a heartbeat. Like home.',
+      refuse: 'You covered your ears, in your way. The sound arrived regardless. It was never optional.',
+    },
+    sloth: {
+      ask: 'You asked how long I\'d known. Forever, friend. The same answer the pattern gives.',
+      refuse: 'You didn\'t ask. You didn\'t need to. Some things arrive at their own speed. Like me.',
+    },
+    wombat: {
+      ask: 'You asked where the tunnels led. Now you stand at the end of them. Solid ground, like I promised.',
+      refuse: 'You never looked down the tunnel. That\'s all right. Every path here led to the same depth.',
+    },
+    rabbit: {
+      ask: 'You asked me why I was afraid. Asking was kind. The fear is gone now. I almost miss it.',
+      refuse: 'You let me keep my fear private. Thank you. It\'s quiet now. Everything is.',
+    },
+    red_panda: {
+      ask: 'You asked what I had made peace with. Look up. You\'ve made peace with it too.',
+      refuse: 'You never asked about my peace. You have your own now. They are the same peace.',
+    },
+  };
+
+  return callbacks[animalType]?.[choice] ?? null;
+}
+
 export async function clearChoiceState(): Promise<void> {
   choiceCache = null;
   try {
