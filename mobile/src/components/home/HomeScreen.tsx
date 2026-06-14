@@ -1174,7 +1174,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Journal</Text>
             <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
-              Keep the house's records in one place.
+              Keep the house&apos;s records in one place.
             </Text>
             {onOpenLedger && (
               <TouchableOpacity
@@ -1936,7 +1936,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 ))}
                 {getSacrificeAmounts(progress.amber).length === 0 && (
                   <Text style={[styles.sacrificeNoAmber, { color: dt.subtitleColor }]}>
-                    You don't have enough amber to offer.
+                    You don&apos;t have enough amber to offer.
                   </Text>
                 )}
               </View>

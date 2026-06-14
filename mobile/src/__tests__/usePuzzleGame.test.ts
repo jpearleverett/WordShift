@@ -129,6 +129,7 @@ import { usePuzzleGame, hasAnyValidMove, PuzzleGameState, PuzzleGameActions } fr
  */
 function callHook(): [PuzzleGameState, PuzzleGameActions] {
   rewindHookIndices();
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- test harness drives the hook against a manual React mock
   return usePuzzleGame();
 }
 

@@ -811,6 +811,7 @@ export const Row: React.FC<RowProps> = memo(({
     </Animated.View>
   );
 });
+Row.displayName = 'Row';
 
 const styles = StyleSheet.create({
   rowWrapper: {

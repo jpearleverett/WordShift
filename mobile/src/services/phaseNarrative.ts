@@ -86,9 +86,9 @@ export function getVictoryTitle(stars: number, phase: DialoguePhase): string {
 
 const VICTORY_FEEDBACK: Record<DialoguePhase, { three: string; two: string; one: string }> = {
   0: {
-    three: 'Flawless solve — you nailed it!',
-    two: 'Solid performance — almost perfect!',
-    one: 'Puzzle conquered — keep improving!',
+    three: 'Flawless! The words knew exactly where to go.',
+    two: 'Lovely work — the whole house felt that one land.',
+    one: 'You got there! The puzzle settled happily into place.',
   },
   1: {
     three: 'Elegant solution — you see the patterns.',
@@ -148,6 +148,8 @@ const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
   4: [
     'The void accepts.', 'Letters dissolve and reform.', 'Nothing changes. Everything changes.',
     'Does it matter?', 'Another shift.', '...', 'The silence between words.',
+    'The arrangement notes your move.', 'Another verse written.', 'One step deeper.',
+    'The letters go where they were always going.', 'It is listening.',
   ],
   5: [
     'The weave tightens.', 'Another thread.', 'The pattern knows.',
@@ -196,7 +198,7 @@ const HINT_FALLBACK: Record<DialoguePhase, string> = {
   1: 'Hmm, not the right path. Try undoing.',
   2: 'You\'ve wandered off course. Undo.',
   3: 'Wrong path. Is there a right one?',
-  4: 'Lost. But were you ever found?',
+  4: 'Lost. But the arrangement knows exactly where you are.',
   5: 'The threads tangle. Undo and try again.',
 };
 
@@ -245,7 +247,7 @@ export function getLockedLetterMessage(phase: DialoguePhase): string {
 const NO_VALID_MOVES_MESSAGES: Record<DialoguePhase, string> = {
   0: 'No words fit from here! Undo a move or clear the board to try a fresh path.',
   1: 'Hmm — no word works from here. Undo a move, or clear the board and try another way.',
-  2: 'The letters refuse every path from here. Undo, or clear the board and begin anew.',
+  2: 'The letters refuse every path from here. Even they seem to know this arrangement was wrong. Undo, or clear the board and begin anew.',
   3: 'No word can form from this arrangement. Unmake a move, or clear it all away.',
   4: 'The arrangement admits no further words. Unmake your moves, or begin again.',
   5: 'The weave has closed around this path. Undo a thread, or clear it and start once more.',
@@ -903,7 +905,7 @@ export function getFoxPostTutorialPlayPrompt(phase: number): string {
   if (phase >= 2) {
     return "Head back to puzzles when you're ready. More amber lets us open new rooms and welcome the others in.";
   }
-  return "Play more puzzles and gather amber, okay? I want to invite more friends and keep building this place with you.";
+  return "Play more puzzles and gather amber, okay? I want to invite more friends. The house will feel so much fuller with everyone here.";
 }
 
 export function getFoxSetupSelectorIntroLines(phase: number): string[] {
@@ -1178,8 +1180,9 @@ export function getPersonalizedPhase5Whisper(
     return getAnimalWhisper(5, unlockedAnimals);
   }
 
-  // 40% chance of personalized whisper at Phase 5, otherwise standard pool
-  if (Math.random() < 0.4) {
+  // Personalized whispers are the strongest Phase 5 beat (the game proves it
+  // was watching) — favor them over the standard pool most of the time.
+  if (Math.random() < 0.65) {
     return {
       animalName: name,
       animalType: selectedType,
@@ -1262,9 +1265,9 @@ export function getRitualMicroEvent(
       `The foundation cracked when ${word} was spoken aloud.`,
     ],
     4: [
-      `${word} was the word it was waiting for. The house knows.`,
-      `The keepers felt ${word} in their bones. The arrangement accepts.`,
-      `${word} completes another verse. The shadow stirs.`,
+      `${word} was the word it was waiting for. The arrangement trembles with recognition.`,
+      `The keepers felt ${word} in their bones. It feels closer now.`,
+      `${word} completes another verse. The silence between the words thickens.`,
     ],
   };
 
@@ -1895,6 +1898,8 @@ const PIT_OFFER_RESULT_MESSAGES: Record<DialoguePhase, string[]> = {
   0: [
     'Words offered! You earned {amber} amber.',
     'Nice! {words} words converted to {amber} amber.',
+    '{words} words, {amber} amber. The pit seems pleased!',
+    'Wonderful! The house thanks you for {words} words. Here is {amber} amber.',
   ],
   1: [
     '{words} words released. {amber} amber received.',
@@ -2129,6 +2134,13 @@ export function getFoxPitNudgeLines(targetPhase: DialoguePhase): string[] {
  * Fox's one-time intro lines when Challenge Mode becomes available (after 15 puzzles).
  */
 export function getChallengeIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 5) {
+    return [
+      'The arrangement has infinite depth, friend. Some paths through it are harder than others.',
+      'Challenge Mode strips away the hints you no longer need. The pattern has already shown you everything.',
+      'It waits in the puzzle setup. If you want to face what you helped build, face it bare.',
+    ];
+  }
   if (phase >= 3) {
     return [
       'The patterns grow more complex. There are harder paths, if you dare.',

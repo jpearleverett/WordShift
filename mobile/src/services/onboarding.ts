@@ -138,7 +138,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 6: On pit screen — Fox explains the Offering Pit
   pit_intro: [
     "Here we are. This is the pit — where all your words end up after a puzzle.",
-    "They drift around down here, waiting.\nWhen you offer them, they turn into amber 💎",
+    "They drift around down here, waiting.\nWhen you offer them, they turn into amber — the warm golden kind.",
     "Amber is what builds the house. Every word you shift feeds it a little more.\nThe pit is... always hungry for more.",
     "Go ahead. Tap the words and give them to it.",
   ],
@@ -150,7 +150,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
 
   // Step 8: Back on home screen — explain unlocks and keep playing
   unlock_explained: [
-    "Now you know the cycle.\nSolve puzzles, offer words, earn amber 💎",
+    "Now you know the cycle.\nSolve puzzles, offer words, earn amber.",
     "Amber builds rooms, and rooms let us invite more friends in.",
     "Keep playing and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],

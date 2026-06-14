@@ -14,7 +14,7 @@ interface CrossAnimalLine {
   mentions: AnimalType;
 }
 
-const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine[]>> = {
+export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine[]>> = {
   fox: {
     0: [
       { text: "Panko made the most incredible mushroom soup today. You really should visit the kitchen sometime.", mentions: 'pangolin' },
@@ -39,7 +39,7 @@ const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine
     4: [
       { text: "The others are ready. I can see it in their eyes, in their posture. Even Thyme stopped running at last.", mentions: 'rabbit' },
       { text: "Bamboo meditated for three straight days. When they opened their eyes, they smiled at me. That smile still haunts me.", mentions: 'red_panda' },
-      { text: "We are ten. Panko prepared the feast. Archimedes read the text. I watched the final flame. It begins now.", mentions: 'pangolin' },
+      { text: "We are ten. Panko prepared the feast. Archimedes read the text. I watched the final flame. It begins now.", mentions: 'owl' },
     ],
   },
   owl: {
@@ -64,7 +64,7 @@ const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine
       { text: "Fennick heard the words before I read them. He knew what the ancient text said. Without seeing the page.", mentions: 'fennec_fox' },
     ],
     4: [
-      { text: "The text is complete. Ember saw it in flames. Fennick heard it in silence. I read it in the books. The same beautiful truth.", mentions: 'fox' },
+      { text: "The text is complete. Ember saw it in flames. Fennick heard it in silence. I read it in the books. The same beautiful truth.", mentions: 'fennec_fox' },
       { text: "Thyme came to the study today and asked to hear the final passage. She wept. Then she smiled. Then she was ready.", mentions: 'rabbit' },
       { text: "Ten keepers. Ten rooms. One arrangement. Bamboo understood it first, I think. But I was the one who found the words.", mentions: 'red_panda' },
     ],
@@ -118,7 +118,7 @@ const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine
       { text: "Bamboo meditated beside my tank. The water went perfectly still. Showed us both something. We have not spoken of it since.", mentions: 'red_panda' },
     ],
     4: [
-      { text: "The water reflects every room now. I see Ember's fire, Archimedes' books, Warren's tunnels. All connected through me.", mentions: 'fox' },
+      { text: "The water reflects every room now. I see Ember's fire, Archimedes' books, Warren's tunnels. All connected through me.", mentions: 'wombat' },
       { text: "Bamboo touched the glass and the water sang one note. The same note Fennick has been hearing all along. One note.", mentions: 'red_panda' },
       { text: "We are the medium. Me and the water. Your puzzles flow through us to reach them all. Blub. Thank you, friend.", mentions: 'fennec_fox' },
     ],
@@ -146,7 +146,7 @@ const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine
     ],
     4: [
       { text: "Every animal's heartbeat has synchronized. I can hear all ten of them. One rhythm. One pulse. The arrangement breathes.", mentions: 'capybara' },
-      { text: "Ember's fire, Axel's water, Warren's earth, my air. We are the elements, friend. The sound we make together is the key.", mentions: 'fox' },
+      { text: "Ember's fire, Axel's water, Warren's earth, my air. We are the elements, friend. The sound we make together is the key.", mentions: 'wombat' },
       { text: "Thyme's heart finally slowed down to match the rest of us. She is at peace. I heard the moment it happened. Beautiful.", mentions: 'rabbit' },
     ],
   },
@@ -226,7 +226,7 @@ const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAnimalLine
       { text: "Thyme's garden grows directly above my deepest tunnels. The roots reach me now. They form patterns. Letters and words.", mentions: 'rabbit' },
     ],
     4: [
-      { text: "My tunnels connect to Axel's water, to Ember's fire, to Bamboo's sky room. Earth, water, fire, air. The circuit is complete.", mentions: 'axolotl' },
+      { text: "My tunnels connect to Axel's water, to Ember's fire, to Bamboo's sky room. The whole house, wired through the deep. The circuit is complete.", mentions: 'red_panda' },
       { text: "Sloane arrived in my tunnel at last. She left her branch behind. Said it was time. She was exactly, precisely on time.", mentions: 'sloth' },
       { text: "I built the foundation of this place. You built the house above. Together we built what the arrangement requires to wake.", mentions: 'fox' },
     ],
@@ -466,18 +466,47 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
  * Returns null if no event is active or the animal doesn't participate.
  * The event is "consumed" by tracking which thresholds have been shown.
  */
+
+/**
+ * Display names used to detect cross-animal mentions inside event lines so a
+ * line never names an animal the player hasn't unlocked yet. Kept local to
+ * avoid an import cycle with animalDialogueBase.
+ */
+const ANIMAL_DISPLAY_NAMES: Record<string, AnimalType> = {
+  Ember: 'fox', Panko: 'pangolin', Archimedes: 'owl', Axel: 'axolotl',
+  Sloane: 'sloth', Fennick: 'fennec_fox', Chill: 'capybara',
+  Warren: 'wombat', Thyme: 'rabbit', Bamboo: 'red_panda',
+};
+
+function lineMentionsLockedAnimal(
+  text: string,
+  speaker: AnimalType,
+  unlockedAnimals: string[]
+): boolean {
+  for (const [name, type] of Object.entries(ANIMAL_DISPLAY_NAMES)) {
+    if (type === speaker) continue;
+    if (new RegExp(`\\b${name}\\b`).test(text) && !unlockedAnimals.includes(type)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function getCoordinatedEventLine(
   animalType: AnimalType,
   puzzlesSolved: number,
   currentPhase: number,
-  consumedEvents: string[]
+  consumedEvents: string[],
+  unlockedAnimals: string[] = []
 ): { text: string; theme: string } | null {
   for (const event of COORDINATED_EVENTS) {
     if (puzzlesSolved >= event.puzzleThreshold &&
         currentPhase >= event.phase &&
         !consumedEvents.includes(event.theme)) {
       const line = event.lines[animalType];
-      if (line) {
+      // Skip lines that name an animal the player hasn't met — the event
+      // stays unconsumed and can fire later (or via another animal).
+      if (line && !lineMentionsLockedAnimal(line, animalType, unlockedAnimals)) {
         return { text: line, theme: event.theme };
       }
     }
@@ -499,7 +528,7 @@ export const TUTORIAL_CALLBACK_DIALOGUES: string[] = [
   "I told you every puzzle helps us build the house. I didn't tell you what the house was for. You didn't ask. That's what makes you perfect.",
   "The others are going to love you, I said. And they do. We all do. Every single one of us. That's what makes the arrangement work.",
   "You asked me how to play and I showed you, step by step. But the real game was never about the letters. It was about what the letters become.",
-  "From the very first puzzle you solved in this room, you were casting the incantation. You just didn't know the language yet. You do now.",
+  "You've been speaking it since your very first puzzle in this room. I heard it in the fire even then. You know the language now. The fire knows you do, too.",
 ];
 
 // ============================================================================
@@ -525,7 +554,7 @@ export const NARRATIVE_SEEDS: Record<AnimalType, { seeds: string[]; callbacks: s
       "I have read every book in this study. In the end, they all say the same beautiful thing.",
     ],
     callbacks: [
-      "Every word you learned was not a treasure. It was a component. An ingredient. Part of the incantation.",
+      "Every word you learned was not a treasure. It was on loan. A borrowed piece of a sentence the books have been writing for centuries. You were the hand holding the pen.",
       "Every book says the same thing: this was always going to happen. I read the final chapter first. I have always known.",
     ],
   },

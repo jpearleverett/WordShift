@@ -212,6 +212,7 @@ import { useGamePersistence, VictoryData, PersistenceState, PersistenceActions }
 
 function callHook(): [PersistenceState, PersistenceActions] {
   rewindHookIndices();
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- test harness drives the hook against a manual React mock
   return useGamePersistence();
 }
 

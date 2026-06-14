@@ -371,7 +371,8 @@ export function useDialogueFlow({
           animal.type,
           progress.puzzlesSolved,
           progress.currentPhase,
-          consumed
+          consumed,
+          progress.unlockedAnimals ?? []
         );
         if (coordEvent) {
           pages.push(coordEvent.text);

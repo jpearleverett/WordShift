@@ -221,6 +221,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
     </View>
   );
 }) as React.FC<RoomViewProps>;
+RoomView.displayName = 'RoomView';
 
 const styles = StyleSheet.create({
   container: {

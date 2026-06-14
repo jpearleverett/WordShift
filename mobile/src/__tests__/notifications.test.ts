@@ -3,6 +3,7 @@ import {
   getNotificationPrefs,
   setNotificationPrefs,
   getNotificationMessage,
+  getStreakRiskMessage,
   resetNotificationPrefs,
   scheduleAllNotifications,
   cancelAllNotifications,
@@ -164,6 +165,20 @@ describe('notifications', () => {
       expect(() => getNotificationMessage('daily', 10)).not.toThrow();
       expect(() => getNotificationMessage('reengagement', -5)).not.toThrow();
       expect(() => getNotificationMessage('reengagement', 99)).not.toThrow();
+    });
+
+    it('streak risk messages include the streak length at each phase', () => {
+      for (let phase = 0; phase <= 5; phase++) {
+        const message = getStreakRiskMessage(phase, 7);
+        expect(typeof message).toBe('string');
+        expect(message).toContain('7');
+        expect(message).not.toContain('{streak}');
+      }
+    });
+
+    it('streak risk message clamps out-of-bounds phases', () => {
+      expect(() => getStreakRiskMessage(-1, 3)).not.toThrow();
+      expect(() => getStreakRiskMessage(99, 3)).not.toThrow();
     });
 
     it('returns valid messages for clamped negative phase', () => {
@@ -457,6 +472,38 @@ describe('notifications', () => {
       const granted = await svc.requestNotificationPermission();
       expect(granted).toBe(true);
       expect(expoMock.requestPermissionsAsync).toHaveBeenCalled();
+    });
+
+    it('schedules daily + next-day re-engagement when there is no streak', async () => {
+      const svc = loadWithStatus('granted');
+      await svc.scheduleAllNotifications(0);
+      // daily reminder + re-engagement (no streak-risk without a streak)
+      expect(expoMock.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
+      const reengagement = (expoMock.scheduleNotificationAsync.mock.calls as any[][])[1][0];
+      const triggerDate: Date = reengagement.trigger.date;
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      expect(triggerDate.getDate()).toBe(tomorrow.getDate());
+    });
+
+    it('schedules a streak-risk notification and defers re-engagement when a streak is active', async () => {
+      expoMock = createExpoMock('granted');
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      jest.doMock('../services/amberCurrency', () => ({
+        getFullProgress: jest.fn(() => Promise.resolve({ currentStreak: 5 })),
+      }));
+      const svc = require('../services/notifications');
+
+      await svc.scheduleAllNotifications(2);
+      // daily reminder + streak risk + re-engagement
+      expect(expoMock.scheduleNotificationAsync).toHaveBeenCalledTimes(3);
+      const bodies = (expoMock.scheduleNotificationAsync.mock.calls as any[][]).map(
+        (c) => c[0].content.body as string
+      );
+      expect(bodies.some(b => b.includes('5'))).toBe(true);
+
+      jest.dontMock('../services/amberCurrency');
     });
   });
 });

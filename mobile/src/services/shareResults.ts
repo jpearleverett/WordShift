@@ -1,4 +1,5 @@
 import { Share, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { incrementShareCount } from './achievements';
 
@@ -173,6 +174,47 @@ export function generateShareText(result: ShareableResult): string {
   return framed.join('\n');
 }
 
+const SHARE_BONUS_KEY = 'wordshift_share_bonus_date';
+
+/** Amber credited for the first completed share each day */
+export const DAILY_SHARE_BONUS_AMBER = 5;
+
+function localDayKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+}
+
+/**
+ * Whether today's share bonus is still unclaimed (for UI hints).
+ */
+export async function isDailyShareBonusAvailable(): Promise<boolean> {
+  try {
+    const last = await AsyncStorage.getItem(SHARE_BONUS_KEY);
+    return last !== localDayKey();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Credit a small amber bonus for the first completed share of the day.
+ * Returns the amount awarded (0 if already claimed today or on failure).
+ */
+export async function maybeAwardDailyShareBonus(): Promise<number> {
+  try {
+    const dayKey = localDayKey();
+    const last = await AsyncStorage.getItem(SHARE_BONUS_KEY);
+    if (last === dayKey) return 0;
+    await AsyncStorage.setItem(SHARE_BONUS_KEY, dayKey);
+    // Lazy require keeps this module free of an amberCurrency import cycle
+    const { awardBonusAmber } = require('./amberCurrency');
+    await awardBonusAmber(DAILY_SHARE_BONUS_AMBER, 'daily_share');
+    return DAILY_SHARE_BONUS_AMBER;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Share puzzle result via system share sheet
  */
@@ -193,6 +235,7 @@ export async function sharePuzzleResult(result: ShareableResult): Promise<boolea
 
     if (shareResult.action === Share.sharedAction) {
       await incrementShareCount();
+      await maybeAwardDailyShareBonus();
       return true;
     }
     return false;

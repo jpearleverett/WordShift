@@ -145,7 +145,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                     {' '}Phase {entry.phase}
                   </Text>
                   <Text style={[styles.entryText, { color: textColor }]}>
-                    "{entry.text}"
+                    &ldquo;{entry.text}&rdquo;
                   </Text>
                 </View>
               ))}

@@ -159,7 +159,7 @@ export const POST_REVELATION_DIALOGUES: Record<AnimalType, string[]> = {
     "The water is warm now. It's been cold my whole life and now it's finally, finally warm. Like someone turned the heater on for the whole ocean.",
     "I can see through the water to somewhere else entirely. It's not scary over there. It looks like the home I always dreamed about.",
     "Regeneration was always the real point. Not of limbs or organs. Of everything. Of the whole world. I see that now.",
-    "Blub. But a different kind of blub. A perfect, final blub. The blub that contains all the other blubs inside it.",
+    "Blub. But not a sound anymore. A frequency. A color. One last blub with all the others folded inside it.",
     "I never grew up. I understand now that I was waiting. Staying young so I could see this with fresh eyes. With wonder.",
     "The bubbles don't pop anymore. They just float upward and become part of the ceiling. Like tiny glass memories.",
     "I tried to regenerate a tail yesterday. Instead I grew something that doesn't have a name yet. It's beautiful though.",
@@ -199,7 +199,7 @@ export const POST_REVELATION_DIALOGUES: Record<AnimalType, string[]> = {
     "Sit with me one more time. The water is warm. The water was always warm. We just couldn't feel it until now.",
     "I filed the final report. Subject: completion. Status: permanent. Recommended action: none. None required. None possible.",
     "My desk is clean for the first time in years. Not because I tidied it — because the work is done. Actually done.",
-    "The spreadsheets balanced themselves. Every column, every row. The numbers add up to a word I can't pronounce but can feel.",
+    "The spreadsheets balanced themselves. Every column, every row. My hand shook when I closed the ledger. Only once. I noted that too.",
     "I schedule nothing now. Every moment is the correct moment. My calendar is blank and completely full at the same time.",
     "The hot spring overflowed. It filled the office, the hallways, the whole house. No one complained. Everyone just... floated.",
   ],
@@ -277,7 +277,7 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
   fox: {
     2: [
       "You're here at last. I've been watching the fire for a long time, waiting for you.",
-      "The fire burns differently now. The flames speak in colors I haven't seen before. Everything is still warm, though. Everything is fine.",
+      "The fire burns differently now. The flames speak in colors I haven't seen before. It says everything is fine. I've decided to believe it.",
       "The others told me about you. About your puzzles. About what happens to the words when you touch them.",
       "Sit with me by the fire. It has stories to tell. They are not all warm ones anymore.",
     ],
@@ -306,7 +306,7 @@ export const CATCHUP_INTRO_DIALOGUES: Record<AnimalType, Record<number, string[]
       "Ember's letter said: come now, before the sky changes. I cooked the whole way here. It kept my claws from shaking.",
       "Welcome to the kitchen. It's been preparing for you. Not me — the kitchen itself has been getting ready.",
       "I curl into a ball less often now. There's no hiding from what lives in this house anymore.",
-      "The recipe I follow came from Archimedes' oldest book. The ingredients aren't food. They're puzzles.",
+      "The recipe I follow came out of a book older than any of us. The ingredients aren't food. They're puzzles.",
       "You've come a long way to reach me. I can smell it on you — the scent of a hundred words arranged.",
     ],
     4: [

@@ -43,15 +43,15 @@ const ALL_ANIMAL_TYPES: AnimalType[] = [
 ];
 
 // Expected dialogue counts per phase (from CLAUDE.md):
-// Phase 0: 12, Phase 1: 14, Phase 2: 10, Phase 3: 15, Phase 4: 15 = 66 total
+// Phase 0: 12, Phase 1: 14, Phase 2: 11 (incl. question-web hook), Phase 3: 15, Phase 4: 15 = 67 total
 const EXPECTED_DIALOGUE_COUNTS_BY_PHASE: Record<number, number> = {
   0: 12,
   1: 14,
-  2: 10,
+  2: 11,
   3: 15,
   4: 15,
 };
-const EXPECTED_TOTAL_DIALOGUES_PER_ANIMAL = 66;
+const EXPECTED_TOTAL_DIALOGUES_PER_ANIMAL = 67;
 const EXPECTED_POST_REVELATION_PER_ANIMAL = 10;
 
 // ---------------------------------------------------------------------------

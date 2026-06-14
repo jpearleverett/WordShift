@@ -150,7 +150,7 @@ mobile/
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG
 │       ├── phaseNarrative.ts    # ALL phase-aware text (victory, moves, hints, loading, etc.)
 │       ├── phaseEvents.ts       # Phase transition cinematic events
-│       ├── achievements.ts      # 34 achievements across 5 categories
+│       ├── achievements.ts      # 34 achievements across 5 categories, each grants one-time amber
 │       ├── weeklyQuests.ts      # Weekly quest system (4 rotating quests)
 │       ├── puzzleVariety.ts     # Puzzle variant configs + unlock requirements
 │       ├── whisperGallery.ts    # Collectible whisper archive
@@ -299,6 +299,8 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 - Streak grace period: 2 days. Streak freeze: 50 amber (or free once per 14 days)
 - Streak milestones: 3/7/14/21/30 days → 15/30/50/65/100 amber
 - Puzzle count milestones (10, 15, 25, 50... up to 350)
+- Achievement rewards: each of the 34 achievements grants one-time amber (10-100, `rewardAmber` in achievements.ts)
+- Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus` in shareResults.ts; hinted on the VictoryModal share button)
 
 ### House Building (Bottom-Up)
 
@@ -329,17 +331,20 @@ Late unlocks have puzzle-count gates to prevent amber surplus outrunning narrati
 | Rabbit | Thyme | Anxious, garden patio | Anxious because they understand | Lagging (-1) |
 | Red Panda | Bamboo | Zen, bamboo attic | Spiritual leader, at peace | Lagging (-1) |
 
-**Awareness tiers**: Vanguard animals are +1 phase ahead, Lagging are -1 behind. `getAnimalPhase(globalPhase, animalType)` applies offset.
+**Awareness tiers**: Vanguard animals are +1 phase ahead, Lagging are -1 behind. `getAnimalPhase(globalPhase, animalType)` applies offset. Narratively the lagging tier lags *publicly, not privately* — Sloane and Bamboo have always known; they simply speak late.
+
+**Canon pronouns** (established by in-dialogue references — keep consistent): Ember she/her, Panko she/her, Archimedes he/him, Axel he/him, Chill he/him, Fennick he/him, Sloane she/her, Warren he/him, Thyme she/her, Bamboo they/them.
 
 ### Dialogue System
 
-**660+ base dialogues** (66 per animal) + **100 post-revelation** (10 per animal):
-- Phase 0: 12, Phase 1: 14, Phase 2: 10, Phases 3-4: 15 each, Phase 5: 10 each
+**670 base dialogues** (67 per animal) + **100 post-revelation** (10 per animal):
+- Phase 0: 12, Phase 1: 14, Phase 2: 11 (incl. question-web hook), Phases 3-4: 15 each, Phase 5: 10 each
+- Counts are enforced by `configValidation.ts` (`EXPECTED_DIALOGUE_COUNTS_BY_PHASE`) — update it when adding lines
 
 **Session mechanics**: Max dialogues per session phase-aware (3-6). Cooldown: 2-5 puzzles between sessions. Grace period for newly unlocked animals.
 
 **Rich interaction layers**:
-- **Cross-animal references**: Phase-scaled frequency (20% → 60%). Vanguard animals get guaranteed first ref at each new phase. Dynamic refs filter by `unlockedAnimals`; static base lines that name another animal carry `requiresAnimals` tags and are skipped by `resolveDialogueIndex()` until that animal is unlocked — no animal is ever mentioned before the player has met them.
+- **Cross-animal references**: Phase-scaled frequency (20% → 60%). Vanguard animals get guaranteed first ref at each new phase. Dynamic refs filter by `unlockedAnimals` (multi-name lines must set `mentions` to the *latest-unlocking* animal named — sequential unlocks guarantee the rest); static base lines that name another animal carry `requiresAnimals` tags and are skipped by `resolveDialogueIndex()` until that animal is unlocked; coordinated event lines are name-scanned against `unlockedAnimals` at delivery time (`getCoordinatedEventLine`). All of these invariants are enforced by `dialogueGating.test.ts` — no animal is ever mentioned before the player has met them.
 - **Question web** (Phase 2): each animal has one `*_2_w1` hook line pointing the player at another animal's mystery ("Ask Warren what he found"), gated on that animal being unlocked.
 - **Trigger word reactions**: Puzzle words (FLAME, VOID, etc.) queue per-animal, consumed on visit.
 - **Sacrifice reactions** (Phase 4+): Animals comment on amber offerings.
@@ -476,7 +481,7 @@ Phase 4+: voluntary amber destruction. No gameplay benefit. Phase-aware response
 Phase 2+: one cosmetic enhancement per room (10 total, 75-150 amber). Phase-aware descriptions.
 
 ### Notifications (`notifications.ts`)
-Local push: daily reminders (phase-aware morning messages) + re-engagement (2-day inactivity). Phase 5 has distinct serene tone.
+Local push: daily reminders (phase-aware morning messages), streak-at-risk reminders (7pm the next missed day when streak ≥ 2, copy via `getStreakRiskMessage(phase, streak)`), and re-engagement (6pm; next day for non-streak players, day after the streak warning for streak holders — an escalation ladder). Each app session reschedules everything, so reminders only fire on genuinely missed days. Phase 5 has distinct serene tone.
 
 **Permission flow**: `scheduleAllNotifications()` never prompts — it only schedules when permission is already granted. The OS dialog is triggered solely by `requestNotificationPermission()`, reached two ways: the one-time contextual prompt after the player's 3rd+ victory (App.tsx `maybePromptForNotifications`, copy from `getNotificationPromptText()`), or the Daily Reminders toggle in Settings. The prompt result is logged as a `notification_permission_result` event.
 
@@ -570,8 +575,8 @@ Edit `calculateStars()` in `starRating.ts`
 - Status bar padding: `Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60`
 
 ### Adding achievements
-1. Add to `ACHIEVEMENTS` array in `achievements.ts` with `id`, `title`, `description`, `icon`, `category`, `check`
-2. `check` receives `AchievementCheckState`
+1. Add to `ACHIEVEMENTS` array in `achievements.ts` with `id`, `title`, `description`, `icon`, `category`, `rewardAmber`, `check`
+2. `check` receives `AchievementCheckState`; `rewardAmber` is credited once via `awardBonusAmber` when the achievement unlocks (shown in AchievementToast)
 3. Add test in `achievements.test.ts`
 
 ### Adding animals

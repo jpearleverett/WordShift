@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { Achievement } from '../services/achievements';
+import { AmberInline } from './AmberInline';
 
 interface AchievementToastProps {
   achievement: Achievement | null;
@@ -71,7 +72,7 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
       ]}
       pointerEvents="none"
       accessibilityLiveRegion="polite"
-      accessibilityLabel={`Achievement unlocked: ${achievement.title}. ${achievement.description}`}
+      accessibilityLabel={`Achievement unlocked: ${achievement.title}. ${achievement.description}.${achievement.rewardAmber > 0 ? ` Earned ${achievement.rewardAmber} amber.` : ''}`}
     >
       <View style={[
         styles.inner,
@@ -87,6 +88,11 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
           ]}>Achievement Unlocked!</Text>
           <Text style={styles.title}>{achievement.title}</Text>
         </View>
+        {achievement.rewardAmber > 0 && (
+          <Text style={styles.reward}>
+            +{achievement.rewardAmber} <AmberInline size={14} />
+          </Text>
+        )}
       </View>
     </Animated.View>
   );
@@ -133,5 +139,11 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: CandyColors.white,
     marginTop: 2,
+  },
+  reward: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: CandyColors.yellow.main,
+    marginLeft: 8,
   },
 });
