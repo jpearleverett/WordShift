@@ -1482,6 +1482,44 @@ function MainApp() {
             </View>
           )}
 
+          {/* Time's Up overlay — speed variant only (GAME_OVER is set solely on time-up) */}
+          {puzzle.gameState === GameState.GAME_OVER && (
+            <View style={styles.loadingOverlay} accessibilityRole="alert">
+              <View style={styles.loadingBox}>
+                <Text style={styles.loadingGlyph}>{persistence.currentPhase >= 3 ? '◈' : '⏱'}</Text>
+                <Text style={styles.timeUpText}>
+                  {puzzle.message || getSpeedTimeUpMessage(persistence.currentPhase)}
+                </Text>
+                <View style={styles.timeUpButtonRow}>
+                  <Pressable
+                    style={styles.timeUpButtonPrimary}
+                    onPress={() => {
+                      hapticLight();
+                      setRitualEchoWords([]);
+                      puzzleActions.startNewGame();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Try again with a new puzzle"
+                  >
+                    <Text style={styles.timeUpButtonText}>Try Again</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.timeUpButtonSecondary}
+                    onPress={() => {
+                      hapticLight();
+                      setCurrentScreen('home');
+                      puzzleActions.setGameState(GameState.IDLE);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Return home"
+                  >
+                    <Text style={styles.timeUpButtonTextSecondary}>Home</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          )}
+
           <ScrollView
             contentContainerStyle={styles.rowsContainer}
             showsVerticalScrollIndicator={false}

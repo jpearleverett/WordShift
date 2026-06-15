@@ -51,25 +51,46 @@ export interface SyncStatus {
 // ============================================================================
 
 /** All AsyncStorage keys that should be included in cloud saves */
+// Keys are the ACTUAL AsyncStorage keys written by the services (verified against
+// each service's STORAGE_KEY constant). Device-specific keys (wordshift_device_id,
+// wordshift_install_id), the local analytics buffer (wordshift_event_log), and the
+// sync-status meta key are intentionally excluded.
 const SYNC_KEYS = [
-  'wordshift_progress',
+  // Core progression & economy
+  'wordshift_home_progress',
+  'wordshift_amber_transactions',
   'wordshift_star_stats',
   'wordshift_achievements',
+  'wordshift_room_upgrades',
+  // Streaks / sharing
   'wordshift_share_count',
+  'wordshift_share_bonus_date',
+  // Puzzle history & in-progress state
   'wordshift_word_history',
-  'wordshift_daily_state',
+  'wordshift_word_harvest',
+  'wordshift_in_progress_puzzle',
+  // Daily challenge & quests
+  'wordshift_daily_challenge',
+  'wordshift_weekly_quests',
+  'wordshift_daily_quests',
+  // Narrative state
   'wordshift_dialogue_sessions',
+  'wordshift_dialogue_choices',
+  'wordshift_whisper_gallery',
+  'wordshift_sacrifices',
+  // Settings, onboarding & one-time intro flags
   'wordshift_settings',
+  'wordshift_notification_prefs',
   'wordshift_onboarding_step',
   'wordshift_tutorial_completed',
   'wordshift_schema_version',
-  'wordshift_weekly_quests',
-  'wordshift_daily_quests',
-  'wordshift_whisper_gallery',
-  'wordshift_sacrifices',
-  'wordshift_notification_prefs',
-  'wordshift_in_progress_puzzle',
-  'wordshift_word_harvest',
+  'wordshift_notification_prompted',
+  'wordshift_challenge_intro_seen',
+  'wordshift_daily_challenge_intro_seen',
+  'wordshift_journal_intro_seen',
+  'wordshift_setup_selector_intro_seen',
+  'wordshift_pit_harvest_intro_seen',
+  'wordshift_micro_beats_seen',
 ];
 
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';

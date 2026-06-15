@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
 import { getWeekId } from './weeklyQuests';
+import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal } from './dateUtils';
 import {
   HomeWorldProgress,
   AmberTransaction,
@@ -69,21 +70,18 @@ function getDefaultProgress(): HomeWorldProgress {
 const VARIANT_REPEAT_DECAY = _VARIANT_REPEAT_DECAY;
 
 /**
- * Get today's date as ISO string (YYYY-MM-DD)
+ * Get today's date as a LOCAL-day YYYY-MM-DD string.
+ * Local (not UTC) so streaks bucket by the player's calendar day.
  */
 function getTodayDateString(): string {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+  return getLocalDateString();
 }
 
 /**
- * Check if a date string is yesterday
+ * Check if a date string is yesterday (local calendar day)
  */
 function isYesterday(dateString: string): boolean {
-  const date = new Date(dateString);
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  return date.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0];
+  return dateString === getLocalDateStringDaysAgo(1);
 }
 
 /**
@@ -91,10 +89,7 @@ function isYesterday(dateString: string): boolean {
  * Returns true if the date is 1 to STREAK_RESET_DAYS days ago
  */
 function isWithinStreakGracePeriod(dateString: string): boolean {
-  const date = new Date(dateString);
-  const today = new Date();
-  const diffMs = today.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = daysAgoLocal(dateString);
   return diffDays >= 1 && diffDays <= STREAK_BONUSES.STREAK_RESET_DAYS;
 }
 

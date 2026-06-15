@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { generateLocalPuzzle } from './localGenerator';
+import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal } from './dateUtils';
 
 const STORAGE_KEY = 'wordshift_daily_challenge';
 
@@ -42,20 +43,18 @@ function getDefaultProgress(): DailyChallengeProgress {
 }
 
 /**
- * Get today's date as YYYY-MM-DD string
+ * Get today's date as a LOCAL-day YYYY-MM-DD string.
+ * Local (not UTC) so daily streaks bucket by the player's calendar day.
  */
 export function getTodayString(): string {
-  const now = new Date();
-  return now.toISOString().split('T')[0];
+  return getLocalDateString();
 }
 
 /**
- * Get yesterday's date as YYYY-MM-DD string
+ * Get yesterday's local-day date as YYYY-MM-DD string
  */
 function getYesterdayString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().split('T')[0];
+  return getLocalDateStringDaysAgo(1);
 }
 
 /**
@@ -103,10 +102,7 @@ export function getDailyChallengeUnlockProgress(
  * Returns true if the date is 1 to DAILY_STREAK_GRACE_DAYS days ago
  */
 function isWithinDailyGracePeriod(dateString: string): boolean {
-  const date = new Date(dateString);
-  const today = new Date();
-  const diffMs = today.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = daysAgoLocal(dateString);
   return diffDays >= 1 && diffDays <= DAILY_STREAK_GRACE_DAYS;
 }
 
