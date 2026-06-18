@@ -247,6 +247,48 @@ export const appStyles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.2,
   },
+  timeUpText: {
+    marginTop: 10,
+    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '800',
+    color: CandyColors.purple.main,
+    textAlign: 'center',
+    maxWidth: 240,
+  },
+  timeUpButtonRow: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 12,
+  },
+  timeUpButtonPrimary: {
+    backgroundColor: CandyColors.green.main,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderBottomWidth: 3,
+    borderBottomColor: CandyColors.green.shadow,
+  },
+  timeUpButtonSecondary: {
+    backgroundColor: CandyColors.gray[200],
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderBottomWidth: 3,
+    borderBottomColor: CandyColors.gray[400],
+  },
+  timeUpButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: CandyColors.white,
+    letterSpacing: 0.3,
+  },
+  timeUpButtonTextSecondary: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: CandyColors.gray[700],
+    letterSpacing: 0.3,
+  },
 
   // Controls
   controls: {

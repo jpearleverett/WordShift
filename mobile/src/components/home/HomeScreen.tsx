@@ -96,6 +96,7 @@ import {
 } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
+import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
 import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines } from '../../services/phaseNarrative';
 import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
 import { hapticLight, hapticSelection } from '../../services/haptics';
@@ -745,12 +746,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     if (!progress || !progress.currentStreak || progress.currentStreak <= 0) return false;
     const last = progress.lastPlayDate;
     if (!last) return false;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
     if (last === today) return false;
-    const lastDate = new Date(last);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays >= 1;
+    return daysAgoLocal(last) >= 1;
   }, [progress?.currentStreak, progress?.lastPlayDate]);
 
   const currentPhase = progress?.currentPhase ?? 0;

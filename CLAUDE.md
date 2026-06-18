@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
-- The full suite has ~1,000 tests across 35 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,040 tests across 37 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -166,16 +166,19 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning + migrations (v3)
 │       ├── configValidation.ts  # Configuration data validation
 │       ├── telemetry.ts         # Optional remote event/crash uploader (disabled by default)
+│       ├── dateUtils.ts          # Local-day date helpers (streak/daily bucketing — NEVER UTC/toISOString)
 │       ├── settings.ts, haptics.ts, audio.ts, eventLogger.ts
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
 │       ├── homeScenePan.ts, shareResults.ts
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,000 tests, 35 suites
+├── src/__tests__/               # ~1,040 tests, 37 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
-├── eas.json                     # EAS build profiles (development/preview/production)
+├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source (buildNumber/versionCode), autoIncrement on production. `submit.production` still needs real store credentials before `eas submit`.
 └── eslint.config.js             # ESLint 9 flat config
 ```
+
+> **CI**: `.github/workflows/ci.yml` (repo root) runs `npm ci` → typecheck → lint → test on every PR and on push to `main`. Keep it green.
 
 ## Game Mechanics
 
@@ -204,7 +207,7 @@ Player-selected from the setup menu. Persisted as preferred variant.
 
 - **Reverse Shift** (unlock: 8 puzzles): Play down then back up. Forward-pass letters stay locked (cumulative locking). All served from pre-generated banks with `reverseSolution` for hints.
 - **Double Shift** (unlock: 25 puzzles): Move 2 letters per step. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. All words are 5 letters (W=5). Difficulty by row count: EASY=3, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. 1.65x amber multiplier.
-- **Speed Shift** (unlock: 35 puzzles): Timed run with difficulty-aware timers (EASY 65s → HARD 48s). The clock **pauses while the app is backgrounded** (AppState listener in `useSpeedTimer`) and resumes from the saved remaining seconds after a relaunch (`speedTimeRemainingSec` in autosave; legacy `speedTimerExpireAt` still restores as a fallback). Time-up shows `getSpeedTimeUpMessage(phase)` with a warning haptic + sound.
+- **Speed Shift** (unlock: 35 puzzles): Timed run with difficulty-aware timers (EASY 65s → HARD 48s). The clock **pauses while the app is backgrounded** (AppState listener in `useSpeedTimer`) and resumes from the saved remaining seconds after a relaunch (`speedTimeRemainingSec` in autosave; legacy `speedTimerExpireAt` still restores as a fallback). Time-up sets `GameState.GAME_OVER` (warning haptic + sound) and shows a **"Time's Up" overlay** in App.tsx with the phase-aware `getSpeedTimeUpMessage(phase)` and two CTAs: **Try Again** (new puzzle) and **Home**. `GAME_OVER` is set *only* on speed time-up.
 - **Chain Shift** (design idea, NOT implemented): 3 linked puzzles where each final word becomes the next starting word. No type, config, or unlock exists in code.
 
 ### Pre-Generated Puzzle Banks
@@ -486,7 +489,7 @@ Local push: daily reminders (phase-aware morning messages), streak-at-risk remin
 **Permission flow**: `scheduleAllNotifications()` never prompts — it only schedules when permission is already granted. The OS dialog is triggered solely by `requestNotificationPermission()`, reached two ways: the one-time contextual prompt after the player's 3rd+ victory (App.tsx `maybePromptForNotifications`, copy from `getNotificationPromptText()`), or the Daily Reminders toggle in Settings. The prompt result is logged as a `notification_permission_result` event.
 
 ### Cloud Save (`cloudSave.ts`)
-Client-side sync layer with pluggable `CloudProvider` interface. Currently `NoOpProvider`. `collectLocalSaveData()` / `restoreFromCloudData()`.
+Client-side sync layer with pluggable `CloudProvider` interface. Currently `NoOpProvider`. `collectLocalSaveData()` / `restoreFromCloudData()`. `SYNC_KEYS` lists the **actual** AsyncStorage keys each service writes (e.g. `wordshift_home_progress`, not `wordshift_progress`) — keep it in sync when adding a persisted key; device-specific keys (`wordshift_device_id`/`install_id`), the local analytics buffer (`wordshift_event_log`), and the sync-status meta key are intentionally excluded. **Not deliverable until a real backend replaces `NoOpProvider`** (the Patron's-Key cloud-save promise depends on this).
 
 ## Asset System
 
@@ -550,6 +553,7 @@ mobile/assets/
 - Component tests use `jest.mock('react-native', ...)` stubs (Node env, no renderer)
 - Performance monitor tests mock `requestAnimationFrame`, `cancelAnimationFrame`, `performance.now`
 - Date-sensitive tests must build dates from local components (`new Date(2026, 1, 9)`), never ISO strings (`new Date('2026-02-09')` parses as UTC midnight → previous local day in timezones behind UTC)
+- **Day-bucketing must use `services/dateUtils.ts`** (`getLocalDateString`, `getLocalDateStringDaysAgo`, `parseLocalDate`, `daysAgoLocal`) — these derive the calendar day from LOCAL components. Never reintroduce `toISOString().split('T')[0]` for streaks, daily challenge, or "played today" logic (it buckets by UTC and corrupts streaks for sub-UTC timezones). `amberCurrency.ts`, `dailyChallenge.ts`, and `HomeScreen` streak-at-risk all route through this helper.
 - Tests whose code path calls `logEvent` should `jest.mock('../services/eventLogger')` so the 5s debounced flush timer can't fire after teardown
 - Phase-threshold tests must use `PHASE_THRESHOLDS` values from `constants/gameBalance.ts` ([0, 20, 65, 150, 235]) — don't hardcode stale balance numbers
 

@@ -132,11 +132,11 @@ describe('cloudSave', () => {
     });
 
     it('collects stored sync keys', async () => {
-      await AsyncStorage.setItem('wordshift_progress', JSON.stringify({ amber: 100 }));
+      await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ amber: 100 }));
       await AsyncStorage.setItem('wordshift_star_stats', JSON.stringify({ total: 50 }));
 
       const data = await collectLocalSaveData();
-      expect(data.data['wordshift_progress']).toBeDefined();
+      expect(data.data['wordshift_home_progress']).toBeDefined();
       expect(data.data['wordshift_star_stats']).toBeDefined();
     });
 
@@ -153,7 +153,7 @@ describe('cloudSave', () => {
 
     it('collects all relevant sync keys when present', async () => {
       const syncKeys = [
-        'wordshift_progress',
+        'wordshift_home_progress',
         'wordshift_star_stats',
         'wordshift_achievements',
         'wordshift_share_count',
@@ -179,10 +179,10 @@ describe('cloudSave', () => {
 
     it('preserves exact string values from storage', async () => {
       const value = JSON.stringify({ amber: 42, streak: 7 });
-      await AsyncStorage.setItem('wordshift_progress', value);
+      await AsyncStorage.setItem('wordshift_home_progress', value);
 
       const data = await collectLocalSaveData();
-      expect(data.data['wordshift_progress']).toBe(value);
+      expect(data.data['wordshift_home_progress']).toBe(value);
     });
   });
 
@@ -197,7 +197,7 @@ describe('cloudSave', () => {
         timestamp: Date.now(),
         deviceId: 'test_device',
         data: {
-          'wordshift_progress': JSON.stringify({ amber: 500 }),
+          'wordshift_home_progress': JSON.stringify({ amber: 500 }),
           'wordshift_star_stats': JSON.stringify({ total: 200 }),
         },
       };
@@ -205,7 +205,7 @@ describe('cloudSave', () => {
       const success = await restoreFromCloudData(cloudData);
       expect(success).toBe(true);
 
-      const progress = await AsyncStorage.getItem('wordshift_progress');
+      const progress = await AsyncStorage.getItem('wordshift_home_progress');
       expect(JSON.parse(progress!).amber).toBe(500);
 
       const stats = await AsyncStorage.getItem('wordshift_star_stats');
@@ -223,19 +223,19 @@ describe('cloudSave', () => {
     });
 
     it('overwrites existing local data', async () => {
-      await AsyncStorage.setItem('wordshift_progress', JSON.stringify({ amber: 100 }));
+      await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ amber: 100 }));
 
       const cloudData: CloudSaveData = {
         version: 1,
         timestamp: Date.now(),
         deviceId: 'test',
         data: {
-          'wordshift_progress': JSON.stringify({ amber: 999 }),
+          'wordshift_home_progress': JSON.stringify({ amber: 999 }),
         },
       };
 
       await restoreFromCloudData(cloudData);
-      const progress = await AsyncStorage.getItem('wordshift_progress');
+      const progress = await AsyncStorage.getItem('wordshift_home_progress');
       expect(JSON.parse(progress!).amber).toBe(999);
     });
 
@@ -256,13 +256,13 @@ describe('cloudSave', () => {
         timestamp: Date.now(),
         deviceId: 'remote',
         data: {
-          wordshift_progress: '"progress_data"',
+          wordshift_home_progress: '"progress_data"',
           wordshift_achievements: '"achievement_data"',
         },
       };
 
       await restoreFromCloudData(cloudData);
-      expect(await AsyncStorage.getItem('wordshift_progress')).toBe('"progress_data"');
+      expect(await AsyncStorage.getItem('wordshift_home_progress')).toBe('"progress_data"');
       expect(await AsyncStorage.getItem('wordshift_achievements')).toBe('"achievement_data"');
     });
   });
@@ -319,13 +319,13 @@ describe('cloudSave', () => {
     });
 
     it('includes local data in upload', async () => {
-      await AsyncStorage.setItem('wordshift_progress', '{"test": true}');
+      await AsyncStorage.setItem('wordshift_home_progress', '{"test": true}');
       const mockUpload = jest.fn(async (_d?: any) => true);
       setCloudProvider(createMockProvider({ upload: mockUpload }));
 
       await uploadToCloud();
       const passedData = mockUpload.mock.calls[0][0];
-      expect(passedData.data['wordshift_progress']).toBe('{"test": true}');
+      expect(passedData.data['wordshift_home_progress']).toBe('{"test": true}');
     });
 
     it('clears pending changes on successful upload', async () => {
@@ -364,7 +364,7 @@ describe('cloudSave', () => {
         version: 1,
         timestamp: Date.now(),
         deviceId: 'cloud_device',
-        data: { 'wordshift_progress': JSON.stringify({ amber: 777 }) },
+        data: { 'wordshift_home_progress': JSON.stringify({ amber: 777 }) },
       };
 
       setCloudProvider(createMockProvider({ download: async () => cloudData }));
@@ -372,7 +372,7 @@ describe('cloudSave', () => {
       const result = await downloadFromCloud();
       expect(result).toBe(true);
 
-      const progress = await AsyncStorage.getItem('wordshift_progress');
+      const progress = await AsyncStorage.getItem('wordshift_home_progress');
       expect(JSON.parse(progress!).amber).toBe(777);
     });
 
@@ -516,7 +516,7 @@ describe('cloudSave', () => {
 
   describe('integration', () => {
     it('round-trips data through upload and download', async () => {
-      await AsyncStorage.setItem('wordshift_progress', JSON.stringify({ level: 42 }));
+      await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ level: 42 }));
 
       let capturedData: CloudSaveData | null = null;
       const mock = createMockProvider({
@@ -538,7 +538,7 @@ describe('cloudSave', () => {
       const result = await downloadFromCloud();
       expect(result).toBe(true);
 
-      const progress = await AsyncStorage.getItem('wordshift_progress');
+      const progress = await AsyncStorage.getItem('wordshift_home_progress');
       expect(JSON.parse(progress!).level).toBe(42);
     });
   });
