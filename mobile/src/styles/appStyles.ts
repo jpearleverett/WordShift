@@ -350,6 +350,14 @@ export const appStyles = StyleSheet.create({
   speedTimerTextUrgent: {
     color: '#FFE0E0',
   },
+  speedRoundText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFE9B0',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginTop: 2,
+  },
   variantBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
     paddingHorizontal: 8,

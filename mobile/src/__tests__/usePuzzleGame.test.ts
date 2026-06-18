@@ -209,6 +209,32 @@ describe('usePuzzleGame', () => {
     });
   });
 
+  describe('startDailyGame', () => {
+    test('starts a standard, playable board from the daily words', () => {
+      let [, actions] = callHook();
+      actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], 'daily hint', 6);
+
+      const [state] = callHook();
+      expect(state.rows).toHaveLength(3);
+      expect(state.rows[0].originalWord).toBe('PLANET');
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.currentWordLength).toBe(6);
+      expect(state.currentVariant).toBe('standard');
+      expect(state.hint).toBe('daily hint');
+    });
+
+    test('uses standard mode with unlimited undos even after challenge mode', () => {
+      let [, actions] = callHook();
+      // Simulate the player having been in challenge mode previously.
+      actions.setGameMode('challenge');
+      actions.startDailyGame(['PLANET', 'PLATES'], undefined, 6);
+
+      const [state] = callHook();
+      expect(state.gameMode).toBe('standard');
+      expect(state.undosRemaining).toBe(Infinity);
+    });
+  });
+
   describe('handleLetterPress', () => {
     function setupGameWithLetters() {
       resetHookState();

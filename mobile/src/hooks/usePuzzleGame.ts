@@ -138,10 +138,18 @@ export interface PuzzleGameActions {
     completedWords: string[];
     formedWord?: string;
     variant?: PuzzleVariant;
+    /** True on the reverse-shift move that completes the descent (midpoint). */
+    reverseMidpoint?: boolean;
   } | null>;
   handleUndo: () => void;
   handleHint: () => void;
   handleNextLevel: () => void;
+  /**
+   * Start a Daily Challenge from pre-generated words. Always a standard,
+   * hint-enabled board (rewards as HARD). Deliberately does NOT mutate the
+   * player's chosen difficulty preference.
+   */
+  startDailyGame: (words: string[], puzzleHint: string | undefined, wordLength: number) => void;
   setShowRules: (show: boolean) => void;
   setShowDifficultyMenu: (show: boolean) => void;
   setShowConfetti: (show: boolean) => void;
@@ -491,6 +499,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
         setMessage(getVariantInstruction(config, currentPhase, selectedDifficulty));
+      } else if (variant !== 'standard') {
+        // The requested variant couldn't be generated and was downgraded to a
+        // standard puzzle. Tell the player instead of silently swapping it.
+        setMessage(
+          currentPhase >= 3
+            ? 'The arrangement could not sustain that pattern — a plain offering instead.'
+            : 'That puzzle style wasn\'t available — here\'s a standard puzzle instead.'
+        );
       }
     } catch (localErr) {
       console.log("Local generation failed, using fallback:", localErr);
@@ -516,6 +532,24 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
     }
   }, [difficulty, initGame, gameMode, currentPhase, generatePuzzleForVariant, selectedVariant]);
+
+  // Daily Challenge bypasses the bank/generation path: words are supplied by
+  // the seeded daily generator. Always standard mode (hints allowed) with
+  // unlimited undos. Difficulty state is left untouched so the player's
+  // preferred difficulty survives the daily run.
+  const startDailyGame = useCallback((
+    words: string[],
+    puzzleHint: string | undefined,
+    wordLength: number
+  ) => {
+    setGameMode('standard');
+    applyBoard(words, puzzleHint, undefined, wordLength, {
+      resetPerformance: true,
+      variant: 'standard',
+    });
+    setUndosRemaining(Infinity);
+    setMessage(getStartMessage(currentPhase));
+  }, [applyBoard, currentPhase]);
 
   const handleLetterPress = useCallback((letter: Letter, rowIndex: number) => {
     if (gameState !== GameState.PLAYING) return;
@@ -686,6 +720,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     completedWords: string[];
     formedWord?: string;
     variant?: PuzzleVariant;
+    reverseMidpoint?: boolean;
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
@@ -737,7 +772,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setDoubleShiftPhase('pick2');
       setError(null);
       setIsProcessing(false);
-      return null; // Not completed yet — still need to pick and drop second letter
+      // Return a (non-null) result with no formedWord. The first letter is now
+      // placed but the word isn't complete, so this routes App.tsx to the
+      // positive drop-feedback path (catch bounce + haptic) rather than the
+      // null -> "invalid drop" error path, while skipping ritual-echo/dread
+      // tracking (which only fire when formedWord is present).
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [] };
     }
 
     // --- Standard validation (single shift OR double shift drop2) ---
@@ -874,7 +914,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     // Reverse Shift: descend to bottom, then return to row 0.
     if (moveDirection === 'down') {
+      let reachedMidpoint = false;
       if (activeRowIndex === maxForwardSourceIndex) {
+        reachedMidpoint = true;
         setMoveDirection('up');
         setActiveRowIndex(rows.length - 1);
         if (!hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation)) {
@@ -896,7 +938,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
-      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
+      return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr, reverseMidpoint: reachedMidpoint };
     }
 
     // Returning upward in reverse mode.
@@ -1162,6 +1204,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const actions: PuzzleGameActions = {
     initGame,
     startNewGame,
+    startDailyGame,
     handleLetterPress,
     handleSlotPress,
     handleUndo,

@@ -120,7 +120,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Good. Now drop it into the glowing slot below.",
   ],
   puzzle_tutorial_valid_move: [
-    "There it is — that little click when a word falls into place.\nKeep going, all the way down.",
+    "There it is — that little click when a word falls into place.\nMade a wrong move? Tap undo, no harm done. Stuck? Tap hint.\nKeep going, all the way down.",
   ],
   puzzle_tutorial_invalid: [
     "Hmm, that didn't land quite right.\nTry undoing and picking a different spot.",
@@ -152,6 +152,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   unlock_explained: [
     "Now you know the cycle.\nSolve puzzles, offer words, earn amber.",
     "Amber builds rooms, and rooms let us invite more friends in.",
+    "Come back each day, too.\nA daily visit keeps the warmth in — and the house remembers who tends it.",
     "Keep playing and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],
 };

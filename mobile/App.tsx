@@ -42,6 +42,7 @@ import {
   hasSeenPitHarvestIntro,
   markPitHarvestIntroSeen,
   consumePendingVariantTutorial,
+  checkFreeStreakFreeze,
 } from './src/services/amberCurrency';
 import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
@@ -64,6 +65,7 @@ import {
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
+import { generateDailyPuzzle, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone } from './src/services/dailyChallenge';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
@@ -81,7 +83,7 @@ import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
 import { estimateSlotIndex } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import { offerBatch } from './src/services/wordHarvest';
@@ -193,9 +195,18 @@ function MainApp() {
 
   // Guard: pit-resume useEffect should only fire on initial mount
   const pitResumeCheckedRef = useRef(false);
+  const freeFreezeCheckedRef = useRef(false);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
+
+  // True while the player is in a Daily Challenge run (drives autosave tagging,
+  // victory recording, and the VictoryModal "Daily Challenge Complete" header).
+  const [isPlayingDaily, setIsPlayingDaily] = useState(false);
+
+  // Speed-variant escalation: consecutive speed wins increment this, shortening
+  // each subsequent clock. Reset on time-up or whenever a fresh run begins.
+  const [speedRound, setSpeedRound] = useState(0);
 
   // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
@@ -266,6 +277,7 @@ function MainApp() {
   // Speed timer for speed-variant puzzles
   const onSpeedTimeUp = useCallback(() => {
     setPuzzleGameState(GameState.GAME_OVER);
+    setSpeedRound(0); // Failing the clock resets the escalation ladder.
     hapticWarning();
     soundInvalidMove();
     setPuzzleMessage(getSpeedTimeUpMessage(persistence.currentPhase));
@@ -281,16 +293,23 @@ function MainApp() {
       stopSpeedTimer();
       return;
     }
-    const limit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
+    const baseLimit = getVariantTimeLimitForDifficulty(puzzle.currentVariant, puzzle.difficulty)
       ?? getVariantTimeLimit(puzzle.currentVariant)
       ?? 60;
-    const initialRemaining = restoredSpeedTimeRef.current ?? limit;
+    // Escalate pressure across a speed streak: each consecutive win trims the
+    // clock, floored so it never becomes impossible.
+    const escalatedLimit = Math.max(
+      SPEED_ESCALATION_MIN_SEC,
+      baseLimit - speedRound * SPEED_ESCALATION_STEP_SEC
+    );
+    const initialRemaining = restoredSpeedTimeRef.current ?? escalatedLimit;
     restoredSpeedTimeRef.current = null;
     startSpeedTimer(initialRemaining);
   }, [
     puzzle.currentVariant,
     puzzle.gameState,
     puzzle.difficulty,
+    speedRound,
     startSpeedTimer,
     stopSpeedTimer,
   ]);
@@ -316,7 +335,7 @@ function MainApp() {
   // Auto-save puzzle state during active play
   useAutosave({
     currentScreen,
-    isPlayingDaily: false,
+    isPlayingDaily,
     rows: puzzle.rows,
     activeRowIndex: puzzle.activeRowIndex,
     selectedLetter: puzzle.selectedLetter,
@@ -389,6 +408,27 @@ function MainApp() {
       }
     }
   }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
+
+  // Free streak freeze: grant one every 14 days (and one on first launch).
+  // Runs once per session after boot. Granted silently during onboarding;
+  // afterwards a gentle notice tells the player their streak is protected.
+  useEffect(() => {
+    if (!onboardingFlow.onboardingReady || freeFreezeCheckedRef.current) return;
+    freeFreezeCheckedRef.current = true;
+    (async () => {
+      try {
+        const granted = await checkFreeStreakFreeze();
+        if (granted && !onboardingFlow.isOnboarding) {
+          Alert.alert(
+            'Free Streak Freeze',
+            'Your streak is protected for one missed day. Keep the chain alive.'
+          );
+        }
+      } catch {
+        // Non-critical — never block launch on a freeze grant.
+      }
+    })();
+  }, [onboardingFlow.onboardingReady, onboardingFlow.isOnboarding]);
 
   // Onboarding tutorial guidance: exact source letter + target slot from solver steps.
   const tutorialGuidance = useMemo(() => {
@@ -544,6 +584,8 @@ function MainApp() {
   const handlePlayPuzzle = useCallback((difficulty?: Difficulty) => {
     hapticLight();
     soundTap();
+    setIsPlayingDaily(false);
+    setSpeedRound(0);
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
@@ -605,11 +647,39 @@ function MainApp() {
   const handleGoHome = useCallback(() => {
     hapticLight();
     puzzlesSinceHomeVisit.current = 0;
+    setIsPlayingDaily(false);
+    setSpeedRound(0);
     transitionTo('home', () => {
       puzzleActions.setGameState(GameState.IDLE);
       puzzleActions.setShowConfetti(false);
     });
   }, [puzzleActions, transitionTo]);
+
+  // Start the Daily Challenge (seeded, always HARD: 6-letter words, 5 rows).
+  const handleStartDaily = useCallback((_difficulty: Difficulty) => {
+    hapticLight();
+    soundTap();
+    persistenceActions.refreshStats();
+    setRitualEchoWords([]);
+    orchestrationActions.setCompletionCoda(null);
+    setIsPlayingDaily(true);
+    setSpeedRound(0);
+    transitionTo('puzzle', async () => {
+      puzzleActions.setGameState(GameState.LOADING);
+      puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
+      try {
+        const daily = await generateDailyPuzzle();
+        puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength);
+        logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true } });
+        maybeShowSetupSelectorIntro().catch(() => {});
+      } catch {
+        // Daily generation failed — fall back to a standard HARD puzzle so the
+        // player is never stranded on a loading screen.
+        setIsPlayingDaily(false);
+        await puzzleActions.startNewGame('HARD');
+      }
+    });
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -640,6 +710,10 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
+      // Speed streak: a completed speed puzzle ratchets up the next clock.
+      if (hasVariantModifier(puzzle.currentVariant, 'speed')) {
+        setSpeedRound(prev => prev + 1);
+      }
       // Clear mid-puzzle save on completion
       clearPuzzleState().catch(() => {});
 
@@ -648,14 +722,46 @@ function MainApp() {
       hapticSuccess();
 
       const victory = await persistenceActions.recordVictory(
-        puzzle.difficulty,
+        // Daily Challenge always rewards as HARD regardless of the player's
+        // chosen difficulty preference (which is left untouched during a daily).
+        isPlayingDaily ? 'HARD' : puzzle.difficulty,
         result.hintsUsed,
         result.invalidAttempts,
         result.gameMode,
         result.completedWords,
         result.variant || 'standard',
-        false
+        isPlayingDaily
       );
+
+      // Record Daily Challenge completion + streak milestone (deferred toast).
+      if (isPlayingDaily) {
+        try {
+          const before = await getDailyStatus();
+          const dailyProgress = await recordDailyCompletion(
+            victory.earnedStars,
+            result.hintsUsed,
+            result.invalidAttempts
+          );
+          logEvent({
+            type: 'daily_completed',
+            data: { stars: victory.earnedStars, streak: dailyProgress.currentStreak },
+          });
+          const milestone = checkDailyStreakMilestone(
+            dailyProgress.currentStreak,
+            before.streak,
+            persistence.currentPhase
+          );
+          if (milestone) {
+            const newBalance = await awardBonusAmber(milestone.amber, 'daily_streak_milestone');
+            persistenceActions.setAmberBalance(newBalance);
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(`${milestone.message} (+${milestone.amber} amber)`);
+            }, 1100);
+          }
+        } catch {
+          // Daily recording is non-critical — never block the victory flow.
+        }
+      }
 
       let finalVictory = victory;
       const shouldAutoCollectVictory = (
@@ -856,6 +962,13 @@ function MainApp() {
         }
       }
 
+      // Reverse-shift midpoint: mark the descent-complete milestone with a
+      // distinct celebratory haptic so the return leg feels like a second act
+      // rather than a continuation.
+      if (result.reverseMidpoint) {
+        hapticSuccess();
+      }
+
       // Track formed word for in-puzzle ritual echo chain
       if (result.formedWord) {
         setRitualEchoWords(prev => [...prev, result.formedWord!]);
@@ -1010,6 +1123,7 @@ function MainApp() {
 
   const handleNextLevel = useCallback(() => {
     hapticLight();
+    setIsPlayingDaily(false);
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
@@ -1035,6 +1149,7 @@ function MainApp() {
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
+    setIsPlayingDaily(false);
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
@@ -1059,10 +1174,10 @@ function MainApp() {
       const moveCount = puzzle.rows.length - 1;
       sharePuzzleResult({
         stars: victoryFlow.victoryData!.earnedStars,
-        difficulty: puzzle.difficulty,
+        difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
         hintsUsed: puzzle.hintsUsed,
         invalidAttempts: puzzle.invalidAttempts,
-        isDaily: false,
+        isDaily: isPlayingDaily,
         moveCount,
         wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
         animalWhisper: orchestration.whisper?.text,
@@ -1093,6 +1208,7 @@ function MainApp() {
     hapticLight();
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
+    setSpeedRound(0);
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions]);
 
@@ -1104,6 +1220,7 @@ function MainApp() {
     soundTap();
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
+    setSpeedRound(0);
     puzzleActions.setSelectedVariant(variant);
     puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
   }, [
@@ -1119,6 +1236,7 @@ function MainApp() {
     hapticMedium();
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
+    setSpeedRound(0);
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
     puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions]);
@@ -1247,6 +1365,7 @@ function MainApp() {
             <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
             <HomeScreen
               onPlayPuzzle={handlePlayPuzzle}
+              onStartDaily={handleStartDaily}
               onAmberChange={persistenceActions.setAmberBalance}
               onOpenSettings={() => transitionTo('settings')}
               onOpenStats={() => transitionTo('stats')}
@@ -1460,6 +1579,14 @@ function MainApp() {
             ]}>
               {'\u23F1'} {speedTimer.speedTimeRemaining}s
             </Text>
+            {speedRound > 0 && (
+              <Text
+                style={styles.speedRoundText}
+                accessibilityLabel={`Speed round ${speedRound + 1}, faster clock`}
+              >
+                {'\uD83D\uDD25'} Round {speedRound + 1}
+              </Text>
+            )}
           </View>
         )}
 
@@ -1628,10 +1755,10 @@ function MainApp() {
         <VictoryModal
           visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete')}
           earnedStars={puzzle.earnedStars}
-          difficulty={puzzle.difficulty}
+          difficulty={isPlayingDaily ? 'HARD' : puzzle.difficulty}
           phase={persistence.currentPhase}
           phaseTransitionPending={persistence.pendingPhaseTransition != null}
-          isPlayingDaily={false}
+          isPlayingDaily={isPlayingDaily}
           victoryData={victoryFlow.victoryData}
           completionCoda={orchestration.completionCoda}
           cumulativeStats={persistence.cumulativeStats}

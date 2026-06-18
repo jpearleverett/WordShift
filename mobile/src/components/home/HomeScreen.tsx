@@ -98,6 +98,8 @@ import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
 import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines } from '../../services/phaseNarrative';
+import { DailyChallengeCard } from '../DailyChallengeCard';
+import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
@@ -106,6 +108,8 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface HomeScreenProps {
   onPlayPuzzle: (difficulty?: Difficulty) => void;
+  /** Start the Daily Challenge (seeded HARD puzzle). */
+  onStartDaily?: (difficulty: Difficulty) => void;
   onAmberChange?: (newBalance: number) => void;
   onOpenSettings?: () => void;
   onOpenStats?: () => void;
@@ -126,6 +130,7 @@ interface HomeScreenProps {
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
+  onStartDaily,
   onAmberChange,
   onOpenSettings,
   onOpenStats,
@@ -817,6 +822,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </View>
 
         <View style={styles.headerRight}>
+          {!isOnboarding && onStartDaily &&
+            isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
+            <DailyChallengeCard
+              onStartDaily={onStartDaily}
+              phase={progress.currentPhase}
+            />
+          )}
           {!isOnboarding && onOpenPit && (
             <Animated.View style={shouldHighlightPitButton ? {
               transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
