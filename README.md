@@ -35,7 +35,7 @@ npm run lint
 ## Docs
 
 - [CLAUDE.md](./CLAUDE.md) — architecture, systems, conventions (read this first)
-- [docs/SHIP_ASSESSMENT.md](./docs/SHIP_ASSESSMENT.md) — pre-launch audit + remediation log
+- [docs/SHIP_ASSESSMENT.md](./docs/SHIP_ASSESSMENT.md) — current ship-readiness assessment (state, gaps, what's wired)
 - [docs/privacy-policy.md](./docs/privacy-policy.md) · [docs/terms.md](./docs/terms.md) — legal (served via GitHub Pages)
 - [MONETIZATION_PLAN.md](./MONETIZATION_PLAN.md) — post-launch plan (nothing implemented in 1.0)
 
