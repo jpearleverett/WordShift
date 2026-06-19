@@ -48,6 +48,9 @@
           "color": "#667EEA"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "telemetryEndpoint": ""
+    }
   }
 }

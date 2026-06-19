@@ -162,35 +162,43 @@ export async function isDailyCompleted(): Promise<boolean> {
   return progress.lastCompletedDate === getTodayString();
 }
 
-// Guard against concurrent daily puzzle generation
-let dailyGenerationInProgress: Promise<{
+export interface DailyPuzzleData {
   words: string[];
   hint?: string;
   difficulty: Difficulty;
   date: string;
   wordLength: number;
-}> | null = null;
+}
+
+// Guard against concurrent daily puzzle generation
+let dailyGenerationInProgress: Promise<DailyPuzzleData> | null = null;
+
+// Resolved-puzzle cache, keyed by local day. Lets a pre-warm at launch
+// make the daily appear instantly on tap (the seeded 6-letter / 5-row
+// generation can take a beat on low-end devices).
+let dailyPuzzleCache: DailyPuzzleData | null = null;
 
 /**
  * Generate the daily challenge puzzle
  * Uses the date as a seed so all players get the same puzzle.
  * Temporarily replaces Math.random with a seeded PRNG during generation.
  * Guarded against concurrent calls — subsequent callers await the first generation.
+ * Memoized per local day — a same-day repeat call returns the cached result.
  */
-export async function generateDailyPuzzle(): Promise<{
-  words: string[];
-  hint?: string;
-  difficulty: Difficulty;
-  date: string;
-  wordLength: number;
-}> {
+export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
+  const today = getTodayString();
+
+  // Return today's already-generated puzzle instantly.
+  if (dailyPuzzleCache && dailyPuzzleCache.date === today) {
+    return dailyPuzzleCache;
+  }
+
   // If generation is already in progress, await the existing result
   if (dailyGenerationInProgress) {
     return dailyGenerationInProgress;
   }
 
   const generationPromise = (async () => {
-    const today = getTodayString();
     const difficulty = getDailyDifficulty(today);
     const rng = seededRandom(`wordshift-daily-${today}`);
 
@@ -204,13 +212,15 @@ export async function generateDailyPuzzle(): Promise<{
         wordLength: 6,
         targetRows: 5,
       });
-      return {
+      const result: DailyPuzzleData = {
         words: puzzle.words,
         hint: puzzle.hint,
         difficulty,
         date: today,
         wordLength: puzzle.wordLength ?? 6,
       };
+      dailyPuzzleCache = result;
+      return result;
     } finally {
       Math.random = originalRandom;
       dailyGenerationInProgress = null;
@@ -219,6 +229,21 @@ export async function generateDailyPuzzle(): Promise<{
 
   dailyGenerationInProgress = generationPromise;
   return generationPromise;
+}
+
+/**
+ * Pre-generate today's daily puzzle in the background so it's ready instantly
+ * when the player taps the Daily Challenge card. Safe to call repeatedly
+ * (no-op once cached for the day) and fire-and-forget (errors are swallowed —
+ * the on-tap path will retry and surface any real failure).
+ */
+export function prewarmDailyPuzzle(): void {
+  const today = getTodayString();
+  if (dailyPuzzleCache && dailyPuzzleCache.date === today) return;
+  if (dailyGenerationInProgress) return;
+  generateDailyPuzzle().catch(() => {
+    // Best-effort warm-up; the real generation happens again on tap if needed.
+  });
 }
 
 /**
@@ -385,6 +410,8 @@ export function checkDailyStreakMilestone(
  */
 export async function clearDailyProgress(): Promise<void> {
   progressCache = getDefaultProgress();
+  dailyPuzzleCache = null;
+  dailyGenerationInProgress = null;
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch {}

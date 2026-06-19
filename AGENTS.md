@@ -12,6 +12,10 @@ WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase 
 - **Important:** When loading in Chrome in this VM, you must open DevTools (F12) **before** navigating to `localhost:8081`, otherwise Chrome's renderer will crash with error code 4 on the large bundle.
 - The web deps (`react-dom`, `react-native-web`) must be installed via `npx expo install react-dom react-native-web` (already done in the update script).
 
+### Setup
+
+- `npm install` is allowed. Fresh containers may start without `node_modules` — run `cd mobile && npm install` (or `npm ci` when `package-lock.json` is unchanged) once before tests/typecheck/lint.
+
 ### Testing
 
 - See `CLAUDE.md` for the full test commands. Key: always use `npm test` (not `npx jest`).
