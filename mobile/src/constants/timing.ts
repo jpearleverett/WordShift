@@ -37,6 +37,11 @@ export const AUTOSAVE_DEBOUNCE_MS = 120;
 
 // === SPEED TIMER ===
 export const SPEED_TIMER_INTERVAL_MS = 250;
+// Speed-variant escalation: each consecutive speed win shortens the next
+// puzzle's clock by this many seconds, never dropping below the floor. This
+// keeps a speed streak tense instead of letting skilled players idle.
+export const SPEED_ESCALATION_STEP_SEC = 5;
+export const SPEED_ESCALATION_MIN_SEC = 30;
 
 // === MICRO-BEAT ===
 export const MICRO_BEAT_GLITCH_DELAY_MS = 600;

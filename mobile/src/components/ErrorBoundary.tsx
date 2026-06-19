@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { reportError } from '../services/errorReporting';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -24,7 +25,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Feed React render errors into the central crash pipeline so they reach
+    // the event log (and any future Sentry/Crashlytics forwarder), not just
+    // the dev console.
+    reportError(error, {
+      source: 'react_error_boundary',
+      metadata: { componentStack: errorInfo.componentStack?.slice(0, 500) },
+    });
   }
 
   handleReset = () => {

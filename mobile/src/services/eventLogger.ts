@@ -11,6 +11,7 @@ export type EventType =
   | 'puzzle_generation_failed'
   | 'puzzle_started'
   | 'puzzle_restored'
+  | 'daily_completed'
   | 'unlock_purchased'
   | 'room_upgrade_purchased'
   | 'dialogue_started'
