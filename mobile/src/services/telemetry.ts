@@ -8,14 +8,43 @@ import { getAllStoredEvents, removeOldestEvents } from './eventLogger';
  * collector. Dependency-free: uses the global fetch available in
  * React Native.
  *
- * Set TELEMETRY_ENDPOINT to an HTTPS collector URL (e.g. a self-hosted
- * collector or a PostHog capture endpoint) to enable uploads.
- * Empty string = fully disabled (the default) — no network traffic occurs.
+ * Enable uploads by setting an HTTPS collector URL (e.g. a self-hosted
+ * collector or a PostHog capture endpoint) WITHOUT a code change: add
+ *   "extra": { "telemetryEndpoint": "https://collector.example/capture" }
+ * to app.json (or inject it via an EAS env-driven app.config). Empty /
+ * unset = fully disabled (the default) — no network traffic occurs.
+ * Remember to update the privacy policy before enabling.
  */
-const TELEMETRY_ENDPOINT = '';
-
 const INSTALL_ID_KEY = 'wordshift_install_id';
-const APP_VERSION = '1.0.0';
+
+/**
+ * Read Expo config `extra` lazily so this module still loads in Node test
+ * environments (where expo-constants isn't resolvable). Mirrors the
+ * lazy-require pattern used for react-native below.
+ */
+function getConfigExtra(): Record<string, unknown> {
+  try {
+    const Constants = require('expo-constants').default;
+    return (Constants?.expoConfig?.extra as Record<string, unknown>) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Resolve the configured collector URL ('' when unset/disabled). */
+function getTelemetryEndpoint(): string {
+  const endpoint = getConfigExtra().telemetryEndpoint;
+  return typeof endpoint === 'string' ? endpoint : '';
+}
+
+function getAppVersion(): string {
+  try {
+    const Constants = require('expo-constants').default;
+    return (Constants?.expoConfig?.version as string) ?? '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+}
 
 /** Minimum time between upload attempts (ms). */
 const SYNC_THROTTLE_MS = 60_000;
@@ -30,7 +59,7 @@ let lastSyncAttempt = 0;
  * Whether telemetry uploads are enabled (an endpoint is configured).
  */
 export function isTelemetryEnabled(): boolean {
-  return TELEMETRY_ENDPOINT.length > 0;
+  return getTelemetryEndpoint().length > 0;
 }
 
 function generateInstallId(): string {
@@ -94,13 +123,13 @@ export async function syncTelemetry(): Promise<void> {
     if (events.length === 0) return;
 
     const installId = await getInstallId();
-    const response = await fetch(TELEMETRY_ENDPOINT, {
+    const response = await fetch(getTelemetryEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         installId,
         platform: getPlatformOS(),
-        appVersion: APP_VERSION,
+        appVersion: getAppVersion(),
         events,
       }),
     });

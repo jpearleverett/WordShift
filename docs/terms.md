@@ -1,3 +1,8 @@
+---
+permalink: /terms/
+title: WordShift Terms of Service
+---
+
 # WordShift Terms of Service
 
 **Effective date:** June 10, 2026

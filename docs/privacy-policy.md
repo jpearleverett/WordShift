@@ -1,3 +1,8 @@
+---
+permalink: /privacy-policy/
+title: WordShift Privacy Policy
+---
+
 # WordShift Privacy Policy
 
 **Effective date:** June 10, 2026

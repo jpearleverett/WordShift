@@ -32,6 +32,8 @@ import {
   markPitNudgeSeen,
   hasSeenJournalIntro,
   markJournalIntroSeen,
+  hasSeenDailyChallengeIntro,
+  markDailyChallengeIntroSeen,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { AmberInline } from '../AmberInline';
@@ -47,6 +49,7 @@ import {
   getWordsOfferedText,
   getJournalIntroLines,
   getJournalSpotlightSteps,
+  getDailyChallengeIntroLines,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -155,7 +158,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro'>('animal_intro');
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -347,6 +350,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       setIntroDialogueIndex(0);
       setIntroOverrideLines(getChallengeIntroLines(progress.currentPhase));
       setIntroContext('challenge_intro');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // Daily Challenge intro (one-time, Fox-led, when the daily card first unlocks).
+  // Celebrates the unlock so the new card isn't discovered silently.
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (!isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase)) return;
+
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenDailyChallengeIntro();
+      if (seen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getDailyChallengeIntroLines(progress.currentPhase));
+      setIntroContext('daily_challenge_intro');
       setShowIntroDialogue(true);
     })();
 
@@ -607,6 +641,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'daily_challenge_intro') {
+        await markDailyChallengeIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -626,6 +662,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markChallengeIntroSeen();
       } else if (introContext === 'pit_nudge') {
         await markPitNudgeSeen();
+      } else if (introContext === 'daily_challenge_intro') {
+        await markDailyChallengeIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }

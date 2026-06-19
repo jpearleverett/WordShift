@@ -19,7 +19,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run a single test file**: `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
-- Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
+- `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
 - The full suite has ~1,044 tests across 37 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack

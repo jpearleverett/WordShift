@@ -11,7 +11,10 @@ import {
   getDailyCommunityStats,
   DAILY_STREAK_MILESTONES,
   checkDailyStreakMilestone,
+  generateDailyPuzzle,
+  prewarmDailyPuzzle,
 } from '../services/dailyChallenge';
+import { generateLocalPuzzle } from '../services/localGenerator';
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => {
@@ -151,6 +154,36 @@ describe('dailyChallenge', () => {
 
     const status = await getDailyStatus();
     expect(status.totalCompleted).toBe(0);
+  });
+});
+
+describe('generateDailyPuzzle caching / prewarm', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await clearDailyProgress();
+    (generateLocalPuzzle as jest.Mock).mockClear();
+  });
+
+  test('memoizes today\'s puzzle — a repeat call does not regenerate', async () => {
+    const first = await generateDailyPuzzle();
+    const second = await generateDailyPuzzle();
+    expect(second).toEqual(first);
+    expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(1);
+  });
+
+  test('prewarm generates the puzzle ahead of time so the next call is cached', async () => {
+    prewarmDailyPuzzle();
+    // Let the fire-and-forget generation settle.
+    await Promise.resolve();
+    await generateDailyPuzzle();
+    expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(1);
+  });
+
+  test('clearDailyProgress drops the cached puzzle', async () => {
+    await generateDailyPuzzle();
+    await clearDailyProgress();
+    await generateDailyPuzzle();
+    expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(2);
   });
 });
 

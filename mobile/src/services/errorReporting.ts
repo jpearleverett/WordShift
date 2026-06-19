@@ -6,8 +6,12 @@ import { logEvent } from './eventLogger';
  * Centralized error capture and reporting. Logs errors to the event system
  * and provides a global error handler for unhandled exceptions.
  *
- * When a real crash reporting service (e.g., Sentry, Crashlytics) is integrated,
- * update `reportError()` to forward errors there.
+ * Errors become `app_error` events in the local event log, which the
+ * telemetry uploader (telemetry.ts) forwards to a collector once
+ * `extra.telemetryEndpoint` is configured in app.json — so configuring
+ * telemetry alone yields remote crash visibility with no extra SDK.
+ * To add richer crash grouping/symbolication (Sentry, Crashlytics),
+ * forward `error` from `reportError()` to that SDK here as well.
  */
 
 interface ErrorContext {

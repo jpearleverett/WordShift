@@ -65,7 +65,7 @@ import {
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
-import { generateDailyPuzzle, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone } from './src/services/dailyChallenge';
+import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone } from './src/services/dailyChallenge';
 import { startFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
@@ -429,6 +429,15 @@ function MainApp() {
       }
     })();
   }, [onboardingFlow.onboardingReady, onboardingFlow.isOnboarding]);
+
+  // Pre-generate today's daily puzzle in the background once it's unlocked, so
+  // tapping the Daily Challenge card opens instantly instead of waiting on the
+  // seeded 6-letter / 5-row generation (noticeable on low-end devices).
+  useEffect(() => {
+    if (onboardingFlow.isOnboarding) return;
+    if (!isDailyChallengeUnlocked(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) return;
+    prewarmDailyPuzzle();
+  }, [onboardingFlow.isOnboarding, puzzlesSolvedForVariantUnlocks, persistence.currentPhase]);
 
   // Onboarding tutorial guidance: exact source letter + target slot from solver steps.
   const tutorialGuidance = useMemo(() => {
