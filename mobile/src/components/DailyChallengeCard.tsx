@@ -14,6 +14,8 @@ import { getSettingsSync } from '../services/settings';
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
   phase?: number;
+  /** Changing this value re-runs the daily status load (e.g. after returning home from a daily completion). */
+  refreshSignal?: number | string;
 }
 
 /**
@@ -25,6 +27,7 @@ interface DailyChallengeCardProps {
 export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   onStartDaily,
   phase = 0,
+  refreshSignal,
 }) => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('HARD');
@@ -37,7 +40,9 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
 
   useEffect(() => {
     loadStatus();
-  }, []);
+    // Re-run on mount and whenever refreshSignal changes (e.g. after a daily
+    // completion when returning home) so the card never shows stale state.
+  }, [refreshSignal]);
 
   useEffect(() => {
     // Stop any existing loops
@@ -142,6 +147,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
       <TouchableOpacity
         style={[styles.button, { backgroundColor: btnBg }]}
         onPress={handlePress}
+        hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         activeOpacity={isCompleted ? 1 : 0.7}
         accessibilityLabel={
           isCompleted

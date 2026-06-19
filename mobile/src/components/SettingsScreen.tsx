@@ -18,7 +18,13 @@ import { GameSettings, getSettings, updateSetting, resetSettings } from '../serv
 import { clearStats } from '../services/starRating';
 import { clearAchievements } from '../services/achievements';
 import { clearDailyProgress } from '../services/dailyChallenge';
-import { clearProgress } from '../services/amberCurrency';
+import {
+  clearProgress,
+  getAmberBalance,
+  getStreakFreezeCount,
+  purchaseStreakFreeze,
+  STREAK_FREEZE_AMBER_COST,
+} from '../services/amberCurrency';
 import { clearWordHistory } from '../services/wordHistory';
 import { clearAllSessions } from '../services/dialogueSession';
 import { clearEvents } from '../services/eventLogger';
@@ -49,13 +55,52 @@ const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<GameSettings | null>(null);
   const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
+  const [freezeCount, setFreezeCount] = useState(0);
+  const [amberBalance, setAmberBalance] = useState(0);
+
+  const refreshStreakFreeze = async () => {
+    const [count, balance] = await Promise.all([getStreakFreezeCount(), getAmberBalance()]);
+    setFreezeCount(count);
+    setAmberBalance(balance);
+  };
 
   useEffect(() => {
     getSettings().then(setSettings);
     getNotificationPrefs().then((prefs) => {
       setDailyRemindersOn(prefs.enabled && prefs.dailyReminderEnabled);
     });
+    refreshStreakFreeze();
   }, []);
+
+  const handleBuyStreakFreeze = () => {
+    hapticLight();
+    if (amberBalance < STREAK_FREEZE_AMBER_COST) {
+      Alert.alert(
+        'Not enough amber',
+        `A streak freeze costs ${STREAK_FREEZE_AMBER_COST} amber. Solve a few more puzzles and come back.`
+      );
+      return;
+    }
+    Alert.alert(
+      'Buy Streak Freeze',
+      `Spend ${STREAK_FREEZE_AMBER_COST} amber for a streak freeze? It automatically protects your streak the next time you miss a day.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Buy',
+          onPress: async () => {
+            const ok = await purchaseStreakFreeze();
+            await refreshStreakFreeze();
+            if (ok) {
+              Alert.alert('Streak Freeze Ready', 'Your streak is now protected against one missed day.');
+            } else {
+              Alert.alert('Not enough amber', 'Purchase could not be completed.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleToggle = async (key: keyof GameSettings, value: boolean) => {
     hapticLight();
@@ -118,6 +163,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             setSettings(fresh);
             const freshPrefs = await getNotificationPrefs();
             setDailyRemindersOn(freshPrefs.enabled && freshPrefs.dailyReminderEnabled);
+            await refreshStreakFreeze();
             Alert.alert('Done', 'All data has been reset.');
           },
         },
@@ -209,6 +255,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               accessibilityRole="switch"
               accessibilityState={{ checked: dailyRemindersOn }}
             />
+          </View>
+        </View>
+
+        {/* Streak Protection */}
+        <Text style={styles.sectionTitle}>STREAK PROTECTION</Text>
+        <View style={styles.section}>
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Streak Freezes</Text>
+              <Text style={styles.settingDescription}>
+                {freezeCount > 0
+                  ? `${freezeCount} ready — each protects your streak for one missed day.`
+                  : 'Protects your streak the next time you miss a day.'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.freezeButton,
+                amberBalance < STREAK_FREEZE_AMBER_COST && styles.freezeButtonDisabled,
+              ]}
+              onPress={handleBuyStreakFreeze}
+              accessibilityRole="button"
+              accessibilityLabel={`Buy a streak freeze for ${STREAK_FREEZE_AMBER_COST} amber`}
+            >
+              <Text style={styles.freezeButtonText}>{`Buy · ${STREAK_FREEZE_AMBER_COST}`}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -344,6 +416,23 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: CandyColors.gray[100],
     marginLeft: 16,
+  },
+  freezeButton: {
+    backgroundColor: CandyColors.purple.main,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  freezeButtonDisabled: {
+    backgroundColor: CandyColors.gray[300],
+  },
+  freezeButtonText: {
+    color: CandyColors.white,
+    fontSize: 14,
+    fontWeight: '800',
   },
   dangerRow: {
     paddingHorizontal: 16,

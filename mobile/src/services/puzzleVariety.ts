@@ -14,6 +14,8 @@
 
 import { Difficulty, PuzzleSolutionStep } from '../types';
 import { isReverseSolvable } from './localGenerator';
+// Speed timers live in the central balance file (single source of truth).
+import { SPEED_TIME_LIMITS as SPEED_TIME_LIMIT_BY_DIFFICULTY } from '../constants/gameBalance';
 
 // ============================================================================
 // Types
@@ -122,13 +124,6 @@ const BASE_VARIANTS: VariantModifier[] = [
   'speed',
   'double_shift',
 ];
-
-const SPEED_TIME_LIMIT_BY_DIFFICULTY: Record<Difficulty, number> = {
-  EASY: 65,
-  MEDIUM: 60,
-  MEDIUM_PLUS: 54,
-  HARD: 48,
-};
 
 const VARIANT_UNLOCK_REQUIREMENTS: Record<Exclude<PuzzleVariant, 'standard'>, VariantUnlockRequirement> = {
   reverse: { puzzlesSolved: 8, minDepthPhase: 0 },

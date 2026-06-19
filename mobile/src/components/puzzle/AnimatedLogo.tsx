@@ -1,14 +1,23 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { CandyColors } from '../../theme/colors';
+import { getSettingsSync } from '../../services/settings';
 
 export const AnimatedLogo: React.FC = () => {
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const rotateLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
+    if (getSettingsSync().reducedMotion) {
+      bounceAnim.setValue(0);
+      rotateAnim.setValue(0);
+      return;
+    }
+
     // Subtle bounce
-    Animated.loop(
+    bounceLoopRef.current = Animated.loop(
       Animated.sequence([
         Animated.timing(bounceAnim, {
           toValue: -3,
@@ -23,10 +32,11 @@ export const AnimatedLogo: React.FC = () => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    bounceLoopRef.current.start();
 
     // Very subtle rotation
-    Animated.loop(
+    rotateLoopRef.current = Animated.loop(
       Animated.sequence([
         Animated.timing(rotateAnim, {
           toValue: 1,
@@ -41,7 +51,15 @@ export const AnimatedLogo: React.FC = () => {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    rotateLoopRef.current.start();
+
+    return () => {
+      bounceLoopRef.current?.stop();
+      bounceLoopRef.current = null;
+      rotateLoopRef.current?.stop();
+      rotateLoopRef.current = null;
+    };
   }, []);
 
   const rotate = rotateAnim.interpolate({

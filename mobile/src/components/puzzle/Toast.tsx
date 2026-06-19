@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CandyColors } from '../../theme/colors';
+import { getSettingsSync } from '../../services/settings';
 
 interface ToastProps {
   message: string;
@@ -22,6 +23,13 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
     slideAnim.setValue(-20);
     opacityAnim.setValue(0);
     shakeAnim.setValue(0);
+
+    if (getSettingsSync().reducedMotion) {
+      slideAnim.setValue(0);
+      opacityAnim.setValue(1);
+      shakeAnim.setValue(0);
+      return;
+    }
 
     const enterAnim = Animated.parallel([
       Animated.spring(slideAnim, {

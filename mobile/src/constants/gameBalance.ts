@@ -223,16 +223,16 @@ export const BANK_RECENT_THRESHOLD = 50;
 export const BANK_MEDIUM_THRESHOLD = 150;
 
 /** Per-word penalty when seen within BANK_RECENT_THRESHOLD. */
-export const BANK_RECENT_PENALTY = -12;
+export const BANK_RECENT_PENALTY = -18;
 
 /** Per-word penalty when seen within BANK_MEDIUM_THRESHOLD. */
-export const BANK_MEDIUM_PENALTY = -6;
+export const BANK_MEDIUM_PENALTY = -9;
 
 /** Bonus when ALL words in a puzzle are novel to the bank. */
-export const BANK_NOVEL_BONUS_FULL = 15;
+export const BANK_NOVEL_BONUS_FULL = 25;
 
 /** Bonus when 3+ words in a puzzle are novel to the bank. */
-export const BANK_NOVEL_BONUS_MOST = 8;
+export const BANK_NOVEL_BONUS_MOST = 12;
 
 /** Bonus when 1-2 words in a puzzle are novel to the bank. */
 export const BANK_NOVEL_BONUS_SOME = 3;

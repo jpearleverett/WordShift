@@ -43,6 +43,9 @@ export const RulesModal: React.FC<RulesModalProps> = ({
           <TouchableOpacity
             style={styles.closeButton}
             onPress={onClose}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
           >
             <Text style={styles.closeButtonText}>{'\u2715'}</Text>
           </TouchableOpacity>

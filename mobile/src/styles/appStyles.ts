@@ -16,7 +16,7 @@ export function getScreenBackgroundColor(screen: string, phase: number): string 
     case 'stats':
       return CandyColors.purple.main;
     case 'pit':
-      return { 0: '#6fb7df', 1: '#104c83', 2: '#514378', 3: '#060612', 4: '#1a122a' }[phase] ?? '#6fb7df';
+      return { 0: '#6fb7df', 1: '#104c83', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1a122a' }[phase] ?? '#6fb7df';
     case 'ledger':
       return phase <= 1 ? CandyColors.purple.main : phase === 2 ? '#3A3060' : phase === 3 ? '#1A1530' : '#0F0818';
     case 'gallery':

@@ -1043,7 +1043,7 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     red_panda: ['The pattern is complete. You are the final thread.', 'Bamboo exhales. The universe inhales.', 'Oneness achieved. Was it what you expected?'],
   },
   5: {
-    fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught him.', 'The warmth remains. It always will.', 'Ember says the smoke writes your name now.', 'The den smells of cedar and something finished.'],
+    fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught her.', 'The warmth remains. It always will.', 'Ember says the smoke writes your name now.', 'The den smells of cedar and something finished.'],
     owl: ['Archimedes closed the book. It stays closed now.', 'The last page was blank. Archimedes smiles.', 'Knowledge rests. Archimedes rests with it.', 'The study is quiet. Archimedes says quiet is a kind of answer.', 'Archimedes found one last footnote. It just says: thank you.'],
     pangolin: ['Panko set the table one last time. For no one. For everyone.', 'The kitchen smells of something ancient and warm.', 'Panko hums while stirring nothing.', 'Panko says the oven stays warm by itself now.', 'The last recipe has no ingredients. Just warmth.'],
     axolotl: ['The water is still. Axel floats. Everything floats.', 'Axel says the water remembers everything you gave it.', 'Bubbles rise. Each one holds a word.', 'Axel regenerated something new. He can not name it yet.', 'The tank glows faintly. Axel says it has always glowed.'],

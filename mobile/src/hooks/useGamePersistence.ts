@@ -58,6 +58,8 @@ export interface VictoryData {
   streakMilestoneBonus: number;
   /** Message for streak milestone achievement */
   streakMilestoneMessage: string | null;
+  /** True when a streak freeze was consumed to protect the streak this victory */
+  streakSaved?: boolean;
   /** Titles of quests completed this victory */
   questsCompleted?: string[];
   /** Words harvested this puzzle (for VictoryModal display) */
@@ -343,6 +345,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         questsCompleted,
         streakMilestoneBonus: amberResult.streakMilestoneBonus,
         streakMilestoneMessage: amberResult.streakMilestoneMessage,
+        streakSaved: amberResult.streakSaved,
         harvestedWords,
         pendingHarvest,
         harvestBatchId,
