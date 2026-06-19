@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - Do NOT run `npm install` unless explicitly asked to — all dependencies are already installed.
-- The full suite has ~1,040 tests across 37 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,044 tests across 37 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -171,7 +171,7 @@ mobile/
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
 │       ├── homeScenePan.ts, shareResults.ts
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,040 tests, 37 suites
+├── src/__tests__/               # ~1,044 tests, 37 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source (buildNumber/versionCode), autoIncrement on production. `submit.production` still needs real store credentials before `eas submit`.
@@ -205,9 +205,9 @@ When a letter is selected, ghost previews show what word would form at each slot
 
 Player-selected from the setup menu. Persisted as preferred variant.
 
-- **Reverse Shift** (unlock: 8 puzzles): Play down then back up. Forward-pass letters stay locked (cumulative locking). All served from pre-generated banks with `reverseSolution` for hints.
-- **Double Shift** (unlock: 25 puzzles): Move 2 letters per step. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. All words are 5 letters (W=5). Difficulty by row count: EASY=3, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. 1.65x amber multiplier.
-- **Speed Shift** (unlock: 35 puzzles): Timed run with difficulty-aware timers (EASY 65s → HARD 48s). The clock **pauses while the app is backgrounded** (AppState listener in `useSpeedTimer`) and resumes from the saved remaining seconds after a relaunch (`speedTimeRemainingSec` in autosave; legacy `speedTimerExpireAt` still restores as a fallback). Time-up sets `GameState.GAME_OVER` (warning haptic + sound) and shows a **"Time's Up" overlay** in App.tsx with the phase-aware `getSpeedTimeUpMessage(phase)` and two CTAs: **Try Again** (new puzzle) and **Home**. `GAME_OVER` is set *only* on speed time-up.
+- **Reverse Shift** (unlock: 8 puzzles): Play down then back up. Forward-pass letters stay locked (cumulative locking). All served from pre-generated banks with `reverseSolution` for hints. The descent→ascent **midpoint** returns `reverseMidpoint: true` so App fires a celebratory `hapticSuccess()` (the return leg reads as a second act). If on-device generation can't produce a reverse-solvable puzzle and silently downgrades to standard, `startNewGame` now surfaces a phase-aware notice instead of swapping styles unannounced.
+- **Double Shift** (unlock: 25 puzzles): Move 2 letters per step. 4-phase input cycle: `pick1 → drop1 → pick2 → drop2`. All words are 5 letters (W=5). Difficulty by row count: EASY=3, MEDIUM=4, MEDIUM_PLUS=5, HARD=6. 1.65x amber multiplier. The first drop (`drop1`) returns a non-null result with **no `formedWord`**, so App gives positive drop feedback (catch bounce + haptic) while skipping ritual-echo/dread tracking — it no longer falls through to the "invalid drop" error path.
+- **Speed Shift** (unlock: 35 puzzles): Timed run with difficulty-aware base timers (EASY 65s → HARD 48s). **Escalation ladder**: each consecutive speed win increments App-level `speedRound`, trimming the next clock by `SPEED_ESCALATION_STEP_SEC` (5s, floored at `SPEED_ESCALATION_MIN_SEC` = 30s) so a streak keeps tightening instead of letting skilled players idle. A "🔥 Round N" indicator appears under the timer once `speedRound > 0`. The ladder resets on time-up and on any fresh run (Play, variant/difficulty/challenge switch, Home); only **Next Level** continues it. The clock **pauses while the app is backgrounded** (AppState listener in `useSpeedTimer`) and resumes from the saved remaining seconds after a relaunch (`speedTimeRemainingSec` in autosave; legacy `speedTimerExpireAt` still restores as a fallback). Time-up sets `GameState.GAME_OVER` (warning haptic + sound) and shows a **"Time's Up" overlay** in App.tsx with the phase-aware `getSpeedTimeUpMessage(phase)` and two CTAs: **Try Again** (new puzzle) and **Home**. `GAME_OVER` is set *only* on speed time-up.
 - **Chain Shift** (design idea, NOT implemented): 3 linked puzzles where each final word becomes the next starting word. No type, config, or unlock exists in code.
 
 ### Pre-Generated Puzzle Banks
@@ -228,11 +228,13 @@ Optional harder mode: difficulty-aware undo limit (EASY/MEDIUM=2, MEDIUM_PLUS/HA
 ### Daily Challenge
 Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tracking with 2-day grace period. Unlocked at 5 puzzles or Phase 1+ (early unlock is the Day-1 retention hook). One-time Fox intro.
 
+**Entry point & wiring**: A `DailyChallengeCard` (📅) sits in the **HomeScreen header**, gated by `isDailyChallengeUnlocked()` and hidden during onboarding (shows a pulsing calendar when available, a check + stars + streak badge once done). Tapping it calls `App.handleStartDaily()` → `generateDailyPuzzle()` → `puzzleActions.startDailyGame()` (a hook action that builds a standard, hint-enabled board from the seeded words **without** disturbing the player's chosen difficulty preference). App-level `isPlayingDaily` state threads through `useAutosave` (tags the save with `isPlayingDaily`/`dailyDate`; a daily save is never restored as a normal puzzle), `recordVictory(..., isDaily=true)` (rewards always count as HARD), and the VictoryModal ("Daily Challenge Complete"). On completion App calls `recordDailyCompletion()` and `checkDailyStreakMilestone()` — milestone amber is credited via `awardBonusAmber('daily_streak_milestone')` with a deferred toast. Completions log a `daily_completed` event. `isPlayingDaily` resets on every non-daily start path (Play, variant/difficulty/challenge switch, Home, Next Level).
+
 ## App Architecture
 
 ### Custom Hooks
 
-**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection and surfaces `getNoValidMovesMessage()` when no legal move remains.
+**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection and surfaces `getNoValidMovesMessage()` when no legal move remains.
 
 **`useGamePersistence()`** — Persistence: amber, stats, phases, streak. Key: `recordVictory()` returns VictoryData (includes `phaseTransitionPending`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus`). `refreshStats()` reloads from storage. Reports phase 5 when post-revelation.
 
@@ -256,11 +258,11 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### App Bootstrap & Reliability
 
-- `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log.
+- `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log. `ErrorBoundary.componentDidCatch` also forwards React render errors through `reportError()` (source `react_error_boundary`), so both async and render-time failures land in the same pipeline (ready to fan out to Sentry/Crashlytics when one is added).
 - The default export `App` is a bootstrap gate: it awaits `runMigrations()` (dataMigration.ts) **before** mounting `MainApp`, so service caches always read migrated data. Renders a quiet dark view while booting; migration failures log and never block launch.
 - Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
 - `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Disabled by default** (`TELEMETRY_ENDPOINT = ''`); set an HTTPS collector URL to enable before a data-informed launch, and update the privacy policy when doing so.
-- FTUE funnel events: `app_open`, `onboarding_step` / `onboarding_complete` (logged from `setOnboardingStep`), `puzzle_started/completed`, `notification_permission_result`, `pit_offer` — enough to answer "where do players drop off" once telemetry is pointed at a collector.
+- FTUE funnel events: `app_open`, `onboarding_step` / `onboarding_complete` (logged from `setOnboardingStep`), `puzzle_started/completed`, `daily_completed`, `notification_permission_result`, `pit_offer` — enough to answer "where do players drop off" once telemetry is pointed at a collector.
 
 ### Screen Navigation
 
@@ -299,7 +301,7 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 - Star bonuses: 3-star +50%, 2-star +25%
 - Challenge mode: 1.5x multiplier
 - Streak multiplier: 10% per day (max 100%, requires 2+ day streak)
-- Streak grace period: 2 days. Streak freeze: 50 amber (or free once per 14 days)
+- Streak grace period: 2 days. Streak freeze: 50 amber, or a free one every 14 days — `checkFreeStreakFreeze()` runs once per session from App's launch effect (granted silently during onboarding; otherwise a one-time Alert tells the player their streak is protected)
 - Streak milestones: 3/7/14/21/30 days → 15/30/50/65/100 amber
 - Puzzle count milestones (10, 15, 25, 50... up to 350)
 - Achievement rewards: each of the 34 achievements grants one-time amber (10-100, `rewardAmber` in achievements.ts)
@@ -357,6 +359,9 @@ Late unlocks have puzzle-count gates to prevent amber surplus outrunning narrati
 - **Tutorial callback**: Fox at Phase 4 recontextualizes innocent tutorial lines as cult recruitment.
 - **Narrative seeds**: Phase 0 seed lines → Phase 4 callbacks for all 10 animals.
 - **Player choice points** (Phase 3): Each animal offers one binary choice. Both paths converge. Phase 4 delivers a one-time pre-dialogue callback recontextualizing the choice (`getAndMarkPhase4CallbackPage`), and Phase 5 weaves a serene choice callback into each animal's post-revelation cycle (`getPhase5ChoiceCallback`).
+
+### Home Header
+The HomeScreen header carries the amber count + streak badge (left) and, on the right, the **Daily Challenge card** (📅, gated by `isDailyChallengeUnlocked`), the Offering Pit button, the Journal Hub button, the utility menu, and Play.
 
 ### Journal Hub Modal
 📚 icon in header groups Word Ledger, Whisper Gallery, and Weekly Quests. Gated until puzzle 6. Fox introduces with 5-line walkthrough.
