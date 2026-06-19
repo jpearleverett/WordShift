@@ -10,6 +10,7 @@ import {
   getUnlockStatus,
 } from '../services/homeWorldData';
 import { clearProgress, loadProgress, devAddAmber } from '../services/amberCurrency';
+import { PHASE_THRESHOLDS } from '../constants/gameBalance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Reset state between tests
@@ -94,6 +95,34 @@ describe('UNLOCK_PROGRESSION', () => {
     expect(UNLOCK_PROGRESSION[0].type).toBe('character');
     expect(UNLOCK_PROGRESSION[1].type).toBe('room');
     expect(UNLOCK_PROGRESSION[2].type).toBe('character');
+  });
+
+  // Pacing guard: house-building must stay spread across the mid-game so the
+  // primary investment object keeps growing through the Phase 1→3 valley,
+  // rather than completing early and leaving the long climb to the Phase 4
+  // climax with no new unlocks. Regressing these gates back toward the
+  // front of the game (the old 28/38/48/58/70/85 curve) reopens the valley.
+  test('gated unlocks are spread with strictly increasing puzzle gates', () => {
+    const gates = UNLOCK_PROGRESSION
+      .map(u => u.minPuzzles)
+      .filter((n): n is number => typeof n === 'number');
+    expect(gates.length).toBeGreaterThanOrEqual(6);
+    for (let i = 1; i < gates.length; i++) {
+      expect(gates[i]).toBeGreaterThan(gates[i - 1]);
+    }
+  });
+
+  test('the final house unlock lands before the Phase 3 threshold', () => {
+    const gates = UNLOCK_PROGRESSION
+      .map(u => u.minPuzzles)
+      .filter((n): n is number => typeof n === 'number');
+    const lastGate = gates[gates.length - 1];
+    const phase3Threshold = PHASE_THRESHOLDS[3]; // 150 weighted ≈ puzzle 135 floor
+    // House finishes building before the dread peak, but deep enough that the
+    // mid-game isn't a barren stretch (last gate sits in the back half of the
+    // pre-Phase-3 window).
+    expect(lastGate).toBeGreaterThanOrEqual(120);
+    expect(lastGate).toBeLessThan(phase3Threshold);
   });
 });
 

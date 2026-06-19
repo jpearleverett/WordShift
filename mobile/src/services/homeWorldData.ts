@@ -493,7 +493,11 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MID GAME (Puzzles 120-200) - The house grows, darkness creeps in
+  // MID GAME (Puzzles ~28-130) - The house grows, darkness creeps in.
+  // These gates are spread across the Phase 1→3 window so the house keeps
+  // growing through the mid-game instead of completing by ~puzzle 85 and
+  // leaving the long stretch to the Phase 4 climax with no new investment.
+  // The final room (Bamboo Attic) lands just before Phase 3 (threshold 135).
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 8. Build the Jungle Room
@@ -531,7 +535,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'desert_room',
     name: 'Desert Camp',
     description: 'Sandy silence under watchful stars',
-    minPuzzles: 38,
+    minPuzzles: 42,
   },
 
   // 11. Invite Fennick the Fennec Fox
@@ -547,7 +551,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // LATE-MID GAME (Puzzles 200-280) - Existential dread intensifies
+  // LATE-MID GAME (Puzzles ~60-105) - Existential dread intensifies
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 12. Build the Office
@@ -560,7 +564,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'office',
     name: 'Chill Office',
     description: 'Where productivity meets existential doubt',
-    minPuzzles: 48,
+    minPuzzles: 60,
   },
 
   // 13. Invite Chill the Capybara
@@ -585,7 +589,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'burrow',
     name: 'Underground Burrow',
     description: 'Below everything, something stirs',
-    minPuzzles: 58,
+    minPuzzles: 82,
   },
 
   // 15. Invite Warren the Wombat
@@ -601,7 +605,9 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // END GAME (Puzzles 280-350+) - Final revelations
+  // END GAME (Puzzles ~105-130) - Final revelations; house completes just
+  // before Phase 3 so the climb to the Phase 4 climax still has the upgrade
+  // and quest sinks rather than the house itself.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 16. Build the Garden
@@ -614,7 +620,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'garden',
     name: 'Garden Patio',
     description: 'Where endings bloom like flowers',
-    minPuzzles: 70,
+    minPuzzles: 105,
   },
 
   // 17. Invite Thyme the Rabbit
@@ -639,7 +645,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'bamboo_attic',
     name: 'Bamboo Attic',
     description: 'The highest place, closest to the sky',
-    minPuzzles: 85,
+    minPuzzles: 130,
   },
 
   // 19. Invite Bamboo the Red Panda (FINAL UNLOCK)
