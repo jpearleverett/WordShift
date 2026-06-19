@@ -57,6 +57,8 @@ interface RowProps {
   onLetterDragDrop?: (letter: Letter, rowIndex: number, position: { x: number; y: number }) => void;
   /** Called when drag activation state changes — used to disable parent ScrollView during drag */
   onDragActiveChange?: (active: boolean) => void;
+  /** Registers this row's measurable node by index so the parent can Y-bounds-check drops */
+  onMeasureRef?: (rowIndex: number, node: View | null) => void;
 }
 
 // Phase-aware row color helper
@@ -415,6 +417,7 @@ export const Row: React.FC<RowProps> = memo(({
   slotPreviews,
   onLetterDragDrop,
   onDragActiveChange,
+  onMeasureRef,
 }) => {
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
@@ -441,6 +444,12 @@ export const Row: React.FC<RowProps> = memo(({
   const invalidShakeX = useRef(new Animated.Value(0)).current;
   const successBounceScale = useRef(new Animated.Value(1)).current;
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Stable ref callback so the parent can measure this row in-window for drop
+  // Y-bounds checking. Kept stable across renders to avoid detach/attach churn.
+  const measureCbRef = useRef<(node: View | null) => void>(() => {});
+  measureCbRef.current = (node: View | null) => onMeasureRef?.(rowIndex, node);
+  const stableMeasureRef = useRef((node: View | null) => measureCbRef.current(node)).current;
 
   useEffect(() => {
     // Animate row transitions
@@ -784,7 +793,7 @@ export const Row: React.FC<RowProps> = memo(({
         />
       )}
 
-      <View style={[styles.rowContainer, getRowStyle()]}>
+      <View ref={onMeasureRef ? stableMeasureRef : undefined} style={[styles.rowContainer, getRowStyle()]}>
         {/* Decorative elements for active row */}
         {isSource && (
           <>

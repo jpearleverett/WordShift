@@ -1,4 +1,3 @@
-import { Difficulty } from '../types';
 import {
   PHASE_THRESHOLDS as _PHASE_THRESHOLDS,
   AMBER_REWARDS as _AMBER_REWARDS,

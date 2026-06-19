@@ -827,6 +827,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <DailyChallengeCard
               onStartDaily={onStartDaily}
               phase={progress.currentPhase}
+              refreshSignal={progress.puzzlesSolved}
             />
           )}
           {!isOnboarding && onOpenPit && (
@@ -836,6 +837,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             } : undefined}>
               <TouchableOpacity
                 style={[styles.headerIconBtn, shouldHighlightPitButton && styles.pitHeaderIconBtn]}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 onPress={() => {
                   hapticLight();
                   onOpenPit?.();
@@ -858,6 +860,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 styles.headerIconBtn,
                 journalSpotlightActive && styles.journalSpotlightIcon,
               ]}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               onPress={journalSpotlightActive ? async () => {
                 // Spotlight: tapping icon advances to journal modal
                 await markJournalIntroSeen();
@@ -878,6 +881,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {!isOnboarding && !isPostTutorialLightMode && (
             <TouchableOpacity
               style={styles.headerIconBtn}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               onPress={handleOpenUtilityMenu}
               accessibilityLabel="Open utility menu"
               accessibilityRole="button"

@@ -827,6 +827,13 @@ function MainApp() {
         }
       }
 
+      // Surface the "your streak was protected" moment when a freeze was consumed
+      if (victory.streakSaved) {
+        addVictoryTimeout(() => {
+          puzzleActions.setMessage('🛡️ A streak freeze protected your streak!');
+        }, 600);
+      }
+
       // Show streak milestone toast if threshold was just crossed
       if (victory.streakMilestoneMessage) {
         addVictoryTimeout(() => {
@@ -1045,6 +1052,18 @@ function MainApp() {
   slotPreviewsRef.current = puzzle.slotPreviews;
   handleSlotPressRef.current = handleSlotPress;
 
+  // Track the active row + move direction (read inside the deferred drop handler)
+  // and a registry of each row's measurable node for Y-bounds checking on drop.
+  const activeRowIndexRef = useRef(puzzle.activeRowIndex);
+  const moveDirectionRef = useRef(puzzle.moveDirection);
+  activeRowIndexRef.current = puzzle.activeRowIndex;
+  moveDirectionRef.current = puzzle.moveDirection;
+  const rowNodeRefs = useRef(new Map<number, any>());
+  const registerRowNode = useCallback((rowIndex: number, node: any) => {
+    if (node) rowNodeRefs.current.set(rowIndex, node);
+    else rowNodeRefs.current.delete(rowIndex);
+  }, []);
+
   const handleLetterDragDrop = useCallback((_letter: any, _rowIndex: number, position: { x: number; y: number }) => {
     // Defer to next tick so React processes the letter selection from onDragStart
     setTimeout(() => {
@@ -1058,9 +1077,32 @@ function MainApp() {
       const targetWordLength = previews.length - 1;
       const estimated = estimateSlotIndex(position.x, previews.length, targetWordLength);
 
-      // Mark as drag-drop for haptic/effect escalation in handleSlotPress
-      isDragDropRef.current = true;
-      onSlotPress(estimated, position);
+      const commit = () => {
+        // Mark as drag-drop for haptic/effect escalation in handleSlotPress
+        isDragDropRef.current = true;
+        onSlotPress(estimated, position);
+      };
+
+      // Y-axis bounds guard: only commit if the drop actually landed on (or near)
+      // the target row. Without this, a flick released far above/below the board
+      // still snaps to the nearest-X slot and commits an unintended move.
+      const targetIdx =
+        activeRowIndexRef.current + (moveDirectionRef.current === 'down' ? 1 : -1);
+      const node = rowNodeRefs.current.get(targetIdx);
+      if (node && typeof node.measureInWindow === 'function') {
+        node.measureInWindow((_x: number, y: number, _w: number, h: number) => {
+          // Generous tolerance (one row-height of slack each side) so legitimate
+          // in-row drops are never rejected; only far-off releases are ignored.
+          const tol = h || 64;
+          if (position.y >= y - tol && position.y <= y + h + tol) {
+            commit();
+          }
+          // else: released far from the target row — ignore the drop entirely.
+        });
+      } else {
+        // No measurement available — preserve prior behavior (don't block).
+        commit();
+      }
     }, 0);
   }, []);
 
@@ -1131,21 +1173,19 @@ function MainApp() {
     maybePromptForNotifications().catch(() => {});
   }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications]);
 
-  // During onboarding, "Continue" on victory modal cleans up and navigates directly to pit
+  // During onboarding, "Continue" on the victory modal dismisses the modal and
+  // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
+  // That FoxGuide's own Continue (handleOnboardingContinue) then routes to the pit.
   const handleOnboardingVictoryContinue = useCallback(async () => {
     hapticLight();
     clearVictoryTimeouts();
-    // Clean up victory state
+    // Clean up victory state so the Fox completion beat is visible behind the modal
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
     setRitualEchoWords([]);
-    // Navigate directly to pit (skip puzzle_complete and going_to_pit steps)
-    await onboardingActions.advanceOnboarding('pit_intro');
-    transitionTo('pit', () => {
-      puzzleActions.setGameState(GameState.IDLE);
-    });
-  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, transitionTo, clearVictoryTimeouts]);
+    await onboardingActions.advanceOnboarding('puzzle_complete');
+  }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
   const handleReturnHome = useCallback(() => {
     hapticLight();
@@ -1675,6 +1715,7 @@ function MainApp() {
                 successDropSignal={successDropSignal}
                 onLetterDragDrop={handleLetterDragDrop}
                 onDragActiveChange={handleDragActiveChange}
+                onMeasureRef={registerRowNode}
                 slotPreviews={
                   idx === puzzle.activeRowIndex + (puzzle.moveDirection === 'down' ? 1 : -1)
                     ? puzzle.slotPreviews

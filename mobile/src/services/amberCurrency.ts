@@ -100,6 +100,12 @@ function isToday(dateString: string): boolean {
   return dateString === getTodayDateString();
 }
 
+// Set true by updateStreak() when a streak freeze is consumed to save a streak.
+// Read (and cleared) by awardPuzzleAmber so the victory flow can surface a
+// "your streak was protected" moment. Module-scoped because updateStreak's
+// numeric return signature is depended on elsewhere.
+let streakFreezeJustConsumed = false;
+
 /**
  * Update streak based on play activity
  * Should be called when a puzzle is completed
@@ -132,6 +138,7 @@ async function updateStreak(): Promise<number> {
       progress.streakFreezes = freezesAvailable - 1;
       progress.currentStreak += 1;
       progress.lastPlayDate = today;
+      streakFreezeJustConsumed = true;
     } else {
       // No freeze available — reset streak
       progress.currentStreak = 1;
@@ -367,6 +374,7 @@ export async function awardPuzzleAmber(
   phaseAcceleration: number;
   streakMilestoneBonus: number;
   streakMilestoneMessage: string | null;
+  streakSaved: boolean;
   phaseTransitionPending: boolean;
 }> {
   const progress = await loadProgress();
@@ -376,6 +384,9 @@ export async function awardPuzzleAmber(
 
   // Update streak first
   const currentStreak = await updateStreak();
+  // Capture (and clear) whether a streak freeze was just consumed to save the streak.
+  const streakSaved = streakFreezeJustConsumed;
+  streakFreezeJustConsumed = false;
 
   // Base reward by difficulty
   let baseAmount = AMBER_REWARDS[difficulty];
@@ -558,6 +569,7 @@ export async function awardPuzzleAmber(
     phaseAcceleration,
     streakMilestoneBonus,
     streakMilestoneMessage,
+    streakSaved,
     phaseTransitionPending: phaseChanged || progress.pendingPhaseTransition != null,
   };
 }

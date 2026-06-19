@@ -28,6 +28,7 @@ import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
 import { AMBER_REWARDS } from '../../constants/gameBalance';
 import { hapticSuccess } from '../../services/haptics';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
+import { getSettingsSync } from '../../services/settings';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -179,6 +180,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   useEffect(() => {
     if (visible) {
       hapticSuccess();
+      if (getSettingsSync().reducedMotion) {
+        // Reveal all cascade groups instantly — skip the stagger
+        contentOpacity1.setValue(1);
+        contentOpacity2.setValue(1);
+        contentOpacity3.setValue(1);
+        contentOpacity4.setValue(1);
+        return;
+      }
       contentOpacity1.setValue(0);
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
@@ -560,6 +569,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       <TouchableOpacity
                         onPress={onGoToPit}
                         activeOpacity={0.7}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         accessibilityLabel={phaseTransitionPending ? 'Visit the pit to continue' : 'Collect amber in the pit'}
                         accessibilityRole="button"
                         style={[styles.collectNowPill, {
@@ -644,6 +654,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <TouchableOpacity
                 onPress={onShare}
                 activeOpacity={0.8}
+                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
                 accessibilityLabel={shareBonusAvailable
                   ? `Share result, earns ${DAILY_SHARE_BONUS_AMBER} amber for the first share today`
                   : 'Share result'}
@@ -670,6 +681,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               <TouchableOpacity
                 onPress={onReturnHome}
                 activeOpacity={0.8}
+                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
                 accessibilityLabel="Return home"
                 accessibilityRole="button"
                 style={{ flex: 1 }}

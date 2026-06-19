@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
-import { DialoguePhase } from '../types/homeWorld';
 
 /**
  * Quest system for WordShift.

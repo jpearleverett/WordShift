@@ -4,19 +4,17 @@ import type { PreGeneratedPuzzle } from '../data/puzzleBankTypes';
 import { DialoguePhase } from '../types/homeWorld';
 import { isInHardCooldown } from './wordHistory';
 import { PuzzleVariant } from './puzzleVariety';
-
-const MAX_USED_TRACKED = 500;
-
-// Bank word novelty scoring thresholds (in bank-puzzle-selections ago)
-// Words seen recently in bank selections get graduated penalties even after
-// the general wordHistory hard cooldown (15 puzzles) has expired.
-const BANK_RECENT_THRESHOLD = 50;   // Strong penalty window
-const BANK_MEDIUM_THRESHOLD = 150;  // Moderate penalty window
-const BANK_RECENT_PENALTY = -18;    // Per word seen within BANK_RECENT_THRESHOLD
-const BANK_MEDIUM_PENALTY = -9;     // Per word seen within BANK_MEDIUM_THRESHOLD
-const BANK_NOVEL_BONUS_FULL = 25;   // All words never seen from this bank
-const BANK_NOVEL_BONUS_MOST = 12;    // 3+ novel words out of ~5
-const BANK_NOVEL_BONUS_SOME = 3;    // 1-2 novel words
+// Bank novelty/recency tuning lives in the central balance file (single source).
+import {
+  MAX_USED_TRACKED,
+  BANK_RECENT_THRESHOLD,
+  BANK_MEDIUM_THRESHOLD,
+  BANK_RECENT_PENALTY,
+  BANK_MEDIUM_PENALTY,
+  BANK_NOVEL_BONUS_FULL,
+  BANK_NOVEL_BONUS_MOST,
+  BANK_NOVEL_BONUS_SOME,
+} from '../constants/gameBalance';
 
 // ---------------------------------------------------------------------------
 // Bank Registry — single source of truth for all 12 puzzle banks
