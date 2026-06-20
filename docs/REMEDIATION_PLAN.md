@@ -42,8 +42,8 @@ resource (account/SDK/backend/collector URL).
 | B2a | Shareable result image | ⏳ | `react-native-view-shot` → native share sheet. The genre's #1 growth lever. |
 | B2b | Daily-result share prompt | ⏳ | Surface on Daily completion + existing `maybeAwardDailyShareBonus`. |
 | B2c | Leaderboard / friend loop | 🔒 | Backend leaderboard depends on C2 cloud infra; start with async deep-link compare. |
-| B3a | Daily login reward | ⏳ | Escalating Day 1→7 chest that rewards *opening the app* (currently absent — streaks require solving). |
-| B3b | Unify the two streak systems | ⏳ | Collapse play-streak + daily-challenge-streak into one model/UI (keep `dateUtils` local-day discipline). |
+| B3a | Daily login reward | ✅ | `dailyLoginReward.ts` — 7-day escalating cycle (10/15/20/25/30/40/75, Day-7 jackpot), wraps weekly, resets on a missed day. Wired into App launch; 9 tests. |
+| B3b | Unify the two streak systems | ⏳ | Collapse play-streak + daily-challenge-streak into one model/UI (keep `dateUtils` local-day discipline). Risky refactor of tested code — left for a dedicated pass. |
 | B3c | Daily-reminder reliability | ✅ | Always-repeating trigger; no longer lapses when the player doesn't relaunch. |
 
 ---
