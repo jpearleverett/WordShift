@@ -82,6 +82,8 @@ import {
   markPromptedForNotifications,
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
+import { initIAP } from './src/services/iap';
+import { initAds } from './src/services/ads';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
@@ -2091,8 +2093,12 @@ export default function App() {
     (async () => {
       try {
         await runMigrations();
+        // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
+        // providers so isPatronSync() and ad gating read correct values. Safe in
+        // Expo Go — no native modules until a real provider is wired.
+        await Promise.all([initIAP(), initAds()]);
       } catch (error) {
-        console.warn('Data migration failed:', error);
+        console.warn('Bootstrap init failed:', error);
       } finally {
         if (!cancelled) setBootReady(true);
       }

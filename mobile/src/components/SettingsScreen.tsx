@@ -45,6 +45,9 @@ import {
   requestNotificationPermission,
 } from '../services/notifications';
 import { clearRoomUpgrades } from '../services/roomUpgrades';
+import { clearEntitlements } from '../services/entitlements';
+import { clearCosmetics } from '../services/cosmetics';
+import { clearAdPacing } from '../services/ads';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -158,6 +161,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               resetMicroBeats(),
               resetNotificationPrefs(),
               clearRoomUpgrades(),
+              clearEntitlements(),
+              clearCosmetics(),
+              clearAdPacing(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);

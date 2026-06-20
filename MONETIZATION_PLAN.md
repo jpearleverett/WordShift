@@ -1,9 +1,13 @@
 # WordShift Monetization Plan
 
-> Status: **planned, not implemented**. WordShift 1.0 ships with no ads, no IAP,
-> and no monetization SDKs. This document is the design reference for a
-> post-launch monetization update, summarized in CLAUDE.md. Nothing in this
-> plan may be built in a way that violates the core principle below.
+> Status: **design intent**. No real ads/IAP SDKs are wired and no revenue path is
+> live yet. A native-free **service scaffold now exists** (`services/entitlements.ts`,
+> `iap.ts`, `ads.ts`, `cosmetics.ts` — all behind NoOp providers) with the Patron amber
+> bonus and ad policy implemented and unit-tested; UI screens and real SDKs are not built.
+> This document is the original design reference; the concrete build plan is
+> `docs/MONETIZATION_F2P_IMPLEMENTATION.md` (the chosen F2P direction). See also the
+> Monetization section of CLAUDE.md. Nothing here may be built in a way that violates
+> the core principle below.
 
 ## Core principle
 
