@@ -31,6 +31,27 @@ resource (account/SDK/backend/collector URL).
 
 ---
 
+## Phase A′ — Ship-blocker hardening (audit follow-up; all code, no external deps)
+
+Fixes from the second full-codebase readiness audit. All landed with the suite
+green (1077/1077), typecheck + lint clean.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| A′1 | **FTUE resume soft-lock** | ✅ | Killing the app during the puzzle/transition onboarding beats (`going_to_puzzle`/`puzzle_tutorial`/`puzzle_complete`/`returning_home`) relaunched to a **dead home screen** (no Fox guide, no Play button) — an unrecoverable first-session brick in the highest-churn window. `useOnboardingFlow` now `normalizeResumeStep`s transient/puzzle steps to a stable target on resume; `App.tsx` resume effect routes the puzzle step back to a freshly-initialized guided tutorial. |
+| A′2 | **ErrorBoundary coverage** | ✅ | Only `home`/`puzzle` were wrapped; a render error on settings/stats/ledger/gallery/pit crashed the whole app. Added a catch-all `ErrorBoundary` around `renderScreen()` (returns the player home). |
+| A′3 | **Perpetual rAF loop** | ✅ | `startFrameMonitoring()` ran forever in production with its samples never consumed (telemetry off) — pure battery/CPU cost. Now gated behind `__DEV__` and stopped on unmount. |
+| A′4 | **`startNewGame` concurrency guard** | ✅ | Long async generation (bank lookup + up to 30s reverse) had no in-flight guard; rapid Play/Next-Level taps or a mid-generation variant switch could clobber a started board. Added a monotonic `generationIdRef`; every `initGame` commit aborts if superseded. |
+| A′5 | **Drag near-miss forgiveness** | ✅ | Off-target drag drops failed instead of snapping. Now routes through `findClosestValidSlot`, bounded to ±1 slot, so a one-slot finger miss lands on the obviously-intended valid slot without ever teleporting across the row. |
+| A′6 | **Puzzle-screen onboarding skip** | ✅ | The skip handler existed but had no button on the puzzle-screen FoxGuide; added `showSkip`/`onSkip`. |
+| A′7 | **DifficultyMenu a11y** | ✅ | Variant/difficulty/challenge buttons on the setup screen now carry `accessibilityRole`/`accessibilityState`/`accessibilityLabel`. |
+| A′8 | **Phase 5 victory register** | ✅ | `getRitualEchoHeader/Footer`, `getWordsOfferedText`, `getIncantationName` collapsed Phase 5 into Phase 4's "offering" dread; Phase 5 now has its own serene "weave/pattern continues" voice in the high-traffic victory modal (+ regression tests). |
+| A′9 | **`checkFreeStreakFreeze` date helper** | ✅ | The one day-bucketing path that bypassed `dateUtils` (`new Date(string)` → UTC) now routes through `daysAgoLocal`. |
+| A′10 | Phase 5 dialogue "always new" badge | ⏳ (deliberately deferred) | The home-screen "new dialogue" badge stays lit forever at Phase 5 and lines loop verbatim. The fix is entangled with the cumulative dialogue-index space and overlaps the deferred endgame loop (`ENDGAME_LOOP_DESIGN.md`); left for the dedicated endgame-loop pass to avoid a risky one-shot change to a fully-tested core system. |
+| A′11 | Remote crash visibility (Sentry) | 🔒 | The global error pipeline is real but lands in a local 500-entry buffer; no Sentry, telemetry off → launching blind to crashes. Needs a collector URL (A9) or a Sentry account. |
+
+---
+
 ## Phase B — Retention & addictiveness (highest leverage)
 
 | # | Item | Status | Notes |

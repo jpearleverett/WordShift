@@ -1,6 +1,6 @@
 # WordShift — Ship-Readiness Assessment (current)
 
-**Last updated:** 2026-06-20
+**Last updated:** 2026-06-20 (audit follow-up: ship-blocker hardening pass)
 **Method:** full-codebase audit (six parallel deep-dive streams: gameplay, FTUE, retention/economy, visual/UX, narrative, technical), claims verified against source — not docs. Scored against AARRR (Pirate Metrics) + Nir Eyal's Hook Model.
 
 > **Forward work:** the prioritized cross-tier remediation roadmap (Phase A polish → B retention → C full-F2P monetization → D soft-launch), with per-item status and external-resource blockers, lives in [`REMEDIATION_PLAN.md`](./REMEDIATION_PLAN.md).
@@ -14,8 +14,8 @@
 | Check | Command | Result |
 |---|---|---|
 | Typecheck | `npm run typecheck` | **0 errors** |
-| Lint | `npm run lint` | **0 errors / 288 warnings** (all stylistic: `array-type`, intentional `require()` lazy-loads) |
-| Tests | `npm test -- --no-coverage` | **38/38 suites · 1056/1056 passing** |
+| Lint | `npm run lint` | **0 errors / 290 warnings** (all intentional `require()` lazy-loads) |
+| Tests | `npm test -- --no-coverage` | **39/39 suites · 1077/1077 passing** |
 
 **There are no code blockers to building and submitting the offline game.** Remaining work is strategic (monetization), backend (cloud save), team-owned (audio), or operational (store credentials, Pages hosting, on-device QA).
 
@@ -28,8 +28,8 @@
 | Core gameplay & mechanics | 92 | Loop, 3 variants, ~5,800 banked puzzles, graceful fallbacks. Chain Shift is design-only (not implemented). |
 | Narrative & content | 88 | 670 base + 100 post-revelation dialogues; earned horror arc; correct unlock-gating. The product's moat. |
 | Visual polish & "juice" | 88 | Native-driver discipline, complete assets, real phase theming across all screens. |
-| Technical readiness | 88 | Green suite, error pipeline wired, lazy banks, correct manifests/bundle IDs. |
-| FTUE / first session | 78 | 11-step resumable onboarding, no dead-ends. Minor: pit auto-offer cascade is passive. |
+| Technical readiness | 88 | Green suite, error pipeline wired, lazy banks, correct manifests/bundle IDs. Audit pass closed: app-wide ErrorBoundary coverage, dev-only frame monitoring, `startNewGame` concurrency guard. Remaining risk is operational: **no remote crash backend** (telemetry off / no Sentry → launching blind to crashes). |
+| FTUE / first session | 84 | 11-step resumable onboarding. **Correction:** the prior "no dead-ends" claim was wrong — a kill during the puzzle/transition beats relaunched to a dead home screen; **now fixed** (step normalization on resume + puzzle-screen skip button). Minor: pit auto-offer cascade is passive. |
 | Retention systems | 75 | Complete loops; mid-game valley improved this session (see Changes). Phase 5 endgame still static. |
 | Acquisition / Referral | ~25 | Share system complete, but no leaderboards/social/friend loop — biggest growth lever unbuilt. |
 | Monetization | N/A (0 built) | No IAP/ads SDK, no paywall. `MONETIZATION_PLAN.md` is plan-only. |
@@ -55,6 +55,14 @@
 ---
 
 ## Changes made this session
+
+**Audit follow-up — ship-blocker hardening** (all code, suite green; see `REMEDIATION_PLAN.md` Phase A′ for the full table):
+- **FTUE resume soft-lock fixed** (the prior "no dead-ends" claim was inaccurate) — `useOnboardingFlow` normalizes transient/puzzle steps on resume; `App.tsx` re-inits the guided tutorial. No relaunch can strand a first-session player.
+- **App-wide ErrorBoundary** — the five secondary screens (settings/stats/ledger/gallery/pit) were unwrapped; a render error there crashed the whole app. Now caught → returns home.
+- **Perpetual `requestAnimationFrame` loop** gated behind `__DEV__` (was pure battery cost in prod).
+- **`startNewGame` concurrency guard** (`generationIdRef`) — rapid taps / mid-generation variant switches can no longer clobber a started board.
+- **Drag near-miss forgiveness** (±1-slot snap via `findClosestValidSlot`), **puzzle-screen onboarding skip button**, **DifficultyMenu accessibility labels**, **Phase 5 victory text register** (serene "weave" voice, +regression tests), **`checkFreeStreakFreeze`** routed through `dateUtils`.
+- **Known deferral:** Phase 5 "new dialogue" badge stays lit + lines loop — entangled with the deferred endgame loop; left for that dedicated pass. **Still open (external):** remote crash backend (Sentry/collector).
 
 **Mid-game retention — filled the Phase 1→3 investment valley** (`homeWorldData.ts`):
 the house (primary mid-game investment object) finished building by ~puzzle 85 while the Phase 4 climax isn't until ~puzzle 225. Spread the six gated room-unlock `minPuzzles` gates `28/38/48/58/70/85 → 28/42/60/82/105/130` so house-building stretches across the whole pre-Phase-3 window; the final room now lands just before Phase 3. Costs unchanged (later gates strictly more affordable). Early hook unlocks (orders 1–7) untouched. Added two guard tests in `homeWorldData.test.ts` (gates strictly increasing; final gate ≥120 and < Phase 3 threshold).

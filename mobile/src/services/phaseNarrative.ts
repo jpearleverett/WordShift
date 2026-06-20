@@ -536,7 +536,8 @@ export function getRitualEchoHeader(phase: number): string {
   if (phase === 1) return 'Words Arranged:';
   if (phase === 2) return 'Words Transformed:';
   if (phase === 3) return 'The Incantation:';
-  return 'The Offering:';
+  if (phase === 4) return 'The Offering:';
+  return 'The Pattern:'; // Phase 5 — serene, settled
 }
 
 /**
@@ -547,7 +548,8 @@ export function getRitualEchoFooter(phase: number, wordCount: number): string {
   if (phase === 1) return 'A curious path...';
   if (phase === 2) return 'The pattern takes shape...';
   if (phase === 3) return 'The arrangement accepts.';
-  return `${wordCount} words offered to the pattern.`;
+  if (phase === 4) return `${wordCount} words offered to the pattern.`;
+  return `${wordCount} words woven into the pattern.`; // Phase 5 — the pattern continues
 }
 
 // ============================================================================
@@ -593,7 +595,16 @@ export function getIncantationName(words: string[], phase: number): string | nul
     `The ${lastWord} Opens`,
   ];
 
-  const templates = phase >= 4 ? phase4Templates : phase >= 3 ? phase3Templates : phase2Templates;
+  // Phase 5 templates - serene, settled; the pattern simply continues
+  const phase5Templates = [
+    `${firstWord} settles into ${lastWord}`,
+    `The Weave of ${lastWord}`,
+    `${firstWord} Becomes ${lastWord}`,
+    `The ${lastWord} Abides`,
+    `${firstWord} Returns as ${lastWord}`,
+  ];
+
+  const templates = phase >= 5 ? phase5Templates : phase >= 4 ? phase4Templates : phase >= 3 ? phase3Templates : phase2Templates;
   // Use a deterministic pick based on word content
   const hash = words.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return templates[hash % templates.length];
@@ -611,7 +622,8 @@ export function getWordsOfferedText(totalWords: number, phase: number): string {
   if (phase <= 1) return `Words shifted: ${totalWords}`;
   if (phase === 2) return `Words transformed: ${totalWords}`;
   if (phase === 3) return `Words offered: ${totalWords}`;
-  return `${totalWords} words offered to the arrangement`;
+  if (phase === 4) return `${totalWords} words offered to the arrangement`;
+  return `${totalWords} words woven into the pattern`; // Phase 5 — serene
 }
 
 // ============================================================================

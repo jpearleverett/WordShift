@@ -204,6 +204,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic id for in-flight puzzle generations. `startNewGame` is a long
+  // async (bank lookup + up to 30s reverse generation); two rapid invocations
+  // (fast Play/Next-Level taps, a variant/difficulty switch mid-generation)
+  // would both run to completion and both call `initGame`, letting a stale
+  // generation clobber a board the player has already started. Each call claims
+  // a fresh id and aborts before committing if a newer call has superseded it.
+  const generationIdRef = useRef(0);
 
   // Clean up shakeError timeout on unmount
   useEffect(() => {
@@ -402,6 +409,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     mode?: GameMode,
     variantOverride?: PuzzleVariant
   ) => {
+    // Claim this generation. Any initGame commit below is skipped if a newer
+    // startNewGame call has since superseded this one (see generationIdRef).
+    const genId = ++generationIdRef.current;
+    const isStale = () => genId !== generationIdRef.current;
     setGameState(GameState.LOADING);
     setMessage(getLoadingMessage(currentPhase));
     setError(null);
@@ -434,6 +445,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         effectiveMode === 'standard'
       ) {
         const curated = CURATED_EARLY_PUZZLES[puzzlesSolved];
+        if (isStale()) return;
         initGame(curated.words, undefined, curated.solution, curated.words[0].length, 'standard');
         setMessage(getStartMessage(currentPhase));
         return;
@@ -454,6 +466,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
               const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
               const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
               if (echoPuzzle) {
+                if (isStale()) return;
                 initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
                 await recordPuzzleWords(echoPuzzle.words);
                 setIsEchoPuzzle(true);
@@ -475,6 +488,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
           const recencyMap = await getWordHistoryWithRecency();
           const bankPuzzle = await selectPreGeneratedPuzzle(selectedDifficulty, currentPhase, recencyMap, variant);
           if (bankPuzzle) {
+            if (isStale()) return;
             initGame(bankPuzzle.words, bankPuzzle.hint, bankPuzzle.solution, bankPuzzle.wordLength, variant, bankPuzzle.reverseSolution);
             await recordPuzzleWords(bankPuzzle.words);
             if (variant !== 'standard') {
@@ -501,6 +515,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         variant,
         timeoutPromise
       );
+      if (isStale()) return;
       initGame(puzzle.words, puzzle.hint, puzzle.solution, puzzle.wordLength, activeVariant, puzzle.reverseSolution);
       if (activeVariant !== 'standard') {
         const config = VARIANT_CONFIGS[activeVariant];
@@ -521,6 +536,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const fallbackVariant = 'standard' as PuzzleVariant;
       const fallbackWords = getRandomFallback(selectedDifficulty);
       const fallbackWordLen = fallbackWords[0].length;
+      if (isStale()) return;
       initGame(
         fallbackWords,
         undefined,

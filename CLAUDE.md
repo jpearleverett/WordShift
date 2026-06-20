@@ -165,7 +165,7 @@ mobile/
 │       ├── ads.ts               # Monetization scaffold: pluggable AdProvider + ad policy (NoOp default)
 │       ├── cosmetics.ts         # Monetization scaffold: owned/equipped cosmetics
 │       ├── wordHarvest.ts       # Offering Pit harvest batches (over-cap = merge oldest, never drop amber)
-│       ├── slotEstimation.ts    # Drag-and-drop slot position estimation
+│       ├── slotEstimation.ts    # Drag-and-drop slot position estimation (`estimateSlotIndex`) + `findClosestValidSlot` (App routes drag drops through it with a ±1-slot bound for near-miss forgiveness — never teleports across the row)
 │       ├── puzzleSaveState.ts   # Mid-puzzle autosave/restore
 │       ├── roomUpgrades.ts      # Room upgrade amber sink (Phase 2+)
 │       ├── onboarding.ts        # Onboarding state machine + persistence
@@ -240,7 +240,7 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### Custom Hooks
 
-**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection: it sets `isStuck` (exposed on state) and surfaces `getNoValidMovesMessage()` when no legal move remains. App.tsx renders a non-transient **stuck-recovery panel** (Undo / Restart, phase-aware headline via `getStuckPanelTitle()`) while `isStuck` — not just the toast. `isStuck` resets on undo/restart/new board.
+**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()` (guarded by a monotonic `generationIdRef` — every `initGame` commit aborts if a newer call superseded it, so rapid Play/Next-Level taps or a mid-generation variant switch can't clobber a started board), `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection: it sets `isStuck` (exposed on state) and surfaces `getNoValidMovesMessage()` when no legal move remains. App.tsx renders a non-transient **stuck-recovery panel** (Undo / Restart, phase-aware headline via `getStuckPanelTitle()`) while `isStuck` — not just the toast. `isStuck` resets on undo/restart/new board.
 
 **`useGamePersistence()`** — Persistence: amber, stats, phases, streak. Key: `recordVictory()` returns VictoryData (includes `phaseTransitionPending`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus`). `refreshStats()` reloads from storage. Reports phase 5 when post-revelation.
 
@@ -264,7 +264,8 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### App Bootstrap & Reliability
 
-- `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log. `ErrorBoundary.componentDidCatch` also forwards React render errors through `reportError()` (source `react_error_boundary`), so both async and render-time failures land in the same pipeline (ready to fan out to Sentry/Crashlytics when one is added).
+- `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log. `ErrorBoundary.componentDidCatch` also forwards React render errors through `reportError()` (source `react_error_boundary`), so both async and render-time failures land in the same pipeline (ready to fan out to Sentry/Crashlytics when one is added). **Render coverage:** `home` and `puzzle` carry their own inner boundaries; an outer catch-all boundary wraps `renderScreen()` so a render error on the secondary screens (settings/stats/ledger/gallery/pit) returns the player home instead of crashing the whole app. Crash capture is local-only (500-entry buffer) until telemetry/Sentry is wired.
+- Frame-rate monitoring (`performanceMonitor.startFrameMonitoring`) is diagnostic-only — its samples are never read in production — so it is gated behind `__DEV__` (and stopped on unmount) and never runs a perpetual `requestAnimationFrame` loop on a player's device.
 - The default export `App` is a bootstrap gate: it awaits `runMigrations()` (dataMigration.ts) **before** mounting `MainApp`, so service caches always read migrated data. Renders a quiet dark view while booting; migration failures log and never block launch.
 - Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
 - `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Disabled by default** (`TELEMETRY_ENDPOINT = ''`); set an HTTPS collector URL to enable before a data-informed launch, and update the privacy policy when doing so.
@@ -445,7 +446,7 @@ Fox guides new players through real screens:
 3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains pit, player offers words
 4. `returning_home` → `unlock_explained` → `complete`: Fox explains the cycle
 
-During onboarding: simplified UI (no difficulty selector, stats, NEW button). Backward compatible with legacy tutorial flag. Persisted via `wordshift_onboarding_step`.
+During onboarding: simplified UI (no difficulty selector, stats, NEW button). Backward compatible with legacy tutorial flag. Persisted via `wordshift_onboarding_step`. **Resume resilience:** transient/puzzle steps (`going_to_puzzle`/`puzzle_tutorial`/`puzzle_complete`/`going_to_pit`/`returning_home`) only exist for a `setTimeout` window and have no owning screen on relaunch; `useOnboardingFlow.normalizeResumeStep` snaps them forward to a stable target on resume, and `App.tsx`'s resume effect routes the puzzle step back to a freshly-initialized guided tutorial board — so a kill mid-onboarding can never strand a new player on a dead home screen. The puzzle-screen FoxGuide also exposes a skip button (`handleSkipOnboarding`).
 
 ## Fox Post-Victory Intros
 
