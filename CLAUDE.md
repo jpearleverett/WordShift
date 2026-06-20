@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,044 tests across 37 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,049 tests across 37 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -171,7 +171,7 @@ mobile/
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
 │       ├── homeScenePan.ts, shareResults.ts
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,044 tests, 37 suites
+├── src/__tests__/               # ~1,049 tests, 37 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source (buildNumber/versionCode), autoIncrement on production. `submit.production` still needs real store credentials before `eas submit`.
@@ -309,17 +309,17 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 
 ### House Building (Bottom-Up)
 
-Rooms and animals unlock alternately. Starting: empty Cozy Den + free Fox invite. Then: build Kitchen (50 amber) → invite Pangolin (100) → build Study (100) → invite Owl (100) → etc. Costs escalate for rooms (50-475), flat 100 for animals.
+Rooms and animals unlock alternately. Starting: empty Cozy Den + free Fox invite. Then: build Kitchen (50 amber) → invite Pangolin (100) → build Study (75) → invite Owl (100) → etc. Costs escalate for rooms (50-400), flat 100 for animals.
 
-Late unlocks have puzzle-count gates to prevent amber surplus outrunning narrative:
-| Unlock | Min Puzzles |
+Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`, homeWorldData.ts). The animal after each gated room follows immediately (sequential, no separate gate). The gates are **spread across the Phase 1→3 window** so the house — the primary mid-game investment object — keeps growing instead of completing by ~puzzle 85 and leaving the long climb to the Phase 4 climax (~puzzle 225) with no new unlocks. The final room lands just before Phase 3 (threshold 135); after that, room upgrades + quests + the climax carry progression. Two guard tests in `homeWorldData.test.ts` pin this spread (strictly increasing gates; final gate ≥120 and < Phase 3 threshold) so it can't silently regress.
+| Gated room (then animal) | Min Puzzles |
 |--------|------------|
-| Jungle (Sloth) | 55 |
-| Desert (Fennec) | 75 |
-| Office (Capybara) | 95 |
-| Burrow (Wombat) | 115 |
-| Garden (Rabbit) | 140 |
-| Bamboo Attic (Red Panda) | 170 |
+| Jungle (Sloane the Sloth) | 28 |
+| Desert (Fennick the Fennec) | 42 |
+| Office (Chill the Capybara) | 60 |
+| Burrow (Warren the Wombat) | 82 |
+| Garden (Thyme the Rabbit) | 105 |
+| Bamboo Attic (Bamboo the Red Panda) | 130 |
 
 ### Animal Characters (10 total, in unlock order)
 
