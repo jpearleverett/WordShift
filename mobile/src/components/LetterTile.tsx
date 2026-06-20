@@ -26,7 +26,7 @@ const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
 const COMPACT_FONT = 21;
 
-export const LetterTile: React.FC<LetterTileProps> = ({
+const LetterTileComponent: React.FC<LetterTileProps> = ({
   letter,
   onPress,
   isSelected,
@@ -943,5 +943,11 @@ const trailStyles = StyleSheet.create({
     zIndex: 20,
   },
 });
+
+// Memoized: LetterTile is instantiated many-per-row across multiple rows and
+// carries several Animated.Values; a shallow prop guard avoids re-rendering
+// tiles whose row props didn't change (Row is already memoized, so props are
+// referentially stable within a stable row).
+export const LetterTile = React.memo(LetterTileComponent);
 
 export default LetterTile;

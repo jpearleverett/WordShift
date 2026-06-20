@@ -1778,7 +1778,13 @@ function MainApp() {
             onPress={() => {
               hapticLight();
               setRitualEchoWords([]);
-              puzzleActions.startNewGame();
+              // RESTART while playing resets THIS board (a true retry); NEW (idle)
+              // fetches a fresh puzzle.
+              if (puzzle.gameState === GameState.PLAYING) {
+                puzzleActions.resetCurrentPuzzle();
+              } else {
+                puzzleActions.startNewGame();
+              }
             }}
             disabled={false}
           />
