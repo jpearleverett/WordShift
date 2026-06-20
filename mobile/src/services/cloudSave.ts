@@ -73,6 +73,7 @@ const SYNC_KEYS = [
   'wordshift_daily_challenge',
   'wordshift_weekly_quests',
   'wordshift_daily_quests',
+  'wordshift_daily_login',
   // Narrative state
   'wordshift_dialogue_sessions',
   'wordshift_dialogue_choices',

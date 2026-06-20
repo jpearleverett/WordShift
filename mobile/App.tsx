@@ -44,6 +44,7 @@ import {
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
 } from './src/services/amberCurrency';
+import { claimDailyLoginReward, DAILY_LOGIN_CYCLE_LENGTH } from './src/services/dailyLoginReward';
 import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
@@ -196,6 +197,7 @@ function MainApp() {
   // Guard: pit-resume useEffect should only fire on initial mount
   const pitResumeCheckedRef = useRef(false);
   const freeFreezeCheckedRef = useRef(false);
+  const dailyLoginCheckedRef = useRef(false);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
@@ -426,6 +428,33 @@ function MainApp() {
         }
       } catch {
         // Non-critical — never block launch on a freeze grant.
+      }
+    })();
+  }, [onboardingFlow.onboardingReady, onboardingFlow.isOnboarding]);
+
+  // Daily login reward: rewards opening the app (not just solving). Runs once per
+  // session after boot, skipped during onboarding so the first session isn't
+  // interrupted before the player understands amber.
+  useEffect(() => {
+    if (!onboardingFlow.onboardingReady || dailyLoginCheckedRef.current) return;
+    if (onboardingFlow.isOnboarding) return;
+    dailyLoginCheckedRef.current = true;
+    (async () => {
+      try {
+        const grant = await claimDailyLoginReward();
+        if (grant) {
+          persistenceActions.refreshStats();
+          const dayLabel = grant.day === DAILY_LOGIN_CYCLE_LENGTH ? 'Day 7 — jackpot!' : `Day ${grant.day}`;
+          const chain = grant.reset
+            ? 'A new chain begins. '
+            : '';
+          Alert.alert(
+            'Welcome back',
+            `${chain}${dayLabel}\nYou received ${grant.amount} amber for visiting today.`
+          );
+        }
+      } catch {
+        // Non-critical — never block launch on the login reward.
       }
     })();
   }, [onboardingFlow.onboardingReady, onboardingFlow.isOnboarding]);
