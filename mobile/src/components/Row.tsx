@@ -19,7 +19,7 @@ import { getWordPhaseTier } from '../services/localGenerator';
 import {
   ROW_HORIZONTAL_MARGIN,
   ROW_PADDING,
-  SLOT_WIDTH,
+  ARC_SLOT_RENDERED_WIDTH,
   ARC_LETTER_MARGIN_H,
   ARC_SLOT_MARGIN_H,
 } from '../constants/tileLayout';
@@ -1066,7 +1066,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 230, 100, 0.95)',
   },
   slotCompact: {
-    width: SLOT_WIDTH + 4, // Slightly wider for trapezoid visibility
+    width: ARC_SLOT_RENDERED_WIDTH, // Slightly wider than SLOT_WIDTH for trapezoid visibility
     height: SLOT_HEIGHT,
     borderTopLeftRadius: 6, // Rounded top corners
     borderTopRightRadius: 6,

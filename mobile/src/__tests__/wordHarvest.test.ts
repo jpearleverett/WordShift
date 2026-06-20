@@ -124,16 +124,20 @@ describe('wordHarvest', () => {
       expect(batch.phaseAtHarvest).toBe(3);
     });
 
-    it('trims oldest batches when over MAX_PENDING_BATCHES (200)', async () => {
+    it('merges (never drops) oldest batches when over MAX_PENDING_BATCHES (200), preserving all amber', async () => {
       // Enqueue 201 batches
       for (let i = 0; i < 201; i++) {
         await enqueueHarvestBatch(makeBatch({ id: `batch_${i}`, amberValue: 1 }));
       }
 
       const state = await getHarvestState();
+      // Batch count stays bounded at the cap
       expect(state.pendingBatches.length).toBe(200);
-      // Oldest (batch_0) should be trimmed, batch_1 should be first
-      expect(state.pendingBatches[0].id).toBe('batch_1');
+      // No amber is ever destroyed — the two oldest were consolidated, not trimmed
+      const totalAmber = state.pendingBatches.reduce((sum, b) => sum + b.amberValue, 0);
+      expect(totalAmber).toBe(201);
+      // The merged batch leads the queue carrying the two oldest batches' combined amber
+      expect(state.pendingBatches[0].amberValue).toBe(2);
       expect(state.pendingBatches[199].id).toBe('batch_200');
     });
 

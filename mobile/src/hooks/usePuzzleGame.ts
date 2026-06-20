@@ -113,6 +113,8 @@ export interface PuzzleGameState {
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
   isEchoPuzzle: boolean;
+  /** True when no legal move remains from the active row — surfaces a recovery panel */
+  isStuck: boolean;
 }
 
 export interface PuzzleGameActions {
@@ -198,6 +200,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Double shift state: tracks the 4-step flow (pick1 → drop1 → pick2 → drop2)
   const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
   const [isEchoPuzzle, setIsEchoPuzzle] = useState(false);
+  const [isStuck, setIsStuck] = useState(false);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -289,6 +292,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameState(GameState.PLAYING);
     setMessage(getStartMessage(currentPhase));
     setError(null);
+    setIsStuck(false);
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
     setReverseSolution(options?.reverseSolution);
@@ -906,8 +910,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       // Stuck detection: only for variants where one pick+drop is a full move
       if (!isDoubleShift && !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation)) {
         setMessage(getNoValidMovesMessage(currentPhase));
+        setIsStuck(true);
       } else {
         setMessage(getMoveMessage(currentPhase));
+        setIsStuck(false);
       }
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
@@ -923,20 +929,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setActiveRowIndex(rows.length - 1);
         if (!hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation)) {
           setMessage(getNoValidMovesMessage(currentPhase));
+          setIsStuck(true);
         } else {
           setMessage(
             currentPhase >= 3
               ? 'The descent is complete. Return every letter to the beginning.'
               : 'Great! Now shift letters back up to the first word.'
           );
+          setIsStuck(false);
         }
       } else {
         setActiveRowIndex(prev => prev + 1);
-        setMessage(
-          hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation)
-            ? getMoveMessage(currentPhase)
-            : getNoValidMovesMessage(currentPhase)
-        );
+        const stuck = !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
+        setMessage(stuck ? getNoValidMovesMessage(currentPhase) : getMoveMessage(currentPhase));
+        setIsStuck(stuck);
       }
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
@@ -950,11 +956,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     }
 
     setActiveRowIndex(prev => prev - 1);
-    setMessage(
-      hasAnyValidMove(newRows, activeRowIndex - 1, 'up', checkValidation)
-        ? getMoveMessage(currentPhase)
-        : getNoValidMovesMessage(currentPhase)
-    );
+    const stuckUp = !hasAnyValidMove(newRows, activeRowIndex - 1, 'up', checkValidation);
+    setMessage(stuckUp ? getNoValidMovesMessage(currentPhase) : getMoveMessage(currentPhase));
+    setIsStuck(stuckUp);
     setLastFormedWord(targetWordStr);
     setIsProcessing(false);
     return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
@@ -1034,6 +1038,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setGameState(GameState.PLAYING);
     setSelectedLetter(null);
     setError(null);
+    setIsStuck(false);
     setMessage("Let's try again!");
 
     // After undoing one delta of a double shift completed step, we're now mid-step
@@ -1183,6 +1188,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setLastFormedWord(null);
     setDoubleShiftPhase(null);
     setIsEchoPuzzle(false);
+    setIsStuck(false);
   }, []);
 
   const state: PuzzleGameState = {
@@ -1217,6 +1223,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     slotPreviews,
     doubleShiftPhase,
     isEchoPuzzle,
+    isStuck,
   };
 
   const actions: PuzzleGameActions = {

@@ -1,0 +1,252 @@
+/**
+ * Ads layer (scaffold).
+ *
+ * Real ad SDKs (AppLovin MAX / Google AdMob) are NATIVE modules that break Expo
+ * Go, so they sit behind an `AdProvider` interface — same pattern as iap.ts /
+ * cloudSave.ts. A `NoOpAdProvider` is used until a real provider is wired via
+ * `setAdProvider()`: the app builds, runs in Expo Go, and stays unit-testable; ad
+ * calls resolve to "no ad shown / reward not granted".
+ *
+ * This module owns ALL ad-policy logic (Patron suppression, interstitial cadence,
+ * rewarded daily cap) as pure/testable code, so the native provider only has to
+ * load and show creatives. Rewarded ads are always OPT-IN (a button the player
+ * taps); interstitials are the only auto-shown format and are heavily gated.
+ *
+ * See docs/MONETIZATION_F2P_IMPLEMENTATION.md §2.2 / §4.2 / §4.3 / §5.
+ */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DialoguePhase } from '../types/homeWorld';
+import { getLocalDateString } from './dateUtils';
+import { isPatronSync } from './entitlements';
+import {
+  REWARDED_DAILY_CAP,
+  INTERSTITIAL_FREQUENCY_EARLY,
+  INTERSTITIAL_FREQUENCY_LATE,
+} from '../constants/gameBalance';
+
+const STORAGE_KEY = 'wordshift_ad_pacing';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Opt-in rewarded placements (each is a button the player chooses to tap). */
+export type RewardedPlacement =
+  | 'victory_double'
+  | 'hint_recovery'
+  | 'cooldown_skip'
+  | 'quest_bonus';
+
+export interface RewardedResult {
+  /** True only when the user watched the full ad and earned the reward. */
+  completed: boolean;
+  reason?: 'no_provider' | 'daily_cap' | 'not_ready' | 'dismissed' | 'error';
+}
+
+export interface AdProvider {
+  initialize(): Promise<void>;
+  loadRewarded(placement: RewardedPlacement): Promise<void>;
+  showRewarded(placement: RewardedPlacement): Promise<RewardedResult>;
+  /** Returns true if an interstitial was actually shown. */
+  showInterstitial(): Promise<boolean>;
+  /** iOS App Tracking Transparency — call at first ad exposure, not launch. */
+  requestATTIfNeeded(): Promise<void>;
+  /** GDPR/UK consent (UMP/CMP). */
+  requestConsentIfNeeded(): Promise<void>;
+  isReady(): boolean;
+  getName(): string;
+}
+
+interface AdPacingState {
+  /** puzzlesSolved value at the last interstitial shown. */
+  lastInterstitialPuzzle: number;
+  /** Local day string of the rewarded counter. */
+  rewardedDate: string;
+  /** Rewarded grants claimed on rewardedDate. */
+  rewardedCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// No-op provider (placeholder until a real ad SDK is connected)
+// ---------------------------------------------------------------------------
+
+class NoOpAdProvider implements AdProvider {
+  async initialize(): Promise<void> {
+    console.log('[Ads] NoOp provider — no ad SDK configured');
+  }
+  async loadRewarded(): Promise<void> {}
+  async showRewarded(): Promise<RewardedResult> {
+    return { completed: false, reason: 'no_provider' };
+  }
+  async showInterstitial(): Promise<boolean> {
+    return false;
+  }
+  async requestATTIfNeeded(): Promise<void> {}
+  async requestConsentIfNeeded(): Promise<void> {}
+  isReady(): boolean {
+    return false;
+  }
+  getName(): string {
+    return 'Not Connected';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Manager + pacing storage
+// ---------------------------------------------------------------------------
+
+let provider: AdProvider = new NoOpAdProvider();
+let pacingCache: AdPacingState | null = null;
+
+/** Swap in a real ad provider during app initialization. */
+export function setAdProvider(newProvider: AdProvider): void {
+  provider = newProvider;
+}
+
+export function getAdProviderName(): string {
+  return provider.getName();
+}
+
+function getDefaultPacing(): AdPacingState {
+  return { lastInterstitialPuzzle: 0, rewardedDate: '', rewardedCount: 0 };
+}
+
+async function loadPacing(): Promise<AdPacingState> {
+  if (pacingCache) return pacingCache;
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === 'object') {
+        pacingCache = { ...getDefaultPacing(), ...parsed };
+        return pacingCache!;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  pacingCache = getDefaultPacing();
+  return pacingCache;
+}
+
+async function savePacing(): Promise<void> {
+  if (!pacingCache) return;
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(pacingCache));
+  } catch {
+    /* ignore */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pure policy helpers (exported for testing)
+// ---------------------------------------------------------------------------
+
+/** Interstitial cadence by phase (looser early to protect the candy-phase tone). */
+export function interstitialFrequency(phase: DialoguePhase): number {
+  return (phase as number) <= 2 ? INTERSTITIAL_FREQUENCY_EARLY : INTERSTITIAL_FREQUENCY_LATE;
+}
+
+/**
+ * Pure decision: should an interstitial show now? Patron + every narrative-beat
+ * exemption is passed in as `exempt` so the single caller (App.tsx) keeps all the
+ * "never interrupt a ceremony / final puzzle / Phase 5" rules in one place.
+ */
+export function shouldShowInterstitial(params: {
+  puzzlesSolved: number;
+  lastInterstitialPuzzle: number;
+  phase: DialoguePhase;
+  isPatron: boolean;
+  exempt: boolean;
+}): boolean {
+  const { puzzlesSolved, lastInterstitialPuzzle, phase, isPatron, exempt } = params;
+  if (isPatron || exempt) return false;
+  const freq = interstitialFrequency(phase);
+  return puzzlesSolved - lastInterstitialPuzzle >= freq;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+export async function initAds(): Promise<void> {
+  await loadPacing();
+  try {
+    await provider.initialize();
+  } catch (error) {
+    console.warn('[Ads] provider initialize failed:', error);
+  }
+}
+
+/** Whether the rewarded daily cap has been reached for the current local day. */
+export async function isRewardedCapReached(): Promise<boolean> {
+  const pacing = await loadPacing();
+  const today = getLocalDateString();
+  if (pacing.rewardedDate !== today) return false; // new day → counter resets on next claim
+  return pacing.rewardedCount >= REWARDED_DAILY_CAP;
+}
+
+/**
+ * Show an opt-in rewarded ad. Returns `{ completed: true }` only when the player
+ * watched the full ad. Enforces the daily cap; increments it on a completed view.
+ * Note: rewarded is a player-chosen boost, so it is available to Patron holders too
+ * (Patron removes *interstitials*, not opt-in rewards).
+ */
+export async function showRewarded(placement: RewardedPlacement): Promise<RewardedResult> {
+  if (await isRewardedCapReached()) {
+    return { completed: false, reason: 'daily_cap' };
+  }
+  const result = await provider.showRewarded(placement);
+  if (result.completed) {
+    const pacing = await loadPacing();
+    const today = getLocalDateString();
+    if (pacing.rewardedDate !== today) {
+      pacing.rewardedDate = today;
+      pacing.rewardedCount = 0;
+    }
+    pacing.rewardedCount += 1;
+    pacingCache = pacing;
+    await savePacing();
+  }
+  return result;
+}
+
+/**
+ * Maybe show an interstitial on a puzzle→home/next transition. Suppressed for
+ * Patron holders, for any caller-supplied exemption, and unless the cadence
+ * threshold is met. Records the showing so the counter advances.
+ */
+export async function maybeShowInterstitial(params: {
+  puzzlesSolved: number;
+  phase: DialoguePhase;
+  exempt?: boolean;
+}): Promise<boolean> {
+  const pacing = await loadPacing();
+  const allowed = shouldShowInterstitial({
+    puzzlesSolved: params.puzzlesSolved,
+    lastInterstitialPuzzle: pacing.lastInterstitialPuzzle,
+    phase: params.phase,
+    isPatron: isPatronSync(),
+    exempt: params.exempt ?? false,
+  });
+  if (!allowed) return false;
+
+  const shown = await provider.showInterstitial();
+  if (shown) {
+    pacing.lastInterstitialPuzzle = params.puzzlesSolved;
+    pacingCache = pacing;
+    await savePacing();
+  }
+  return shown;
+}
+
+/** Clear ad pacing state (for Settings → Reset All). */
+export async function clearAdPacing(): Promise<void> {
+  pacingCache = getDefaultPacing();
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}

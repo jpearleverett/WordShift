@@ -20,7 +20,9 @@ import {
 import {
   MIN_PUZZLES_FOR_PHASE,
   VARIANT_REPEAT_DECAY as _VARIANT_REPEAT_DECAY,
+  PATRON_AMBER_BONUS,
 } from '../constants/gameBalance';
+import { isPatronSync } from './entitlements';
 
 const PROGRESS_STORAGE_KEY = 'wordshift_home_progress';
 const TRANSACTIONS_STORAGE_KEY = 'wordshift_amber_transactions';
@@ -363,6 +365,7 @@ export async function awardPuzzleAmber(
   baseAmount: number;
   streakBonus: number;
   challengeBonus: number;
+  patronBonus: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
   firstCompletionBonus: number;
@@ -413,6 +416,15 @@ export async function awardPuzzleAmber(
 
     // Track challenge completions
     progress.challengeCompletions = (progress.challengeCompletions || 0) + 1;
+  }
+
+  // Patron's Key: flat per-puzzle amber bonus. Additive to the REWARD only — it must
+  // never touch phase progression (computed separately below), so pacing is identical
+  // for free and paid players (hard rule: no pay-to-skip-phases).
+  let patronBonus = 0;
+  if (isPatronSync()) {
+    patronBonus = PATRON_AMBER_BONUS;
+    totalAmount += patronBonus;
   }
 
   if (creditToBalance) {
@@ -558,6 +570,7 @@ export async function awardPuzzleAmber(
     baseAmount,
     streakBonus,
     challengeBonus,
+    patronBonus,
     milestoneBonus,
     milestoneMessage,
     firstCompletionBonus,

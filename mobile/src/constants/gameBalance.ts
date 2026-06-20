@@ -62,6 +62,33 @@ export const FIRST_COMPLETION_BONUS: { EASY: number; MEDIUM: number; MEDIUM_PLUS
 export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
 
 // ============================================================================
+// MONETIZATION (scaffold — see docs/MONETIZATION_F2P_IMPLEMENTATION.md)
+// ============================================================================
+
+/**
+ * Flat per-puzzle amber bonus granted to Patron's Key holders.
+ *
+ * IMPORTANT: this is added to the amber *reward* only. It must NEVER feed phase
+ * progression (phaseProgress / phase thresholds) — pacing stays identical for
+ * free and paid players (hard rule: no pay-to-skip-phases).
+ */
+export const PATRON_AMBER_BONUS = 2;
+
+/**
+ * Max rewarded-video grants a player can claim per local day (anti-farm).
+ * Ad amber stays small relative to phase thresholds so it can't trivialize pacing.
+ */
+export const REWARDED_DAILY_CAP = 8;
+
+/**
+ * Interstitial cadence: show at most one interstitial every Nth completed puzzle.
+ * Looser early (Phase 0–2) to protect the candy-phase tone contract, tighter later.
+ * Patron holders and all narrative-beat exemptions bypass this entirely (see ads.ts).
+ */
+export const INTERSTITIAL_FREQUENCY_EARLY = 3; // Phase 0–2
+export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3+
+
+// ============================================================================
 // OFFERING PIT
 // ============================================================================
 

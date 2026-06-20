@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,056 tests across 38 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,077 tests across 39 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -159,8 +159,12 @@ mobile/
 │       ├── dialogueChoices.ts   # Phase 3 player choice points
 │       ├── sacrifice.ts         # Phase 4+ amber sacrifice mechanic
 │       ├── notifications.ts     # Push notification scheduling
-│       ├── cloudSave.ts         # Cloud save infrastructure
-│       ├── wordHarvest.ts       # Offering Pit harvest batches
+│       ├── cloudSave.ts         # Cloud save infrastructure (pluggable provider, NoOp default)
+│       ├── entitlements.ts      # Monetization scaffold: owned purchases / Patron status (source of truth)
+│       ├── iap.ts               # Monetization scaffold: pluggable BillingProvider (NoOp default)
+│       ├── ads.ts               # Monetization scaffold: pluggable AdProvider + ad policy (NoOp default)
+│       ├── cosmetics.ts         # Monetization scaffold: owned/equipped cosmetics
+│       ├── wordHarvest.ts       # Offering Pit harvest batches (over-cap = merge oldest, never drop amber)
 │       ├── slotEstimation.ts    # Drag-and-drop slot position estimation
 │       ├── puzzleSaveState.ts   # Mid-puzzle autosave/restore
 │       ├── roomUpgrades.ts      # Room upgrade amber sink (Phase 2+)
@@ -173,7 +177,7 @@ mobile/
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
 │       ├── homeScenePan.ts, shareResults.ts
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,056 tests, 38 suites
+├── src/__tests__/               # ~1,077 tests, 39 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source (buildNumber/versionCode), autoIncrement on production. `submit.production` still needs real store credentials before `eas submit`.
@@ -236,7 +240,7 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### Custom Hooks
 
-**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection and surfaces `getNoValidMovesMessage()` when no legal move remains.
+**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection: it sets `isStuck` (exposed on state) and surfaces `getNoValidMovesMessage()` when no legal move remains. App.tsx renders a non-transient **stuck-recovery panel** (Undo / Restart, phase-aware headline via `getStuckPanelTitle()`) while `isStuck` — not just the toast. `isStuck` resets on undo/restart/new board.
 
 **`useGamePersistence()`** — Persistence: amber, stats, phases, streak. Key: `recordVictory()` returns VictoryData (includes `phaseTransitionPending`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus`). `refreshStats()` reloads from storage. Reports phase 5 when post-revelation.
 
@@ -409,7 +413,7 @@ ALL player-facing text shifts with phase. Key functions:
 - `getLoadingMessage()`, `getStartMessage()`, `getRulesText()`, `getPhaseChangeNarrative()`
 - `getRitualEchoHeader/Footer()`, `getIncantationName()`, `getWordsOfferedText()`
 - `getAnimalWhisper()`, `getAnimalInterjection()`, `getRitualMicroEvent()`
-- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`, `getNoValidMovesMessage()`
+- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`, `getNoValidMovesMessage()`, `getStuckPanelTitle()`
 - `getNotificationPromptText()` — phase-aware copy for the one-time in-app notification pre-permission prompt
 - Pit functions: `getPitScreenTitle/Subtitle()`, `getPitButtonLabel()`, `getPitOfferAllLabel()`, etc.
 - Ward functions: `getPitWardHint()`, `getPitTransitionReadyText/CeremonyText()`, `getWardMarkColors()`
@@ -430,6 +434,8 @@ One-time events at specific puzzle milestones (35, 40, 50, 55, 65, 80, 90, 100, 
 **House Completion**: All 10 rooms + animals → ceremony modal + cinematic event.
 **Final Puzzle**: After house completion + Phase 4, next puzzle triggers `FINAL_PUZZLE_EVENT`.
 **Post-Revelation (Phase 5)**: Next puzzle after final triggers `POST_REVELATION_EVENT` + `markPostRevelation()`. Special victory text, 10 new dialogues per animal.
+
+> **Known gap (Phase 5 dead-end):** after house completion + final puzzle there is currently no repeatable amber sink and Phase-5 dialogue loops verbatim. Fine for a finite premium title; a retention/LTV problem for F2P. Design fix (the "Tending Shrine" loop + recency-weighted dialogue) is specced in `docs/ENDGAME_LOOP_DESIGN.md` and not yet implemented.
 
 ## Onboarding (11-Step Guided Intro)
 
@@ -497,14 +503,14 @@ Local push: daily reminders (phase-aware morning messages, scheduled as an **alw
 **Permission flow**: `scheduleAllNotifications()` never prompts — it only schedules when permission is already granted. The OS dialog is triggered solely by `requestNotificationPermission()`, reached two ways: the one-time contextual prompt after the player's 3rd+ victory (App.tsx `maybePromptForNotifications`, copy from `getNotificationPromptText()`), or the Daily Reminders toggle in Settings. The prompt result is logged as a `notification_permission_result` event.
 
 ### Cloud Save (`cloudSave.ts`)
-Client-side sync layer with pluggable `CloudProvider` interface. Currently `NoOpProvider`. `collectLocalSaveData()` / `restoreFromCloudData()`. `SYNC_KEYS` lists the **actual** AsyncStorage keys each service writes (e.g. `wordshift_home_progress`, not `wordshift_progress`; includes `wordshift_daily_login`) — keep it in sync when adding a persisted key; device-specific keys (`wordshift_device_id`/`install_id`), the local analytics buffer (`wordshift_event_log`), and the sync-status meta key are intentionally excluded. **Not deliverable until a real backend replaces `NoOpProvider`** (the Patron's-Key cloud-save promise depends on this).
+Client-side sync layer with pluggable `CloudProvider` interface. Currently `NoOpProvider`. `collectLocalSaveData()` / `restoreFromCloudData()`. `SYNC_KEYS` lists the **actual** AsyncStorage keys each service writes (e.g. `wordshift_home_progress`, not `wordshift_progress`; includes `wordshift_daily_login`, `wordshift_cosmetics`) — keep it in sync when adding a persisted key; device-specific keys (`wordshift_device_id`/`install_id`/`wordshift_ad_pacing`), the local analytics buffer (`wordshift_event_log`), store-authoritative entitlements (`wordshift_entitlements`), and the sync-status meta key are intentionally excluded. **Not deliverable until a real backend replaces `NoOpProvider`** (the Patron's-Key cloud-save promise depends on this).
 
 ## Asset System
 
 ### Current State
 - **Store assets are real**: 1024×1024 icon.png, adaptive-icon.png, splash.png, and the Android notification-icon.png are generated by `scripts/tools/generateAppIcons.mjs` / `generateNotificationIcon.mjs` (`npm run generate:assets`)
 - **SFX pack**: 14 WAV chimes in `assets/sounds/`, generated by `scripts/tools/generateSounds.mjs`
-- **All 10 character sprites** wired up: idle.png, talk.png, robed.png per animal
+- **All 10 character sprites** wired up: idle.png, talk.png, robed.png per animal. **Known art defect:** `axolotl/talk.png` is byte-identical to `axolotl/idle.png` (every other animal has a distinct talk frame) — needs a distinct mouth-open frame from the artist. A reduced-motion-safe talk transform on the dialogue portrait (HomeScreen `dialogueSpriteTalking`) currently masks the symptom for all animals.
 - **All 10 room backgrounds** wired up in RoomView.tsx
 - **Environment**: sky_day/dusk/storm/shadow.png (phase-aware), pitt_day/dusk/night.png (pit backgrounds). Oversized backgrounds were downscaled for mobile via `scripts/tools/downscaleImages.mjs` (skies 1080px wide, aquarium/jungle/office rooms downscaled too)
 - **World art (pixel style, wired into HouseWorld)**: `cloud_1/2.png`, `roof.png` (chimney + attic window baked in; smoke puffs animate above it), `foundation.png`, and the tappable `pit_entrance.png` (stone path + glowing mouth) rendered in the layout flow below the foundation — all crisp pixel art matching the room interiors, generated by `scripts/tools/generatePixelWorld.mjs`. `ground.png`/`tree.png` exist but are intentionally NOT rendered: the sky backgrounds are full landscapes with their own grass and trees. The soft `shadow_figure.png` (the entity) is deliberately NOT pixel art — it should read as otherworldly against the pixel world (`generateWorldArt.mjs`)
@@ -643,13 +649,28 @@ Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250:
 
 ## Monetization
 
-Full plan in `MONETIZATION_PLAN.md`. Core principle: players pay for *expression* and *convenience*, never for *narrative progression*.
+Core principle: players pay for *expression* and *convenience*, never for *narrative progression*.
+
+**Strategy docs (read these before building monetization):**
+- `MONETIZATION_PLAN.md` — original design intent.
+- `docs/MONETIZATION_F2P_IMPLEMENTATION.md` — concrete F2P build plan (SDKs, SKUs, store/legal prereqs, effort/rollout). **This is the chosen direction.**
+- `docs/ANALYTICS_AND_CRASH_SETUP.md` — turning on telemetry + adding Sentry.
+- `docs/ENDGAME_LOOP_DESIGN.md` — the Phase-5 endgame loop ("Tending Shrine") that LTV depends on.
+
+**Scaffold status (data/service layer EXISTS; UI + real SDKs do NOT):**
+- `services/entitlements.ts` — single source of truth for "what the player paid for" (`isPatron()`/`isPatronSync()`, `grantEntitlements`, `setEntitlements`, `clearEntitlements`). AsyncStorage-backed, native-free.
+- `services/iap.ts` — pluggable `BillingProvider` behind a `NoOpBillingProvider` (mirrors `cloudSave.ts`). `PRODUCT_IDS`, `purchaseProduct`, `restorePurchases`, `entitlementsForProduct`. Swap in a real RevenueCat provider via `setBillingProvider()`. `initIAP()` runs in App bootstrap (warms entitlement cache).
+- `services/ads.ts` — pluggable `AdProvider` behind a `NoOpAdProvider`. Owns ALL ad policy as pure/testable code: `interstitialFrequency`, `shouldShowInterstitial`, rewarded daily cap, Patron suppression. `showRewarded` (opt-in), `maybeShowInterstitial`. `initAds()` runs in App bootstrap.
+- `services/cosmetics.ts` — owned/equipped cosmetic state (amber-bought local + IAP via entitlements). `ownsCosmetic`, `recordAmberCosmeticPurchase`, `equipCosmetic`. Patron tile theme auto-owned via entitlement.
+- **Wired:** Patron `+2` amber/puzzle in `amberCurrency.awardPuzzleAmber()` (`PATRON_AMBER_BONUS`, returned as `patronBonus`) — additive to the REWARD only, **never** phase progress. New keys cleared in Settings → Reset All. `wordshift_cosmetics` added to `cloudSave.SYNC_KEYS`; `wordshift_entitlements` (store-authoritative) and `wordshift_ad_pacing` (device-specific) intentionally excluded.
+- **NOT built yet:** `PatronScreen.tsx`, `ShopScreen.tsx`, real RevenueCat/AdMob providers, equipped-theme wiring into `theme/colors.ts`/`LetterTile`, the EAS Dev Client migration (native SDKs end Expo Go). See `docs/MONETIZATION_F2P_IMPLEMENTATION.md` §4.
+- Everything ships behind NoOp providers, so the app runs unchanged in Expo Go today and all logic is unit-tested (`__tests__/monetization.test.ts`).
 
 **Key points:**
 - **Rewarded video ads** (opt-in): bonus amber, cooldown skip, quest bonus, hint recovery
 - **Interstitials** (between puzzles only): every 3rd (Phase 0-2) or 5th (Phase 3+), many exemptions
 - **Patron's Key** ($6.99): ad-free, exclusive tile theme, +2 amber/puzzle, extended undo, cloud save
 - **Cosmetic Shop**: tile themes, room accents, confetti effects, animal accessories
-- **Content Pass**: monthly ($1.99) and quarterly ($4.99) curated content
+- **Content Pass**: monthly ($1.99) and quarterly ($4.99) curated content — **deferred** (no recurring content yet; gated on the endgame loop)
 - **Mid-game amber sinks**: animal gifts, room upgrades, amber altar
 - **Never**: energy/lives, loot boxes, pay-to-skip-phases, forced ads, paywalled animals, amber bundles

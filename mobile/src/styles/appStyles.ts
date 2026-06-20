@@ -301,6 +301,65 @@ export const appStyles = StyleSheet.create({
     gap: 20,
   },
 
+  // Stuck-recovery panel
+  stuckPanel: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.main,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  stuckPanelTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: CandyColors.gray[800],
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  stuckPanelBody: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: CandyColors.gray[600],
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  stuckPanelButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  stuckPanelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: CandyColors.yellow.main,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stuckPanelButtonPrimary: {
+    backgroundColor: CandyColors.green.main,
+  },
+  stuckPanelButtonDisabled: {
+    opacity: 0.4,
+  },
+  stuckPanelButtonPressed: {
+    opacity: 0.75,
+  },
+  stuckPanelButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
   // Challenge mode styles
   leftStatsGroup: {
     flexDirection: 'row',

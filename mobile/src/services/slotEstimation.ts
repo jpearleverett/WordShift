@@ -11,7 +11,7 @@ import { Dimensions } from 'react-native';
 import {
   ROW_HORIZONTAL_MARGIN,
   ROW_PADDING,
-  SLOT_WIDTH,
+  ARC_SLOT_RENDERED_WIDTH,
   ARC_SLOT_MARGIN_H,
   ARC_LETTER_MARGIN_H,
   STANDARD_TILE_W,
@@ -53,8 +53,10 @@ export function estimateSlotIndex(
   // Each letter cell width (tile + 2 × margin)
   const letterCellW = tileW + tileMarginH * 2;
 
-  // Each slot cell width (slot inner + 2 × arc margin)
-  const slotEffectiveW = SLOT_WIDTH + ARC_SLOT_MARGIN_H * 2;
+  // Each slot cell width (rendered compact slot + 2 × arc margin). The arc always
+  // renders the compact slot style (ARC_SLOT_RENDERED_WIDTH), so the estimation
+  // must match that width to avoid drift compounding across slots.
+  const slotEffectiveW = ARC_SLOT_RENDERED_WIDTH + ARC_SLOT_MARGIN_H * 2;
 
   // Letter count is slotCount - 1
   const letterCount = slotCount - 1;

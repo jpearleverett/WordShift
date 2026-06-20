@@ -118,6 +118,35 @@ describe('awardPuzzleAmber', () => {
     const balance = await getAmberBalance();
     expect(balance).toBe(0);
   });
+
+  test('no Patron bonus for non-patrons', async () => {
+    const result = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
+    expect(result.patronBonus).toBe(0);
+  });
+});
+
+describe('Patron amber bonus', () => {
+  test('adds a flat per-puzzle bonus to the reward only, not phase progress', async () => {
+    const { grantEntitlements, loadEntitlements, clearEntitlements, ENTITLEMENTS } =
+      require('../services/entitlements');
+    await clearEntitlements();
+
+    // Baseline (non-patron)
+    const free = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
+    await clearProgress();
+
+    // Become a patron and warm the synchronous cache
+    await grantEntitlements([ENTITLEMENTS.PATRON]);
+    await loadEntitlements();
+    const patron = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
+
+    expect(patron.patronBonus).toBe(2);
+    expect(patron.amount).toBe(free.amount + 2);
+    // Phase pacing is identical — bonus must not feed phase acceleration
+    expect(patron.phaseAcceleration).toBe(free.phaseAcceleration);
+
+    await clearEntitlements();
+  });
 });
 
 describe('applyVariantAmberBonus', () => {

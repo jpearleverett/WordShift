@@ -53,8 +53,10 @@ export interface SyncStatus {
 /** All AsyncStorage keys that should be included in cloud saves */
 // Keys are the ACTUAL AsyncStorage keys written by the services (verified against
 // each service's STORAGE_KEY constant). Device-specific keys (wordshift_device_id,
-// wordshift_install_id), the local analytics buffer (wordshift_event_log), and the
-// sync-status meta key are intentionally excluded.
+// wordshift_install_id), the local analytics buffer (wordshift_event_log), the ad
+// pacing counter (wordshift_ad_pacing), entitlements (wordshift_entitlements —
+// restored authoritatively from the store, not the cloud), and the sync-status meta
+// key are intentionally excluded.
 const SYNC_KEYS = [
   // Core progression & economy
   'wordshift_home_progress',
@@ -62,6 +64,7 @@ const SYNC_KEYS = [
   'wordshift_star_stats',
   'wordshift_achievements',
   'wordshift_room_upgrades',
+  'wordshift_cosmetics',
   // Streaks / sharing
   'wordshift_share_count',
   'wordshift_share_bonus_date',

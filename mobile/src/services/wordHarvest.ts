@@ -105,11 +105,22 @@ export async function enqueueHarvestBatch(batch: HarvestBatch): Promise<{ overfl
 
   state.pendingBatches.push(normalizedBatch);
 
-  // Trim oldest if over cap
+  // If we're over the cap, consolidate the two oldest batches into one rather
+  // than dropping the oldest outright. Amber is deferred until offered in the
+  // Pit, so trimming a batch would permanently destroy the player's earned (but
+  // uncollected) amber. Merging keeps the batch count bounded while preserving
+  // every amber point and word. `overflow` is still reported so the UI can nudge
+  // the player to visit the Pit and clear the backlog.
   let overflow = false;
   if (state.pendingBatches.length > MAX_PENDING_BATCHES) {
     overflow = true;
-    state.pendingBatches = state.pendingBatches.slice(-MAX_PENDING_BATCHES);
+    const [oldest, secondOldest, ...rest] = state.pendingBatches;
+    const merged: HarvestBatch = {
+      ...oldest,
+      words: [...new Set([...oldest.words, ...secondOldest.words])],
+      amberValue: oldest.amberValue + secondOldest.amberValue,
+    };
+    state.pendingBatches = [merged, ...rest];
   }
 
   harvestCache = state;
