@@ -5,24 +5,22 @@
  * screen-space X coordinate into the closest slot index.
  */
 import { Dimensions } from 'react-native';
+// Single source of truth: the arc geometry lives in a neutral constants module
+// shared with Row.tsx/LetterTile.tsx, so the drag-drop slot math can never
+// silently drift from the rendered layout.
+import {
+  ROW_HORIZONTAL_MARGIN,
+  ROW_PADDING,
+  SLOT_WIDTH,
+  ARC_SLOT_MARGIN_H,
+  ARC_LETTER_MARGIN_H,
+  STANDARD_TILE_W,
+  STANDARD_TILE_MARGIN_H,
+  COMPACT_TILE_W,
+  COMPACT_TILE_MARGIN_H,
+} from '../constants/tileLayout';
 
-// Layout constants mirrored from Row.tsx and LetterTile.tsx.
-// These must stay in sync with the source components.
-const ROW_HORIZONTAL_MARGIN = 12; // Row.tsx:19
-const ROW_PADDING = 8;            // Row.tsx:20
-const SLOT_WIDTH = 14;            // Row.tsx:25
-
-// Arc-mode margins
-const ARC_SLOT_MARGIN_H = -1;     // Row.tsx:849 arcSlotWrapper marginHorizontal
-const ARC_LETTER_MARGIN_H = -3;   // Row.tsx:853 arcLetterWrapper marginHorizontal
-
-// Tile dimensions
-const STANDARD_TILE_W = 52;       // LetterTile.tsx standard width
-const STANDARD_TILE_MARGIN_H = 3; // LetterTile.tsx standard marginHorizontal
-const COMPACT_TILE_W = 42;        // LetterTile.tsx compact width
-const COMPACT_TILE_MARGIN_H = 2;  // LetterTile.tsx compact marginHorizontal
-
-// Compact threshold: target rows with wordLength >= 6 use compact tiles (Row.tsx:418)
+// Compact threshold: target rows with wordLength >= 6 use compact tiles (Row.tsx)
 const COMPACT_THRESHOLD = 6;
 
 interface SlotPreview {

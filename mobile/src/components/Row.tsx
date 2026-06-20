@@ -16,14 +16,17 @@ import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { hapticMedium, hapticError } from '../services/haptics';
 import { getWordPhaseTier } from '../services/localGenerator';
-
-const ROW_HORIZONTAL_MARGIN = 12;
-const ROW_PADDING = 8;
+import {
+  ROW_HORIZONTAL_MARGIN,
+  ROW_PADDING,
+  SLOT_WIDTH,
+  ARC_LETTER_MARGIN_H,
+  ARC_SLOT_MARGIN_H,
+} from '../constants/tileLayout';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
 const ARC_LIFT = 18; // How much center elements lift up relative to edges
-const SLOT_WIDTH = 14; // Narrow slots to keep letters close together
 const SLOT_HEIGHT = 52; // Height to match letter tiles vertically
 
 /** Preview data for a single slot position */
@@ -874,10 +877,10 @@ const styles = StyleSheet.create({
     // No extra padding - container stays same size, content overflows
   },
   arcLetterWrapper: {
-    marginHorizontal: -3, // 10% more separation than before (-5 -> -3)
+    marginHorizontal: ARC_LETTER_MARGIN_H, // 10% more separation than before (-5 -> -3)
   },
   arcSlotWrapper: {
-    marginHorizontal: -1, // Minimal gap - slots nestle between letters
+    marginHorizontal: ARC_SLOT_MARGIN_H, // Minimal gap - slots nestle between letters
     zIndex: 10, // Bring slots to front (on top of letters)
   },
 
