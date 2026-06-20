@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
-import { getLocalDateString } from './dateUtils';
 
 /**
  * Push notification scheduling service for WordShift.
@@ -337,29 +336,14 @@ async function scheduleDailyReminder(
 ): Promise<void> {
   const message = getNotificationMessage('daily', phase);
   try {
-    // If the player has already played today, the reminder hour may still be
-    // ahead of us (e.g. an evening player, 9am reminder already passed) or
-    // behind us — either way we don't want to ping them again for a day they
-    // already played. Schedule the first occurrence for tomorrow via a one-shot
-    // date trigger; otherwise keep the lightweight repeating daily trigger.
-    const playedToday = (await getLastPlayDateSafe()) === getLocalDateString();
-    if (playedToday) {
-      const triggerDate = new Date();
-      triggerDate.setDate(triggerDate.getDate() + 1);
-      triggerDate.setHours(hour, 0, 0, 0);
-      await mod.scheduleNotificationAsync({
-        content: {
-          title: 'WordShift',
-          body: message,
-          sound: true,
-        },
-        trigger: {
-          date: triggerDate,
-        },
-      });
-      return;
-    }
-
+    // Always use a REPEATING daily trigger so the "daily puzzle is ready" reminder
+    // never lapses for the exact cohort we most want to reach — players who don't
+    // reopen the app. (A previous version scheduled a one-shot for tomorrow when
+    // the player had already played today, which meant the reminder silently
+    // depended on the player relaunching to re-arm it.) Every session reschedules
+    // all notifications, so this stays fresh; the only cost is a possible same-day
+    // ping if the player plays shortly before the reminder hour — an acceptable
+    // trade vs. the reminder vanishing entirely.
     await mod.scheduleNotificationAsync({
       content: {
         title: 'WordShift',
@@ -410,21 +394,6 @@ async function getCurrentStreakSafe(): Promise<number> {
     return progress?.currentStreak ?? 0;
   } catch {
     return 0;
-  }
-}
-
-/**
- * Read the player's last-played local day (YYYY-MM-DD) without a static import
- * cycle — amberCurrency is only needed here, at schedule time. Returns null
- * when unavailable, which the daily reminder treats as "not played today".
- */
-async function getLastPlayDateSafe(): Promise<string | null> {
-  try {
-    const { getFullProgress } = require('./amberCurrency');
-    const progress = await getFullProgress();
-    return progress?.lastPlayDate ?? null;
-  } catch {
-    return null;
   }
 }
 
