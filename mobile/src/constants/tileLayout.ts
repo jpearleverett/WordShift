@@ -15,6 +15,13 @@ export const ROW_PADDING = 8;
 // Arc slot width (narrow slots keep letters close together)
 export const SLOT_WIDTH = 14;
 
+// The arc layout always renders slots with the compact style, whose width is
+// slightly wider than SLOT_WIDTH for trapezoid visibility (Row.tsx `slotCompact`).
+// Drag-drop slot math MUST use this rendered width — not the bare SLOT_WIDTH — or
+// the estimated slot centers drift a few px each and compound left-to-right,
+// causing long-word drops to resolve to the neighbouring slot.
+export const ARC_SLOT_RENDERED_WIDTH = SLOT_WIDTH + 4;
+
 // Arc wrapper margins (negative = elements nestle together)
 export const ARC_LETTER_MARGIN_H = -3; // arcLetterWrapper marginHorizontal
 export const ARC_SLOT_MARGIN_H = -1; // arcSlotWrapper marginHorizontal

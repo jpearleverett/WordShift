@@ -1129,7 +1129,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.talk!
                             : CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.idle
                       }
-                      style={styles.dialogueSpriteImage}
+                      style={[
+                        styles.dialogueSpriteImage,
+                        dialogueFlow.isTalking && styles.dialogueSpriteTalking,
+                      ]}
                       resizeMode="cover"
                       accessibilityLabel={`${dialogueFlow.selectedAnimal.name} portrait`}
                     />
@@ -2589,6 +2592,13 @@ const styles = StyleSheet.create({
   dialogueSpriteImage: {
     width: SCREEN_WIDTH * 0.36,
     height: SCREEN_WIDTH * 0.48,
+  },
+  // Subtle "talking" lift applied while isTalking toggles (every 300ms). Reads as
+  // gentle movement for every animal and ensures the portrait never looks frozen
+  // even if an animal's talk frame matches its idle frame. Under reduced motion
+  // isTalking stays constant, so this resolves to a static (non-moving) offset.
+  dialogueSpriteTalking: {
+    transform: [{ translateY: -2 }, { scale: 1.02 }],
   },
   dialogueSpriteEmoji: {
     fontSize: Math.min(80, SCREEN_WIDTH * 0.2),

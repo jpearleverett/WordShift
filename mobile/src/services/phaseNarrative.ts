@@ -257,6 +257,20 @@ export function getNoValidMovesMessage(phase: DialoguePhase): string {
   return NO_VALID_MOVES_MESSAGES[phase];
 }
 
+/** Short, phase-aware headline for the stuck-recovery panel. */
+const STUCK_PANEL_TITLES: Record<DialoguePhase, string> = {
+  0: 'Stuck? No worries!',
+  1: 'A dead end.',
+  2: 'This path has closed.',
+  3: 'The way is shut.',
+  4: 'No path remains.',
+  5: 'The thread frays.',
+};
+
+export function getStuckPanelTitle(phase: DialoguePhase): string {
+  return STUCK_PANEL_TITLES[phase];
+}
+
 // ============================================================================
 // LOADING MESSAGES — What shows during puzzle generation
 // ============================================================================
@@ -2000,8 +2014,9 @@ export function getPitOverflowText(phase: DialoguePhase, extraCount: number): st
 // --- Harvest overflow warning ---
 
 /**
- * Phase-aware message shown when pending harvest batches hit the 200 cap
- * and oldest batches are trimmed.
+ * Phase-aware message shown when pending harvest batches hit the 200 cap.
+ * Oldest batches are merged (never dropped — no amber is lost); this nudges
+ * the player to visit the Pit and clear the backlog.
  */
 export function getHarvestOverflowMessage(phase: DialoguePhase): string {
   if (phase >= 3) return 'The pit overflows. Feed it.';

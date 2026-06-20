@@ -63,6 +63,8 @@ import {
   getFoxPitHarvestIntroLines,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
+  getNoValidMovesMessage,
+  getStuckPanelTitle,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
@@ -1772,6 +1774,50 @@ function MainApp() {
             visible={puzzle.gameState === GameState.PLAYING && ritualEchoWords.length > 0}
           />
         </View>
+
+        {/* Stuck-recovery panel — appears when no legal move remains so the
+            player has a clear, non-transient way out instead of only a toast */}
+        {puzzle.isStuck && puzzle.gameState === GameState.PLAYING && !onboardingFlow.isOnboarding && (
+          <View
+            style={styles.stuckPanel}
+            accessibilityRole="alert"
+            accessibilityLabel={`${getStuckPanelTitle(persistence.currentPhase)} ${getNoValidMovesMessage(persistence.currentPhase)}`}
+          >
+            <Text style={styles.stuckPanelTitle}>{getStuckPanelTitle(persistence.currentPhase)}</Text>
+            <Text style={styles.stuckPanelBody}>{getNoValidMovesMessage(persistence.currentPhase)}</Text>
+            <View style={styles.stuckPanelButtons}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.stuckPanelButton,
+                  puzzle.history.length === 0 && styles.stuckPanelButtonDisabled,
+                  pressed && styles.stuckPanelButtonPressed,
+                ]}
+                onPress={handleUndo}
+                disabled={puzzle.history.length === 0}
+                accessibilityRole="button"
+                accessibilityLabel="Undo last move"
+              >
+                <Text style={styles.stuckPanelButtonText}>↩ Undo move</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.stuckPanelButton,
+                  styles.stuckPanelButtonPrimary,
+                  pressed && styles.stuckPanelButtonPressed,
+                ]}
+                onPress={() => {
+                  hapticLight();
+                  setRitualEchoWords([]);
+                  puzzleActions.resetCurrentPuzzle();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Restart this puzzle"
+              >
+                <Text style={styles.stuckPanelButtonText}>🔄 Restart</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {/* Bottom Controls — simplified during onboarding (no NEW button) */}
         <View style={styles.controls}>
