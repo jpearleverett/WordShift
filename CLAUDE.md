@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,049 tests across 37 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,056 tests across 38 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -85,6 +85,7 @@ mobile/
 │   ├── constants.ts             # Word lists by length (3-7 letters), COMMON_WORDS, fallback puzzle pools
 │   ├── constants/               # Centralized game balance and timing constants
 │   │   ├── gameBalance.ts       # Phase thresholds, amber rewards, streak config, puzzle gen timeouts
+│   │   ├── tileLayout.ts        # Shared arc-layout geometry (single source of truth for Row/LetterTile/slotEstimation)
 │   │   └── timing.ts            # Animation/interaction timing constants
 │   ├── dictionary.ts            # 11,504-word dictionary (3-7 letters, profanity-filtered)
 │   ├── data/                    # Pre-generated puzzle banks (12 banks, ~480 puzzles each after profanity purge; lazy-loaded)
@@ -148,6 +149,7 @@ mobile/
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions, unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG
+│       ├── dailyLoginReward.ts  # Daily app-open reward (7-day escalating cycle, local-day bucketed)
 │       ├── phaseNarrative.ts    # ALL phase-aware text (victory, moves, hints, loading, etc.)
 │       ├── phaseEvents.ts       # Phase transition cinematic events
 │       ├── achievements.ts      # 34 achievements across 5 categories, each grants one-time amber
@@ -171,7 +173,7 @@ mobile/
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
 │       ├── homeScenePan.ts, shareResults.ts
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,049 tests, 37 suites
+├── src/__tests__/               # ~1,056 tests, 38 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source (buildNumber/versionCode), autoIncrement on production. `submit.production` still needs real store credentials before `eas submit`.
@@ -306,6 +308,7 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 - Puzzle count milestones (10, 15, 25, 50... up to 350)
 - Achievement rewards: each of the 34 achievements grants one-time amber (10-100, `rewardAmber` in achievements.ts)
 - Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus` in shareResults.ts; hinted on the VictoryModal share button)
+- Daily login reward: rewards *opening the app* (not just solving) — a 7-day escalating cycle (10/15/20/25/30/40/75, Day-7 jackpot) that wraps weekly and resets on a missed day. `claimDailyLoginReward()` in `dailyLoginReward.ts`, claimed once per session from App's launch effect (skipped during onboarding), source `'daily_login'`
 
 ### House Building (Bottom-Up)
 
@@ -489,12 +492,12 @@ Phase 4+: voluntary amber destruction. No gameplay benefit. Phase-aware response
 Phase 2+: one cosmetic enhancement per room (10 total, 75-150 amber). Phase-aware descriptions.
 
 ### Notifications (`notifications.ts`)
-Local push: daily reminders (phase-aware morning messages), streak-at-risk reminders (7pm the next missed day when streak ≥ 2, copy via `getStreakRiskMessage(phase, streak)`), and re-engagement (6pm; next day for non-streak players, day after the streak warning for streak holders — an escalation ladder). Each app session reschedules everything, so reminders only fire on genuinely missed days. Phase 5 has distinct serene tone.
+Local push: daily reminders (phase-aware morning messages, scheduled as an **always-repeating** daily trigger so the "puzzle is ready" ping never lapses for players who don't relaunch), streak-at-risk reminders (7pm the next missed day when streak ≥ 2, copy via `getStreakRiskMessage(phase, streak)`), and re-engagement (6pm; next day for non-streak players, day after the streak warning for streak holders — an escalation ladder). Each app session reschedules everything; the streak/re-engagement pings only fire on genuinely missed days. Phase 5 has distinct serene tone.
 
 **Permission flow**: `scheduleAllNotifications()` never prompts — it only schedules when permission is already granted. The OS dialog is triggered solely by `requestNotificationPermission()`, reached two ways: the one-time contextual prompt after the player's 3rd+ victory (App.tsx `maybePromptForNotifications`, copy from `getNotificationPromptText()`), or the Daily Reminders toggle in Settings. The prompt result is logged as a `notification_permission_result` event.
 
 ### Cloud Save (`cloudSave.ts`)
-Client-side sync layer with pluggable `CloudProvider` interface. Currently `NoOpProvider`. `collectLocalSaveData()` / `restoreFromCloudData()`. `SYNC_KEYS` lists the **actual** AsyncStorage keys each service writes (e.g. `wordshift_home_progress`, not `wordshift_progress`) — keep it in sync when adding a persisted key; device-specific keys (`wordshift_device_id`/`install_id`), the local analytics buffer (`wordshift_event_log`), and the sync-status meta key are intentionally excluded. **Not deliverable until a real backend replaces `NoOpProvider`** (the Patron's-Key cloud-save promise depends on this).
+Client-side sync layer with pluggable `CloudProvider` interface. Currently `NoOpProvider`. `collectLocalSaveData()` / `restoreFromCloudData()`. `SYNC_KEYS` lists the **actual** AsyncStorage keys each service writes (e.g. `wordshift_home_progress`, not `wordshift_progress`; includes `wordshift_daily_login`) — keep it in sync when adding a persisted key; device-specific keys (`wordshift_device_id`/`install_id`), the local analytics buffer (`wordshift_event_log`), and the sync-status meta key are intentionally excluded. **Not deliverable until a real backend replaces `NoOpProvider`** (the Patron's-Key cloud-save promise depends on this).
 
 ## Asset System
 
