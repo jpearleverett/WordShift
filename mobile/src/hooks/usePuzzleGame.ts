@@ -160,6 +160,8 @@ export interface PuzzleGameActions {
   setCurrentPhase: (phase: DialoguePhase) => void;
   setSelectedVariant: (variant: PuzzleVariant) => void;
   restorePuzzleState: (saved: SavedPuzzleState) => void;
+  /** Restore the current board to its starting state (a true retry of THIS puzzle). */
+  resetCurrentPuzzle: () => void;
   clearBoard: () => void;
 }
 
@@ -1152,6 +1154,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setEarnedStars(0);
   }, []);
 
+  // Re-apply the same puzzle from its starting words (each row preserves its
+  // immutable originalWord). Unlike startNewGame this does NOT fetch a different
+  // puzzle — it's a real "retry this board", the recovery path for a stuck state.
+  // Performance counters (invalid attempts, hints used) are intentionally kept so
+  // a reset can't be used to game the star rating; undos refresh with the board.
+  const resetCurrentPuzzle = useCallback(() => {
+    if (rows.length === 0) return;
+    const originalWords = rows.map(r => r.originalWord);
+    const wordLen = originalWords[0]?.length ?? currentWordLength;
+    applyBoard(originalWords, hint || undefined, solution, wordLen, {
+      resetPerformance: false,
+      preserveVariant: true,
+      reverseSolution,
+    });
+  }, [rows, applyBoard, hint, solution, reverseSolution, currentWordLength]);
+
   const clearBoard = useCallback(() => {
     setRows([]);
     setActiveRowIndex(0);
@@ -1220,6 +1238,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setCurrentPhase,
     setSelectedVariant,
     restorePuzzleState,
+    resetCurrentPuzzle,
     clearBoard,
   };
 

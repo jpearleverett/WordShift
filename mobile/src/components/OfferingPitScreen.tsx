@@ -1523,6 +1523,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     if (onboardingHadPending.current && harvestState && harvestState.pendingBatches.length === 0) {
       onOnboardingOfferComplete?.();
     }
+    // Safety net: if we reach pit_offering with nothing to offer (a missing/empty
+    // harvest batch), there's no devour interaction that can complete the step,
+    // so the onboarding Fox guide would never appear and the flow could soft-lock.
+    // Fire completion after a short delay in that case. If batches load late, this
+    // effect re-runs, marks hadPending, and the timer is cleared before it fires.
+    if (!onboardingHadPending.current && harvestState && harvestState.pendingBatches.length === 0) {
+      const fallback = setTimeout(() => onOnboardingOfferComplete?.(), 4000);
+      return () => clearTimeout(fallback);
+    }
   }, [onboardingStep, harvestState, onOnboardingOfferComplete]);
 
   // ---- Harvest All (with spiral paths) ----

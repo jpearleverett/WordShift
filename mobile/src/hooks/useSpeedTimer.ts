@@ -35,6 +35,9 @@ export function useSpeedTimer(
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef<number>(0);
   const limitRef = useRef<number>(0);
+  // True between start and stop/time-up — gates AppState handling so transient
+  // foreground events never touch the clock when no run is active.
+  const runningRef = useRef<boolean>(false);
 
   const clearTimer = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -43,12 +46,12 @@ export function useSpeedTimer(
     }
   }, []);
 
-  const startSpeedTimer = useCallback((seconds: number) => {
+  // Single source of truth for the countdown interval. `limitRef` holds the
+  // remaining seconds budget and `startedAtRef` is reset to now, so both fresh
+  // starts and post-background resumes share identical tick logic.
+  const beginTicking = useCallback(() => {
     clearTimer();
-    limitRef.current = seconds;
     startedAtRef.current = Date.now();
-    setSpeedTimeRemaining(seconds);
-
     intervalRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startedAtRef.current) / 1000);
       const remaining = Math.max(0, limitRef.current - elapsed);
@@ -56,49 +59,54 @@ export function useSpeedTimer(
 
       if (remaining <= 0) {
         clearTimer();
+        runningRef.current = false;
         onTimeUpRef.current();
       }
     }, SPEED_TIMER_INTERVAL_MS);
   }, [clearTimer]);
 
+  const startSpeedTimer = useCallback((seconds: number) => {
+    limitRef.current = seconds;
+    runningRef.current = true;
+    setSpeedTimeRemaining(seconds);
+    beginTicking();
+  }, [beginTicking]);
+
   const stopSpeedTimer = useCallback(() => {
+    runningRef.current = false;
     clearTimer();
     setSpeedTimeRemaining(null);
   }, [clearTimer]);
 
-  // Pause while backgrounded: a phone call or app switch must not eat the
-  // clock. On background we bank the remaining seconds and stop ticking;
-  // on return we restart the countdown from the banked value.
+  // Pause while backgrounded: a phone call or app switch must not eat the clock.
+  // Only true `background` pauses — transient `inactive` (notification banner,
+  // Control Center, incoming-call UI) is ignored so the clock isn't churned by
+  // events that don't actually suspend the app.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'background' || nextState === 'inactive') {
+      if (!runningRef.current) return;
+
+      if (nextState === 'background') {
         if (intervalRef.current !== null) {
           const elapsed = Math.floor((Date.now() - startedAtRef.current) / 1000);
           limitRef.current = Math.max(0, limitRef.current - elapsed);
           clearTimer();
         }
-      } else if (nextState === 'active') {
-        // Resume only if a run was in progress (remaining state still set)
-        setSpeedTimeRemaining((current) => {
-          if (current !== null && intervalRef.current === null && limitRef.current > 0) {
-            startedAtRef.current = Date.now();
-            intervalRef.current = setInterval(() => {
-              const elapsed = Math.floor((Date.now() - startedAtRef.current) / 1000);
-              const remaining = Math.max(0, limitRef.current - elapsed);
-              setSpeedTimeRemaining(remaining);
-              if (remaining <= 0) {
-                clearTimer();
-                onTimeUpRef.current();
-              }
-            }, SPEED_TIMER_INTERVAL_MS);
-            return limitRef.current;
-          }
-          return current;
-        });
+      } else if (nextState === 'active' && intervalRef.current === null) {
+        // Returning from a pause. Resume from the banked budget, or fire time-up
+        // if the clock expired while we were suspended.
+        if (limitRef.current > 0) {
+          setSpeedTimeRemaining(limitRef.current);
+          beginTicking();
+        } else {
+          runningRef.current = false;
+          setSpeedTimeRemaining(0);
+          onTimeUpRef.current();
+        }
       }
     });
     return () => subscription.remove();
-  }, [clearTimer]);
+  }, [clearTimer, beginTicking]);
 
   // Cleanup on unmount.
   useEffect(() => {

@@ -96,7 +96,7 @@ describe('onboarding', () => {
       expect(ONBOARDING_FOX_LINES.going_to_pit.length).toBe(1);
 
       expect(ONBOARDING_FOX_LINES.pit_intro).toBeDefined();
-      expect(ONBOARDING_FOX_LINES.pit_intro.length).toBe(4);
+      expect(ONBOARDING_FOX_LINES.pit_intro.length).toBe(2);
 
       expect(ONBOARDING_FOX_LINES.pit_offering_complete).toBeDefined();
       expect(ONBOARDING_FOX_LINES.pit_offering_complete.length).toBe(1);

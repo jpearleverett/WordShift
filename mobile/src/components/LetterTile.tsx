@@ -4,6 +4,12 @@ import { Letter } from '../types';
 import { getTileColor, CandyColors, getPhaseTheme, getResonanceConfig } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
+import {
+  STANDARD_TILE_W,
+  STANDARD_TILE_MARGIN_H,
+  COMPACT_TILE_W,
+  COMPACT_TILE_MARGIN_H,
+} from '../constants/tileLayout';
 
 interface LetterTileProps {
   letter: Letter;
@@ -20,13 +26,13 @@ interface LetterTileProps {
 }
 
 // Compact tile dimensions for 6+ letter words
-const COMPACT_OUTER_W = 42;
+const COMPACT_OUTER_W = COMPACT_TILE_W; // 42
 const COMPACT_OUTER_H = 52;
 const COMPACT_BODY_W = 42;
 const COMPACT_BODY_H = 46;
 const COMPACT_FONT = 21;
 
-export const LetterTile: React.FC<LetterTileProps> = ({
+const LetterTileComponent: React.FC<LetterTileProps> = ({
   letter,
   onPress,
   isSelected,
@@ -609,7 +615,7 @@ export const LetterTile: React.FC<LetterTileProps> = ({
       accessibilityLabel={!isClickable ? `Letter ${letter.char}${letter.isLocked ? ', locked' : ''}` : undefined}
       style={[
         styles.tileOuter,
-        compact && { width: COMPACT_OUTER_W, height: COMPACT_OUTER_H, marginHorizontal: 2 },
+        compact && { width: COMPACT_TILE_W, height: COMPACT_OUTER_H, marginHorizontal: COMPACT_TILE_MARGIN_H },
         {
           transform: [
             { scale: scaleAnim },
@@ -790,9 +796,9 @@ export const LetterTile: React.FC<LetterTileProps> = ({
 
 const styles = StyleSheet.create({
   tileOuter: {
-    width: 52,
+    width: STANDARD_TILE_W,
     height: 64,
-    marginHorizontal: 3,
+    marginHorizontal: STANDARD_TILE_MARGIN_H,
     alignItems: 'center',
   },
   glowOuter: {
@@ -943,5 +949,11 @@ const trailStyles = StyleSheet.create({
     zIndex: 20,
   },
 });
+
+// Memoized: LetterTile is instantiated many-per-row across multiple rows and
+// carries several Animated.Values; a shallow prop guard avoids re-rendering
+// tiles whose row props didn't change (Row is already memoized, so props are
+// referentially stable within a stable row).
+export const LetterTile = React.memo(LetterTileComponent);
 
 export default LetterTile;

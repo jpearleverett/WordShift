@@ -378,6 +378,66 @@ describe('usePuzzleGame', () => {
 
   });
 
+  describe('resetCurrentPuzzle', () => {
+    test('restores the starting board and clears transient selection', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+
+      // Pick up a letter (transient state that a reset should discard)
+      let [state] = callHook();
+      const letter = state.rows[0].words[0];
+      [, actions] = callHook();
+      actions.handleLetterPress(letter, 0);
+
+      [state] = callHook();
+      expect(state.selectedLetter).not.toBeNull();
+
+      [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+
+      [state] = callHook();
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.selectedLetter).toBeNull();
+      expect(state.rows.map(r => r.originalWord)).toEqual(['LIME', 'TIME', 'TIED']);
+      expect(state.rows[0].words.map(l => l.char).join('')).toBe('LIME');
+    });
+
+    test('preserves performance counters so a reset cannot game the star rating', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+
+      // Make an invalid move to bump invalidAttempts (removing L from LIME -> IME is invalid)
+      let [state] = callHook();
+      const letter = state.rows[0].words[0]; // 'L'
+      [, actions] = callHook();
+      actions.handleLetterPress(letter, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(0);
+
+      let [afterMove] = callHook();
+      expect(afterMove.invalidAttempts).toBe(1);
+
+      [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+
+      const [afterReset] = callHook();
+      expect(afterReset.invalidAttempts).toBe(1);
+      expect(afterReset.gameState).toBe(GameState.PLAYING);
+    });
+
+    test('is a no-op when there is no active board', () => {
+      resetHookState();
+      const [, actions] = callHook();
+      // Never initialized — gameState IDLE, no rows
+      actions.resetCurrentPuzzle();
+      const [state] = callHook();
+      expect(state.rows).toHaveLength(0);
+      expect(state.gameState).toBe(GameState.IDLE);
+    });
+  });
+
   describe('handleHint', () => {
     test('increments hintsUsed when solution step matches', () => {
       resetHookState();

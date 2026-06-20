@@ -1,7 +1,9 @@
 # WordShift — Ship-Readiness Assessment (current)
 
-**Last updated:** 2026-06-19
+**Last updated:** 2026-06-20
 **Method:** full-codebase audit (six parallel deep-dive streams: gameplay, FTUE, retention/economy, visual/UX, narrative, technical), claims verified against source — not docs. Scored against AARRR (Pirate Metrics) + Nir Eyal's Hook Model.
+
+> **Forward work:** the prioritized cross-tier remediation roadmap (Phase A polish → B retention → C full-F2P monetization → D soft-launch), with per-item status and external-resource blockers, lives in [`REMEDIATION_PLAN.md`](./REMEDIATION_PLAN.md).
 
 > This doc is the **current** state of the game. Earlier point-in-time audits and their remediation logs were removed because their scorecards/blocker lists described states that no longer exist and were actively misleading the next reader. See "History" at the bottom for what those passes resolved (so you don't re-chase already-fixed items).
 
@@ -13,7 +15,7 @@
 |---|---|---|
 | Typecheck | `npm run typecheck` | **0 errors** |
 | Lint | `npm run lint` | **0 errors / 288 warnings** (all stylistic: `array-type`, intentional `require()` lazy-loads) |
-| Tests | `npm test -- --no-coverage` | **37/37 suites · 1049/1049 passing** |
+| Tests | `npm test -- --no-coverage` | **38/38 suites · 1056/1056 passing** |
 
 **There are no code blockers to building and submitting the offline game.** Remaining work is strategic (monetization), backend (cloud save), team-owned (audio), or operational (store credentials, Pages hosting, on-device QA).
 
@@ -41,7 +43,8 @@
 - **Daily Challenge:** end-to-end. Card in HomeScreen header (gated, unlocks at 5 puzzles), `startDailyGame()` hook action, `isPlayingDaily` threaded through autosave/victory/modal, `recordDailyCompletion()` + streak-milestone amber/toast, `prewarmDailyPuzzle()` at launch, one-time Fox unlock intro.
 - **Offering Pit (deferred amber):** auto-collects through 8 puzzles, then manual harvest; Fox `pit_harvest` intro fires at puzzle 8.
 - **Share / referral:** complete Wordle-style emoji grid + word chain + daily date + `wordshift://` deep link + cosmetic frames + a +5 amber first-share-of-day bonus (`shareResults.ts`).
-- **Notifications:** OS permission prompt is **contextual** (after the 3rd victory), never cold-launch. Daily reminder + streak-at-risk + re-engagement scheduled each session; phase-aware copy.
+- **Notifications:** OS permission prompt is **contextual** (after the 3rd victory), never cold-launch. Daily reminder (always-repeating trigger, relaunch-independent) + streak-at-risk + re-engagement scheduled each session; phase-aware copy.
+- **Daily login reward:** rewards opening the app (7-day escalating cycle, Day-7 jackpot, resets on a missed day) — `dailyLoginReward.ts`, claimed once per session at launch.
 - **Bootstrap reliability:** `runMigrations()` awaited before `MainApp` mounts; `installGlobalErrorHandler()` at module load; `ErrorBoundary.componentDidCatch` forwards to `reportError()`.
 - **Performance:** puzzle banks lazy-loaded via `require()` thunks; device-tier gating + frame monitoring present.
 - **Room upgrades:** surfaced as a Phase 2+ mid-game amber sink in HomeScreen.

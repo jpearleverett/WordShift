@@ -921,8 +921,14 @@ export async function recordRitualWords(
     progress.triggerWordQueue = progress.triggerWordQueue.slice(-20);
   }
 
-  // Apply ritual energy as bonus to phase progress
-  // Each point of ritual energy adds 0.1 to phase progress
+  // Apply ritual energy as a bonus to phase progress.
+  // IMPORTANT: this is a SECOND, separate accelerator that stacks on top of the
+  // weighted acceleration in calculatePhaseAcceleration() (applied at amber-award
+  // time). Each point of ritual energy adds 0.1 here, so a high-dread puzzle
+  // (ritualEnergy is clamped 0-10 upstream) contributes up to +1.0 phaseProgress
+  // ON TOP OF the normal curve. Kept intentionally for now; the magnitude should
+  // be retuned with live data during the economy rebalance rather than tweaked
+  // blind (the phase-threshold tests pin the current numbers).
   if (ritualEnergy > 0) {
     progress.phaseProgress = (progress.phaseProgress ?? 0) + ritualEnergy * 0.1;
   }

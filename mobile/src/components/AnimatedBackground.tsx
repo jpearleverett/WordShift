@@ -6,33 +6,40 @@ import { getMaxParticleCount } from '../services/deviceTier';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-interface FloatingParticle {
+interface ParticleLayout {
   id: number;
   x: number;
   size: number;
   duration: number;
   delay: number;
-  color: string;
+  /** Stable index into the active phase's palette so motion persists while color shifts */
+  colorSeed: number;
   type: 'circle' | 'star' | 'diamond';
 }
 
-// Generate random particles for the background using phase-specific colors
-const generateParticles = (count: number, colors: string[]): FloatingParticle[] => {
-  const particles: FloatingParticle[] = [];
+interface FloatingParticle extends ParticleLayout {
+  color: string;
+}
+
+// Generate the stable motion layout once; color is derived per-phase later so a
+// phase transition recolors the same particles instead of leaving them pinned to
+// the launch palette (the gradual candy→dread shift should reach the particles too).
+const generateParticleLayout = (count: number): ParticleLayout[] => {
+  const layout: ParticleLayout[] = [];
   const types: Array<'circle' | 'star' | 'diamond'> = ['circle', 'star', 'diamond'];
 
   for (let i = 0; i < count; i++) {
-    particles.push({
+    layout.push({
       id: i,
       x: Math.random() * SCREEN_WIDTH,
       size: 8 + Math.random() * 20,
       duration: 8000 + Math.random() * 12000,
       delay: Math.random() * 5000,
-      color: colors[Math.floor(Math.random() * colors.length)],
+      colorSeed: Math.floor(Math.random() * 997),
       type: types[Math.floor(Math.random() * types.length)],
     });
   }
-  return particles;
+  return layout;
 };
 
 const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
@@ -205,9 +212,19 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
   const reducedMotion = getSettingsSync().reducedMotion;
   const theme = useMemo(() => getPhaseTheme(phase), [phase]);
   const particleCount = getMaxParticleCount();
-  const particles = useRef(
-    reducedMotion ? [] : generateParticles(particleCount, theme.particleColors)
+  // Layout (positions/timing) is generated once and kept stable; color is mapped
+  // from the current phase palette so transitions recolor in place.
+  const particleLayout = useRef(
+    reducedMotion ? [] : generateParticleLayout(particleCount)
   ).current;
+  const particles = useMemo<FloatingParticle[]>(
+    () =>
+      particleLayout.map((p) => ({
+        ...p,
+        color: theme.particleColors[p.colorSeed % theme.particleColors.length],
+      })),
+    [particleLayout, theme]
+  );
   // Use opacity-based pulse with native driver instead of JS-bridge backgroundColor
   const pulseOpacity = useRef(new Animated.Value(0)).current;
 

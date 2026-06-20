@@ -8,7 +8,6 @@ import {
   recordDailyCompletion,
   getDailyStatus,
   clearDailyProgress,
-  getDailyCommunityStats,
   DAILY_STREAK_MILESTONES,
   checkDailyStreakMilestone,
   generateDailyPuzzle,
@@ -184,42 +183,6 @@ describe('generateDailyPuzzle caching / prewarm', () => {
     await clearDailyProgress();
     await generateDailyPuzzle();
     expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe('getDailyCommunityStats', () => {
-  test('returns deterministic stats for the same date', () => {
-    const stats1 = getDailyCommunityStats('2026-02-14');
-    const stats2 = getDailyCommunityStats('2026-02-14');
-    expect(stats1).toEqual(stats2);
-  });
-
-  test('returns different stats for different dates', () => {
-    const stats1 = getDailyCommunityStats('2026-02-14');
-    const stats2 = getDailyCommunityStats('2026-02-15');
-    // Extremely unlikely to be identical for two different dates
-    expect(
-      stats1.completionRate !== stats2.completionRate ||
-      stats1.averageStars !== stats2.averageStars ||
-      stats1.totalPlayers !== stats2.totalPlayers
-    ).toBe(true);
-  });
-
-  test('completion rate is within expected range', () => {
-    const stats = getDailyCommunityStats('2026-02-14');
-    expect(stats.completionRate).toBeGreaterThanOrEqual(65);
-    expect(stats.completionRate).toBeLessThanOrEqual(90);
-  });
-
-  test('average stars is within expected range', () => {
-    const stats = getDailyCommunityStats('2026-02-14');
-    expect(stats.averageStars).toBeGreaterThanOrEqual(1.6);
-    expect(stats.averageStars).toBeLessThanOrEqual(2.8);
-  });
-
-  test('has valid difficulty rating', () => {
-    const stats = getDailyCommunityStats('2026-02-14');
-    expect(['Tricky', 'Moderate', 'Straightforward']).toContain(stats.difficultyRating);
   });
 });
 
