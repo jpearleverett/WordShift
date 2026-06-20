@@ -1397,6 +1397,8 @@ function MainApp() {
               text={onboardingActions.getOnboardingFoxText()}
               buttonText={onboardingActions.getOnboardingButtonText()}
               onContinue={onboardingActions.handleOnboardingContinue}
+              showSkip={true}
+              onSkip={onboardingActions.handleSkipOnboarding}
               position="bottom"
             />
           )}
@@ -1444,7 +1446,7 @@ function MainApp() {
                   text={onboardingActions.getOnboardingFoxText()}
                   buttonText={onboardingActions.getOnboardingButtonText()}
                   onContinue={onboardingFlow.onboardingStep === 'home_empty' ? undefined : onboardingActions.handleOnboardingContinue}
-                  showSkip={onboardingFlow.onboardingStep !== 'unlock_explained'}
+                  showSkip={true}
                   onSkip={onboardingActions.handleSkipOnboarding}
                   position={onboardingFlow.onboardingStep === 'home_empty' ? 'middle' : 'bottom'}
                   anchorStyle={onboardingFlow.onboardingStep === 'home_empty'

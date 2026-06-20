@@ -135,12 +135,11 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
   ],
 
-  // Step 6: On pit screen — Fox explains the Offering Pit
+  // Step 6: On pit screen — Fox explains the Offering Pit (kept short: the player
+  // already had their first-win reward moment, so this is trimmed to two beats).
   pit_intro: [
-    "Here we are. This is the pit — where all your words end up after a puzzle.",
-    "They drift around down here, waiting.\nWhen you offer them, they turn into amber — the warm golden kind.",
-    "Amber is what builds the house. Every word you shift feeds it a little more.\nThe pit is... always hungry for more.",
-    "Go ahead. Tap the words and give them to it.",
+    "Here we are. The pit — where your words drift after every puzzle, waiting.",
+    "Offer them and they turn to amber: the warm gold that builds the house.\nThe pit is always hungry for more. Go on — give it the words.",
   ],
 
   // Step 7: After auto-offer completes on pit screen
