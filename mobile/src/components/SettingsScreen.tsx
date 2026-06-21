@@ -34,6 +34,7 @@ import { hapticLight } from '../services/haptics';
 import { clearPuzzleState } from '../services/puzzleSaveState';
 import { clearHarvestState } from '../services/wordHarvest';
 import { clearSacrificeState } from '../services/sacrifice';
+import { clearTendingState } from '../services/tending';
 import { clearWeeklyQuests } from '../services/weeklyQuests';
 import { clearWhisperGallery } from '../services/whisperGallery';
 import { clearChoiceState } from '../services/dialogueChoices';
@@ -164,6 +165,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               clearEntitlements(),
               clearCosmetics(),
               clearAdPacing(),
+              clearTendingState(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);

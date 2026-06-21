@@ -142,10 +142,12 @@ mobile/
 │       ├── wordHistory.ts       # Word cooldown tracking for diversity
 │       ├── starRating.ts        # Star rating + cumulative stats
 │       ├── amberCurrency.ts     # Amber economy, streak, phase progression, deferred transitions
-│       ├── dialogue/            # Split dialogue system (5 submodules)
+│       ├── dialogue/            # Split dialogue system
 │       │   ├── animalDialogueBase.ts, animalDialogueIntro.ts
 │       │   ├── animalDialogueReactions.ts, animalDialogueNarrative.ts
-│       │   └── animalDialogueVariants.ts
+│       │   ├── animalDialogueVariants.ts
+│       │   ├── animalDialogueTending.ts  # ~50 Phase-5 Tending milestone lines (5/animal)
+│       │   └── phase5Pool.ts    # Shared Phase-5 line pool (base + choice + tending) for hook + badge
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions, unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG
@@ -158,6 +160,7 @@ mobile/
 │       ├── whisperGallery.ts    # Collectible whisper archive
 │       ├── dialogueChoices.ts   # Phase 3 player choice points
 │       ├── sacrifice.ts         # Phase 4+ amber sacrifice mechanic
+│       ├── tending.ts           # Phase 5 Tending Shrine: soft-infinite cosmetic amber sink + honest Phase-5 dialogue selection (caughtUp pointer, pure selectPhase5Dialogue)
 │       ├── notifications.ts     # Push notification scheduling
 │       ├── cloudSave.ts         # Cloud save infrastructure (pluggable provider, NoOp default)
 │       ├── entitlements.ts      # Monetization scaffold: owned purchases / Patron status (source of truth)
@@ -436,7 +439,15 @@ One-time events at specific puzzle milestones (35, 40, 50, 55, 65, 80, 90, 100, 
 **Final Puzzle**: After house completion + Phase 4, next puzzle triggers `FINAL_PUZZLE_EVENT`.
 **Post-Revelation (Phase 5)**: Next puzzle after final triggers `POST_REVELATION_EVENT` + `markPostRevelation()`. Special victory text, 10 new dialogues per animal.
 
-> **Known gap (Phase 5 dead-end):** after house completion + final puzzle there is currently no repeatable amber sink and Phase-5 dialogue loops verbatim. Fine for a finite premium title; a retention/LTV problem for F2P. Design fix (the "Tending Shrine" loop + recency-weighted dialogue) is specced in `docs/ENDGAME_LOOP_DESIGN.md` and not yet implemented.
+### The Tending Shrine (Phase 5 endgame loop)
+
+The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is **resolved** by the Tending Shrine — a serene, soft-infinite, **cosmetic-only** amber sink (`src/services/tending.ts`).
+
+- **Loop:** at global phase 5 (post-revelation), a ✴ button in the Offering Pit header opens the Tending modal. The player spends amber to "deepen the pattern," advancing a **Tending Level** on an escalating cost curve (`getTendingCost`, `TENDING_*` in `gameBalance.ts`, capped 5,000) with a once-per-local-day discount (`getNextTendingInfo`, via `dateUtils`). The service does **not** spend — the pit calls `spendAmber(cost, 'tending')` then `applyTend(cost)` (mirrors `sacrifice`/`roomUpgrades`). Milestones (5/10/25/50/100) fire a serene ceremony.
+- **Honest, refreshing dialogue:** the Phase-5 branch of `useDialogueFlow` (and the home badge in `getAnimalsWithStatus`) now build a shared pool via `dialogue/phase5Pool.ts` (10 base post-rev lines + Phase-3 choice callback + unlocked Tending milestone lines). New lines deliver in order; once caught up, re-reads come in a **deterministic shuffled** order (`selectPhase5Dialogue` — no more verbatim looping). A per-animal `caughtUp` pointer (persisted in tending state) makes `hasNewDialogue` **honest**: lit only while undelivered lines remain, re-lit when a Tending milestone unlocks one. ~50 milestone lines live in `dialogue/animalDialogueTending.ts` (5/animal), recorded to the Whisper Gallery.
+- **Cadence:** a Phase-5-gated `tend_amber` quest type (deliberately net-negative — a sink disguised as a quest) + an extended `MILESTONE_BONUSES` tail past 350.
+- **Hygiene:** `wordshift_tending` is in `cloudSave.SYNC_KEYS`; `clearTendingState` is in Settings → Reset All; covered by `tending.test.ts`.
+- **Deferred:** richer *visual* deepening (sigil/ember intensity tied to TL — v1 ships a Depth readout + serene ceremony), cosmetic-shop monetization motifs (gated on the unbuilt shop), and the Option B "endless descent" ladder. See `docs/ENDGAME_LOOP_DESIGN.md`.
 
 ## Onboarding (11-Step Guided Intro)
 

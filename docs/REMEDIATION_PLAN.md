@@ -57,7 +57,7 @@ green (1077/1077), typecheck + lint clean.
 | # | Item | Status | Notes |
 |---|------|--------|-------|
 | B1a | Cosmetic Shop (amber sink) | ⏳ | New `cosmeticsShop.ts` + modal: tile themes, room accents, confetti, accessories. Wire the stubbed `ShareableResult.shareFrame`. Doubles as the C5 monetization surface. |
-| B1b | Amber Altar / escalating sink (Phase 4+) | ⏳ | Repeatable offering with cosmetic/prestige return — gives late-game amber somewhere to go. |
+| B1b | Amber Altar / escalating sink (Phase 5) | ✅ | **The Tending Shrine** shipped (`tending.ts` + pit modal): soft-infinite, cosmetic-only, escalating amber sink with a daily-discount return hook + serene milestone ceremonies. Also fixes the verbatim Phase-5 dialogue loop (recency-shuffled selection, honest `hasNewDialogue`, ~50 milestone-gated new lines) and adds a `tend_amber` quest + `MILESTONE_BONUSES` tail. Deferred: richer TL-tied *visual* deepening + cosmetic-shop motifs (gated on B1a) + Option B endless ladder. See `docs/ENDGAME_LOOP_DESIGN.md`. |
 | B1c | Animal gifts | ⏳ | Spend amber to unlock bonus dialogue/whispers (surfaces the never-seen Phase 0–1 surplus content). |
 | B1d | Economy rebalance | ⏳ | **The #1 retention fix.** House completes ~puzzle 130; Phase 3 min is 135, Phase 4 is 225 → ~95-puzzle "sink desert." Add the B1a–c sinks to span 130→225, retune sources, pin with guard tests vs `gameBalance.ts`. |
 | B2a | Shareable result image | ⏳ | `react-native-view-shot` → native share sheet. The genre's #1 growth lever. |

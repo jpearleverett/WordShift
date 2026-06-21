@@ -30,7 +30,7 @@
 | Visual polish & "juice" | 88 | Native-driver discipline, complete assets, real phase theming across all screens. |
 | Technical readiness | 88 | Green suite, error pipeline wired, lazy banks, correct manifests/bundle IDs. Audit pass closed: app-wide ErrorBoundary coverage, dev-only frame monitoring, `startNewGame` concurrency guard. Remaining risk is operational: **no remote crash backend** (telemetry off / no Sentry → launching blind to crashes). |
 | FTUE / first session | 84 | 11-step resumable onboarding. **Correction:** the prior "no dead-ends" claim was wrong — a kill during the puzzle/transition beats relaunched to a dead home screen; **now fixed** (step normalization on resume + puzzle-screen skip button). Minor: pit auto-offer cascade is passive. |
-| Retention systems | 75 | Complete loops; mid-game valley improved this session (see Changes). Phase 5 endgame still static. |
+| Retention systems | 82 | Complete loops; mid-game valley improved. **Phase-5 endgame dead-end resolved** — the Tending Shrine ships a repeatable cosmetic amber sink + honest, refreshing Phase-5 dialogue (the prior D30 cliff). Remaining D30+ upside: TL-tied visual deepening + the Option B endless ladder (deferred). |
 | Acquisition / Referral | ~25 | Share system complete, but no leaderboards/social/friend loop — biggest growth lever unbuilt. |
 | Monetization | N/A (0 built) | No IAP/ads SDK, no paywall. `MONETIZATION_PLAN.md` is plan-only. |
 
@@ -78,7 +78,7 @@ the house (primary mid-game investment object) finished building by ~puzzle 85 w
 2. **Add a referral/virality loop** — a spoiler-free shareable daily-result card and/or leaderboards. The share *text* already exists; the social pull does not. Highest-ROI growth lever for a word game (cf. Wordle).
 
 **Retention:**
-3. **Phase 5 endgame is mechanically static** — narratively complete, but no new goal after the climax (D30+ cliff). Recommend a post-revelation loop (seasonal / void-tribute / leaderboard). The Phase-4+ `sacrifice` mechanic partially serves as an endgame amber sink.
+3. **Phase 5 endgame — RESOLVED (v1).** The Tending Shrine (`tending.ts` + pit modal) is a repeatable, soft-infinite, cosmetic-only amber sink with a daily return hook + milestone ceremonies, and the Phase-5 dialogue now refreshes (recency-shuffled, honest `hasNewDialogue`, ~50 milestone-gated new lines). Remaining upside (not blocking): TL-tied *visual* deepening, cosmetic-shop motifs (gated on the shop), and the Option B endless-descent ladder. See `docs/ENDGAME_LOOP_DESIGN.md`.
 
 **Infrastructure / team-owned:**
 4. **Cloud save is `NoOpProvider`** (`cloudSave.ts`) — needs a real backend. Fine for a v1 offline game; blocks the Patron's-Key cloud-save promise.

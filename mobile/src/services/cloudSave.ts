@@ -82,6 +82,7 @@ const SYNC_KEYS = [
   'wordshift_dialogue_choices',
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
+  'wordshift_tending',
   // Settings, onboarding & one-time intro flags
   'wordshift_settings',
   'wordshift_notification_prefs',

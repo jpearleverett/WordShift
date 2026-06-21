@@ -299,6 +299,31 @@ export const SPEED_TIME_LIMITS: Record<string, number> = {
   HARD: 48,
 };
 
+// ============================================================================
+// TENDING SHRINE (Phase 5 endgame loop)
+// ============================================================================
+
+/**
+ * The Tending Shrine is the Phase-5 repeatable, cosmetic-only amber sink.
+ * Players spend amber to "deepen the pattern," advancing a soft-infinite
+ * Tending Level. Cost escalates so the sink absorbs arbitrary endgame income
+ * without ever blocking the (optional) loop.
+ *
+ * getTendingCost(level) = round( BASE * GROWTH^level / 10 ) * 10, capped.
+ * Approximate curve: L1 40 · L2 50 · L5 70 · L10 120 · L25 680 · L50+ capped.
+ * The first ~5 levels (~290 total) cost roughly one good day's earnings, so a
+ * newly-Phase-5 player gets immediate, satisfying deepening; the cap keeps a
+ * grinder spending meaningfully forever. Retune against live data, not blind.
+ */
+export const TENDING_BASE = 40;
+export const TENDING_GROWTH = 1.12;
+export const TENDING_COST_CAP = 5000;
+/** First deepening each local day is discounted — the daily return hook. */
+export const TENDING_DAILY_BONUS_DISCOUNT = 0.3;
+/** Tending Levels that fire a ceremony + unlock a new serene dialogue line. */
+export const TENDING_MILESTONES = [5, 10, 25, 50, 100];
+
+
 /** Default time limit for speed variant when difficulty is unknown. */
 export const SPEED_DEFAULT_TIME = 60;
 
@@ -331,6 +356,15 @@ export const MILESTONE_BONUSES: {
   { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'The arrangement nears completion.', dreadMessage: 'Two hundred fifty offerings. Something stirs.' },
   { puzzles: 300, amber: 400, message: 'Master puzzler!', darkMessage: 'Three hundred words spoken into the void.', dreadMessage: 'The void has heard enough. The void responds.' },
   { puzzles: 350, amber: 500, message: 'The journey continues...', darkMessage: 'The journey never ends. It only transforms.', dreadMessage: 'Three hundred fifty incantations. The pattern is nearly complete.' },
+  // Endgame tail — a modest repeating +75 every 50 puzzles so the puzzle-count
+  // faucet never fully dries up at Phase 5. Kept small so it doesn't outpace the
+  // Tending Shrine sink (the deliberate endgame amber drain).
+  { puzzles: 400, amber: 75, message: 'Still tending the pattern.', darkMessage: 'Four hundred. The pattern keeps its shape because you keep it.', dreadMessage: 'Four hundred offerings. The weave holds.' },
+  { puzzles: 450, amber: 75, message: 'Still here.', darkMessage: 'Four hundred fifty. Stopping would feel like forgetting.', dreadMessage: 'The pattern continues. Four hundred fifty.' },
+  { puzzles: 500, amber: 100, message: 'Five hundred.', darkMessage: 'Five hundred arrangements. Terrible peace.', dreadMessage: 'Five hundred. The shape is yours now.' },
+  { puzzles: 600, amber: 100, message: 'The tending continues.', darkMessage: 'Six hundred. The fire stays lit because you tend it.', dreadMessage: 'Six hundred offerings woven into the pattern.' },
+  { puzzles: 750, amber: 150, message: 'Faithful keeper.', darkMessage: 'Seven hundred fifty. The pattern remembers every one.', dreadMessage: 'Seven hundred fifty. The weave deepens.' },
+  { puzzles: 1000, amber: 200, message: 'A thousand.', darkMessage: 'A thousand arrangements. The pattern, and you, continue.', dreadMessage: 'One thousand. The shape will outlast us both.' },
 ];
 
 // ============================================================================

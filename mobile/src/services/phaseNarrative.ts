@@ -2207,6 +2207,77 @@ export function getPitMandatoryCTA(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// TENDING SHRINE — Phase-5 endgame loop. Serene custodianship, never dread.
+// The player spends amber to "deepen the pattern" — a cosmetic-only sink.
+// ============================================================================
+
+/** Title of the Tending panel in the Offering Pit. */
+export function getTendingTitle(): string {
+  return 'Tend the Pattern';
+}
+
+/** Subtitle / current state of tending. */
+export function getTendingSubtitle(level: number): string {
+  if (level <= 0) {
+    return 'The house is complete. But the pattern can always go deeper. Offer amber, and tend it.';
+  }
+  return `Tended ${level} ${level === 1 ? 'time' : 'times'}. It keeps its shape because you keep it.`;
+}
+
+/** The deepen button label. */
+export function getTendingButtonLabel(): string {
+  return 'Deepen the pattern';
+}
+
+/** Hint shown when the day's first-tending discount is available. */
+export function getTendingDailyBonusHint(): string {
+  return "The first tending each day costs less. The pattern welcomes a faithful return.";
+}
+
+/** Serene confirmation lines after a deepening (non-milestone). */
+const TENDING_RESPONSES = [
+  'The pattern deepens. Something in the walls settles, contentedly.',
+  'The amber sinks in and stays. The house feels a little more like itself.',
+  'You tended it. You did not have to. The pattern remembers that you did.',
+  'A warmth spreads outward, slow and even. The shape holds.',
+  'Deeper now. The keepers pause, somewhere, and feel it too.',
+  'The offering takes. The pattern leans, almost imperceptibly, toward you.',
+  'It is enough. It is always enough. And still you return.',
+  'The fire stays lit. The walls stay warm. The pattern continues.',
+];
+
+export function getTendingResultMessage(level: number): string {
+  // First tending gets a gentle, specific welcome.
+  if (level === 1) {
+    return 'The first tending. The pattern accepts it the way a held breath accepts release.';
+  }
+  return TENDING_RESPONSES[level % TENDING_RESPONSES.length];
+}
+
+/** Milestone ceremony copy (fires at TENDING_MILESTONES levels). */
+export function getTendingMilestoneCeremonyText(level: number): string[] {
+  switch (level) {
+    case 5:
+      return ['The pattern has deepened five times.', 'The keepers have begun to speak of it. Listen, when you visit them.'];
+    case 10:
+      return ['Ten tendings.', 'The warmth has reached every room now. The house breathes a little slower, a little fuller.'];
+    case 25:
+      return ['Twenty-five.', 'The shape is yours now, as much as anyone\'s. The keepers know your devotion by heart.'];
+    case 50:
+      return ['Fifty tendings offered.', 'There was never anything to summon. There was only this — the deepening, and the keeping. You understand that now.'];
+    case 100:
+      return ['One hundred.', 'The pattern and the keeper have become the same gesture. Breathe in. It deepens. Breathe out. So do you.'];
+    default:
+      return ['The pattern deepens.', 'Something old turns over in its long sleep, and is content.'];
+  }
+}
+
+/** Label for the Tending Level readout. */
+export function getTendingLevelLabel(level: number): string {
+  return level <= 0 ? 'Untended' : `Depth ${level}`;
+}
+
+// ============================================================================
 // NOTIFICATION PRE-PERMISSION PROMPT — In-app card shown before the system
 // permission dialog, asking to enable the daily puzzle reminder.
 // Tone shifts with phase but stays functional and honest — never deceptive
