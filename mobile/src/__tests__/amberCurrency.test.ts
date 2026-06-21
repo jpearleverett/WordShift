@@ -32,6 +32,7 @@ import {
   markJournalIntroSeen,
 } from '../services/amberCurrency';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
+import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 beforeEach(async () => {
@@ -453,6 +454,40 @@ describe('streak freeze', () => {
 
   test('STREAK_FREEZE_AMBER_COST is 50', () => {
     expect(STREAK_FREEZE_AMBER_COST).toBe(50);
+  });
+});
+
+describe('streak grace (yesterday-only continuation)', () => {
+  // loadProgress() returns the live cache reference, so we can seed streak
+  // state directly before awarding a puzzle (which runs updateStreak()).
+  const seedStreak = async (daysSinceLastPlay: number, freezes: number) => {
+    const progress = await loadProgress();
+    progress.currentStreak = 5;
+    progress.lastPlayDate = getLocalDateStringDaysAgo(daysSinceLastPlay);
+    progress.streakFreezes = freezes;
+  };
+
+  test('playing yesterday continues the streak for free', async () => {
+    await seedStreak(1, 0);
+    await awardPuzzleAmber('EASY', 1);
+    const progress = await loadProgress();
+    expect(progress.currentStreak).toBe(6);
+    expect(progress.streakFreezes).toBe(0);
+  });
+
+  test('a skipped day with no freeze resets the streak to 1', async () => {
+    await seedStreak(2, 0); // last played 2 days ago = missed yesterday
+    await awardPuzzleAmber('EASY', 1);
+    const progress = await loadProgress();
+    expect(progress.currentStreak).toBe(1);
+  });
+
+  test('a skipped day is saved by consuming a streak freeze', async () => {
+    await seedStreak(2, 1);
+    await awardPuzzleAmber('EASY', 1);
+    const progress = await loadProgress();
+    expect(progress.currentStreak).toBe(6);
+    expect(progress.streakFreezes).toBe(0);
   });
 });
 

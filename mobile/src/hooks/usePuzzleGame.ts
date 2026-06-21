@@ -72,6 +72,73 @@ export function hasAnyValidMove(
   return false;
 }
 
+/**
+ * Double-shift look-ahead: given the source letters AFTER the first letter has
+ * been removed and the intermediate target (W+1, with the first letter already
+ * inserted), does there exist a valid second move (pick a non-locked letter,
+ * drop it anywhere) that leaves BOTH the final source and final target as valid
+ * words? Used to give the drop1 step honest ✓/✗ guidance instead of guesswork.
+ */
+export function canCompleteDoubleShift(
+  reducedSourceLetters: Letter[],
+  intermediateTargetChars: string[],
+  isWordValid: (word: string) => boolean
+): boolean {
+  for (let b = 0; b < reducedSourceLetters.length; b++) {
+    if (reducedSourceLetters[b].isLocked) continue;
+    const finalSource = reducedSourceLetters
+      .filter((_, idx) => idx !== b)
+      .map(l => l.char)
+      .join('');
+    if (!isWordValid(finalSource)) continue;
+    const secondChar = reducedSourceLetters[b].char;
+    for (let j = 0; j <= intermediateTargetChars.length; j++) {
+      const finalTarget =
+        intermediateTargetChars.slice(0, j).join('') +
+        secondChar +
+        intermediateTargetChars.slice(j).join('');
+      if (isWordValid(finalTarget)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Stuck detection for the double-shift variant (where a full move is two
+ * pick+drop pairs). Returns true if SOME first letter + first drop position
+ * leads to a completable two-letter move. Mirrors hasAnyValidMove for the
+ * single-shift case so double-shift players can't get silently trapped.
+ */
+export function hasAnyValidDoubleShiftMove(
+  rows: RowData[],
+  activeRowIndex: number,
+  isWordValid: (word: string) => boolean
+): boolean {
+  if (activeRowIndex < 0 || activeRowIndex >= rows.length) return false;
+  const targetRowIndex = activeRowIndex + 1; // double shift always descends
+  if (targetRowIndex >= rows.length) return false;
+
+  const sourceLetters = rows[activeRowIndex].words;
+  const baseTargetChars = rows[targetRowIndex].words.map(l => l.char);
+
+  for (let a = 0; a < sourceLetters.length; a++) {
+    if (sourceLetters[a].isLocked) continue;
+    const reducedSource = sourceLetters.filter((_, idx) => idx !== a);
+    const firstChar = sourceLetters[a].char;
+    for (let i = 0; i <= baseTargetChars.length; i++) {
+      const intermediate = [
+        ...baseTargetChars.slice(0, i),
+        firstChar,
+        ...baseTargetChars.slice(i),
+      ];
+      if (canCompleteDoubleShift(reducedSource, intermediate, isWordValid)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export interface PuzzleGameState {
   rows: RowData[];
   activeRowIndex: number;
@@ -923,8 +990,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
 
       setActiveRowIndex(prev => prev + 1);
-      // Stuck detection: only for variants where one pick+drop is a full move
-      if (!isDoubleShift && !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation)) {
+      // Stuck detection: double-shift needs the two-letter look-ahead; every
+      // other forward variant is one pick+drop per move.
+      const stuckForward = isDoubleShift
+        ? !hasAnyValidDoubleShiftMove(newRows, activeRowIndex + 1, checkValidation)
+        : !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
+      if (stuckForward) {
         setMessage(getNoValidMovesMessage(currentPhase));
         setIsStuck(true);
       } else {
@@ -1113,8 +1184,25 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       ].join('');
 
       if (isDoubleShift && doubleShiftPhase === 'drop1') {
-        // During drop1, show intermediate words (no validation — they're W+1 intermediates)
-        previews.push({ word: newWord, isValid: true });
+        // During drop1 the intermediate word (W+1) is never itself a dictionary
+        // word, so validating the string is meaningless. Instead, look ahead:
+        // mark the slot ✓ only if SOME second move can complete the step from
+        // here. This turns the first drop from blind guesswork into real
+        // guidance (a ✗ slot is a dead-end before the player commits to it).
+        const reducedSource = rows[activeRowIndex].words.filter(l => l.id !== selectedLetter.id);
+        const intermediateChars = [
+          ...targetLetters.slice(0, i),
+          selectedLetter.char,
+          ...targetLetters.slice(i),
+        ];
+        previews.push({
+          word: newWord,
+          isValid: canCompleteDoubleShift(
+            reducedSource,
+            intermediateChars,
+            (w) => validWordsCache.current.has(w)
+          ),
+        });
       } else if (isDoubleShift && doubleShiftPhase === 'drop2') {
         // During drop2, both source and target must be valid words.
         // Source validity is the same for all slots (doesn't depend on drop position),

@@ -80,6 +80,33 @@ export interface OnboardingFlowActions {
 }
 
 /**
+ * Transient onboarding steps exist only for a `setTimeout` window during a
+ * screen transition and have no owning screen on relaunch. If the app is
+ * killed mid-transition (or on the puzzle/return beats), the persisted step
+ * would otherwise resume to a dead home screen — no Fox guide, no Play button
+ * (gated by `!isOnboarding`), no escape. Snap those steps forward to their
+ * nearest stable, resumable target so a first-session kill can never strand
+ * a brand-new player. App.tsx's resume effect then routes the stable step to
+ * its screen (puzzle steps re-init the guided tutorial puzzle).
+ *
+ * Exported (pure) so the resume-resilience contract can be unit-tested
+ * directly — a regression here re-opens the first-session soft-lock.
+ */
+export function normalizeResumeStep(step: OnboardingStep): OnboardingStep {
+  switch (step) {
+    case 'going_to_puzzle':
+    case 'puzzle_complete':
+      return 'puzzle_tutorial';
+    case 'going_to_pit':
+      return 'pit_intro';
+    case 'returning_home':
+      return 'unlock_explained';
+    default:
+      return step;
+  }
+}
+
+/**
  * Encapsulates the multi-screen onboarding state machine.
  *
  * On mount it reads the persisted onboarding step (with backward-compat
@@ -101,28 +128,6 @@ export function useOnboardingFlow(
   const [pitOfferDone, setPitOfferDone] = useState(false);
 
   const isOnboarding = onboardingStep !== 'complete';
-
-  // Transient onboarding steps exist only for a `setTimeout` window during a
-  // screen transition and have no owning screen on relaunch. If the app is
-  // killed mid-transition (or on the puzzle/return beats), the persisted step
-  // would otherwise resume to a dead home screen — no Fox guide, no Play button
-  // (gated by `!isOnboarding`), no escape. Snap those steps forward to their
-  // nearest stable, resumable target so a first-session kill can never strand
-  // a brand-new player. App.tsx's resume effect then routes the stable step to
-  // its screen (puzzle steps re-init the guided tutorial puzzle).
-  const normalizeResumeStep = (step: OnboardingStep): OnboardingStep => {
-    switch (step) {
-      case 'going_to_puzzle':
-      case 'puzzle_complete':
-        return 'puzzle_tutorial';
-      case 'going_to_pit':
-        return 'pit_intro';
-      case 'returning_home':
-        return 'unlock_explained';
-      default:
-        return step;
-    }
-  };
 
   // Guards for async-in-setTimeout cleanup
   const mountedRef = useRef(true);

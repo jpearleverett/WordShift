@@ -71,6 +71,15 @@ describe('weeklyQuests', () => {
       const id = getWeekId();
       expect(id).toMatch(/^\d{4}-W\d{2}$/);
     });
+
+    it('buckets by LOCAL calendar day, not UTC', () => {
+      // A date late in the local evening must report the same week as local
+      // noon of the same calendar day. (A UTC-based bucket could roll a
+      // sub-UTC-timezone evening into the next day — and potentially next week.)
+      const localNoon = getWeekId(new Date(2026, 1, 15, 12, 0, 0)); // Sun
+      const localLateEvening = getWeekId(new Date(2026, 1, 15, 23, 30, 0));
+      expect(localLateEvening).toBe(localNoon);
+    });
   });
 
   // ===========================================================================
@@ -174,6 +183,26 @@ describe('weeklyQuests', () => {
     it('weekly period uses week ID', async () => {
       const state = await loadWeeklyQuests(0);
       expect(state.weekly.periodId).toBe(getWeekId());
+    });
+
+    it('never selects more than 2 quests of the same type, even when the pool is restricted', async () => {
+      // Early-game context restricts the surviving template pool (no challenge,
+      // no sacrifice/tend, few animals) — exercising the fill pass. The fill
+      // pass must still respect the max-2-per-type guard the first pass uses.
+      const state = await loadWeeklyQuests(0, {
+        puzzlesSolved: 1,
+        unlockedAnimalCount: 1,
+        challengeUnlocked: false,
+      });
+      for (const quests of [state.daily.quests, state.weekly.quests]) {
+        const counts: Record<string, number> = {};
+        for (const q of quests) {
+          counts[q.type] = (counts[q.type] ?? 0) + 1;
+        }
+        for (const type of Object.keys(counts)) {
+          expect(counts[type]).toBeLessThanOrEqual(2);
+        }
+      }
     });
   });
 

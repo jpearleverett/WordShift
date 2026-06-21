@@ -139,7 +139,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // already had their first-win reward moment, so this is trimmed to two beats).
   pit_intro: [
     "Here we are. The pit — where your words drift after every puzzle, waiting.",
-    "Offer them and they turn to amber: the warm gold that builds the house.\nThe pit is always hungry for more. Go on — give it the words.",
+    "Offer them and they turn to amber: the warm gold that builds the house.\nThe pit is always hungry for more. Watch — it takes them on its own.",
   ],
 
   // Step 7: After auto-offer completes on pit screen

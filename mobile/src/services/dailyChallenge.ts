@@ -58,10 +58,14 @@ function getYesterdayString(): string {
 }
 
 /**
- * Grace period for daily challenge streaks (in days)
- * Consistent with main game streak grace period (STREAK_BONUSES.STREAK_RESET_DAYS)
+ * Grace period for daily challenge streaks (in days).
+ * Yesterday-only: the daily streak continues only if the player completed
+ * yesterday's challenge — a missed day breaks it (the daily has no freeze
+ * safety net, so a looser grace would silently survive a skipped day and
+ * contradict the "don't break the chain" framing). Matches the main game's
+ * yesterday-only free-continuation rule.
  */
-const DAILY_STREAK_GRACE_DAYS = 2;
+const DAILY_STREAK_GRACE_DAYS = 1;
 
 /**
  * Daily challenge unlock pacing.

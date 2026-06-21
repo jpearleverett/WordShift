@@ -24,14 +24,23 @@ export const PHASE_THRESHOLDS = [0, 20, 65, 150, 235];
 /**
  * Minimum real puzzles the player must have completed before a phase
  * can activate — prevents narrative acceleration from skipping content.
+ *
+ * These floors are the *binding* constraint for engaged (accelerating)
+ * players: once weighted progress clears PHASE_THRESHOLDS, the floor is what
+ * actually gates the transition. The Phase 4 (cult reveal) and Phase 5
+ * (post-revelation) floors are deliberately reachable — the entire narrative
+ * payoff lives there, so an engaged player must be able to arrive at the
+ * climax in a single committed playthrough rather than ~225-300 puzzles.
+ * House-building still completes (~puzzle 130) before Phase 4, and Phase 5
+ * still lands comfortably after the Phase 4 dread window + final puzzle.
  */
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
   1: 15,
   2: 55,
   3: 135,
-  4: 225,
-  5: 300, // Post-revelation — after house completion + final puzzle
+  4: 155, // The Horizon — the cult reveal, just after the house completes
+  5: 210, // Post-revelation — after house completion + final puzzle
 };
 
 // ============================================================================

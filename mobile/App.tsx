@@ -44,7 +44,8 @@ import {
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
 } from './src/services/amberCurrency';
-import { claimDailyLoginReward, DAILY_LOGIN_CYCLE_LENGTH } from './src/services/dailyLoginReward';
+import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
+import { DailyLoginModal } from './src/components/DailyLoginModal';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
@@ -215,6 +216,10 @@ function MainApp() {
   const [isPlayingDaily, setIsPlayingDaily] = useState(false);
   // Result-card share preview (null = closed).
   const [shareResultData, setShareResultData] = useState<ShareableResult | null>(null);
+
+  // Daily-login claim modal — set to the already-granted reward to present it
+  // (null = closed). Purely presentational; amber is credited before this is set.
+  const [dailyLoginGrant, setDailyLoginGrant] = useState<DailyLoginGrant | null>(null);
 
   // Speed-variant escalation: consecutive speed wins increment this, shortening
   // each subsequent clock. Reset on time-up or whenever a fresh run begins.
@@ -472,14 +477,7 @@ function MainApp() {
         const grant = await claimDailyLoginReward();
         if (grant) {
           persistenceActions.refreshStats();
-          const dayLabel = grant.day === DAILY_LOGIN_CYCLE_LENGTH ? 'Day 7 — jackpot!' : `Day ${grant.day}`;
-          const chain = grant.reset
-            ? 'A new chain begins. '
-            : '';
-          Alert.alert(
-            'Welcome back',
-            `${chain}${dayLabel}\nYou received ${grant.amount} amber for visiting today.`
-          );
+          setDailyLoginGrant(grant);
         }
       } catch {
         // Non-critical — never block launch on the login reward.
@@ -1139,7 +1137,13 @@ function MainApp() {
 
       // Estimate which slot the user dropped over based on X position.
       const targetWordLength = previews.length - 1;
-      const estimated = estimateSlotIndex(position.x, previews.length, targetWordLength);
+      const estimateOut: { droppedRightOfCenter?: boolean } = {};
+      const estimated = estimateSlotIndex(
+        position.x,
+        previews.length,
+        targetWordLength,
+        estimateOut,
+      );
 
       // Near-miss forgiveness: arc slots are only ~28px wide on a finger-driven
       // layout, so a drop that lands one slot shy of its intended (valid) target
@@ -1150,7 +1154,11 @@ function MainApp() {
       // still falls through to handleSlotPress's invalid feedback.
       let targetSlot = estimated;
       if (!previews[estimated]?.isValid) {
-        const closestValid = findClosestValidSlot(estimated, previews);
+        const closestValid = findClosestValidSlot(
+          estimated,
+          previews,
+          estimateOut.droppedRightOfCenter,
+        );
         if (closestValid !== null && Math.abs(closestValid - estimated) <= 1) {
           targetSlot = closestValid;
         }
@@ -2025,9 +2033,19 @@ function MainApp() {
                   )
                   : puzzle.gameState === GameState.PLAYING
                     ? (
-                      tutorialGuidance?.letterToMove
-                        ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
-                        : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
+                      // After the FIRST successful move, give the "that little
+                      // click" reinforcement beat (once, between move 1 and 2),
+                      // merged with the next-tile hint so the player is never
+                      // left without guidance.
+                      puzzle.history.length === 1
+                        ? `${ONBOARDING_FOX_LINES.puzzle_tutorial_valid_move[0]}${
+                            tutorialGuidance?.letterToMove
+                              ? `\n\nNow tap the glowing "${tutorialGuidance.letterToMove}".`
+                              : ''
+                          }`
+                        : tutorialGuidance?.letterToMove
+                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
+                          : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
                     )
                     : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
             }
@@ -2140,6 +2158,12 @@ function MainApp() {
           // refresh to pick up the first-share-of-day amber bonus.
           persistenceActions.refreshStats();
         }}
+      />
+      {/* Daily login reward — celebratory claim modal (amber already credited) */}
+      <DailyLoginModal
+        grant={dailyLoginGrant}
+        phase={persistence.currentPhase}
+        onClose={() => setDailyLoginGrant(null)}
       />
     </View>
   );
