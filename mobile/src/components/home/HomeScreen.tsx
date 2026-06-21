@@ -100,7 +100,7 @@ import {
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines } from '../../services/phaseNarrative';
+import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
@@ -118,6 +118,7 @@ interface HomeScreenProps {
   onOpenStats?: () => void;
   onOpenLedger?: () => void;
   onOpenGallery?: () => void;
+  onOpenShop?: () => void;
   onOpenPit?: () => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
@@ -139,6 +140,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenStats,
   onOpenLedger,
   onOpenGallery,
+  onOpenShop,
   onOpenPit,
   pitPhaseReady,
   onboardingStep,
@@ -1255,6 +1257,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📜 {getGalleryTitle(progress.currentPhase)}</Text>
+              </TouchableOpacity>
+            )}
+            {onOpenShop && (
+              <TouchableOpacity
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                onPress={() => {
+                  setShowJournalModal(false);
+                  onOpenShop?.();
+                }}
+                accessibilityLabel={`Open ${getShopTitle(progress.currentPhase)}`}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>✨ {getShopTitle(progress.currentPhase)}</Text>
               </TouchableOpacity>
             )}
             {!!weeklyQuestState && (

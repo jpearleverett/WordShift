@@ -37,9 +37,18 @@ import {
   ownsCosmetic,
   recordAmberCosmeticPurchase,
   equipCosmetic,
+  unequipCosmetic,
   getEquipped,
+  getEquippedSync,
+  initCosmetics,
   clearCosmetics,
 } from '../services/cosmetics';
+import {
+  getTileColor,
+  getEquippedTileTheme,
+  setEquippedTileTheme,
+  TILE_THEMES,
+} from '../theme/colors';
 import { REWARDED_DAILY_CAP } from '../constants/gameBalance';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -257,5 +266,49 @@ describe('cosmetics', () => {
 
   it('refuses to equip an unowned cosmetic', async () => {
     expect(await equipCosmetic('theme_patron')).toBe(false);
+  });
+
+  it('records an amber-bought theme as owned and equippable', async () => {
+    expect(await ownsCosmetic('theme_ember')).toBe(false);
+    expect(await recordAmberCosmeticPurchase('theme_ember')).toBe(true);
+    expect(await ownsCosmetic('theme_ember')).toBe(true);
+    // Already owned → second record is a no-op false.
+    expect(await recordAmberCosmeticPurchase('theme_ember')).toBe(false);
+    expect(await equipCosmetic('theme_ember')).toBe(true);
+    expect(await getEquipped('tile_theme')).toBe('theme_ember');
+  });
+
+  it('every amber tile theme has a matching palette in TILE_THEMES', () => {
+    COSMETICS.filter(c => c.category === 'tile_theme' && c.acquisition.kind === 'amber')
+      .forEach(c => expect(TILE_THEMES[c.id]).toBeDefined());
+  });
+
+  it('equipping a theme applies it to getTileColor (and unequip restores default)', async () => {
+    const defaultColor = getTileColor('A');
+    await recordAmberCosmeticPurchase('theme_tide');
+    await equipCosmetic('theme_tide');
+    expect(getEquippedTileTheme()).toBe('theme_tide');
+    expect(getTileColor('A')).toEqual(TILE_THEMES.theme_tide['A'.charCodeAt(0) % TILE_THEMES.theme_tide.length]);
+
+    await unequipCosmetic('tile_theme');
+    expect(getEquippedTileTheme()).toBeNull();
+    expect(getTileColor('A')).toEqual(defaultColor);
+  });
+
+  it('getEquippedSync mirrors the equipped selection', async () => {
+    expect(getEquippedSync('tile_theme')).toBeUndefined();
+    await recordAmberCosmeticPurchase('theme_bone');
+    await equipCosmetic('theme_bone');
+    expect(getEquippedSync('tile_theme')).toBe('theme_bone');
+  });
+
+  it('initCosmetics re-applies the equipped theme to colors', async () => {
+    await recordAmberCosmeticPurchase('theme_ember');
+    await equipCosmetic('theme_ember');
+    // Simulate the colors module starting cold (e.g. a fresh launch).
+    setEquippedTileTheme(null);
+    expect(getEquippedTileTheme()).toBeNull();
+    await initCosmetics();
+    expect(getEquippedTileTheme()).toBe('theme_ember');
   });
 });

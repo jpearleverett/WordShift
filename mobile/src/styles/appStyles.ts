@@ -20,6 +20,7 @@ export function getScreenBackgroundColor(screen: string, phase: number): string 
     case 'ledger':
       return phase <= 1 ? CandyColors.purple.main : phase === 2 ? '#3A3060' : phase === 3 ? '#1A1530' : '#0F0818';
     case 'gallery':
+    case 'shop':
       return phase >= 3 ? '#0A0A14' : '#1A1030';
     default:
       return '#1A1A2E';

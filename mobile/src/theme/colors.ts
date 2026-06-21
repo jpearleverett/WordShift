@@ -104,10 +104,90 @@ export const CandyColors = {
 
 // Get a tile color based on letter character code for consistency
 export const getTileColor = (char: string) => {
+  const palette = getActiveTilePalette();
   const charCode = char.toUpperCase().charCodeAt(0);
-  const index = charCode % CandyColors.tileColors.length;
-  return CandyColors.tileColors[index];
+  const index = charCode % palette.length;
+  return palette[index];
 };
+
+// ----------------------------------------------------------------------------
+// Cosmetic tile themes (Cosmetic Shop)
+// ----------------------------------------------------------------------------
+// Named alternate tile palettes the player can buy (amber) or unlock (Patron).
+// Each mirrors the default `tileColors` shape. They stay phase-aware by design:
+// only the base palette swaps — the puzzle screen's phase overlays, glow, and
+// darkening still apply on top, so a bought theme still reads with the story.
+//
+// `theme_ember` / `theme_tide` / `theme_bone` double as the Phase-5 Tending
+// shrine motifs (warm / deep / quiet), so deepening the pattern and dressing the
+// board share an expressive vocabulary.
+
+type TilePalette = { bg: string; border: string; glow: string }[];
+
+export const TILE_THEMES: Record<string, TilePalette> = {
+  theme_ember: [
+    { bg: '#FF8A5B', border: '#CC6B43', glow: 'rgba(255, 138, 91, 0.5)' },
+    { bg: '#FF6B4A', border: '#CC5238', glow: 'rgba(255, 107, 74, 0.5)' },
+    { bg: '#E8543A', border: '#B5402C', glow: 'rgba(232, 84, 58, 0.5)' },
+    { bg: '#FFB259', border: '#CC8C43', glow: 'rgba(255, 178, 89, 0.5)' },
+    { bg: '#FF7E79', border: '#CC635F', glow: 'rgba(255, 126, 121, 0.5)' },
+    { bg: '#D94F3D', border: '#A93C2E', glow: 'rgba(217, 79, 61, 0.5)' },
+    { bg: '#FFA24D', border: '#CC803B', glow: 'rgba(255, 162, 77, 0.5)' },
+    { bg: '#FF6F61', border: '#CC584C', glow: 'rgba(255, 111, 97, 0.5)' },
+  ],
+  theme_tide: [
+    { bg: '#3FB6C9', border: '#2E8895', glow: 'rgba(63, 182, 201, 0.5)' },
+    { bg: '#4D8FE8', border: '#3A6FB5', glow: 'rgba(77, 143, 232, 0.5)' },
+    { bg: '#45999B', border: '#327173', glow: 'rgba(69, 153, 155, 0.5)' },
+    { bg: '#6A7FD8', border: '#5263A8', glow: 'rgba(106, 127, 216, 0.5)' },
+    { bg: '#3FA9A0', border: '#2E7D77', glow: 'rgba(63, 169, 160, 0.5)' },
+    { bg: '#4FB0E0', border: '#3B86A9', glow: 'rgba(79, 176, 224, 0.5)' },
+    { bg: '#5B8FD9', border: '#466FA8', glow: 'rgba(91, 143, 217, 0.5)' },
+    { bg: '#3FC2B0', border: '#2E9486', glow: 'rgba(63, 194, 176, 0.5)' },
+  ],
+  theme_bone: [
+    { bg: '#C9BFB0', border: '#978F82', glow: 'rgba(201, 191, 176, 0.45)' },
+    { bg: '#B8A99A', border: '#8A7D70', glow: 'rgba(184, 169, 154, 0.45)' },
+    { bg: '#A9B0A6', border: '#7F857C', glow: 'rgba(169, 176, 166, 0.45)' },
+    { bg: '#C2B2A0', border: '#918578', glow: 'rgba(194, 178, 160, 0.45)' },
+    { bg: '#B0A6B2', border: '#847C86', glow: 'rgba(176, 166, 178, 0.45)' },
+    { bg: '#BEB4A2', border: '#8E867A', glow: 'rgba(190, 180, 162, 0.45)' },
+    { bg: '#A8ADB6', border: '#7E8288', glow: 'rgba(168, 173, 182, 0.45)' },
+    { bg: '#C4B8AE', border: '#938A82', glow: 'rgba(196, 184, 174, 0.45)' },
+  ],
+  theme_patron: [
+    { bg: '#FFD479', border: '#CCA85B', glow: 'rgba(255, 212, 121, 0.55)' },
+    { bg: '#F5C04D', border: '#C4993D', glow: 'rgba(245, 192, 77, 0.55)' },
+    { bg: '#FFCB6B', border: '#CCA255', glow: 'rgba(255, 203, 107, 0.55)' },
+    { bg: '#E8B44A', border: '#B58F3A', glow: 'rgba(232, 180, 74, 0.55)' },
+    { bg: '#FFD98A', border: '#CCAE6E', glow: 'rgba(255, 217, 138, 0.55)' },
+    { bg: '#F0BC55', border: '#C09644', glow: 'rgba(240, 188, 85, 0.55)' },
+    { bg: '#FFD060', border: '#CCA64D', glow: 'rgba(255, 208, 96, 0.55)' },
+    { bg: '#E0A840', border: '#B38633', glow: 'rgba(224, 168, 64, 0.55)' },
+  ],
+};
+
+// The equipped tile theme id is pushed in from cosmetics.ts (registration pattern
+// keeps this low-level theme module free of any service/AsyncStorage imports, so
+// there is no import cycle and `getTileColor` stays a cheap synchronous lookup).
+let activeTileThemeId: string | null = null;
+
+/** Set (or clear) the equipped tile theme. Called by cosmetics on init/equip. */
+export function setEquippedTileTheme(id: string | null): void {
+  activeTileThemeId = id && TILE_THEMES[id] ? id : null;
+}
+
+/** The currently equipped tile theme id, or null for the default candy palette. */
+export function getEquippedTileTheme(): string | null {
+  return activeTileThemeId;
+}
+
+function getActiveTilePalette(): TilePalette {
+  if (activeTileThemeId && TILE_THEMES[activeTileThemeId]) {
+    return TILE_THEMES[activeTileThemeId];
+  }
+  return CandyColors.tileColors;
+}
 
 // Sparkle/star colors for effects
 export const SparkleColors = [

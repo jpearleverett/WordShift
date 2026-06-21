@@ -32,7 +32,7 @@
 | FTUE / first session | 84 | 11-step resumable onboarding. **Correction:** the prior "no dead-ends" claim was wrong — a kill during the puzzle/transition beats relaunched to a dead home screen; **now fixed** (step normalization on resume + puzzle-screen skip button). Minor: pit auto-offer cascade is passive. |
 | Retention systems | 82 | Complete loops; mid-game valley improved. **Phase-5 endgame dead-end resolved** — the Tending Shrine ships a repeatable cosmetic amber sink + honest, refreshing Phase-5 dialogue (the prior D30 cliff). Remaining D30+ upside: TL-tied visual deepening + the Option B endless ladder (deferred). |
 | Acquisition / Referral | ~25 | Share system complete, but no leaderboards/social/friend loop — biggest growth lever unbuilt. |
-| Monetization | N/A (0 built) | No IAP/ads SDK, no paywall. `MONETIZATION_PLAN.md` is plan-only. |
+| Monetization | ~15 | Still no real-money path (no IAP/ads SDK, no paywall — needs the dev-client migration). **But** the amber **Cosmetic Shop ships** (`ShopScreen.tsx`: buy/equip tile themes), a real expression amber sink that's also the drop-in surface for `kind:'iap'` items later. Patron `+2` amber wired. |
 
 **Overall:** built like a premium / Apple-Arcade-quality narrative puzzle, not (yet) a top-grossing F2P. Positioning is a deliberate decision still to be made.
 

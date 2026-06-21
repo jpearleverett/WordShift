@@ -83,12 +83,14 @@ import {
 import { runMigrations } from './src/services/dataMigration';
 import { initIAP } from './src/services/iap';
 import { initAds } from './src/services/ads';
+import { initCosmetics } from './src/services/cosmetics';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
+import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import { offerBatch } from './src/services/wordHarvest';
 import {
@@ -104,7 +106,7 @@ import {
 import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
 
 // App screen type — expanded with settings, stats, and ledger
-type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit';
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
 
 type PostVictoryIntroKind = 'variant_unlock' | 'home_tools';
 interface PostVictoryIntro {
@@ -1421,6 +1423,20 @@ function MainApp() {
       );
     }
 
+    if (currentScreen === 'shop') {
+      return (
+        <View style={{ flex: 1 }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <ShopScreen
+            phase={persistence.currentPhase}
+            amberBalance={persistence.amberBalance}
+            onClose={() => transitionTo('home')}
+            onAmberChange={(newBalance) => persistenceActions.setAmberBalance(newBalance)}
+          />
+        </View>
+      );
+    }
+
     if (currentScreen === 'pit') {
       return (
         <View style={{ flex: 1 }}>
@@ -1485,6 +1501,7 @@ function MainApp() {
               onOpenStats={() => transitionTo('stats')}
               onOpenLedger={() => transitionTo('ledger')}
               onOpenGallery={() => transitionTo('gallery')}
+              onOpenShop={() => transitionTo('shop')}
               onOpenPit={() => transitionTo('pit')}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
@@ -2137,7 +2154,7 @@ export default function App() {
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in
         // Expo Go — no native modules until a real provider is wired.
-        await Promise.all([initIAP(), initAds()]);
+        await Promise.all([initIAP(), initAds(), initCosmetics()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
       } finally {

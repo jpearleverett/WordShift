@@ -2278,6 +2278,38 @@ export function getTendingLevelLabel(level: number): string {
 }
 
 // ============================================================================
+// COSMETIC SHOP — expression, never progression. Tone shifts with phase.
+// ============================================================================
+
+export function getShopTitle(phase: number): string {
+  if (phase >= 4) return 'Vestments';
+  if (phase >= 2) return 'Adornments';
+  return 'Tile Shop';
+}
+
+export function getShopSubtitle(phase: number): string {
+  if (phase >= 4) return 'Dress the offering. It changes nothing, and everything.';
+  if (phase >= 2) return 'Spend amber to change how the words look. For yourself.';
+  return 'Spend amber to dress up your tiles!';
+}
+
+export function getShopThemeSectionLabel(phase: number): string {
+  if (phase >= 3) return 'TILE VESTMENTS';
+  return 'TILE THEMES';
+}
+
+/** Label for the "no theme / default" option. */
+export function getShopDefaultThemeName(phase: number): string {
+  if (phase >= 3) return 'Unadorned';
+  return 'Candy (default)';
+}
+
+/** Locked-because-Patron note for entitlement-only cosmetics. */
+export function getShopPatronLockedLabel(): string {
+  return 'Patron only';
+}
+
+// ============================================================================
 // NOTIFICATION PRE-PERMISSION PROMPT — In-app card shown before the system
 // permission dialog, asking to enable the daily puzzle reminder.
 // Tone shifts with phase but stays functional and honest — never deceptive

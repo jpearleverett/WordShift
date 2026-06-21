@@ -26,7 +26,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 
 - **Framework**: React Native with Expo SDK 54
 - **Language**: TypeScript (strict)
-- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`)
+- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop'`)
 - **State**: React useState/useEffect (no external state library)
 - **Persistence**: AsyncStorage with in-memory cache pattern
 - **Haptics**: expo-haptics (settings-gated)
@@ -124,7 +124,8 @@ mobile/
 │   │   │   ├── DifficultyMenu.tsx # Setup menu: difficulty + variant selector
 │   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper
 │   │   │   └── RitualEchoChain.tsx # Real-time word chain display
-│   │   ├── OfferingPitScreen.tsx # Offering Pit: tap-to-devour words, ward marks, phase transitions
+│   │   ├── OfferingPitScreen.tsx # Offering Pit: tap-to-devour words, ward marks, phase transitions, Phase-5 Tending Shrine modal
+│   │   ├── shop/ShopScreen.tsx  # Cosmetic Shop: buy/equip amber tile themes (expression-only)
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive
 │   │   ├── WordLedger.tsx       # Ritual word history screen
 │   │   └── home/
@@ -166,7 +167,7 @@ mobile/
 │       ├── entitlements.ts      # Monetization scaffold: owned purchases / Patron status (source of truth)
 │       ├── iap.ts               # Monetization scaffold: pluggable BillingProvider (NoOp default)
 │       ├── ads.ts               # Monetization scaffold: pluggable AdProvider + ad policy (NoOp default)
-│       ├── cosmetics.ts         # Monetization scaffold: owned/equipped cosmetics
+│       ├── cosmetics.ts         # Cosmetic ownership/equip + amber tile-theme shop (getEquippedSync, initCosmetics; pushes theme to colors.ts)
 │       ├── wordHarvest.ts       # Offering Pit harvest batches (over-cap = merge oldest, never drop amber)
 │       ├── slotEstimation.ts    # Drag-and-drop slot position estimation (`estimateSlotIndex`) + `findClosestValidSlot` (App routes drag drops through it with a ±1-slot bound for near-miss forgiveness — never teleports across the row)
 │       ├── puzzleSaveState.ts   # Mid-puzzle autosave/restore
@@ -673,9 +674,10 @@ Core principle: players pay for *expression* and *convenience*, never for *narra
 - `services/entitlements.ts` — single source of truth for "what the player paid for" (`isPatron()`/`isPatronSync()`, `grantEntitlements`, `setEntitlements`, `clearEntitlements`). AsyncStorage-backed, native-free.
 - `services/iap.ts` — pluggable `BillingProvider` behind a `NoOpBillingProvider` (mirrors `cloudSave.ts`). `PRODUCT_IDS`, `purchaseProduct`, `restorePurchases`, `entitlementsForProduct`. Swap in a real RevenueCat provider via `setBillingProvider()`. `initIAP()` runs in App bootstrap (warms entitlement cache).
 - `services/ads.ts` — pluggable `AdProvider` behind a `NoOpAdProvider`. Owns ALL ad policy as pure/testable code: `interstitialFrequency`, `shouldShowInterstitial`, rewarded daily cap, Patron suppression. `showRewarded` (opt-in), `maybeShowInterstitial`. `initAds()` runs in App bootstrap.
-- `services/cosmetics.ts` — owned/equipped cosmetic state (amber-bought local + IAP via entitlements). `ownsCosmetic`, `recordAmberCosmeticPurchase`, `equipCosmetic`. Patron tile theme auto-owned via entitlement.
+- `services/cosmetics.ts` — owned/equipped cosmetic state (amber-bought local + IAP via entitlements). `ownsCosmetic`, `recordAmberCosmeticPurchase`, `equipCosmetic`/`unequipCosmetic`, `getEquipped`/`getEquippedSync`, `initCosmetics` (App bootstrap). Patron tile theme auto-owned via entitlement.
+- **Cosmetic Shop BUILT (amber path):** `components/shop/ShopScreen.tsx` (`currentScreen: 'shop'`, reached from the Journal hub) lets the player buy & equip **tile themes** with amber. Themes live in `theme/colors.ts` `TILE_THEMES` (Ember-warm/Deep-tide/Bone-quiet — these double as the Phase-5 Tending shrine motifs — + the Patron-entitlement gold set). The equipped theme is pushed into `colors.ts` via `setEquippedTileTheme()` (registration pattern → no import cycle) and resolved synchronously inside `getTileColor()`, so it stays phase-aware (phase overlays/glow still apply on top). Amber purchase routes through `spendAmber(cost, 'cosmetic_<id>')` → `recordAmberCosmeticPurchase` (auto-equips). Reachability gated with the Journal hub (puzzle 6+).
 - **Wired:** Patron `+2` amber/puzzle in `amberCurrency.awardPuzzleAmber()` (`PATRON_AMBER_BONUS`, returned as `patronBonus`) — additive to the REWARD only, **never** phase progress. New keys cleared in Settings → Reset All. `wordshift_cosmetics` added to `cloudSave.SYNC_KEYS`; `wordshift_entitlements` (store-authoritative) and `wordshift_ad_pacing` (device-specific) intentionally excluded.
-- **NOT built yet:** `PatronScreen.tsx`, `ShopScreen.tsx`, real RevenueCat/AdMob providers, equipped-theme wiring into `theme/colors.ts`/`LetterTile`, the EAS Dev Client migration (native SDKs end Expo Go). See `docs/MONETIZATION_F2P_IMPLEMENTATION.md` §4.
+- **NOT built yet:** `PatronScreen.tsx`, real RevenueCat/AdMob providers, real-money IAP cosmetic items (the shop's catalog supports `kind: 'iap'`; only amber + Patron-entitlement items ship today), confetti/room-accent shop tabs, the EAS Dev Client migration (native SDKs end Expo Go). See `docs/MONETIZATION_F2P_IMPLEMENTATION.md` §4.
 - Everything ships behind NoOp providers, so the app runs unchanged in Expo Go today and all logic is unit-tested (`__tests__/monetization.test.ts`).
 
 **Key points:**

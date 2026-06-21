@@ -16,6 +16,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hasEntitlementSync, ENTITLEMENTS } from './entitlements';
+import { setEquippedTileTheme } from '../theme/colors';
 
 const STORAGE_KEY = 'wordshift_cosmetics';
 
@@ -45,6 +46,30 @@ export interface CosmeticItem {
  * amber never feels like "the currency I should have paid to skip".
  */
 export const COSMETICS: CosmeticItem[] = [
+  // Amber-bought tile themes. These double as the Phase-5 Tending shrine motifs
+  // (warm / deep / quiet), so deepening the pattern and dressing the board share
+  // a vocabulary. IDs match the palettes in `theme/colors.ts` (TILE_THEMES).
+  {
+    id: 'theme_ember',
+    category: 'tile_theme',
+    name: 'Ember-warm',
+    description: 'Tiles in the warm reds and golds of a kept fire.',
+    acquisition: { kind: 'amber', cost: 300 },
+  },
+  {
+    id: 'theme_tide',
+    category: 'tile_theme',
+    name: 'Deep-tide',
+    description: 'The deep blues and teals of water that sees somewhere else.',
+    acquisition: { kind: 'amber', cost: 400 },
+  },
+  {
+    id: 'theme_bone',
+    category: 'tile_theme',
+    name: 'Bone-quiet',
+    description: 'A hushed, desaturated set for the terrible peace.',
+    acquisition: { kind: 'amber', cost: 500 },
+  },
   {
     id: 'theme_patron',
     category: 'tile_theme',
@@ -66,9 +91,18 @@ export interface CosmeticState {
 }
 
 let cache: CosmeticState | null = null;
+// Synchronous mirror of the equipped selection, so render-path code (e.g.
+// `theme/colors.ts` resolving the tile theme) never needs to await AsyncStorage.
+let syncEquipped: Partial<Record<CosmeticCategory, string>> = {};
 
 function getDefault(): CosmeticState {
   return { owned: {}, equipped: {} };
+}
+
+/** Mirror the equipped selection synchronously and push the tile theme to colors. */
+function syncEquippedFrom(state: CosmeticState): void {
+  syncEquipped = { ...state.equipped };
+  setEquippedTileTheme(state.equipped.tile_theme ?? null);
 }
 
 async function load(): Promise<CosmeticState> {
@@ -79,6 +113,7 @@ async function load(): Promise<CosmeticState> {
       const parsed = JSON.parse(stored);
       if (parsed && typeof parsed.owned === 'object') {
         cache = { owned: parsed.owned ?? {}, equipped: parsed.equipped ?? {} };
+        syncEquippedFrom(cache);
         return cache;
       }
     }
@@ -86,7 +121,24 @@ async function load(): Promise<CosmeticState> {
     /* ignore */
   }
   cache = getDefault();
+  syncEquippedFrom(cache);
   return cache;
+}
+
+/**
+ * Warm the cosmetic cache and apply the equipped tile theme at app bootstrap
+ * (mirrors initIAP/initAds). Safe to call repeatedly.
+ */
+export async function initCosmetics(): Promise<void> {
+  const state = await load();
+  // Always (re)apply, even on a warm cache, so the colors module reflects the
+  // equipped theme after a cold start.
+  syncEquippedFrom(state);
+}
+
+/** Synchronously read the equipped cosmetic id for a category (render-path safe). */
+export function getEquippedSync(category: CosmeticCategory): string | undefined {
+  return syncEquipped[category];
 }
 
 async function save(): Promise<void> {
@@ -151,8 +203,18 @@ export async function equipCosmetic(id: string): Promise<boolean> {
   const state = await load();
   state.equipped[item.category] = id;
   cache = state;
+  syncEquippedFrom(state);
   await save();
   return true;
+}
+
+/** Unequip a category, returning to the phase default. */
+export async function unequipCosmetic(category: CosmeticCategory): Promise<void> {
+  const state = await load();
+  delete state.equipped[category];
+  cache = state;
+  syncEquippedFrom(state);
+  await save();
 }
 
 /** The equipped cosmetic id for a category, or undefined (= phase default). */
@@ -164,6 +226,7 @@ export async function getEquipped(category: CosmeticCategory): Promise<string | 
 /** Clear all cosmetic state (for Settings → Reset All). */
 export async function clearCosmetics(): Promise<void> {
   cache = getDefault();
+  syncEquippedFrom(cache);
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch {
