@@ -77,6 +77,8 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     if (phase >= 4) return { friction: 9, tension: 80 };
     if (phase >= 3) return { friction: 7, tension: 100 };
     if (phase >= 2) return { friction: 5, tension: 150 };
+    // Phase 1: a barely-perceptible settling — the first hint the candy is cooling.
+    if (phase >= 1) return { friction: 4, tension: 175 };
     return { friction: 3, tension: 200 };
   };
 
@@ -84,6 +86,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     if (phase >= 4) return { quarter: 400, half: 800 };
     if (phase >= 3) return { quarter: 300, half: 600 };
     if (phase >= 2) return { quarter: 200, half: 400 };
+    if (phase >= 1) return { quarter: 175, half: 350 };
     return { quarter: 150, half: 300 };
   };
 
@@ -91,6 +94,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     if (phase >= 4) return -1.5;
     if (phase >= 3) return -2;
     if (phase >= 2) return -3;
+    if (phase >= 1) return -3.5;
     return -4;
   };
 
@@ -303,7 +307,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
     // Phase 1: very slow, barely perceptible shimmer
     // Phase 2-3: moderate pulse
     // Phase 4: faster breathing
-    const cycleDuration = phase >= 4 ? 2000 : phase >= 3 ? 2500 : phase >= 2 ? 3000 : 4000;
+    const cycleDuration = phase >= 4 ? 2000 : phase >= 3 ? 2500 : phase >= 2 ? 3000 : phase >= 1 ? 3500 : 4000;
 
     const resonanceLoop = Animated.loop(
       Animated.sequence([
