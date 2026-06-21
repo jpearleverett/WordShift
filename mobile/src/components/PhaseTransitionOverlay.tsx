@@ -29,6 +29,17 @@ function fireSceneHaptic(scene: PhaseScene, shakeIntensity?: number): void {
   }
 }
 
+/**
+ * Phase-appropriate flash color: bright/white at low phases (still candy-cute),
+ * shifting toward crimson at the dark phases.
+ */
+function getFlashColor(phase: number): string {
+  if (phase >= 4) return '#E03050'; // crimson
+  if (phase === 3) return '#7A4A6A'; // dim rose
+  if (phase === 2) return '#B0A8D8'; // pale lavender
+  return '#FFFFFF'; // bright
+}
+
 interface PhaseTransitionOverlayProps {
   event: PhaseTransitionEvent | null;
   onComplete: () => void;
@@ -115,8 +126,86 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   const [activeSceneIndex, setActiveSceneIndex] = useState(-1);
   const sceneOpacity = useRef(new Animated.Value(0)).current;
   const sceneTranslateY = useRef(new Animated.Value(20)).current;
+  // Screen-effect drivers (native-driven, transform/opacity only)
+  const shakeX = useRef(new Animated.Value(0)).current;
+  const shakeY = useRef(new Animated.Value(0)).current;
+  const flashOpacity = useRef(new Animated.Value(0)).current;
+  const vignetteOpacity = useRef(new Animated.Value(0)).current;
+  const effectAnimsRef = useRef<Animated.CompositeAnimation[]>([]);
+  const [flashColor, setFlashColor] = useState('#FFFFFF');
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const hasSkipped = useRef(false);
+
+  const stopEffectAnims = () => {
+    effectAnimsRef.current.forEach((a) => a.stop());
+    effectAnimsRef.current = [];
+    shakeX.stopAnimation();
+    shakeY.stopAnimation();
+    flashOpacity.stopAnimation();
+  };
+
+  /**
+   * Render the scene's declared screen effect. Native driver only; fully
+   * skipped in reduced motion (the static scene is already shown by the caller).
+   */
+  const runSceneEffect = (scene: PhaseScene, eventShake: number, phase: number) => {
+    if (getSettingsSync().reducedMotion) return;
+    const intensity = scene.effectIntensity ?? eventShake ?? 0.5;
+
+    switch (scene.effect) {
+      case 'shake': {
+        const mag = 6 + 14 * intensity; // px
+        shakeX.setValue(0);
+        shakeY.setValue(0);
+        const step = (toX: number, toY: number) =>
+          Animated.timing(shakeX, { toValue: toX, duration: 45, useNativeDriver: true });
+        // Drive both axes via a parallel of two sequences so X/Y desync slightly
+        const xSeq = Animated.sequence([
+          step(mag, 0),
+          Animated.timing(shakeX, { toValue: -mag, duration: 60, useNativeDriver: true }),
+          Animated.timing(shakeX, { toValue: mag * 0.6, duration: 55, useNativeDriver: true }),
+          Animated.timing(shakeX, { toValue: -mag * 0.4, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeX, { toValue: 0, duration: 45, useNativeDriver: true }),
+        ]);
+        const ySeq = Animated.sequence([
+          Animated.timing(shakeY, { toValue: -mag * 0.5, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeY, { toValue: mag * 0.4, duration: 55, useNativeDriver: true }),
+          Animated.timing(shakeY, { toValue: -mag * 0.25, duration: 50, useNativeDriver: true }),
+          Animated.timing(shakeY, { toValue: 0, duration: 60, useNativeDriver: true }),
+        ]);
+        const anim = Animated.parallel([xSeq, ySeq]);
+        effectAnimsRef.current.push(anim);
+        anim.start();
+        break;
+      }
+      case 'flash': {
+        setFlashColor(getFlashColor(phase));
+        flashOpacity.setValue(0);
+        const peak = 0.35 + 0.45 * intensity;
+        const anim = Animated.sequence([
+          Animated.timing(flashOpacity, { toValue: peak, duration: 90, useNativeDriver: true }),
+          Animated.timing(flashOpacity, { toValue: 0, duration: 320, useNativeDriver: true }),
+        ]);
+        effectAnimsRef.current.push(anim);
+        anim.start();
+        break;
+      }
+      case 'vignette_close': {
+        // Darkening edge frame fades in and lingers (it stays for the dark phases).
+        const target = 0.5 + 0.4 * intensity;
+        const anim = Animated.timing(vignetteOpacity, {
+          toValue: target,
+          duration: 700,
+          useNativeDriver: true,
+        });
+        effectAnimsRef.current.push(anim);
+        anim.start();
+        break;
+      }
+      default:
+        break;
+    }
+  };
 
   const handleSkip = () => {
     if (hasSkipped.current) return;
@@ -126,6 +215,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     // Stop any in-flight animations from the current scene
     sceneOpacity.stopAnimation();
     sceneTranslateY.stopAnimation();
+    stopEffectAnims();
     overlayOpacity.stopAnimation();
     overlayOpacity.setValue(0);
     onComplete();
@@ -134,6 +224,12 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
   useEffect(() => {
     if (!event) return;
     hasSkipped.current = false;
+    // Reset screen-effect drivers for a fresh event
+    stopEffectAnims();
+    shakeX.setValue(0);
+    shakeY.setValue(0);
+    flashOpacity.setValue(0);
+    vignetteOpacity.setValue(0);
 
     const reducedMotion = getSettingsSync().reducedMotion;
     // Scale ALL timing by 0.4x in reduced motion (not just skip animations)
@@ -162,6 +258,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         setActiveSceneIndex(index);
         if (!reducedMotion) {
           fireSceneHaptic(scene, event.shakeIntensity);
+          runSceneEffect(scene, event.shakeIntensity ?? 0, event.phase);
         }
         if (reducedMotion) {
           sceneOpacity.setValue(1);
@@ -220,6 +317,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
     timersRef.current = timers;
     return () => {
       timers.forEach(clearTimeout);
+      stopEffectAnims();
     };
   }, [event]);
 
@@ -234,11 +332,27 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
         {
           opacity: overlayOpacity,
           backgroundColor: event.bgColor,
+          transform: [{ translateX: shakeX }, { translateY: shakeY }],
         },
       ]}
       accessibilityRole="alert"
       accessibilityLabel={`Phase transition: ${event.title}`}
     >
+      {/* Darkening edge vignette (fades in on vignette_close scenes) */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.vignette, { opacity: vignetteOpacity }]}
+      />
+
+      {/* Full-screen flash overlay */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.flash,
+          { opacity: flashOpacity, backgroundColor: flashColor },
+        ]}
+      />
+
       {/* Cinematic ambient particles */}
       {event.particles && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -356,5 +470,19 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  flash: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1001,
+  },
+  // Approximated radial vignette: a thick dark border whose inner corners are
+  // rounded, darkening the screen edges while leaving the center clearer.
+  // (No new assets; a true radial gradient isn't available without one.)
+  vignette: {
+    ...StyleSheet.absoluteFillObject,
+    borderColor: 'rgba(0, 0, 0, 0.85)',
+    borderWidth: Math.round(Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.32),
+    borderRadius: Math.round(Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.55),
+    zIndex: 999,
   },
 });

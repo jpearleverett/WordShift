@@ -80,7 +80,12 @@ const EMOTION_BUBBLES: Record<number, string[]> = {
   2: ['💭', '😰', '💧', '❓', '🌫️'],
   3: ['😰', '💧', '👁️', '💀', '🌑'],
   4: ['💀', '👁️', '🌑', '⚫', '😱'],
+  // Phase 5: terrible peace — serene resignation, not cheerful, not dreadful.
+  5: ['🕯️', '🌑', '…', '🤍', '🌫️'],
 };
+
+// Ghostly mauve mood color for Phase 5 (matches getPhaseTheme phase 5 / colors.ts)
+const PHASE5_MOOD_COLOR = '#7B6B8A';
 
 // Z's animation component for sleeping animals
 const SleepingZs: React.FC = () => {
@@ -351,8 +356,13 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
         }),
       ]).start();
 
-      // Show a happy emotion on tap
-      const emojis = currentPhase >= 3 ? ['😰', '💧'] : ['💕', '✨', '💖'];
+      // Show a tap emotion appropriate to the phase
+      const emojis =
+        currentPhase >= 5
+          ? ['🕯️', '🤍', '…']        // serene resignation
+          : currentPhase >= 3
+            ? ['😰', '💧']             // dread
+            : ['💕', '✨', '💖'];      // candy-cute joy
       setCurrentEmotion(emojis[Math.floor(Math.random() * emojis.length)]);
       emotionY.setValue(0);
       emotionOpacity.setValue(0);
@@ -527,6 +537,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
       case 2: return CandyColors.orange.main;
       case 3: return CandyColors.red.light;
       case 4: return CandyColors.purple.dark;
+      case 5: return PHASE5_MOOD_COLOR; // ghostly mauve — terrible peace
       default: return CandyColors.green.main;
     }
   };
