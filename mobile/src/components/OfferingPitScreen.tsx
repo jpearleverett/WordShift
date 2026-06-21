@@ -61,6 +61,10 @@ import { getSettingsSync } from '../services/settings';
 import { logEvent } from '../services/eventLogger';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
 import { getDeviceTier, shouldSimplifyAnimations } from '../services/deviceTier';
+import { RewardedAdButton } from './monetization/RewardedAdButton';
+
+/** Bonus amber granted for a player-initiated rewarded ad at the Tending Shrine. */
+const REWARDED_TEND_BONUS = 30;
 
 // ---------------------------------------------------------------------------
 // Assets & Constants
@@ -2194,6 +2198,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                     Earn more amber to deepen the pattern further.
                   </Text>
                 )}
+                <RewardedAdButton
+                  placement="quest_bonus"
+                  phase={phase}
+                  label={`Offer your attention  ·  +${REWARDED_TEND_BONUS} amber`}
+                  onReward={async () => {
+                    const newBalance = await awardBonusAmber(REWARDED_TEND_BONUS, 'rewarded_tend');
+                    setDisplayBalance(newBalance);
+                    onAmberChange?.(newBalance);
+                    hapticMedium();
+                  }}
+                />
               </>
             )}
           </View>
