@@ -26,8 +26,8 @@ spoiling the reveal, while the age rating must declare it honestly.
 > 🧩 **Thousands of puzzles.** Four difficulties, Reverse and Double Shift
 > modes, timed Speed runs, and a Daily Challenge shared by every player.
 >
-> 🔥 **Keep your streak.** Daily streaks with forgiving grace days, weekly
-> quests, and 34 achievements.
+> 🔥 **Keep your streak.** Daily streaks with streak freezes to protect them,
+> weekly quests, and 34 achievements.
 >
 > 🌙 **Stay a while.** The animals have so much to tell you. They find you
 > fascinating. They're so glad you're here.
@@ -48,7 +48,7 @@ spoiling the reveal, while the age rating must declare it honestly.
 - **ESRB:** Teen (fantasy themes, mild horror) — answer "infrequent/mild horror/fear themes" honestly in the questionnaire.
 - **PEGI:** 12 (moderate horror themes, no violence, no profanity — dictionary is filtered).
 - **Apple:** 12+ — "Infrequent/Mild Horror/Fear Themes."
-- Declare **no data collection** (Play Data Safety / Apple Privacy Nutrition) while `TELEMETRY_ENDPOINT` remains empty. If telemetry is enabled, re-declare before submitting.
+- Declare **no data collection** (Play Data Safety / Apple Privacy Nutrition): `TELEMETRY_ENDPOINT` is empty and nothing is transmitted.
 
 ## Asset checklist
 

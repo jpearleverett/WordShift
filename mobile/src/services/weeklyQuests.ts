@@ -1,12 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
+import { getLocalDateString, parseLocalDate } from './dateUtils';
 
 /**
  * Quest system for WordShift.
  *
  * Two tiers:
  * - **Daily quests** (5): Reset at midnight local time. Lighter objectives.
- * - **Weekly challenges** (5): Reset Monday 00:00 UTC. Harder, higher rewards.
+ * - **Weekly challenges** (5): Reset Monday 00:00 local time. Harder, higher rewards.
+ *
+ * Both tiers bucket by the player's LOCAL calendar day (via dateUtils) so weekly
+ * and daily resets stay consistent with streaks/daily-challenge across timezones.
  *
  * Quest descriptions shift tone with narrative phase.
  */
@@ -148,15 +152,18 @@ let weeklyQuestCache: QuestState | null = null;
 
 /**
  * Get the ISO week identifier for a given date (e.g., "2026-W07").
- * Week starts on Monday.
+ * Week starts on Monday, bucketed by LOCAL calendar day (not UTC) so the
+ * weekly reset lines up with the rest of the app's local-day logic.
  */
 export function getWeekId(date: Date = new Date()): string {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7; // Make Sunday = 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum); // Thursday of the week
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  // Work from the LOCAL calendar day at local midnight (via dateUtils), so the
+  // week boundary follows the player's wall clock rather than UTC.
+  const d = parseLocalDate(getLocalDateString(date));
+  const dayNum = d.getDay() || 7; // Make Sunday = 7
+  d.setDate(d.getDate() + 4 - dayNum); // Thursday of the week
+  const yearStart = parseLocalDate(`${d.getFullYear()}-01-01`);
   const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-  return `${d.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
+  return `${d.getFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -229,13 +236,16 @@ function generateQuestsFromPool(
     selected.push(template);
   }
 
-  // Fill remaining if we didn't reach target count
+  // Fill remaining if we didn't reach target count. Re-apply the same
+  // max-2-per-type guard so the fill pass can't backfill a same-y set when few
+  // templates survived filtering (early-game players).
   if (selected.length < count) {
     for (const template of shuffled) {
       if (selected.length >= count) break;
-      if (!selected.includes(template)) {
-        selected.push(template);
-      }
+      if (selected.includes(template)) continue;
+      const typeCount = selected.filter(s => s.type === template.type).length;
+      if (typeCount >= 2) continue;
+      selected.push(template);
     }
   }
 
@@ -539,18 +549,18 @@ export function getTimeUntilDailyReset(): { hours: number; minutes: number } {
 }
 
 /**
- * Get time remaining until weekly quest reset (next Monday 00:00 UTC).
+ * Get time remaining until weekly quest reset (next Monday 00:00 local time).
  */
 export function getTimeUntilReset(): { days: number; hours: number; minutes: number } {
   const now = new Date();
-  const dayOfWeek = now.getUTCDay(); // 0 = Sunday
+  const dayOfWeek = now.getDay(); // 0 = Sunday (local)
   const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-  const nextMonday = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() + daysUntilMonday,
+  const nextMonday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + daysUntilMonday,
     0, 0, 0
-  ));
+  );
   const msRemaining = nextMonday.getTime() - now.getTime();
   const totalMinutes = Math.floor(msRemaining / 60000);
   return {

@@ -42,6 +42,7 @@ export function estimateSlotIndex(
   dropX: number,
   slotCount: number,
   targetWordLength: number,
+  out?: { droppedRightOfCenter?: boolean },
 ): number {
   const screenWidth = Dimensions.get('window').width;
 
@@ -74,6 +75,7 @@ export function estimateSlotIndex(
   // Walk through the arc layout to compute each slot center
   let bestSlot = 0;
   let bestDist = Infinity;
+  let bestCenter = contentStartX;
   let x = contentStartX;
 
   for (let i = 0; i < slotCount; i++) {
@@ -83,6 +85,7 @@ export function estimateSlotIndex(
     if (dist < bestDist) {
       bestDist = dist;
       bestSlot = i;
+      bestCenter = slotCenter;
     }
     x += slotEffectiveW;
 
@@ -94,19 +97,32 @@ export function estimateSlotIndex(
     }
   }
 
+  // Report whether the drop fell to the right of the chosen slot's center, so
+  // callers can break outward-search ties toward the finger (see
+  // findClosestValidSlot).
+  if (out) {
+    out.droppedRightOfCenter = dropX >= bestCenter;
+  }
+
   return bestSlot;
 }
 
 /**
  * Given a target slot index and the available previews, find the
- * closest valid slot — preferring the target, then searching outward
- * with left bias on ties.
+ * closest valid slot — preferring the target, then searching outward.
+ *
+ * At each equidistant offset the search checks one side before the other.
+ * By default it checks LEFT first (the historical left bias). When
+ * `preferRightOnTie` is true — i.e. the finger dropped to the right of the
+ * estimated slot's center — it checks RIGHT first so a tie resolves toward
+ * the finger rather than always leftward.
  *
  * Returns the valid slot index, or null if no valid slots exist.
  */
 export function findClosestValidSlot(
   targetIndex: number,
   previews: SlotPreview[],
+  preferRightOnTie = false,
 ): number | null {
   if (previews[targetIndex]?.isValid) return targetIndex;
 
@@ -114,10 +130,17 @@ export function findClosestValidSlot(
   for (let offset = 1; offset < previews.length; offset++) {
     const left = targetIndex - offset;
     const right = targetIndex + offset;
+    const leftValid = left >= 0 && previews[left]?.isValid;
+    const rightValid = right < previews.length && previews[right]?.isValid;
 
-    // Left bias: check left first
-    if (left >= 0 && previews[left]?.isValid) return left;
-    if (right < previews.length && previews[right]?.isValid) return right;
+    // On a tie (both sides valid at this offset), resolve toward the finger.
+    if (preferRightOnTie) {
+      if (rightValid) return right;
+      if (leftValid) return left;
+    } else {
+      if (leftValid) return left;
+      if (rightValid) return right;
+    }
   }
 
   return null;

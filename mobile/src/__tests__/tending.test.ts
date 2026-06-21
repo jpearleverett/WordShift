@@ -22,7 +22,7 @@ import {
   TENDING_MILESTONES,
   TENDING_DAILY_BONUS_DISCOUNT,
 } from '../constants/gameBalance';
-import { getTendingMilestoneLines } from '../services/dialogue/animalDialogueTending';
+import { getTendingMilestoneLines, TENDING_DIALOGUES } from '../services/dialogue/animalDialogueTending';
 import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -264,6 +264,17 @@ describe('getTendingMilestoneLines', () => {
       const lines = getTendingMilestoneLines(a, 100);
       expect(lines).toHaveLength(TENDING_MILESTONES.length);
       lines.forEach(l => expect(l.length).toBeGreaterThan(0));
+    }
+  });
+
+  it('has exactly one line per milestone for every animal (content guard)', () => {
+    // Guards against a milestone being added without a matching dialogue line
+    // (or vice versa) — a mismatch would silently drop the extra milestone's
+    // line because getTendingMilestoneLines indexes by milestone position.
+    const keys = Object.keys(TENDING_DIALOGUES) as (keyof typeof TENDING_DIALOGUES)[];
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) {
+      expect(TENDING_DIALOGUES[key]).toHaveLength(TENDING_MILESTONES.length);
     }
   });
 });

@@ -1,18 +1,15 @@
 /**
  * Ads layer (scaffold).
  *
- * Real ad SDKs (AppLovin MAX / Google AdMob) are NATIVE modules that break Expo
- * Go, so they sit behind an `AdProvider` interface — same pattern as iap.ts /
- * cloudSave.ts. A `NoOpAdProvider` is used until a real provider is wired via
- * `setAdProvider()`: the app builds, runs in Expo Go, and stays unit-testable; ad
- * calls resolve to "no ad shown / reward not granted".
+ * A real ad SDK is a NATIVE module that breaks Expo Go, so it sits behind an
+ * `AdProvider` interface — same pattern as iap.ts / cloudSave.ts. The active
+ * provider is a `NoOpAdProvider`: the app builds, runs in Expo Go, and stays
+ * unit-testable; ad calls resolve to "no ad shown / reward not granted".
  *
  * This module owns ALL ad-policy logic (Patron suppression, interstitial cadence,
- * rewarded daily cap) as pure/testable code, so the native provider only has to
- * load and show creatives. Rewarded ads are always OPT-IN (a button the player
- * taps); interstitials are the only auto-shown format and are heavily gated.
- *
- * See docs/MONETIZATION_F2P_IMPLEMENTATION.md §2.2 / §4.2 / §4.3 / §5.
+ * rewarded daily cap) as pure/testable code. Rewarded ads are always OPT-IN (a
+ * button the player taps); interstitials are the only auto-shown format and are
+ * heavily gated.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';

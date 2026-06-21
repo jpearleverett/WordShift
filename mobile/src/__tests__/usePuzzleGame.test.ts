@@ -121,7 +121,7 @@ jest.mock('../constants', () => ({
   },
 }));
 
-import { usePuzzleGame, hasAnyValidMove, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
+import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
 
 /**
  * Helper: call usePuzzleGame with fresh hook indices (simulates a re-render).
@@ -668,6 +668,74 @@ describe('usePuzzleGame', () => {
     test('returns false when the target row is out of bounds', () => {
       const rows = [makeRow('TIME'), makeRow('TIED')];
       expect(hasAnyValidMove(rows, 1, 'down', validator(['TIE', 'TIMED']))).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // Double-shift look-ahead (drop1 guidance + stuck detection)
+  // =========================================================================
+
+  describe('double-shift look-ahead', () => {
+    const makeRow = (word: string, lockedIndices: number[] = []) => ({
+      id: `row_${word}`,
+      originalWord: word,
+      words: word.split('').map((char, i) => ({
+        id: `${word}_${i}`,
+        char,
+        isLocked: lockedIndices.includes(i),
+      })),
+    });
+    const makeLetters = (word: string, lockedIndices: number[] = []) =>
+      makeRow(word, lockedIndices).words;
+    const validator = (words: string[]) => {
+      const set = new Set(words);
+      return (w: string) => set.has(w);
+    };
+
+    // Source SPLAT, target IE. Removing P (drop1 @0 -> "PIE") then S (drop2 @end)
+    // leaves source "LAT" and forms target "PIES".
+    test('canCompleteDoubleShift finds a valid second move', () => {
+      const reducedSource = makeLetters('SLAT'); // SPLAT minus the first-picked P
+      const intermediate = 'PIE'.split(''); // base IE with P already dropped
+      expect(
+        canCompleteDoubleShift(reducedSource, intermediate, validator(['LAT', 'PIES']))
+      ).toBe(true);
+    });
+
+    test('canCompleteDoubleShift returns false when no completion exists', () => {
+      const reducedSource = makeLetters('SLAT');
+      const intermediate = 'PIE'.split('');
+      // 'LAT' is a valid source remainder but no target completion is valid
+      expect(
+        canCompleteDoubleShift(reducedSource, intermediate, validator(['LAT']))
+      ).toBe(false);
+    });
+
+    test('canCompleteDoubleShift skips locked letters as the second pick', () => {
+      // Lock the only letter (S, index 0) that would complete the move
+      const reducedSource = makeLetters('SLAT', [0]);
+      const intermediate = 'PIE'.split('');
+      expect(
+        canCompleteDoubleShift(reducedSource, intermediate, validator(['LAT', 'PIES']))
+      ).toBe(false);
+    });
+
+    test('hasAnyValidDoubleShiftMove returns true when a two-letter move completes', () => {
+      const rows = [makeRow('SPLAT'), makeRow('IE')];
+      expect(
+        hasAnyValidDoubleShiftMove(rows, 0, validator(['LAT', 'PIES']))
+      ).toBe(true);
+    });
+
+    test('hasAnyValidDoubleShiftMove returns false when the row is trapped', () => {
+      const rows = [makeRow('SPLAT'), makeRow('IE')];
+      // No source remainder / target combination is valid -> stuck
+      expect(hasAnyValidDoubleShiftMove(rows, 0, validator(['ZZZ']))).toBe(false);
+    });
+
+    test('hasAnyValidDoubleShiftMove returns false at the out-of-bounds last row', () => {
+      const rows = [makeRow('SPLAT'), makeRow('IE')];
+      expect(hasAnyValidDoubleShiftMove(rows, 1, validator(['LAT', 'PIES']))).toBe(false);
     });
   });
 

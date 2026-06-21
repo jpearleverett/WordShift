@@ -22,15 +22,15 @@ All gameplay data is stored locally on your device using your operating system's
 - Settings (sound, haptics, reduced motion, notification preferences)
 - A locally generated random install identifier and a local event log used for debugging
 
-This data never leaves your device unless diagnostics upload is enabled in a future release (see below). Deleting the app, or using **Settings → Reset All Progress**, permanently deletes this data.
+This data never leaves your device. Deleting the app, or using **Settings → Reset All Progress**, permanently deletes this data.
 
 ## Notifications
 
 If you choose to enable reminders, the app schedules **local notifications** on your device (a daily puzzle reminder and an occasional check-in nudge). These are generated on your device; no push-notification service or server is involved. You can disable them at any time in the app's Settings or your system settings.
 
-## Diagnostics (disabled by default)
+## Diagnostics
 
-The app contains an optional diagnostics uploader that is **switched off in this release**: no network endpoint is configured and no data is transmitted. If a future update enables it, the upload would be limited to anonymous gameplay events and crash information (no names, no contacts, no precise location, no advertising identifiers), this policy will be updated, and the change will be noted in the release notes.
+The app contains an optional diagnostics component that is **switched off**: no network endpoint is configured and no data is transmitted off your device.
 
 ## Children's privacy
 

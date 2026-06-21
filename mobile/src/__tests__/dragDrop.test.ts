@@ -87,7 +87,15 @@ describe('findClosestValidSlot', () => {
   it('searches left first (left bias) on equidistant valid slots', () => {
     // Target index 2, valid at indices 1 and 3 (equidistant)
     const previews = [invalid('A'), valid('B'), invalid('C'), valid('D'), invalid('E')];
-    expect(findClosestValidSlot(2, previews)).toBe(1); // Left bias
+    expect(findClosestValidSlot(2, previews)).toBe(1); // Left bias (default)
+  });
+
+  it('breaks ties toward the finger when preferRightOnTie is true', () => {
+    // Target index 2, valid at indices 1 and 3 (equidistant). When the drop
+    // landed to the right of the estimated slot's center, prefer the right slot.
+    const previews = [invalid('A'), valid('B'), invalid('C'), valid('D'), invalid('E')];
+    expect(findClosestValidSlot(2, previews, true)).toBe(3); // Right preferred
+    expect(findClosestValidSlot(2, previews, false)).toBe(1); // Still left by default
   });
 
   it('finds the nearest valid slot to the right when left is invalid', () => {

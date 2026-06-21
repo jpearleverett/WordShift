@@ -87,12 +87,13 @@ function isYesterday(dateString: string): boolean {
 }
 
 /**
- * Check if a date string is within the streak grace period (STREAK_RESET_DAYS)
- * Returns true if the date is 1 to STREAK_RESET_DAYS days ago
+ * Check if a date string is exactly yesterday (local day).
+ * Free streak continuation requires play *yesterday* — any longer gap must be
+ * covered by a streak freeze (see updateStreak). This keeps daily habit
+ * tension intact instead of letting an every-other-day cadence ride forever.
  */
-function isWithinStreakGracePeriod(dateString: string): boolean {
-  const diffDays = daysAgoLocal(dateString);
-  return diffDays >= 1 && diffDays <= STREAK_BONUSES.STREAK_RESET_DAYS;
+function playedYesterday(dateString: string): boolean {
+  return daysAgoLocal(dateString) === 1;
 }
 
 /**
@@ -128,12 +129,12 @@ async function updateStreak(): Promise<number> {
   } else if (isToday(progress.lastPlayDate)) {
     // Already played today - streak unchanged
     // Just return current streak
-  } else if (isWithinStreakGracePeriod(progress.lastPlayDate)) {
-    // Played within grace period (STREAK_RESET_DAYS) - continue streak
+  } else if (playedYesterday(progress.lastPlayDate)) {
+    // Played yesterday — continue streak
     progress.currentStreak += 1;
     progress.lastPlayDate = today;
   } else {
-    // Missed too many days — check for streak freeze before resetting
+    // Missed at least one full day — a streak freeze can still save it
     const freezesAvailable = progress.streakFreezes ?? 0;
     if (freezesAvailable > 0 && progress.currentStreak > 0) {
       // Consume a streak freeze to save the streak
