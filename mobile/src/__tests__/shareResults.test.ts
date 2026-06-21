@@ -118,6 +118,37 @@ describe('shareResults', () => {
     expect(text).toContain('"The FLAME Dance"');
   });
 
+  test('daily shares are spoiler-free (no word chain or incantation)', () => {
+    const text = generateShareText({
+      stars: 3,
+      difficulty: 'HARD',
+      hintsUsed: 0,
+      invalidAttempts: 0,
+      moveCount: 5,
+      isDaily: true,
+      dailyDate: '2026-06-21',
+      wordChain: ['VOID', 'VOIDS', 'AVOID'],
+      incantationName: 'Offering: VOID to AVOID',
+    });
+    // Grid + date stay; the words must not leak today's daily puzzle.
+    expect(text).toContain('2026-06-21');
+    expect(text).not.toContain('VOID');
+    expect(text).not.toContain('AVOID');
+    expect(text).not.toContain('Offering: VOID');
+  });
+
+  test('non-daily shares still show the word chain', () => {
+    const text = generateShareText({
+      stars: 3,
+      difficulty: 'MEDIUM',
+      hintsUsed: 0,
+      invalidAttempts: 0,
+      moveCount: 3,
+      wordChain: ['FLAME', 'FAME', 'FRAME'],
+    });
+    expect(text).toContain('FLAME');
+  });
+
   test('generateShareText includes animal whisper when provided', () => {
     const text = generateShareText({
       stars: 2,

@@ -48,7 +48,10 @@ import { claimDailyLoginReward, DAILY_LOGIN_CYCLE_LENGTH } from './src/services/
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
-import { sharePuzzleResult } from './src/services/shareResults';
+import { ShareableResult } from './src/services/shareResults';
+import { initShareImage } from './src/services/shareImage';
+import { ShareResultModal } from './src/components/share/ShareResultModal';
+import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
@@ -210,6 +213,8 @@ function MainApp() {
   // True while the player is in a Daily Challenge run (drives autosave tagging,
   // victory recording, and the VictoryModal "Daily Challenge Complete" header).
   const [isPlayingDaily, setIsPlayingDaily] = useState(false);
+  // Result-card share preview (null = closed).
+  const [shareResultData, setShareResultData] = useState<ShareableResult | null>(null);
 
   // Speed-variant escalation: consecutive speed wins increment this, shortening
   // each subsequent clock. Reset on time-up or whenever a fresh run begins.
@@ -1281,35 +1286,28 @@ function MainApp() {
     });
   }, [puzzleActions, transitionTo, startVictoryExitFlow]);
 
-  const handleShare = useCallback(async () => {
+  // Share opens a preview of the result card (which shares an image when the
+  // native capturer is present, else falls back to the emoji-grid text share).
+  // It overlays the victory screen rather than exiting it, so sharing never
+  // costs the player their victory moment.
+  const handleShare = useCallback(() => {
     if (!victoryFlow.victoryData) return;
     hapticLight();
-    startVictoryExitFlow(() => {
-      const moveCount = puzzle.rows.length - 1;
-      sharePuzzleResult({
-        stars: victoryFlow.victoryData!.earnedStars,
-        difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
-        hintsUsed: puzzle.hintsUsed,
-        invalidAttempts: puzzle.invalidAttempts,
-        isDaily: isPlayingDaily,
-        moveCount,
-        wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
-        animalWhisper: orchestration.whisper?.text,
-        phase: persistence.currentPhase,
-        incantationName: puzzle.lastIncantationName || undefined,
-      }).then(shared => {
-        if (shared) {
-          logEvent({
-            type: 'share_completed',
-            data: {
-              difficulty: puzzle.difficulty,
-              phase: persistence.currentPhase,
-            },
-          });
-        }
-      });
+    const moveCount = puzzle.rows.length - 1;
+    setShareResultData({
+      stars: victoryFlow.victoryData.earnedStars,
+      difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
+      hintsUsed: puzzle.hintsUsed,
+      invalidAttempts: puzzle.invalidAttempts,
+      isDaily: isPlayingDaily,
+      dailyDate: isPlayingDaily ? getLocalDateString() : undefined,
+      moveCount,
+      wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
+      animalWhisper: orchestration.whisper?.text,
+      phase: persistence.currentPhase,
+      incantationName: puzzle.lastIncantationName || undefined,
     });
-  }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, startVictoryExitFlow]);
+  }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily]);
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (victoryAnimatingRef.current && victoryFlow.victoryData) {
@@ -2133,6 +2131,16 @@ function MainApp() {
         event={phaseTransitionEvent}
         onComplete={() => setPhaseTransitionEvent(null)}
       />
+      {/* Shareable result card preview — overlays everything */}
+      <ShareResultModal
+        result={shareResultData}
+        onClose={() => setShareResultData(null)}
+        onShared={() => {
+          // shareImage logs the share_completed event (with image/text kind);
+          // refresh to pick up the first-share-of-day amber bonus.
+          persistenceActions.refreshStats();
+        }}
+      />
     </View>
   );
 }
@@ -2154,6 +2162,7 @@ export default function App() {
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in
         // Expo Go — no native modules until a real provider is wired.
+        initShareImage(); // registers the native image capturer if present (no-op in Expo Go)
         await Promise.all([initIAP(), initAds(), initCosmetics()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);

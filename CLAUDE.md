@@ -126,6 +126,8 @@ mobile/
 │   │   │   └── RitualEchoChain.tsx # Real-time word chain display
 │   │   ├── OfferingPitScreen.tsx # Offering Pit: tap-to-devour words, ward marks, phase transitions, Phase-5 Tending Shrine modal
 │   │   ├── shop/ShopScreen.tsx  # Cosmetic Shop: buy/equip amber tile themes (expression-only)
+│   │   ├── share/ShareCard.tsx  # Phase-aware, spoiler-free shareable result card (forwardRef for PNG capture)
+│   │   ├── share/ShareResultModal.tsx # Victory share preview → shares image (or text fallback)
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive
 │   │   ├── WordLedger.tsx       # Ritual word history screen
 │   │   └── home/
@@ -179,7 +181,8 @@ mobile/
 │       ├── dateUtils.ts          # Local-day date helpers (streak/daily bucketing — NEVER UTC/toISOString)
 │       ├── settings.ts, haptics.ts, audio.ts, eventLogger.ts
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
-│       ├── homeScenePan.ts, shareResults.ts
+│       ├── homeScenePan.ts, shareResults.ts (emoji-grid text share; daily shares are spoiler-free)
+│       ├── shareImage.ts        # Pluggable result-image capture (react-native-view-shot behind a provider; text fallback in Expo Go)
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
 ├── src/__tests__/               # ~1,077 tests, 39 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
@@ -316,7 +319,7 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 - Streak milestones: 3/7/14/21/30 days → 15/30/50/65/100 amber
 - Puzzle count milestones (10, 15, 25, 50... up to 350)
 - Achievement rewards: each of the 34 achievements grants one-time amber (10-100, `rewardAmber` in achievements.ts)
-- Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus` in shareResults.ts; hinted on the VictoryModal share button)
+- Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus`/`recordShareSuccess` in shareResults.ts; hinted on the share-card preview). The VictoryModal Share button opens a `ShareResultModal` preview of a phase-aware `ShareCard`; `shareImage.shareResultImage()` captures a PNG when `react-native-view-shot` is present (dev client) and otherwise falls back to the emoji-grid text share. **Daily shares are spoiler-free** (grid only — no word chain/incantation, since the daily is the same puzzle for everyone).
 - Daily login reward: rewards *opening the app* (not just solving) — a 7-day escalating cycle (10/15/20/25/30/40/75, Day-7 jackpot) that wraps weekly and resets on a missed day. `claimDailyLoginReward()` in `dailyLoginReward.ts`, claimed once per session from App's launch effect (skipped during onboarding), source `'daily_login'`
 
 ### House Building (Bottom-Up)
