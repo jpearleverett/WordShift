@@ -29,6 +29,8 @@ import { AMBER_REWARDS } from '../../constants/gameBalance';
 import { hapticSuccess } from '../../services/haptics';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { getSettingsSync } from '../../services/settings';
+import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
+import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -68,6 +70,10 @@ interface VictoryModalProps {
   /** True when a phase transition is waiting to be confirmed in the pit */
   phaseTransitionPending?: boolean;
   isPlayingDaily: boolean;
+  /** Daily leaderboard standing for this result (null = none / backend off) */
+  dailyRank?: DailyRank | null;
+  /** Quiet, spoiler-safe aggregate social-proof line (null = none / backend off) */
+  socialProofLine?: string | null;
   victoryData: VictoryData | null;
   completionCoda?: { title: string; text: string } | null;
   cumulativeStats: CumulativeStats | null;
@@ -137,6 +143,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   phase,
   phaseTransitionPending,
   isPlayingDaily,
+  dailyRank,
+  socialProofLine,
   victoryData,
   completionCoda,
   cumulativeStats,
@@ -267,6 +275,25 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {isPlayingDaily ? 'Daily Challenge Complete' : 'Puzzle Complete'}
             </Text>
+
+            {isPlayingDaily && dailyRank && (
+              <DailyLeaderboardCard
+                rank={dailyRank.rank}
+                total={dailyRank.total}
+                percentile={dailyRank.percentile}
+                beatText={getBeatPercentText(dailyRank.percentile, phase)}
+                phase={phase}
+              />
+            )}
+
+            {!!socialProofLine && (
+              <Text
+                style={[styles.socialProofLine, { color: phaseTheme.modalSecondaryTextColor }]}
+                accessibilityLabel={socialProofLine}
+              >
+                {socialProofLine}
+              </Text>
+            )}
 
             {/* Group 1: Harvest, bonuses, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
@@ -831,6 +858,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: CandyColors.gray[500],
     marginBottom: 4,
+  },
+  socialProofLine: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 2,
+    opacity: 0.85,
   },
   victoryFeedback: {
     fontSize: 13,

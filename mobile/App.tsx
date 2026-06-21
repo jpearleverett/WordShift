@@ -47,6 +47,8 @@ import {
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
 import { PatronModal } from './src/components/monetization/PatronModal';
+import { submitDailyResult, getDailyRank, DailyRank } from './src/services/leaderboard';
+import { recordPuzzleContribution, getAggregateProof, getWordsOfferedText } from './src/services/socialProof';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
@@ -214,6 +216,12 @@ function MainApp() {
   const dailyLoginCheckedRef = useRef(false);
   // Patron (cosmetic IAP) modal — opened from Shop header / Settings
   const [showPatronModal, setShowPatronModal] = useState(false);
+  // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
+  const puzzleStartTimeRef = useRef<number>(0);
+  // Daily Challenge leaderboard standing for the current victory (null = none/off)
+  const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
+  // Quiet, spoiler-safe aggregate social-proof line for the victory modal
+  const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
@@ -741,6 +749,7 @@ function MainApp() {
       try {
         const daily = await generateDailyPuzzle();
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength);
+        puzzleStartTimeRef.current = Date.now();
         logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true } });
         maybeShowSetupSelectorIntro().catch(() => {});
       } catch {
@@ -804,8 +813,43 @@ function MainApp() {
         isPlayingDaily
       );
 
+      // Aggregate social proof: contribute this puzzle's words to the global
+      // daily count (spoiler-safe, anonymous). No-op until the backend is on.
+      recordPuzzleContribution(result.completedWords?.length ?? 0);
+      setSocialProofLine(null);
+      (async () => {
+        try {
+          const proof = await getAggregateProof();
+          if (proof && proof.wordsOfferedToday > 0) {
+            setSocialProofLine(getWordsOfferedText(proof.wordsOfferedToday, persistence.currentPhase));
+          }
+        } catch {
+          // Social proof is decorative — never block the victory flow.
+        }
+      })();
+
       // Record Daily Challenge completion + streak milestone (deferred toast).
       if (isPlayingDaily) {
+        // Submit to the daily leaderboard and fetch standing for the modal.
+        // Fire-and-forget; both no-op (null) until the backend is configured.
+        setDailyRank(null);
+        (async () => {
+          try {
+            const elapsedMs = puzzleStartTimeRef.current > 0
+              ? Date.now() - puzzleStartTimeRef.current
+              : 0;
+            await submitDailyResult({
+              date: getLocalDateString(),
+              timeMs: elapsedMs,
+              stars: victory.earnedStars,
+              hintsUsed: result.hintsUsed,
+            });
+            const rank = await getDailyRank(getLocalDateString());
+            if (rank) setDailyRank(rank);
+          } catch {
+            // Leaderboard is non-critical — never block the victory flow.
+          }
+        })();
         try {
           const before = await getDailyStatus();
           const dailyProgress = await recordDailyCompletion(
@@ -1955,6 +1999,8 @@ function MainApp() {
           phase={persistence.currentPhase}
           phaseTransitionPending={persistence.pendingPhaseTransition != null}
           isPlayingDaily={isPlayingDaily}
+          dailyRank={dailyRank}
+          socialProofLine={socialProofLine}
           victoryData={victoryFlow.victoryData}
           completionCoda={orchestration.completionCoda}
           cumulativeStats={persistence.cumulativeStats}
