@@ -21,6 +21,9 @@ import {
   MIN_PUZZLES_FOR_PHASE,
   VARIANT_REPEAT_DECAY as _VARIANT_REPEAT_DECAY,
   PATRON_AMBER_BONUS,
+  SURPRISE_BONUS_CHANCE,
+  SURPRISE_BONUS_AMOUNTS,
+  SURPRISE_BONUS_MIN_PUZZLES,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -101,6 +104,30 @@ function playedYesterday(dateString: string): boolean {
  */
 function isToday(dateString: string): boolean {
   return dateString === getTodayDateString();
+}
+
+/**
+ * Injectable RNG seam for the variable-ratio surprise bonus.
+ * Production uses Math.random; tests swap a deterministic generator via
+ * setSurpriseRng(). This is the ONLY test-only hook — production never depends
+ * on it beyond the default Math.random seam.
+ */
+let surpriseRng: () => number = Math.random;
+
+/** TEST-ONLY: override the surprise-bonus RNG. Pass no arg to restore Math.random. */
+export function setSurpriseRng(rng?: () => number): void {
+  surpriseRng = rng ?? Math.random;
+}
+
+/**
+ * Variable-ratio surprise bonus for a normal win. Returns 0 unless the player is
+ * past the onboarding window and the injectable RNG lands within
+ * SURPRISE_BONUS_CHANCE. Additive to the amber REWARD only — never phase progress.
+ */
+function computeSurpriseBonus(difficulty: Difficulty, puzzlesSolved: number): number {
+  if (puzzlesSolved < SURPRISE_BONUS_MIN_PUZZLES) return 0;
+  if (surpriseRng() >= SURPRISE_BONUS_CHANCE) return 0;
+  return SURPRISE_BONUS_AMOUNTS[difficulty];
 }
 
 // Set true by updateStreak() when a streak freeze is consumed to save a streak.
@@ -369,6 +396,7 @@ export async function awardPuzzleAmber(
   streakBonus: number;
   challengeBonus: number;
   patronBonus: number;
+  surpriseBonus: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
   firstCompletionBonus: number;
@@ -429,6 +457,12 @@ export async function awardPuzzleAmber(
     patronBonus = PATRON_AMBER_BONUS;
     totalAmount += patronBonus;
   }
+
+  // Variable-ratio surprise bonus (normal wins only, post-onboarding). Additive
+  // to the REWARD only; uses the already-incremented puzzle count for the
+  // onboarding suppression check. NEVER touches phase progression.
+  const surpriseBonus = computeSurpriseBonus(difficulty, progress.puzzlesSolved);
+  totalAmount += surpriseBonus;
 
   if (creditToBalance) {
     progress.amber += totalAmount;
@@ -574,6 +608,7 @@ export async function awardPuzzleAmber(
     streakBonus,
     challengeBonus,
     patronBonus,
+    surpriseBonus,
     milestoneBonus,
     milestoneMessage,
     firstCompletionBonus,

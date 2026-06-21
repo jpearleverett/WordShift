@@ -30,7 +30,9 @@ import {
   markChallengeIntroSeen,
   hasSeenJournalIntro,
   markJournalIntroSeen,
+  setSurpriseRng,
 } from '../services/amberCurrency';
+import { SURPRISE_BONUS_AMOUNTS, SURPRISE_BONUS_MIN_PUZZLES } from '../constants/gameBalance';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,6 +40,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
   await clearProgress();
+  // Force the variable-ratio surprise bonus OFF by default so the many exact-amount
+  // assertions stay deterministic. Surprise-specific tests opt in via setSurpriseRng.
+  setSurpriseRng(() => 1);
+});
+
+afterEach(() => {
+  // Restore the production Math.random seam.
+  setSurpriseRng();
 });
 
 describe('loadProgress', () => {
@@ -147,6 +157,79 @@ describe('Patron amber bonus', () => {
     expect(patron.phaseAcceleration).toBe(free.phaseAcceleration);
 
     await clearEntitlements();
+  });
+});
+
+describe('surprise bonus (variable-ratio reward)', () => {
+  // Push past the onboarding suppression window so the surprise bonus is eligible.
+  async function advancePastSuppressionWindow(): Promise<void> {
+    await devAddPuzzles(SURPRISE_BONUS_MIN_PUZZLES);
+  }
+
+  test('grants surpriseBonus when RNG forces a hit, additive to reward only', async () => {
+    await advancePastSuppressionWindow();
+
+    // Baseline: RNG forced to MISS.
+    setSurpriseRng(() => 1);
+    const baseline = await awardPuzzleAmber('MEDIUM', 1, 'standard', 0, true);
+    expect(baseline.surpriseBonus).toBe(0);
+
+    // Reset and replay the identical win with RNG forced to HIT.
+    await clearProgress();
+    await advancePastSuppressionWindow();
+    setSurpriseRng(() => 0); // 0 < SURPRISE_BONUS_CHANCE ⇒ always hit
+    const lucky = await awardPuzzleAmber('MEDIUM', 1, 'standard', 0, true);
+
+    expect(lucky.surpriseBonus).toBe(SURPRISE_BONUS_AMOUNTS.MEDIUM);
+    // Reward is exactly baseline + surprise — the bonus is purely additive.
+    expect(lucky.amount).toBe(baseline.amount + lucky.surpriseBonus);
+    // Crucially: phase progression is UNCHANGED vs the no-surprise baseline.
+    expect(lucky.phaseAcceleration).toBe(baseline.phaseAcceleration);
+  });
+
+  test('phaseProgress matches between a hit and a miss (surprise never feeds pacing)', async () => {
+    await advancePastSuppressionWindow();
+    setSurpriseRng(() => 1); // miss
+    await awardPuzzleAmber('HARD', 1, 'standard', 0, true);
+    const missProgress = (await loadProgress()).phaseProgress;
+
+    await clearProgress();
+    await advancePastSuppressionWindow();
+    setSurpriseRng(() => 0); // hit
+    const hit = await awardPuzzleAmber('HARD', 1, 'standard', 0, true);
+    const hitProgress = (await loadProgress()).phaseProgress;
+
+    expect(hit.surpriseBonus).toBeGreaterThan(0);
+    expect(hitProgress).toBe(missProgress);
+  });
+
+  test('surpriseBonus is 0 when RNG forces a miss', async () => {
+    await advancePastSuppressionWindow();
+    setSurpriseRng(() => 0.99); // >= chance ⇒ miss
+    const result = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
+    expect(result.surpriseBonus).toBe(0);
+  });
+
+  test('surpriseBonus is suppressed during the onboarding window even on a forced hit', async () => {
+    // No advance — puzzlesSolved becomes 1 (< SURPRISE_BONUS_MIN_PUZZLES) after this award.
+    setSurpriseRng(() => 0); // would hit, but suppressed by the puzzle-count floor
+    const result = await awardPuzzleAmber('MEDIUM', 1, 'standard', 0, true);
+    expect(result.surpriseBonus).toBe(0);
+  });
+
+  test('surprise amount scales with difficulty', async () => {
+    await advancePastSuppressionWindow();
+    setSurpriseRng(() => 0);
+    const easy = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
+
+    await clearProgress();
+    await advancePastSuppressionWindow();
+    setSurpriseRng(() => 0);
+    const hard = await awardPuzzleAmber('HARD', 1, 'standard', 0, true);
+
+    expect(easy.surpriseBonus).toBe(SURPRISE_BONUS_AMOUNTS.EASY);
+    expect(hard.surpriseBonus).toBe(SURPRISE_BONUS_AMOUNTS.HARD);
+    expect(hard.surpriseBonus).toBeGreaterThan(easy.surpriseBonus);
   });
 });
 

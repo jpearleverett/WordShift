@@ -474,34 +474,138 @@ describe('notifications', () => {
       expect(expoMock.requestPermissionsAsync).toHaveBeenCalled();
     });
 
-    it('schedules daily + next-day re-engagement when there is no streak', async () => {
+    // Classify scheduled notifications by their trigger HOUR. Daily reminders
+    // fire at the configured reminder hour (default 9), re-engagement at 18:00,
+    // streak-risk at 19:00. This is more robust than fixed call counts/indices
+    // now that the daily reminder pre-arms a non-repeating multi-day ladder.
+    function scheduledTriggers(): { hour: number; date: Date; body: string }[] {
+      return (expoMock.scheduleNotificationAsync.mock.calls as any[][]).map((c) => {
+        const arg = c[0];
+        const date: Date = arg.trigger.date;
+        return { hour: date.getHours(), date, body: arg.content.body as string };
+      });
+    }
+
+    it('schedules a multi-day daily reminder ladder + next-day re-engagement when there is no streak', async () => {
       const svc = loadWithStatus('granted');
       await svc.scheduleAllNotifications(0);
-      // daily reminder + re-engagement (no streak-risk without a streak)
-      expect(expoMock.scheduleNotificationAsync).toHaveBeenCalledTimes(2);
-      const reengagement = (expoMock.scheduleNotificationAsync.mock.calls as any[][])[1][0];
-      const triggerDate: Date = reengagement.trigger.date;
+
+      const triggers = scheduledTriggers();
+      // Daily reminders fire at hour 9 (the default reminder hour).
+      const daily = triggers.filter((t) => t.hour === 9);
+      expect(daily.length).toBeGreaterThan(0);
+      // Pre-armed for multiple future days (non-repeating one-shots, not a single repeat).
+      expect(daily.length).toBeGreaterThanOrEqual(3);
+
+      // Re-engagement is the 18:00 ping. No streak ⇒ no 19:00 streak-risk.
+      const reengagement = triggers.filter((t) => t.hour === 18);
+      const streakRisk = triggers.filter((t) => t.hour === 19);
+      expect(reengagement.length).toBe(1);
+      expect(streakRisk.length).toBe(0);
+
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      expect(triggerDate.getDate()).toBe(tomorrow.getDate());
+      expect(reengagement[0].date.getDate()).toBe(tomorrow.getDate());
     });
 
-    it('schedules a streak-risk notification and defers re-engagement when a streak is active', async () => {
+    it('does not schedule a daily reminder to fire on an already-played day', async () => {
+      expoMock = createExpoMock('granted');
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      const { getLocalDateString } = require('../services/dateUtils');
+      jest.doMock('../services/amberCurrency', () => ({
+        // Played TODAY (local day), no streak.
+        getFullProgress: jest.fn(() =>
+          Promise.resolve({ currentStreak: 0, lastPlayDate: getLocalDateString() })
+        ),
+      }));
+      const svc = require('../services/notifications');
+
+      await svc.scheduleAllNotifications(0);
+
+      const today = new Date().getDate();
+      const dailyToday = (expoMock.scheduleNotificationAsync.mock.calls as any[][])
+        .map((c) => c[0])
+        .filter((arg) => arg.trigger.date.getHours() === 9 && arg.trigger.date.getDate() === today);
+      // Today's reminder is suppressed because the player already engaged today.
+      expect(dailyToday.length).toBe(0);
+      // But future days are still pre-armed.
+      const dailyFuture = (expoMock.scheduleNotificationAsync.mock.calls as any[][])
+        .map((c) => c[0])
+        .filter((arg) => arg.trigger.date.getHours() === 9 && arg.trigger.date.getDate() !== today);
+      expect(dailyFuture.length).toBeGreaterThan(0);
+
+      jest.dontMock('../services/amberCurrency');
+    });
+
+    it('schedules streak-risk and defers re-engagement when a streak is active and not played today', async () => {
       expoMock = createExpoMock('granted');
       jest.resetModules();
       jest.doMock('expo-notifications', () => expoMock, { virtual: true });
       jest.doMock('../services/amberCurrency', () => ({
-        getFullProgress: jest.fn(() => Promise.resolve({ currentStreak: 5 })),
+        // Active streak, but NOT played today ⇒ genuinely at risk.
+        getFullProgress: jest.fn(() => Promise.resolve({ currentStreak: 5, lastPlayDate: null })),
       }));
       const svc = require('../services/notifications');
 
       await svc.scheduleAllNotifications(2);
-      // daily reminder + streak risk + re-engagement
-      expect(expoMock.scheduleNotificationAsync).toHaveBeenCalledTimes(3);
-      const bodies = (expoMock.scheduleNotificationAsync.mock.calls as any[][]).map(
-        (c) => c[0].content.body as string
-      );
-      expect(bodies.some(b => b.includes('5'))).toBe(true);
+
+      const triggers = scheduledTriggers();
+      // 19:00 streak-risk ping present, carrying the streak length.
+      const streakRisk = triggers.filter((t) => t.hour === 19);
+      expect(streakRisk.length).toBe(1);
+      expect(streakRisk[0].body).toContain('5');
+      // Re-engagement deferred to +2 days (the streak ping leads the ladder).
+      const reengagement = triggers.filter((t) => t.hour === 18);
+      expect(reengagement.length).toBe(1);
+      const twoDays = new Date();
+      twoDays.setDate(twoDays.getDate() + 2);
+      expect(reengagement[0].date.getDate()).toBe(twoDays.getDate());
+
+      jest.dontMock('../services/amberCurrency');
+    });
+
+    it('does NOT schedule streak-risk when the player already played today (chain safe)', async () => {
+      expoMock = createExpoMock('granted');
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      const { getLocalDateString } = require('../services/dateUtils');
+      jest.doMock('../services/amberCurrency', () => ({
+        // Active streak AND played today ⇒ not at risk, suppress the warning.
+        getFullProgress: jest.fn(() =>
+          Promise.resolve({ currentStreak: 5, lastPlayDate: getLocalDateString() })
+        ),
+      }));
+      const svc = require('../services/notifications');
+
+      await svc.scheduleAllNotifications(2);
+
+      const triggers = scheduledTriggers();
+      const streakRisk = triggers.filter((t) => t.hour === 19);
+      expect(streakRisk.length).toBe(0);
+      // Re-engagement falls back to next-day (no streak-risk leading the ladder).
+      const reengagement = triggers.filter((t) => t.hour === 18);
+      expect(reengagement.length).toBe(1);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      expect(reengagement[0].date.getDate()).toBe(tomorrow.getDate());
+
+      jest.dontMock('../services/amberCurrency');
+    });
+
+    it('does NOT schedule streak-risk when the streak is below 2', async () => {
+      expoMock = createExpoMock('granted');
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      jest.doMock('../services/amberCurrency', () => ({
+        getFullProgress: jest.fn(() => Promise.resolve({ currentStreak: 1, lastPlayDate: null })),
+      }));
+      const svc = require('../services/notifications');
+
+      await svc.scheduleAllNotifications(0);
+
+      const streakRisk = scheduledTriggers().filter((t) => t.hour === 19);
+      expect(streakRisk.length).toBe(0);
 
       jest.dontMock('../services/amberCurrency');
     });

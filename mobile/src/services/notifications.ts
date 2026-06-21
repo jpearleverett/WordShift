@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
+import { getLocalDateString } from './dateUtils';
 
 /**
  * Push notification scheduling service for WordShift.
@@ -271,9 +272,13 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     await mod.cancelAllScheduledNotificationsAsync();
   } catch {}
 
+  // Whether the player has already engaged today — drives same-day suppression
+  // so a daily player never gets a redundant "your puzzle is ready" ping.
+  const playedToday = await hasPlayedTodaySafe();
+
   // Schedule daily reminder
   if (prefs.dailyReminderEnabled) {
-    await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase);
+    await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday);
   }
 
   // Re-engagement ladder. Players with an active streak hear about the
@@ -282,7 +287,10 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
   // reschedules, so these only fire on days the player actually missed.
   if (prefs.reengagementEnabled) {
     const streak = await getCurrentStreakSafe();
-    const hasStreakRisk = streak >= 2;
+    // Streak-risk only fires when genuinely at risk: a real streak (>= 2) that
+    // hasn't already been kept alive today. If they've played today the chain
+    // is safe, so the warning would contradict reality — suppress it.
+    const hasStreakRisk = streak >= 2 && !playedToday;
     if (hasStreakRisk) {
       await scheduleStreakRisk(mod, currentPhase, streak);
     }
@@ -329,33 +337,54 @@ export function getStreakRiskMessage(phase: number, streak: number): string {
 // Internal scheduling
 // ============================================================================
 
+/** How many days ahead the daily reminder is pre-armed as one-shots. */
+const DAILY_REMINDER_LOOKAHEAD_DAYS = 3;
+
 async function scheduleDailyReminder(
   mod: any,
   hour: number,
-  phase: number
+  phase: number,
+  playedToday: boolean
 ): Promise<void> {
-  const message = getNotificationMessage('daily', phase);
   try {
-    // Always use a REPEATING daily trigger so the "daily puzzle is ready" reminder
-    // never lapses for the exact cohort we most want to reach — players who don't
-    // reopen the app. (A previous version scheduled a one-shot for tomorrow when
-    // the player had already played today, which meant the reminder silently
-    // depended on the player relaunching to re-arm it.) Every session reschedules
-    // all notifications, so this stays fresh; the only cost is a possible same-day
-    // ping if the player plays shortly before the reminder hour — an acceptable
-    // trade vs. the reminder vanishing entirely.
-    await mod.scheduleNotificationAsync({
-      content: {
-        title: 'WordShift',
-        body: message,
-        sound: true,
-      },
-      trigger: {
-        hour,
-        minute: 0,
-        repeats: true,
-      },
-    });
+    // Strategy: instead of one unconditional REPEATING daily trigger (which pings
+    // EVERY morning, even right after the player played — a known uninstall driver),
+    // schedule a small ladder of non-repeating dated one-shots for the next few days
+    // at the reminder hour. We deliberately SKIP today's reminder when the player has
+    // already engaged today, so a daily player never gets a redundant "your puzzle is
+    // ready" ping for a day they've already completed.
+    //
+    // scheduleAllNotifications runs every session and cancels+reschedules everything,
+    // so the ladder keeps re-arming and stays fresh. Pre-arming a few days ahead
+    // preserves the "never lapses for players who don't relaunch" intent as well as
+    // non-repeating triggers allow — a player who goes dark for a day or two still
+    // gets the morning ping (future days can't be known-played, so they're always
+    // armed; only TODAY is suppressed once already played).
+    const now = new Date();
+    // Skip today's reminder entirely if the player already engaged today;
+    // otherwise arm it (the in-loop past-time guard drops it if the hour passed).
+    const startOffset = playedToday ? 1 : 0;
+    for (let dayOffset = startOffset; dayOffset <= DAILY_REMINDER_LOOKAHEAD_DAYS; dayOffset++) {
+      const triggerDate = new Date();
+      triggerDate.setDate(triggerDate.getDate() + dayOffset);
+      triggerDate.setHours(hour, 0, 0, 0);
+
+      // Never schedule a trigger in the past (e.g. dayOffset 0 with hour already passed).
+      if (triggerDate.getTime() <= now.getTime()) continue;
+
+      // Re-roll the phase-aware message per day for variety.
+      const message = getNotificationMessage('daily', phase);
+      await mod.scheduleNotificationAsync({
+        content: {
+          title: 'WordShift',
+          body: message,
+          sound: true,
+        },
+        trigger: {
+          date: triggerDate,
+        },
+      });
+    }
   } catch {}
 }
 
@@ -397,6 +426,24 @@ async function getCurrentStreakSafe(): Promise<number> {
   }
 }
 
+/**
+ * Whether the player has already engaged today (local calendar day). Used to
+ * suppress redundant reminders for a day they've already played — the daily
+ * reminder and streak-risk pings should never fire on a day the player has
+ * already completed a puzzle. Reads lastPlayDate via the same lazy require seam
+ * as getCurrentStreakSafe to avoid a static import cycle.
+ */
+async function hasPlayedTodaySafe(): Promise<boolean> {
+  try {
+    const { getFullProgress } = require('./amberCurrency');
+    const progress = await getFullProgress();
+    const lastPlay: string | null = progress?.lastPlayDate ?? null;
+    return !!lastPlay && lastPlay === getLocalDateString();
+  } catch {
+    return false;
+  }
+}
+
 async function scheduleStreakRisk(
   mod: any,
   phase: number,
@@ -404,11 +451,18 @@ async function scheduleStreakRisk(
 ): Promise<void> {
   const message = getStreakRiskMessage(phase, streak);
   try {
-    // Tomorrow evening — rescheduled forward every session, so it only
-    // ever fires on a day the player hasn't played by then.
+    // This only runs when the player has NOT played today (gated in
+    // scheduleAllNotifications), so the streak is genuinely at risk THIS
+    // evening — target today's 7pm if it hasn't passed yet, otherwise the
+    // next evening. Rescheduled forward every session, so it only ever fires
+    // on a day the player still hasn't played by then; the moment they play,
+    // the next session's reschedule drops this notification entirely.
+    const now = new Date();
     const triggerDate = new Date();
-    triggerDate.setDate(triggerDate.getDate() + 1);
-    triggerDate.setHours(19, 0, 0, 0); // 7pm
+    triggerDate.setHours(19, 0, 0, 0); // 7pm today
+    if (triggerDate.getTime() <= now.getTime()) {
+      triggerDate.setDate(triggerDate.getDate() + 1); // 7pm already passed → tomorrow
+    }
 
     await mod.scheduleNotificationAsync({
       content: {
