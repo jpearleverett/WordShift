@@ -13,8 +13,6 @@ import {
   getWordThresholdDialogue,
   getTotalDialogueCount,
   getSacrificeReaction,
-  getPostRevelationDialogue,
-  getPostRevelationDialogueCount,
 } from '../services/animalDialogue';
 import { getSacrificeCount } from '../services/sacrifice';
 import {
@@ -44,12 +42,18 @@ import {
   DialogueChoice,
   loadChoiceState,
   getAndMarkPhase4CallbackPage,
-  getPhase5ChoiceCallback,
 } from '../services/dialogueChoices';
 import { recordWhisper } from '../services/whisperGallery';
 import { getFoxPostTutorialPlayPrompt } from '../services/phaseNarrative';
 import { recordAnimalVisit } from '../services/weeklyQuests';
 import { hapticLight, hapticSelection } from '../services/haptics';
+import {
+  loadTendingState,
+  selectPhase5Dialogue,
+  setPhase5CaughtUp,
+  hashSeed,
+} from '../services/tending';
+import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
 
 interface SessionInfo {
   status: 'available' | 'in_session' | 'cooldown';
@@ -112,11 +116,43 @@ export function useDialogueFlow({
   // used synchronously by the Phase 5 post-revelation dialogue cycle.
   const [playerChoices, setPlayerChoices] = useState<Record<string, PlayerChoice>>({});
 
+  // Tending Shrine (Phase 5 endgame) state, loaded synchronously into the hook so
+  // the Phase-5 dialogue selection + honest "new dialogue" badge can read it
+  // during render. `tendingLevel` grows the per-animal line pool; `tendingCaughtUp`
+  // tracks how many pool lines each animal has genuinely delivered.
+  const [tendingLevel, setTendingLevel] = useState(0);
+  const [tendingCaughtUp, setTendingCaughtUp] = useState<Record<string, number>>({});
+
+  const refreshTendingState = useCallback(async () => {
+    try {
+      const state = await loadTendingState();
+      setTendingLevel(state.level);
+      setTendingCaughtUp({ ...state.caughtUp });
+    } catch {}
+  }, []);
+
   useEffect(() => {
     loadChoiceState()
       .then(state => setPlayerChoices(state.choices ?? {}))
       .catch(() => {});
-  }, []);
+    refreshTendingState();
+  }, [refreshTendingState]);
+
+  // Build an animal's current Phase-5 line pool from loaded hook state.
+  const getPhase5Pool = (animalType: AnimalType): string[] =>
+    buildPhase5Pool(animalType, tendingLevel, playerChoices[animalType] ?? null);
+
+  // Select the Phase-5 line for an animal at a given dialogue index, using the
+  // recency-aware selector (new lines in order, then deterministic shuffled
+  // re-reads). Returns the pool so callers can reason about its length.
+  const selectPhase5 = (animalType: AnimalType, currentDialogueIndex: number) => {
+    const pool = getPhase5Pool(animalType);
+    const totalRegular = getTotalDialogueCount(animalType, 4);
+    const caughtUp = tendingCaughtUp[animalType] ?? 0;
+    const deliveredIndex = Math.max(0, currentDialogueIndex - totalRegular);
+    const result = selectPhase5Dialogue(pool, caughtUp, deliveredIndex, hashSeed(animalType));
+    return { pool, caughtUp, ...result };
+  };
 
   // Animal types currently unlocked — lines tagged with `requiresAnimals`
   // are skipped while any of their referenced animals is still locked.
@@ -227,24 +263,12 @@ export function useDialogueFlow({
     if (animalPhase === 5) {
       const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
       if (selectedAnimal.currentDialogueIndex >= totalRegular) {
-        // Regular dialogues exhausted — cycle the post-revelation lines,
-        // plus one extra slot for the player's Phase 3 choice callback.
-        const prCount = getPostRevelationDialogueCount(selectedAnimal.type);
-        const choiceCallback = getPhase5ChoiceCallback(
-          selectedAnimal.type,
-          playerChoices[selectedAnimal.type] ?? null
-        );
-        const cycleLen = prCount + (choiceCallback ? 1 : 0);
-        // Safe modulo that handles negative values in JS: ((x % n) + n) % n
-        const rawIndex = selectedAnimal.currentDialogueIndex - totalRegular;
-        const postRevIndex = cycleLen > 0
-          ? ((rawIndex % cycleLen) + cycleLen) % cycleLen
-          : 0;
-        if (choiceCallback && postRevIndex === prCount) {
-          return choiceCallback;
-        }
-        const postRevDialogue = getPostRevelationDialogue(selectedAnimal.type, postRevIndex);
-        return postRevDialogue || 'The pattern holds.';
+        // Regular dialogues exhausted — serve the post-revelation pool via the
+        // recency-aware selector (genuinely-new lines in order, then a
+        // deterministic shuffled re-read so the same lines never arrive in the
+        // same verbatim sequence). The pool grows as the player deepens the
+        // pattern at the Tending Shrine.
+        return selectPhase5(selectedAnimal.type, selectedAnimal.currentDialogueIndex).text;
       }
       // Still within regular Phase 4 dialogues
       const regularDialogue = getCurrentDialogue(
@@ -282,6 +306,9 @@ export function useDialogueFlow({
 
   // Handle animal tap
   const handleAnimalTap = useCallback(async (animal: Animal) => {
+    // Pick up any Tending done since the hook mounted (e.g. the player just
+    // deepened the pattern in the pit) so Phase-5 selection/badge are current.
+    await refreshTendingState();
     const availability = await checkDialogueAvailability(animal.id);
 
     if (!availability.available) {
@@ -515,7 +542,7 @@ export function useDialogueFlow({
         useNativeDriver: true,
       }).start();
     }
-  }, [dialogueSlide, progress]);
+  }, [dialogueSlide, progress, refreshTendingState]);
 
   // Recompute hasNewDialogue for a specific animal after session changes
   const recomputeHasNewDialogue = useCallback((animal: Animal): boolean => {
@@ -523,10 +550,19 @@ export function useDialogueFlow({
     if (isOnCooldown(animal.id)) return false;
     const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
     const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
-    if (animalPhase === 5) return true;
+    if (animalPhase === 5) {
+      const totalRegular = getTotalDialogueCount(animal.type, 4);
+      // Still finishing the Phase-4 lines — genuinely has more.
+      if (animal.currentDialogueIndex < totalRegular) return true;
+      // Post-revelation: honest now — the badge lights only while the animal has
+      // undelivered pool lines, and re-lights when a Tending milestone unlocks one.
+      const pool = buildPhase5Pool(animal.type, tendingLevel, playerChoices[animal.type] ?? null);
+      const caughtUp = tendingCaughtUp[animal.type] ?? 0;
+      return caughtUp < pool.length;
+    }
     const resolved = resolveDialogueIndex(animal.type, animal.currentDialogueIndex, animalPhase, getUnlockedTypes());
     return resolved < totalDialogues;
-  }, [progress]);
+  }, [progress, tendingLevel, tendingCaughtUp, playerChoices]);
 
   // Handle closing dialogue. Manual closes keep the session warm so
   // checking in with an animal never feels punitive.
@@ -599,6 +635,21 @@ export function useDialogueFlow({
         }).catch(() => {});
       }
 
+      // Phase 5: if the line just shown was a genuinely-new pool line (not a
+      // shuffled re-read), advance the animal's caught-up pointer and persist it,
+      // so the badge stays honest and the next visit delivers the following new line.
+      const totalRegular = getTotalDialogueCount(selectedAnimal.type, 4);
+      let nextCaughtUp = tendingCaughtUp[selectedAnimal.type] ?? 0;
+      if (animalPhase === 5 && selectedAnimal.currentDialogueIndex >= totalRegular) {
+        const sel = selectPhase5(selectedAnimal.type, selectedAnimal.currentDialogueIndex);
+        if (sel.isNew) {
+          nextCaughtUp = sel.nextCaughtUp;
+          const animalType = selectedAnimal.type;
+          setTendingCaughtUp(prev => ({ ...prev, [animalType]: nextCaughtUp }));
+          setPhase5CaughtUp(animalType, nextCaughtUp).catch(() => {});
+        }
+      }
+
       const status = getSessionStatus(selectedAnimal.id);
       setSessionInfo(status);
 
@@ -608,9 +659,16 @@ export function useDialogueFlow({
       const newIndex = resolveDialogueIndex(selectedAnimal.type, cur + 1, resolvePhase, unlocked);
       await markDialogueRead(selectedAnimal.id, newIndex);
 
-      const updatedAnimal = { ...selectedAnimal, currentDialogueIndex: newIndex };
-      const totalDialogues = getTotalDialogueCount(selectedAnimal.type, animalPhase);
-      const hasNewDialogue = !isOnCooldown(selectedAnimal.id) && newIndex < totalDialogues;
+      // Honest hasNewDialogue: at Phase 5 (post-revelation) use the Tending pool /
+      // caught-up pointer; otherwise the normal index-vs-total check.
+      let hasNewDialogue: boolean;
+      if (animalPhase === 5 && newIndex >= totalRegular) {
+        const pool = getPhase5Pool(selectedAnimal.type);
+        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && nextCaughtUp < pool.length;
+      } else {
+        const totalDialogues = getTotalDialogueCount(selectedAnimal.type, animalPhase);
+        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && newIndex < totalDialogues;
+      }
 
       setAnimals(prev =>
         prev.map(a =>
@@ -649,7 +707,7 @@ export function useDialogueFlow({
       }
       closeDialogue(true);
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingLevel, tendingCaughtUp, playerChoices]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {

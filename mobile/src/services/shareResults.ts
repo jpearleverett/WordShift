@@ -141,15 +141,20 @@ export function generateShareText(result: ShareableResult): string {
   lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${result.difficulty}${challengeTag}`);
   lines.push(performanceGrid(result.moveCount, result.hintsUsed, result.invalidAttempts));
 
-  // Word chain (enhanced sharing)
-  if (result.wordChain && result.wordChain.length > 0) {
+  // Daily challenges are the same puzzle for everyone today, so the word chain
+  // and the (word-bearing) incantation name would SPOIL it for friends. Keep the
+  // grid (the Wordle-style spoiler-free signal) and omit the words for daily.
+  const spoilerSafe = !result.isDaily;
+
+  // Word chain (enhanced sharing) — non-daily only.
+  if (spoilerSafe && result.wordChain && result.wordChain.length > 0) {
     const phase = result.phase || 0;
     lines.push('');
     lines.push(formatWordChain(result.wordChain, phase));
   }
 
-  // Named incantation (Phase 2+)
-  if (result.incantationName) {
+  // Named incantation (Phase 2+) — non-daily only (it names the words).
+  if (spoilerSafe && result.incantationName) {
     lines.push(`"${result.incantationName}"`);
   }
 
@@ -216,6 +221,16 @@ export async function maybeAwardDailyShareBonus(): Promise<number> {
 }
 
 /**
+ * Record a successful share: bump the share-count achievement stat and credit
+ * the once-per-day share bonus. Shared by the text and image share paths so the
+ * bonus is granted exactly once regardless of which path ran.
+ */
+export async function recordShareSuccess(): Promise<void> {
+  await incrementShareCount();
+  await maybeAwardDailyShareBonus();
+}
+
+/**
  * Share puzzle result via system share sheet
  */
 export async function sharePuzzleResult(result: ShareableResult): Promise<boolean> {
@@ -234,8 +249,7 @@ export async function sharePuzzleResult(result: ShareableResult): Promise<boolea
     );
 
     if (shareResult.action === Share.sharedAction) {
-      await incrementShareCount();
-      await maybeAwardDailyShareBonus();
+      await recordShareSuccess();
       return true;
     }
     return false;

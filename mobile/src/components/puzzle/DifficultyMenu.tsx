@@ -66,6 +66,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
           isSelected && isDark && { backgroundColor: phaseTheme.modalTextColor + '25' },
         ]}
         onPress={() => onSelectVariant(option.variant)}
+        accessibilityRole="button"
+        accessibilityState={{ selected: isSelected }}
+        accessibilityLabel={`${option.config.title}${isSelected ? ', selected' : ''}${isActive ? ', active' : ''}`}
       >
         <Text style={styles.variantIcon}>{option.config.icon}</Text>
         <View style={styles.variantContent}>
@@ -123,6 +126,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               },
             ]}
             onPress={() => onSelectDifficulty(d)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: currentDifficulty === d }}
+            accessibilityLabel={`${d === 'MEDIUM_PLUS' ? 'Medium Plus' : d.charAt(0) + d.slice(1).toLowerCase()} difficulty${currentDifficulty === d ? ', selected' : ''}`}
           >
             <View style={[
               styles.difficultyMenuDot,
@@ -220,6 +226,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 },
               ]}
               onPress={onToggleChallengeMode}
+              accessibilityRole="button"
+              accessibilityState={{ selected: gameMode === 'challenge' }}
+              accessibilityLabel={`Challenge mode, ${gameMode === 'challenge' ? 'on' : 'off'}`}
             >
               <Text style={styles.challengeMenuIcon}>
                 {gameMode === 'challenge' ? '\uD83D\uDD13' : '\uD83D\uDD12'}

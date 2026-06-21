@@ -680,6 +680,37 @@ describe('weeklyQuests', () => {
   });
 
   // ===========================================================================
+  // tend_amber quest type (Phase 5 endgame)
+  // ===========================================================================
+
+  describe('tend_amber quest type', () => {
+    it('tend_amber quests only generate at Phase 5+', async () => {
+      const state4 = await loadWeeklyQuests(4);
+      const all4 = [...state4.daily.quests, ...state4.weekly.quests];
+      expect(all4.some(q => q.type === 'tend_amber')).toBe(false);
+
+      await clearWeeklyQuests();
+      const state5 = await loadWeeklyQuests(5);
+      expect(state5.daily.quests.length).toBe(5);
+      expect(state5.weekly.quests.length).toBe(5);
+    });
+
+    it('updateQuestProgress handles amberTended', async () => {
+      await clearWeeklyQuests();
+      const state = await loadWeeklyQuests(5);
+      const allQuests = [...state.daily.quests, ...state.weekly.quests];
+      const tendQuest = allQuests.find(q => q.type === 'tend_amber');
+      if (!tendQuest) return; // Skip if not randomly generated this period
+
+      await updateQuestProgress({ amberTended: 40 }, 5);
+      const updated = await loadWeeklyQuests(5);
+      const allUpdated = [...updated.daily.quests, ...updated.weekly.quests];
+      const updatedQuest = allUpdated.find(q => q.id === tendQuest.id);
+      expect(updatedQuest?.progress).toBeGreaterThanOrEqual(40);
+    });
+  });
+
+  // ===========================================================================
   // Phase-scaled quest rewards
   // ===========================================================================
 

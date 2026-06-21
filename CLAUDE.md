@@ -26,7 +26,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 
 - **Framework**: React Native with Expo SDK 54
 - **Language**: TypeScript (strict)
-- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit'`)
+- **Navigation**: State-based (`currentScreen: 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop'`)
 - **State**: React useState/useEffect (no external state library)
 - **Persistence**: AsyncStorage with in-memory cache pattern
 - **Haptics**: expo-haptics (settings-gated)
@@ -124,7 +124,10 @@ mobile/
 │   │   │   ├── DifficultyMenu.tsx # Setup menu: difficulty + variant selector
 │   │   │   ├── AnimalWhisper.tsx # Ghost-like post-puzzle whisper
 │   │   │   └── RitualEchoChain.tsx # Real-time word chain display
-│   │   ├── OfferingPitScreen.tsx # Offering Pit: tap-to-devour words, ward marks, phase transitions
+│   │   ├── OfferingPitScreen.tsx # Offering Pit: tap-to-devour words, ward marks, phase transitions, Phase-5 Tending Shrine modal
+│   │   ├── shop/ShopScreen.tsx  # Cosmetic Shop: buy/equip amber tile themes (expression-only)
+│   │   ├── share/ShareCard.tsx  # Phase-aware, spoiler-free shareable result card (forwardRef for PNG capture)
+│   │   ├── share/ShareResultModal.tsx # Victory share preview → shares image (or text fallback)
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive
 │   │   ├── WordLedger.tsx       # Ritual word history screen
 │   │   └── home/
@@ -142,10 +145,12 @@ mobile/
 │       ├── wordHistory.ts       # Word cooldown tracking for diversity
 │       ├── starRating.ts        # Star rating + cumulative stats
 │       ├── amberCurrency.ts     # Amber economy, streak, phase progression, deferred transitions
-│       ├── dialogue/            # Split dialogue system (5 submodules)
+│       ├── dialogue/            # Split dialogue system
 │       │   ├── animalDialogueBase.ts, animalDialogueIntro.ts
 │       │   ├── animalDialogueReactions.ts, animalDialogueNarrative.ts
-│       │   └── animalDialogueVariants.ts
+│       │   ├── animalDialogueVariants.ts
+│       │   ├── animalDialogueTending.ts  # ~50 Phase-5 Tending milestone lines (5/animal)
+│       │   └── phase5Pool.ts    # Shared Phase-5 line pool (base + choice + tending) for hook + badge
 │       ├── dialogueSession.ts   # Dialogue sessions with puzzle-based cooldowns
 │       ├── homeWorldData.ts     # Room/animal definitions, unlock progression
 │       ├── dailyChallenge.ts    # Daily puzzle with seeded PRNG
@@ -158,14 +163,15 @@ mobile/
 │       ├── whisperGallery.ts    # Collectible whisper archive
 │       ├── dialogueChoices.ts   # Phase 3 player choice points
 │       ├── sacrifice.ts         # Phase 4+ amber sacrifice mechanic
+│       ├── tending.ts           # Phase 5 Tending Shrine: soft-infinite cosmetic amber sink + honest Phase-5 dialogue selection (caughtUp pointer, pure selectPhase5Dialogue)
 │       ├── notifications.ts     # Push notification scheduling
 │       ├── cloudSave.ts         # Cloud save infrastructure (pluggable provider, NoOp default)
 │       ├── entitlements.ts      # Monetization scaffold: owned purchases / Patron status (source of truth)
 │       ├── iap.ts               # Monetization scaffold: pluggable BillingProvider (NoOp default)
 │       ├── ads.ts               # Monetization scaffold: pluggable AdProvider + ad policy (NoOp default)
-│       ├── cosmetics.ts         # Monetization scaffold: owned/equipped cosmetics
+│       ├── cosmetics.ts         # Cosmetic ownership/equip + amber shop (tile themes + confetti palettes; getEquippedSync, initCosmetics; pushes tile theme to colors.ts)
 │       ├── wordHarvest.ts       # Offering Pit harvest batches (over-cap = merge oldest, never drop amber)
-│       ├── slotEstimation.ts    # Drag-and-drop slot position estimation
+│       ├── slotEstimation.ts    # Drag-and-drop slot position estimation (`estimateSlotIndex`) + `findClosestValidSlot` (App routes drag drops through it with a ±1-slot bound for near-miss forgiveness — never teleports across the row)
 │       ├── puzzleSaveState.ts   # Mid-puzzle autosave/restore
 │       ├── roomUpgrades.ts      # Room upgrade amber sink (Phase 2+)
 │       ├── onboarding.ts        # Onboarding state machine + persistence
@@ -175,7 +181,8 @@ mobile/
 │       ├── dateUtils.ts          # Local-day date helpers (streak/daily bucketing — NEVER UTC/toISOString)
 │       ├── settings.ts, haptics.ts, audio.ts, eventLogger.ts
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
-│       ├── homeScenePan.ts, shareResults.ts
+│       ├── homeScenePan.ts, shareResults.ts (emoji-grid text share; daily shares are spoiler-free)
+│       ├── shareImage.ts        # Pluggable result-image capture (react-native-view-shot behind a provider; text fallback in Expo Go)
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
 ├── src/__tests__/               # ~1,077 tests, 39 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
@@ -240,7 +247,7 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### Custom Hooks
 
-**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()`, `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection: it sets `isStuck` (exposed on state) and surfaces `getNoValidMovesMessage()` when no legal move remains. App.tsx renders a non-transient **stuck-recovery panel** (Undo / Restart, phase-aware headline via `getStuckPanelTitle()`) while `isStuck` — not just the toast. `isStuck` resets on undo/restart/new board.
+**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()` (guarded by a monotonic `generationIdRef` — every `initGame` commit aborts if a newer call superseded it, so rapid Play/Next-Level taps or a mid-generation variant switch can't clobber a started board), `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection: it sets `isStuck` (exposed on state) and surfaces `getNoValidMovesMessage()` when no legal move remains. App.tsx renders a non-transient **stuck-recovery panel** (Undo / Restart, phase-aware headline via `getStuckPanelTitle()`) while `isStuck` — not just the toast. `isStuck` resets on undo/restart/new board.
 
 **`useGamePersistence()`** — Persistence: amber, stats, phases, streak. Key: `recordVictory()` returns VictoryData (includes `phaseTransitionPending`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus`). `refreshStats()` reloads from storage. Reports phase 5 when post-revelation.
 
@@ -264,7 +271,8 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### App Bootstrap & Reliability
 
-- `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log. `ErrorBoundary.componentDidCatch` also forwards React render errors through `reportError()` (source `react_error_boundary`), so both async and render-time failures land in the same pipeline (ready to fan out to Sentry/Crashlytics when one is added).
+- `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log. `ErrorBoundary.componentDidCatch` also forwards React render errors through `reportError()` (source `react_error_boundary`), so both async and render-time failures land in the same pipeline (ready to fan out to Sentry/Crashlytics when one is added). **Render coverage:** `home` and `puzzle` carry their own inner boundaries; an outer catch-all boundary wraps `renderScreen()` so a render error on the secondary screens (settings/stats/ledger/gallery/pit) returns the player home instead of crashing the whole app. Crash capture is local-only (500-entry buffer) until telemetry/Sentry is wired.
+- Frame-rate monitoring (`performanceMonitor.startFrameMonitoring`) is diagnostic-only — its samples are never read in production — so it is gated behind `__DEV__` (and stopped on unmount) and never runs a perpetual `requestAnimationFrame` loop on a player's device.
 - The default export `App` is a bootstrap gate: it awaits `runMigrations()` (dataMigration.ts) **before** mounting `MainApp`, so service caches always read migrated data. Renders a quiet dark view while booting; migration failures log and never block launch.
 - Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
 - `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Disabled by default** (`TELEMETRY_ENDPOINT = ''`); set an HTTPS collector URL to enable before a data-informed launch, and update the privacy policy when doing so.
@@ -311,7 +319,7 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 - Streak milestones: 3/7/14/21/30 days → 15/30/50/65/100 amber
 - Puzzle count milestones (10, 15, 25, 50... up to 350)
 - Achievement rewards: each of the 34 achievements grants one-time amber (10-100, `rewardAmber` in achievements.ts)
-- Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus` in shareResults.ts; hinted on the VictoryModal share button)
+- Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus`/`recordShareSuccess` in shareResults.ts; hinted on the share-card preview). The VictoryModal Share button opens a `ShareResultModal` preview of a phase-aware `ShareCard`; `shareImage.shareResultImage()` captures a PNG when `react-native-view-shot` is present (dev client) and otherwise falls back to the emoji-grid text share. **Daily shares are spoiler-free** (grid only — no word chain/incantation, since the daily is the same puzzle for everyone).
 - Daily login reward: rewards *opening the app* (not just solving) — a 7-day escalating cycle (10/15/20/25/30/40/75, Day-7 jackpot) that wraps weekly and resets on a missed day. `claimDailyLoginReward()` in `dailyLoginReward.ts`, claimed once per session from App's launch effect (skipped during onboarding), source `'daily_login'`
 
 ### House Building (Bottom-Up)
@@ -435,7 +443,17 @@ One-time events at specific puzzle milestones (35, 40, 50, 55, 65, 80, 90, 100, 
 **Final Puzzle**: After house completion + Phase 4, next puzzle triggers `FINAL_PUZZLE_EVENT`.
 **Post-Revelation (Phase 5)**: Next puzzle after final triggers `POST_REVELATION_EVENT` + `markPostRevelation()`. Special victory text, 10 new dialogues per animal.
 
-> **Known gap (Phase 5 dead-end):** after house completion + final puzzle there is currently no repeatable amber sink and Phase-5 dialogue loops verbatim. Fine for a finite premium title; a retention/LTV problem for F2P. Design fix (the "Tending Shrine" loop + recency-weighted dialogue) is specced in `docs/ENDGAME_LOOP_DESIGN.md` and not yet implemented.
+### The Tending Shrine (Phase 5 endgame loop)
+
+The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is **resolved** by the Tending Shrine — a serene, soft-infinite, **cosmetic-only** amber sink (`src/services/tending.ts`).
+
+- **Loop:** at global phase 5 (post-revelation), a ✴ button in the Offering Pit header opens the Tending modal. The player spends amber to "deepen the pattern," advancing a **Tending Level** on an escalating cost curve (`getTendingCost`, `TENDING_*` in `gameBalance.ts`, capped 5,000) with a once-per-local-day discount (`getNextTendingInfo`, via `dateUtils`). The service does **not** spend — the pit calls `spendAmber(cost, 'tending')` then `applyTend(cost)` (mirrors `sacrifice`/`roomUpgrades`). Milestones (5/10/25/50/100) fire a serene ceremony.
+- **Honest, refreshing dialogue:** the Phase-5 branch of `useDialogueFlow` (and the home badge in `getAnimalsWithStatus`) now build a shared pool via `dialogue/phase5Pool.ts` (10 base post-rev lines + Phase-3 choice callback + unlocked Tending milestone lines). New lines deliver in order; once caught up, re-reads come in a **deterministic shuffled** order that **reshuffles each cycle** (`selectPhase5Dialogue` — no verbatim loop, no single repeating sequence). A per-animal `caughtUp` pointer (persisted in tending state) makes `hasNewDialogue` **honest**: lit only while undelivered lines remain, re-lit when a Tending milestone unlocks one. ~50 milestone lines live in `dialogue/animalDialogueTending.ts` (5/animal), recorded to the Whisper Gallery.
+- **Cadence:** a Phase-5-gated `tend_amber` quest type (deliberately net-negative — a sink disguised as a quest) + an extended `MILESTONE_BONUSES` tail past 350.
+- **Hygiene:** `wordshift_tending` is in `cloudSave.SYNC_KEYS`; `clearTendingState` is in Settings → Reset All; covered by `tending.test.ts`.
+- **Visual deepening:** the world scales with Tending Level via `getTendingIntensity(level)` (sqrt curve, saturates ~level 50). The home Arrangement sigils (`ArrangementConnector` in HouseWorld) brighten/thicken/glow and the Offering Pit raises more rim embers + a warmer inner/core glow as the player tends (reduced-motion/device-tier gated, no new art). `HomeScreen` loads `tendingLevel` and threads it → `HouseWorld`; the pit reads its own `tendingLevel` state.
+- **Cosmetic Shop (amber path):** the `theme_ember`/`theme_tide`/`theme_bone` tile themes (Cosmetic Shop) double as the Tending motifs — see the Monetization section.
+- **Deferred:** the Option B "endless descent" ladder and real-money cosmetic motifs (gated on the dev-client + RevenueCat migration). See `docs/ENDGAME_LOOP_DESIGN.md`.
 
 ## Onboarding (11-Step Guided Intro)
 
@@ -445,7 +463,7 @@ Fox guides new players through real screens:
 3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains pit, player offers words
 4. `returning_home` → `unlock_explained` → `complete`: Fox explains the cycle
 
-During onboarding: simplified UI (no difficulty selector, stats, NEW button). Backward compatible with legacy tutorial flag. Persisted via `wordshift_onboarding_step`.
+During onboarding: simplified UI (no difficulty selector, stats, NEW button). Backward compatible with legacy tutorial flag. Persisted via `wordshift_onboarding_step`. **Resume resilience:** transient/puzzle steps (`going_to_puzzle`/`puzzle_tutorial`/`puzzle_complete`/`going_to_pit`/`returning_home`) only exist for a `setTimeout` window and have no owning screen on relaunch; `useOnboardingFlow.normalizeResumeStep` snaps them forward to a stable target on resume, and `App.tsx`'s resume effect routes the puzzle step back to a freshly-initialized guided tutorial board — so a kill mid-onboarding can never strand a new player on a dead home screen. The puzzle-screen FoxGuide also exposes a skip button (`handleSkipOnboarding`).
 
 ## Fox Post-Victory Intros
 
@@ -661,9 +679,10 @@ Core principle: players pay for *expression* and *convenience*, never for *narra
 - `services/entitlements.ts` — single source of truth for "what the player paid for" (`isPatron()`/`isPatronSync()`, `grantEntitlements`, `setEntitlements`, `clearEntitlements`). AsyncStorage-backed, native-free.
 - `services/iap.ts` — pluggable `BillingProvider` behind a `NoOpBillingProvider` (mirrors `cloudSave.ts`). `PRODUCT_IDS`, `purchaseProduct`, `restorePurchases`, `entitlementsForProduct`. Swap in a real RevenueCat provider via `setBillingProvider()`. `initIAP()` runs in App bootstrap (warms entitlement cache).
 - `services/ads.ts` — pluggable `AdProvider` behind a `NoOpAdProvider`. Owns ALL ad policy as pure/testable code: `interstitialFrequency`, `shouldShowInterstitial`, rewarded daily cap, Patron suppression. `showRewarded` (opt-in), `maybeShowInterstitial`. `initAds()` runs in App bootstrap.
-- `services/cosmetics.ts` — owned/equipped cosmetic state (amber-bought local + IAP via entitlements). `ownsCosmetic`, `recordAmberCosmeticPurchase`, `equipCosmetic`. Patron tile theme auto-owned via entitlement.
+- `services/cosmetics.ts` — owned/equipped cosmetic state (amber-bought local + IAP via entitlements). `ownsCosmetic`, `recordAmberCosmeticPurchase`, `equipCosmetic`/`unequipCosmetic`, `getEquipped`/`getEquippedSync`, `initCosmetics` (App bootstrap). Patron tile theme auto-owned via entitlement.
+- **Cosmetic Shop BUILT (amber path):** `components/shop/ShopScreen.tsx` (`currentScreen: 'shop'`, reached from the **home utility menu** ☰) lets the player buy & equip **tile themes** and **confetti palettes** with amber, in two sections. Tile themes live in `theme/colors.ts` `TILE_THEMES` (Ember-warm/Deep-tide/Bone-quiet — these double as the Phase-5 Tending shrine motifs — + the Patron-entitlement gold set); the equipped one is pushed into `colors.ts` via `setEquippedTileTheme()` (registration pattern → no import cycle) and resolved synchronously inside `getTileColor()`, so it stays phase-aware (phase overlays/glow still apply on top). Confetti palettes live in `CONFETTI_THEMES`; an equipped one overrides the phase-default confetti colors in `Confetti.tsx` (via `getEquippedSync('confetti')`), with the phase-aware default when none is equipped. Amber purchase routes through `spendAmber(cost, 'cosmetic_<id>')` → `recordAmberCosmeticPurchase` (auto-equips).
 - **Wired:** Patron `+2` amber/puzzle in `amberCurrency.awardPuzzleAmber()` (`PATRON_AMBER_BONUS`, returned as `patronBonus`) — additive to the REWARD only, **never** phase progress. New keys cleared in Settings → Reset All. `wordshift_cosmetics` added to `cloudSave.SYNC_KEYS`; `wordshift_entitlements` (store-authoritative) and `wordshift_ad_pacing` (device-specific) intentionally excluded.
-- **NOT built yet:** `PatronScreen.tsx`, `ShopScreen.tsx`, real RevenueCat/AdMob providers, equipped-theme wiring into `theme/colors.ts`/`LetterTile`, the EAS Dev Client migration (native SDKs end Expo Go). See `docs/MONETIZATION_F2P_IMPLEMENTATION.md` §4.
+- **NOT built yet:** `PatronScreen.tsx`, real RevenueCat/AdMob providers, real-money IAP cosmetic items (the shop's catalog supports `kind: 'iap'`; only amber + Patron-entitlement items ship today), confetti/room-accent shop tabs, the EAS Dev Client migration (native SDKs end Expo Go). See `docs/MONETIZATION_F2P_IMPLEMENTATION.md` §4.
 - Everything ships behind NoOp providers, so the app runs unchanged in Expo Go today and all logic is unit-tested (`__tests__/monetization.test.ts`).
 
 **Key points:**

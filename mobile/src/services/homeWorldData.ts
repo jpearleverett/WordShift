@@ -4,6 +4,9 @@ import { getPhaseStartIndex } from './dialogue/animalDialogueBase';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
 import { logEvent } from './eventLogger';
+import { loadTendingState } from './tending';
+import { loadChoiceState } from './dialogueChoices';
+import { getPhase5PoolLength } from './dialogue/phase5Pool';
 
 // ============================================================================
 // PHASE-AWARE ROOM DESCRIPTIONS
@@ -860,6 +863,13 @@ export async function getRoomsWithStatus(): Promise<Room[]> {
 export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const progress = await loadProgress();
 
+  // Phase-5 endgame: the honest "new dialogue" badge needs the Tending Shrine
+  // state + recorded choices (a vanguard animal can reach animalPhase 5 at global
+  // phase 4, so load whenever we're at the threshold). Loaded once, not per animal.
+  const nearEndgame = progress.currentPhase >= 4;
+  const tendingState = nearEndgame ? await loadTendingState() : null;
+  const choiceState = nearEndgame ? await loadChoiceState() : null;
+
   return ANIMALS.map(animal => {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
     const dialogueIndex = progress.lastDialogueRead[animal.id] ?? 0;
@@ -868,8 +878,26 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
     let hasNewDialogue = false;
     if (unlocked && !isOnCooldown(animal.id)) {
       const animalPhase = getAnimalPhase(progress.currentPhase, animal.type);
-      const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
-      hasNewDialogue = dialogueIndex < totalDialogues;
+      if (animalPhase === 5 && tendingState) {
+        const totalRegular = getTotalDialogueCount(animal.type, 4);
+        if (dialogueIndex < totalRegular) {
+          // Still finishing the Phase-4 lines.
+          hasNewDialogue = true;
+        } else {
+          // Post-revelation: honest — lit only while the animal has undelivered
+          // pool lines (re-lights when a Tending milestone unlocks a new one).
+          const poolLen = getPhase5PoolLength(
+            animal.type,
+            tendingState.level,
+            choiceState?.choices?.[animal.type] ?? null
+          );
+          const caughtUp = tendingState.caughtUp[animal.type] ?? 0;
+          hasNewDialogue = caughtUp < poolLen;
+        }
+      } else {
+        const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
+        hasNewDialogue = dialogueIndex < totalDialogues;
+      }
     }
 
     return {

@@ -536,7 +536,8 @@ export function getRitualEchoHeader(phase: number): string {
   if (phase === 1) return 'Words Arranged:';
   if (phase === 2) return 'Words Transformed:';
   if (phase === 3) return 'The Incantation:';
-  return 'The Offering:';
+  if (phase === 4) return 'The Offering:';
+  return 'The Pattern:'; // Phase 5 — serene, settled
 }
 
 /**
@@ -547,7 +548,8 @@ export function getRitualEchoFooter(phase: number, wordCount: number): string {
   if (phase === 1) return 'A curious path...';
   if (phase === 2) return 'The pattern takes shape...';
   if (phase === 3) return 'The arrangement accepts.';
-  return `${wordCount} words offered to the pattern.`;
+  if (phase === 4) return `${wordCount} words offered to the pattern.`;
+  return `${wordCount} words woven into the pattern.`; // Phase 5 — the pattern continues
 }
 
 // ============================================================================
@@ -593,7 +595,16 @@ export function getIncantationName(words: string[], phase: number): string | nul
     `The ${lastWord} Opens`,
   ];
 
-  const templates = phase >= 4 ? phase4Templates : phase >= 3 ? phase3Templates : phase2Templates;
+  // Phase 5 templates - serene, settled; the pattern simply continues
+  const phase5Templates = [
+    `${firstWord} settles into ${lastWord}`,
+    `The Weave of ${lastWord}`,
+    `${firstWord} Becomes ${lastWord}`,
+    `The ${lastWord} Abides`,
+    `${firstWord} Returns as ${lastWord}`,
+  ];
+
+  const templates = phase >= 5 ? phase5Templates : phase >= 4 ? phase4Templates : phase >= 3 ? phase3Templates : phase2Templates;
   // Use a deterministic pick based on word content
   const hash = words.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return templates[hash % templates.length];
@@ -611,7 +622,8 @@ export function getWordsOfferedText(totalWords: number, phase: number): string {
   if (phase <= 1) return `Words shifted: ${totalWords}`;
   if (phase === 2) return `Words transformed: ${totalWords}`;
   if (phase === 3) return `Words offered: ${totalWords}`;
-  return `${totalWords} words offered to the arrangement`;
+  if (phase === 4) return `${totalWords} words offered to the arrangement`;
+  return `${totalWords} words woven into the pattern`; // Phase 5 — serene
 }
 
 // ============================================================================
@@ -2192,6 +2204,119 @@ export function getPitMandatoryText(phase: DialoguePhase): string {
 export function getPitMandatoryCTA(phase: DialoguePhase): string {
   if (phase >= 3) return 'The pit demands your presence';
   return 'Visit the Pit';
+}
+
+// ============================================================================
+// TENDING SHRINE — Phase-5 endgame loop. Serene custodianship, never dread.
+// The player spends amber to "deepen the pattern" — a cosmetic-only sink.
+// ============================================================================
+
+/** Title of the Tending panel in the Offering Pit. */
+export function getTendingTitle(): string {
+  return 'Tend the Pattern';
+}
+
+/** Subtitle / current state of tending. */
+export function getTendingSubtitle(level: number): string {
+  if (level <= 0) {
+    return 'The house is complete. But the pattern can always go deeper. Offer amber, and tend it.';
+  }
+  return `Tended ${level} ${level === 1 ? 'time' : 'times'}. It keeps its shape because you keep it.`;
+}
+
+/** The deepen button label. */
+export function getTendingButtonLabel(): string {
+  return 'Deepen the pattern';
+}
+
+/** Hint shown when the day's first-tending discount is available. */
+export function getTendingDailyBonusHint(): string {
+  return "The first tending each day costs less. The pattern welcomes a faithful return.";
+}
+
+/** Serene confirmation lines after a deepening (non-milestone). */
+const TENDING_RESPONSES = [
+  'The pattern deepens. Something in the walls settles, contentedly.',
+  'The amber sinks in and stays. The house feels a little more like itself.',
+  'You tended it. You did not have to. The pattern remembers that you did.',
+  'A warmth spreads outward, slow and even. The shape holds.',
+  'Deeper now. The keepers pause, somewhere, and feel it too.',
+  'The offering takes. The pattern leans, almost imperceptibly, toward you.',
+  'It is enough. It is always enough. And still you return.',
+  'The fire stays lit. The walls stay warm. The pattern continues.',
+];
+
+export function getTendingResultMessage(level: number): string {
+  // First tending gets a gentle, specific welcome.
+  if (level === 1) {
+    return 'The first tending. The pattern accepts it the way a held breath accepts release.';
+  }
+  return TENDING_RESPONSES[level % TENDING_RESPONSES.length];
+}
+
+/** Milestone ceremony copy (fires at TENDING_MILESTONES levels). */
+export function getTendingMilestoneCeremonyText(level: number): string[] {
+  switch (level) {
+    case 5:
+      return ['The pattern has deepened five times.', 'The keepers have begun to speak of it. Listen, when you visit them.'];
+    case 10:
+      return ['Ten tendings.', 'The warmth has reached every room now. The house breathes a little slower, a little fuller.'];
+    case 25:
+      return ['Twenty-five.', 'The shape is yours now, as much as anyone\'s. The keepers know your devotion by heart.'];
+    case 50:
+      return ['Fifty tendings offered.', 'There was never anything to summon. There was only this — the deepening, and the keeping. You understand that now.'];
+    case 100:
+      return ['One hundred.', 'The pattern and the keeper have become the same gesture. Breathe in. It deepens. Breathe out. So do you.'];
+    default:
+      return ['The pattern deepens.', 'Something old turns over in its long sleep, and is content.'];
+  }
+}
+
+/** Label for the Tending Level readout. */
+export function getTendingLevelLabel(level: number): string {
+  return level <= 0 ? 'Untended' : `Depth ${level}`;
+}
+
+// ============================================================================
+// COSMETIC SHOP — expression, never progression. Tone shifts with phase.
+// ============================================================================
+
+export function getShopTitle(phase: number): string {
+  if (phase >= 4) return 'Vestments';
+  if (phase >= 2) return 'Adornments';
+  return 'Tile Shop';
+}
+
+export function getShopSubtitle(phase: number): string {
+  if (phase >= 4) return 'Dress the offering. It changes nothing, and everything.';
+  if (phase >= 2) return 'Spend amber to change how the words look. For yourself.';
+  return 'Spend amber to dress up your tiles!';
+}
+
+export function getShopThemeSectionLabel(phase: number): string {
+  if (phase >= 3) return 'TILE VESTMENTS';
+  return 'TILE THEMES';
+}
+
+export function getShopConfettiSectionLabel(phase: number): string {
+  if (phase >= 3) return 'CELEBRATION';
+  return 'CONFETTI';
+}
+
+/** Label for the "no theme / default" option. */
+export function getShopDefaultThemeName(phase: number): string {
+  if (phase >= 3) return 'Unadorned';
+  return 'Candy (default)';
+}
+
+export function getShopDefaultConfettiName(phase: number): string {
+  if (phase >= 3) return 'Unadorned';
+  return 'Classic (default)';
+}
+
+/** Locked-because-Patron note for entitlement-only cosmetics. */
+export function getShopPatronLockedLabel(): string {
+  return 'Patron only';
 }
 
 // ============================================================================

@@ -26,6 +26,10 @@ import {
   getPitMandatoryText,
   getPitMandatoryCTA,
   getGoalSuggestion,
+  getRitualEchoHeader,
+  getRitualEchoFooter,
+  getWordsOfferedText,
+  getIncantationName,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -971,5 +975,35 @@ describe('getNextStreakMilestoneText', () => {
     const text = getNextStreakMilestoneText(4, 5);
     expect(typeof text).toBe('string');
     expect((text as string).length).toBeGreaterThan(0);
+  });
+});
+
+describe('Phase 5 victory register (serene, distinct from Phase 4 offering)', () => {
+  it('getRitualEchoHeader gives Phase 5 its own settled header', () => {
+    expect(getRitualEchoHeader(4)).toBe('The Offering:');
+    expect(getRitualEchoHeader(5)).toBe('The Pattern:');
+    expect(getRitualEchoHeader(5)).not.toBe(getRitualEchoHeader(4));
+  });
+
+  it('getRitualEchoFooter weaves rather than offers at Phase 5', () => {
+    expect(getRitualEchoFooter(4, 3)).toContain('offered');
+    expect(getRitualEchoFooter(5, 3)).toContain('woven');
+    expect(getRitualEchoFooter(5, 3)).not.toBe(getRitualEchoFooter(4, 3));
+  });
+
+  it('getWordsOfferedText shifts to the Phase 5 weave register', () => {
+    expect(getWordsOfferedText(7, 4)).toContain('arrangement');
+    expect(getWordsOfferedText(7, 5)).toContain('woven');
+    expect(getWordsOfferedText(7, 5)).not.toBe(getWordsOfferedText(7, 4));
+  });
+
+  it('getIncantationName uses serene Phase 5 templates', () => {
+    const words = ['VOID', 'DOOM'];
+    const p4 = getIncantationName(words, 4);
+    const p5 = getIncantationName(words, 5);
+    expect(typeof p5).toBe('string');
+    expect((p5 as string).length).toBeGreaterThan(0);
+    // Phase 5 templates never use the Phase 4 "Offering:"/"Incantation" framing
+    expect(p5).not.toMatch(/Offering|Incantation|Descends/);
   });
 });

@@ -27,7 +27,8 @@ export type QuestType =
   | 'earn_amber'        // Earn N total amber
   | 'visit_animals'     // Talk to N different animals
   | 'streak_days'       // Maintain a streak for N days
-  | 'sacrifice_amber';  // Offer N amber to the arrangement (Phase 4+ only)
+  | 'sacrifice_amber'   // Offer N amber to the arrangement (Phase 4+ only)
+  | 'tend_amber';       // Deepen the pattern by N amber at the Shrine (Phase 5+ only)
 
 export type QuestTier = 'daily' | 'weekly';
 
@@ -104,6 +105,10 @@ const DAILY_QUEST_POOL: QuestTemplate[] = [
   { type: 'visit_animals', titleTemplate: 'Social Call', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'Consult {target} keepers', target: 2, rewardAmber: 14 },
   { type: 'earn_amber', titleTemplate: 'Amber Scavenger', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'Gather {target} amber', target: 30, rewardAmber: 10 },
   { type: 'earn_amber', titleTemplate: 'Amber Seeker', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'The coffers need {target} amber', target: 60, rewardAmber: 18 },
+  // Tending (Phase 5+ only). Deliberately net-negative — rewards less amber than
+  // it asks you to tend, so it pulls amber out of the economy (a sink disguised
+  // as a quest) while giving a daily reason to deepen the pattern.
+  { type: 'tend_amber', titleTemplate: 'Daily Tending', descTemplate: 'Deepen the pattern by {target} amber', darkDescTemplate: 'Tend the pattern with {target} amber today', target: 100, rewardAmber: 25 },
 ];
 
 // Weekly quest pool — harder, multi-day objectives with bigger rewards
@@ -126,6 +131,8 @@ const WEEKLY_QUEST_POOL: QuestTemplate[] = [
   // Sacrifice (Phase 4+ only)
   { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 100, rewardAmber: 60 },
   { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 200, rewardAmber: 110 },
+  // Tending (Phase 5+ only) — net-negative sink, weekly cadence for the Shrine.
+  { type: 'tend_amber', titleTemplate: 'The Long Tending', descTemplate: 'Deepen the pattern by {target} amber this week', darkDescTemplate: 'Tend the pattern with {target} amber', target: 500, rewardAmber: 90 },
 ];
 
 // ============================================================================
@@ -197,6 +204,7 @@ function generateQuestsFromPool(
   // Filter the pool based on player state
   const filtered = pool.filter(t => {
     if (t.type === 'sacrifice_amber' && phase < 4) return false;
+    if (t.type === 'tend_amber' && phase < 5) return false;
     if (t.type === 'challenge_mode' && !challengeUnlocked) return false;
     if (t.type === 'visit_animals') {
       if (unlockedAnimalCount < 2) return false;
@@ -333,6 +341,8 @@ export async function updateQuestProgress(event: {
   currentStreak?: number;
   /** Amber sacrificed this session (for sacrifice_amber quests) */
   amberSacrificed?: number;
+  /** Amber tended at the Shrine this session (for tend_amber quests) */
+  amberTended?: number;
 }, currentPhase: number = 0): Promise<Quest[]> {
   const combined = await loadWeeklyQuests(currentPhase);
   const allNewlyCompleted: Quest[] = [];
@@ -386,6 +396,11 @@ export async function updateQuestProgress(event: {
         case 'sacrifice_amber':
           if (event.amberSacrificed !== undefined && event.amberSacrificed > 0) {
             progressDelta = event.amberSacrificed;
+          }
+          break;
+        case 'tend_amber':
+          if (event.amberTended !== undefined && event.amberTended > 0) {
+            progressDelta = event.amberTended;
           }
           break;
       }

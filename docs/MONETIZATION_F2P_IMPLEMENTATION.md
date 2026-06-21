@@ -253,6 +253,8 @@ catalogs, so amber never feels like "the currency I should have bought."
 
 ### 4.5 Cosmetic shop
 
+> **STATUS: amber path SHIPPED.** `src/components/shop/ShopScreen.tsx` exists and is reachable from the Journal hub (`currentScreen: 'shop'`). It sells & equips **tile themes** for amber (`spendAmber(cost, 'cosmetic_<id>')` → `recordAmberCosmeticPurchase`, auto-equip). Themes live in `theme/colors.ts` `TILE_THEMES`; the equipped one is pushed in via `setEquippedTileTheme()` and resolved in `getTileColor()` (phase-aware preserved). `cosmetics.ts` gained `initCosmetics`/`getEquippedSync`/`unequipCosmetic`. **Still to do for real money:** add `kind:'iap'` cosmetic items (the catalog already supports them) once the dev-client + RevenueCat land, plus the Confetti / Room-Accent tabs. The original design below is retained.
+
 - **UI:** new `src/components/shop/ShopScreen.tsx`, reachable from the HomeScreen utility menu
   (route added to `currentScreen` union in `App.tsx`). Tabs: Tile Themes / Confetti / Room
   Accents. Each item: preview, price (amber **or** IAP), owned/equip state.

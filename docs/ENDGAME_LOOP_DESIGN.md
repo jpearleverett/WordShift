@@ -1,9 +1,20 @@
 # WordShift — Endgame Loop Design: Fixing the Phase-5 Dead-End
 
-**Status:** Design proposal
+**Status:** ✅ **IMPLEMENTED (v1)** — the recommended design (Option A "The Tending Shrine" + Option C's quest/milestone cadence) shipped. This document is retained as the design rationale; see the "Implementation (shipped)" note below for what landed vs. what's still deferred.
 **Author:** Game design (F2P retention / endgame loops)
 **Scope:** Post-revelation (Phase 5) repeatable loop + amber sink + dialogue refresh
 **Constraint:** Free-to-play. Expression/convenience monetization only. **Never** pay-to-skip-narrative. Phase 5 stays serene/resigned, never more dread. Never reveal the phase system or break the fourth wall.
+
+> ## Implementation (shipped)
+> **The Tending Shrine is live.** A Phase-5-only, soft-infinite, cosmetic amber sink in the Offering Pit (✴ header button → modal). The player spends amber to "deepen the pattern," advancing a Tending Level on the documented escalating cost curve (`getTendingCost`, capped 5,000) with a once-per-local-day discount. Milestones (5/10/25/50/100) fire a serene ceremony.
+> - **Service:** `src/services/tending.ts` (state, cost curve, daily bonus, milestones, per-animal `caughtUp` pointer, pure `selectPhase5Dialogue`). Balance in `gameBalance.ts` (`TENDING_*`).
+> - **Dialogue refresh (Section 3, shipped):** `useDialogueFlow` Phase-5 branch now uses a shared pool (`dialogue/phase5Pool.ts`) = 10 base post-rev lines + choice callback + unlocked Tending milestone lines. Genuinely-new lines deliver in order; once caught up, re-reads come in a deterministic **shuffled** order (no verbatim looping). `hasNewDialogue` is **honest** now (in both `useDialogueFlow` and `getAnimalsWithStatus`): lit only while undelivered lines remain, re-lit when a milestone unlocks one.
+> - **~50 new milestone lines** (`dialogue/animalDialogueTending.ts`, 5/animal), recorded to the Whisper Gallery as collectibles.
+> - **Cadence (Section 4/Option C, shipped):** a `tend_amber` quest type (Phase-5-gated, deliberately net-negative) + extended `MILESTONE_BONUSES` tail past 350.
+> - **Hygiene:** `wordshift_tending` in `cloudSave.SYNC_KEYS`; `clearTendingState` in Settings → Reset All; full `tending.test.ts` (cost curve, daily bonus, milestones, caughtUp, the pure selector) + quest gating tests.
+> - **Visual deepening (shipped):** the world now visibly deepens with the Tending Level via `getTendingIntensity(level)` (sqrt curve, saturates ~level 50) — the home **Arrangement sigils** (`ArrangementConnector`) brighten/thicken/light their nodes and glow, and the **Offering Pit** raises more rim embers + a warmer inner/core glow. Reduced-motion / device-tier gating preserved; no new art.
+> - **Cosmetic Shop (shipped, amber path):** `components/shop/ShopScreen.tsx` sells & equips amber **tile themes** — Ember-warm / Deep-tide / Bone-quiet double as the Tending motifs (`theme/colors.ts` `TILE_THEMES`). Real-money IAP cosmetic items remain gated on the dev-client + RevenueCat migration.
+> - **Deferred:** **Option B** (the endless-descent ladder, an explicit fast-follow) and the real-money cosmetic motifs.
 
 ---
 

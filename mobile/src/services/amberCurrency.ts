@@ -243,9 +243,11 @@ export async function checkFreeStreakFreeze(): Promise<boolean> {
     return true;
   }
 
-  const lastDate = new Date(lastFree);
-  const todayDate = new Date(today);
-  const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Route the interval through the local-day helper rather than parsing the
+  // YYYY-MM-DD string with `new Date()` (which interprets it as UTC midnight).
+  // Functionally equivalent here, but keeps every day-bucketing path consistent
+  // with the dateUtils contract so a future edit can't reintroduce a UTC skew.
+  const diffDays = daysAgoLocal(lastFree);
 
   if (diffDays >= FREE_FREEZE_INTERVAL_DAYS) {
     progress.streakFreezes = (progress.streakFreezes ?? 0) + 1;

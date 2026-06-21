@@ -31,16 +31,37 @@ resource (account/SDK/backend/collector URL).
 
 ---
 
+## Phase A′ — Ship-blocker hardening (audit follow-up; all code, no external deps)
+
+Fixes from the second full-codebase readiness audit. All landed with the suite
+green (1077/1077), typecheck + lint clean.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| A′1 | **FTUE resume soft-lock** | ✅ | Killing the app during the puzzle/transition onboarding beats (`going_to_puzzle`/`puzzle_tutorial`/`puzzle_complete`/`returning_home`) relaunched to a **dead home screen** (no Fox guide, no Play button) — an unrecoverable first-session brick in the highest-churn window. `useOnboardingFlow` now `normalizeResumeStep`s transient/puzzle steps to a stable target on resume; `App.tsx` resume effect routes the puzzle step back to a freshly-initialized guided tutorial. |
+| A′2 | **ErrorBoundary coverage** | ✅ | Only `home`/`puzzle` were wrapped; a render error on settings/stats/ledger/gallery/pit crashed the whole app. Added a catch-all `ErrorBoundary` around `renderScreen()` (returns the player home). |
+| A′3 | **Perpetual rAF loop** | ✅ | `startFrameMonitoring()` ran forever in production with its samples never consumed (telemetry off) — pure battery/CPU cost. Now gated behind `__DEV__` and stopped on unmount. |
+| A′4 | **`startNewGame` concurrency guard** | ✅ | Long async generation (bank lookup + up to 30s reverse) had no in-flight guard; rapid Play/Next-Level taps or a mid-generation variant switch could clobber a started board. Added a monotonic `generationIdRef`; every `initGame` commit aborts if superseded. |
+| A′5 | **Drag near-miss forgiveness** | ✅ | Off-target drag drops failed instead of snapping. Now routes through `findClosestValidSlot`, bounded to ±1 slot, so a one-slot finger miss lands on the obviously-intended valid slot without ever teleporting across the row. |
+| A′6 | **Puzzle-screen onboarding skip** | ✅ | The skip handler existed but had no button on the puzzle-screen FoxGuide; added `showSkip`/`onSkip`. |
+| A′7 | **DifficultyMenu a11y** | ✅ | Variant/difficulty/challenge buttons on the setup screen now carry `accessibilityRole`/`accessibilityState`/`accessibilityLabel`. |
+| A′8 | **Phase 5 victory register** | ✅ | `getRitualEchoHeader/Footer`, `getWordsOfferedText`, `getIncantationName` collapsed Phase 5 into Phase 4's "offering" dread; Phase 5 now has its own serene "weave/pattern continues" voice in the high-traffic victory modal (+ regression tests). |
+| A′9 | **`checkFreeStreakFreeze` date helper** | ✅ | The one day-bucketing path that bypassed `dateUtils` (`new Date(string)` → UTC) now routes through `daysAgoLocal`. |
+| A′10 | Phase 5 dialogue "always new" badge | ⏳ (deliberately deferred) | The home-screen "new dialogue" badge stays lit forever at Phase 5 and lines loop verbatim. The fix is entangled with the cumulative dialogue-index space and overlaps the deferred endgame loop (`ENDGAME_LOOP_DESIGN.md`); left for the dedicated endgame-loop pass to avoid a risky one-shot change to a fully-tested core system. |
+| A′11 | Remote crash visibility (Sentry) | 🔒 | The global error pipeline is real but lands in a local 500-entry buffer; no Sentry, telemetry off → launching blind to crashes. Needs a collector URL (A9) or a Sentry account. |
+
+---
+
 ## Phase B — Retention & addictiveness (highest leverage)
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| B1a | Cosmetic Shop (amber sink) | ⏳ | New `cosmeticsShop.ts` + modal: tile themes, room accents, confetti, accessories. Wire the stubbed `ShareableResult.shareFrame`. Doubles as the C5 monetization surface. |
-| B1b | Amber Altar / escalating sink (Phase 4+) | ⏳ | Repeatable offering with cosmetic/prestige return — gives late-game amber somewhere to go. |
+| B1a | Cosmetic Shop (amber sink) | ✅ (amber path) | `components/shop/ShopScreen.tsx` ships: buy & equip **tile themes** with amber (Ember-warm/Deep-tide/Bone-quiet — doubling as the Tending shrine motifs — + Patron-entitlement gold). Equipped theme resolved in `theme/colors.ts` `getTileColor()` (registration pattern, phase-aware), reached from the Journal hub. Real-money IAP cosmetic items + confetti/room-accent tabs deferred to C5 (need the dev-client + SDK). A real expression amber sink today; the C5 monetization layer drops on top of the same catalog. |
+| B1b | Amber Altar / escalating sink (Phase 5) | ✅ | **The Tending Shrine** shipped (`tending.ts` + pit modal): soft-infinite, cosmetic-only, escalating amber sink with a daily-discount return hook + serene milestone ceremonies. Also fixes the verbatim Phase-5 dialogue loop (recency-shuffled selection, honest `hasNewDialogue`, ~50 milestone-gated new lines) and adds a `tend_amber` quest + `MILESTONE_BONUSES` tail. Deferred: richer TL-tied *visual* deepening + cosmetic-shop motifs (gated on B1a) + Option B endless ladder. See `docs/ENDGAME_LOOP_DESIGN.md`. |
 | B1c | Animal gifts | ⏳ | Spend amber to unlock bonus dialogue/whispers (surfaces the never-seen Phase 0–1 surplus content). |
 | B1d | Economy rebalance | ⏳ | **The #1 retention fix.** House completes ~puzzle 130; Phase 3 min is 135, Phase 4 is 225 → ~95-puzzle "sink desert." Add the B1a–c sinks to span 130→225, retune sources, pin with guard tests vs `gameBalance.ts`. |
-| B2a | Shareable result image | ⏳ | `react-native-view-shot` → native share sheet. The genre's #1 growth lever. |
-| B2b | Daily-result share prompt | ⏳ | Surface on Daily completion + existing `maybeAwardDailyShareBonus`. |
+| B2a | Shareable result image | ✅ (scaffolded, Expo-Go-safe) | Built the visual `ShareCard` + a `ShareResultModal` preview (victory Share → card preview → share). Image capture lives behind a pluggable provider (`shareImage.ts`): with `react-native-view-shot` present it shares a PNG; in Expo Go it gracefully falls back to the existing emoji-grid TEXT share (and the card is visible to screenshot). Flip on real capture: `npm i react-native-view-shot expo-sharing` + dev client → `initShareImage()` auto-registers. Also **fixed a daily-share spoiler leak** (the word chain/incantation were shared for daily puzzles; now grid-only for daily). |
+| B2b | Daily-result share prompt | 🟡 | The Daily VictoryModal already routes its Share through the new card preview; a *proactive* "share your streak" nudge on daily completion is still a small follow-up. |
 | B2c | Leaderboard / friend loop | 🔒 | Backend leaderboard depends on C2 cloud infra; start with async deep-link compare. |
 | B3a | Daily login reward | ✅ | `dailyLoginReward.ts` — 7-day escalating cycle (10/15/20/25/30/40/75, Day-7 jackpot), wraps weekly, resets on a missed day. Wired into App launch; 9 tests. |
 | B3b | Unify the two streak systems | ⏳ | Collapse play-streak + daily-challenge-streak into one model/UI (keep `dateUtils` local-day discipline). Risky refactor of tested code — left for a dedicated pass. |

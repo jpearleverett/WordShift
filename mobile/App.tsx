@@ -45,11 +45,13 @@ import {
   checkFreeStreakFreeze,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DAILY_LOGIN_CYCLE_LENGTH } from './src/services/dailyLoginReward';
-import { updateQuestProgress } from './src/services/weeklyQuests';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
-import { sharePuzzleResult } from './src/services/shareResults';
+import { ShareableResult } from './src/services/shareResults';
+import { initShareImage } from './src/services/shareImage';
+import { ShareResultModal } from './src/components/share/ShareResultModal';
+import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
 import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
@@ -69,7 +71,7 @@ import {
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone } from './src/services/dailyChallenge';
-import { startFrameMonitoring } from './src/services/performanceMonitor';
+import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
 import { WhisperGalleryScreen } from './src/components/WhisperGalleryScreen';
@@ -84,12 +86,14 @@ import {
 import { runMigrations } from './src/services/dataMigration';
 import { initIAP } from './src/services/iap';
 import { initAds } from './src/services/ads';
+import { initCosmetics } from './src/services/cosmetics';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
-import { estimateSlotIndex } from './src/services/slotEstimation';
+import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
+import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
 import { offerBatch } from './src/services/wordHarvest';
 import {
@@ -105,7 +109,7 @@ import {
 import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
 
 // App screen type — expanded with settings, stats, and ledger
-type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit';
+type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
 
 type PostVictoryIntroKind = 'variant_unlock' | 'home_tools';
 interface PostVictoryIntro {
@@ -209,6 +213,8 @@ function MainApp() {
   // True while the player is in a Daily Challenge run (drives autosave tagging,
   // victory recording, and the VictoryModal "Daily Challenge Complete" header).
   const [isPlayingDaily, setIsPlayingDaily] = useState(false);
+  // Result-card share preview (null = closed).
+  const [shareResultData, setShareResultData] = useState<ShareableResult | null>(null);
 
   // Speed-variant escalation: consecutive speed wins increment this, shortening
   // each subsequent clock. Reset on time-up or whenever a fresh run begins.
@@ -373,9 +379,20 @@ function MainApp() {
   // App-level initialization (non-onboarding)
   useEffect(() => {
     initAudio();
-    startFrameMonitoring();
+    // Frame-rate monitoring is a diagnostic-only tool: its samples are never
+    // read in production (no consumer, telemetry disabled by default), so the
+    // perpetual requestAnimationFrame loop would be pure battery/CPU cost on
+    // every device. Restrict it to dev builds; stop it on unmount.
+    if (__DEV__) {
+      startFrameMonitoring();
+    }
     scheduleAllNotifications(0).catch(() => {});
     uploadToCloud().catch(() => {});
+    return () => {
+      if (__DEV__) {
+        stopFrameMonitoring();
+      }
+    };
   }, []);
 
   // Android hardware back button: sub-screens navigate home; home exits the app.
@@ -401,18 +418,25 @@ function MainApp() {
     return () => subscription.remove();
   }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions]);
 
-  // Resume pit screen if onboarding was interrupted during pit flow (initial mount only)
+  // Resume the correct screen if onboarding was interrupted (initial mount only).
+  // The onboarding hook has already normalized transient steps to stable ones,
+  // so here we only need to map a stable step to its owning screen. Without this,
+  // a kill during the puzzle/pit/return beats would relaunch to a dead home
+  // screen (no Fox guide, no Play button) — an unrecoverable first-session brick.
   useEffect(() => {
     if (onboardingFlow.onboardingReady && !pitResumeCheckedRef.current) {
       pitResumeCheckedRef.current = true;
-      if (
-        onboardingFlow.onboardingStep === 'going_to_pit' ||
-        onboardingFlow.onboardingStep === 'pit_intro' ||
-        onboardingFlow.onboardingStep === 'pit_offering'
-      ) {
+      const step = onboardingFlow.onboardingStep;
+      if (step === 'going_to_pit' || step === 'pit_intro' || step === 'pit_offering') {
         setCurrentScreen('pit');
+      } else if (step === 'puzzle_tutorial') {
+        // Re-init the guided tutorial puzzle so the player resumes a live,
+        // winnable board with the Fox overlay rather than a dead screen.
+        setCurrentScreen('puzzle');
+        puzzleActions.startNewGame('EASY');
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onboardingFlow.onboardingReady, onboardingFlow.onboardingStep]);
 
   // Free streak freeze: grant one every 14 days (and one on first launch).
@@ -1114,15 +1138,28 @@ function MainApp() {
       if (!previews || previews.length === 0) return;
 
       // Estimate which slot the user dropped over based on X position.
-      // Use that exact slot — if it's not valid, let handleSlotPress show
-      // invalid feedback rather than silently jumping to a distant valid slot.
       const targetWordLength = previews.length - 1;
       const estimated = estimateSlotIndex(position.x, previews.length, targetWordLength);
+
+      // Near-miss forgiveness: arc slots are only ~28px wide on a finger-driven
+      // layout, so a drop that lands one slot shy of its intended (valid) target
+      // reads as "the game dropped my letter for nothing." If the estimated slot
+      // is invalid but an *immediately adjacent* slot is valid, snap to it.
+      // Bounded to ±1 slot so we still never teleport a letter across the row to
+      // a distant valid slot — an invalid drop that isn't a clear near-miss
+      // still falls through to handleSlotPress's invalid feedback.
+      let targetSlot = estimated;
+      if (!previews[estimated]?.isValid) {
+        const closestValid = findClosestValidSlot(estimated, previews);
+        if (closestValid !== null && Math.abs(closestValid - estimated) <= 1) {
+          targetSlot = closestValid;
+        }
+      }
 
       const commit = () => {
         // Mark as drag-drop for haptic/effect escalation in handleSlotPress
         isDragDropRef.current = true;
-        onSlotPress(estimated, position);
+        onSlotPress(targetSlot, position);
       };
 
       // Y-axis bounds guard: only commit if the drop actually landed on (or near)
@@ -1249,35 +1286,28 @@ function MainApp() {
     });
   }, [puzzleActions, transitionTo, startVictoryExitFlow]);
 
-  const handleShare = useCallback(async () => {
+  // Share opens a preview of the result card (which shares an image when the
+  // native capturer is present, else falls back to the emoji-grid text share).
+  // It overlays the victory screen rather than exiting it, so sharing never
+  // costs the player their victory moment.
+  const handleShare = useCallback(() => {
     if (!victoryFlow.victoryData) return;
     hapticLight();
-    startVictoryExitFlow(() => {
-      const moveCount = puzzle.rows.length - 1;
-      sharePuzzleResult({
-        stars: victoryFlow.victoryData!.earnedStars,
-        difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
-        hintsUsed: puzzle.hintsUsed,
-        invalidAttempts: puzzle.invalidAttempts,
-        isDaily: isPlayingDaily,
-        moveCount,
-        wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
-        animalWhisper: orchestration.whisper?.text,
-        phase: persistence.currentPhase,
-        incantationName: puzzle.lastIncantationName || undefined,
-      }).then(shared => {
-        if (shared) {
-          logEvent({
-            type: 'share_completed',
-            data: {
-              difficulty: puzzle.difficulty,
-              phase: persistence.currentPhase,
-            },
-          });
-        }
-      });
+    const moveCount = puzzle.rows.length - 1;
+    setShareResultData({
+      stars: victoryFlow.victoryData.earnedStars,
+      difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
+      hintsUsed: puzzle.hintsUsed,
+      invalidAttempts: puzzle.invalidAttempts,
+      isDaily: isPlayingDaily,
+      dailyDate: isPlayingDaily ? getLocalDateString() : undefined,
+      moveCount,
+      wordChain: puzzle.lastCompletedWords.length > 0 ? puzzle.lastCompletedWords : undefined,
+      animalWhisper: orchestration.whisper?.text,
+      phase: persistence.currentPhase,
+      incantationName: puzzle.lastIncantationName || undefined,
     });
-  }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, startVictoryExitFlow]);
+  }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily]);
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (victoryAnimatingRef.current && victoryFlow.victoryData) {
@@ -1391,6 +1421,20 @@ function MainApp() {
       );
     }
 
+    if (currentScreen === 'shop') {
+      return (
+        <View style={{ flex: 1 }}>
+          <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+          <ShopScreen
+            phase={persistence.currentPhase}
+            amberBalance={persistence.amberBalance}
+            onClose={() => transitionTo('home')}
+            onAmberChange={(newBalance) => persistenceActions.setAmberBalance(newBalance)}
+          />
+        </View>
+      );
+    }
+
     if (currentScreen === 'pit') {
       return (
         <View style={{ flex: 1 }}>
@@ -1455,6 +1499,7 @@ function MainApp() {
               onOpenStats={() => transitionTo('stats')}
               onOpenLedger={() => transitionTo('ledger')}
               onOpenGallery={() => transitionTo('gallery')}
+              onOpenShop={() => transitionTo('shop')}
               onOpenPit={() => transitionTo('pit')}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
@@ -1998,6 +2043,8 @@ function MainApp() {
                 ? onboardingActions.handleOnboardingContinue
                 : undefined
             }
+            showSkip={true}
+            onSkip={onboardingActions.handleSkipOnboarding}
             position="bottom"
             anchorStyle={
               onboardingFlow.onboardingStep === 'puzzle_complete'
@@ -2061,7 +2108,16 @@ function MainApp() {
   // Render screen with global overlays on top
   return (
     <View style={{ flex: 1, backgroundColor: rootBgColor }}>
-      {renderScreen()}
+      {/* Catch-all boundary: the home/puzzle screens carry their own inner
+          boundaries; this outer one covers the secondary screens (settings,
+          stats, ledger, gallery, pit) so a render error on any of them returns
+          the player home instead of crashing the entire app. */}
+      <ErrorBoundary
+        fallbackMessage="Something went wrong. Tap to return home."
+        onReset={() => setCurrentScreen('home')}
+      >
+        {renderScreen()}
+      </ErrorBoundary>
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
         pointerEvents="none"
@@ -2074,6 +2130,16 @@ function MainApp() {
       <PhaseTransitionOverlay
         event={phaseTransitionEvent}
         onComplete={() => setPhaseTransitionEvent(null)}
+      />
+      {/* Shareable result card preview — overlays everything */}
+      <ShareResultModal
+        result={shareResultData}
+        onClose={() => setShareResultData(null)}
+        onShared={() => {
+          // shareImage logs the share_completed event (with image/text kind);
+          // refresh to pick up the first-share-of-day amber bonus.
+          persistenceActions.refreshStats();
+        }}
       />
     </View>
   );
@@ -2096,7 +2162,8 @@ export default function App() {
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in
         // Expo Go — no native modules until a real provider is wired.
-        await Promise.all([initIAP(), initAds()]);
+        initShareImage(); // registers the native image capturer if present (no-op in Expo Go)
+        await Promise.all([initIAP(), initAds(), initCosmetics()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
       } finally {

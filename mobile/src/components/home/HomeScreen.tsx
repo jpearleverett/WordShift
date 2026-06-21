@@ -100,10 +100,11 @@ import {
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines } from '../../services/phaseNarrative';
+import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
+import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
 
@@ -118,6 +119,7 @@ interface HomeScreenProps {
   onOpenStats?: () => void;
   onOpenLedger?: () => void;
   onOpenGallery?: () => void;
+  onOpenShop?: () => void;
   onOpenPit?: () => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
@@ -139,6 +141,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenStats,
   onOpenLedger,
   onOpenGallery,
+  onOpenShop,
   onOpenPit,
   pitPhaseReady,
   onboardingStep,
@@ -203,6 +206,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
+  const [tendingLevel, setTendingLevel] = useState(0);
   const [upgradeFeedback, setUpgradeFeedback] = useState<string | null>(null);
 
   // Dialogue flow hook
@@ -272,6 +276,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // Load room upgrades
     const upgrades = await getPurchasedUpgrades();
     setPurchasedUpgrades(upgrades);
+
+    // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
+    setTendingLevel(await getTendingLevel());
   }, [unlockFlow.refreshUnlockData]);
 
   // Keep the ref in sync
@@ -968,6 +975,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           nextUnlock={unlockFlow.nextUnlock}
           amberBalance={progress.amber}
           purchasedUpgrades={purchasedUpgrades}
+          tendingLevel={tendingLevel}
           savedPanY={initialHousePanY}
           onPanYChange={onHousePanChange}
           onPitPress={!isOnboarding && onOpenPit ? () => {
@@ -1322,6 +1330,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📊 Statistics</Text>
+              </TouchableOpacity>
+            )}
+            {onOpenShop && (
+              <TouchableOpacity
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onOpenShop?.();
+                }}
+                accessibilityLabel={`Open ${getShopTitle(progress.currentPhase)}`}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>✨ {getShopTitle(progress.currentPhase)}</Text>
               </TouchableOpacity>
             )}
             {onOpenSettings && (

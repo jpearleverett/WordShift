@@ -33,15 +33,30 @@ import {
   getPitTransitionReadyText,
   getPitTransitionCeremonyText,
   getWardMarkColors,
+  getTendingTitle,
+  getTendingSubtitle,
+  getTendingButtonLabel,
+  getTendingDailyBonusHint,
+  getTendingResultMessage,
+  getTendingMilestoneCeremonyText,
+  getTendingLevelLabel,
 } from '../services/phaseNarrative';
-import { confirmPhaseTransition } from '../services/amberCurrency';
+import { confirmPhaseTransition, spendAmber, awardBonusAmber } from '../services/amberCurrency';
+import {
+  loadTendingState,
+  getNextTendingInfo,
+  applyTend,
+  isTendingAvailable,
+  getTendingIntensity,
+  NextTendingInfo,
+} from '../services/tending';
+import { updateQuestProgress, Quest } from '../services/weeklyQuests';
 import {
   getHarvestState,
   offerBatch,
   offerAllBatches,
   HarvestState,
 } from '../services/wordHarvest';
-import { awardBonusAmber } from '../services/amberCurrency';
 import { getSettingsSync } from '../services/settings';
 import { logEvent } from '../services/eventLogger';
 import { hapticLight, hapticMedium, hapticHeavy } from '../services/haptics';
@@ -632,6 +647,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [pendingAmberOffset, setPendingAmberOffset] = useState(0);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
 
+  // Tending Shrine (Phase 5 endgame loop) — the repeatable cosmetic amber sink.
+  const tendingEnabled = isTendingAvailable(phase);
+  const [showTendingModal, setShowTendingModal] = useState(false);
+  const [tendingLevel, setTendingLevel] = useState(0);
+  const [tendingNext, setTendingNext] = useState<NextTendingInfo | null>(null);
+  const [tendingBusy, setTendingBusy] = useState(false);
+  // Pending ceremony/result toast timers, tracked so they're cleared on unmount.
+  const tendTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
   const finalizingBatches = useRef<Set<string>>(new Set());
@@ -660,7 +684,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const harvestStateRef = useRef(harvestState);
   const amberBalanceRef = useRef(amberBalance);
 
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      tendTimersRef.current.forEach(clearTimeout);
+      tendTimersRef.current = [];
+    };
+  }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
   useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
   useEffect(() => { amberBalanceRef.current = amberBalance; }, [amberBalance]);
@@ -839,9 +870,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     return () => { anim.stop(); };
   }, [pitIsActive, glowIntensity]);
 
-  // Derive breathing opacity and scale from progress + phase
+  // Derive breathing opacity and scale from progress + phase. The Phase-5
+  // Tending Level deepens the pit: a small boost to the inner/core glow so the
+  // pit visibly grows warmer/deeper as the player tends (caps via the sqrt curve).
   const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
   const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
+  const tendDeepening = getTendingIntensity(tendingLevel);
+  const tendGlowMul = 1 + tendDeepening * 0.5; // up to +50% inner/core glow
 
   // Per-layer opacity interpolations for concentric glow (outer→inner: 0.4x, 0.7x, 1.0x, 2.5x of base)
   // Each layer is multiplied by glowIntensity so the glow dims when no words are present
@@ -862,14 +897,20 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const breathOpacityInner = Animated.multiply(
     pitBreathProgress.interpolate({
       inputRange: [0, 1],
-      outputRange: [breathOpacityRange[0], breathOpacityRange[1]],
+      outputRange: [
+        Math.min(breathOpacityRange[0] * tendGlowMul, 0.85),
+        Math.min(breathOpacityRange[1] * tendGlowMul, 0.95),
+      ],
     }),
     glowIntensity,
   );
   const breathOpacityCore = Animated.multiply(
     pitBreathProgress.interpolate({
       inputRange: [0, 1],
-      outputRange: [Math.min(breathOpacityRange[0] * 2.5, 0.7), Math.min(breathOpacityRange[1] * 2.5, 0.85)],
+      outputRange: [
+        Math.min(breathOpacityRange[0] * 2.5 * tendGlowMul, 0.8),
+        Math.min(breathOpacityRange[1] * 2.5 * tendGlowMul, 0.92),
+      ],
     }),
     glowIntensity,
   );
@@ -882,7 +923,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   useEffect(() => {
     if (reducedMotion || simplify) return;
 
-    const maxRim = getMaxRimParticles();
+    // More embers rise as the player tends the pattern (Phase-5 deepening),
+    // up to roughly double at full intensity — still device-tier/motion gated.
+    const maxRim = Math.round(getMaxRimParticles() * (1 + getTendingIntensity(tendingLevel)));
     const spawnInterval = 1000; // ms between spawns
     let spawnCount = 0;
 
@@ -944,7 +987,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const interval = setInterval(spawnRimParticle, spawnInterval);
     return () => clearInterval(interval);
-  }, [phase, reducedMotion, simplify]);
+  }, [phase, reducedMotion, simplify, tendingLevel]);
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {
@@ -1350,6 +1393,81 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       Animated.timing(resultOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start(() => { if (mountedRef.current) setResultMessage(null); });
   }, [resultOpacity]);
+
+  // ---- Tending Shrine (Phase 5 endgame sink) ----
+  const refreshTending = useCallback(async () => {
+    if (!tendingEnabled) return;
+    try {
+      const state = await loadTendingState();
+      if (!mountedRef.current) return;
+      setTendingLevel(state.level);
+      setTendingNext(getNextTendingInfo(state));
+    } catch {}
+  }, [tendingEnabled]);
+
+  useEffect(() => { refreshTending(); }, [refreshTending]);
+
+  const handleDeepenPattern = useCallback(async () => {
+    if (tendingBusy || !tendingNext) return;
+    const cost = tendingNext.cost;
+    if (displayBalance < cost) {
+      showResultToast('Not enough amber to deepen the pattern yet.');
+      return;
+    }
+    setTendingBusy(true);
+    try {
+      const spend = await spendAmber(cost, 'tending');
+      if (!spend.success) {
+        showResultToast('The pattern could not accept that offering right now.');
+        return;
+      }
+      if (mountedRef.current) {
+        setDisplayBalance(spend.newBalance);
+        onAmberChange?.(spend.newBalance);
+      }
+      const result = await applyTend(cost);
+      // A tend quest is deliberately a sink disguised as a quest — record the
+      // amount and surface any quest that completes (so it's not silent).
+      let completedQuests: Quest[] = [];
+      try {
+        completedQuests = await updateQuestProgress({ amberTended: cost }, phase);
+      } catch { /* quest tracking is best-effort */ }
+      logEvent({ type: 'pit_offer', data: { tending: result.level, amber: cost } });
+      await refreshTending();
+      if (!mountedRef.current) return;
+
+      // Schedule a toast on a tracked timer (cleared on unmount).
+      const schedule = (msg: string, delay: number, heavy = false) => {
+        const t = setTimeout(() => {
+          if (!mountedRef.current) return;
+          if (heavy) hapticHeavy(); else hapticMedium();
+          showResultToast(msg);
+        }, delay);
+        tendTimersRef.current.push(t);
+      };
+
+      let nextDelay = 0;
+      if (result.milestone != null) {
+        // Milestone: close the modal and sequence the serene ceremony lines.
+        setShowTendingModal(false);
+        hapticHeavy();
+        const lines = getTendingMilestoneCeremonyText(result.milestone);
+        lines.forEach((line, i) => schedule(line, i * 2600, i === 0));
+        nextDelay = lines.length * 2600;
+      } else {
+        hapticMedium();
+        showResultToast(getTendingResultMessage(result.level));
+        nextDelay = 2700;
+      }
+
+      // Quest-completion feedback after the result/ceremony settles.
+      if (completedQuests.length > 0) {
+        schedule(`Quest complete: ${completedQuests[0].title}`, nextDelay);
+      }
+    } finally {
+      if (mountedRef.current) setTendingBusy(false);
+    }
+  }, [tendingBusy, tendingNext, displayBalance, onAmberChange, phase, refreshTending, showResultToast]);
 
   // ---- Batch completion ----
   const tryFinalizeBatch = useCallback(async (batchId: string) => {
@@ -1949,6 +2067,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </View>
         {!isOnboarding && (
           <View style={styles.headerRight}>
+            {tendingEnabled && !isOnboarding && (
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => { hapticLight(); refreshTending(); setShowTendingModal(true); }}
+                accessibilityLabel={`Tend the pattern, ${getTendingLevelLabel(tendingLevel)}`}
+                accessibilityRole="button"
+              >
+                <Text style={styles.headerIconText}>{'✴'}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={() => { hapticLight(); setShowUtilityModal(true); }}
@@ -2010,6 +2138,63 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               >
                 <Text style={styles.utilityButtonText}>⚙️ Settings</Text>
               </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Tending Shrine modal — Phase 5 cosmetic amber sink */}
+      <Modal
+        visible={showTendingModal}
+        transparent
+        statusBarTranslucent
+        animationType="fade"
+        onRequestClose={() => setShowTendingModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.utilityOverlay}
+          activeOpacity={1}
+          onPress={() => setShowTendingModal(false)}
+          accessibilityLabel="Close tending"
+          accessibilityRole="button"
+        >
+          <View style={styles.tendingModal} onStartShouldSetResponder={() => true}>
+            <Text style={styles.tendingTitle}>{getTendingTitle()}</Text>
+            <Text style={styles.tendingDepth}>{getTendingLevelLabel(tendingLevel)}</Text>
+            <Text style={styles.tendingSubtitle}>{getTendingSubtitle(tendingLevel)}</Text>
+
+            {tendingNext && (
+              <>
+                <View style={styles.tendingCostRow}>
+                  <Text style={styles.tendingCostText}>
+                    {'💎'} {tendingNext.cost}
+                  </Text>
+                  {tendingNext.dailyBonusApplied && (
+                    <Text style={styles.tendingCostStrike}>{tendingNext.baseCost}</Text>
+                  )}
+                </View>
+                {tendingNext.dailyBonusApplied && (
+                  <Text style={styles.tendingBonusHint}>{getTendingDailyBonusHint()}</Text>
+                )}
+                <TouchableOpacity
+                  style={[
+                    styles.tendingButton,
+                    (tendingBusy || displayBalance < tendingNext.cost) && styles.tendingButtonDisabled,
+                  ]}
+                  disabled={tendingBusy || displayBalance < tendingNext.cost}
+                  onPress={handleDeepenPattern}
+                  accessibilityLabel={`${getTendingButtonLabel()} for ${tendingNext.cost} amber`}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: tendingBusy || displayBalance < tendingNext.cost }}
+                >
+                  <Text style={styles.tendingButtonText}>{getTendingButtonLabel()}</Text>
+                </TouchableOpacity>
+                {displayBalance < tendingNext.cost && (
+                  <Text style={styles.tendingInsufficient}>
+                    Earn more amber to deepen the pattern further.
+                  </Text>
+                )}
+              </>
             )}
           </View>
         </TouchableOpacity>
@@ -2213,6 +2398,90 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontSize: 15,
     fontWeight: '800',
+  },
+  // ---- Tending Shrine modal ----
+  tendingModal: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 36,
+    backgroundColor: 'rgba(18, 14, 32, 0.99)',
+    borderWidth: 1,
+    borderColor: 'rgba(180, 150, 220, 0.3)',
+  },
+  tendingTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: CandyColors.white,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  tendingDepth: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: 'rgba(206, 184, 232, 0.95)',
+    textAlign: 'center',
+    marginTop: 4,
+    letterSpacing: 1.5,
+  },
+  tendingSubtitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(225, 215, 240, 0.85)',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  tendingCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  tendingCostText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFD479',
+  },
+  tendingCostStrike: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: 'rgba(225, 215, 240, 0.5)',
+    textDecorationLine: 'line-through',
+  },
+  tendingBonusHint: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: 'rgba(180, 210, 170, 0.9)',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  tendingButton: {
+    marginTop: 18,
+    backgroundColor: 'rgba(120, 80, 180, 0.65)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(200, 170, 240, 0.45)',
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  tendingButtonDisabled: {
+    opacity: 0.45,
+  },
+  tendingButtonText: {
+    color: CandyColors.white,
+    fontSize: 17,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  tendingInsufficient: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: 'rgba(225, 215, 240, 0.6)',
+    textAlign: 'center',
+    marginTop: 12,
   },
   // ---- Pit glow (old single-oval style removed — now uses inline multi-layered glow) ----
   // ---- Content overlays ----
