@@ -7,11 +7,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * (Firebase, Supabase, custom server) is abstracted behind a CloudProvider
  * interface so it can be swapped later.
  *
- * Current state: Uses a NoOpProvider that logs operations but doesn't
- * actually sync. When a real backend is connected, swap the provider.
+ * Default: a NoOpProvider that logs operations but doesn't actually sync.
+ * When Supabase credentials are configured (app.json `extra`), App bootstrap
+ * calls installCloudProviderIfConfigured() to swap in SupabaseCloudProvider.
  *
  * Save data includes: amber, stats, phase, unlocks, achievements,
  * dialogue progress, quest progress, cosmetics, and sacrifice state.
+ *
+ * Auth-free identity: the cloud "owner" is the anonymous install id by
+ * default, overridable by a locally-stored recovery code so a player can
+ * restore progress on a new device without an account.
  */
 
 // ============================================================================
@@ -101,6 +106,11 @@ const SYNC_KEYS = [
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';
 const CURRENT_SAVE_VERSION = 1;
 
+/** Local override for the cloud owner id (set when linking a recovery code). */
+const CLOUD_OWNER_KEY = 'wordshift_cloud_owner';
+/** A populated progress key signals this install is NOT a fresh reinstall. */
+const FRESH_INSTALL_SENTINEL_KEY = 'wordshift_home_progress';
+
 // ============================================================================
 // No-Op Provider (placeholder until real backend is connected)
 // ============================================================================
@@ -121,6 +131,233 @@ class NoOpProvider implements CloudProvider {
     return 'Not Connected';
   }
   async isReady(): Promise<boolean> {
+    return false;
+  }
+}
+
+// ============================================================================
+// Supabase Cloud Provider (real backend, installed when configured)
+// ============================================================================
+
+/** Shape of a row in the `saves` table. */
+interface SaveRow {
+  owner: string;
+  version: number;
+  timestamp: number;
+  device_id: string;
+  payload: string;
+}
+
+/**
+ * Lazy-require the Supabase client with its real types preserved, so this
+ * module still loads in Node test environments (where expo-constants and the
+ * client's transitive deps may not resolve at import time).
+ */
+function sb(): typeof import('./supabaseClient') {
+  return require('./supabaseClient');
+}
+
+/**
+ * Resolve the stable cloud owner id for this install: a locally-stored
+ * recovery-code override if present, else the anonymous install id.
+ */
+export async function getCloudOwnerId(): Promise<string> {
+  try {
+    const override = await AsyncStorage.getItem(CLOUD_OWNER_KEY);
+    if (override && override.trim()) return override.trim();
+  } catch {}
+  return sb().getBackendIdentity();
+}
+
+class SupabaseCloudProvider implements CloudProvider {
+  async upload(data: CloudSaveData): Promise<boolean> {
+    const owner = await getCloudOwnerId();
+    const row = {
+      owner,
+      version: data.version,
+      timestamp: data.timestamp,
+      device_id: data.deviceId,
+      payload: JSON.stringify(data.data),
+    };
+    const result = await sb().sbInsert<SaveRow>('saves', row, {
+      upsert: true,
+      onConflict: 'owner',
+      returning: false,
+    });
+    return result !== null;
+  }
+
+  async download(): Promise<CloudSaveData | null> {
+    const owner = await getCloudOwnerId();
+    const rows = await sb().sbSelect<SaveRow>(
+      'saves',
+      `select=*&owner=eq.${encodeURIComponent(owner)}`,
+    );
+    if (!rows || rows.length === 0) return null;
+    // Reconstruct the newest row (defensive — owner is a unique key, but a
+    // stale duplicate should never win).
+    const newest = rows.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+    let parsed: Record<string, string> = {};
+    try {
+      const obj = JSON.parse(newest.payload);
+      if (obj && typeof obj === 'object') parsed = obj as Record<string, string>;
+    } catch {
+      return null;
+    }
+    return {
+      version: typeof newest.version === 'number' ? newest.version : CURRENT_SAVE_VERSION,
+      timestamp: typeof newest.timestamp === 'number' ? newest.timestamp : 0,
+      deviceId: typeof newest.device_id === 'string' ? newest.device_id : '',
+      data: parsed,
+    };
+  }
+
+  async hasNewerSave(localTimestamp: number): Promise<boolean> {
+    const owner = await getCloudOwnerId();
+    const rows = await sb().sbSelect<{ timestamp: number }>(
+      'saves',
+      `select=timestamp&owner=eq.${encodeURIComponent(owner)}`,
+    );
+    if (!rows || rows.length === 0) return false;
+    const remoteMax = rows.reduce((max, r) => (r.timestamp > max ? r.timestamp : max), 0);
+    return remoteMax > localTimestamp;
+  }
+
+  getName(): string {
+    return 'Supabase';
+  }
+
+  async isReady(): Promise<boolean> {
+    return sb().isSupabaseConfigured();
+  }
+}
+
+/**
+ * Install the real Supabase provider IFF credentials are configured. Safe to
+ * call unconditionally (a no-op when unconfigured — NoOp stays the default).
+ * Call once during App bootstrap.
+ */
+export function installCloudProviderIfConfigured(): void {
+  try {
+    if (sb().isSupabaseConfigured()) {
+      setCloudProvider(new SupabaseCloudProvider());
+    }
+  } catch {
+    // Never let provider installation break launch.
+  }
+}
+
+// ============================================================================
+// Recovery Code (auth-free cross-device restore)
+// ============================================================================
+
+// Crockford-style alphabet minus ambiguous chars (no 0/O, 1/I/L).
+const RECOVERY_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+
+/** Normalize user-entered codes: uppercase, strip non-alphanumerics. */
+function normalizeRecoveryCode(raw: string): string {
+  return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** Chunk an 8-char canonical body into the friendly WS-XXXX-XXXX form. */
+function formatRecoveryCode(body: string): string {
+  return `WS-${body.slice(0, 4)}-${body.slice(4, 8)}`;
+}
+
+/**
+ * Deterministically derive the canonical 8-char recovery BODY from an owner
+ * id. Idempotent: if `owner` is already a canonical 8-char body (e.g. it was
+ * itself produced here on a prior call), it is returned unchanged — so the
+ * displayed code never drifts across calls.
+ */
+function deriveRecoveryBody(owner: string): string {
+  const cleaned = normalizeRecoveryCode(owner);
+  if (cleaned.length === 8) return cleaned;
+  let base = cleaned;
+  if (base.length < 8) {
+    // Pad deterministically from a simple rolling hash of the owner.
+    let h = 0;
+    for (let i = 0; i < owner.length; i++) {
+      h = (h * 31 + owner.charCodeAt(i)) >>> 0;
+    }
+    let pad = '';
+    while (base.length + pad.length < 8) {
+      pad += RECOVERY_ALPHABET[h % RECOVERY_ALPHABET.length];
+      h = Math.floor(h / RECOVERY_ALPHABET.length) || ((h * 31 + 7) >>> 0);
+    }
+    base = base + pad;
+  }
+  return base.slice(0, 8);
+}
+
+/**
+ * Return a stable, human-friendly recovery code for this install, persisting
+ * the canonical 8-char body as the cloud owner so the code — and the cloud
+ * identity it represents — remain constant across calls and across reinstalls
+ * that link the same code. Showing this code lets the player restore on another
+ * device via linkRecoveryCode().
+ *
+ * Note: viewing the code locks in the canonical body as the owner. Because this
+ * is intended to run in App bootstrap (before any cloud write), the cloud
+ * identity stabilizes to the code body up front, so the code always addresses
+ * the same `saves` row.
+ */
+export async function getOrCreateRecoveryCode(): Promise<string> {
+  // If a canonical owner is already stored, the code is just its chunked form.
+  try {
+    const existing = await AsyncStorage.getItem(CLOUD_OWNER_KEY);
+    if (existing && existing.trim()) {
+      return formatRecoveryCode(deriveRecoveryBody(existing.trim()));
+    }
+  } catch {}
+
+  const owner = await getCloudOwnerId();
+  const body = deriveRecoveryBody(owner);
+  try {
+    await AsyncStorage.setItem(CLOUD_OWNER_KEY, body);
+  } catch {}
+  return formatRecoveryCode(body);
+}
+
+/**
+ * Link a recovery code entered by the player: validate/normalize and store it
+ * as the cloud owner override, so subsequent owner resolution uses it. After
+ * linking, call downloadFromCloud() (or maybeAutoRestoreOnFreshInstall) to pull
+ * the linked save. Returns false for clearly-invalid input.
+ */
+export async function linkRecoveryCode(code: string): Promise<boolean> {
+  const canonical = normalizeRecoveryCode(code);
+  if (canonical.length < 8) return false;
+  try {
+    await AsyncStorage.setItem(CLOUD_OWNER_KEY, canonical);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * On a fresh install (no local progress) with cloud configured, pull down a
+ * cloud save for this owner if one exists. Returns whether a restore happened.
+ * Call from App bootstrap before MainApp mounts. Never throws.
+ */
+export async function maybeAutoRestoreOnFreshInstall(): Promise<boolean> {
+  try {
+    if (!sb().isSupabaseConfigured()) return false;
+
+    // Only auto-restore when local progress looks empty.
+    const local = await AsyncStorage.getItem(FRESH_INSTALL_SENTINEL_KEY);
+    if (local && local.trim()) return false;
+
+    const cloudData = await provider.download();
+    if (!cloudData) return false;
+
+    const restored = await restoreFromCloudData(cloudData);
+    if (restored) {
+      await updateSyncStatus(true);
+    }
+    return restored;
+  } catch {
     return false;
   }
 }
@@ -303,5 +540,6 @@ export async function clearSyncStatus(): Promise<void> {
   try {
     await AsyncStorage.removeItem(SYNC_STATUS_KEY);
     await AsyncStorage.removeItem('wordshift_device_id');
+    await AsyncStorage.removeItem(CLOUD_OWNER_KEY);
   } catch {}
 }
