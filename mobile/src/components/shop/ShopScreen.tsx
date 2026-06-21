@@ -31,12 +31,15 @@ import {
   getShopPatronLockedLabel,
 } from '../../services/phaseNarrative';
 import { hapticLight, hapticMedium } from '../../services/haptics';
+import { isPatronSync } from '../../services/entitlements';
 
 interface ShopScreenProps {
   phase: number;
   amberBalance: number;
   onClose: () => void;
   onAmberChange?: (newBalance: number) => void;
+  /** Open the Patron (cosmetic IAP) modal. */
+  onOpenPatron?: () => void;
 }
 
 const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
@@ -80,6 +83,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   amberBalance,
   onClose,
   onAmberChange,
+  onOpenPatron,
 }) => {
   const isDark = phase >= 3;
   const bgColor = isDark ? '#0A0A14' : '#1A1030';
@@ -300,6 +304,17 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
         ) : (
           <>
+            {onOpenPatron && !isPatronSync() && (
+              <TouchableOpacity
+                style={styles.patronBanner}
+                onPress={() => { hapticLight(); onOpenPatron(); }}
+                accessibilityLabel="Become a Patron"
+                accessibilityRole="button"
+              >
+                <Text style={styles.patronBannerTitle}>{'✦'} Become a Patron</Text>
+                <Text style={styles.patronBannerSub}>Support WordShift — a small amber bonus + an exclusive gold tile set</Text>
+              </TouchableOpacity>
+            )}
             {renderSection(
               'tile_theme',
               getShopThemeSectionLabel(phase),
@@ -350,6 +365,17 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   amberPillText: { color: '#FFD479', fontSize: 15, fontWeight: '900' },
+  patronBanner: {
+    backgroundColor: 'rgba(139, 105, 20, 0.18)',
+    borderColor: 'rgba(255, 212, 121, 0.55)',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 18,
+  },
+  patronBannerTitle: { color: '#FFD479', fontSize: 16, fontWeight: '900', marginBottom: 3 },
+  patronBannerSub: { color: 'rgba(220, 200, 240, 0.85)', fontSize: 12.5, fontWeight: '600' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
   loading: { paddingTop: 80, alignItems: 'center' },

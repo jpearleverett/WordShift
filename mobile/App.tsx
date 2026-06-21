@@ -46,6 +46,7 @@ import {
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
+import { PatronModal } from './src/components/monetization/PatronModal';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
@@ -211,6 +212,8 @@ function MainApp() {
   const pitResumeCheckedRef = useRef(false);
   const freeFreezeCheckedRef = useRef(false);
   const dailyLoginCheckedRef = useRef(false);
+  // Patron (cosmetic IAP) modal — opened from Shop header / Settings
+  const [showPatronModal, setShowPatronModal] = useState(false);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
@@ -1442,6 +1445,7 @@ function MainApp() {
             amberBalance={persistence.amberBalance}
             onClose={() => transitionTo('home')}
             onAmberChange={(newBalance) => persistenceActions.setAmberBalance(newBalance)}
+            onOpenPatron={() => setShowPatronModal(true)}
           />
         </View>
       );
@@ -2168,6 +2172,12 @@ function MainApp() {
         grant={dailyLoginGrant}
         phase={persistence.currentPhase}
         onClose={() => setDailyLoginGrant(null)}
+      />
+      <PatronModal
+        visible={showPatronModal}
+        phase={persistence.currentPhase}
+        onClose={() => setShowPatronModal(false)}
+        onPatronChange={(isPatron) => { if (isPatron) persistenceActions.refreshStats(); }}
       />
     </View>
   );
