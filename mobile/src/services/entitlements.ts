@@ -1,16 +1,14 @@
 /**
  * Entitlements — the app's single source of truth for "what has this player paid for".
  *
- * This is a thin, native-free persistence layer. The actual billing (RevenueCat /
- * StoreKit / Play Billing) lives behind the `BillingProvider` interface in `iap.ts`;
- * after a verified purchase or restore, `iap.ts` writes the granted entitlement keys
- * here. The rest of the app reads entitlement state from THIS module only, so UI and
- * gameplay code never import store SDK types.
+ * This is a thin, native-free persistence layer. Billing lives behind the
+ * `BillingProvider` interface in `iap.ts`; after a verified purchase or restore,
+ * `iap.ts` writes the granted entitlement keys here. The rest of the app reads
+ * entitlement state from THIS module only, so UI and gameplay code never import
+ * store SDK types.
  *
  * Mirrors the AsyncStorage in-memory-cache pattern used across the codebase
  * (roomUpgrades.ts, wordHarvest.ts). Safe to run in Expo Go — nothing native is imported.
- *
- * See docs/MONETIZATION_F2P_IMPLEMENTATION.md.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';

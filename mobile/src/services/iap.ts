@@ -1,20 +1,14 @@
 /**
  * In-app purchase layer (scaffold).
  *
- * The real billing SDK (RevenueCat `react-native-purchases` is the documented
- * choice) is a NATIVE module and would break Expo Go, so it is abstracted behind
- * a `BillingProvider` interface — exactly like `cloudSave.ts` abstracts the cloud
- * backend behind `CloudProvider`. Until a real provider is wired via
- * `setBillingProvider()`, a `NoOpBillingProvider` is used: the app builds, runs in
- * Expo Go, and is fully unit-testable; purchases simply fail cleanly.
+ * A real billing SDK is a NATIVE module and would break Expo Go, so it is
+ * abstracted behind a `BillingProvider` interface — exactly like `cloudSave.ts`
+ * abstracts the cloud backend behind `CloudProvider`. The active provider is a
+ * `NoOpBillingProvider`: the app builds, runs in Expo Go, and is fully
+ * unit-testable; purchases simply fail cleanly.
  *
  * On a verified purchase/restore, this module translates products → entitlement
  * keys and writes them to `entitlements.ts`, which is what the rest of the app reads.
- *
- * To go live (see docs/MONETIZATION_F2P_IMPLEMENTATION.md §2.1 / §4.0):
- *   1. `npm i react-native-purchases`, add its config plugin, move to EAS Dev Client.
- *   2. Implement a `RevenueCatBillingProvider implements BillingProvider`.
- *   3. Call `setBillingProvider(new RevenueCatBillingProvider(apiKey))` in initIAP().
  */
 
 import {

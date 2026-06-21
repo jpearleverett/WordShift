@@ -71,7 +71,7 @@ export const FIRST_COMPLETION_BONUS: { EASY: number; MEDIUM: number; MEDIUM_PLUS
 export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
 
 // ============================================================================
-// MONETIZATION (scaffold — see docs/MONETIZATION_F2P_IMPLEMENTATION.md)
+// MONETIZATION (scaffold — inert behind NoOp providers)
 // ============================================================================
 
 /**

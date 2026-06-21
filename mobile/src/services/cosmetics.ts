@@ -1,17 +1,16 @@
 /**
- * Cosmetics — owned/equipped cosmetic state (scaffold).
+ * Cosmetics — owned/equipped cosmetic state.
  *
- * Pure data layer for the cosmetic shop (tile themes, confetti, room accents).
+ * Pure data layer for the cosmetic shop (tile themes, confetti palettes).
  * Ownership comes from two sources:
  *   - amber purchases (spent via amberCurrency.spendAmber, recorded here locally), and
- *   - IAP purchases (recorded as entitlements in entitlements.ts).
+ *   - entitlement grants (recorded in entitlements.ts).
  * `ownsCosmetic()` checks both. Mirrors the roomUpgrades.ts cache pattern; native-free.
  *
- * NOTE (scaffold scope): this module tracks ownership + the equipped selection.
- * Wiring the *equipped* tile theme into rendering (theme/colors.ts `getTileColor()` /
- * LetterTile.tsx) and building ShopScreen.tsx are the remaining steps — see
- * docs/MONETIZATION_F2P_IMPLEMENTATION.md §4.5. All themes must stay phase-aware so a
- * purchased theme still darkens with the story (the tone contract).
+ * The equipped tile theme is pushed into theme/colors.ts via `setEquippedTileTheme()`
+ * and resolved synchronously in `getTileColor()`; ShopScreen.tsx is the player-facing
+ * surface. All themes stay phase-aware so a purchased theme still darkens with the
+ * story (the tone contract).
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
