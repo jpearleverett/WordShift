@@ -41,6 +41,7 @@ export interface VictoryData {
   amberEarned: number;
   streakBonus: number;
   challengeBonus: number;
+  surpriseBonus?: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
   firstCompletionBonus?: number;
@@ -458,6 +459,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 ? Math.floor(baseAmber * 0.25)
                 : 0;
               const challengeBonusAmber = victoryData.challengeBonus ?? 0;
+              const surpriseBonusAmber = victoryData.surpriseBonus ?? 0;
               const variantBonusAmber = victoryData.variantBonus ?? 0;
               const streakBonusAmber = victoryData.streakBonus ?? 0;
               const firstCompBonus = victoryData.firstCompletionBonus ?? 0;
@@ -504,6 +506,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
                             <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>+{challengeBonusAmber}</Text>
+                          </View>
+                        )}
+                        {surpriseBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'✨'} Lucky Find
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+{surpriseBonusAmber}</Text>
                           </View>
                         )}
                         {variantBonusAmber > 0 && variant && variant !== 'standard' && (

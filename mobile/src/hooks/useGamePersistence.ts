@@ -35,6 +35,8 @@ export interface VictoryData {
   newPhase: DialoguePhase;
   streakBonus: number;
   challengeBonus: number;
+  /** Variable-ratio "lucky" surprise bonus (0 when none); reward-only, never phase progress */
+  surpriseBonus: number;
   currentStreak: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
@@ -163,6 +165,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         newPhase: currentPhase,
         streakBonus: 0,
         challengeBonus: 0,
+        surpriseBonus: 0,
         currentStreak: 0,
         milestoneBonus: 0,
         milestoneMessage: null,
@@ -330,6 +333,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         newPhase: effectivePhase,
         streakBonus: amberResult.streakBonus,
         challengeBonus: amberResult.challengeBonus,
+        surpriseBonus: amberResult.surpriseBonus,
         currentStreak: amberResult.currentStreak,
         milestoneBonus: amberResult.milestoneBonus,
         milestoneMessage: amberResult.milestoneMessage,
@@ -363,6 +367,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         newPhase: currentPhase,
         streakBonus: 0,
         challengeBonus: 0,
+        surpriseBonus: 0,
         currentStreak: 0,
         milestoneBonus: 0,
         milestoneMessage: null,
