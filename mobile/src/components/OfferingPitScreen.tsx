@@ -50,7 +50,7 @@ import {
   getTendingIntensity,
   NextTendingInfo,
 } from '../services/tending';
-import { updateQuestProgress } from '../services/weeklyQuests';
+import { updateQuestProgress, Quest } from '../services/weeklyQuests';
 import {
   getHarvestState,
   offerBatch,
@@ -653,6 +653,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const [tendingLevel, setTendingLevel] = useState(0);
   const [tendingNext, setTendingNext] = useState<NextTendingInfo | null>(null);
   const [tendingBusy, setTendingBusy] = useState(false);
+  // Pending ceremony/result toast timers, tracked so they're cleared on unmount.
+  const tendTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
@@ -682,7 +684,14 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const harvestStateRef = useRef(harvestState);
   const amberBalanceRef = useRef(amberBalance);
 
-  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      tendTimersRef.current.forEach(clearTimeout);
+      tendTimersRef.current = [];
+    };
+  }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
   useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
   useEffect(() => { amberBalanceRef.current = amberBalance; }, [amberBalance]);
@@ -1417,28 +1426,43 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         onAmberChange?.(spend.newBalance);
       }
       const result = await applyTend(cost);
-      // A tend quest is deliberately a sink disguised as a quest — record the amount.
-      updateQuestProgress({ amberTended: cost }, phase).catch(() => {});
+      // A tend quest is deliberately a sink disguised as a quest — record the
+      // amount and surface any quest that completes (so it's not silent).
+      let completedQuests: Quest[] = [];
+      try {
+        completedQuests = await updateQuestProgress({ amberTended: cost }, phase);
+      } catch { /* quest tracking is best-effort */ }
       logEvent({ type: 'pit_offer', data: { tending: result.level, amber: cost } });
       await refreshTending();
       if (!mountedRef.current) return;
 
+      // Schedule a toast on a tracked timer (cleared on unmount).
+      const schedule = (msg: string, delay: number, heavy = false) => {
+        const t = setTimeout(() => {
+          if (!mountedRef.current) return;
+          if (heavy) hapticHeavy(); else hapticMedium();
+          showResultToast(msg);
+        }, delay);
+        tendTimersRef.current.push(t);
+      };
+
+      let nextDelay = 0;
       if (result.milestone != null) {
         // Milestone: close the modal and sequence the serene ceremony lines.
         setShowTendingModal(false);
         hapticHeavy();
         const lines = getTendingMilestoneCeremonyText(result.milestone);
-        lines.forEach((line, i) => {
-          setTimeout(() => {
-            if (mountedRef.current) {
-              hapticMedium();
-              showResultToast(line);
-            }
-          }, i * 2600);
-        });
+        lines.forEach((line, i) => schedule(line, i * 2600, i === 0));
+        nextDelay = lines.length * 2600;
       } else {
         hapticMedium();
         showResultToast(getTendingResultMessage(result.level));
+        nextDelay = 2700;
+      }
+
+      // Quest-completion feedback after the result/ceremony settles.
+      if (completedQuests.length > 0) {
+        schedule(`Quest complete: ${completedQuests[0].title}`, nextDelay);
       }
     } finally {
       if (mountedRef.current) setTendingBusy(false);

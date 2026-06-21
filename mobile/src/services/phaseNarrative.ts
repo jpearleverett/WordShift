@@ -2298,10 +2298,20 @@ export function getShopThemeSectionLabel(phase: number): string {
   return 'TILE THEMES';
 }
 
+export function getShopConfettiSectionLabel(phase: number): string {
+  if (phase >= 3) return 'CELEBRATION';
+  return 'CONFETTI';
+}
+
 /** Label for the "no theme / default" option. */
 export function getShopDefaultThemeName(phase: number): string {
   if (phase >= 3) return 'Unadorned';
   return 'Candy (default)';
+}
+
+export function getShopDefaultConfettiName(phase: number): string {
+  if (phase >= 3) return 'Unadorned';
+  return 'Classic (default)';
 }
 
 /** Locked-because-Patron note for entitlement-only cosmetics. */

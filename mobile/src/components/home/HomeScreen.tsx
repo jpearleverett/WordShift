@@ -1265,19 +1265,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📜 {getGalleryTitle(progress.currentPhase)}</Text>
               </TouchableOpacity>
             )}
-            {onOpenShop && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
-                onPress={() => {
-                  setShowJournalModal(false);
-                  onOpenShop?.();
-                }}
-                accessibilityLabel={`Open ${getShopTitle(progress.currentPhase)}`}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>✨ {getShopTitle(progress.currentPhase)}</Text>
-              </TouchableOpacity>
-            )}
             {!!weeklyQuestState && (
               <TouchableOpacity
                 style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
@@ -1343,6 +1330,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📊 Statistics</Text>
+              </TouchableOpacity>
+            )}
+            {onOpenShop && (
+              <TouchableOpacity
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onOpenShop?.();
+                }}
+                accessibilityLabel={`Open ${getShopTitle(progress.currentPhase)}`}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>✨ {getShopTitle(progress.currentPhase)}</Text>
               </TouchableOpacity>
             )}
             {onOpenSettings && (

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { getSettingsSync } from '../services/settings';
-import { getPhaseTheme } from '../theme/colors';
+import { getPhaseTheme, CONFETTI_THEMES } from '../theme/colors';
 import { getMaxConfettiCount } from '../services/deviceTier';
+import { getEquippedSync } from '../services/cosmetics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -148,7 +149,13 @@ export const Confetti: React.FC<ConfettiProps> = ({ active, onComplete, phase = 
       const baseCount = getMaxConfettiCount();
       // Scale confetti density with ritual energy
       const energyBonus = ritualEnergy >= 7 ? Math.floor(baseCount * 0.4) : ritualEnergy >= 4 ? Math.floor(baseCount * 0.2) : 0;
-      setPieces(generateConfetti(baseCount + energyBonus, theme.confettiColors));
+      // An equipped cosmetic confetti palette overrides the phase default (pure
+      // expression); with none equipped the confetti stays phase-aware.
+      const equippedConfetti = getEquippedSync('confetti');
+      const confettiColors = equippedConfetti && CONFETTI_THEMES[equippedConfetti]
+        ? CONFETTI_THEMES[equippedConfetti]
+        : theme.confettiColors;
+      setPieces(generateConfetti(baseCount + energyBonus, confettiColors));
       // Max animation time: up to 500ms delay + 3500ms fall = 4000ms
       const timeout = setTimeout(() => {
         onComplete?.();

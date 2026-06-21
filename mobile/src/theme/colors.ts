@@ -167,6 +167,16 @@ export const TILE_THEMES: Record<string, TilePalette> = {
   ],
 };
 
+// Cosmetic confetti palettes (Cosmetic Shop). When one is equipped it replaces
+// the phase-default confetti colors (pure expression); with none equipped the
+// confetti stays phase-aware (darkens with the story) as before. Tuned to read
+// tastefully across phases rather than garish.
+export const CONFETTI_THEMES: Record<string, string[]> = {
+  confetti_gold: ['#FFD479', '#F5C04D', '#FFE6A8', '#E8B44A', '#FFCB6B', '#FFFFFF'],
+  confetti_dusk: ['#9B7FCF', '#6B5B8A', '#C3A6E0', '#7E6BA8', '#B49AD8', '#E8DCF5'],
+  confetti_ember: ['#FF8A5B', '#E8543A', '#FFB259', '#D94F3D', '#FF7E79', '#FFD0A0'],
+};
+
 // The equipped tile theme id is pushed in from cosmetics.ts (registration pattern
 // keeps this low-level theme module free of any service/AsyncStorage imports, so
 // there is no import cycle and `getTileColor` stays a cheap synchronous lookup).

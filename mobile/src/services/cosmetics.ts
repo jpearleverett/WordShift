@@ -77,6 +77,28 @@ export const COSMETICS: CosmeticItem[] = [
     description: 'An exclusive amber-and-gold tile set, yours as a Patron.',
     acquisition: { kind: 'entitlement', entitlement: ENTITLEMENTS.PATRON },
   },
+  // Amber-bought confetti palettes. IDs match CONFETTI_THEMES in theme/colors.ts.
+  {
+    id: 'confetti_gold',
+    category: 'confetti',
+    name: 'Golden Fall',
+    description: 'Victory falls in warm amber and gold.',
+    acquisition: { kind: 'amber', cost: 250 },
+  },
+  {
+    id: 'confetti_dusk',
+    category: 'confetti',
+    name: 'Dusk Drift',
+    description: 'A drift of mauve and violet for the deepening evening.',
+    acquisition: { kind: 'amber', cost: 350 },
+  },
+  {
+    id: 'confetti_ember',
+    category: 'confetti',
+    name: 'Ember Rain',
+    description: 'Embers raining upward, to match a kept fire.',
+    acquisition: { kind: 'amber', cost: 350 },
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import { CandyColors, TILE_THEMES } from '../../theme/colors';
+import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
 import {
   getCosmeticsByCategory,
   ownsCosmetic,
@@ -18,6 +18,7 @@ import {
   unequipCosmetic,
   getEquipped,
   CosmeticItem,
+  CosmeticCategory,
 } from '../../services/cosmetics';
 import { spendAmber } from '../../services/amberCurrency';
 import {
@@ -25,6 +26,8 @@ import {
   getShopSubtitle,
   getShopThemeSectionLabel,
   getShopDefaultThemeName,
+  getShopConfettiSectionLabel,
+  getShopDefaultConfettiName,
   getShopPatronLockedLabel,
 } from '../../services/phaseNarrative';
 import { hapticLight, hapticMedium } from '../../services/haptics';
@@ -38,7 +41,7 @@ interface ShopScreenProps {
 
 const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
 
-/** A small row of tiles previewing a palette. */
+/** A small row of tiles previewing a tile palette. */
 const ThemePreview: React.FC<{ themeId: string | null }> = ({ themeId }) => {
   const palette = themeId && TILE_THEMES[themeId] ? TILE_THEMES[themeId] : CandyColors.tileColors;
   return (
@@ -58,6 +61,20 @@ const ThemePreview: React.FC<{ themeId: string | null }> = ({ themeId }) => {
   );
 };
 
+const DEFAULT_CONFETTI = ['#FF6B9D', '#C44DFF', '#4DAFFF', '#FFD84D', '#4DE8C2', '#FF8C4D'];
+
+/** A small scatter of dots previewing a confetti palette. */
+const ConfettiPreview: React.FC<{ themeId: string | null }> = ({ themeId }) => {
+  const palette = themeId && CONFETTI_THEMES[themeId] ? CONFETTI_THEMES[themeId] : DEFAULT_CONFETTI;
+  return (
+    <View style={styles.previewConfetti}>
+      {[0, 1, 2, 3, 4, 5].map(i => (
+        <View key={i} style={[styles.previewDot, { backgroundColor: palette[i % palette.length] }]} />
+      ))}
+    </View>
+  );
+};
+
 export const ShopScreen: React.FC<ShopScreenProps> = ({
   phase,
   amberBalance,
@@ -73,20 +90,25 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   const [balance, setBalance] = useState(amberBalance);
   const [owned, setOwned] = useState<Record<string, boolean>>({});
-  const [equipped, setEquipped] = useState<string | undefined>(undefined);
+  const [equipped, setEquipped] = useState<Partial<Record<CosmeticCategory, string>>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const themes = getCosmeticsByCategory('tile_theme');
+  const tileThemes = useMemo(() => getCosmeticsByCategory('tile_theme'), []);
+  const confettiThemes = useMemo(() => getCosmeticsByCategory('confetti'), []);
+  const allItems = useMemo(() => [...tileThemes, ...confettiThemes], [tileThemes, confettiThemes]);
 
   const refresh = useCallback(async () => {
     const ownedEntries = await Promise.all(
-      themes.map(async t => [t.id, await ownsCosmetic(t.id)] as const)
+      allItems.map(async t => [t.id, await ownsCosmetic(t.id)] as const)
     );
-    const eq = await getEquipped('tile_theme');
+    const [tile, confetti] = await Promise.all([
+      getEquipped('tile_theme'),
+      getEquipped('confetti'),
+    ]);
     setOwned(Object.fromEntries(ownedEntries));
-    setEquipped(eq);
-  }, [themes]);
+    setEquipped({ tile_theme: tile, confetti });
+  }, [allItems]);
 
   useEffect(() => {
     (async () => {
@@ -128,11 +150,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     }
   }, [busy, refresh]);
 
-  const handleEquipDefault = useCallback(async () => {
+  const handleEquipDefault = useCallback(async (category: CosmeticCategory) => {
     if (busy) return;
-    setBusy('__default__');
+    setBusy(`__default_${category}__`);
     try {
-      await unequipCosmetic('tile_theme');
+      await unequipCosmetic(category);
       hapticLight();
       await refresh();
     } finally {
@@ -142,7 +164,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   const renderActionButton = (item: CosmeticItem) => {
     const isOwned = owned[item.id];
-    const isEquipped = equipped === item.id;
+    const isEquipped = equipped[item.category] === item.id;
     if (isEquipped) {
       return (
         <View style={[styles.actionBtn, styles.actionEquipped]}>
@@ -187,7 +209,61 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     );
   };
 
-  const defaultEquipped = equipped === undefined;
+  const renderSection = (
+    category: CosmeticCategory,
+    sectionLabel: string,
+    defaultName: string,
+    defaultDesc: string,
+    items: CosmeticItem[],
+    Preview: React.FC<{ themeId: string | null }>,
+  ) => {
+    const defaultEquipped = equipped[category] === undefined;
+    return (
+      <View key={category}>
+        <Text style={[styles.sectionLabel, { color: textColor }]}>{sectionLabel}</Text>
+
+        {/* Default (free) option */}
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <Preview themeId={null} />
+          <View style={styles.cardBody}>
+            <Text style={[styles.cardName, { color: headerColor }]}>{defaultName}</Text>
+            <Text style={[styles.cardDesc, { color: textColor }]}>{defaultDesc}</Text>
+          </View>
+          {defaultEquipped ? (
+            <View style={[styles.actionBtn, styles.actionEquipped]}>
+              <Text style={styles.actionEquippedText}>Equipped ✓</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionEquip]}
+              onPress={() => handleEquipDefault(category)}
+              disabled={busy != null}
+              accessibilityRole="button"
+              accessibilityLabel={`Equip ${defaultName}`}
+            >
+              <Text style={styles.actionEquipText}>Equip</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {items.map(item => (
+          <View
+            key={item.id}
+            style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}
+          >
+            <Preview themeId={item.id} />
+            <View style={styles.cardBody}>
+              <Text style={[styles.cardName, { color: headerColor }]}>{item.name}</Text>
+              <Text style={[styles.cardDesc, { color: textColor }]} numberOfLines={2}>
+                {item.description}
+              </Text>
+            </View>
+            {renderActionButton(item)}
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
@@ -224,56 +300,25 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
         ) : (
           <>
-            <Text style={[styles.sectionLabel, { color: textColor }]}>
-              {getShopThemeSectionLabel(phase)}
-            </Text>
-
-            {/* Default (free) option */}
-            <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
-              <ThemePreview themeId={null} />
-              <View style={styles.cardBody}>
-                <Text style={[styles.cardName, { color: headerColor }]}>
-                  {getShopDefaultThemeName(phase)}
-                </Text>
-                <Text style={[styles.cardDesc, { color: textColor }]}>
-                  The original candy tiles.
-                </Text>
-              </View>
-              {defaultEquipped ? (
-                <View style={[styles.actionBtn, styles.actionEquipped]}>
-                  <Text style={styles.actionEquippedText}>Equipped ✓</Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.actionEquip]}
-                  onPress={handleEquipDefault}
-                  disabled={busy != null}
-                  accessibilityRole="button"
-                  accessibilityLabel="Equip default tiles"
-                >
-                  <Text style={styles.actionEquipText}>Equip</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {themes.map(item => (
-              <View
-                key={item.id}
-                style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}
-              >
-                <ThemePreview themeId={item.id} />
-                <View style={styles.cardBody}>
-                  <Text style={[styles.cardName, { color: headerColor }]}>{item.name}</Text>
-                  <Text style={[styles.cardDesc, { color: textColor }]} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                </View>
-                {renderActionButton(item)}
-              </View>
-            ))}
+            {renderSection(
+              'tile_theme',
+              getShopThemeSectionLabel(phase),
+              getShopDefaultThemeName(phase),
+              'The original candy tiles.',
+              tileThemes,
+              ThemePreview,
+            )}
+            {renderSection(
+              'confetti',
+              getShopConfettiSectionLabel(phase),
+              getShopDefaultConfettiName(phase),
+              'The usual phase-aware celebration.',
+              confettiThemes,
+              ConfettiPreview,
+            )}
 
             <Text style={[styles.footnote, { color: textColor }]}>
-              Themes are for expression only — they never change the puzzle, the
+              Cosmetics are for expression only — they never change the puzzle, the
               story, or your progress.
             </Text>
           </>
@@ -336,6 +381,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   previewTileText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  previewConfetti: {
+    width: 96,
+    height: 52,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignContent: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  previewDot: { width: 12, height: 12, borderRadius: 3 },
   actionBtn: {
     minWidth: 76,
     paddingHorizontal: 12,

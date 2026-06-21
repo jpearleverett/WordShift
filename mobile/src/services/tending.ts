@@ -167,7 +167,11 @@ export function selectPhase5Dialogue(
   if (caughtUp < pool.length) {
     return { text: pool[caughtUp], isNew: true, nextCaughtUp: caughtUp + 1 };
   }
-  const perm = seededPermutation(pool.length, seed);
+  // Caught up — serve re-reads in a deterministic shuffled order. The permutation
+  // is re-seeded per full cycle (seed + cycle index), so a deep re-reader doesn't
+  // settle into one repeating sequence: each pass through the pool is reshuffled.
+  const cycle = Math.floor(deliveredIndex / pool.length);
+  const perm = seededPermutation(pool.length, (seed + cycle) >>> 0);
   const idx = perm[((deliveredIndex % pool.length) + pool.length) % pool.length];
   return { text: pool[idx], isNew: false, nextCaughtUp: caughtUp };
 }

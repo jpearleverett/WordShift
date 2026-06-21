@@ -222,6 +222,20 @@ describe('selectPhase5Dialogue (pure)', () => {
     expect(seen).not.toEqual(pool);
   });
 
+  it('reshuffles each re-read cycle (no single repeating sequence)', () => {
+    // Use a realistic pool size (the Phase-5 pool is ~10-16 lines).
+    const big = Array.from({ length: 12 }, (_, i) => `L${i}`);
+    const seed = hashSeed('owl');
+    const cycleOf = (c: number) =>
+      Array.from({ length: big.length }, (_, i) =>
+        selectPhase5Dialogue(big, big.length, c * big.length + i, seed).text
+      ).join('|');
+    // Each cycle is a full permutation; across several cycles there is more than
+    // one distinct ordering (it doesn't settle into a single repeating sequence).
+    const orderings = new Set([0, 1, 2, 3].map(cycleOf));
+    expect(orderings.size).toBeGreaterThan(1);
+  });
+
   it('surfaces a newly-grown pool entry as the next new line', () => {
     // Caught up to 4; pool grows to 5 (a Tending milestone line appended).
     const grown = [...pool, 'e'];

@@ -48,6 +48,7 @@ import {
   getEquippedTileTheme,
   setEquippedTileTheme,
   TILE_THEMES,
+  CONFETTI_THEMES,
 } from '../theme/colors';
 import { REWARDED_DAILY_CAP } from '../constants/gameBalance';
 
@@ -310,5 +311,21 @@ describe('cosmetics', () => {
     expect(getEquippedTileTheme()).toBeNull();
     await initCosmetics();
     expect(getEquippedTileTheme()).toBe('theme_ember');
+  });
+
+  it('supports an independent confetti category (buy/equip + sync)', async () => {
+    expect(getEquippedSync('confetti')).toBeUndefined();
+    expect(await ownsCosmetic('confetti_gold')).toBe(false);
+    expect(await recordAmberCosmeticPurchase('confetti_gold')).toBe(true);
+    expect(await equipCosmetic('confetti_gold')).toBe(true);
+    expect(await getEquipped('confetti')).toBe('confetti_gold');
+    expect(getEquippedSync('confetti')).toBe('confetti_gold');
+    // Equipping confetti does not touch the tile-theme selection.
+    expect(getEquippedSync('tile_theme')).toBeUndefined();
+  });
+
+  it('every amber confetti theme has a matching palette in CONFETTI_THEMES', () => {
+    COSMETICS.filter(c => c.category === 'confetti' && c.acquisition.kind === 'amber')
+      .forEach(c => expect(CONFETTI_THEMES[c.id]).toBeDefined());
   });
 });
