@@ -1,0 +1,159 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Mutable expo-config extra so we can toggle configured/unconfigured per test.
+let mockExtra: Record<string, unknown> = {};
+jest.mock('expo-constants', () => ({
+  default: {
+    get expoConfig() {
+      return { extra: mockExtra, version: '1.0.0' };
+    },
+  },
+}));
+
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+);
+
+import {
+  recordPuzzleContribution,
+  getAggregateProof,
+  getWordsOfferedText,
+  getActiveSeekersText,
+} from '../services/socialProof';
+
+const CONFIGURED = {
+  supabaseUrl: 'https://x.supabase.co',
+  supabaseAnonKey: 'anon-key',
+};
+
+function okJson(body: unknown) {
+  return { ok: true, status: 200, json: async () => body };
+}
+
+describe('socialProof', () => {
+  beforeEach(() => {
+    (AsyncStorage.clear as jest.Mock)();
+    mockExtra = {};
+    (global as Record<string, unknown>).fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    delete (global as Record<string, unknown>).fetch;
+  });
+
+  describe('unconfigured: full no-op, no network', () => {
+    test('recordPuzzleContribution returns null and never fetches', async () => {
+      expect(await recordPuzzleContribution(5)).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    test('getAggregateProof returns null and never fetches', async () => {
+      expect(await getAggregateProof()).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('configured', () => {
+    beforeEach(() => {
+      mockExtra = { ...CONFIGURED };
+    });
+
+    test('recordPuzzleContribution bumps the counter via RPC', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(okJson(12408));
+      const total = await recordPuzzleContribution(7);
+      expect(total).toBe(12408);
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toContain('/rest/v1/rpc/bump_words_offered');
+      const sent = JSON.parse(init.body);
+      expect(sent.p_count).toBe(7);
+      expect(typeof sent.p_date).toBe('string');
+    });
+
+    test('recordPuzzleContribution accepts an object {words_offered} result', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(okJson({ words_offered: 99 }));
+      expect(await recordPuzzleContribution(3)).toBe(99);
+    });
+
+    test('recordPuzzleContribution is a no-op for non-positive counts', async () => {
+      expect(await recordPuzzleContribution(0)).toBeNull();
+      expect(await recordPuzzleContribution(-4)).toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    test('getAggregateProof reads the RPC result', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        okJson({ wordsOfferedToday: 12408, activeSeekers: 642 })
+      );
+      const proof = await getAggregateProof();
+      expect(proof).toEqual({ wordsOfferedToday: 12408, activeSeekers: 642 });
+      const [url] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toContain('/rest/v1/rpc/aggregate_proof');
+      // RPC succeeded → no fallback select.
+      expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
+    });
+
+    test('getAggregateProof falls back to selecting the counters row', async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(okJson(null)) // RPC empty
+        .mockResolvedValueOnce(
+          okJson([{ date: 'd', words_offered: 5000, active_seekers: 300 }])
+        );
+      const proof = await getAggregateProof();
+      expect(proof).toEqual({ wordsOfferedToday: 5000, activeSeekers: 300 });
+      const secondUrl = (global.fetch as jest.Mock).mock.calls[1][0];
+      expect(secondUrl).toContain('/rest/v1/daily_counters');
+    });
+
+    test('getAggregateProof returns null when there is no data', async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(okJson(null))
+        .mockResolvedValueOnce(okJson([]));
+      expect(await getAggregateProof()).toBeNull();
+    });
+
+    test('getAggregateProof tolerates a missing active_seekers field', async () => {
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(okJson(null))
+        .mockResolvedValueOnce(okJson([{ date: 'd', words_offered: 10 }]));
+      const proof = await getAggregateProof();
+      expect(proof).toEqual({ wordsOfferedToday: 10, activeSeekers: 0 });
+    });
+  });
+
+  describe('getWordsOfferedText (phase-aware, spoiler-safe)', () => {
+    test('bright phases are plain & friendly with thousands separators', () => {
+      expect(getWordsOfferedText(12408, 0)).toBe('12,408 words shared by players today');
+      expect(getWordsOfferedText(12408, 1)).toBe('12,408 words shared by players today');
+    });
+
+    test('mid phases weight the language', () => {
+      expect(getWordsOfferedText(12408, 2)).toBe('12,408 words woven by players today');
+      expect(getWordsOfferedText(12408, 3)).toBe('12,408 words offered by seekers today');
+    });
+
+    test('phase 4 uses the arrangement framing', () => {
+      expect(getWordsOfferedText(12408, 4)).toBe(
+        '12,408 words offered to the arrangement today'
+      );
+      expect(getWordsOfferedText(12408, 5)).toBe(
+        '12,408 words offered to the arrangement today'
+      );
+    });
+
+    test('formats small numbers without commas', () => {
+      expect(getWordsOfferedText(42, 0)).toBe('42 words shared by players today');
+    });
+  });
+
+  describe('getActiveSeekersText (phase-aware, spoiler-safe)', () => {
+    test('bright phases say "players"', () => {
+      expect(getActiveSeekersText(642, 0)).toBe('642 players playing today');
+    });
+    test('mid phases say "seekers"', () => {
+      expect(getActiveSeekersText(642, 2)).toBe('642 seekers playing today');
+    });
+    test('late phases use the gathered framing', () => {
+      expect(getActiveSeekersText(642, 4)).toBe('642 gathered at the pattern today');
+    });
+  });
+});
