@@ -10,8 +10,13 @@ import {
   StatusBar,
   Alert,
   Linking,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import Constants from 'expo-constants';
+import { isSupabaseConfigured } from '../services/supabaseClient';
+import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud } from '../services/cloudSave';
 import { CandyColors } from '../theme/colors';
 import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
@@ -61,6 +66,47 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
   const [freezeCount, setFreezeCount] = useState(0);
   const [amberBalance, setAmberBalance] = useState(0);
+  // Cloud backup & restore
+  const cloudEnabled = isSupabaseConfigured();
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
+  const [showRestore, setShowRestore] = useState(false);
+  const [restoreInput, setRestoreInput] = useState('');
+  const [restoreBusy, setRestoreBusy] = useState(false);
+
+  const handleShowRecoveryCode = async () => {
+    hapticLight();
+    try {
+      const code = await getOrCreateRecoveryCode();
+      setRecoveryCode(code);
+    } catch {
+      Alert.alert('Backup', 'Could not generate a recovery code right now.');
+    }
+  };
+
+  const handleRestoreFromCode = async () => {
+    const code = restoreInput.trim();
+    if (!code) return;
+    setRestoreBusy(true);
+    try {
+      const linked = await linkRecoveryCode(code);
+      if (!linked) {
+        Alert.alert('Restore', "That code doesn't look right. Check it and try again.");
+        return;
+      }
+      const restored = await downloadFromCloud();
+      setShowRestore(false);
+      setRestoreInput('');
+      if (restored) {
+        Alert.alert('Restored', 'Your progress was restored. The app will use it from now on.');
+      } else {
+        Alert.alert('Restore', 'No saved progress was found for that code yet.');
+      }
+    } catch {
+      Alert.alert('Restore', 'Something went wrong restoring your progress.');
+    } finally {
+      setRestoreBusy(false);
+    }
+  };
 
   const refreshStreakFreeze = async () => {
     const [count, balance] = await Promise.all([getStreakFreezeCount(), getAmberBalance()]);
@@ -292,6 +338,27 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           </View>
         </View>
 
+        {/* Backup & Restore (only when a cloud backend is configured) */}
+        {cloudEnabled && (
+          <>
+            <Text style={styles.sectionTitle}>BACKUP &amp; RESTORE</Text>
+            <View style={styles.section}>
+              <TouchableOpacity style={styles.aboutRow} onPress={handleShowRecoveryCode} accessibilityRole="button" accessibilityLabel="Show recovery code">
+                <Text style={styles.linkText}>{recoveryCode ? 'Your recovery code' : 'Show recovery code'}</Text>
+              </TouchableOpacity>
+              {recoveryCode && (
+                <View style={styles.recoveryCodeBox}>
+                  <Text style={styles.recoveryCodeText} accessibilityLabel={`Recovery code ${recoveryCode}`}>{recoveryCode}</Text>
+                  <Text style={styles.recoveryCodeHint}>Write this down. Enter it on a new device to restore your progress.</Text>
+                </View>
+              )}
+              <TouchableOpacity style={styles.aboutRow} onPress={() => { hapticLight(); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
+                <Text style={styles.linkText}>Restore from another device</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
         {/* Data */}
         <Text style={styles.sectionTitle}>DATA</Text>
         <View style={styles.section}>
@@ -349,6 +416,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      <Modal visible={showRestore} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowRestore(false)}>
+        <View style={styles.restoreOverlay}>
+          <View style={styles.restoreCard}>
+            <Text style={styles.restoreTitle}>Restore progress</Text>
+            <Text style={styles.restoreHint}>Enter the recovery code from your other device. This replaces the data currently on this device.</Text>
+            <TextInput
+              style={styles.restoreInput}
+              value={restoreInput}
+              onChangeText={setRestoreInput}
+              placeholder="WS-XXXX-XXXX"
+              placeholderTextColor={CandyColors.gray[400]}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!restoreBusy}
+              accessibilityLabel="Recovery code"
+            />
+            <View style={styles.restoreButtons}>
+              <TouchableOpacity style={styles.restoreCancel} onPress={() => { setShowRestore(false); setRestoreInput(''); }} disabled={restoreBusy} accessibilityRole="button" accessibilityLabel="Cancel">
+                <Text style={styles.restoreCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.restoreConfirm} onPress={handleRestoreFromCode} disabled={restoreBusy || !restoreInput.trim()} accessibilityRole="button" accessibilityLabel="Restore">
+                {restoreBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.restoreConfirmText}>Restore</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -484,5 +579,91 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 60,
+  },
+  recoveryCodeBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: CandyColors.gray[100],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: CandyColors.gray[200],
+  },
+  recoveryCodeText: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 2,
+    color: CandyColors.purple.dark,
+    textAlign: 'center',
+  },
+  recoveryCodeHint: {
+    fontSize: 12,
+    color: CandyColors.gray[500],
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  restoreOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  restoreCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 22,
+  },
+  restoreTitle: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: CandyColors.gray[800],
+    marginBottom: 8,
+  },
+  restoreHint: {
+    fontSize: 13.5,
+    color: CandyColors.gray[600],
+    marginBottom: 16,
+    lineHeight: 19,
+  },
+  restoreInput: {
+    borderWidth: 1.5,
+    borderColor: CandyColors.gray[300],
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    color: CandyColors.gray[800],
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  restoreButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  restoreCancel: {
+    flex: 1,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginRight: 8,
+    borderRadius: 12,
+    backgroundColor: CandyColors.gray[200],
+  },
+  restoreCancelText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: CandyColors.gray[700],
+  },
+  restoreConfirm: {
+    flex: 1,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginLeft: 8,
+    borderRadius: 12,
+    backgroundColor: CandyColors.purple.main,
+  },
+  restoreConfirmText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });
