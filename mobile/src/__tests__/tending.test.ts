@@ -12,6 +12,7 @@ import {
   clearTendingState,
   unlockedTendingLineCount,
   getTendingMilestoneAt,
+  getTendingIntensity,
   selectPhase5Dialogue,
   hashSeed,
 } from '../services/tending';
@@ -149,6 +150,25 @@ describe('tending', () => {
     it('identifies milestone levels', () => {
       expect(getTendingMilestoneAt(5)).toBe(5);
       expect(getTendingMilestoneAt(6)).toBeNull();
+    });
+  });
+
+  describe('getTendingIntensity (visual deepening)', () => {
+    it('is 0 at level 0 and saturates at 1', () => {
+      expect(getTendingIntensity(0)).toBe(0);
+      expect(getTendingIntensity(50)).toBe(1);
+      expect(getTendingIntensity(1000)).toBe(1); // never exceeds 1
+    });
+
+    it('rises monotonically with an early-visible curve', () => {
+      const a = getTendingIntensity(5);
+      const b = getTendingIntensity(10);
+      const c = getTendingIntensity(25);
+      expect(a).toBeGreaterThan(0);
+      expect(b).toBeGreaterThan(a);
+      expect(c).toBeGreaterThan(b);
+      // sqrt curve: a noticeable fraction by the first milestone.
+      expect(a).toBeGreaterThan(0.25);
     });
   });
 

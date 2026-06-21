@@ -24,6 +24,7 @@ import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
 import { clampHomeScenePanY, resolveHomeScenePanY } from '../../services/homeScenePan';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { getTendingIntensity } from '../../services/tending';
 
 // Environment assets
 const SKY_DAY = require('../../../assets/environment/sky_day.png');
@@ -405,14 +406,28 @@ const PHASE_BG_COLORS: Record<number, string> = {
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
 // ═══════════════════════════════════════════════════════════════════════════
 
-const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
+const ArrangementConnector: React.FC<{ phase: number; tendingIntensity?: number }> = ({
+  phase,
+  tendingIntensity = 0,
+}) => {
   if (phase < 2) return null;
 
-  const lineWidth = phase === 5 ? 1.5 : phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
+  let lineWidth = phase === 5 ? 1.5 : phase >= 4 ? 3 : phase >= 3 ? 2 : 1;
   const lineColor = phase === 5 ? '#6B5B8A' : phase >= 4 ? '#8B2252' : phase >= 3 ? '#6B4C8A' : '#9B7FCF';
-  const lineOpacity = phase === 5 ? 0.3 : phase >= 4 ? 0.7 : phase >= 3 ? 0.4 : 0.2;
-  const showNodes = phase >= 3;
-  const showGlow = phase === 4;
+  let lineOpacity = phase === 5 ? 0.3 : phase >= 4 ? 0.7 : phase >= 3 ? 0.4 : 0.2;
+  let showNodes = phase >= 3;
+  let showGlow = phase === 4;
+
+  // Phase-5 "deepening": as the player tends the pattern, the dormant sigils
+  // on the house brighten, thicken, light their nodes, and begin to glow — a
+  // visible, serene reward for tending that needs no new art.
+  const t = phase === 5 ? Math.max(0, Math.min(1, tendingIntensity)) : 0;
+  if (t > 0) {
+    lineOpacity = 0.3 + t * 0.5;        // 0.3 → 0.8
+    lineWidth = 1.5 + t * 2.5;          // 1.5 → 4
+    showNodes = t > 0.25;
+    showGlow = t > 0.4;
+  }
 
   return (
     <View style={arrangementStyles.connector}>
@@ -426,6 +441,8 @@ const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
             opacity: lineOpacity,
           },
           showGlow && arrangementStyles.lineGlow,
+          // At Phase 5 the deepening glow is serene mauve, not Phase-4 crimson.
+          showGlow && t > 0 && { shadowColor: lineColor, shadowOpacity: 0.4 + t * 0.4, shadowRadius: 3 + t * 4 },
         ]}
       />
       {/* Node circle at connection point */}
@@ -435,6 +452,7 @@ const ArrangementConnector: React.FC<{ phase: number }> = ({ phase }) => {
             arrangementStyles.node,
             { borderColor: lineColor },
             showGlow && arrangementStyles.nodeGlow,
+            showGlow && t > 0 && { backgroundColor: lineColor, shadowColor: lineColor, shadowOpacity: 0.5 + t * 0.4 },
           ]}
         />
       )}
@@ -645,6 +663,8 @@ interface HouseWorldProps {
   onPanYChange?: (panY: number) => void;
   /** Tapping the in-world pit entrance opens the Offering Pit. */
   onPitPress?: () => void;
+  /** Phase-5 Tending Level — drives the "deepening" of the arrangement sigils. */
+  tendingLevel?: number;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
@@ -660,7 +680,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   savedPanY = null,
   onPanYChange,
   onPitPress,
+  tendingLevel = 0,
 }) => {
+  const tendingIntensity = getTendingIntensity(tendingLevel);
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -942,7 +964,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                         </View>
                         {/* Arrangement sigil connection between rooms */}
                         {index < sortedRooms.length - 1 && (
-                          <ArrangementConnector phase={currentPhase} />
+                          <ArrangementConnector phase={currentPhase} tendingIntensity={tendingIntensity} />
                         )}
                       </React.Fragment>
                     );

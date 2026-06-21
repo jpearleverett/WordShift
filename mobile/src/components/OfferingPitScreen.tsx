@@ -47,6 +47,7 @@ import {
   getNextTendingInfo,
   applyTend,
   isTendingAvailable,
+  getTendingIntensity,
   NextTendingInfo,
 } from '../services/tending';
 import { updateQuestProgress } from '../services/weeklyQuests';
@@ -860,9 +861,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     return () => { anim.stop(); };
   }, [pitIsActive, glowIntensity]);
 
-  // Derive breathing opacity and scale from progress + phase
+  // Derive breathing opacity and scale from progress + phase. The Phase-5
+  // Tending Level deepens the pit: a small boost to the inner/core glow so the
+  // pit visibly grows warmer/deeper as the player tends (caps via the sqrt curve).
   const breathOpacityRange = BREATH_OPACITY[phase] ?? BREATH_OPACITY[0];
   const breathScaleRange = BREATH_SCALE[phase] ?? BREATH_SCALE[0];
+  const tendDeepening = getTendingIntensity(tendingLevel);
+  const tendGlowMul = 1 + tendDeepening * 0.5; // up to +50% inner/core glow
 
   // Per-layer opacity interpolations for concentric glow (outer→inner: 0.4x, 0.7x, 1.0x, 2.5x of base)
   // Each layer is multiplied by glowIntensity so the glow dims when no words are present
@@ -883,14 +888,20 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const breathOpacityInner = Animated.multiply(
     pitBreathProgress.interpolate({
       inputRange: [0, 1],
-      outputRange: [breathOpacityRange[0], breathOpacityRange[1]],
+      outputRange: [
+        Math.min(breathOpacityRange[0] * tendGlowMul, 0.85),
+        Math.min(breathOpacityRange[1] * tendGlowMul, 0.95),
+      ],
     }),
     glowIntensity,
   );
   const breathOpacityCore = Animated.multiply(
     pitBreathProgress.interpolate({
       inputRange: [0, 1],
-      outputRange: [Math.min(breathOpacityRange[0] * 2.5, 0.7), Math.min(breathOpacityRange[1] * 2.5, 0.85)],
+      outputRange: [
+        Math.min(breathOpacityRange[0] * 2.5 * tendGlowMul, 0.8),
+        Math.min(breathOpacityRange[1] * 2.5 * tendGlowMul, 0.92),
+      ],
     }),
     glowIntensity,
   );
@@ -903,7 +914,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   useEffect(() => {
     if (reducedMotion || simplify) return;
 
-    const maxRim = getMaxRimParticles();
+    // More embers rise as the player tends the pattern (Phase-5 deepening),
+    // up to roughly double at full intensity — still device-tier/motion gated.
+    const maxRim = Math.round(getMaxRimParticles() * (1 + getTendingIntensity(tendingLevel)));
     const spawnInterval = 1000; // ms between spawns
     let spawnCount = 0;
 
@@ -965,7 +978,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const interval = setInterval(spawnRimParticle, spawnInterval);
     return () => clearInterval(interval);
-  }, [phase, reducedMotion, simplify]);
+  }, [phase, reducedMotion, simplify, tendingLevel]);
 
   // ---- Load harvest state ----
   const loadState = useCallback(async () => {

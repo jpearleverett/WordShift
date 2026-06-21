@@ -104,6 +104,7 @@ import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines, getShopT
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
+import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
 
@@ -205,6 +206,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
+  const [tendingLevel, setTendingLevel] = useState(0);
   const [upgradeFeedback, setUpgradeFeedback] = useState<string | null>(null);
 
   // Dialogue flow hook
@@ -274,6 +276,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // Load room upgrades
     const upgrades = await getPurchasedUpgrades();
     setPurchasedUpgrades(upgrades);
+
+    // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
+    setTendingLevel(await getTendingLevel());
   }, [unlockFlow.refreshUnlockData]);
 
   // Keep the ref in sync
@@ -970,6 +975,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           nextUnlock={unlockFlow.nextUnlock}
           amberBalance={progress.amber}
           purchasedUpgrades={purchasedUpgrades}
+          tendingLevel={tendingLevel}
           savedPanY={initialHousePanY}
           onPanYChange={onHousePanChange}
           onPitPress={!isOnboarding && onOpenPit ? () => {

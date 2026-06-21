@@ -99,6 +99,17 @@ export function unlockedTendingLineCount(level: number): number {
   return TENDING_MILESTONES.filter(m => m <= level).length;
 }
 
+/**
+ * Normalized "deepening" intensity in [0, 1] for visual scaling — how much the
+ * world (pit glow/embers, house arrangement sigils) has deepened at a given
+ * Tending Level. A sqrt curve gives an immediately-visible change at the first
+ * few levels, saturating around level 50 so the effect never runs away. Pure.
+ */
+export function getTendingIntensity(level: number): number {
+  if (level <= 0) return 0;
+  return Math.min(1, Math.sqrt(level / 50));
+}
+
 /** The milestone level at `level`, or null if `level` is not a milestone. */
 export function getTendingMilestoneAt(level: number): number | null {
   return TENDING_MILESTONES.includes(level) ? level : null;

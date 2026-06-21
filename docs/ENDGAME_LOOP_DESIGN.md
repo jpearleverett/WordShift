@@ -12,7 +12,9 @@
 > - **~50 new milestone lines** (`dialogue/animalDialogueTending.ts`, 5/animal), recorded to the Whisper Gallery as collectibles.
 > - **Cadence (Section 4/Option C, shipped):** a `tend_amber` quest type (Phase-5-gated, deliberately net-negative) + extended `MILESTONE_BONUSES` tail past 350.
 > - **Hygiene:** `wordshift_tending` in `cloudSave.SYNC_KEYS`; `clearTendingState` in Settings → Reset All; full `tending.test.ts` (cost curve, daily bonus, milestones, caughtUp, the pure selector) + quest gating tests.
-> - **Deferred (per the doc's own sequencing):** the richer *visual* "deepening" (intensified sigils/embers tied to TL — v1 ships a Depth readout + serene ceremony, not new art), the cosmetic-shop **monetization** motifs (Section 5, gated on the unbuilt shop), and **Option B** (the endless-descent ladder, an explicit fast-follow).
+> - **Visual deepening (shipped):** the world now visibly deepens with the Tending Level via `getTendingIntensity(level)` (sqrt curve, saturates ~level 50) — the home **Arrangement sigils** (`ArrangementConnector`) brighten/thicken/light their nodes and glow, and the **Offering Pit** raises more rim embers + a warmer inner/core glow. Reduced-motion / device-tier gating preserved; no new art.
+> - **Cosmetic Shop (shipped, amber path):** `components/shop/ShopScreen.tsx` sells & equips amber **tile themes** — Ember-warm / Deep-tide / Bone-quiet double as the Tending motifs (`theme/colors.ts` `TILE_THEMES`). Real-money IAP cosmetic items remain gated on the dev-client + RevenueCat migration.
+> - **Deferred:** **Option B** (the endless-descent ladder, an explicit fast-follow) and the real-money cosmetic motifs.
 
 ---
 
