@@ -90,7 +90,8 @@ import { initAds } from './src/services/ads';
 import { initCosmetics } from './src/services/cosmetics';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
-import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
+import { initCrashReporter } from './src/services/crashReporter';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
@@ -123,6 +124,9 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
 installGlobalErrorHandler();
+// Register remote crash forwarding (no-op unless extra.sentryDsn is configured),
+// so captured errors reach a collector as soon as one is wired.
+initCrashReporter();
 
 function MainApp() {
   // Screen navigation
@@ -2182,6 +2186,11 @@ export default function App() {
     logEvent({ type: 'app_open' });
     (async () => {
       try {
+        // Install the cloud provider (no-op unless Supabase is configured), then
+        // pull a cloud save BEFORE migrations/services read storage — so a fresh
+        // install (or a device switch via recovery code) restores prior progress.
+        installCloudProviderIfConfigured();
+        await maybeAutoRestoreOnFreshInstall();
         await runMigrations();
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in
