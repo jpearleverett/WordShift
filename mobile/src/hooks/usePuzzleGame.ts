@@ -211,6 +211,7 @@ export interface PuzzleGameActions {
     reverseMidpoint?: boolean;
   } | null>;
   handleUndo: () => void;
+  grantExtraUndo: () => void;
   handleHint: () => void;
   handleNextLevel: () => void;
   /**
@@ -1066,6 +1067,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     doubleShiftPhase,
   ]);
 
+  // Grant one extra undo (e.g. an amber-spend refill in Challenge mode). No-op
+  // outside the limited-undo modes (where undosRemaining is Infinity).
+  const grantExtraUndo = useCallback(() => {
+    setUndosRemaining(prev => (prev === Infinity ? prev : prev + 1));
+  }, []);
+
   const handleUndo = useCallback(() => {
     if (gameState !== GameState.PLAYING) return;
     if (history.length === 0) return;
@@ -1337,6 +1344,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     handleLetterPress,
     handleSlotPress,
     handleUndo,
+    grantExtraUndo,
     handleHint,
     handleNextLevel,
     setShowRules,

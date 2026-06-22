@@ -37,6 +37,7 @@ import { FoxGuide } from './src/components/FoxGuide';
 import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
 import {
   awardBonusAmber,
+  spendAmber,
   hasSeenSetupSelectorIntro,
   markSetupSelectorIntroSeen,
   hasSeenPitHarvestIntro,
@@ -92,7 +93,7 @@ import { initIAP } from './src/services/iap';
 import { initAds } from './src/services/ads';
 import { initCosmetics } from './src/services/cosmetics';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
 import { initCrashReporter } from './src/services/crashReporter';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
@@ -1253,6 +1254,24 @@ function MainApp() {
     puzzleActions.handleUndo();
   }, [puzzleActions]);
 
+  // Challenge-only convenience: spend EARNED amber to refill one undo when out.
+  // Convenience, never progress — Challenge stays hint-free by design.
+  const handleBuyUndo = useCallback(async () => {
+    if (puzzle.gameMode !== 'challenge') return;
+    if (persistence.amberBalance < AMBER_UNDO_REFILL_COST) {
+      puzzleActions.setMessage('Not enough amber for an undo.');
+      hapticWarning();
+      return;
+    }
+    const spend = await spendAmber(AMBER_UNDO_REFILL_COST, 'undo_refill');
+    if (spend.success) {
+      persistenceActions.setAmberBalance(spend.newBalance);
+      puzzleActions.grantExtraUndo();
+      hapticSuccess();
+      soundUndo();
+    }
+  }, [puzzle.gameMode, persistence.amberBalance, puzzleActions, persistenceActions]);
+
   const handleHintPress = useCallback(() => {
     hapticSelection();
     soundHint();
@@ -1709,6 +1728,20 @@ function MainApp() {
                   <Text style={styles.challengeUndoText}>
                     {puzzle.undosRemaining} undo{puzzle.undosRemaining !== 1 ? 's' : ''}
                   </Text>
+                )}
+                {puzzle.undosRemaining === 0 && puzzle.gameState === GameState.PLAYING && (
+                  <TouchableOpacity
+                    style={[
+                      styles.buyUndoButton,
+                      persistence.amberBalance < AMBER_UNDO_REFILL_COST && styles.buyUndoButtonDisabled,
+                    ]}
+                    onPress={handleBuyUndo}
+                    disabled={persistence.amberBalance < AMBER_UNDO_REFILL_COST}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
+                  >
+                    <Text style={styles.buyUndoText}>↩ +1 · {AMBER_UNDO_REFILL_COST}💎</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             )}

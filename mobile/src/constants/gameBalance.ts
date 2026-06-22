@@ -115,6 +115,13 @@ export const SURPRISE_BONUS_AMOUNTS: { EASY: number; MEDIUM: number; MEDIUM_PLUS
 export const SURPRISE_BONUS_MIN_PUZZLES = 8;
 
 /**
+ * Amber cost to refill one extra undo in Challenge mode (the only mode where
+ * undos are scarce). A convenience sink spent from EARNED amber — never a paid
+ * currency, never affects narrative progress.
+ */
+export const AMBER_UNDO_REFILL_COST = 15;
+
+/**
  * Max rewarded-video grants a player can claim per local day (anti-farm).
  * Ad amber stays small relative to phase thresholds so it can't trivialize pacing.
  */
