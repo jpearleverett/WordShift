@@ -29,6 +29,11 @@ import { AMBER_REWARDS } from '../../constants/gameBalance';
 import { hapticSuccess } from '../../services/haptics';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { getSettingsSync } from '../../services/settings';
+import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
+import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
+import { RewardedAdButton } from '../monetization/RewardedAdButton';
+import { getRewardedDoubleLabel, getRewardedDoubleConfirm } from '../../services/phaseNarrative';
+import { isAdFreeSync } from '../../services/entitlements';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -41,6 +46,7 @@ export interface VictoryData {
   amberEarned: number;
   streakBonus: number;
   challengeBonus: number;
+  surpriseBonus?: number;
   milestoneBonus: number;
   milestoneMessage: string | null;
   firstCompletionBonus?: number;
@@ -67,6 +73,16 @@ interface VictoryModalProps {
   /** True when a phase transition is waiting to be confirmed in the pit */
   phaseTransitionPending?: boolean;
   isPlayingDaily: boolean;
+  /** Daily leaderboard standing for this result (null = none / backend off) */
+  dailyRank?: DailyRank | null;
+  /** Quiet, spoiler-safe aggregate social-proof line (null = none / backend off) */
+  socialProofLine?: string | null;
+  /** App-level gate for the optional rewarded "double the reward" affordance */
+  rewardedDoubleEnabled?: boolean;
+  /** True once the player has doubled this victory's reward */
+  rewardedDoubleClaimed?: boolean;
+  /** Grant the doubled reward (called on a completed rewarded view) */
+  onRewardedDouble?: () => void;
   victoryData: VictoryData | null;
   completionCoda?: { title: string; text: string } | null;
   cumulativeStats: CumulativeStats | null;
@@ -136,6 +152,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   phase,
   phaseTransitionPending,
   isPlayingDaily,
+  dailyRank,
+  socialProofLine,
+  rewardedDoubleEnabled,
+  rewardedDoubleClaimed,
+  onRewardedDouble,
   victoryData,
   completionCoda,
   cumulativeStats,
@@ -266,6 +287,25 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {isPlayingDaily ? 'Daily Challenge Complete' : 'Puzzle Complete'}
             </Text>
+
+            {isPlayingDaily && dailyRank && (
+              <DailyLeaderboardCard
+                rank={dailyRank.rank}
+                total={dailyRank.total}
+                percentile={dailyRank.percentile}
+                beatText={getBeatPercentText(dailyRank.percentile, phase)}
+                phase={phase}
+              />
+            )}
+
+            {!!socialProofLine && (
+              <Text
+                style={[styles.socialProofLine, { color: phaseTheme.modalSecondaryTextColor }]}
+                accessibilityLabel={socialProofLine}
+              >
+                {socialProofLine}
+              </Text>
+            )}
 
             {/* Group 1: Harvest, bonuses, streak, milestone */}
             <Animated.View style={{ opacity: contentOpacity1 }}>
@@ -458,6 +498,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 ? Math.floor(baseAmber * 0.25)
                 : 0;
               const challengeBonusAmber = victoryData.challengeBonus ?? 0;
+              const surpriseBonusAmber = victoryData.surpriseBonus ?? 0;
               const variantBonusAmber = victoryData.variantBonus ?? 0;
               const streakBonusAmber = victoryData.streakBonus ?? 0;
               const firstCompBonus = victoryData.firstCompletionBonus ?? 0;
@@ -504,6 +545,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
                             <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>+{challengeBonusAmber}</Text>
+                          </View>
+                        )}
+                        {surpriseBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'✨'} Lucky Find
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+{surpriseBonusAmber}</Text>
                           </View>
                         )}
                         {variantBonusAmber > 0 && variant && variant !== 'standard' && (
@@ -558,6 +607,36 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         </Text>
                       </View>
                     </View>
+                    {/* Optional "double the reward". Ad-free players (Patron /
+                        Remove-Ads) get it granted instantly with no ad — their
+                        perk. Everyone else opts in by watching (the button
+                        self-gates on provider/cap). App gates onboarding/early game. */}
+                    {rewardedDoubleEnabled && !isOnboarding && onRewardedDouble && (
+                      rewardedDoubleClaimed ? (
+                        <Text style={[styles.rewardedDoubleConfirm, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {'✓ '}{getRewardedDoubleConfirm(phase as DialoguePhase)}
+                        </Text>
+                      ) : isAdFreeSync() ? (
+                        <TouchableOpacity
+                          style={[styles.freeDoubleButton, phase >= 3 ? styles.freeDoubleButtonDark : styles.freeDoubleButtonLight]}
+                          onPress={onRewardedDouble}
+                          accessibilityRole="button"
+                          accessibilityLabel={getRewardedDoubleLabel(phase as DialoguePhase)}
+                        >
+                          <Text style={[styles.freeDoubleText, phase >= 3 ? styles.freeDoubleTextDark : styles.freeDoubleTextLight]}>
+                            {'✦ '}{getRewardedDoubleLabel(phase as DialoguePhase)}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <RewardedAdButton
+                          placement="victory_double"
+                          phase={phase}
+                          label={getRewardedDoubleLabel(phase as DialoguePhase)}
+                          onReward={onRewardedDouble}
+                          style={styles.rewardedDoubleButton}
+                        />
+                      )
+                    )}
                     {/* Collect Now — compact pill inside amber stats box */}
                     {!isOnboarding && !victoryData.autoCollected && (
                       <>
@@ -822,6 +901,44 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[500],
     marginBottom: 4,
   },
+  socialProofLine: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 2,
+    opacity: 0.85,
+  },
+  rewardedDoubleButton: {
+    marginTop: 10,
+  },
+  rewardedDoubleConfirm: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  freeDoubleButton: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  freeDoubleButtonLight: {
+    backgroundColor: 'rgba(255, 201, 77, 0.16)',
+    borderColor: 'rgba(255, 201, 77, 0.45)',
+  },
+  freeDoubleButtonDark: {
+    backgroundColor: 'rgba(150, 90, 60, 0.18)',
+    borderColor: 'rgba(180, 110, 70, 0.4)',
+  },
+  freeDoubleText: { fontSize: 13.5, fontWeight: '800' },
+  freeDoubleTextLight: { color: '#FFD479' },
+  freeDoubleTextDark: { color: '#E0B080' },
   victoryFeedback: {
     fontSize: 13,
     fontWeight: '600',

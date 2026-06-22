@@ -50,7 +50,10 @@
       ]
     ],
     "extra": {
-      "telemetryEndpoint": ""
+      "telemetryEndpoint": "",
+      "supabaseUrl": "",
+      "supabaseAnonKey": "",
+      "sentryDsn": ""
     }
   }
 }

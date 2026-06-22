@@ -37,6 +37,7 @@ import { FoxGuide } from './src/components/FoxGuide';
 import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
 import {
   awardBonusAmber,
+  spendAmber,
   hasSeenSetupSelectorIntro,
   markSetupSelectorIntroSeen,
   hasSeenPitHarvestIntro,
@@ -46,6 +47,9 @@ import {
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
+import { PatronModal } from './src/components/monetization/PatronModal';
+import { submitDailyResult, getDailyRank, DailyRank } from './src/services/leaderboard';
+import { recordPuzzleContribution, getAggregateProof, getWordsOfferedText } from './src/services/socialProof';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
@@ -89,8 +93,9 @@ import { initIAP } from './src/services/iap';
 import { initAds } from './src/services/ads';
 import { initCosmetics } from './src/services/cosmetics';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT } from './src/constants/gameBalance';
-import { markPendingChanges, uploadToCloud } from './src/services/cloudSave';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST } from './src/constants/gameBalance';
+import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
+import { initCrashReporter } from './src/services/crashReporter';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
@@ -123,6 +128,9 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
 installGlobalErrorHandler();
+// Register remote crash forwarding (no-op unless extra.sentryDsn is configured),
+// so captured errors reach a collector as soon as one is wired.
+initCrashReporter();
 
 function MainApp() {
   // Screen navigation
@@ -207,6 +215,16 @@ function MainApp() {
   const pitResumeCheckedRef = useRef(false);
   const freeFreezeCheckedRef = useRef(false);
   const dailyLoginCheckedRef = useRef(false);
+  // Patron (cosmetic IAP) modal — opened from Shop header / Settings
+  const [showPatronModal, setShowPatronModal] = useState(false);
+  // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
+  const puzzleStartTimeRef = useRef<number>(0);
+  // Daily Challenge leaderboard standing for the current victory (null = none/off)
+  const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
+  // Quiet, spoiler-safe aggregate social-proof line for the victory modal
+  const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
+  // Optional rewarded "double the reward" — one claim per victory
+  const [victoryDoubleClaimed, setVictoryDoubleClaimed] = useState(false);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
@@ -734,6 +752,7 @@ function MainApp() {
       try {
         const daily = await generateDailyPuzzle();
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength);
+        puzzleStartTimeRef.current = Date.now();
         logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true } });
         maybeShowSetupSelectorIntro().catch(() => {});
       } catch {
@@ -797,8 +816,44 @@ function MainApp() {
         isPlayingDaily
       );
 
+      // Aggregate social proof: contribute this puzzle's words to the global
+      // daily count (spoiler-safe, anonymous). No-op until the backend is on.
+      recordPuzzleContribution(result.completedWords?.length ?? 0);
+      setSocialProofLine(null);
+      setVictoryDoubleClaimed(false);
+      (async () => {
+        try {
+          const proof = await getAggregateProof();
+          if (proof && proof.wordsOfferedToday > 0) {
+            setSocialProofLine(getWordsOfferedText(proof.wordsOfferedToday, persistence.currentPhase));
+          }
+        } catch {
+          // Social proof is decorative — never block the victory flow.
+        }
+      })();
+
       // Record Daily Challenge completion + streak milestone (deferred toast).
       if (isPlayingDaily) {
+        // Submit to the daily leaderboard and fetch standing for the modal.
+        // Fire-and-forget; both no-op (null) until the backend is configured.
+        setDailyRank(null);
+        (async () => {
+          try {
+            const elapsedMs = puzzleStartTimeRef.current > 0
+              ? Date.now() - puzzleStartTimeRef.current
+              : 0;
+            await submitDailyResult({
+              date: getLocalDateString(),
+              timeMs: elapsedMs,
+              stars: victory.earnedStars,
+              hintsUsed: result.hintsUsed,
+            });
+            const rank = await getDailyRank(getLocalDateString());
+            if (rank) setDailyRank(rank);
+          } catch {
+            // Leaderboard is non-critical — never block the victory flow.
+          }
+        })();
         try {
           const before = await getDailyStatus();
           const dailyProgress = await recordDailyCompletion(
@@ -1199,6 +1254,24 @@ function MainApp() {
     puzzleActions.handleUndo();
   }, [puzzleActions]);
 
+  // Challenge-only convenience: spend EARNED amber to refill one undo when out.
+  // Convenience, never progress — Challenge stays hint-free by design.
+  const handleBuyUndo = useCallback(async () => {
+    if (puzzle.gameMode !== 'challenge') return;
+    if (persistence.amberBalance < AMBER_UNDO_REFILL_COST) {
+      puzzleActions.setMessage('Not enough amber for an undo.');
+      hapticWarning();
+      return;
+    }
+    const spend = await spendAmber(AMBER_UNDO_REFILL_COST, 'undo_refill');
+    if (spend.success) {
+      persistenceActions.setAmberBalance(spend.newBalance);
+      puzzleActions.grantExtraUndo();
+      hapticSuccess();
+      soundUndo();
+    }
+  }, [puzzle.gameMode, persistence.amberBalance, puzzleActions, persistenceActions]);
+
   const handleHintPress = useCallback(() => {
     hapticSelection();
     soundHint();
@@ -1293,6 +1366,21 @@ function MainApp() {
       transitionTo('pit');
     });
   }, [puzzleActions, transitionTo, startVictoryExitFlow]);
+
+  // Optional rewarded "double the reward": credits a bonus equal to this
+  // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
+  // per victory. Inert until a real ad provider is connected.
+  const handleRewardedDouble = useCallback(async () => {
+    const earned = victoryFlow.victoryData?.amberEarned ?? 0;
+    if (earned <= 0 || victoryDoubleClaimed) return;
+    try {
+      const newBalance = await awardBonusAmber(earned, 'rewarded_victory_double');
+      persistenceActions.setAmberBalance(newBalance);
+      setVictoryDoubleClaimed(true);
+    } catch {
+      // Non-critical — never block the victory flow.
+    }
+  }, [victoryFlow.victoryData, victoryDoubleClaimed, persistenceActions]);
 
   // Share opens a preview of the result card (which shares an image when the
   // native capturer is present, else falls back to the emoji-grid text share).
@@ -1438,6 +1526,7 @@ function MainApp() {
             amberBalance={persistence.amberBalance}
             onClose={() => transitionTo('home')}
             onAmberChange={(newBalance) => persistenceActions.setAmberBalance(newBalance)}
+            onOpenPatron={() => setShowPatronModal(true)}
           />
         </View>
       );
@@ -1639,6 +1728,20 @@ function MainApp() {
                   <Text style={styles.challengeUndoText}>
                     {puzzle.undosRemaining} undo{puzzle.undosRemaining !== 1 ? 's' : ''}
                   </Text>
+                )}
+                {puzzle.undosRemaining === 0 && puzzle.gameState === GameState.PLAYING && (
+                  <TouchableOpacity
+                    style={[
+                      styles.buyUndoButton,
+                      persistence.amberBalance < AMBER_UNDO_REFILL_COST && styles.buyUndoButtonDisabled,
+                    ]}
+                    onPress={handleBuyUndo}
+                    disabled={persistence.amberBalance < AMBER_UNDO_REFILL_COST}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Refill one undo for ${AMBER_UNDO_REFILL_COST} amber`}
+                  >
+                    <Text style={styles.buyUndoText}>↩ +1 · {AMBER_UNDO_REFILL_COST}💎</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             )}
@@ -1947,6 +2050,11 @@ function MainApp() {
           phase={persistence.currentPhase}
           phaseTransitionPending={persistence.pendingPhaseTransition != null}
           isPlayingDaily={isPlayingDaily}
+          dailyRank={dailyRank}
+          socialProofLine={socialProofLine}
+          rewardedDoubleEnabled={(persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) > AUTO_COLLECT_PUZZLE_LIMIT}
+          rewardedDoubleClaimed={victoryDoubleClaimed}
+          onRewardedDouble={handleRewardedDouble}
           victoryData={victoryFlow.victoryData}
           completionCoda={orchestration.completionCoda}
           cumulativeStats={persistence.cumulativeStats}
@@ -2165,6 +2273,12 @@ function MainApp() {
         phase={persistence.currentPhase}
         onClose={() => setDailyLoginGrant(null)}
       />
+      <PatronModal
+        visible={showPatronModal}
+        phase={persistence.currentPhase}
+        onClose={() => setShowPatronModal(false)}
+        onPatronChange={(isPatron) => { if (isPatron) persistenceActions.refreshStats(); }}
+      />
     </View>
   );
 }
@@ -2182,6 +2296,11 @@ export default function App() {
     logEvent({ type: 'app_open' });
     (async () => {
       try {
+        // Install the cloud provider (no-op unless Supabase is configured), then
+        // pull a cloud save BEFORE migrations/services read storage — so a fresh
+        // install (or a device switch via recovery code) restores prior progress.
+        installCloudProviderIfConfigured();
+        await maybeAutoRestoreOnFreshInstall();
         await runMigrations();
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in

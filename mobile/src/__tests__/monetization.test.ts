@@ -6,6 +6,8 @@ import {
   hasEntitlementSync,
   isPatron,
   isPatronSync,
+  isAdFree,
+  isAdFreeSync,
   grantEntitlements,
   setEntitlements,
   getGrantedEntitlements,
@@ -115,7 +117,24 @@ describe('iap', () => {
 
   it('maps products to entitlements', () => {
     expect(entitlementsForProduct(PRODUCT_IDS.PATRON_KEY)).toEqual([ENTITLEMENTS.PATRON]);
+    expect(entitlementsForProduct(PRODUCT_IDS.REMOVE_ADS)).toEqual([ENTITLEMENTS.ADFREE]);
     expect(entitlementsForProduct('com.wordshift.theme_x')).toEqual(['com.wordshift.theme_x']);
+  });
+
+  it('ad-free is granted by Remove-Ads AND by Patron (superset)', async () => {
+    await loadEntitlements();
+    expect(isAdFreeSync()).toBe(false);
+    expect(await isAdFree()).toBe(false);
+
+    await grantEntitlements([ENTITLEMENTS.ADFREE]);
+    expect(isAdFreeSync()).toBe(true);
+    expect(await isAdFree()).toBe(true);
+    expect(isPatronSync()).toBe(false); // remove-ads is not patron
+
+    await clearEntitlements();
+    await grantEntitlements([ENTITLEMENTS.PATRON]);
+    expect(isAdFreeSync()).toBe(true); // patron is ad-free too
+    expect(await isAdFree()).toBe(true);
   });
 
   it('grants entitlements after a successful purchase via a fake provider', async () => {

@@ -31,8 +31,25 @@ const sessionErrors: Array<{
 const MAX_SESSION_ERRORS = 50;
 
 /**
+ * Optional pluggable forwarder for remote crash reporting (e.g. Sentry over
+ * HTTP). Default = none, so the local-only behavior is unchanged until a
+ * forwarder is registered (see crashReporter.initCrashReporter).
+ */
+type ErrorForwarder = (error: Error | string, context: ErrorContext) => void;
+let errorForwarder: ErrorForwarder | null = null;
+
+/**
+ * Register a forwarder that receives every reported error AFTER local logging.
+ * Pass null to remove it. Forwarders run inside a try/catch so a failing
+ * transport can never break local error reporting.
+ */
+export function setErrorForwarder(fn: ErrorForwarder | null): void {
+  errorForwarder = fn;
+}
+
+/**
  * Report an error with context.
- * Currently logs to eventLogger. Replace with Sentry/Crashlytics when available.
+ * Logs to eventLogger and (if registered) forwards to a remote crash sink.
  */
 export function reportError(error: Error | string, context: ErrorContext): void {
   const errorMessage = error instanceof Error ? error.message : error;
@@ -63,6 +80,15 @@ export function reportError(error: Error | string, context: ErrorContext): void 
 
   // Console warn for dev visibility
   console.warn(`[WordShift Error] ${context.source}: ${errorMessage}`);
+
+  // Forward to the remote crash sink last, never letting it throw.
+  if (errorForwarder) {
+    try {
+      errorForwarder(error, context);
+    } catch {
+      // A failing transport must never break local error reporting.
+    }
+  }
 }
 
 /**

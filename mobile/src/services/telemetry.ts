@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllStoredEvents, removeOldestEvents } from './eventLogger';
+import { isSupabaseConfigured, sbInsert } from './supabaseClient';
 
 /**
  * Optional remote telemetry transport.
@@ -56,10 +57,12 @@ let installIdCache: string | null = null;
 let lastSyncAttempt = 0;
 
 /**
- * Whether telemetry uploads are enabled (an endpoint is configured).
+ * Whether telemetry uploads are enabled — either a custom collector endpoint
+ * OR a Supabase backend is configured. When neither is set, telemetry is a
+ * complete no-op and no network traffic occurs.
  */
 export function isTelemetryEnabled(): boolean {
-  return getTelemetryEndpoint().length > 0;
+  return getTelemetryEndpoint().length > 0 || isSupabaseConfigured();
 }
 
 function generateInstallId(): string {
@@ -123,19 +126,44 @@ export async function syncTelemetry(): Promise<void> {
     if (events.length === 0) return;
 
     const installId = await getInstallId();
-    const response = await fetch(getTelemetryEndpoint(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        installId,
-        platform: getPlatformOS(),
-        appVersion: getAppVersion(),
-        events,
-      }),
-    });
+    const endpoint = getTelemetryEndpoint();
 
-    if (response.ok) {
-      await removeOldestEvents(events.length);
+    if (endpoint.length > 0) {
+      // Custom collector path (unchanged): one batched POST.
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          installId,
+          platform: getPlatformOS(),
+          appVersion: getAppVersion(),
+          events,
+        }),
+      });
+
+      if (response.ok) {
+        await removeOldestEvents(events.length);
+      }
+      return;
+    }
+
+    // Supabase analytics sink — no custom endpoint, but a backend is
+    // configured. Upload one row per event into the `events` table.
+    if (isSupabaseConfigured()) {
+      const platform = getPlatformOS();
+      const appVersion = getAppVersion();
+      const rows = events.map((event) => ({
+        install_id: installId,
+        platform,
+        app_version: appVersion,
+        type: event.type,
+        data: event.data ?? {},
+        created_at: new Date(event.timestamp).toISOString(),
+      }));
+      const result = await sbInsert('events', rows, { returning: false });
+      if (result !== null) {
+        await removeOldestEvents(events.length);
+      }
     }
   } catch {
     // Network/storage failure — events stay queued for the next sync

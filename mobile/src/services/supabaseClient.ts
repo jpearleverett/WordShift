@@ -1,0 +1,195 @@
+import { getInstallId } from './telemetry';
+
+/**
+ * Shared Supabase REST client for WordShift.
+ *
+ * Dependency-free: talks to Supabase's PostgREST API over the global `fetch`
+ * available in React Native — NO native SDK, so the app keeps running in
+ * Expo Go and nothing is bundled until credentials are configured.
+ *
+ * Enable WITHOUT a code change by adding to app.json `extra`:
+ *   "supabaseUrl": "https://<project>.supabase.co",
+ *   "supabaseAnonKey": "<anon public key>"
+ * (and optionally "sentryDsn" for crash forwarding). Empty / unset = fully
+ * disabled (the default) — no network traffic occurs and every call below
+ * resolves to null without throwing.
+ *
+ * The anonymous install id (telemetry.getInstallId) is the default identity
+ * for per-player rows (cloud save, leaderboard). Auth-free by design.
+ *
+ * Remember to update the privacy policy before enabling.
+ */
+
+export interface SupabaseConfig {
+  url: string;
+  anonKey: string;
+}
+
+/**
+ * Read Expo config `extra` lazily so this module still loads in Node test
+ * environments (where expo-constants isn't resolvable).
+ */
+function getConfigExtra(): Record<string, unknown> {
+  try {
+    const Constants = require('expo-constants').default;
+    return (Constants?.expoConfig?.extra as Record<string, unknown>) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Resolve configured Supabase credentials, or null when unset/disabled. */
+export function getSupabaseConfig(): SupabaseConfig | null {
+  const extra = getConfigExtra();
+  const url = typeof extra.supabaseUrl === 'string' ? extra.supabaseUrl.trim() : '';
+  const anonKey = typeof extra.supabaseAnonKey === 'string' ? extra.supabaseAnonKey.trim() : '';
+  if (!url || !anonKey) return null;
+  return { url: url.replace(/\/+$/, ''), anonKey };
+}
+
+/** Whether a Supabase backend is configured (credentials present). */
+export function isSupabaseConfigured(): boolean {
+  return getSupabaseConfig() !== null;
+}
+
+/** Resolve the configured Sentry DSN ('' when unset/disabled). */
+export function getSentryDsn(): string {
+  const dsn = getConfigExtra().sentryDsn;
+  return typeof dsn === 'string' ? dsn.trim() : '';
+}
+
+/** Default per-player identity for backend rows (anonymous install id). */
+export async function getBackendIdentity(): Promise<string> {
+  return getInstallId();
+}
+
+const DEFAULT_TIMEOUT_MS = 8_000;
+
+/** Race a fetch against a timeout so a hung request never blocks the caller. */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response | null> {
+  try {
+    const AbortController = (global as Record<string, unknown>).AbortController as
+      | (new () => { signal: unknown; abort(): void })
+      | undefined;
+    if (AbortController) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...init, signal: controller.signal as never });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    // No AbortController (older RN / Node test) — fall back to a plain race.
+    return (await Promise.race([
+      fetch(url, init),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ])) as Response | null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Low-level PostgREST request. `path` is appended to `<url>/rest/v1/`.
+ * Returns the raw Response (or null when unconfigured / on network failure).
+ * Never throws.
+ */
+export async function sbFetch(
+  path: string,
+  init: RequestInit & { timeoutMs?: number } = {},
+): Promise<Response | null> {
+  const config = getSupabaseConfig();
+  if (!config) return null;
+
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, headers, ...rest } = init;
+  const url = `${config.url}/rest/v1/${path.replace(/^\/+/, '')}`;
+  return fetchWithTimeout(
+    url,
+    {
+      ...rest,
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        'Content-Type': 'application/json',
+        ...(headers as Record<string, string> | undefined),
+      },
+    },
+    timeoutMs,
+  );
+}
+
+async function parseJson<T>(response: Response | null): Promise<T | null> {
+  if (!response || !response.ok) return null;
+  try {
+    // 204 No Content (e.g. an insert without `return=representation`)
+    if (response.status === 204) return null;
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * SELECT rows. `query` is a PostgREST querystring, e.g.
+ *   sbSelect('saves', 'select=*&owner=eq.abc')
+ * Returns the row array, or null on failure / when disabled.
+ */
+export async function sbSelect<T>(table: string, query: string): Promise<T[] | null> {
+  const sep = query ? (query.startsWith('?') ? '' : '?') : '';
+  const response = await sbFetch(`${table}${sep}${query}`, { method: 'GET' });
+  return parseJson<T[]>(response);
+}
+
+interface InsertOptions {
+  /** Upsert on conflict (sends Prefer: resolution=merge-duplicates). */
+  upsert?: boolean;
+  /** Column(s) defining the conflict target for an upsert. */
+  onConflict?: string;
+  /** Return the written rows (Prefer: return=representation). Default true. */
+  returning?: boolean;
+}
+
+/**
+ * INSERT (or UPSERT) one or more rows. Returns written rows when `returning`,
+ * else an empty array on success, or null on failure / when disabled.
+ */
+export async function sbInsert<T>(
+  table: string,
+  rows: object | object[],
+  opts: InsertOptions = {},
+): Promise<T[] | null> {
+  const { upsert = false, onConflict, returning = true } = opts;
+  const preferParts: string[] = [];
+  if (returning) preferParts.push('return=representation');
+  else preferParts.push('return=minimal');
+  if (upsert) preferParts.push('resolution=merge-duplicates');
+
+  const conflictQs = upsert && onConflict ? `?on_conflict=${encodeURIComponent(onConflict)}` : '';
+  const response = await sbFetch(`${table}${conflictQs}`, {
+    method: 'POST',
+    headers: { Prefer: preferParts.join(',') },
+    body: JSON.stringify(rows),
+  });
+  if (!response) return null;
+  if (!response.ok) return null;
+  const parsed = await parseJson<T[]>(response);
+  return parsed ?? ([] as T[]);
+}
+
+/**
+ * Call a Postgres function (RPC). Used for atomic server-side aggregates
+ * (e.g. incrementing global counters, computing a percentile). Returns the
+ * function result, or null on failure / when disabled.
+ */
+export async function sbRpc<T>(fn: string, params: object = {}): Promise<T | null> {
+  const response = await sbFetch(`rpc/${fn}`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+  return parseJson<T>(response);
+}

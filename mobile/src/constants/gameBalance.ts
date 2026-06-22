@@ -83,6 +83,44 @@ export const CHALLENGE_AMBER_MULTIPLIER = 1.5;
  */
 export const PATRON_AMBER_BONUS = 2;
 
+// ============================================================================
+// SURPRISE BONUS (variable-ratio reward)
+// ============================================================================
+
+/**
+ * Variable-ratio "lucky" amber bonus on a normal win — the one intentionally
+ * non-deterministic reward in an otherwise fully predictable economy. On a small
+ * fraction of standard victories the player gets a modest extra amber windfall,
+ * the unpredictable-reward lever that keeps "just one more puzzle" alive.
+ *
+ * IMPORTANT (hard rule, mirrors PATRON_AMBER_BONUS): this is additive to the
+ * amber *reward* only. It must NEVER feed phase progression — pacing stays
+ * identical whether or not the surprise fires.
+ */
+export const SURPRISE_BONUS_CHANCE = 0.12;
+
+/** Flat surprise amber granted (scaled by difficulty) when the bonus fires. */
+export const SURPRISE_BONUS_AMOUNTS: { EASY: number; MEDIUM: number; MEDIUM_PLUS: number; HARD: number } = {
+  EASY: 6,
+  MEDIUM: 8,
+  MEDIUM_PLUS: 12,
+  HARD: 16,
+};
+
+/**
+ * Suppress the surprise bonus until the player has solved at least this many
+ * puzzles — keeps the early/onboarding economy clean and predictable, mirroring
+ * how other variable mechanics ramp in only after the tutorial window.
+ */
+export const SURPRISE_BONUS_MIN_PUZZLES = 8;
+
+/**
+ * Amber cost to refill one extra undo in Challenge mode (the only mode where
+ * undos are scarce). A convenience sink spent from EARNED amber — never a paid
+ * currency, never affects narrative progress.
+ */
+export const AMBER_UNDO_REFILL_COST = 15;
+
 /**
  * Max rewarded-video grants a player can claim per local day (anti-farm).
  * Ad amber stays small relative to phase thresholds so it can't trivialize pacing.

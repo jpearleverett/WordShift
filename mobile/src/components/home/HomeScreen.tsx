@@ -131,6 +131,12 @@ interface HomeScreenProps {
   initialHousePanY?: number | null;
   /** Persist the latest house pan position */
   onHousePanChange?: (panY: number) => void;
+  /**
+   * Fired once when the house first becomes complete (all rooms + animals).
+   * When provided, App plays the full HOUSE_COMPLETION_EVENT cinematic instead
+   * of the inline fallback modal.
+   */
+  onHouseCompleted?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -148,6 +154,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onAdvanceOnboarding,
   initialHousePanY = null,
   onHousePanChange,
+  onHouseCompleted,
 }) => {
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
@@ -253,8 +260,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= 10;
       if (allRoomsUnlocked && allAnimalsUnlocked) {
         await markHouseCompleted();
-        setShowHouseCompletion(true);
-        setHouseCompletionTextIndex(0);
+        if (onHouseCompleted) {
+          // App plays the full HOUSE_COMPLETION_EVENT cinematic over the home scene.
+          onHouseCompleted();
+        } else {
+          // Fallback (e.g. in isolation/tests): the inline completion modal.
+          setShowHouseCompletion(true);
+          setHouseCompletionTextIndex(0);
+        }
       }
     }
 
@@ -280,7 +293,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
     setTendingLevel(await getTendingLevel());
-  }, [unlockFlow.refreshUnlockData]);
+  }, [unlockFlow.refreshUnlockData, onHouseCompleted]);
 
   // Keep the ref in sync
   loadAllDataRef.current = loadAllData;

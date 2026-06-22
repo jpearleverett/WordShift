@@ -27,6 +27,8 @@ const STORAGE_KEY = 'wordshift_entitlements';
 export const ENTITLEMENTS = {
   /** Patron's Key — ad-free, +amber/puzzle, exclusive cosmetic, extended undo, cloud save. */
   PATRON: 'patron',
+  /** Remove Ads / Supporter — ad-free, and the victory 2x reward is granted with no ad. */
+  ADFREE: 'adfree',
 } as const;
 
 export type EntitlementKey = string;
@@ -108,6 +110,19 @@ export async function isPatron(): Promise<boolean> {
 /** Synchronous Patron check (off cache; false until warmed). */
 export function isPatronSync(): boolean {
   return hasEntitlementSync(ENTITLEMENTS.PATRON);
+}
+
+/**
+ * Is the player ad-free? True for Patrons (superset) OR Remove-Ads owners.
+ * Ad-free players also get the victory 2x reward granted directly, with no ad.
+ */
+export async function isAdFree(): Promise<boolean> {
+  return (await isPatron()) || hasEntitlement(ENTITLEMENTS.ADFREE);
+}
+
+/** Synchronous ad-free check (off cache; false until warmed). */
+export function isAdFreeSync(): boolean {
+  return isPatronSync() || hasEntitlementSync(ENTITLEMENTS.ADFREE);
 }
 
 /**

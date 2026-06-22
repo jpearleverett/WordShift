@@ -388,6 +388,23 @@ export const appStyles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
+  buyUndoButton: {
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 201, 77, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 201, 77, 0.5)',
+  },
+  buyUndoButtonDisabled: {
+    opacity: 0.4,
+  },
+  buyUndoText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFD479',
+  },
   speedTimerContainer: {
     alignSelf: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
