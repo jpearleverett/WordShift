@@ -1,4 +1,4 @@
-import { DialoguePhase, PHASE_DESCRIPTIONS } from '../types/homeWorld';
+import { DialoguePhase } from '../types/homeWorld';
 import { STREAK_MILESTONES } from '../constants/gameBalance';
 
 /**

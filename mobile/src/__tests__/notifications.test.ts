@@ -4,6 +4,7 @@ import {
   setNotificationPrefs,
   getNotificationMessage,
   getStreakRiskMessage,
+  getQuestExpiryMessage,
   resetNotificationPrefs,
   scheduleAllNotifications,
   cancelAllNotifications,
@@ -179,6 +180,19 @@ describe('notifications', () => {
     it('streak risk message clamps out-of-bounds phases', () => {
       expect(() => getStreakRiskMessage(-1, 3)).not.toThrow();
       expect(() => getStreakRiskMessage(99, 3)).not.toThrow();
+    });
+
+    it('returns a non-empty quest-expiry message at each phase', () => {
+      for (let phase = 0; phase <= 5; phase++) {
+        const message = getQuestExpiryMessage(phase);
+        expect(typeof message).toBe('string');
+        expect(message.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('quest-expiry message clamps out-of-bounds phases', () => {
+      expect(() => getQuestExpiryMessage(-1)).not.toThrow();
+      expect(() => getQuestExpiryMessage(99)).not.toThrow();
     });
 
     it('returns valid messages for clamped negative phase', () => {

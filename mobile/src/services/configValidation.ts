@@ -162,9 +162,9 @@ export function validatePhaseThresholds(): ValidationResult {
 export function validateAchievements(): ValidationResult {
   const errors: string[] = [];
 
-  // Check total count (34 achievements across 5 categories)
-  if (ACHIEVEMENTS.length !== 34) {
-    errors.push(`Expected 34 achievements, got ${ACHIEVEMENTS.length}`);
+  // Check total count (40 achievements across 5 categories)
+  if (ACHIEVEMENTS.length !== 40) {
+    errors.push(`Expected 40 achievements, got ${ACHIEVEMENTS.length}`);
   }
 
   // Check unique IDs

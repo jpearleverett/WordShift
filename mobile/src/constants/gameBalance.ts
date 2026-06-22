@@ -398,7 +398,14 @@ export const MILESTONE_BONUSES: {
   { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
   { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
   { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
+  // Mid-game valley beats (~130–170): the house finishes around puzzle 130 but the
+  // Phase 4 reveal doesn't land until ~155, leaving a stretch with no new unlocks.
+  // These keep the amber faucet pulsing through that gap so the climb to the climax
+  // never feels rewardless. Kept modest so they don't outpace the room-upgrade sink.
+  { puzzles: 135, amber: 90, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole — and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
+  { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'Every room is full, yet something still feels unfinished.', dreadMessage: 'The walls are full. The space between them is not.' },
   { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },
+  { puzzles: 165, amber: 130, message: 'Unstoppable!', darkMessage: 'You no longer wonder why you keep going. You just go.', dreadMessage: 'One hundred sixty-five offerings. The horizon leans closer.' },
   { puzzles: 200, amber: 250, message: 'True dedication!', darkMessage: 'Two hundred transformations. The house trembles.', dreadMessage: 'The ritual deepens. Two hundred incantations.' },
   { puzzles: 250, amber: 300, message: 'Quarter thousand!', darkMessage: 'The arrangement nears completion.', dreadMessage: 'Two hundred fifty offerings. Something stirs.' },
   { puzzles: 300, amber: 400, message: 'Master puzzler!', darkMessage: 'Three hundred words spoken into the void.', dreadMessage: 'The void has heard enough. The void responds.' },

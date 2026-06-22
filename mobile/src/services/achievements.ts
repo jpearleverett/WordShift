@@ -376,6 +376,64 @@ export const ACHIEVEMENTS: Achievement[] = [
     category: 'puzzle',
     check: (s) => s.stats.totalPuzzlesCompleted >= 500,
   },
+
+  // ===== Long-tail / endgame achievements =====
+  // These exist so a dedicated player who clears the rest by ~month 2-3 still has
+  // an unlock or two on the horizon. All read existing check-state fields.
+  {
+    id: 'puzzle_750',
+    rewardAmber: 125,
+    title: 'Keeper of Words',
+    description: 'Complete 750 puzzles',
+    icon: '📜',
+    category: 'puzzle',
+    check: (s) => s.stats.totalPuzzlesCompleted >= 750,
+  },
+  {
+    id: 'perfect_50',
+    rewardAmber: 60,
+    title: 'Constellation',
+    description: 'Get 3 stars on 50 puzzles',
+    icon: '🌌',
+    category: 'mastery',
+    check: (s) => s.stats.threeStarCount >= 50,
+  },
+  {
+    id: 'challenge_50',
+    rewardAmber: 75,
+    title: 'Unyielding',
+    description: 'Complete 50 puzzles in Challenge Mode',
+    icon: '🗡️',
+    category: 'mastery',
+    check: (s) => s.challengeCompletions >= 50,
+  },
+  {
+    id: 'streak_100',
+    rewardAmber: 150,
+    title: 'Eternal',
+    description: 'Maintain a 100-day play streak',
+    icon: '♾️',
+    category: 'streak',
+    check: (s) => s.currentStreak >= 100,
+  },
+  {
+    id: 'daily_30',
+    rewardAmber: 60,
+    title: 'Faithful Visitor',
+    description: 'Complete 30 daily challenges',
+    icon: '📆',
+    category: 'journey',
+    check: (s) => s.dailyChallengesCompleted >= 30,
+  },
+  {
+    id: 'amber_5000',
+    rewardAmber: 100,
+    title: 'Amber Keeper',
+    description: 'Earn 5,000 total amber',
+    icon: '🔶',
+    category: 'collection',
+    check: (s) => s.amberEarned >= 5000,
+  },
 ];
 
 // In-memory cache

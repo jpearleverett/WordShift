@@ -158,7 +158,7 @@ mobile/
 │       ├── dailyLoginReward.ts  # Daily app-open reward (7-day escalating cycle, local-day bucketed)
 │       ├── phaseNarrative.ts    # ALL phase-aware text (victory, moves, hints, loading, etc.)
 │       ├── phaseEvents.ts       # Phase transition cinematic events
-│       ├── achievements.ts      # 34 achievements across 5 categories, each grants one-time amber
+│       ├── achievements.ts      # 40 achievements across 5 categories, each grants one-time amber
 │       ├── weeklyQuests.ts      # Weekly quest system (4 rotating quests)
 │       ├── puzzleVariety.ts     # Puzzle variant configs + unlock requirements
 │       ├── whisperGallery.ts    # Collectible whisper archive
@@ -317,7 +317,7 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 - Streak continuation: free only when the player played **yesterday** (local day); any longer gap consumes a streak freeze, else the streak resets to 1. Streak freeze: 50 amber, or a free one every 14 days — `checkFreeStreakFreeze()` runs once per session from App's launch effect (granted silently during onboarding; otherwise a one-time Alert tells the player their streak is protected)
 - Streak milestones: 3/7/14/21/30 days → 15/30/50/65/100 amber
 - Puzzle count milestones (10, 15, 25, 50... up to 350)
-- Achievement rewards: each of the 34 achievements grants one-time amber (10-100, `rewardAmber` in achievements.ts)
+- Achievement rewards: each of the 40 achievements grants one-time amber (10-150, `rewardAmber` in achievements.ts)
 - Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus`/`recordShareSuccess` in shareResults.ts; hinted on the share-card preview). The VictoryModal Share button opens a `ShareResultModal` preview of a phase-aware `ShareCard`; `shareImage.shareResultImage()` captures a PNG when `react-native-view-shot` is present (dev client) and otherwise falls back to the emoji-grid text share. **Daily shares are spoiler-free** (grid only — no word chain/incantation, since the daily is the same puzzle for everyone).
 - Daily login reward: rewards *opening the app* (not just solving) — a 7-day escalating cycle (10/15/20/25/30/40/75, Day-7 jackpot) that wraps weekly and resets on a missed day. `claimDailyLoginReward()` in `dailyLoginReward.ts`, claimed once per session from App's launch effect (skipped during onboarding), source `'daily_login'`. The grant is presented in a celebratory `DailyLoginModal` (7-day cycle, current day highlighted, Day-7 jackpot; phase-aware, reduced-motion aware)
 
