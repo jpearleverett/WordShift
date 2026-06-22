@@ -17,7 +17,7 @@ import {
   restorePurchases,
   IapProduct,
 } from '../../services/iap';
-import { isPatronSync } from '../../services/entitlements';
+import { isPatronSync, isAdFreeSync } from '../../services/entitlements';
 import { PATRON_AMBER_BONUS } from '../../constants/gameBalance';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
@@ -62,15 +62,20 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   const isDark = phase >= 3;
 
   const [isPatron, setIsPatron] = useState<boolean>(isPatronSync());
+  const [adFree, setAdFree] = useState<boolean>(isAdFreeSync());
   const [flow, setFlow] = useState<FlowState>('idle');
   const [priceString, setPriceString] = useState<string | null>(null);
+  const [adsPriceString, setAdsPriceString] = useState<string | null>(null);
 
   const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.9)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
 
-  // Sync Patron flag whenever the modal opens (cache may have warmed since mount).
+  // Sync entitlement flags whenever the modal opens (cache may have warmed since mount).
   useEffect(() => {
-    if (visible) setIsPatron(isPatronSync());
+    if (visible) {
+      setIsPatron(isPatronSync());
+      setAdFree(isAdFreeSync());
+    }
   }, [visible]);
 
   // Fetch a localized price string from the store when available. The NoOp
@@ -80,11 +85,18 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const products: IapProduct[] = await getProducts([PRODUCT_IDS.PATRON_KEY]);
+        const products: IapProduct[] = await getProducts([PRODUCT_IDS.PATRON_KEY, PRODUCT_IDS.REMOVE_ADS]);
         const patron = products.find(p => p.productId === PRODUCT_IDS.PATRON_KEY);
-        if (!cancelled) setPriceString(patron?.priceString ?? null);
+        const ads = products.find(p => p.productId === PRODUCT_IDS.REMOVE_ADS);
+        if (!cancelled) {
+          setPriceString(patron?.priceString ?? null);
+          setAdsPriceString(ads?.priceString ?? null);
+        }
       } catch {
-        if (!cancelled) setPriceString(null);
+        if (!cancelled) {
+          setPriceString(null);
+          setAdsPriceString(null);
+        }
       }
     })();
     return () => {
@@ -145,6 +157,30 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     }
   }, [flow, onPatronChange]);
 
+  const handlePurchaseRemoveAds = useCallback(async () => {
+    if (flow === 'working') return;
+    setFlow('working');
+    hapticLight();
+    try {
+      const result = await purchaseProduct(PRODUCT_IDS.REMOVE_ADS);
+      if (result.success) {
+        // adFree reads patron OR remove-ads; refresh both flags from cache.
+        setAdFree(isAdFreeSync());
+        setIsPatron(isPatronSync());
+        hapticMedium();
+        setFlow('idle');
+        return;
+      }
+      if (result.cancelled) {
+        setFlow('idle');
+        return;
+      }
+      setFlow('unavailable');
+    } catch {
+      setFlow('unavailable');
+    }
+  }, [flow]);
+
   const handleRestore = useCallback(async () => {
     if (flow === 'working') return;
     setFlow('working');
@@ -153,6 +189,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
       await restorePurchases();
       const patron = isPatronSync();
       setIsPatron(patron);
+      setAdFree(isAdFreeSync());
       onPatronChange?.(patron);
       if (patron) hapticMedium();
       setFlow('idle');
@@ -280,7 +317,35 @@ export const PatronModal: React.FC<PatronModalProps> = ({
             </TouchableOpacity>
           )}
 
-          {!isPatron && (
+          {/* Secondary, cheaper tier: Remove Ads — your 2x rewards instantly, no ad. */}
+          {!isPatron && !adFree && (
+            <View style={styles.removeAdsBlock}>
+              <Text style={[styles.removeAdsHint, { color: bodyColor }]}>
+                Just want the convenience? Skip the ads and claim your doubled
+                reward after each puzzle with a single tap.
+              </Text>
+              <TouchableOpacity
+                style={[styles.secondaryBtn, { borderColor: accent }]}
+                onPress={handlePurchaseRemoveAds}
+                disabled={flow === 'working'}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: flow === 'working' }}
+                accessibilityLabel="Remove ads"
+              >
+                <Text style={[styles.secondaryBtnText, { color: accent }]}>
+                  {adsPriceString ? `Remove Ads · ${adsPriceString}` : 'Remove Ads'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!isPatron && adFree && (
+            <Text style={[styles.adFreeNote, { color: bodyColor }]}>
+              Ads removed ✓ — your doubled reward is granted with a single tap.
+            </Text>
+          )}
+
+          {(!isPatron || !adFree) && (
             <TouchableOpacity
               style={styles.restoreBtn}
               onPress={handleRestore}
@@ -414,6 +479,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 0.3,
+  },
+  removeAdsBlock: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  removeAdsHint: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  secondaryBtn: {
+    paddingVertical: 13,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  adFreeNote: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 16,
   },
   restoreBtn: {
     marginTop: 12,

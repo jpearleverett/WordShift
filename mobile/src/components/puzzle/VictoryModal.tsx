@@ -33,6 +33,7 @@ import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { getRewardedDoubleLabel, getRewardedDoubleConfirm } from '../../services/phaseNarrative';
+import { isAdFreeSync } from '../../services/entitlements';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -606,14 +607,27 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         </Text>
                       </View>
                     </View>
-                    {/* Optional rewarded "double the reward" — opt-in, phase-aware,
-                        self-gates on provider/cap/Patron; app gates onboarding/early game */}
-                    {rewardedDoubleEnabled && !isOnboarding && (
+                    {/* Optional "double the reward". Ad-free players (Patron /
+                        Remove-Ads) get it granted instantly with no ad — their
+                        perk. Everyone else opts in by watching (the button
+                        self-gates on provider/cap). App gates onboarding/early game. */}
+                    {rewardedDoubleEnabled && !isOnboarding && onRewardedDouble && (
                       rewardedDoubleClaimed ? (
                         <Text style={[styles.rewardedDoubleConfirm, { color: phaseTheme.modalSecondaryTextColor }]}>
                           {'✓ '}{getRewardedDoubleConfirm(phase as DialoguePhase)}
                         </Text>
-                      ) : onRewardedDouble ? (
+                      ) : isAdFreeSync() ? (
+                        <TouchableOpacity
+                          style={[styles.freeDoubleButton, phase >= 3 ? styles.freeDoubleButtonDark : styles.freeDoubleButtonLight]}
+                          onPress={onRewardedDouble}
+                          accessibilityRole="button"
+                          accessibilityLabel={getRewardedDoubleLabel(phase as DialoguePhase)}
+                        >
+                          <Text style={[styles.freeDoubleText, phase >= 3 ? styles.freeDoubleTextDark : styles.freeDoubleTextLight]}>
+                            {'✦ '}{getRewardedDoubleLabel(phase as DialoguePhase)}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
                         <RewardedAdButton
                           placement="victory_double"
                           phase={phase}
@@ -621,7 +635,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                           onReward={onRewardedDouble}
                           style={styles.rewardedDoubleButton}
                         />
-                      ) : null
+                      )
                     )}
                     {/* Collect Now — compact pill inside amber stats box */}
                     {!isOnboarding && !victoryData.autoCollected && (
@@ -905,6 +919,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
   },
+  freeDoubleButton: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  freeDoubleButtonLight: {
+    backgroundColor: 'rgba(255, 201, 77, 0.16)',
+    borderColor: 'rgba(255, 201, 77, 0.45)',
+  },
+  freeDoubleButtonDark: {
+    backgroundColor: 'rgba(150, 90, 60, 0.18)',
+    borderColor: 'rgba(180, 110, 70, 0.4)',
+  },
+  freeDoubleText: { fontSize: 13.5, fontWeight: '800' },
+  freeDoubleTextLight: { color: '#FFD479' },
+  freeDoubleTextDark: { color: '#E0B080' },
   victoryFeedback: {
     fontSize: 13,
     fontWeight: '600',

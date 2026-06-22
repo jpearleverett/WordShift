@@ -120,15 +120,21 @@ const mockPurchaseProduct = jest.fn();
 const mockRestorePurchases = jest.fn();
 const mockGetProducts = jest.fn();
 jest.mock('../services/iap', () => ({
-  PRODUCT_IDS: { PATRON_KEY: 'com.wordshift.patron_key', COSMETIC_BUNDLE: 'com.wordshift.cosmetic_bundle' },
+  PRODUCT_IDS: {
+    PATRON_KEY: 'com.wordshift.patron_key',
+    COSMETIC_BUNDLE: 'com.wordshift.cosmetic_bundle',
+    REMOVE_ADS: 'com.wordshift.remove_ads',
+  },
   getProducts: (...args: unknown[]) => mockGetProducts(...args),
   purchaseProduct: (...args: unknown[]) => mockPurchaseProduct(...args),
   restorePurchases: (...args: unknown[]) => mockRestorePurchases(...args),
 }));
 
 let mockIsPatron = false;
+let mockIsAdFree = false;
 jest.mock('../services/entitlements', () => ({
   isPatronSync: () => mockIsPatron,
+  isAdFreeSync: () => mockIsPatron || mockIsAdFree,
 }));
 
 const mockShowRewarded = jest.fn();
@@ -209,6 +215,7 @@ async function renderC(Comp: (props: any) => unknown, props: Record<string, unkn
 beforeEach(() => {
   resetHookState();
   mockIsPatron = false;
+  mockIsAdFree = false;
   mockAdProviderName = 'Not Connected';
   mockPurchaseProduct.mockReset();
   mockRestorePurchases.mockReset();

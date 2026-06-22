@@ -27,6 +27,8 @@ import {
 export const PRODUCT_IDS = {
   PATRON_KEY: 'com.wordshift.patron_key',
   COSMETIC_BUNDLE: 'com.wordshift.cosmetic_bundle',
+  /** Remove Ads / Supporter — ad-free + the victory 2x granted with no ad. */
+  REMOVE_ADS: 'com.wordshift.remove_ads',
 } as const;
 
 export type ProductId = string;
@@ -116,6 +118,7 @@ export function isBillingReady(): boolean {
  */
 export function entitlementsForProduct(productId: ProductId): EntitlementKey[] {
   if (productId === PRODUCT_IDS.PATRON_KEY) return [ENTITLEMENTS.PATRON];
+  if (productId === PRODUCT_IDS.REMOVE_ADS) return [ENTITLEMENTS.ADFREE];
   return [productId];
 }
 
