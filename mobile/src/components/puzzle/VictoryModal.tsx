@@ -31,6 +31,8 @@ import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../servi
 import { getSettingsSync } from '../../services/settings';
 import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
+import { RewardedAdButton } from '../monetization/RewardedAdButton';
+import { getRewardedDoubleLabel, getRewardedDoubleConfirm } from '../../services/phaseNarrative';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -74,6 +76,12 @@ interface VictoryModalProps {
   dailyRank?: DailyRank | null;
   /** Quiet, spoiler-safe aggregate social-proof line (null = none / backend off) */
   socialProofLine?: string | null;
+  /** App-level gate for the optional rewarded "double the reward" affordance */
+  rewardedDoubleEnabled?: boolean;
+  /** True once the player has doubled this victory's reward */
+  rewardedDoubleClaimed?: boolean;
+  /** Grant the doubled reward (called on a completed rewarded view) */
+  onRewardedDouble?: () => void;
   victoryData: VictoryData | null;
   completionCoda?: { title: string; text: string } | null;
   cumulativeStats: CumulativeStats | null;
@@ -145,6 +153,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   isPlayingDaily,
   dailyRank,
   socialProofLine,
+  rewardedDoubleEnabled,
+  rewardedDoubleClaimed,
+  onRewardedDouble,
   victoryData,
   completionCoda,
   cumulativeStats,
@@ -595,6 +606,23 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         </Text>
                       </View>
                     </View>
+                    {/* Optional rewarded "double the reward" — opt-in, phase-aware,
+                        self-gates on provider/cap/Patron; app gates onboarding/early game */}
+                    {rewardedDoubleEnabled && !isOnboarding && (
+                      rewardedDoubleClaimed ? (
+                        <Text style={[styles.rewardedDoubleConfirm, { color: phaseTheme.modalSecondaryTextColor }]}>
+                          {'✓ '}{getRewardedDoubleConfirm(phase as DialoguePhase)}
+                        </Text>
+                      ) : onRewardedDouble ? (
+                        <RewardedAdButton
+                          placement="victory_double"
+                          phase={phase}
+                          label={getRewardedDoubleLabel(phase as DialoguePhase)}
+                          onReward={onRewardedDouble}
+                          style={styles.rewardedDoubleButton}
+                        />
+                      ) : null
+                    )}
                     {/* Collect Now — compact pill inside amber stats box */}
                     {!isOnboarding && !victoryData.autoCollected && (
                       <>
@@ -867,6 +895,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 2,
     opacity: 0.85,
+  },
+  rewardedDoubleButton: {
+    marginTop: 10,
+  },
+  rewardedDoubleConfirm: {
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 10,
   },
   victoryFeedback: {
     fontSize: 13,

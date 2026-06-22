@@ -323,6 +323,36 @@ export function getSpeedTimeUpMessage(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// REWARDED "DOUBLE THE REWARD" — opt-in, phase-aware, never a coin shout
+// ============================================================================
+
+const REWARDED_DOUBLE_LABELS: Record<DialoguePhase, string> = {
+  0: 'Double this reward',
+  1: 'Double this reward',
+  2: 'Linger a moment — double the offering',
+  3: 'Stay a while — double the offering',
+  4: 'Give it your attention — double the offering',
+  5: 'Tend it longer — double the offering',
+};
+
+const REWARDED_DOUBLE_CONFIRM: Record<DialoguePhase, string> = {
+  0: 'Reward doubled!',
+  1: 'Reward doubled!',
+  2: 'The offering is doubled.',
+  3: 'The offering is doubled.',
+  4: 'The offering is doubled.',
+  5: 'The offering is doubled.',
+};
+
+export function getRewardedDoubleLabel(phase: DialoguePhase): string {
+  return REWARDED_DOUBLE_LABELS[phase];
+}
+
+export function getRewardedDoubleConfirm(phase: DialoguePhase): string {
+  return REWARDED_DOUBLE_CONFIRM[phase];
+}
+
+// ============================================================================
 // WHISPER GALLERY EMPTY STATE — Shown when no whispers are collected yet
 // ============================================================================
 

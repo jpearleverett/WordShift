@@ -222,6 +222,8 @@ function MainApp() {
   const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
   // Quiet, spoiler-safe aggregate social-proof line for the victory modal
   const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
+  // Optional rewarded "double the reward" — one claim per victory
+  const [victoryDoubleClaimed, setVictoryDoubleClaimed] = useState(false);
 
   // Phase transition overlay state
   const [phaseTransitionEvent, setPhaseTransitionEvent] = useState<PhaseTransitionEvent | null>(null);
@@ -817,6 +819,7 @@ function MainApp() {
       // daily count (spoiler-safe, anonymous). No-op until the backend is on.
       recordPuzzleContribution(result.completedWords?.length ?? 0);
       setSocialProofLine(null);
+      setVictoryDoubleClaimed(false);
       (async () => {
         try {
           const proof = await getAggregateProof();
@@ -1344,6 +1347,21 @@ function MainApp() {
       transitionTo('pit');
     });
   }, [puzzleActions, transitionTo, startVictoryExitFlow]);
+
+  // Optional rewarded "double the reward": credits a bonus equal to this
+  // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
+  // per victory. Inert until a real ad provider is connected.
+  const handleRewardedDouble = useCallback(async () => {
+    const earned = victoryFlow.victoryData?.amberEarned ?? 0;
+    if (earned <= 0 || victoryDoubleClaimed) return;
+    try {
+      const newBalance = await awardBonusAmber(earned, 'rewarded_victory_double');
+      persistenceActions.setAmberBalance(newBalance);
+      setVictoryDoubleClaimed(true);
+    } catch {
+      // Non-critical — never block the victory flow.
+    }
+  }, [victoryFlow.victoryData, victoryDoubleClaimed, persistenceActions]);
 
   // Share opens a preview of the result card (which shares an image when the
   // native capturer is present, else falls back to the emoji-grid text share).
@@ -2001,6 +2019,9 @@ function MainApp() {
           isPlayingDaily={isPlayingDaily}
           dailyRank={dailyRank}
           socialProofLine={socialProofLine}
+          rewardedDoubleEnabled={(persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) > AUTO_COLLECT_PUZZLE_LIMIT}
+          rewardedDoubleClaimed={victoryDoubleClaimed}
+          onRewardedDouble={handleRewardedDouble}
           victoryData={victoryFlow.victoryData}
           completionCoda={orchestration.completionCoda}
           cumulativeStats={persistence.cumulativeStats}
