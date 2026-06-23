@@ -1,0 +1,162 @@
+/**
+ * RevenueCat billing provider (drop-in adapter).
+ *
+ * Implements the `BillingProvider` interface from `iap.ts` on top of
+ * `react-native-purchases`. It is INERT until two things are true:
+ *   1. `react-native-purchases` is installed (it's a native module — needs a
+ *      dev/production build, not Expo Go), and
+ *   2. a RevenueCat public SDK key is provided (via the `config` argument or
+ *      `app.json` → `expo.extra.revenueCatIosKey` / `revenueCatAndroidKey`).
+ *
+ * Until then every method degrades exactly like the NoOp provider (`isReady()`
+ * returns false, purchases fail cleanly), so registering it with
+ * `setBillingProvider()` is always safe. The native module is loaded with a
+ * guarded dynamic `require` INSIDE `initialize()` so this file imports cleanly
+ * under Jest / typecheck / Expo Go where the module is absent.
+ *
+ * Wiring (after `npx expo install react-native-purchases` + adding keys):
+ *   import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
+ *   setBillingProvider(createRevenueCatBillingProvider());
+ *   // ...then the existing `await initIAP()` in the App bootstrap configures it.
+ *
+ * RevenueCat dashboard setup: create Entitlements named `patron` and `adfree`
+ * and attach the matching store products (`com.wordshift.patron_key`,
+ * `com.wordshift.remove_ads`). Active entitlement identifiers map straight to
+ * `ENTITLEMENTS.PATRON` / `ENTITLEMENTS.ADFREE`.
+ */
+
+import { Platform } from 'react-native';
+import {
+  BillingProvider,
+  IapProduct,
+  ProductId,
+  PurchaseResult,
+} from '../iap';
+import { EntitlementKey } from '../entitlements';
+
+export interface RevenueCatConfig {
+  /** RevenueCat public SDK key for the Apple App Store. */
+  iosKey?: string;
+  /** RevenueCat public SDK key for the Google Play Store. */
+  androidKey?: string;
+}
+
+/** Pull keys from app.json → expo.extra when not passed explicitly. */
+function keyFromExtra(): string | undefined {
+  try {
+    // Lazy require so the file stays importable if expo-constants is absent.
+    const Constants = require('expo-constants').default ?? require('expo-constants');
+    const extra = Constants?.expoConfig?.extra ?? Constants?.manifest?.extra ?? {};
+    return Platform.OS === 'ios' ? extra.revenueCatIosKey : extra.revenueCatAndroidKey;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Guarded load of the native SDK. Returns null when it isn't installed. */
+function loadPurchases(): any | null {
+  try {
+    const mod = require('react-native-purchases');
+    return mod?.default ?? mod;
+  } catch {
+    return null;
+  }
+}
+
+export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): BillingProvider {
+  let Purchases: any | null = null;
+  let ready = false;
+
+  /** Translate a RevenueCat customerInfo into our entitlement key set. */
+  function entitlementsFrom(customerInfo: any): EntitlementKey[] {
+    const active = customerInfo?.entitlements?.active ?? {};
+    // RevenueCat entitlement identifiers are configured as 'patron'/'adfree',
+    // which already equal our ENTITLEMENTS values — pass them straight through.
+    return Object.keys(active);
+  }
+
+  return {
+    getName(): string {
+      return 'RevenueCat';
+    },
+
+    isReady(): boolean {
+      return ready;
+    },
+
+    async initialize(): Promise<void> {
+      const apiKey =
+        (Platform.OS === 'ios' ? config.iosKey : config.androidKey) ?? keyFromExtra();
+      if (!apiKey) {
+        // No key configured yet — stay inert.
+        return;
+      }
+      const mod = loadPurchases();
+      if (!mod) {
+        // SDK not installed (e.g. Expo Go) — stay inert.
+        return;
+      }
+      try {
+        await mod.configure({ apiKey });
+        Purchases = mod;
+        ready = true;
+      } catch (error) {
+        console.warn('[IAP] RevenueCat configure failed:', error);
+        ready = false;
+      }
+    },
+
+    async getProducts(productIds: ProductId[]): Promise<IapProduct[]> {
+      if (!ready || !Purchases) return [];
+      try {
+        const products: any[] = await Purchases.getProducts(productIds);
+        return (products ?? []).map((p) => ({
+          productId: p.identifier,
+          title: p.title ?? p.identifier,
+          description: p.description ?? '',
+          priceString: p.priceString ?? '',
+        }));
+      } catch (error) {
+        console.warn('[IAP] RevenueCat getProducts failed:', error);
+        return [];
+      }
+    },
+
+    async purchase(productId: ProductId): Promise<PurchaseResult> {
+      if (!ready || !Purchases) {
+        return { success: false, productId, error: 'billing_unavailable' };
+      }
+      try {
+        // Fetch the store product object RevenueCat needs to start a purchase.
+        const products: any[] = await Purchases.getProducts([productId]);
+        const product = (products ?? []).find((p) => p.identifier === productId) ?? products?.[0];
+        if (!product) {
+          return { success: false, productId, error: 'product_not_found' };
+        }
+        const { customerInfo } = await Purchases.purchaseStoreProduct(product);
+        return {
+          success: true,
+          productId,
+          entitlements: entitlementsFrom(customerInfo),
+        };
+      } catch (error: any) {
+        if (error?.userCancelled) {
+          return { success: false, productId, cancelled: true };
+        }
+        console.warn('[IAP] RevenueCat purchase failed:', error);
+        return { success: false, productId, error: error?.message ?? 'purchase_failed' };
+      }
+    },
+
+    async restorePurchases(): Promise<{ entitlements: EntitlementKey[] }> {
+      if (!ready || !Purchases) return { entitlements: [] };
+      try {
+        const customerInfo = await Purchases.restorePurchases();
+        return { entitlements: entitlementsFrom(customerInfo) };
+      } catch (error) {
+        console.warn('[IAP] RevenueCat restore failed:', error);
+        return { entitlements: [] };
+      }
+    },
+  };
+}

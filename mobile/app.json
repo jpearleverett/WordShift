@@ -53,7 +53,13 @@
       "telemetryEndpoint": "",
       "supabaseUrl": "",
       "supabaseAnonKey": "",
-      "sentryDsn": ""
+      "sentryDsn": "",
+      "revenueCatIosKey": "",
+      "revenueCatAndroidKey": "",
+      "admobInterstitialIdIos": "",
+      "admobInterstitialIdAndroid": "",
+      "admobRewardedIdIos": "",
+      "admobRewardedIdAndroid": ""
     }
   }
 }
