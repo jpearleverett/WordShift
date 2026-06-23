@@ -27,7 +27,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -65,7 +67,11 @@
       "admobInterstitialIdIos": "",
       "admobInterstitialIdAndroid": "ca-app-pub-6575205005908086/1853886149",
       "admobRewardedIdIos": "",
-      "admobRewardedIdAndroid": "ca-app-pub-6575205005908086/4565855562"
-    }
+      "admobRewardedIdAndroid": "ca-app-pub-6575205005908086/4565855562",
+      "eas": {
+        "projectId": "e8c8c0b5-f666-472d-91bf-3b055d96be23"
+      }
+    },
+    "owner": "jpearleverett"
   }
 }
