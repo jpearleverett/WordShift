@@ -89,9 +89,10 @@ import {
   markPromptedForNotifications,
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
-import { initIAP } from './src/services/iap';
+import { initIAP, setBillingProvider } from './src/services/iap';
 import { initAds } from './src/services/ads';
 import { initCosmetics } from './src/services/cosmetics';
+import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
@@ -2306,6 +2307,9 @@ export default function App() {
         // providers so isPatronSync() and ad gating read correct values. Safe in
         // Expo Go — no native modules until a real provider is wired.
         initShareImage(); // registers the native image capturer if present (no-op in Expo Go)
+        // RevenueCat billing: inert until react-native-purchases is installed AND
+        // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
+        setBillingProvider(createRevenueCatBillingProvider());
         await Promise.all([initIAP(), initAds(), initCosmetics()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);

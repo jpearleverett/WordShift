@@ -34,3 +34,6 @@ yarn-error.*
 src/data/.reverseBank*_phase*.json
 src/data/.reverseBank*_phase*.json.bak
 src/data/.reverseBank*_phase*.json.tmp
+
+# EAS / store credentials — never commit
+secrets/

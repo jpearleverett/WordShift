@@ -170,3 +170,10 @@ same `setErrorForwarder()` seam in `src/services/errorReporting.ts`.
 - `eas init` to populate `expo.extra.eas.projectId` / `owner`.
 - Fill `eas.json` → `submit.production` with App Store Connect / Play Console
   credentials before `eas submit`.
+
+## 4. Monetization (in-app purchases + ads)
+
+Separate, also drop-in. The RevenueCat (IAP) and AdMob (ads) provider adapters are
+already written behind the `iap.ts` / `ads.ts` seams and stay inert until you
+install the SDKs and add keys. See **`docs/MONETIZATION_SETUP.md`** for the exact
+steps.

@@ -32,7 +32,7 @@ export interface NotificationPreferences {
 
 interface ScheduledNotification {
   id: string;
-  type: 'daily_reminder' | 'reengagement' | 'streak_risk' | 'animal_message';
+  type: 'daily_reminder' | 'reengagement' | 'streak_risk' | 'animal_message' | 'quest_expiry';
   scheduledAt: number;
 }
 
@@ -122,6 +122,35 @@ const STREAK_RISK_MESSAGES: Record<number, string[]> = {
   5: [
     '{streak} days. The pattern holds, if you wish it to.',
     'The chain rests at {streak} days. It will wait — but not forever.',
+  ],
+};
+
+// Fires the evening before the weekly quest reset when the player has quest
+// progress that would otherwise expire unclaimed. Phase-aware tone.
+const QUEST_EXPIRY_MESSAGES: Record<number, string[]> = {
+  0: [
+    'Your weekly quests reset soon — finish them before they\'re gone!',
+    'Last chance this week! Wrap up your quests for bonus amber.',
+  ],
+  1: [
+    'The week\'s arrangements close soon. A few remain unfinished.',
+    'Your weekly quests fade at the turn of the week. Claim what\'s yours.',
+  ],
+  2: [
+    'The week\'s tasks dissolve soon. The unfinished ones simply... vanish.',
+    'Loose threads remain in this week\'s pattern. The reset will not wait.',
+  ],
+  3: [
+    'The week closes. What you leave undone will not be offered again.',
+    'The quests expire at the turn. The pattern dislikes loose ends.',
+  ],
+  4: [
+    'The week\'s offerings expire soon. Complete them before the reset takes them.',
+    'Unfinished work returns to the void at week\'s end. Finish it.',
+  ],
+  5: [
+    'The week turns soon. Tend what remains, if you wish.',
+    'A few tasks still wait this week. They will quietly reset, unhurried.',
   ],
 };
 
@@ -295,6 +324,13 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
       await scheduleStreakRisk(mod, currentPhase, streak);
     }
     await scheduleReengagement(mod, currentPhase, hasStreakRisk ? 2 : 1);
+
+    // Weekly-quest-expiry nudge: the evening before the weekly reset, but only
+    // when the player has quests in flight (progress made, or completed-but-
+    // unclaimed amber waiting). Players who never touch quests are not nagged.
+    if (await shouldRemindQuestExpirySafe(currentPhase)) {
+      await scheduleQuestExpiry(mod, currentPhase);
+    }
   }
 }
 
@@ -331,6 +367,15 @@ export function getStreakRiskMessage(phase: number, streak: number): string {
   const messages = STREAK_RISK_MESSAGES[clampedPhase];
   const template = messages[Math.floor(Math.random() * messages.length)];
   return template.replace(/\{streak\}/g, String(streak));
+}
+
+/**
+ * Get a phase-aware weekly-quest-expiry message.
+ */
+export function getQuestExpiryMessage(phase: number): string {
+  const clampedPhase = Math.min(5, Math.max(0, phase));
+  const messages = QUEST_EXPIRY_MESSAGES[clampedPhase];
+  return messages[Math.floor(Math.random() * messages.length)];
 }
 
 // ============================================================================
@@ -442,6 +487,58 @@ async function hasPlayedTodaySafe(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Whether a weekly-quest-expiry reminder is worth scheduling. True only when the
+ * player has skin in the game this week — an in-progress (but not completed)
+ * weekly quest, or a completed-but-unclaimed reward. Read via a lazy require so
+ * notifications never form a static import cycle with the quest service.
+ */
+async function shouldRemindQuestExpirySafe(phase: number): Promise<boolean> {
+  try {
+    const { loadWeeklyQuests, getUnclaimedAmber } = require('./weeklyQuests');
+    const state = await loadWeeklyQuests(phase);
+    if (getUnclaimedAmber(state, phase) > 0) return true;
+    return (state?.weekly?.quests ?? []).some(
+      (q: { progress: number; completed: boolean }) => q.progress > 0 && !q.completed
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function scheduleQuestExpiry(mod: any, phase: number): Promise<void> {
+  const message = getQuestExpiryMessage(phase);
+  try {
+    // Weekly quests reset at the local-Monday boundary. Fire the reminder the
+    // evening before (Sunday 6pm). Rescheduled every session, so it always
+    // points at the upcoming reset and drops once the player finishes/claims.
+    const now = new Date();
+    const day = now.getDay(); // 0 = Sunday ... 1 = Monday
+    let daysUntilMonday = (1 - day + 7) % 7;
+    if (daysUntilMonday === 0) daysUntilMonday = 7; // today is Monday → next week
+    const nextMonday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + daysUntilMonday,
+      0, 0, 0, 0
+    );
+    // 6 hours before the reset = Sunday 18:00 local.
+    const triggerDate = new Date(nextMonday.getTime() - 6 * 60 * 60 * 1000);
+    if (triggerDate.getTime() <= now.getTime()) return; // window already passed this week
+
+    await mod.scheduleNotificationAsync({
+      content: {
+        title: 'WordShift',
+        body: message,
+        sound: true,
+      },
+      trigger: {
+        date: triggerDate,
+      },
+    });
+  } catch {}
 }
 
 async function scheduleStreakRisk(
