@@ -47,6 +47,12 @@
           "icon": "./assets/notification-icon.png",
           "color": "#667EEA"
         }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-6575205005908086~2045457833"
+        }
       ]
     ],
     "extra": {
@@ -57,9 +63,9 @@
       "revenueCatIosKey": "",
       "revenueCatAndroidKey": "goog_kjsyIEiIlaWqKPxzmdXDavZqkfn",
       "admobInterstitialIdIos": "",
-      "admobInterstitialIdAndroid": "",
+      "admobInterstitialIdAndroid": "ca-app-pub-6575205005908086/1853886149",
       "admobRewardedIdIos": "",
-      "admobRewardedIdAndroid": ""
+      "admobRewardedIdAndroid": "ca-app-pub-6575205005908086/4565855562"
     }
   }
 }
