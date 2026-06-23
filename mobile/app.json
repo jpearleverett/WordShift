@@ -40,7 +40,7 @@
         "backgroundColor": "#FFF0F5"
       },
       "package": "com.wordshift.app",
-      "versionCode": 1
+      "versionCode": 3
     },
     "plugins": [
       [
