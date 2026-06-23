@@ -90,9 +90,10 @@ import {
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
 import { initIAP, setBillingProvider } from './src/services/iap';
-import { initAds } from './src/services/ads';
+import { initAds, setAdProvider } from './src/services/ads';
 import { initCosmetics } from './src/services/cosmetics';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
+import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
@@ -2310,6 +2311,10 @@ export default function App() {
         // RevenueCat billing: inert until react-native-purchases is installed AND
         // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
         setBillingProvider(createRevenueCatBillingProvider());
+        // AdMob: inert until react-native-google-mobile-ads is installed AND the
+        // admob*Id* keys are set in app.json → extra. initAds() initializes it
+        // (and the adapter requests GDPR/UMP consent on init).
+        setAdProvider(createAdMobAdProvider());
         await Promise.all([initIAP(), initAds(), initCosmetics()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);

@@ -170,6 +170,19 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
       try {
         await mod().initialize();
         ready = true;
+        // GDPR/UMP consent (EEA/UK). Non-fatal — outside those regions it's a
+        // no-op, and on failure ads still serve as non-personalized.
+        try {
+          const AdsConsent = mod.AdsConsent;
+          if (AdsConsent) {
+            await AdsConsent.requestInfoUpdate();
+            if (typeof AdsConsent.loadAndShowConsentFormIfRequired === 'function') {
+              await AdsConsent.loadAndShowConsentFormIfRequired();
+            }
+          }
+        } catch {
+          /* non-fatal */
+        }
         // Warm one of each so the first show is instant.
         await Promise.all([preloadInterstitial(), preloadRewarded()]);
       } catch (error) {
