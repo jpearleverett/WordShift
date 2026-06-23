@@ -27,7 +27,7 @@ spoiling the reveal, while the age rating must declare it honestly.
 > modes, timed Speed runs, and a Daily Challenge shared by every player.
 >
 > 🔥 **Keep your streak.** Daily streaks with streak freezes to protect them,
-> weekly quests, and 34 achievements.
+> weekly quests, and 40 achievements.
 >
 > 🌙 **Stay a while.** The animals have so much to tell you. They find you
 > fascinating. They're so glad you're here.
@@ -36,8 +36,10 @@ spoiling the reveal, while the age rating must declare it honestly.
 >
 > ---
 >
-> No accounts. No ads. Fully playable offline. A slow-burn story for players
-> 12+ — things in the cozy house are not quite what they seem.
+> No accounts required. Core puzzles play offline. Free to play, with optional
+> ads and a couple of cosmetic/convenience purchases — including a one-time
+> Remove Ads if you'd rather not see them. A slow-burn story for players 13+ —
+> things in the cozy house are not quite what they seem.
 
 ## Keywords (iOS, ≤100 chars)
 
@@ -48,7 +50,20 @@ spoiling the reveal, while the age rating must declare it honestly.
 - **ESRB:** Teen (fantasy themes, mild horror) — answer "infrequent/mild horror/fear themes" honestly in the questionnaire.
 - **PEGI:** 12 (moderate horror themes, no violence, no profanity — dictionary is filtered).
 - **Apple:** 12+ — "Infrequent/Mild Horror/Fear Themes."
-- Declare **no data collection** (Play Data Safety / Apple Privacy Nutrition): `TELEMETRY_ENDPOINT` is empty and nothing is transmitted.
+- **Contains ads:** Yes (Google AdMob — interstitial + opt-in rewarded). Declare it in the Play "Ads" question.
+- **Target audience:** 13+ (do not target children — ads + dark themes). Avoids the Families policy.
+
+## Data safety / privacy (Play Data Safety + Apple Privacy)
+
+Backend features are LIVE (Supabase + Sentry + AdMob + Google Play Billing), so you must declare data collection — do **not** mark "no data collected". Declare:
+
+- **App activity / analytics** — anonymous events (install id, platform, app version, event type) → Supabase. Purpose: analytics. Not linked to identity, not shared for ads.
+- **Crash logs / diagnostics** — device model, OS, app version, stack traces → Sentry. Purpose: app functionality / diagnostics.
+- **Device or other IDs — Advertising ID** — collected by Google AdMob. Purpose: advertising/marketing. May be shared with Google.
+- **Purchase history** — entitlement records via Google Play Billing / RevenueCat. Purpose: app functionality.
+- **App info & performance / "Other" save data** — optional cloud backup (game save under a random install id) + daily leaderboard result (time/stars/hints) → Supabase, only if the player uses those features.
+
+Privacy policy URL (required): `https://jpearleverett.github.io/WordShift/privacy-policy/` (enable GitHub Pages: repo → Settings → Pages → deploy from branch, `/docs`).
 
 ## Asset checklist
 
