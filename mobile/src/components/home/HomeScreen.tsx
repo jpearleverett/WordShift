@@ -103,7 +103,7 @@ import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
 import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
-import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade } from '../../services/roomUpgrades';
+import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade, areDeepeningsAvailable, getDeepenedRooms, getRoomDeepening, purchaseRoomDeepening } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
@@ -216,6 +216,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
+  const [purchasedDeepenings, setPurchasedDeepenings] = useState<Record<string, number>>({});
   const [tendingLevel, setTendingLevel] = useState(0);
   const [upgradeFeedback, setUpgradeFeedback] = useState<string | null>(null);
 
@@ -289,9 +290,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     });
     setWeeklyQuestState(questState);
 
-    // Load room upgrades
+    // Load room upgrades (tier 1) + deepenings (tier 2)
     const upgrades = await getPurchasedUpgrades();
     setPurchasedUpgrades(upgrades);
+    setPurchasedDeepenings(await getDeepenedRooms());
 
     // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
     setTendingLevel(await getTendingLevel());
@@ -328,6 +330,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       })
       .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => entry !== null);
   }, [rooms, purchasedUpgrades, progress]);
+
+  // Tier-2 "deepenings": a room is eligible once its tier-1 decoration is in
+  // place and the deepening hasn't been bought. Fills the Phase-3 spend valley.
+  const availableRoomDeepenings = useMemo(() => {
+    if (!progress) return [];
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => {
+        const deepening = getRoomDeepening(room.id);
+        if (!deepening) return null;
+        if (!purchasedUpgrades[room.id]) return null; // tier-1 required first
+        if (purchasedDeepenings[room.id]) return null;
+        return { room, deepening };
+      })
+      .filter((entry): entry is { room: Room; deepening: NonNullable<ReturnType<typeof getRoomDeepening>> } => entry !== null);
+  }, [rooms, purchasedUpgrades, purchasedDeepenings, progress]);
 
   const isPostTutorialLightMode = useMemo(() => {
     if (!progress || isOnboarding) return false;
@@ -796,6 +814,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onAmberChange?.(spendResult.newBalance);
     setUpgradeFeedback(`${upgrade.name} added to ${rooms.find(r => r.id === roomId)?.name || 'the room'}.`);
     logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: upgrade.cost } });
+    await loadAllData();
+  }, [progress, onAmberChange, rooms, loadAllData]);
+
+  const handlePurchaseDeepening = useCallback(async (roomId: string) => {
+    if (!progress) return;
+    const deepening = getRoomDeepening(roomId);
+    if (!deepening) return;
+
+    const spendResult = await spendAmber(deepening.cost, `room_deepening_${roomId}`);
+    if (!spendResult.success) {
+      setUpgradeFeedback('Not enough amber for that yet.');
+      return;
+    }
+
+    const purchased = await purchaseRoomDeepening(roomId);
+    if (!purchased) {
+      setUpgradeFeedback('That change is already in place.');
+      return;
+    }
+
+    onAmberChange?.(spendResult.newBalance);
+    setUpgradeFeedback(`${deepening.name} settles into ${rooms.find(r => r.id === roomId)?.name || 'the room'}.`);
+    logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: deepening.cost, tier: 2 } });
     await loadAllData();
   }, [progress, onAmberChange, rooms, loadAllData]);
 
@@ -1608,6 +1649,42 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </View>
                   ))
                 )}
+              </View>
+            )}
+
+            {areDeepeningsAvailable(progress.currentPhase) && availableRoomDeepenings.length > 0 && (
+              <View style={styles.upgradeSection}>
+                <Text style={styles.nextUnlockLabel}>The House Deepens</Text>
+                {availableRoomDeepenings.slice(0, 4).map(({ room, deepening }) => (
+                  <View
+                    key={`deepen_${room.id}`}
+                    style={[styles.unlockItem, styles.upgradeItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                  >
+                    <View style={styles.unlockInfo}>
+                      <Text style={[styles.unlockName, { color: dt.textColor }]}>{room.name}: {deepening.name}</Text>
+                      <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                        {deepening.description}
+                      </Text>
+                      <Text style={styles.unlockCost}><AmberInline /> {deepening.cost} amber</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[
+                        styles.buyButton,
+                        progress.amber < deepening.cost && styles.buyButtonDisabled,
+                      ]}
+                      onPress={() => {
+                        handlePurchaseDeepening(room.id).catch(() => {});
+                      }}
+                      disabled={progress.amber < deepening.cost}
+                      accessibilityLabel={`Deepen ${room.name} with ${deepening.name} for ${deepening.cost} amber`}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.buyButtonText}>
+                        {progress.amber >= deepening.cost ? 'Deepen' : 'Need More'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
               </View>
             )}
 

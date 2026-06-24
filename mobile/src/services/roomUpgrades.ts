@@ -24,8 +24,10 @@ export interface RoomUpgrade {
 }
 
 export interface RoomUpgradeState {
-  /** Map of roomId → timestamp when purchased */
+  /** Map of roomId → timestamp when the (tier-1) decoration was purchased */
   purchased: Record<string, number>;
+  /** Map of roomId → timestamp when the (tier-2) "deepening" was purchased */
+  deepened: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +108,76 @@ export const ROOM_UPGRADES: RoomUpgrade[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Tier-2 "deepenings" (1 per room) — a second, costlier enhancement that opens
+// at Phase 3, filling the mid-game spend valley (~puzzle 130–155) after the
+// tier-1 decorations are exhausted and before the Phase-4 climax. Cosmetic only
+// (never progression). Copy leans into the growing dread — these are not cozy.
+// ---------------------------------------------------------------------------
+
+export const ROOM_DEEPENINGS: RoomUpgrade[] = [
+  {
+    roomId: 'cozy_den',
+    name: 'Ashen Mantel',
+    description: 'The hearth is reset in dark stone. The fire keeps a colder light.',
+    cost: 175,
+  },
+  {
+    roomId: 'kitchen',
+    name: 'Salt Circle',
+    description: 'A ring of salt poured around the table. Panko says it\'s for the bread.',
+    cost: 175,
+  },
+  {
+    roomId: 'study',
+    name: 'Marginalia',
+    description: 'Every book now carries the same handwriting in its margins. None remember writing it.',
+    cost: 200,
+  },
+  {
+    roomId: 'aquarium',
+    name: 'Still Water',
+    description: 'The tank no longer ripples. Axel watches it more than he used to.',
+    cost: 200,
+  },
+  {
+    roomId: 'jungle_room',
+    name: 'Inward Bloom',
+    description: 'The flowers have turned to face the center of the house, all of them, at once.',
+    cost: 200,
+  },
+  {
+    roomId: 'desert_room',
+    name: 'New Constellation',
+    description: 'A shape has been added to the star map. Fennick swears it wasn\'t there.',
+    cost: 225,
+  },
+  {
+    roomId: 'office',
+    name: 'Second Shadow',
+    description: 'The lamp throws two shadows now. Chill has filed the discrepancy and moved on.',
+    cost: 225,
+  },
+  {
+    roomId: 'burrow',
+    name: 'Listening Crystals',
+    description: 'The crystals have grown toward the surface. Warren leaves them be.',
+    cost: 250,
+  },
+  {
+    roomId: 'garden',
+    name: 'Tuned Chimes',
+    description: 'The chimes have settled on a single note. Thyme hums it without noticing.',
+    cost: 250,
+  },
+  {
+    roomId: 'bamboo_attic',
+    name: 'Risen Lanterns',
+    description: 'The lanterns hold near the rafters now, steady, like they\'re waiting. Bamboo is at peace with it.',
+    cost: 300,
+  },
+];
+
+// ---------------------------------------------------------------------------
 // In-memory cache
 // ---------------------------------------------------------------------------
 
@@ -122,12 +194,13 @@ async function loadState(): Promise<RoomUpgradeState> {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (parsed && typeof parsed.purchased === 'object') {
-        cache = parsed;
+        // Normalize: older saves predate the `deepened` map.
+        cache = { purchased: parsed.purchased ?? {}, deepened: parsed.deepened ?? {} };
         return cache!;
       }
     }
   } catch { /* ignore */ }
-  cache = { purchased: {} };
+  cache = { purchased: {}, deepened: {} };
   return cache;
 }
 
@@ -191,9 +264,57 @@ export function getUpgradeDescription(roomId: string, phase: DialoguePhase): str
   return upgrade.description;
 }
 
+// ---------------------------------------------------------------------------
+// Tier-2 "deepening" API (mirrors the tier-1 functions above)
+// ---------------------------------------------------------------------------
+
+/** Get the deepening (tier-2) definition for a room, or undefined if none. */
+export function getRoomDeepening(roomId: string): RoomUpgrade | undefined {
+  return ROOM_DEEPENINGS.find(u => u.roomId === roomId);
+}
+
+/** Whether a room's deepening (tier-2) has been purchased. */
+export async function isRoomDeepened(roomId: string): Promise<boolean> {
+  const state = await loadState();
+  return roomId in state.deepened;
+}
+
+/** All purchased deepening (tier-2) roomId → timestamp. */
+export async function getDeepenedRooms(): Promise<Record<string, number>> {
+  const state = await loadState();
+  return { ...state.deepened };
+}
+
+/**
+ * Deepenings open at Phase 3 — they land in the ~puzzle 130–155 spend valley,
+ * after the tier-1 decorations (Phase 2+) have been the earlier amber sink.
+ */
+export function areDeepeningsAvailable(phase: DialoguePhase): boolean {
+  return (phase as number) >= 3;
+}
+
+/**
+ * Purchase a room's deepening (tier-2). Requires the tier-1 decoration to be in
+ * place first (you deepen a room you've already dressed). Returns false if no
+ * deepening exists, the tier-1 upgrade isn't purchased, or it's already bought.
+ * Does NOT spend amber — caller must call spendAmber first (mirrors tier-1).
+ */
+export async function purchaseRoomDeepening(roomId: string): Promise<boolean> {
+  const deepening = getRoomDeepening(roomId);
+  if (!deepening) return false;
+
+  const state = await loadState();
+  if (!(roomId in state.purchased)) return false; // tier-1 required first
+  if (roomId in state.deepened) return false;
+
+  state.deepened[roomId] = Date.now();
+  await saveState();
+  return true;
+}
+
 /** Clear all room upgrade data (for Reset All Data). */
 export async function clearRoomUpgrades(): Promise<void> {
-  cache = { purchased: {} };
+  cache = { purchased: {}, deepened: {} };
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch { /* ignore */ }
