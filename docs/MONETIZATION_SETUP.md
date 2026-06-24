@@ -1,6 +1,12 @@
 # WordShift Monetization Setup (drop-in)
 
-Like the backend, monetization is **disabled by default**. The app ships and runs
+> **Status:** ✅ Completed for Android. Both adapters are wired in `App.tsx`, the
+> native SDKs are installed, and RevenueCat (`revenueCatAndroidKey`) + AdMob
+> (app id in the config plugin, unit ids in `extra`) are configured in
+> `app.json`. iOS keys are intentionally left blank. The guide below remains the
+> reference for re-doing this or adding iOS.
+
+Like the backend, monetization is **disabled by default** (until wired as below). The app ships and runs
 in Expo Go with no purchases and no ads. Two provider adapters are already written
 against the `BillingProvider` / `AdProvider` seams in `src/services/iap.ts` and
 `src/services/ads.ts`:

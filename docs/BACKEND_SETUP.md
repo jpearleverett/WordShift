@@ -1,9 +1,14 @@
 # WordShift Backend Setup (optional, drop-in)
 
-Everything below is **disabled by default**. The app ships and runs in Expo Go
-with zero network calls until you fill in credentials in `mobile/app.json`
-under `expo.extra`. No native SDKs are added — all integrations use plain
-`fetch`, so Expo Go keeps working.
+> **Status:** ✅ Configured. `supabaseUrl` + `supabaseAnonKey` (cloud save,
+> leaderboard, social proof, analytics) and `sentryDsn` (crash reporting) are set
+> in `app.json` → `expo.extra`, and the Supabase SQL below has been run. The
+> guide remains the reference for re-provisioning or pointing at a new project.
+
+Everything below is **disabled by default** (until credentials are filled in, as
+they now are). The app ships and runs in Expo Go with zero network calls until you
+fill in credentials in `mobile/app.json` under `expo.extra`. No native SDKs are
+added — all integrations use plain `fetch`, so Expo Go keeps working.
 
 > **Privacy:** before enabling any of these, update `docs/privacy-policy.md`
 > to disclose cloud save, analytics, and crash reporting, and review the data
