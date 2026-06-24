@@ -571,7 +571,7 @@ mobile/assets/
 - **Narrative consistency**: Any new feature must respect current phase. Cheerful-only-at-Phase-0.
 - **No over-engineering**: Only make directly requested changes. Don't add features, refactoring, or docstrings beyond what's asked.
 - Accessibility: `accessibilityLabel` and `accessibilityRole` on interactive elements; never convey information by color alone (see the ✓/✗ slot-preview prefixes); dark-phase text colors must hold ≥4.5:1 contrast against their backgrounds
-- Store/legal: privacy policy + terms live in `docs/` (GitHub Pages); Settings links route through `src/constants/links.ts`
+- Store/legal: privacy policy, terms, and data-deletion pages are **live and publicly accessible** via GitHub Pages (served from `docs/`). All three URLs are wired into `src/constants/links.ts` and surfaced in Settings → About (Privacy Policy / Terms of Service / Data Deletion rows); store-listing metadata in `docs/STORE_LISTING.md` points at the same live URLs
 
 ## Testing Patterns
 

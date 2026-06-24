@@ -63,7 +63,11 @@ Backend features are LIVE (Supabase + Sentry + AdMob + Google Play Billing), so 
 - **Purchase history** — entitlement records via Google Play Billing / RevenueCat. Purpose: app functionality.
 - **App info & performance / "Other" save data** — optional cloud backup (game save under a random install id) + daily leaderboard result (time/stars/hints) → Supabase, only if the player uses those features.
 
-Privacy policy URL (required): `https://jpearleverett.github.io/WordShift/privacy-policy/` (enable GitHub Pages: repo → Settings → Pages → deploy from branch, `/docs`).
+Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from branch, `/docs`). Use these URLs in the store consoles and in-app Settings (all three are also wired into `mobile/src/constants/links.ts`):
+
+- Privacy policy URL (required, both stores): `https://jpearleverett.github.io/WordShift/privacy-policy/`
+- Terms of Service URL: `https://jpearleverett.github.io/WordShift/terms/`
+- Data deletion URL (Play Data Safety — account/data deletion): `https://jpearleverett.github.io/WordShift/data-deletion/`
 
 ## Asset checklist
 

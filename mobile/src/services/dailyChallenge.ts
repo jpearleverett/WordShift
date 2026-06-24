@@ -70,8 +70,12 @@ const DAILY_STREAK_GRACE_DAYS = 1;
 /**
  * Daily challenge unlock pacing.
  * Unlocks early (Day-1 retention hook) once the core loop has been tasted.
+ * Set to 3 (was 5): onboarding spends the player's first solve, so 3 means the
+ * Daily Challenge appears within the first real session — letting the
+ * daily-login + daily-challenge rhythm form by Day 2 instead of Day 3+, the
+ * single highest-leverage early-retention nudge in the genre.
  */
-export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 5;
+export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 3;
 
 /**
  * Daily challenge unlock condition.

@@ -578,6 +578,18 @@ describe('checkNarrativeMicroBeat', () => {
     expect(beat!.type).toBe('ambient_whisper');
   });
 
+  test('keeps the narrative pulse alive through the mid-game valley (140-185)', async () => {
+    for (const count of [140, 155, 170, 185]) {
+      await resetMicroBeats();
+      (AsyncStorage.clear as jest.Mock)();
+      const beat = await checkNarrativeMicroBeat(count);
+      expect(beat).not.toBeNull();
+      expect(beat!.type).toBe('ambient_whisper');
+      expect(beat!.text).toBeTruthy();
+      expect(beat!.durationMs).toBeGreaterThan(0);
+    }
+  });
+
   test('does not fire the same beat twice', async () => {
     const first = await checkNarrativeMicroBeat(35);
     expect(first).not.toBeNull();

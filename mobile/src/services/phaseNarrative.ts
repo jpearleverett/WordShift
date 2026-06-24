@@ -1491,6 +1491,31 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'You feel it too, don\'t you? The way the letters know where they belong before you place them.',
     durationMs: 4000,
   },
+  // Mid-game valley beats (140–185): the house finishes around puzzle 130 but the
+  // Phase 4 reveal doesn't land until ~155, leaving a stretch with no new unlocks.
+  // These keep the narrative pulse alive through that gap — escalating dread that
+  // bridges "the house is whole" into the cult reveal and one slog-breaker beyond
+  // it — so the climb to the climax never goes quiet.
+  140: {
+    type: 'ambient_whisper',
+    text: 'The house is finished. Every room full. So why does it still feel like it\'s waiting for something?',
+    durationMs: 4000,
+  },
+  155: {
+    type: 'ambient_whisper',
+    text: 'The animals have stopped pretending the puzzles are just puzzles. They watch you the way you\'d watch a door beginning to open.',
+    durationMs: 4500,
+  },
+  170: {
+    type: 'ambient_whisper',
+    text: 'You could stop now. You know that. You won\'t. They know that too.',
+    durationMs: 4000,
+  },
+  185: {
+    type: 'ambient_whisper',
+    text: 'Each arrangement settles a little deeper than the last. The space between the words is no longer empty.',
+    durationMs: 4000,
+  },
 };
 
 /** AsyncStorage key for tracking consumed micro-beats */
