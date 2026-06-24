@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,141 tests across 42 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,241 tests across 50 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -113,7 +113,7 @@ mobile/
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst
 │   │   ├── FoxGuide.tsx         # Floating Fox speech bubble (onboarding)
-│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, legal links, support contact, Reset All
+│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, legal links (Privacy Policy / Terms of Service / Data Deletion — all live), support contact, Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
 │   │   ├── DailyChallengeCard.tsx # Compact daily challenge button (header)
@@ -186,7 +186,7 @@ mobile/
 │       ├── homeScenePan.ts, shareResults.ts (emoji-grid text share; daily shares are spoiler-free)
 │       ├── shareImage.ts        # Pluggable result-image capture (react-native-view-shot behind a provider; text fallback in Expo Go)
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,141 tests, 42 suites
+├── src/__tests__/               # ~1,241 tests, 50 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console.
@@ -203,6 +203,8 @@ mobile/
 3. Drop letter into next word — word grows by 1 letter
 4. Both resulting words must be valid English words
 5. Progress through all rows to win
+
+**Move feedback (game feel):** a valid move plays a catch bounce + star burst with escalated haptics (drag-drop `hapticHeavy()` vs tap `hapticMedium()`) and `soundValidMove()`; an **invalid drop** plays `hapticError()` + `soundInvalidMove()` + the target-row error shake (so rejection is felt at the hand, not just shown on the board — `App.tsx` `handleSlotPress` result-`null` path).
 
 ### Word Preview Mechanic
 When a letter is selected, ghost previews show what word would form at each slot position. Valid words green with a "✓ " prefix, invalid red/dimmed with "✗ " (validity is never conveyed by color alone). Computed via `useMemo` in `usePuzzleGame.ts`, passed to `Row.tsx` as `slotPreviews`.
@@ -239,7 +241,7 @@ First 3 post-onboarding puzzles are hand-picked (`CURATED_EARLY_PUZZLES` in `con
 Optional harder mode: difficulty-aware undo limit (EASY/MEDIUM=2, MEDIUM_PLUS/HARD=1), no hints. 1.5x amber. Challenge completions count 2x toward phase progression.
 
 ### Daily Challenge
-Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tracking with a yesterday-only grace (a missed day breaks the streak; the daily has no freeze). Unlocked at 5 puzzles or Phase 1+ (early unlock is the Day-1 retention hook). One-time Fox intro.
+Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tracking with a yesterday-only grace (a missed day breaks the streak; the daily has no freeze). Unlocked at **3 puzzles** or Phase 1+ (`DAILY_CHALLENGE_UNLOCK_PUZZLES`; onboarding consumes the first solve, so 3 surfaces the daily within the first real session — the daily-login + daily-challenge habit forms by Day 2). One-time Fox intro.
 
 **Entry point & wiring**: A `DailyChallengeCard` (📅) sits in the **HomeScreen header**, gated by `isDailyChallengeUnlocked()` and hidden during onboarding (shows a pulsing calendar when available, a check + stars + streak badge once done). Tapping it calls `App.handleStartDaily()` → `generateDailyPuzzle()` → `puzzleActions.startDailyGame()` (a hook action that builds a standard, hint-enabled board from the seeded words **without** disturbing the player's chosen difficulty preference). App-level `isPlayingDaily` state threads through `useAutosave` (tags the save with `isPlayingDaily`/`dailyDate`; a daily save is never restored as a normal puzzle), `recordVictory(..., isDaily=true)` (rewards always count as HARD), and the VictoryModal ("Daily Challenge Complete"). On completion App calls `recordDailyCompletion()` and `checkDailyStreakMilestone()` — milestone amber is credited via `awardBonusAmber('daily_streak_milestone')` with a deferred toast. Completions log a `daily_completed` event. `isPlayingDaily` resets on every non-daily start path (Play, variant/difficulty/challenge switch, Home, Next Level).
 
@@ -317,7 +319,7 @@ Ward marks: 7 circles along upper pit arc. Phase-aware colors (turquoise → pur
 - Streak multiplier: 10% per day (max 100%, requires 2+ day streak)
 - Streak continuation: free only when the player played **yesterday** (local day); any longer gap consumes a streak freeze, else the streak resets to 1. Streak freeze: 50 amber, or a free one every 14 days — `checkFreeStreakFreeze()` runs once per session from App's launch effect (granted silently during onboarding; otherwise a one-time Alert tells the player their streak is protected)
 - Streak milestones: 3/7/14/21/30 days → 15/30/50/65/100 amber
-- Puzzle count milestones (10, 15, 25, 50... up to 350)
+- Puzzle count milestones (`MILESTONE_BONUSES`, 10/15/25/50…). Includes a **mid-game valley faucet** (135/145/150/165) that keeps amber flowing through the ~130–170 gap where the house is already built but the Phase-4 climax hasn't landed, plus a modest repeating endgame tail (400/450/500/600/750/1000) so the Phase-5 faucet never fully dries up
 - Achievement rewards: each of the 40 achievements grants one-time amber (10-150, `rewardAmber` in achievements.ts)
 - Daily share bonus: +5 amber for the first completed share each day (`maybeAwardDailyShareBonus`/`recordShareSuccess` in shareResults.ts; hinted on the share-card preview). The VictoryModal Share button opens a `ShareResultModal` preview of a phase-aware `ShareCard`; `shareImage.shareResultImage()` captures a PNG when `react-native-view-shot` is present (dev client) and otherwise falls back to the emoji-grid text share. **Daily shares are spoiler-free** (grid only — no word chain/incantation, since the daily is the same puzzle for everyone).
 - Daily login reward: rewards *opening the app* (not just solving) — a 7-day escalating cycle (10/15/20/25/30/40/75, Day-7 jackpot) that wraps weekly and resets on a missed day. `claimDailyLoginReward()` in `dailyLoginReward.ts`, claimed once per session from App's launch effect (skipped during onboarding), source `'daily_login'`. The grant is presented in a celebratory `DailyLoginModal` (7-day cycle, current day highlighted, Day-7 jackpot; phase-aware, reduced-motion aware)
@@ -435,7 +437,7 @@ Phase 0 contains subtle foreshadowing:
 
 ## Narrative Micro-Beats
 
-One-time events at specific puzzle milestones (35, 40, 50, 55, 65, 80, 90, 100, 110, 130) to break the Phase 1-2 retention valley. `glitch_title` type briefly shows wrong victory text. `ambient_whisper` type shows atmospheric messages.
+One-time events at specific puzzle counts (`MICRO_BEATS` in `phaseNarrative.ts`, keyed by exact count, each fires once). Early/mid beats (5–130) break the Phase 1-2 retention valley; **mid-game valley beats (140/155/170/185)** keep the narrative pulse alive through the ~130–185 gap (house complete ~130, Phase-4 reveal ~155) — escalating dread that bridges "the house is whole" into the cult reveal and one slog-breaker beyond it. `glitch_title` type briefly shows wrong victory text. `ambient_whisper` type shows atmospheric messages.
 
 ## Endgame
 
@@ -458,7 +460,7 @@ The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is *
 
 Fox guides new players through real screens:
 1. `home_empty` → `fox_invited`: See empty den, invite Fox, Fox intro (4 lines)
-2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights
+2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights. The FoxGuide bubble gives a **proactive first-action prompt** on load (`Tap the glowing "X" tile to pick it up.`, `App.tsx` ~L2157) — the player is never left guessing what to do first; it then advances to drop guidance, a between-moves reinforcement beat, and tile/slot glow highlights driven by `tutorialGuidance`
 3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains pit, player offers words
 4. `returning_home` → `unlock_explained` → `complete`: Fox explains the cycle
 
@@ -527,7 +529,7 @@ Client-side sync layer with a pluggable `CloudProvider` interface. A live Supaba
 ### Current State
 - **Store assets are real**: 1024×1024 icon.png, adaptive-icon.png, splash.png, and the Android notification-icon.png are generated by `scripts/tools/generateAppIcons.mjs` / `generateNotificationIcon.mjs` (`npm run generate:assets`)
 - **SFX pack**: 14 WAV chimes in `assets/sounds/`, generated by `scripts/tools/generateSounds.mjs`
-- **All 10 character sprites** wired up: idle.png, talk.png, robed.png per animal. **Known art defect:** `axolotl/talk.png` is byte-identical to `axolotl/idle.png` (every other animal has a distinct talk frame). A reduced-motion-safe talk transform on the dialogue portrait (HomeScreen `dialogueSpriteTalking`) masks the symptom for all animals.
+- **All 10 character sprites** wired up: idle.png, talk.png, robed.png per animal. **Intentional design — not a defect:** `axolotl/talk.png` is byte-identical to `axolotl/idle.png` *on purpose* — Axel (the axolotl) wears a scuba mask, so he can't visibly talk; his mouth never moves, hence no distinct talk frame. Do NOT "fix" this by generating a separate talk sprite. The reduced-motion-safe talk transform on the dialogue portrait (HomeScreen `dialogueSpriteTalking`) still gives Axel subtle motion while speaking, consistent with every other animal.
 - **All 10 room backgrounds** wired up in RoomView.tsx
 - **Environment**: sky_day/dusk/storm/shadow.png (phase-aware), pitt_day/dusk/night.png (pit backgrounds). Oversized backgrounds were downscaled for mobile via `scripts/tools/downscaleImages.mjs` (skies 1080px wide, aquarium/jungle/office rooms downscaled too)
 - **World art (pixel style, wired into HouseWorld)**: `cloud_1/2.png`, `roof.png` (chimney + attic window baked in; smoke puffs animate above it), `foundation.png`, and the tappable `pit_entrance.png` (stone path + glowing mouth) rendered in the layout flow below the foundation — all crisp pixel art matching the room interiors, generated by `scripts/tools/generatePixelWorld.mjs`. `ground.png`/`tree.png` exist but are intentionally NOT rendered: the sky backgrounds are full landscapes with their own grass and trees. The soft `shadow_figure.png` (the entity) is deliberately NOT pixel art — it should read as otherworldly against the pixel world (`generateWorldArt.mjs`)
@@ -571,7 +573,7 @@ mobile/assets/
 - **Narrative consistency**: Any new feature must respect current phase. Cheerful-only-at-Phase-0.
 - **No over-engineering**: Only make directly requested changes. Don't add features, refactoring, or docstrings beyond what's asked.
 - Accessibility: `accessibilityLabel` and `accessibilityRole` on interactive elements; never convey information by color alone (see the ✓/✗ slot-preview prefixes); dark-phase text colors must hold ≥4.5:1 contrast against their backgrounds
-- Store/legal: privacy policy + terms live in `docs/` (GitHub Pages); Settings links route through `src/constants/links.ts`
+- Store/legal: privacy policy, terms, and data-deletion pages are **live and publicly accessible** via GitHub Pages (served from `docs/`). All three URLs are wired into `src/constants/links.ts` and surfaced in Settings → About (Privacy Policy / Terms of Service / Data Deletion rows); store-listing metadata in `docs/STORE_LISTING.md` points at the same live URLs
 
 ## Testing Patterns
 

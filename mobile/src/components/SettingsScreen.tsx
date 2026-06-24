@@ -395,6 +395,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           <View style={styles.divider} />
           <TouchableOpacity
             style={styles.aboutRow}
+            onPress={() => openLink(EXTERNAL_LINKS.dataDeletion)}
+            accessibilityRole="link"
+            accessibilityLabel="Data Deletion"
+          >
+            <Text style={styles.linkText}>Data Deletion</Text>
+            <Text style={styles.linkChevron}>{'>'}</Text>
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.aboutRow}
             onPress={() => openLink(getSupportMailto(APP_VERSION))}
             accessibilityRole="button"
             accessibilityLabel="Contact Support"

@@ -84,21 +84,21 @@ describe('dailyChallenge', () => {
 
   test('daily challenge unlocks after enough puzzle progress', () => {
     expect(isDailyChallengeUnlocked(0, 0)).toBe(false);
-    expect(isDailyChallengeUnlocked(4, 0)).toBe(false);
-    expect(isDailyChallengeUnlocked(5, 0)).toBe(true);
-    expect(isDailyChallengeUnlocked(2, 1)).toBe(true);
+    expect(isDailyChallengeUnlocked(2, 0)).toBe(false);
+    expect(isDailyChallengeUnlocked(3, 0)).toBe(true);
+    expect(isDailyChallengeUnlocked(1, 1)).toBe(true);
   });
 
   test('daily challenge unlock progress reports remaining puzzles', () => {
     expect(getDailyChallengeUnlockProgress(0, 0)).toEqual({
       unlocked: false,
-      puzzlesRemaining: 5,
+      puzzlesRemaining: 3,
+    });
+    expect(getDailyChallengeUnlockProgress(2, 0)).toEqual({
+      unlocked: false,
+      puzzlesRemaining: 1,
     });
     expect(getDailyChallengeUnlockProgress(3, 0)).toEqual({
-      unlocked: false,
-      puzzlesRemaining: 2,
-    });
-    expect(getDailyChallengeUnlockProgress(5, 0)).toEqual({
       unlocked: true,
       puzzlesRemaining: 0,
     });
