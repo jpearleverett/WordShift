@@ -7,6 +7,7 @@ import {
   _clearDailyLoginCache,
   DAILY_LOGIN_REWARDS,
   DAILY_LOGIN_CYCLE_LENGTH,
+  COMEBACK_BONUS_AMBER,
 } from '../services/dailyLoginReward';
 
 const STORAGE_KEY = 'wordshift_daily_login';
@@ -127,5 +128,38 @@ describe('dailyLoginReward', () => {
     const stored = JSON.parse((await AsyncStorage.getItem(STORAGE_KEY))!);
     expect(stored.lastClaimedDate).toBe(getLocalDateString());
     expect(stored.cycleDay).toBe(1);
+  });
+
+  describe('lapsed-player comeback bonus', () => {
+    test('returning after a 3+ day lapse grants a one-time comeback bonus', async () => {
+      await seedState(4, 5); // last claim 4 days ago -> lapsed
+      const grant = await claimDailyLoginReward();
+      expect(grant!.reset).toBe(true);
+      expect(grant!.day).toBe(1);
+      expect(grant!.comebackBonus).toBe(COMEBACK_BONUS_AMBER);
+      expect(grant!.newBalance).toBe(1000 + DAILY_LOGIN_REWARDS[0] + COMEBACK_BONUS_AMBER);
+      expect(awardBonusAmber).toHaveBeenCalledWith(
+        DAILY_LOGIN_REWARDS[0] + COMEBACK_BONUS_AMBER,
+        'daily_login_comeback'
+      );
+    });
+
+    test('a short gap (below the comeback threshold) grants no comeback bonus', async () => {
+      await seedState(2, 5); // 2-day gap, below the 3-day comeback threshold
+      const grant = await claimDailyLoginReward();
+      expect(grant!.comebackBonus).toBe(0);
+      expect(awardBonusAmber).toHaveBeenCalledWith(DAILY_LOGIN_REWARDS[0], 'daily_login');
+    });
+
+    test('first ever claim never grants a comeback bonus', async () => {
+      const grant = await claimDailyLoginReward();
+      expect(grant!.comebackBonus).toBe(0);
+    });
+
+    test('a consecutive-day claim grants no comeback bonus', async () => {
+      await seedState(1, 3);
+      const grant = await claimDailyLoginReward();
+      expect(grant!.comebackBonus).toBe(0);
+    });
   });
 });

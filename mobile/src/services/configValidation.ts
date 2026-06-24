@@ -121,9 +121,12 @@ export function validatePhaseThresholds(): ValidationResult {
     return { valid: false, errors };
   }
 
+  // 5 threshold entries drive phases 0-4. Phase 5 (post-revelation) is NOT
+  // threshold-driven — it's gated on the final-puzzle event via
+  // markPostRevelation() — so the 6-phase model still has exactly 5 thresholds.
   if (PHASE_THRESHOLDS.length !== 5) {
     errors.push(
-      `PHASE_THRESHOLDS should have 5 entries (phases 0-4), got ${PHASE_THRESHOLDS.length}`
+      `PHASE_THRESHOLDS should have 5 entries (thresholds for phases 0-4; phase 5 is event-driven), got ${PHASE_THRESHOLDS.length}`
     );
   }
 

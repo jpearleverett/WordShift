@@ -12,8 +12,10 @@ import {
   checkDailyStreakMilestone,
   generateDailyPuzzle,
   prewarmDailyPuzzle,
+  loadDailyProgress,
 } from '../services/dailyChallenge';
 import { generateLocalPuzzle } from '../services/localGenerator';
+import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => {
@@ -153,6 +155,60 @@ describe('dailyChallenge', () => {
 
     const status = await getDailyStatus();
     expect(status.totalCompleted).toBe(0);
+  });
+});
+
+describe('dailyChallenge streak freeze mercy', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await clearDailyProgress();
+  });
+
+  test('yesterday completion continues the streak without spending a freeze', async () => {
+    const p = await loadDailyProgress();
+    p.currentStreak = 3;
+    p.streakFreezes = 1;
+    p.lastFreezeGrantDate = getLocalDateStringDaysAgo(1);
+    p.lastCompletedDate = getLocalDateStringDaysAgo(1);
+    const result = await recordDailyCompletion(3, 0, 0);
+    expect(result.currentStreak).toBe(4);
+    expect(result.streakFreezes).toBe(1);
+    expect(result.streakSavedByFreeze).toBe(false);
+  });
+
+  test('a banked freeze forgives a missed day and keeps the streak', async () => {
+    const p = await loadDailyProgress();
+    p.currentStreak = 5;
+    p.bestStreak = 5;
+    p.streakFreezes = 1;
+    p.lastFreezeGrantDate = getLocalDateStringDaysAgo(1);
+    p.lastCompletedDate = getLocalDateStringDaysAgo(2); // one full day missed
+    const result = await recordDailyCompletion(3, 0, 0);
+    expect(result.streakSavedByFreeze).toBe(true);
+    expect(result.currentStreak).toBe(6);
+    expect(result.streakFreezes).toBe(0);
+  });
+
+  test('without a freeze, a missed day resets the streak to 1', async () => {
+    const p = await loadDailyProgress();
+    p.currentStreak = 5;
+    p.streakFreezes = 0;
+    p.lastFreezeGrantDate = getLocalDateStringDaysAgo(1);
+    p.lastCompletedDate = getLocalDateStringDaysAgo(2);
+    const result = await recordDailyCompletion(3, 0, 0);
+    expect(result.streakSavedByFreeze).toBe(false);
+    expect(result.currentStreak).toBe(1);
+  });
+
+  test('a free freeze is granted after the interval has elapsed', async () => {
+    const p = await loadDailyProgress();
+    p.currentStreak = 2;
+    p.streakFreezes = 0;
+    p.lastFreezeGrantDate = getLocalDateStringDaysAgo(20); // > 14-day interval
+    p.lastCompletedDate = getLocalDateStringDaysAgo(1); // yesterday → free continue
+    const result = await recordDailyCompletion(3, 0, 0);
+    expect(result.streakFreezes).toBe(1); // granted, not spent
+    expect(result.currentStreak).toBe(3);
   });
 });
 

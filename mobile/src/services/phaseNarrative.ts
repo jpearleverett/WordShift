@@ -166,6 +166,31 @@ export function getMoveMessage(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// COMBO MOVE MESSAGES — Escalating feedback for consecutive clean moves within a
+// single puzzle. `streak` is the count of successful moves so far this board (2+).
+// Each tier ramps the energy so a clean run *feels* like it's building, which is
+// the genre's core intra-level addiction lever (Toon Blast / Wordscapes). The
+// tone still bends with phase: bright and loud early, reverent and cold late.
+// ============================================================================
+
+const COMBO_MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
+  // Index by tier: [streak 2, streak 3, streak 4+]
+  0: ['Nice — 2 in a row!', "Sweet! 3 chain!", "On fire! 🔥"],
+  1: ['Two clean. Keep going.', 'Three in a row — flowing now.', 'A perfect run.'],
+  2: ['Two without a stumble.', 'The pattern gathers pace.', 'Unbroken. It builds.'],
+  3: ['Two, cleanly.', 'The chain holds — three deep.', 'An unbroken descent.'],
+  4: ['Two offered, unbroken.', 'Three — the arrangement leans closer.', 'A flawless verse. It hears.'],
+  5: ['Two threads, true.', 'Three, woven without a snag.', 'The weave sings, unbroken.'],
+};
+
+/** Escalating message for a clean-move streak (call only when streak >= 2). */
+export function getComboMoveMessage(streak: number, phase: DialoguePhase): string {
+  const tiers = COMBO_MOVE_MESSAGES[phase];
+  const idx = Math.min(Math.max(streak - 2, 0), tiers.length - 1);
+  return tiers[idx];
+}
+
+// ============================================================================
 // HINT MESSAGES — Tone shifts for hints
 // ============================================================================
 
@@ -269,6 +294,25 @@ const STUCK_PANEL_TITLES: Record<DialoguePhase, string> = {
 
 export function getStuckPanelTitle(phase: DialoguePhase): string {
   return STUCK_PANEL_TITLES[phase];
+}
+
+// ============================================================================
+// DRAG MISS — Shown when a dragged letter is released away from any row, so the
+// drop is ignored. The letter stays picked up; this tells the player why nothing
+// happened and that they can simply drop it on a row.
+// ============================================================================
+
+const DRAG_MISS_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'Oops — drop the letter onto a row to place it.',
+  1: 'Not quite there — release the letter over a row.',
+  2: 'The letter found no row. Bring it down onto one.',
+  3: 'It slipped free. Settle the letter onto a row.',
+  4: 'The letter would not settle. Lay it upon a row.',
+  5: 'The thread drifted loose. Rest it upon a row.',
+};
+
+export function getDragMissMessage(phase: DialoguePhase): string {
+  return DRAG_MISS_MESSAGES[phase];
 }
 
 // ============================================================================

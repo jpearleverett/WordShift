@@ -7,11 +7,12 @@ import { logEvent } from './eventLogger';
  * and provides a global error handler for unhandled exceptions.
  *
  * Errors become `app_error` events in the local event log, which the
- * telemetry uploader (telemetry.ts) forwards to a collector once
- * `extra.telemetryEndpoint` is configured in app.json — so configuring
- * telemetry alone yields remote crash visibility with no extra SDK.
- * To add richer crash grouping/symbolication (Sentry, Crashlytics),
- * forward `error` from `reportError()` to that SDK here as well.
+ * telemetry uploader (telemetry.ts) forwards to the Supabase `events` table
+ * when `extra.supabaseUrl`/`supabaseAnonKey` are set (or a custom
+ * `extra.telemetryEndpoint` if that's configured instead) — so configured
+ * telemetry yields remote crash visibility with no extra SDK. Richer crash
+ * grouping/symbolication (Sentry) is wired via `setErrorForwarder` /
+ * `initCrashReporter`, which forwards `error` from `reportError()`.
  */
 
 interface ErrorContext {

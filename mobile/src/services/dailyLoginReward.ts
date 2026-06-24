@@ -18,6 +18,15 @@ const STORAGE_KEY = 'wordshift_daily_login';
 export const DAILY_LOGIN_REWARDS = [10, 15, 20, 25, 30, 40, 75] as const;
 export const DAILY_LOGIN_CYCLE_LENGTH = DAILY_LOGIN_REWARDS.length;
 
+/**
+ * Win-back: a player returning after a multi-day lapse gets a one-time comeback
+ * bonus on top of their (reset) Day-1 reward, so the return is rewarded rather
+ * than punished with a bare restart. Triggered when the gap since the last claim
+ * is at least COMEBACK_GAP_DAYS.
+ */
+export const COMEBACK_GAP_DAYS = 3;
+export const COMEBACK_BONUS_AMBER = 50;
+
 interface DailyLoginState {
   /** Local calendar day (YYYY-MM-DD) the reward was last claimed. */
   lastClaimedDate: string | null;
@@ -28,9 +37,11 @@ interface DailyLoginState {
 export interface DailyLoginGrant {
   /** Day within the cycle that was just claimed (1..7). */
   day: number;
-  /** Amber granted for this claim. */
+  /** Amber granted for this claim (the cycle reward only, excluding comeback). */
   amount: number;
-  /** New amber balance after the grant. */
+  /** One-time win-back bonus for a lapsed returner (0 when not applicable). */
+  comebackBonus: number;
+  /** New amber balance after the grant (cycle reward + comeback). */
   newBalance: number;
   /** True if the previous chain lapsed and the cycle reset to Day 1. */
   reset: boolean;
@@ -118,9 +129,18 @@ export async function claimDailyLoginReward(): Promise<DailyLoginGrant | null> {
 
   const { day, reset } = computeNextCycleDay(state, today);
   const amount = DAILY_LOGIN_REWARDS[day - 1];
-  const newBalance = await awardBonusAmber(amount, 'daily_login');
+
+  // Win-back: only for a returning player (has prior history) whose gap since
+  // the last claim is a real lapse — never for a brand-new first claim.
+  const gap = state.lastClaimedDate ? daysAgoLocal(state.lastClaimedDate) : 0;
+  const comebackBonus = gap >= COMEBACK_GAP_DAYS ? COMEBACK_BONUS_AMBER : 0;
+
+  const newBalance = await awardBonusAmber(
+    amount + comebackBonus,
+    comebackBonus > 0 ? 'daily_login_comeback' : 'daily_login'
+  );
 
   await save({ lastClaimedDate: today, cycleDay: day });
 
-  return { day, amount, newBalance, reset };
+  return { day, amount, comebackBonus, newBalance, reset };
 }

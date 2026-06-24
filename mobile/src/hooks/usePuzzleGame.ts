@@ -6,7 +6,7 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getNoValidMovesMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getNoValidMovesMessage } from '../services/phaseNarrative';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords, isPostRevelation } from '../services/amberCurrency';
 import {
   getVariantOverrides,
@@ -254,6 +254,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [showConfetti, setShowConfetti] = useState(false);
   const [invalidAttempts, setInvalidAttempts] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
+  // Consecutive clean moves this board (resets on invalid attempt / undo / new
+  // board). Drives the escalating combo move-message. Kept in a ref so it never
+  // triggers a re-render of its own.
+  const cleanMoveStreakRef = useRef(0);
   const [earnedStars, setEarnedStars] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('standard');
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
@@ -364,6 +368,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setActiveRowIndex(0);
     setSelectedLetter(null);
     setHistory([]);
+    cleanMoveStreakRef.current = 0;
     setGameState(GameState.PLAYING);
     setMessage(getStartMessage(currentPhase));
     setError(null);
@@ -906,6 +911,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isSourceValid) {
       shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
+      cleanMoveStreakRef.current = 0;
       // For double shift drop2, go back to pick2 (let player try different letter/slot)
       if (isDoubleShift && doubleShiftPhase === 'drop2') {
         setDoubleShiftPhase('pick2');
@@ -919,6 +925,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isTargetValid) {
       shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
+      cleanMoveStreakRef.current = 0;
       // For double shift drop2, go back to pick2 (let player try different letter/slot)
       if (isDoubleShift && doubleShiftPhase === 'drop2') {
         setDoubleShiftPhase('pick2');
@@ -984,6 +991,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       };
     };
 
+    // Escalating move feedback: a clean run of moves builds energy via the combo
+    // message; a stuck board ends the run and shows the no-moves message. Reset
+    // happens here (stuck) and on invalid attempts / undo / new board elsewhere.
+    const moveMessageFor = (stuck: boolean): string => {
+      if (stuck) {
+        cleanMoveStreakRef.current = 0;
+        return getNoValidMovesMessage(currentPhase);
+      }
+      cleanMoveStreakRef.current += 1;
+      return cleanMoveStreakRef.current >= 2
+        ? getComboMoveMessage(cleanMoveStreakRef.current, currentPhase)
+        : getMoveMessage(currentPhase);
+    };
+
     if (!isReverseMode) {
       if (activeRowIndex === maxForwardSourceIndex) {
         const completedWords = newRows.map(r => r.words.map(l => l.char).join(''));
@@ -996,13 +1017,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       const stuckForward = isDoubleShift
         ? !hasAnyValidDoubleShiftMove(newRows, activeRowIndex + 1, checkValidation)
         : !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
-      if (stuckForward) {
-        setMessage(getNoValidMovesMessage(currentPhase));
-        setIsStuck(true);
-      } else {
-        setMessage(getMoveMessage(currentPhase));
-        setIsStuck(false);
-      }
+      setMessage(moveMessageFor(stuckForward));
+      setIsStuck(stuckForward);
       setLastFormedWord(targetWordStr);
       setIsProcessing(false);
       return { completed: false, hintsUsed, invalidAttempts, gameMode, completedWords: [], formedWord: targetWordStr };
@@ -1013,6 +1029,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       let reachedMidpoint = false;
       if (activeRowIndex === maxForwardSourceIndex) {
         reachedMidpoint = true;
+        // Fresh combo for the return leg — the ascent reads as a second act.
+        cleanMoveStreakRef.current = 0;
         setMoveDirection('up');
         setActiveRowIndex(rows.length - 1);
         if (!hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation)) {
@@ -1029,7 +1047,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       } else {
         setActiveRowIndex(prev => prev + 1);
         const stuck = !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
-        setMessage(stuck ? getNoValidMovesMessage(currentPhase) : getMoveMessage(currentPhase));
+        setMessage(moveMessageFor(stuck));
         setIsStuck(stuck);
       }
       setLastFormedWord(targetWordStr);
@@ -1045,7 +1063,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     setActiveRowIndex(prev => prev - 1);
     const stuckUp = !hasAnyValidMove(newRows, activeRowIndex - 1, 'up', checkValidation);
-    setMessage(stuckUp ? getNoValidMovesMessage(currentPhase) : getMoveMessage(currentPhase));
+    setMessage(moveMessageFor(stuckUp));
     setIsStuck(stuckUp);
     setLastFormedWord(targetWordStr);
     setIsProcessing(false);
@@ -1076,6 +1094,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const handleUndo = useCallback(() => {
     if (gameState !== GameState.PLAYING) return;
     if (history.length === 0) return;
+
+    // Taking back a move breaks the clean-move streak.
+    cleanMoveStreakRef.current = 0;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -1268,6 +1289,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setShowDifficultyMenu(false);
     setShowConfetti(false);
     setEarnedStars(0);
+    // Resume without an active combo (the saved streak isn't persisted).
+    cleanMoveStreakRef.current = 0;
   }, []);
 
   // Re-apply the same puzzle from its starting words (each row preserves its
