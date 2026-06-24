@@ -5,6 +5,27 @@
 > (app id in the config plugin, unit ids in `extra`) are configured in
 > `app.json`. iOS keys are intentionally left blank. The guide below remains the
 > reference for re-doing this or adding iOS.
+>
+> **Surfaces actually wired (readiness pass):**
+> - **Interstitials are invoked** — `App.tsx` `maybeShowVictoryInterstitial()`
+>   fires on the normal puzzle→next-level / puzzle→home exits
+>   (`handleNextLevel` / `handleReturnHome`). All narrative-beat exemptions live
+>   there: onboarding, the daily, pending phase transitions, queued
+>   final/post-revelation cinematics, Phase 5, and the early "pure delight"
+>   window (first `AUTO_COLLECT_PUZZLE_LIMIT` puzzles). Cadence is driven by
+>   `VictoryData.puzzlesSolved` against `INTERSTITIAL_FREQUENCY_*`. (Tuning lever:
+>   raise `INTERSTITIAL_FREQUENCY_EARLY` / the early-window guard for a gentler
+>   first few sessions.)
+> - **Rewarded** placements wired: `victory_double` (VictoryModal) and
+>   `quest_bonus`. `hint_recovery` / `cooldown_skip` are defined but intentionally
+>   not surfaced (standard mode has uncapped free hints; Challenge is hint-free by
+>   design — no honest UX home for them).
+> - **Restore Purchases** is reachable in **Settings → PURCHASES**
+>   (`restorePurchases()`), in addition to the Patron modal — satisfies the
+>   store-policy accessible-restore requirement.
+> - **iOS ATT string** (`NSUserTrackingUsageDescription`) is present in
+>   `app.json` → `ios.infoPlist` so the ATT prompt isn't suppressed once iOS ad
+>   keys are filled.
 
 Like the backend, monetization is **disabled by default** (until wired as below). The app ships and runs
 in Expo Go with no purchases and no ads. Two provider adapters are already written
@@ -89,6 +110,10 @@ ads.
      }]
    ]
    ```
+   > Note: `NSUserTrackingUsageDescription` is **already set directly** in
+   > `app.json` → `ios.infoPlist`. If you add the `expo-tracking-transparency`
+   > plugin's `userTrackingPermission`, drop the direct `infoPlist` key (or omit
+   > the plugin option) so the Info.plist string has a single source.
 4. Put the ad **unit** ids in `mobile/app.json` → `expo.extra`:
    ```jsonc
    "admobInterstitialIdIos": "ca-app-pub-XXXX/IOS_INTERSTITIAL",

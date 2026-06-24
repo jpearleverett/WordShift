@@ -113,7 +113,7 @@ mobile/
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst
 │   │   ├── FoxGuide.tsx         # Floating Fox speech bubble (onboarding)
-│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, legal links (Privacy Policy / Terms of Service / Data Deletion — all live), support contact, Reset All
+│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, Restore Purchases (PURCHASES section), legal links (Privacy Policy / Terms of Service / Data Deletion — all live), support contact, Reset All
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
 │   │   ├── DailyChallengeCard.tsx # Compact daily challenge button (header)
@@ -190,7 +190,7 @@ mobile/
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console.
-└── eslint.config.js             # ESLint 9 flat config
+└── eslint.config.js             # ESLint 9 flat config. Overrides downgrade CommonJS/unused-var idioms in `scripts/**` (generators) and test files so real app-code warnings aren't drowned (baseline: 0 errors, ~200 warnings — mostly intentional guarded `require`s + hook-dep notes)
 ```
 
 > **CI**: `.github/workflows/ci.yml` (repo root) runs `npm ci` → typecheck → lint → test on every PR and on push to `main`. Keep it green.
@@ -419,7 +419,7 @@ Phase 0-1: `#6fb7df` (sky_day) → Phase 2: `#514378` (sky_dusk) → Phase 3: `#
 
 ### Phase-Aware Text (`phaseNarrative.ts`)
 ALL player-facing text shifts with phase. Key functions:
-- `getVictoryTitle()`, `getVictoryFeedback()`, `getMoveMessage()`, `getHintMessage()`
+- `getVictoryTitle()`, `getVictoryFeedback()`, `getMoveMessage()`, `getComboMoveMessage()` (intra-puzzle clean-streak escalation), `getDragMissMessage()` (drag released off-row), `getHintMessage()`
 - `getLoadingMessage()`, `getStartMessage()`, `getRulesText()`, `getPhaseChangeNarrative()`
 - `getRitualEchoHeader/Footer()`, `getIncantationName()`, `getWordsOfferedText()`
 - `getAnimalWhisper()`, `getAnimalInterjection()`, `getRitualMicroEvent()`
@@ -461,7 +461,7 @@ The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is *
 Fox guides new players through real screens:
 1. `home_empty` → `fox_invited`: See empty den, invite Fox, Fox intro (4 lines)
 2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights. The FoxGuide bubble gives a **proactive first-action prompt** on load (`Tap the glowing "X" tile to pick it up.`, `App.tsx` ~L2157) — the player is never left guessing what to do first; it then advances to drop guidance, a between-moves reinforcement beat, and tile/slot glow highlights driven by `tutorialGuidance`
-3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains pit, player offers words
+3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains the pit, then a standing FoxGuide prompt (`pit_offering_prompt`, no continue button until offered) tells the player to **tap each floating word** to offer it — the step only advances once every word is devoured
 4. `returning_home` → `unlock_explained` → `complete`: Fox explains the cycle
 
 During onboarding: simplified UI (no difficulty selector, stats, NEW button). Backward compatible with legacy tutorial flag. Persisted via `wordshift_onboarding_step`. **Resume resilience:** transient/puzzle steps (`going_to_puzzle`/`puzzle_tutorial`/`puzzle_complete`/`going_to_pit`/`returning_home`) only exist for a `setTimeout` window and have no owning screen on relaunch; `useOnboardingFlow.normalizeResumeStep` snaps them forward to a stable target on resume, and `App.tsx`'s resume effect routes the puzzle step back to a freshly-initialized guided tutorial board — so a kill mid-onboarding can never strand a new player on a dead home screen. The puzzle-screen FoxGuide also exposes a skip button (`handleSkipOnboarding`).
