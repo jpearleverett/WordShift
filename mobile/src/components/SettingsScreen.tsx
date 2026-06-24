@@ -30,6 +30,8 @@ import {
   purchaseStreakFreeze,
   STREAK_FREEZE_AMBER_COST,
 } from '../services/amberCurrency';
+import { restorePurchases } from '../services/iap';
+import { isPatronSync, isAdFreeSync } from '../services/entitlements';
 import { clearWordHistory } from '../services/wordHistory';
 import { clearAllSessions } from '../services/dialogueSession';
 import { clearEvents } from '../services/eventLogger';
@@ -72,6 +74,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [showRestore, setShowRestore] = useState(false);
   const [restoreInput, setRestoreInput] = useState('');
   const [restoreBusy, setRestoreBusy] = useState(false);
+  const [purchaseRestoreBusy, setPurchaseRestoreBusy] = useState(false);
+
+  // Restore previously-purchased IAP entitlements (Patron / ad-free). Store
+  // policy requires an accessible restore path outside the purchase modal, so
+  // this lives in Settings as well as the Patron modal.
+  const handleRestorePurchases = async () => {
+    if (purchaseRestoreBusy) return;
+    hapticLight();
+    setPurchaseRestoreBusy(true);
+    try {
+      await restorePurchases();
+      const patron = isPatronSync();
+      const adFree = isAdFreeSync();
+      if (patron) {
+        Alert.alert('Purchases Restored', 'Welcome back. Your Patron benefits are active again.');
+      } else if (adFree) {
+        Alert.alert('Purchases Restored', 'Your ad-free purchase has been restored.');
+      } else {
+        Alert.alert('Restore Purchases', 'No previous purchases were found for this store account.');
+      }
+    } catch {
+      Alert.alert('Restore Purchases', "We couldn't reach the store. Please try again in a moment.");
+    } finally {
+      setPurchaseRestoreBusy(false);
+    }
+  };
 
   const handleShowRecoveryCode = async () => {
     hapticLight();
@@ -367,6 +395,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             <Text style={styles.dangerDescription}>
               Clears statistics, achievements, and daily challenge history
             </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Purchases — restore IAP entitlements (store-policy requirement) */}
+        <Text style={styles.sectionTitle}>PURCHASES</Text>
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.aboutRow}
+            onPress={handleRestorePurchases}
+            disabled={purchaseRestoreBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Restore Purchases"
+          >
+            <Text style={styles.linkText}>Restore Purchases</Text>
+            {purchaseRestoreBusy
+              ? <ActivityIndicator color={CandyColors.purple.main} />
+              : <Text style={styles.linkChevron}>{'>'}</Text>}
           </TouchableOpacity>
         </View>
 

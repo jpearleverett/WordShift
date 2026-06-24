@@ -339,12 +339,14 @@ export function useOnboardingFlow(
     const key = onboardingStep === 'puzzle_tutorial'
       ? 'puzzle_tutorial_intro'
       : onboardingStep === 'pit_offering'
-        ? 'pit_offering_complete'
+        // Before the player has offered, show the standing "tap each word"
+        // prompt; after, show the completion beat.
+        ? (pitOfferDone ? 'pit_offering_complete' : 'pit_offering_prompt')
         : onboardingStep;
     const lines = ONBOARDING_FOX_LINES[key];
     if (!lines || lines.length === 0) return '';
     return lines[Math.min(onboardingLineIndex, lines.length - 1)] || '';
-  }, [onboardingStep, onboardingLineIndex]);
+  }, [onboardingStep, onboardingLineIndex, pitOfferDone]);
 
   const getOnboardingButtonText = useCallback((): string => {
     switch (onboardingStep) {

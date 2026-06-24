@@ -76,6 +76,8 @@ export interface VictoryData {
   phaseTransitionPending: boolean;
   /** True when pending harvest batches hit the 200 cap and oldest were trimmed */
   harvestOverflow: boolean;
+  /** Monotonic count of real puzzles solved (drives interstitial ad cadence) */
+  puzzlesSolved: number;
 }
 
 export interface PersistenceState {
@@ -181,6 +183,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         autoCollected: false,
         phaseTransitionPending: false,
         harvestOverflow: false,
+        puzzlesSolved: cumulativeStats?.totalPuzzlesCompleted ?? 0,
       };
     }
 
@@ -356,6 +359,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         autoCollected: false,
         phaseTransitionPending: amberResult.phaseTransitionPending,
         harvestOverflow: harvestResult.overflow,
+        puzzlesSolved: amberResult.puzzlesSolved,
       };
     } catch (err) {
       console.warn('Failed to record puzzle completion:', err);
@@ -385,6 +389,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         autoCollected: false,
         phaseTransitionPending: false,
         harvestOverflow: false,
+        puzzlesSolved: cumulativeStats?.totalPuzzlesCompleted ?? 0,
       };
     } finally {
       recordInProgress.current = false;

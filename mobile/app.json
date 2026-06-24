@@ -21,7 +21,8 @@
       "bundleIdentifier": "com.wordshift.app",
       "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserTrackingUsageDescription": "WordShift uses your data to show ads that are more relevant to you. You can play fully without allowing tracking."
       },
       "privacyManifests": {
         "NSPrivacyAccessedAPITypes": [

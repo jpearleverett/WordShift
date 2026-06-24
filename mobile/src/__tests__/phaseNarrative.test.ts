@@ -12,6 +12,8 @@ import {
   getInvalidWordMessage,
   getLockedLetterMessage,
   getNoValidMovesMessage,
+  getComboMoveMessage,
+  getDragMissMessage,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
   getWhisperGalleryEmptyText,
@@ -472,6 +474,54 @@ describe('getNoValidMovesMessage', () => {
     const messages = allSixPhases.map(p => getNoValidMovesMessage(p));
     const unique = new Set(messages);
     expect(unique.size).toBe(6);
+  });
+});
+
+describe('getComboMoveMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test.each(allSixPhases)('returns a non-empty string for phase %i at streak 2', (phase) => {
+    const msg = getComboMoveMessage(2, phase);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('escalates through tiers as the streak grows (phase 0)', () => {
+    const t2 = getComboMoveMessage(2, 0);
+    const t3 = getComboMoveMessage(3, 0);
+    const t4 = getComboMoveMessage(4, 0);
+    expect(new Set([t2, t3, t4]).size).toBe(3);
+  });
+
+  test('saturates at the top tier for very long streaks', () => {
+    // streak 4 and 9 both map to the final tier
+    expect(getComboMoveMessage(9, 2)).toBe(getComboMoveMessage(4, 2));
+  });
+
+  test('clamps streaks below 2 to the first tier without throwing', () => {
+    expect(typeof getComboMoveMessage(0, 3)).toBe('string');
+    expect(getComboMoveMessage(1, 3)).toBe(getComboMoveMessage(2, 3));
+  });
+});
+
+describe('getDragMissMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test.each(allSixPhases)('returns a non-empty string for phase %i', (phase) => {
+    const msg = getDragMissMessage(phase);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('each phase produces a unique message', () => {
+    const unique = new Set(allSixPhases.map(p => getDragMissMessage(p)));
+    expect(unique.size).toBe(6);
+  });
+
+  test('every phase references dropping onto a row', () => {
+    allSixPhases.forEach(p => {
+      expect(getDragMissMessage(p).toLowerCase()).toContain('row');
+    });
   });
 });
 

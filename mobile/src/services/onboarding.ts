@@ -139,19 +139,29 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // already had their first-win reward moment, so this is trimmed to two beats).
   pit_intro: [
     "Here we are. The pit — where your words drift after every puzzle, waiting.",
-    "Offer them and they turn to amber: the warm gold that builds the house.\nThe pit is always hungry for more. Watch — it takes them on its own.",
+    "Offer them and they turn to amber: the warm gold that builds the house.\nGo on — the pit is hungry. Feed it.",
   ],
 
-  // Step 7: After auto-offer completes on pit screen
+  // Step 6.5: On the pit screen, before the player has offered — a standing
+  // prompt telling them the required action (tap each floating word). The
+  // FoxGuide shows this with NO continue button, so the only way forward is to
+  // actually tap the words. (Previously this step had no instruction and the
+  // prior line implied the pit auto-devoured — the #1 D1 stall point.)
+  pit_offering_prompt: [
+    "Tap each glowing word to offer it.\nWatch them turn to amber, one by one.",
+  ],
+
+  // Step 7: After the player has offered every word on the pit screen
   pit_offering_complete: [
     "See? Amber, from the words you formed.\nThe pit takes the words and gives back what the house needs.\n...It always does.",
   ],
 
-  // Step 8: Back on home screen — explain unlocks and keep playing
+  // Step 8: Back on home screen — explain unlocks and keep playing (trimmed to
+  // three beats so the text-dense tail right after the first-win dopamine hit
+  // doesn't drag).
   unlock_explained: [
     "Now you know the cycle.\nSolve puzzles, offer words, earn amber.",
-    "Amber builds rooms, and rooms let us invite more friends in.",
-    "Come back each day, too.\nA daily visit keeps the warmth in — and the house remembers who tends it.",
-    "Keep playing and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
+    "Amber builds rooms — and rooms let us invite more friends in.",
+    "Come back each day, and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],
 };

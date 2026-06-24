@@ -165,8 +165,13 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
           {/* Claimed amount, prominent */}
           <View style={styles.claimedBanner}>
             <Text style={[styles.claimedText, { color: phaseTheme.modalTextColor }]}>
-              You received <AmberInline size={18} /> {grant.amount}
+              You received <AmberInline size={18} /> {grant.amount + grant.comebackBonus}
             </Text>
+            {grant.comebackBonus > 0 && (
+              <Text style={[styles.jackpotText, { color: CandyColors.yellow.dark }]}>
+                +{grant.comebackBonus} welcome-back bonus
+              </Text>
+            )}
             {claimedDay === DAILY_LOGIN_CYCLE_LENGTH && (
               <Text style={[styles.jackpotText, { color: CandyColors.yellow.dark }]}>
                 Jackpot!

@@ -44,6 +44,11 @@ import {
   markPitHarvestIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
+  isHouseCompleted,
+  isFinalPuzzleCompleted,
+  markFinalPuzzleCompleted,
+  isPostRevelation,
+  markPostRevelation,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
@@ -72,9 +77,9 @@ import {
   getSpeedTimeUpMessage,
   getNoValidMovesMessage,
   getStuckPanelTitle,
+  getDragMissMessage,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
-import { isHouseCompleted, isFinalPuzzleCompleted, markFinalPuzzleCompleted, isPostRevelation, markPostRevelation } from './src/services/amberCurrency';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone } from './src/services/dailyChallenge';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
@@ -90,7 +95,7 @@ import {
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
 import { initIAP, setBillingProvider } from './src/services/iap';
-import { initAds, setAdProvider } from './src/services/ads';
+import { initAds, setAdProvider, maybeShowInterstitial } from './src/services/ads';
 import { initCosmetics } from './src/services/cosmetics';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
@@ -878,6 +883,12 @@ function MainApp() {
             addVictoryTimeout(() => {
               puzzleActions.setMessage(`${milestone.message} (+${milestone.amber} amber)`);
             }, 1100);
+          } else if (dailyProgress.streakSavedByFreeze) {
+            // A banked freeze forgave a missed day — let the player know the
+            // chain survived so the protection feels real, not silent.
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage('🛡️ A missed day — but your daily streak held.');
+            }, 1100);
           }
         } catch {
           // Daily recording is non-critical — never block the victory flow.
@@ -1052,9 +1063,22 @@ function MainApp() {
       // No action
       isDragDropRef.current = false;
     } else {
-      // Valid intermediate move — trigger star burst celebration
+      // Valid intermediate move.
       const wasDragDrop = isDragDropRef.current;
       isDragDropRef.current = false;
+
+      // Double-shift drop1 is only HALF a move — the first of two letters is
+      // placed but no word is formed yet (no formedWord). Give it an honest
+      // "click into place" (soft haptic + tap sound + catch bounce) instead of
+      // the full star-burst celebration, which is reserved for completed words.
+      const isHalfMove = !result.formedWord && !result.completed;
+
+      if (isHalfMove) {
+        hapticSelection();
+        soundTap();
+        if (wasDragDrop) setSuccessDropSignal(prev => prev + 1);
+        return;
+      }
 
       // Escalated haptics for drag-drop: heavy thud vs medium tap
       if (wasDragDrop) {
@@ -1184,6 +1208,12 @@ function MainApp() {
     if (node) rowNodeRefs.current.set(rowIndex, node);
     else rowNodeRefs.current.delete(rowIndex);
   }, []);
+  // Read inside the deferred drop handler (which has empty deps) so a rejected
+  // drop can give phase-aware feedback without going stale.
+  const currentPhaseRef = useRef(persistence.currentPhase);
+  currentPhaseRef.current = persistence.currentPhase;
+  const setMessageRef = useRef(puzzleActions.setMessage);
+  setMessageRef.current = puzzleActions.setMessage;
 
   const handleLetterDragDrop = useCallback((_letter: any, _rowIndex: number, position: { x: number; y: number }) => {
     // Defer to next tick so React processes the letter selection from onDragStart
@@ -1240,8 +1270,14 @@ function MainApp() {
           const tol = h || 64;
           if (position.y >= y - tol && position.y <= y + h + tol) {
             commit();
+          } else {
+            // Released far from the target row — ignore the drop, but give
+            // feedback: the picked-up letter is still selected, so the player
+            // can simply drop it onto a row. Without this the floating tile just
+            // vanishes with no signal, reading as a dropped-for-nothing bug.
+            hapticSelection();
+            setMessageRef.current(getDragMissMessage(currentPhaseRef.current));
           }
-          // else: released far from the target row — ignore the drop entirely.
         });
       } else {
         // No measurement available — preserve prior behavior (don't block).
@@ -1325,15 +1361,40 @@ function MainApp() {
     }
   }, [onboardingFlow.isOnboarding, persistence.cumulativeStats, persistence.currentPhase]);
 
+  // Fire an interstitial on a normal puzzle→next/home exit. All narrative-beat
+  // exemptions live here so ads never interrupt a ceremony, the daily, the pit
+  // ignition, onboarding, or the serene post-revelation tone. Must run BEFORE
+  // startVictoryExitFlow (which resets victoryData). Patron suppression + cadence
+  // are handled inside ads.ts. Fire-and-forget: the ad overlays the transition.
+  const maybeShowVictoryInterstitial = useCallback(() => {
+    const vd = victoryFlow.victoryData;
+    if (!vd) return;
+    const step = onboardingFlow.onboardingStep;
+    const inOnboarding = step !== undefined && step !== 'complete';
+    const exempt =
+      inOnboarding ||
+      isPlayingDaily ||
+      vd.phaseTransitionPending ||                     // pit ignition ceremony incoming
+      phaseTransitionEvent != null ||                  // final / post-revelation cinematic queued
+      (vd.newPhase as number) >= 5 ||                  // post-revelation: never break the serene tone
+      vd.puzzlesSolved <= AUTO_COLLECT_PUZZLE_LIMIT;   // protect the early "pure delight" window — no ads in the first session
+    maybeShowInterstitial({
+      puzzlesSolved: vd.puzzlesSolved,
+      phase: vd.newPhase,
+      exempt,
+    }).catch(() => {});
+  }, [victoryFlow.victoryData, onboardingFlow.onboardingStep, isPlayingDaily, phaseTransitionEvent]);
+
   const handleNextLevel = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
+    maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
     maybePromptForNotifications().catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications]);
+  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -1352,13 +1413,14 @@ function MainApp() {
   const handleReturnHome = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
+    maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('home');
     });
     maybePromptForNotifications().catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications]);
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial]);
 
   const handleGoToPit = useCallback(() => {
     hapticLight();
@@ -1565,14 +1627,22 @@ function MainApp() {
             onboardingStep={onboardingFlow.onboardingStep}
             onOnboardingOfferComplete={onboardingActions.handlePitOnboardingOfferComplete}
           />
-          {/* Fox Guide overlay — shown during onboarding on pit screen */}
+          {/* Fox Guide overlay — shown during onboarding on pit screen. During
+              pit_offering it stays visible the whole time: first as a standing
+              "tap each word" prompt with NO continue button (so the player must
+              actually offer), then — once pitOfferDone — with the completion
+              beat and a continue button. */}
           {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering') && (
             <FoxGuide
-              visible={onboardingFlow.onboardingStep === 'pit_intro' || (onboardingFlow.onboardingStep === 'pit_offering' && onboardingFlow.pitOfferDone)}
+              visible={onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering'}
               variant="dialogue"
               text={onboardingActions.getOnboardingFoxText()}
               buttonText={onboardingActions.getOnboardingButtonText()}
-              onContinue={onboardingActions.handleOnboardingContinue}
+              onContinue={
+                onboardingFlow.onboardingStep === 'pit_offering' && !onboardingFlow.pitOfferDone
+                  ? undefined
+                  : onboardingActions.handleOnboardingContinue
+              }
               showSkip={true}
               onSkip={onboardingActions.handleSkipOnboarding}
               position="bottom"

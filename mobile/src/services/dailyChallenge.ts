@@ -27,6 +27,16 @@ export interface DailyChallengeProgress {
   currentStreak: number;
   bestStreak: number;
   lastCompletedDate: string | null;
+  /** Banked daily-streak freezes (auto-applied to forgive a missed day). */
+  streakFreezes: number;
+  /** Local-day the last free freeze was granted (null = never). */
+  lastFreezeGrantDate: string | null;
+  /**
+   * Transient (not persisted): true on the completion that just consumed a
+   * freeze to protect the streak, so the UI can tell the player their daily
+   * streak was saved.
+   */
+  streakSavedByFreeze?: boolean;
 }
 
 // In-memory cache
@@ -39,6 +49,8 @@ function getDefaultProgress(): DailyChallengeProgress {
     currentStreak: 0,
     bestStreak: 0,
     lastCompletedDate: null,
+    streakFreezes: 0,
+    lastFreezeGrantDate: null,
   };
 }
 
@@ -59,13 +71,22 @@ function getYesterdayString(): string {
 
 /**
  * Grace period for daily challenge streaks (in days).
- * Yesterday-only: the daily streak continues only if the player completed
- * yesterday's challenge — a missed day breaks it (the daily has no freeze
- * safety net, so a looser grace would silently survive a skipped day and
- * contradict the "don't break the chain" framing). Matches the main game's
- * yesterday-only free-continuation rule.
+ * Yesterday-only free continuation: the streak continues for free only if the
+ * player completed yesterday's challenge. A larger gap doesn't immediately
+ * break the chain — it consumes a banked daily-streak freeze if one is
+ * available (see recordDailyCompletion), mirroring the main game's freeze
+ * safety net so a single missed day no longer nukes a long daily streak.
  */
 const DAILY_STREAK_GRACE_DAYS = 1;
+
+/**
+ * How often a free daily-streak freeze is granted (in days), and the max that
+ * can be banked at once. A committed daily player accrues one freeze every two
+ * weeks (capped at one), so the occasional missed day is forgiven without
+ * making the streak trivially unbreakable.
+ */
+const DAILY_FREE_FREEZE_INTERVAL_DAYS = 14;
+const DAILY_MAX_FREEZES = 1;
 
 /**
  * Daily challenge unlock pacing.
@@ -151,7 +172,9 @@ export async function loadDailyProgress(): Promise<DailyChallengeProgress> {
   try {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
-      progressCache = JSON.parse(stored);
+      // Merge over defaults so saves written before the freeze fields existed
+      // load with sane values instead of `undefined`.
+      progressCache = { ...getDefaultProgress(), ...JSON.parse(stored) };
       return progressCache!;
     }
   } catch (err) {
@@ -270,9 +293,29 @@ export async function recordDailyCompletion(
     return progress;
   }
 
-  // Calculate streak (with grace period matching main game)
+  // Grant a free freeze on a periodic cadence (capped) so a committed daily
+  // player banks protection against the occasional missed day.
+  const freezeAgeDays = progress.lastFreezeGrantDate
+    ? daysAgoLocal(progress.lastFreezeGrantDate)
+    : Infinity;
+  if (progress.streakFreezes < DAILY_MAX_FREEZES && freezeAgeDays >= DAILY_FREE_FREEZE_INTERVAL_DAYS) {
+    progress.streakFreezes = DAILY_MAX_FREEZES;
+    progress.lastFreezeGrantDate = today;
+  }
+
+  // Calculate streak. Yesterday → free continuation. A larger gap consumes a
+  // banked freeze (if any) to keep the chain alive; otherwise the streak resets.
+  progress.streakSavedByFreeze = false;
   if (progress.lastCompletedDate && isWithinDailyGracePeriod(progress.lastCompletedDate)) {
     progress.currentStreak += 1;
+  } else if (
+    progress.lastCompletedDate &&
+    progress.currentStreak > 1 &&
+    progress.streakFreezes > 0
+  ) {
+    progress.streakFreezes -= 1;
+    progress.currentStreak += 1;
+    progress.streakSavedByFreeze = true;
   } else if (progress.lastCompletedDate !== today) {
     progress.currentStreak = 1;
   }
@@ -318,6 +361,7 @@ export async function getDailyStatus(): Promise<{
   streak: number;
   bestStreak: number;
   totalCompleted: number;
+  streakFreezes: number;
 }> {
   const progress = await loadDailyProgress();
   const today = getTodayString();
@@ -331,6 +375,7 @@ export async function getDailyStatus(): Promise<{
     streak: progress.currentStreak,
     bestStreak: progress.bestStreak,
     totalCompleted: progress.totalCompleted,
+    streakFreezes: progress.streakFreezes,
   };
 }
 
