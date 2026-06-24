@@ -120,6 +120,7 @@ interface HomeScreenProps {
   onOpenLedger?: () => void;
   onOpenGallery?: () => void;
   onOpenShop?: () => void;
+  onOpenStore?: () => void;
   onOpenPit?: () => void;
   /** Current onboarding step (undefined when onboarding is complete) */
   onboardingStep?: OnboardingStep;
@@ -148,6 +149,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenLedger,
   onOpenGallery,
   onOpenShop,
+  onOpenStore,
   onOpenPit,
   pitPhaseReady,
   onboardingStep,
@@ -1430,6 +1432,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>✨ {getShopTitle(progress.currentPhase)}</Text>
+              </TouchableOpacity>
+            )}
+            {onOpenStore && (
+              <TouchableOpacity
+                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                onPress={() => {
+                  setShowUtilityModal(false);
+                  onOpenStore?.();
+                }}
+                accessibilityLabel="Open store"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>🛒 Store</Text>
               </TouchableOpacity>
             )}
             {onOpenSettings && (

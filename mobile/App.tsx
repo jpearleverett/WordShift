@@ -95,8 +95,12 @@ import {
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
 import { initIAP, setBillingProvider } from './src/services/iap';
-import { initAds, setAdProvider, maybeShowInterstitial } from './src/services/ads';
+import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached } from './src/services/ads';
 import { initCosmetics } from './src/services/cosmetics';
+import { initHints, addHints } from './src/services/hints';
+import { StoreModal } from './src/components/monetization/StoreModal';
+import { recordInterstitialSeen, consumePatronNudge, consumeRemoveAdsNudge } from './src/services/monetizationPrompts';
+import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler } from './src/services/errorReporting';
@@ -224,6 +228,8 @@ function MainApp() {
   const dailyLoginCheckedRef = useRef(false);
   // Patron (cosmetic IAP) modal — opened from Shop header / Settings
   const [showPatronModal, setShowPatronModal] = useState(false);
+  // Store modal — consumable amber/hint packs + the cosmetic bundle.
+  const [showStoreModal, setShowStoreModal] = useState(false);
   // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
   const puzzleStartTimeRef = useRef<number>(0);
   // Daily Challenge leaderboard standing for the current victory (null = none/off)
@@ -1316,6 +1322,56 @@ function MainApp() {
     puzzleActions.handleHint();
   }, [puzzleActions]);
 
+  // Out-of-hints recovery: a completed `hint_recovery` clip grants one hint;
+  // otherwise (no provider / cap / dismissed) we gently route to the store.
+  const handleClaimRewardedHint = useCallback(async () => {
+    try {
+      const res = await showRewarded('hint_recovery');
+      if (res.completed) {
+        await addHints(REWARDED_HINT_GRANT, 'rewarded_hint');
+        puzzleActions.refreshHintBalance();
+        hapticSuccess();
+        puzzleActions.setMessage(`+${REWARDED_HINT_GRANT} hint`);
+      } else if (res.reason === 'daily_cap') {
+        puzzleActions.setMessage('Daily clip limit reached — try the store.');
+      } else {
+        setShowStoreModal(true);
+      }
+    } catch {
+      setShowStoreModal(true);
+    }
+  }, [puzzleActions]);
+
+  // Raised by the hint button when the balance is empty. Offers a rewarded clip
+  // (when under the daily cap) or the store. Guarded against re-entrant alerts.
+  const outOfHintsAlertRef = useRef(false);
+  const handleOutOfHints = useCallback(async () => {
+    if (outOfHintsAlertRef.current) return;
+    outOfHintsAlertRef.current = true;
+    const done = () => { outOfHintsAlertRef.current = false; };
+    const capReached = await isRewardedCapReached().catch(() => false);
+    const buttons: { text: string; style?: 'cancel'; onPress?: () => void }[] = [];
+    if (!capReached) {
+      buttons.push({ text: 'Watch a clip (+1)', onPress: () => { done(); handleClaimRewardedHint(); } });
+    }
+    buttons.push({ text: 'Get hints', onPress: () => { done(); setShowStoreModal(true); } });
+    buttons.push({ text: 'Not now', style: 'cancel', onPress: done });
+    Alert.alert(
+      'Out of hints',
+      'Watch a short clip for a free hint, or grab a hint pack in the store.',
+      buttons,
+      { onDismiss: done, cancelable: true },
+    );
+  }, [handleClaimRewardedHint]);
+
+  const prevOutOfHintsSignal = useRef(0);
+  useEffect(() => {
+    if (puzzle.outOfHintsSignal > prevOutOfHintsSignal.current) {
+      prevOutOfHintsSignal.current = puzzle.outOfHintsSignal;
+      handleOutOfHints();
+    }
+  }, [puzzle.outOfHintsSignal, handleOutOfHints]);
+
   // One-time contextual notification prompt — shown after dismissing the
   // victory modal once the player has finished 3+ puzzles. The OS permission
   // dialog is only triggered if the player accepts the in-app prompt.
@@ -1382,8 +1438,43 @@ function MainApp() {
       puzzlesSolved: vd.puzzlesSolved,
       phase: vd.newPhase,
       exempt,
+    }).then(async (shown) => {
+      if (!shown) return;
+      // After the player has actually seen a few interstitials, offer the
+      // contextual one-time Remove-Ads upsell ("tired of these?").
+      await recordInterstitialSeen();
+      if (await consumeRemoveAdsNudge()) {
+        Alert.alert(
+          'Tired of ads?',
+          'You can remove interstitials for good, or become a Patron for a quieter table and a little amber every puzzle.',
+          [
+            { text: 'Maybe later', style: 'cancel' },
+            { text: 'See options', onPress: () => setShowPatronModal(true) },
+          ],
+        );
+      }
     }).catch(() => {});
   }, [victoryFlow.victoryData, onboardingFlow.onboardingStep, isPlayingDaily, phaseTransitionEvent]);
+
+  // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
+  // for Patrons and during onboarding (gating lives in monetizationPrompts.ts).
+  const patronNudgeInFlightRef = useRef(false);
+  const maybeShowPatronNudge = useCallback(async () => {
+    if (patronNudgeInFlightRef.current) return;
+    patronNudgeInFlightRef.current = true;
+    try {
+      if (onboardingFlow.isOnboarding) return;
+      const solved =
+        victoryFlow.victoryData?.puzzlesSolved ??
+        persistence.cumulativeStats?.totalPuzzlesCompleted ??
+        0;
+      if (await consumePatronNudge(solved)) {
+        setShowPatronModal(true);
+      }
+    } finally {
+      patronNudgeInFlightRef.current = false;
+    }
+  }, [onboardingFlow.isOnboarding, victoryFlow.victoryData, persistence.cumulativeStats]);
 
   const handleNextLevel = useCallback(() => {
     hapticLight();
@@ -1394,7 +1485,8 @@ function MainApp() {
       puzzleActions.handleNextLevel();
     });
     maybePromptForNotifications().catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial]);
+    maybeShowPatronNudge().catch(() => {});
+  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -1420,7 +1512,8 @@ function MainApp() {
       transitionTo('home');
     });
     maybePromptForNotifications().catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial]);
+    maybeShowPatronNudge().catch(() => {});
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
 
   const handleGoToPit = useCallback(() => {
     hapticLight();
@@ -1669,6 +1762,7 @@ function MainApp() {
               onOpenLedger={() => transitionTo('ledger')}
               onOpenGallery={() => transitionTo('gallery')}
               onOpenShop={() => transitionTo('shop')}
+              onOpenStore={() => setShowStoreModal(true)}
               onOpenPit={() => transitionTo('pit')}
               onboardingStep={onboardingFlow.onboardingStep}
               onAdvanceOnboarding={onboardingActions.advanceOnboarding}
@@ -2064,7 +2158,7 @@ function MainApp() {
           />
           <ActionButton
             icon="💡"
-            label="HINT"
+            label={puzzle.gameMode === 'challenge' ? 'HINT' : `HINT · ${puzzle.hintBalance}`}
             colors={{
               bg: CandyColors.blue.main,
               border: CandyColors.blue.shadow,
@@ -2072,6 +2166,11 @@ function MainApp() {
             }}
             onPress={handleHintPress}
             disabled={puzzle.gameState !== GameState.PLAYING}
+            accessibilityLabel={
+              puzzle.gameMode === 'challenge'
+                ? 'Hint (unavailable in Challenge Mode)'
+                : `Hint, ${puzzle.hintBalance} remaining`
+            }
           />
           {!onboardingFlow.isOnboarding && (
           <ActionButton
@@ -2351,6 +2450,16 @@ function MainApp() {
         onClose={() => setShowPatronModal(false)}
         onPatronChange={(isPatron) => { if (isPatron) persistenceActions.refreshStats(); }}
       />
+      <StoreModal
+        visible={showStoreModal}
+        phase={persistence.currentPhase}
+        amberBalance={persistence.amberBalance}
+        hintBalance={puzzle.hintBalance}
+        onClose={() => setShowStoreModal(false)}
+        onAmberChange={persistenceActions.setAmberBalance}
+        onHintsChange={() => puzzleActions.refreshHintBalance()}
+        onOpenPatron={() => setShowPatronModal(true)}
+      />
     </View>
   );
 }
@@ -2385,7 +2494,9 @@ export default function App() {
         // admob*Id* keys are set in app.json → extra. initAds() initializes it
         // (and the adapter requests GDPR/UMP consent on init).
         setAdProvider(createAdMobAdProvider());
-        await Promise.all([initIAP(), initAds(), initCosmetics()]);
+        // initHints seeds the one-time free hint stash; awaited before MainApp
+        // mounts, so usePuzzleGame reads the correct balance on its first render.
+        await Promise.all([initIAP(), initAds(), initCosmetics(), initHints()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
       } finally {

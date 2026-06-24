@@ -48,15 +48,30 @@ unaffected until you wire them.
 
 ## 1. In-app purchases (RevenueCat)
 
-Products are modeled as one-time **non-consumables** in code
-(`iap.ts` → `PRODUCT_IDS`): `com.wordshift.patron_key` → `patron` entitlement,
-`com.wordshift.remove_ads` → `adfree` entitlement.
+Products (`iap.ts` → `PRODUCT_IDS`). Two flavors:
 
-1. Create those products in App Store Connect (Non-Consumable) and Google Play
-   Console (In-app product), with the **exact** ids above.
+**Non-consumables** (grant an entitlement):
+- `com.wordshift.patron_key` → `patron` entitlement
+- `com.wordshift.remove_ads` → `adfree` entitlement
+- `com.wordshift.cosmetic_bundle` → `cosmetic_bundle` entitlement (The Keeper's
+  Collection: Eclipse tile theme + confetti)
+
+**Consumables** (repeatable; credit currency, NO entitlement — `purchaseConsumable`):
+- `com.wordshift.amber_small` / `amber_medium` / `amber_large` → amber packs
+  (amounts in `gameBalance.AMBER_PACK_GRANTS`)
+- `com.wordshift.hints_small` / `hints_large` → hint packs
+  (`gameBalance.HINT_PACK_GRANTS`)
+
+1. Create the products with the **exact** ids above. In App Store Connect:
+   non-consumables as **Non-Consumable**, the amber/hint packs as **Consumable**.
+   In Google Play Console: create them as **In-app products** and configure the
+   amber/hint SKUs as **consumable** (RevenueCat/Billing consumes them on
+   purchase so they can be bought again).
 2. In RevenueCat, add an iOS app and an Android app, create **Entitlements named
-   `patron` and `adfree`**, attach the matching products, and copy the **public
-   SDK keys** (one per platform).
+   `patron`, `adfree`, and `cosmetic_bundle`**, attach the matching
+   non-consumable products, and copy the **public SDK keys** (one per platform).
+   The amber/hint consumables need **no** entitlement — the app credits them
+   directly from the purchase result.
 3. Install the SDK (native module — requires a dev/production build):
    ```bash
    cd mobile

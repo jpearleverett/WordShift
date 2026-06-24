@@ -26,6 +26,7 @@ export type EventType =
   | 'onboarding_step'
   | 'onboarding_complete'
   | 'pit_offer'
+  | 'iap_purchase'
   | 'app_error';
 
 /**

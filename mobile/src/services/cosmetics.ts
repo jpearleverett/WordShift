@@ -98,6 +98,24 @@ export const COSMETICS: CosmeticItem[] = [
     description: 'Embers raining upward, to match a kept fire.',
     acquisition: { kind: 'amber', cost: 350 },
   },
+  // "The Keeper's Collection" — a one-time IAP cosmetic bundle. Both items are
+  // owned together via the COSMETIC_BUNDLE entitlement (granted by the bundle
+  // purchase), and are not amber-purchasable, keeping the cash/amber catalogs
+  // disjoint.
+  {
+    id: 'theme_eclipse',
+    category: 'tile_theme',
+    name: 'Eclipse',
+    description: 'A deep violet-and-crimson set for the Keeper. Bundle exclusive.',
+    acquisition: { kind: 'entitlement', entitlement: ENTITLEMENTS.COSMETIC_BUNDLE },
+  },
+  {
+    id: 'confetti_eclipse',
+    category: 'confetti',
+    name: 'Eclipse Fall',
+    description: 'Violet and ember light, falling. Bundle exclusive.',
+    acquisition: { kind: 'entitlement', entitlement: ENTITLEMENTS.COSMETIC_BUNDLE },
+  },
 ];
 
 // ---------------------------------------------------------------------------

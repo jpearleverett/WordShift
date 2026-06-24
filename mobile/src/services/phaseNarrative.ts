@@ -231,6 +231,20 @@ export function getHintFallback(phase: DialoguePhase): string {
   return HINT_FALLBACK[phase];
 }
 
+// Shown when the player taps HINT with an empty hint balance.
+const OUT_OF_HINTS_MESSAGES: Record<DialoguePhase, string> = {
+  0: "You're out of hints! Watch a quick clip or grab more to keep going.",
+  1: 'No hints left. Earn one with a short clip, or stock up.',
+  2: 'Your hints are spent. The pattern offers more — for a price.',
+  3: 'No hints remain. Something will trade you one.',
+  4: 'The arrangement has taken your hints. It will give more, if you ask.',
+  5: 'Your hints are gone, like everything else. More can be drawn.',
+};
+
+export function getOutOfHintsMessage(phase: DialoguePhase): string {
+  return OUT_OF_HINTS_MESSAGES[phase];
+}
+
 // ============================================================================
 // INVALID WORD MESSAGES — Phase-aware feedback when a word isn't valid
 // ============================================================================

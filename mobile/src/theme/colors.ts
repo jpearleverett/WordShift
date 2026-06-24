@@ -165,6 +165,19 @@ export const TILE_THEMES: Record<string, TilePalette> = {
     { bg: '#FFD060', border: '#CCA64D', glow: 'rgba(255, 208, 96, 0.55)' },
     { bg: '#E0A840', border: '#B38633', glow: 'rgba(224, 168, 64, 0.55)' },
   ],
+  // Exclusive to "The Keeper's Collection" cosmetic bundle (IAP). A deep
+  // eclipse set — violet-black with crimson embers — that reads premium against
+  // every phase while still darkening with the story.
+  theme_eclipse: [
+    { bg: '#5B4A8A', border: '#3E3260', glow: 'rgba(122, 92, 200, 0.55)' },
+    { bg: '#7A3F6B', border: '#552B4A', glow: 'rgba(180, 80, 150, 0.5)' },
+    { bg: '#46407A', border: '#2F2B55', glow: 'rgba(100, 90, 190, 0.5)' },
+    { bg: '#8A3F4F', border: '#602B37', glow: 'rgba(200, 80, 100, 0.5)' },
+    { bg: '#5246A0', border: '#372F70', glow: 'rgba(110, 95, 220, 0.55)' },
+    { bg: '#6B3A7A', border: '#4A2855', glow: 'rgba(160, 85, 185, 0.5)' },
+    { bg: '#9C4A56', border: '#6E343D', glow: 'rgba(215, 95, 110, 0.5)' },
+    { bg: '#403A75', border: '#2B2851', glow: 'rgba(95, 88, 185, 0.5)' },
+  ],
 };
 
 // Cosmetic confetti palettes (Cosmetic Shop). When one is equipped it replaces
@@ -175,6 +188,8 @@ export const CONFETTI_THEMES: Record<string, string[]> = {
   confetti_gold: ['#FFD479', '#F5C04D', '#FFE6A8', '#E8B44A', '#FFCB6B', '#FFFFFF'],
   confetti_dusk: ['#9B7FCF', '#6B5B8A', '#C3A6E0', '#7E6BA8', '#B49AD8', '#E8DCF5'],
   confetti_ember: ['#FF8A5B', '#E8543A', '#FFB259', '#D94F3D', '#FF7E79', '#FFD0A0'],
+  // Exclusive to "The Keeper's Collection" cosmetic bundle (IAP).
+  confetti_eclipse: ['#7A5CC8', '#B45096', '#D75F6E', '#5F58B9', '#A055B9', '#E8DCF5'],
 };
 
 // The equipped tile theme id is pushed in from cosmetics.ts (registration pattern

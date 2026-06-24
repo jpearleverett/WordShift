@@ -136,6 +136,53 @@ export const INTERSTITIAL_FREQUENCY_EARLY = 3; // Phase 0–2
 export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3+
 
 // ============================================================================
+// HINT ECONOMY
+// ============================================================================
+// Hints are a consumable resource. A player starts with a free stash, can earn
+// more from the opt-in `hint_recovery` rewarded ad, or buy hint packs (IAP).
+// Spending a hint still costs stars (the star-rating penalty is unchanged), so
+// hints buy *convenience*, never narrative progress (3-star → phase accel is
+// untouched by simply *having* hints available).
+
+/** Free hints granted once, the first time the hint balance is initialized. */
+export const STARTING_FREE_HINTS = 5;
+
+/** Hints granted per completed `hint_recovery` rewarded ad view. */
+export const REWARDED_HINT_GRANT = 1;
+
+// ============================================================================
+// IN-APP PURCHASES (consumable packs)
+// ============================================================================
+// Amber/hint amounts granted by each consumable SKU. Amber packs are a
+// convenience faucet for the cosmetic shop + amber sinks — they credit the
+// REWARD balance only and (like every amber source) never feed phase progress.
+
+/** Amber granted per amber pack SKU. */
+export const AMBER_PACK_GRANTS = {
+  small: 600,
+  medium: 1800, // best-value tier
+  large: 5000,
+} as const;
+
+/** Hints granted per hint pack SKU. */
+export const HINT_PACK_GRANTS = {
+  small: 5,
+  large: 20,
+} as const;
+
+// ============================================================================
+// MONETIZATION SOFT PROMPTS
+// ============================================================================
+// Gentle, frequency-capped nudges (never modal spam). All are suppressed for
+// players who already own the relevant entitlement.
+
+/** Earliest puzzle count at which the one-time Patron nudge may appear. */
+export const PATRON_NUDGE_MIN_PUZZLES = 6;
+
+/** Show the Remove-Ads nudge once this many interstitials have been seen. */
+export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
+
+// ============================================================================
 // OFFERING PIT
 // ============================================================================
 
