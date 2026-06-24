@@ -6,7 +6,8 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getNoValidMovesMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getNoValidMovesMessage } from '../services/phaseNarrative';
+import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords, isPostRevelation } from '../services/amberCurrency';
 import {
   getVariantOverrides,
@@ -182,6 +183,10 @@ export interface PuzzleGameState {
   isEchoPuzzle: boolean;
   /** True when no legal move remains from the active row — surfaces a recovery panel */
   isStuck: boolean;
+  /** Player's spendable hint balance (consumable hint economy). */
+  hintBalance: number;
+  /** Increments each time HINT is tapped with an empty balance (App offers ad/store). */
+  outOfHintsSignal: number;
 }
 
 export interface PuzzleGameActions {
@@ -213,6 +218,8 @@ export interface PuzzleGameActions {
   handleUndo: () => void;
   grantExtraUndo: () => void;
   handleHint: () => void;
+  /** Re-read the hint balance from the hints service (after a grant/purchase). */
+  refreshHintBalance: () => void;
   handleNextLevel: () => void;
   /**
    * Start a Daily Challenge from pre-generated words. Always a standard,
@@ -254,6 +261,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [showConfetti, setShowConfetti] = useState(false);
   const [invalidAttempts, setInvalidAttempts] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
+  // Consumable hint economy: spendable balance + a signal raised when the player
+  // taps HINT with none left (App offers a rewarded clip / the store).
+  const [hintBalance, setHintBalance] = useState(() => getHintBalanceSync());
+  const [outOfHintsSignal, setOutOfHintsSignal] = useState(0);
   // Consecutive clean moves this board (resets on invalid attempt / undo / new
   // board). Drives the escalating combo move-message. Kept in a ref so it never
   // triggers a re-render of its own.
@@ -710,6 +721,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
+    // Consumable hint economy: out of hints → prompt for a clip / the store.
+    // (A hint is only actually spent below, once help is delivered.)
+    if (!hasHintSync()) {
+      setMessage(getOutOfHintsMessage(currentPhase));
+      setOutOfHintsSignal(prev => prev + 1);
+      return;
+    }
+
     const hintTargetRowIndex = moveDirection === 'down' ? activeRowIndex + 1 : activeRowIndex - 1;
     if (hintTargetRowIndex < 0 || hintTargetRowIndex >= rows.length) {
       setMessage(getHintFallback(currentPhase));
@@ -752,6 +771,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
+      consumeHintSync();
+      setHintBalance(getHintBalanceSync());
       if (relevantStep.lettersToMove && doubleShiftMidStep) {
         // Double shift mid-step: only show the second letter (first was already placed)
         setMessage(
@@ -800,6 +821,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
 
       if (foundMove) {
         setHintsUsed(prev => prev + 1);
+        consumeHintSync();
+        setHintBalance(getHintBalanceSync());
         setMessage(getHintMessage(foundMove.letter, foundMove.resultWord, currentPhase));
       } else {
         setMessage(getHintFallback(currentPhase));
@@ -1309,6 +1332,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     });
   }, [rows, applyBoard, hint, solution, reverseSolution, currentWordLength]);
 
+  const refreshHintBalance = useCallback(() => {
+    setHintBalance(getHintBalanceSync());
+  }, []);
+
   const clearBoard = useCallback(() => {
     setRows([]);
     setActiveRowIndex(0);
@@ -1358,6 +1385,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     doubleShiftPhase,
     isEchoPuzzle,
     isStuck,
+    hintBalance,
+    outOfHintsSignal,
   };
 
   const actions: PuzzleGameActions = {
@@ -1369,6 +1398,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     handleUndo,
     grantExtraUndo,
     handleHint,
+    refreshHintBalance,
     handleNextLevel,
     setShowRules,
     setShowDifficultyMenu,

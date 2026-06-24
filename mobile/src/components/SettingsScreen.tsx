@@ -56,6 +56,8 @@ import { clearRoomUpgrades } from '../services/roomUpgrades';
 import { clearEntitlements } from '../services/entitlements';
 import { clearCosmetics } from '../services/cosmetics';
 import { clearAdPacing } from '../services/ads';
+import { clearHints } from '../services/hints';
+import { clearMonetPrompts } from '../services/monetizationPrompts';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -240,6 +242,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               clearCosmetics(),
               clearAdPacing(),
               clearTendingState(),
+              clearHints(),
+              clearMonetPrompts(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);

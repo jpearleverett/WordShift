@@ -77,11 +77,18 @@ jest.mock('../services/phaseNarrative', () => ({
   getMoveMessage: jest.fn(() => 'Nice move!'),
   getHintMessage: jest.fn((_l: string, _w: string, _p: number) => 'Hint: move letter'),
   getHintFallback: jest.fn(() => 'Try undoing!'),
+  getOutOfHintsMessage: jest.fn((_p: number) => 'Out of hints!'),
   getLoadingMessage: jest.fn(() => 'Loading...'),
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
   getNoValidMovesMessage: jest.fn((_p: number) => 'No words fit from here! Undo a move or clear the board to try a fresh path.'),
+}));
+
+jest.mock('../services/hints', () => ({
+  getHintBalanceSync: jest.fn(() => 5),
+  hasHintSync: jest.fn(() => true),
+  consumeHintSync: jest.fn(() => true),
 }));
 
 jest.mock('../services/amberCurrency', () => ({
@@ -455,6 +462,26 @@ describe('usePuzzleGame', () => {
 
       [state] = callHook();
       expect(state.hintsUsed).toBe(1);
+    });
+
+    test('out of hints raises the signal and does not spend a hint', () => {
+      resetHookState();
+      // Empty hint balance for this call only.
+      require('../services/hints').hasHintSync.mockReturnValueOnce(false);
+      let [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME'], undefined, [
+        { stepIndex: 0, sourceWord: 'LIME', targetWord: 'TIME', letterToMove: 'L', explanation: 'test' },
+      ]);
+
+      let [state] = callHook();
+      const signalBefore = state.outOfHintsSignal;
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      [state] = callHook();
+      expect(state.hintsUsed).toBe(0); // no hint delivered
+      expect(state.outOfHintsSignal).toBe(signalBefore + 1);
     });
 
     test('blocked in challenge mode', () => {

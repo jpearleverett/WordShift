@@ -29,6 +29,8 @@ export const ENTITLEMENTS = {
   PATRON: 'patron',
   /** Remove Ads / Supporter — ad-free, and the victory 2x reward is granted with no ad. */
   ADFREE: 'adfree',
+  /** The Keeper's Collection — a one-time cosmetic bundle (exclusive tile theme + confetti). */
+  COSMETIC_BUNDLE: 'cosmetic_bundle',
 } as const;
 
 export type EntitlementKey = string;
