@@ -166,9 +166,14 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
 
       const loaded = loadAdsModule();
       if (!loaded) return; // SDK not installed → inert
-      mod = loaded.default ?? loaded;
+      // Keep the FULL module namespace: InterstitialAd / RewardedAd / AdEventType /
+      // RewardedAdEventType / AdsConsent are NAMED exports, while the default export
+      // is the mobileAds() initializer. Conflating them makes every ad request throw
+      // silently (ads never load, 0 requests reach AdMob).
+      mod = loaded;
       try {
-        await mod().initialize();
+        const mobileAds = loaded.default ?? loaded;
+        await mobileAds().initialize();
         ready = true;
         // GDPR/UMP consent (EEA/UK). Non-fatal — outside those regions it's a
         // no-op, and on failure ads still serve as non-personalized.
