@@ -31,7 +31,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Persistence**: AsyncStorage with in-memory cache pattern
 - **Haptics**: expo-haptics (settings-gated)
 - **Audio**: expo-av playing a bundled 14-sound WAV SFX pack (`assets/sounds/`, settings-gated, plays in iOS silent mode)
-- **Analytics/crash**: local event log (`eventLogger.ts`) + global error handler installed at startup; optional remote upload via `telemetry.ts` (disabled until an endpoint is configured)
+- **Analytics/crash**: local event log (`eventLogger.ts`) + global error handler installed at startup; remote analytics upload via `telemetry.ts`/Supabase and crash forwarding via Sentry are **configured** (`supabaseUrl`/`supabaseAnonKey`/`sentryDsn` set in `app.json` → `extra`)
 - **Testing**: Jest with ts-jest preset
 - **Target**: iOS and Android via Expo Go
 
@@ -166,10 +166,11 @@ mobile/
 │       ├── sacrifice.ts         # Phase 4+ amber sacrifice mechanic
 │       ├── tending.ts           # Phase 5 Tending Shrine: soft-infinite cosmetic amber sink + honest Phase-5 dialogue selection (caughtUp pointer, pure selectPhase5Dialogue)
 │       ├── notifications.ts     # Push notification scheduling
-│       ├── cloudSave.ts         # Cloud save infrastructure (pluggable provider, NoOp default)
-│       ├── entitlements.ts      # Monetization scaffold: owned purchases / Patron status (source of truth)
-│       ├── iap.ts               # Monetization scaffold: pluggable BillingProvider (NoOp default)
-│       ├── ads.ts               # Monetization scaffold: pluggable AdProvider + ad policy (NoOp default)
+│       ├── cloudSave.ts         # Cloud save (pluggable provider; live Supabase provider when supabaseUrl set in app.json — configured)
+│       ├── entitlements.ts      # Monetization: owned purchases / Patron status (source of truth)
+│       ├── iap.ts               # Monetization: BillingProvider seam (live RevenueCat adapter in providers/revenueCatBilling.ts)
+│       ├── ads.ts               # Monetization: AdProvider seam + ad policy (live AdMob adapter in providers/googleAdMobAds.ts)
+│       ├── providers/           # Live monetization adapters: revenueCatBilling.ts (IAP), googleAdMobAds.ts (ads)
 │       ├── cosmetics.ts         # Cosmetic ownership/equip + amber shop (tile themes + confetti palettes; getEquippedSync, initCosmetics; pushes tile theme to colors.ts)
 │       ├── wordHarvest.ts       # Offering Pit harvest batches (over-cap = merge oldest, never drop amber)
 │       ├── slotEstimation.ts    # Drag-and-drop slot position estimation (`estimateSlotIndex`) + `findClosestValidSlot` (App routes drag drops through it with a ±1-slot bound for near-miss forgiveness; ties break toward the finger, never teleports across the row)
@@ -178,7 +179,7 @@ mobile/
 │       ├── onboarding.ts        # Onboarding state machine + persistence
 │       ├── dataMigration.ts     # Schema versioning + migrations (v3)
 │       ├── configValidation.ts  # Configuration data validation
-│       ├── telemetry.ts         # Optional remote event/crash uploader (disabled by default)
+│       ├── telemetry.ts         # Remote event uploader → Supabase events table when supabaseUrl is set (configured)
 │       ├── dateUtils.ts          # Local-day date helpers (streak/daily bucketing — NEVER UTC/toISOString)
 │       ├── settings.ts, haptics.ts, audio.ts, eventLogger.ts
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
@@ -188,7 +189,7 @@ mobile/
 ├── src/__tests__/               # ~1,141 tests, 42 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
-├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source (buildNumber/versionCode), autoIncrement on production. `submit.production` still needs real store credentials before `eas submit`.
+├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console.
 └── eslint.config.js             # ESLint 9 flat config
 ```
 
@@ -274,7 +275,7 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 - Frame-rate monitoring (`performanceMonitor.startFrameMonitoring`) is diagnostic-only — its samples are never read in production — so it is gated behind `__DEV__` (and stopped on unmount) and never runs a perpetual `requestAnimationFrame` loop on a player's device.
 - The default export `App` is a bootstrap gate: it awaits `runMigrations()` (dataMigration.ts) **before** mounting `MainApp`, so service caches always read migrated data. Renders a quiet dark view while booting; migration failures log and never block launch.
 - Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
-- `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Disabled** (`TELEMETRY_ENDPOINT = ''`): no endpoint is configured and nothing is transmitted.
+- `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Active**: sends to the Supabase `events` table (`supabaseUrl`/`supabaseAnonKey` set in `app.json` → `extra`); falls back to a custom `telemetryEndpoint` if that's set instead. Only anonymous events (install id, platform, app version, event type) are sent.
 - FTUE funnel events: `app_open`, `onboarding_step` / `onboarding_complete` (logged from `setOnboardingStep`), `puzzle_started/completed`, `daily_completed`, `notification_permission_result`, `pit_offer` — recorded to the local event log.
 
 ### Screen Navigation
@@ -514,12 +515,12 @@ Phase 4+: voluntary amber destruction. No gameplay benefit. Phase-aware response
 Phase 2+: one cosmetic enhancement per room (10 total, 75-150 amber). Phase-aware descriptions.
 
 ### Notifications (`notifications.ts`)
-Local push: daily reminders (phase-aware morning messages, scheduled as an **always-repeating** daily trigger so the "puzzle is ready" ping never lapses for players who don't relaunch), streak-at-risk reminders (7pm the next missed day when streak ≥ 2, copy via `getStreakRiskMessage(phase, streak)`), and re-engagement (6pm; next day for non-streak players, day after the streak warning for streak holders — an escalation ladder). Each app session reschedules everything; the streak/re-engagement pings only fire on genuinely missed days. Phase 5 has distinct serene tone.
+Local push: daily reminders (phase-aware morning messages, scheduled as a short ladder of non-repeating dated one-shots `DAILY_REMINDER_LOOKAHEAD_DAYS` ahead, skipping today once the player has played — so a daily player never gets a redundant "puzzle is ready" ping), streak-at-risk reminders (7pm the next missed day when streak ≥ 2, copy via `getStreakRiskMessage(phase, streak)`), re-engagement (6pm; next day for non-streak players, day after the streak warning for streak holders — an escalation ladder), and a **weekly-quest-expiry** reminder (Sunday 6pm before the local-Monday quest reset, `getQuestExpiryMessage(phase)`, only when the player has weekly-quest progress in flight or unclaimed reward). Each app session reschedules everything; the streak/re-engagement/quest pings only fire on genuinely missed/relevant days. Phase 5 has distinct serene tone.
 
 **Permission flow**: `scheduleAllNotifications()` never prompts — it only schedules when permission is already granted. The OS dialog is triggered solely by `requestNotificationPermission()`, reached two ways: the one-time contextual prompt after the player's 3rd+ victory (App.tsx `maybePromptForNotifications`, copy from `getNotificationPromptText()`), or the Daily Reminders toggle in Settings. The prompt result is logged as a `notification_permission_result` event.
 
 ### Cloud Save (`cloudSave.ts`)
-Client-side sync layer with a pluggable `CloudProvider` interface. The active provider is `NoOpProvider` (no network I/O — nothing is synced off-device). `collectLocalSaveData()` / `restoreFromCloudData()`. `SYNC_KEYS` lists the **actual** AsyncStorage keys each service writes (e.g. `wordshift_home_progress`, not `wordshift_progress`; includes `wordshift_daily_login`, `wordshift_cosmetics`) — keep it in sync when adding a persisted key; device-specific keys (`wordshift_device_id`/`install_id`/`wordshift_ad_pacing`), the local analytics buffer (`wordshift_event_log`), store-authoritative entitlements (`wordshift_entitlements`), and the sync-status meta key are intentionally excluded.
+Client-side sync layer with a pluggable `CloudProvider` interface. A live Supabase provider activates when `supabaseUrl`/`supabaseAnonKey` are set in `app.json` → `extra` (**now configured**); it also powers the daily leaderboard + aggregate social proof. Falls back to `NoOpProvider` (no network I/O) when unconfigured. `collectLocalSaveData()` / `restoreFromCloudData()`. `SYNC_KEYS` lists the **actual** AsyncStorage keys each service writes (e.g. `wordshift_home_progress`, not `wordshift_progress`; includes `wordshift_daily_login`, `wordshift_cosmetics`) — keep it in sync when adding a persisted key; device-specific keys (`wordshift_device_id`/`install_id`/`wordshift_ad_pacing`), the local analytics buffer (`wordshift_event_log`), store-authoritative entitlements (`wordshift_entitlements`), and the sync-status meta key are intentionally excluded.
 
 ## Asset System
 
@@ -668,12 +669,12 @@ Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250:
 
 **Cosmetic Shop (amber):** `components/shop/ShopScreen.tsx` (`currentScreen: 'shop'`, reached from the **home utility menu** ☰) buys & equips **tile themes** and **confetti palettes** with amber, in two sections. Tile themes live in `theme/colors.ts` `TILE_THEMES` (Ember-warm/Deep-tide/Bone-quiet — these double as the Phase-5 Tending motifs — + a Patron-entitlement gold set); the equipped one is pushed into `colors.ts` via `setEquippedTileTheme()` (registration pattern → no import cycle) and resolved synchronously inside `getTileColor()`, so it stays phase-aware (phase overlays/glow apply on top). Confetti palettes live in `CONFETTI_THEMES`; an equipped one overrides the phase-default confetti in `Confetti.tsx` (via `getEquippedSync('confetti')`), with the phase-aware default when none is equipped. Amber purchase routes through `spendAmber(cost, 'cosmetic_<id>')` → `recordAmberCosmeticPurchase` (auto-equips).
 
-**Service scaffolds (inert — NoOp providers, no purchases/ads/network):**
+**Services (providers WIRED — live when configured, NoOp fallback):** As of the launch-prep pass, real provider adapters are registered in `App.tsx` and keys live in `app.json` → `expo.extra`, so the app ships with live IAP + ads when those keys are present; the NoOp providers remain the automatic fallback in Expo Go / when a key or SDK is absent.
 - `services/entitlements.ts` — source of truth for owned items / Patron status (`isPatron()`/`isPatronSync()`, `grantEntitlements`, `setEntitlements`, `clearEntitlements`). AsyncStorage-backed, native-free.
-- `services/iap.ts` — `BillingProvider` behind a `NoOpBillingProvider`; holds `PRODUCT_IDS`/`purchaseProduct`/`restorePurchases`/`entitlementsForProduct` as pure code. `initIAP()` runs in App bootstrap (warms the entitlement cache).
-- `services/ads.ts` — `AdProvider` behind a `NoOpAdProvider`; holds ad policy as pure/testable code (`interstitialFrequency`, `shouldShowInterstitial`, rewarded daily cap, Patron suppression). The active provider shows nothing. `initAds()` runs in App bootstrap.
+- `services/iap.ts` — `BillingProvider` seam; holds `PRODUCT_IDS`/`purchaseProduct`/`restorePurchases`/`entitlementsForProduct` as pure code. **`services/providers/revenueCatBilling.ts`** (`createRevenueCatBillingProvider`) is the live RevenueCat adapter, registered via `setBillingProvider()` before `initIAP()`. Reads `revenueCatIosKey`/`revenueCatAndroidKey` from `extra`; products map to the `patron`/`adfree` entitlements.
+- `services/ads.ts` — `AdProvider` seam + ad policy as pure/testable code (`interstitialFrequency`, `shouldShowInterstitial`, rewarded daily cap, Patron suppression). **`services/providers/googleAdMobAds.ts`** (`createAdMobAdProvider`) is the live AdMob adapter, registered via `setAdProvider()` before `initAds()`; reads `admobInterstitialId*`/`admobRewardedId*` from `extra` and requests GDPR/UMP consent on init. AdMob app id is in the `react-native-google-mobile-ads` config plugin in `app.json`.
 - `services/cosmetics.ts` — owned/equipped cosmetic state (amber-bought local + entitlement-granted). `ownsCosmetic`, `recordAmberCosmeticPurchase`, `equipCosmetic`/`unequipCosmetic`, `getEquipped`/`getEquippedSync`, `initCosmetics` (App bootstrap).
-- The active providers do nothing, so the app runs unchanged in Expo Go and all logic is unit-tested (`__tests__/monetization.test.ts`).
+- Both adapters load their native module via a guarded dynamic `require` and degrade to NoOp when absent, so the app still runs in Expo Go and all logic is unit-tested (`__tests__/monetization.test.ts`, `__tests__/providerAdapters.test.ts`). Native modules required for a real build: `react-native-purchases`, `react-native-google-mobile-ads`, `expo-tracking-transparency`.
 
 **Patron amber bonus:** `amberCurrency.awardPuzzleAmber()` adds `PATRON_AMBER_BONUS` (+2, returned as `patronBonus`) when the Patron entitlement is set — additive to the REWARD only, **never** phase progress. `wordshift_cosmetics` is in `cloudSave.SYNC_KEYS`; `wordshift_entitlements` (store-authoritative) and `wordshift_ad_pacing` (device-specific) are excluded; cosmetic/entitlement keys are cleared in Settings → Reset All.
 
