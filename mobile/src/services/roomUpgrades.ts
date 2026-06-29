@@ -109,9 +109,11 @@ export const ROOM_UPGRADES: RoomUpgrade[] = [
 
 // ---------------------------------------------------------------------------
 // Tier-2 "deepenings" (1 per room) — a second, costlier enhancement that opens
-// at Phase 3, filling the mid-game spend valley (~puzzle 130–155) after the
-// tier-1 decorations are exhausted and before the Phase-4 climax. Cosmetic only
-// (never progression). Copy leans into the growing dread — these are not cozy.
+// at Phase 2 (the same gate as the tier-1 decorations it builds on), filling the
+// ~puzzle 65–135 mid-game spend valley as one continuous sink (decorate, then
+// deepen). Requires the room's tier-1 decoration first; never disappears, so
+// slower players still find it later. Cosmetic only (never progression). Copy
+// leans into the growing dread — these are not cozy.
 // ---------------------------------------------------------------------------
 
 export const ROOM_DEEPENINGS: RoomUpgrade[] = [

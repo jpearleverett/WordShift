@@ -4,7 +4,7 @@
 
 ### Project overview
 
-WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase is in `/workspace/mobile/`. There is no backend, database, or Docker dependency — it is entirely client-side.
+WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase is in `/workspace/mobile/`. No Docker dependency. The core game is client-side (all gameplay state in AsyncStorage); optional backend features (Supabase cloud save / daily leaderboard / anonymous analytics, Sentry crash reporting) and monetization (RevenueCat in-app purchases, AdMob ads) activate only when their keys are set in `app.json` → `expo.extra`, and otherwise degrade to no-ops — so the app still builds and runs in Expo Go with zero network calls.
 
 ### Running the app
 
@@ -21,7 +21,7 @@ WordShift is a React Native (Expo SDK 54) mobile word puzzle game. The codebase 
 - See `CLAUDE.md` for the full test commands. Key: always use `npm test` (not `npx jest`).
 - **Run all tests:** `cd mobile && npm test -- --no-coverage`
 - **Run a single file:** `cd mobile && npm test -- --no-coverage --testPathPattern=<filename>`
-- The suite is expected green (~1,141 tests across 42 suites). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
+- The suite is expected green (~1,301 tests across 54 suites; counts drift as features land — not load-bearing). Date-sensitive tests construct dates with local components (`new Date(2026, 1, 9)`) — never ISO strings, which parse as UTC and break in timezones behind UTC.
 
 ### TypeScript
 
