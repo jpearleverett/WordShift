@@ -334,7 +334,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [rooms, purchasedUpgrades, progress]);
 
   // Tier-2 "deepenings": a room is eligible once its tier-1 decoration is in
-  // place and the deepening hasn't been bought. Fills the Phase-3 spend valley.
+  // place and the deepening hasn't been bought. Opens at Phase 2 to fill the
+  // ~puzzle 65–135 mid-game spend valley (continuous with tier-1 decorations).
   const availableRoomDeepenings = useMemo(() => {
     if (!progress) return [];
     return rooms

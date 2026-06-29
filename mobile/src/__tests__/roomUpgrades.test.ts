@@ -42,10 +42,13 @@ describe('room upgrade catalog', () => {
 });
 
 describe('availability gating', () => {
-  it('tier-1 opens at Phase 2, deepenings at Phase 3', () => {
+  it('tier-1 and deepenings both open at Phase 2 (continuous mid-valley sink)', () => {
     expect(areUpgradesAvailable(1 as never)).toBe(false);
     expect(areUpgradesAvailable(2 as never)).toBe(true);
-    expect(areDeepeningsAvailable(2 as never)).toBe(false);
+    // Deepenings open at the same Phase-2 gate as tier-1 to fill the ~puzzle
+    // 65–135 spend valley (still require the tier-1 decoration first).
+    expect(areDeepeningsAvailable(1 as never)).toBe(false);
+    expect(areDeepeningsAvailable(2 as never)).toBe(true);
     expect(areDeepeningsAvailable(3 as never)).toBe(true);
   });
 });
