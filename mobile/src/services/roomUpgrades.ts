@@ -286,11 +286,19 @@ export async function getDeepenedRooms(): Promise<Record<string, number>> {
 }
 
 /**
- * Deepenings open at Phase 3 — they land in the ~puzzle 130–155 spend valley,
- * after the tier-1 decorations (Phase 2+) have been the earlier amber sink.
+ * Deepenings open at Phase 2 — the same gate as the tier-1 decorations they
+ * build on. This is deliberate: Phase 2 spans the ~puzzle 65–135 mid-game
+ * valley, where the house has largely finished unlocking and amber starts to
+ * pile up with nothing compelling to spend it on. Opening tier-1 AND tier-2 in
+ * the same phase turns two discrete unlock cliffs into one continuous sink
+ * (decorate a room, then deepen it) that keeps amber meaningful through the
+ * valley and on into Phase 3 — deepenings never disappear, so slower-paced
+ * players still find them waiting later. A deepening still requires the room's
+ * tier-1 decoration first (see purchaseRoomDeepening), so the natural order
+ * holds: dress the room before you deepen it.
  */
 export function areDeepeningsAvailable(phase: DialoguePhase): boolean {
-  return (phase as number) >= 3;
+  return (phase as number) >= 2;
 }
 
 /**

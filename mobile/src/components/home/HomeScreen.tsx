@@ -211,6 +211,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const ambientOpacity = useRef(new Animated.Value(0)).current;
   const ambientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ambientAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  // Bounds the home_empty onboarding recovery reloads (see safety-net effect).
+  const homeEmptyRecoveryAttemptsRef = useRef(0);
 
   // Goal suggestion (contextual next-action hint)
 
@@ -332,7 +334,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [rooms, purchasedUpgrades, progress]);
 
   // Tier-2 "deepenings": a room is eligible once its tier-1 decoration is in
-  // place and the deepening hasn't been bought. Fills the Phase-3 spend valley.
+  // place and the deepening hasn't been bought. Opens at Phase 2 to fill the
+  // ~puzzle 65–135 mid-game spend valley (continuous with tier-1 decorations).
   const availableRoomDeepenings = useMemo(() => {
     if (!progress) return [];
     return rooms
@@ -387,6 +390,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     }
   }, [onboardingStep, progress, unlockFlow.nextUnlock]);
+
+  // Onboarding safety net: home_empty is the single most fragile moment in the
+  // funnel — the FoxGuide has no Continue button, so the ONLY way forward is the
+  // invite prompt appearing. If data is slow or `nextUnlock` never resolves to
+  // the free Fox invite, a new player stalls on a dead home screen and bounces.
+  // After a short delay, self-heal: reload data (re-evaluates the invite) when
+  // the unlock hasn't resolved, or force-show the invite when it has. The effect
+  // re-runs as state changes, retrying until recovered (capped to avoid a
+  // pathological reload loop on a genuinely corrupt install).
+  useEffect(() => {
+    if (onboardingStep !== 'home_empty') return;
+    // Already in a good state — invite is up with valid data.
+    if (unlockFlow.showInvitePrompt && unlockFlow.nextUnlock) return;
+    const t = setTimeout(() => {
+      const next = unlockFlow.nextUnlock;
+      if (next && next.type === 'character' && next.cost === 0) {
+        unlockFlow.setShowInvitePrompt(true);
+      } else if (homeEmptyRecoveryAttemptsRef.current < 5) {
+        // Unlock data hasn't resolved (or isn't the free invite yet) — reload.
+        homeEmptyRecoveryAttemptsRef.current += 1;
+        loadAllData();
+      }
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [onboardingStep, unlockFlow.showInvitePrompt, unlockFlow.nextUnlock]);
 
   // Challenge Mode intro (one-time, Fox-led, after 15 puzzles).
   useEffect(() => {

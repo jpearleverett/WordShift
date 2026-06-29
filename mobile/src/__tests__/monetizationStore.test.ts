@@ -59,6 +59,23 @@ describe('consumable catalog', () => {
       expect(p.reward.amount).toBeGreaterThan(0);
     }
   });
+
+  it('amber packs escalate value per dollar and badge the genuine best value', () => {
+    const byId = (id: string) => CONSUMABLE_PRODUCTS.find(p => p.productId === id)!;
+    const small = byId(PRODUCT_IDS.AMBER_SMALL);
+    const medium = byId(PRODUCT_IDS.AMBER_MEDIUM);
+    const large = byId(PRODUCT_IDS.AMBER_LARGE);
+    const perDollar = (p: typeof small) =>
+      p.reward.amount / parseFloat(p.fallbackPrice.replace('$', ''));
+
+    // Value must strictly increase with pack size (ladder psychology).
+    expect(perDollar(medium)).toBeGreaterThan(perDollar(small));
+    expect(perDollar(large)).toBeGreaterThan(perDollar(medium));
+
+    // The "best value" badge belongs on the genuine best-per-dollar amber SKU.
+    expect(large.bestValue).toBe(true);
+    expect(medium.bestValue).toBeFalsy();
+  });
 });
 
 describe('purchaseConsumable', () => {

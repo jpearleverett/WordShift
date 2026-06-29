@@ -175,19 +175,16 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
         const mobileAds = loaded.default ?? loaded;
         await mobileAds().initialize();
         ready = true;
-        // GDPR/UMP consent (EEA/UK). Non-fatal — outside those regions it's a
-        // no-op, and on failure ads still serve as non-personalized.
-        try {
-          const AdsConsent = mod.AdsConsent;
-          if (AdsConsent) {
-            await AdsConsent.requestInfoUpdate();
-            if (typeof AdsConsent.loadAndShowConsentFormIfRequired === 'function') {
-              await AdsConsent.loadAndShowConsentFormIfRequired();
-            }
-          }
-        } catch {
-          /* non-fatal */
-        }
+        // NOTE: GDPR/UMP consent + iOS ATT are deliberately NOT requested here.
+        // This runs in the cold-start bootstrap, and a consent/tracking dialog
+        // before the player has seen a single frame is the classic permission-
+        // wall anti-pattern (hurts D1, especially for EEA users). Consent/ATT are
+        // deferred to first actual ad exposure via `ensureAdConsent()` in ads.ts,
+        // which calls `requestConsentIfNeeded()` / `requestATTIfNeeded()` below.
+        // The first preloaded ad may serve non-personalized; subsequent loads are
+        // personalized once consent resolves — an acceptable trade for not
+        // interrupting the first session.
+        //
         // Warm one of each so the first show is instant.
         await Promise.all([preloadInterstitial(), preloadRewarded()]);
       } catch (error) {

@@ -157,11 +157,14 @@ export const REWARDED_HINT_GRANT = 1;
 // convenience faucet for the cosmetic shop + amber sinks — they credit the
 // REWARD balance only and (like every amber source) never feed phase progress.
 
-/** Amber granted per amber pack SKU. */
+// Amber granted per amber pack SKU. Tuned so per-dollar value ESCALATES with
+// pack size (small ~606/$, medium ~669/$, large ~787/$ at $0.99/$2.99/$6.99) —
+// standard ladder psychology that rewards trading up. The largest pack is the
+// genuine best value and carries the "best value" badge (see CONSUMABLE_PRODUCTS).
 export const AMBER_PACK_GRANTS = {
   small: 600,
-  medium: 1800, // best-value tier
-  large: 5000,
+  medium: 2000,
+  large: 5500, // best-value tier (highest amber-per-dollar)
 } as const;
 
 /** Hints granted per hint pack SKU. */
@@ -365,8 +368,10 @@ export const MAX_USED_TRACKED = 500;
 // DAILY CHALLENGE
 // ============================================================================
 
-/** Minimum puzzles solved before daily challenge is unlocked. */
-export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 5;
+// NOTE: the daily-challenge unlock threshold lives in dailyChallenge.ts
+// (DAILY_CHALLENGE_UNLOCK_PUZZLES = 3, the value isDailyChallengeUnlocked
+// actually reads). A divergent =5 copy previously sat here, imported by nobody,
+// which silently lied about the "single source of truth". Removed.
 
 // ============================================================================
 // WEEKLY QUESTS

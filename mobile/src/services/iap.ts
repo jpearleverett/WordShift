@@ -82,15 +82,15 @@ export const CONSUMABLE_PRODUCTS: ConsumableProductInfo[] = [
     productId: PRODUCT_IDS.AMBER_MEDIUM,
     reward: { kind: 'amber', amount: AMBER_PACK_GRANTS.medium },
     name: 'Jar of Amber',
-    description: `${AMBER_PACK_GRANTS.medium} amber — best value.`,
-    bestValue: true,
+    description: `${AMBER_PACK_GRANTS.medium} amber — more per coin.`,
     fallbackPrice: '$2.99',
   },
   {
     productId: PRODUCT_IDS.AMBER_LARGE,
     reward: { kind: 'amber', amount: AMBER_PACK_GRANTS.large },
     name: 'Hoard of Amber',
-    description: `${AMBER_PACK_GRANTS.large} amber, a deep reserve.`,
+    description: `${AMBER_PACK_GRANTS.large} amber — best value.`,
+    bestValue: true,
     fallbackPrice: '$6.99',
   },
   {
