@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,241 tests across 50 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,301 tests across 54 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -186,7 +186,7 @@ mobile/
 │       ├── homeScenePan.ts, shareResults.ts (emoji-grid text share; daily shares are spoiler-free)
 │       ├── shareImage.ts        # Pluggable result-image capture (react-native-view-shot behind a provider; text fallback in Expo Go)
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,241 tests, 50 suites
+├── src/__tests__/               # ~1,301 tests, 54 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console.
@@ -393,7 +393,7 @@ The core system making puzzles feel like rituals:
 - **Named Incantations** (Phase 2+): Deterministic chain names. Phase 2: "The HEAT Dance". Phase 4: "Offering: VOID to DOOM".
 - **Ritual Energy**: Dread word presence scored 0-10. Each point adds 0.1 to `phaseProgress`. High-energy puzzles (7+) trigger micro-events.
 - **Word Ledger**: Scrollable screen of all formed words. Dread words highlighted at Phase 2+.
-- **Animal Whispers**: 150+ lines (3 per animal per phase). Prefers animals matching puzzle trigger words.
+- **Animal Whispers**: 250+ lines (5 per animal per phase). Prefers animals matching puzzle trigger words.
 - **Dread Word Visual Feedback** (Phase 2+): Crimson pulse overlay on dread word formation. Phase-scaled opacity (0.10 → 0.25).
 - **In-Puzzle Ritual Echo Chain**: Real-time word chain on puzzle screen left side. Phase-aware styling.
 - **Arrangement Pattern** (Phase 2+): Visual sigil lines connecting rooms on house exterior.
@@ -515,7 +515,7 @@ Collectible archive of all whispers, dialogue snippets, and narrative moments. C
 Phase 4+: voluntary amber destruction. No gameplay benefit. Phase-aware responses. Milestone messages at 1/5/10/25/50/100.
 
 ### Room Upgrades (`roomUpgrades.ts`)
-Phase 2+: one cosmetic enhancement per room (tier 1, 10 total, 75-150 amber). Phase-aware descriptions. **Tier-2 "deepenings"** (`ROOM_DEEPENINGS`, 10 total, 175-300 amber) open at **Phase 3** and require the room's tier-1 decoration first (`purchaseRoomDeepening` / `areDeepeningsAvailable` / `getDeepenedRooms`, stored in a separate `deepened` map under the same `wordshift_room_upgrades` key). They exist to fill the **mid-game spend valley (~puzzle 130–155)** — the gap after the house is built and tier-1 is exhausted, before the Phase-4 climax — giving the player a fresh sink + collection goal (HomeScreen "The House Deepens" section). Dread-leaning copy (the rooms turn unsettling, not cozy). Cleared in Reset All; covered by `roomUpgrades.test.ts`.
+Phase 2+: one cosmetic enhancement per room (tier 1, 10 total, 75-150 amber). Phase-aware descriptions. **Tier-2 "deepenings"** (`ROOM_DEEPENINGS`, 10 total, 175-300 amber) open at **Phase 2** — the same gate as the tier-1 decorations they build on — and require the room's tier-1 decoration first (`purchaseRoomDeepening` / `areDeepeningsAvailable` / `getDeepenedRooms`, stored in a separate `deepened` map under the same `wordshift_room_upgrades` key). Opening both tiers in one phase turns two unlock cliffs into one continuous sink (decorate, then deepen) across the **mid-game spend valley (~puzzle 65–135)**, where the house has finished unlocking and amber piles up; deepenings never disappear, so slower players still find them later. HomeScreen "The House Deepens" section. Dread-leaning copy (the rooms turn unsettling, not cozy). Cleared in Reset All; covered by `roomUpgrades.test.ts`.
 
 ### Notifications (`notifications.ts`)
 Local push: daily reminders (phase-aware morning messages, scheduled as a short ladder of non-repeating dated one-shots `DAILY_REMINDER_LOOKAHEAD_DAYS` ahead, skipping today once the player has played — so a daily player never gets a redundant "puzzle is ready" ping), streak-at-risk reminders (7pm the next missed day when streak ≥ 2, copy via `getStreakRiskMessage(phase, streak)`), re-engagement (6pm; next day for non-streak players, day after the streak warning for streak holders — an escalation ladder), and a **weekly-quest-expiry** reminder (Sunday 6pm before the local-Monday quest reset, `getQuestExpiryMessage(phase)`, only when the player has weekly-quest progress in flight or unclaimed reward). Each app session reschedules everything; the streak/re-engagement/quest pings only fire on genuinely missed/relevant days. Phase 5 has distinct serene tone.

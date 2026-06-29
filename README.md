@@ -11,11 +11,13 @@ Every puzzle you solve is an incantation. The animals know.
 3. Drop it into the next word — that word grows and must also be valid.
 4. Reach the bottom of the chain to win. Earn amber, build the house, meet the animals, and watch the world change.
 
-Variants: **Reverse Shift** (down then back up, cumulative letter locking), **Double Shift** (two letters per move), **Speed Shift** (timed runs). Plus a deterministic **Daily Challenge**, streaks, weekly quests, 34 achievements, and a phase-based narrative system that re-skins every screen, message, and animation as the story darkens.
+Variants: **Reverse Shift** (down then back up, cumulative letter locking), **Double Shift** (two letters per move), **Speed Shift** (timed runs). Plus a deterministic **Daily Challenge**, streaks, weekly quests, 40 achievements, and a phase-based narrative system that re-skins every screen, message, and animation as the story darkens.
+
+Monetization is convenience/expression only (never progression): a cosmetic shop bought with in-game amber, optional consumable amber/hint packs, a one-time cosmetic bundle, an optional Patron / Remove-Ads purchase, and gently-gated ads.
 
 ## Tech
 
-React Native + Expo SDK 54, TypeScript (strict), Jest. Entirely client-side — no backend, no accounts; all state in AsyncStorage. See [CLAUDE.md](./CLAUDE.md) for the full architecture reference (it's the canonical codebase doc).
+React Native + Expo SDK 54, TypeScript (strict), Jest. Local-first — the core puzzles play fully offline with all state in AsyncStorage, and there are no user accounts. Optional backend features (cloud save, daily leaderboard, anonymous analytics via **Supabase**; crash reporting via **Sentry**) and monetization (in-app purchases via **RevenueCat**, ads via **AdMob**) activate only when their keys are present in `app.json` → `extra`, and degrade to no-ops otherwise (so Expo Go still runs everything). See [CLAUDE.md](./CLAUDE.md) for the full architecture reference (it's the canonical codebase doc).
 
 ## Development
 
@@ -35,7 +37,9 @@ npm run lint
 ## Docs
 
 - [CLAUDE.md](./CLAUDE.md) — architecture, systems, conventions (read this first)
-- [docs/privacy-policy.md](./docs/privacy-policy.md) · [docs/terms.md](./docs/terms.md) — legal (served via GitHub Pages)
+- [docs/BACKEND_SETUP.md](./docs/BACKEND_SETUP.md) — Supabase / Sentry provisioning (cloud save, leaderboard, analytics, crash reporting)
+- [docs/MONETIZATION_SETUP.md](./docs/MONETIZATION_SETUP.md) — RevenueCat (IAP) + AdMob (ads) store/product setup
+- [docs/privacy-policy.md](./docs/privacy-policy.md) · [docs/terms.md](./docs/terms.md) · [docs/data-deletion.md](./docs/data-deletion.md) — legal (served via GitHub Pages)
 - [docs/STORE_LISTING.md](./docs/STORE_LISTING.md) — store listing copy, keywords, age rating, screenshot shot list
 
 ## Content rating
