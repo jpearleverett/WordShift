@@ -55,6 +55,19 @@ import {
 } from '../services/tending';
 import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
 
+/**
+ * Pick the session-end message. Only claim "come back later" when the animal is
+ * GENUINELY on cooldown — during the newly-unlocked grace period the cooldown is
+ * skipped, so re-tapping immediately shows more dialogue; telling the player to
+ * come back later there is just wrong. Caller passes `onCooldown` read AFTER the
+ * session has ended (so grace state is settled).
+ */
+function sessionEndMessage(name: string, onCooldown: boolean): string {
+  return onCooldown
+    ? `${name} wants to rest now. Come back after solving a few puzzles.`
+    : `${name} pauses to gather their thoughts — tap them again whenever you'd like to keep talking.`;
+}
+
 interface SessionInfo {
   status: 'available' | 'in_session' | 'cooldown';
   dialoguesRemaining?: number;
@@ -605,10 +618,10 @@ export function useDialogueFlow({
     // Regular dialogue advance — check if session is still available
     const availability = await checkDialogueAvailability(selectedAnimal.id);
     if (!availability.available) {
-      closeDialogue(true);
-      setCooldownMessage(
-        `${selectedAnimal.name} wants to rest now. Come back after solving some puzzles!`
-      );
+      const animalId = selectedAnimal.id;
+      const animalName = selectedAnimal.name;
+      await closeDialogue(true);
+      setCooldownMessage(sessionEndMessage(animalName, isOnCooldown(animalId)));
       return;
     }
 
@@ -682,10 +695,10 @@ export function useDialogueFlow({
       );
 
       if (status.dialoguesRemaining !== undefined && status.dialoguesRemaining <= 0) {
-        closeDialogue(true);
-        setCooldownMessage(
-          `${selectedAnimal.name} wants to rest now. Come back later for more conversation!`
-        );
+        const animalId = selectedAnimal.id;
+        const animalName = selectedAnimal.name;
+        await closeDialogue(true);
+        setCooldownMessage(sessionEndMessage(animalName, isOnCooldown(animalId)));
         return;
       }
     } else {

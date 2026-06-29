@@ -908,18 +908,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return getIntroDialogueLine(introAnimal.type, introDialogueIndex) || '';
   };
 
-  // Get intro dialogue progress text
-  const getIntroProgress = (): string => {
-    if (!introAnimal || !progress) return '';
-    const current = introDialogueIndex + 1;
-    const total = introOverrideLines
-      ? introOverrideLines.length
-      : shouldUseCatchup()
-        ? getCatchupIntroDialogueCount(introAnimal.type, progress.currentPhase)
-        : getIntroDialogueCount(introAnimal.type);
-    return `${current}/${total}`;
-  };
-
   // Check if there are more intro dialogues
   const hasMoreIntroDialogues = (): boolean => {
     if (!introAnimal || !progress) return false;
@@ -2204,9 +2192,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </View>
 
                   <View style={styles.dialogueFooter}>
-                    <Text style={[styles.introProgressInline, { color: dt.progressColor }]}>
-                      {getIntroProgress()}
-                    </Text>
                     <TouchableOpacity
                       style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
                       onPress={handleAdvanceIntroDialogue}
