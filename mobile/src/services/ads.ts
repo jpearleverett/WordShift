@@ -32,7 +32,6 @@ const STORAGE_KEY = 'wordshift_ad_pacing';
 export type RewardedPlacement =
   | 'victory_double'
   | 'hint_recovery'
-  | 'cooldown_skip'
   | 'quest_bonus';
 
 export interface RewardedResult {
@@ -272,6 +271,9 @@ export async function maybeShowInterstitial(params: {
 /** Clear ad pacing state (for Settings → Reset All). */
 export async function clearAdPacing(): Promise<void> {
   pacingCache = getDefaultPacing();
+  // A full reset re-arms the lazy consent/ATT request; the OS won't re-prompt
+  // once the user has decided, so this is harmless and keeps "Reset All" honest.
+  consentAndAttRequested = false;
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch {

@@ -245,6 +245,27 @@ describe('ads runtime', () => {
     expect(again).toBe(false);
   });
 
+  it('requests consent + ATT once at first ad exposure, never before', async () => {
+    let consent = 0;
+    let att = 0;
+    setAdProvider(fakeAdProvider({
+      requestConsentIfNeeded: async () => { consent++; },
+      requestATTIfNeeded: async () => { att++; },
+    }));
+    // Nothing shown yet → no consent/ATT prompt (no cold-start permission wall).
+    expect(consent).toBe(0);
+    expect(att).toBe(0);
+    // First interstitial triggers consent + ATT exactly once.
+    const shown = await maybeShowInterstitial({ puzzlesSolved: 50, phase: 0 });
+    expect(shown).toBe(true);
+    expect(consent).toBe(1);
+    expect(att).toBe(1);
+    // A later ad (rewarded) does not re-request within the session.
+    await showRewarded('victory_double');
+    expect(consent).toBe(1);
+    expect(att).toBe(1);
+  });
+
   it('enforces the rewarded daily cap', async () => {
     setAdProvider(fakeAdProvider());
     for (let i = 0; i < REWARDED_DAILY_CAP; i++) {

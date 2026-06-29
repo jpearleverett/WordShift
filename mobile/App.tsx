@@ -1101,18 +1101,24 @@ function MainApp() {
       });
       addVictoryTimeout(() => setStarBurst({ active: false, x: 0, y: 0 }), 600);
 
-      // Drag-drop bonus effects: target row bounce + screen micro-shake
-      if (wasDragDrop) {
-        setSuccessDropSignal(prev => prev + 1);
+      // Target-row catch bounce on BOTH inputs so the placed tile always
+      // "lands" — the default/accessible tap path used to skip this and feel
+      // noticeably flatter than a drag-drop.
+      setSuccessDropSignal(prev => prev + 1);
 
-        // Light screen micro-shake via existing dread shake infrastructure
+      // Screen micro-shake via the existing dread-shake infrastructure, scaled
+      // by input: a firm thud for drag-drop, a lighter tick for tap. Drag still
+      // feels heavier (and gets hapticHeavy above), but tap is no longer silent
+      // on screen.
+      {
         const settings = getSettingsSync();
         if (!settings.reducedMotion) {
+          const intensity = wasDragDrop ? DROP_SHAKE_INTENSITY : DROP_SHAKE_INTENSITY * 0.45;
           dropShakeAnimRef.current?.stop();
           const shakeAnim = Animated.sequence([
-            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
-            Animated.timing(dreadEffects.screenShakeRef, { toValue: -DROP_SHAKE_INTENSITY, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
-            Animated.timing(dreadEffects.screenShakeRef, { toValue: DROP_SHAKE_INTENSITY * 0.5, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: intensity, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: -intensity, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
+            Animated.timing(dreadEffects.screenShakeRef, { toValue: intensity * 0.5, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
             Animated.timing(dreadEffects.screenShakeRef, { toValue: 0, duration: DROP_SHAKE_KEYFRAME_MS, useNativeDriver: true }),
           ]);
           dropShakeAnimRef.current = shakeAnim;

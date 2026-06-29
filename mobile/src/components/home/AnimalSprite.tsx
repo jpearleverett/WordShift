@@ -217,6 +217,25 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   rabbit: 8, // Big hops
 };
 
+/**
+ * Progressive "dread" treatment for the idle sprite across Phases 1-3 — the
+ * stretch where the dialogue has already curdled but there is no distinct
+ * mid-state art (sprites are binary: idle through Phase 3, robed at Phase 4+).
+ * Layering a low-opacity tinted copy of the SAME sprite on top cools and
+ * desaturates only the animal shape (Image `tintColor` respects the alpha mask,
+ * so the transparent bounding box is untouched) while the underlying full-colour
+ * detail still reads through. The wash deepens phase by phase so the *animals*
+ * visibly turn before Phase 4 names the cult — restoring "show before tell" on
+ * the most important narrative object. Phase 0 = none; Phase 4+ = robed art.
+ */
+function getSpriteDreadTint(phase: number): { color: string; opacity: number } | null {
+  if (phase >= 4) return null; // robed sprite already carries the reveal
+  if (phase === 3) return { color: '#160F2C', opacity: 0.38 }; // cold near-black, storm-sky dread
+  if (phase === 2) return { color: '#2A2F58', opacity: 0.24 }; // cool desaturation creeps in
+  if (phase === 1) return { color: '#3A4378', opacity: 0.12 }; // faint cool wash, barely there
+  return null;
+}
+
 export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   animal,
   roomWidth,
@@ -595,16 +614,37 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
 
           {/* Animal body */}
           {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
-            <Image
-              source={
+            (() => {
+              const spriteSource =
                 currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
                   ? CHARACTER_SPRITES[animal.type]!.robed!
-                  : CHARACTER_SPRITES[animal.type]!.idle
-              }
-              style={styles.spriteImage}
-              resizeMode="contain"
-              onError={() => setSpriteLoadFailed(true)}
-            />
+                  : CHARACTER_SPRITES[animal.type]!.idle;
+              const dreadTint = getSpriteDreadTint(currentPhase);
+              return (
+                <View style={styles.spriteImage}>
+                  <Image
+                    source={spriteSource}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode="contain"
+                    onError={() => setSpriteLoadFailed(true)}
+                  />
+                  {/* Phase 1-3 dread wash — a tinted copy that darkens only the
+                      sprite shape (tintColor honours alpha), deepening per phase. */}
+                  {dreadTint && (
+                    <Image
+                      source={spriteSource}
+                      style={[
+                        StyleSheet.absoluteFill,
+                        { tintColor: dreadTint.color, opacity: dreadTint.opacity },
+                      ]}
+                      resizeMode="contain"
+                      importantForAccessibility="no"
+                      accessibilityElementsHidden
+                    />
+                  )}
+                </View>
+              );
+            })()
           ) : (
             <View style={[styles.emojiBody, { borderColor: getMoodColor() }]}>
               <Text style={styles.emoji}>{ANIMAL_EMOJIS[animal.type]}</Text>
