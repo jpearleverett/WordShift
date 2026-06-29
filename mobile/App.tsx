@@ -1226,7 +1226,16 @@ function MainApp() {
     setTimeout(() => {
       const previews = slotPreviewsRef.current;
       const onSlotPress = handleSlotPressRef.current;
-      if (!previews || previews.length === 0) return;
+      if (!previews || previews.length === 0) {
+        // Previews weren't ready when the drop resolved (rare: a slow frame
+        // between onDragStart's selection commit and this deferred read). Don't
+        // swallow the drop silently — that reads as "the game ate my letter."
+        // The picked-up letter is still selected, so give the same gentle
+        // feedback as an off-row miss and let the player retry.
+        hapticSelection();
+        setMessageRef.current(getDragMissMessage(currentPhaseRef.current));
+        return;
+      }
 
       // Estimate which slot the user dropped over based on X position.
       const targetWordLength = previews.length - 1;

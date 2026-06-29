@@ -95,10 +95,37 @@ class NoOpAdProvider implements AdProvider {
 
 let provider: AdProvider = new NoOpAdProvider();
 let pacingCache: AdPacingState | null = null;
+let consentAndAttRequested = false;
 
 /** Swap in a real ad provider during app initialization. */
 export function setAdProvider(newProvider: AdProvider): void {
   provider = newProvider;
+}
+
+/**
+ * Request GDPR/UMP consent + iOS ATT exactly once, lazily, at FIRST ad exposure
+ * — never at cold start. A consent/tracking dialog before the player has seen the
+ * game is the textbook permission-wall anti-pattern (hurts D1, especially EEA).
+ * Idempotent: the OS won't re-prompt once the user has decided, and the session
+ * flag prevents redundant calls. Safe on NoOp (both methods are no-ops there).
+ * Called from the interstitial + rewarded show paths so it precedes the very
+ * first ad on whichever path fires first.
+ */
+export async function ensureAdConsent(): Promise<void> {
+  if (consentAndAttRequested) return;
+  consentAndAttRequested = true;
+  // Consent (UMP) first, then iOS ATT — both non-fatal; ads serve
+  // non-personalized if either is declined or unavailable.
+  try {
+    await provider.requestConsentIfNeeded();
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    await provider.requestATTIfNeeded();
+  } catch {
+    /* non-fatal */
+  }
 }
 
 export function getAdProviderName(): string {
@@ -194,6 +221,8 @@ export async function showRewarded(placement: RewardedPlacement): Promise<Reward
   if (await isRewardedCapReached()) {
     return { completed: false, reason: 'daily_cap' };
   }
+  // First ad exposure may be a rewarded clip — request consent/ATT before show.
+  await ensureAdConsent();
   const result = await provider.showRewarded(placement);
   if (result.completed) {
     const pacing = await loadPacing();
@@ -229,6 +258,8 @@ export async function maybeShowInterstitial(params: {
   });
   if (!allowed) return false;
 
+  // First ad exposure may be an interstitial — request consent/ATT before show.
+  await ensureAdConsent();
   const shown = await provider.showInterstitial();
   if (shown) {
     pacing.lastInterstitialPuzzle = params.puzzlesSolved;
