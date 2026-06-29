@@ -217,6 +217,23 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   rabbit: 8, // Big hops
 };
 
+// Per-animal vertical nudge (px, +down) to plant feet on the floor. The sprite
+// art isn't uniformly bottom-aligned in its frame — some characters are drawn
+// higher, so with the same room placement they read as floating. These offsets
+// push those few down so everyone walks on the floor. 0 = already grounded.
+const FLOOR_OFFSET: Record<AnimalType, number> = {
+  red_panda: 0,
+  axolotl: 0, // lives in the tank — placement handled by the water, leave as-is
+  pangolin: 14,
+  sloth: 0,
+  fennec_fox: 0,
+  fox: 0,
+  owl: 18,
+  capybara: 0,
+  wombat: 0,
+  rabbit: 0,
+};
+
 /**
  * Progressive "dread" treatment for the idle sprite across Phases 1-3 — the
  * stretch where the dialogue has already curdled but there is no distinct
@@ -572,6 +589,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     outputRange: [roomHeight * 0.3, roomHeight - 95],
   });
 
+  // Per-animal nudge so feet land on the floor (some sprite art sits high in frame).
+  const floorOffset = FLOOR_OFFSET[animal.type] ?? 0;
+
   return (
     <Animated.View
       style={[
@@ -580,6 +600,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           transform: [
             { translateX },
             { translateY },
+            { translateY: floorOffset },
             { translateY: bounceY },
           ],
         },
