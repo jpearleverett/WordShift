@@ -727,7 +727,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </View>
             </TouchableOpacity>
 
-            {!isEarlyGameVictory && (
             <View style={styles.victoryButtonRowSecondary}>
               {/* Share — uniform secondary */}
               <TouchableOpacity
@@ -773,7 +772,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
-            )}
             </>
             )}
             </Animated.View>

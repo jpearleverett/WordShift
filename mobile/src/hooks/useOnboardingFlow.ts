@@ -126,6 +126,8 @@ export function useOnboardingFlow(
   const [onboardingLineIndex, setOnboardingLineIndex] = useState(0);
   const [onboardingReady, setOnboardingReady] = useState(false);
   const [pitOfferDone, setPitOfferDone] = useState(false);
+  // Guards the one-shot auto-return-home after the tutorial pit offering.
+  const pitAutoReturnedRef = useRef(false);
 
   const isOnboarding = onboardingStep !== 'complete';
 
@@ -248,6 +250,7 @@ export function useOnboardingFlow(
           callbacks.resetVictory();
           clearRitualEchoWords();
           setPitOfferDone(false);
+          pitAutoReturnedRef.current = false;
           addTimeout(async () => {
             if (!mountedRef.current) return;
             await advanceOnboarding('pit_intro');
@@ -328,9 +331,22 @@ export function useOnboardingFlow(
   // handlePitOnboardingOfferComplete
   // ------------------------------------------------------------------
   const handlePitOnboardingOfferComplete = useCallback(() => {
+    if (pitAutoReturnedRef.current) return;
+    pitAutoReturnedRef.current = true;
     setPitOfferDone(true);
     callbacks.refreshStats();
-  }, [callbacks]);
+    // Auto-return home a beat after the words are offered, so the tutorial
+    // continues at home on its own — the player shouldn't have to find a
+    // "Continue" tap at the pit (which read as a soft-lock).
+    addTimeout(async () => {
+      if (!mountedRef.current) return;
+      await advanceOnboarding('returning_home');
+      if (!mountedRef.current) return;
+      callbacks.transitionTo('home', async () => {
+        await advanceOnboarding('unlock_explained');
+      });
+    }, ONBOARDING_TRANSITION_DELAY_MS + 1200);
+  }, [callbacks, advanceOnboarding, addTimeout]);
 
   // ------------------------------------------------------------------
   // Fox text helpers
