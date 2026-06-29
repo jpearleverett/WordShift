@@ -85,7 +85,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
 
   useEffect(() => {
-    if (visible) setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
+    if (visible) {
+      setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
+      logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
+    }
   }, [visible]);
 
   // Fetch localized price strings from the store; NoOp returns [] → fallbacks used.
@@ -137,6 +140,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       if (flow === 'working') return;
       setFlow('working');
       hapticLight();
+      logEvent({ type: 'purchase_initiated', data: { productId: info.productId, kind: info.reward.kind } });
       try {
         const result = await purchaseConsumable(info.productId);
         if (result.success && result.reward) {
@@ -153,11 +157,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           return;
         }
         if (result.cancelled) {
+          logEvent({ type: 'purchase_cancelled', data: { productId: info.productId, kind: info.reward.kind } });
           setFlow('idle');
           return;
         }
+        logEvent({ type: 'purchase_failed', data: { productId: info.productId, kind: info.reward.kind, reason: result.error ?? 'unknown' } });
         setFlow('unavailable');
       } catch {
+        logEvent({ type: 'purchase_failed', data: { productId: info.productId, kind: info.reward.kind, reason: 'exception' } });
         setFlow('unavailable');
       }
     },
@@ -168,6 +175,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     if (flow === 'working' || ownsBundle) return;
     setFlow('working');
     hapticLight();
+    logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic' } });
     try {
       const result = await purchaseProduct(PRODUCT_IDS.COSMETIC_BUNDLE);
       if (result.success) {
@@ -178,11 +186,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         return;
       }
       if (result.cancelled) {
+        logEvent({ type: 'purchase_cancelled', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic' } });
         setFlow('idle');
         return;
       }
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic', reason: result.error ?? 'unknown' } });
       setFlow('unavailable');
     } catch {
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic', reason: 'exception' } });
       setFlow('unavailable');
     }
   }, [flow, ownsBundle]);

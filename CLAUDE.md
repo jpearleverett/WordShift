@@ -279,6 +279,7 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 - Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
 - `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Active**: sends to the Supabase `events` table (`supabaseUrl`/`supabaseAnonKey` set in `app.json` → `extra`); falls back to a custom `telemetryEndpoint` if that's set instead. Only anonymous events (install id, platform, app version, event type) are sent.
 - FTUE funnel events: `app_open`, `onboarding_step` / `onboarding_complete` (logged from `setOnboardingStep`), `puzzle_started/completed`, `daily_completed`, `notification_permission_result`, `pit_offer` — recorded to the local event log.
+- Purchase funnel events (StoreModal + PatronModal): `store_opened` → `purchase_initiated` → `iap_purchase` (success) ↘ `purchase_cancelled` / `purchase_failed`. Each carries `data.productId` + `data.kind` (`amber`/`hints`/`cosmetic`/`patron`/`adfree`), and failures carry `data.reason`. `telemetry.ts` uploads the full `data` payload into the Supabase `events` table (one row per event, with `install_id`/`platform`/`app_version`), so conversion (opened→initiated→purchased) and drop-off are queryable per product. No PII — anonymous install id only.
 
 ### Screen Navigation
 

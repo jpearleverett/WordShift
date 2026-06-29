@@ -26,7 +26,13 @@ export type EventType =
   | 'onboarding_step'
   | 'onboarding_complete'
   | 'pit_offer'
+  // Purchase funnel: store_opened → purchase_initiated → iap_purchase (success)
+  //                                                    ↘ purchase_cancelled / purchase_failed
+  | 'store_opened'
+  | 'purchase_initiated'
   | 'iap_purchase'
+  | 'purchase_cancelled'
+  | 'purchase_failed'
   | 'app_error';
 
 /**
