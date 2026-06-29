@@ -8,8 +8,11 @@ import {
   getRoomsWithStatus,
   getAnimalsWithStatus,
   getUnlockStatus,
+  canReserveUnlock,
+  reserveNextUnlock,
+  claimReservedUnlockIfReady,
 } from '../services/homeWorldData';
-import { clearProgress, loadProgress, devAddAmber } from '../services/amberCurrency';
+import { clearProgress, loadProgress, devAddAmber, getReservedUnlockId } from '../services/amberCurrency';
 import { PHASE_THRESHOLDS } from '../constants/gameBalance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -277,5 +280,88 @@ describe('resolveDialogueIndex (locked-animal forward references)', () => {
       expect(web).toBeDefined();
       expect(web.requiresAnimals).toContain(target);
     }
+  });
+});
+
+describe('reserve-ahead (pay-now, build-when-gate-opens)', () => {
+  // Unlock everything in order up to (not including) the given gated unlock,
+  // leaving it as the next unlock, gated only by its minPuzzles (puzzlesSolved
+  // stays 0 because buying doesn't complete puzzles).
+  async function unlockUpTo(targetUnlockId: string) {
+    await devAddAmber(100000);
+    for (const u of UNLOCK_PROGRESSION) {
+      if (u.id === targetUnlockId) break;
+      await purchaseUnlock(u.id);
+    }
+  }
+
+  test('jungle is the next unlock, gated by puzzles, after its prerequisites', async () => {
+    await unlockUpTo('unlock_jungle');
+    const next = await getNextUnlock();
+    expect(next?.id).toBe('unlock_jungle');
+    const avail = await isUnlockAvailable('unlock_jungle');
+    expect(avail.available).toBe(false); // puzzle-gated
+  });
+
+  test('canReserveUnlock: true when gated + affordable + prerequisites met', async () => {
+    await unlockUpTo('unlock_jungle');
+    expect(await canReserveUnlock('unlock_jungle')).toBe(true);
+  });
+
+  test('canReserveUnlock: false when not affordable', async () => {
+    await unlockUpTo('unlock_jungle');
+    // Drain amber below the jungle cost by reserving... instead, spend it away.
+    const p = await loadProgress();
+    p.amber = 0;
+    expect(await canReserveUnlock('unlock_jungle')).toBe(false);
+  });
+
+  test('canReserveUnlock: false once the puzzle gate is already met', async () => {
+    await unlockUpTo('unlock_jungle');
+    const p = await loadProgress();
+    p.puzzlesSolved = 28; // gate met → normal build, not reserve
+    expect(await canReserveUnlock('unlock_jungle')).toBe(false);
+  });
+
+  test('reserve then claim when the gate opens', async () => {
+    await unlockUpTo('unlock_jungle');
+
+    const res = await reserveNextUnlock('unlock_jungle');
+    expect(res.success).toBe(true);
+    expect(await getReservedUnlockId()).toBe('unlock_jungle');
+
+    // Amber was spent; room not built yet.
+    let p = await loadProgress();
+    expect(p.unlockedRooms).not.toContain('jungle_room');
+
+    // Cannot reserve a second thing while one is pending.
+    expect(await canReserveUnlock('unlock_desert')).toBe(false);
+
+    // Gate not met yet → nothing claimed.
+    expect(await claimReservedUnlockIfReady()).toBeNull();
+    expect(await getReservedUnlockId()).toBe('unlock_jungle');
+
+    // Reach the gate → claim builds the room and clears the reservation.
+    p = await loadProgress();
+    p.puzzlesSolved = 28;
+    const claimed = await claimReservedUnlockIfReady();
+    expect(claimed?.id).toBe('unlock_jungle');
+    expect(await getReservedUnlockId()).toBeNull();
+    p = await loadProgress();
+    expect(p.unlockedRooms).toContain('jungle_room');
+  });
+
+  test('reserve spends amber up front (no double charge on claim)', async () => {
+    await unlockUpTo('unlock_jungle');
+    const before = (await loadProgress()).amber;
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    await reserveNextUnlock('unlock_jungle');
+    const afterReserve = (await loadProgress()).amber;
+    expect(afterReserve).toBe(before - jungle.cost);
+
+    const p = await loadProgress();
+    p.puzzlesSolved = 28;
+    await claimReservedUnlockIfReady();
+    expect((await loadProgress()).amber).toBe(afterReserve); // claim is free
   });
 });

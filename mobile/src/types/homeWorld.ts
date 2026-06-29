@@ -224,6 +224,10 @@ export interface HomeWorldProgress {
   phaseProgress?: number;
   // Challenge mode tracking
   challengeCompletions?: number;
+  // A puzzle-gated unlock the player has paid for in advance ("reserved"); it
+  // auto-builds when its level gate opens. Only the immediate next unlock can be
+  // reserved (one at a time). undefined/null = nothing reserved.
+  reservedUnlockId?: string | null;
   // Last milestone puzzle count that was claimed (prevents double-claiming)
   lastClaimedMilestone?: number;
   // === Ritual Tracking (Incantation System) ===

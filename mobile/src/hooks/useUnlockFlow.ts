@@ -6,7 +6,10 @@ import {
   getUnlockStatus,
   purchaseUnlock,
   isUnlockAvailable,
+  canReserveUnlock,
+  reserveNextUnlock,
 } from '../services/homeWorldData';
+import { getReservedUnlockId } from '../services/amberCurrency';
 import { hapticError, hapticLight, hapticSuccess } from '../services/haptics';
 
 interface UseUnlockFlowParams {
@@ -28,7 +31,12 @@ interface UseUnlockFlowReturn {
   purchaseError: string | null;
   nextUnlock: Unlockable | null;
   allUnlocks: Unlockable[];
+  /** The reserved (paid-ahead, awaiting its level gate) unlock id, or null. */
+  reservedUnlockId: string | null;
+  /** Whether the current next unlock can be reserved now (gated + affordable). */
+  canReserve: boolean;
   handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
+  handleReserve: (unlock: Unlockable) => Promise<void>;
   handleRoomPress: (room: Room) => void;
   setShowShop: (show: boolean) => void;
   setShowRoomUnlock: (room: Room | null) => void;
@@ -59,6 +67,8 @@ export function useUnlockFlow({
   const [showInvitePrompt, setShowInvitePrompt] = useState(false);
   const [nextUnlock, setNextUnlock] = useState<Unlockable | null>(null);
   const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
+  const [reservedUnlockId, setReservedUnlockId] = useState<string | null>(null);
+  const [canReserve, setCanReserve] = useState(false);
   const [unlockAvailability, setUnlockAvailability] = useState<{
     available: boolean;
     reason?: string;
@@ -83,11 +93,19 @@ export function useUnlockFlow({
     setNextUnlock(unlock);
     setAllUnlocks(unlocks);
 
+    const reserved = await getReservedUnlockId();
+    setReservedUnlockId(reserved);
+
     if (unlock) {
-      const availability = await isUnlockAvailable(unlock.id);
+      const [availability, reservable] = await Promise.all([
+        isUnlockAvailable(unlock.id),
+        canReserveUnlock(unlock.id),
+      ]);
       setUnlockAvailability(availability);
+      setCanReserve(reservable);
     } else {
       setUnlockAvailability(null);
+      setCanReserve(false);
     }
 
     // Check if there's an empty room waiting for an animal (first-time invite prompt)
@@ -128,6 +146,21 @@ export function useUnlockFlow({
       setShowInvitePrompt(true);
     }
   }, [animals, nextUnlock]);
+
+  // Reserve a puzzle-gated unlock (pay now, auto-builds when the level opens).
+  const handleReserve = useCallback(async (unlock: Unlockable) => {
+    setPurchaseError(null);
+    const result = await reserveNextUnlock(unlock.id);
+    if (result.success) {
+      hapticSuccess();
+      if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
+      await loadAllData();
+      setShowRoomUnlock(null);
+    } else {
+      hapticError();
+      setPurchaseError(result.error || 'Unable to reserve right now.');
+    }
+  }, [loadAllData, onAmberChange]);
 
   // Handle unlock purchase
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
@@ -171,7 +204,10 @@ export function useUnlockFlow({
     purchaseError,
     nextUnlock,
     allUnlocks,
+    reservedUnlockId,
+    canReserve,
     handlePurchase,
+    handleReserve,
     handleRoomPress,
     setShowShop,
     setShowRoomUnlock,
