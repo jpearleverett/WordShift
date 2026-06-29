@@ -21,6 +21,7 @@ import { isPatronSync, isAdFreeSync } from '../../services/entitlements';
 import { PATRON_AMBER_BONUS } from '../../constants/gameBalance';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
+import { logEvent } from '../../services/eventLogger';
 
 interface PatronModalProps {
   visible: boolean;
@@ -135,24 +136,29 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     if (flow === 'working') return;
     setFlow('working');
     hapticLight();
+    logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron' } });
     try {
       const result = await purchaseProduct(PRODUCT_IDS.PATRON_KEY);
       if (result.success) {
         const patron = isPatronSync();
         setIsPatron(patron);
         onPatronChange?.(patron);
+        logEvent({ type: 'iap_purchase', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron' } });
         hapticMedium();
         setFlow('idle');
         return;
       }
       // User dismissed the native sheet → just return to idle (no error state).
       if (result.cancelled) {
+        logEvent({ type: 'purchase_cancelled', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron' } });
         setFlow('idle');
         return;
       }
       // billing_unavailable (NoOp) or any other failure → calm unavailable state.
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron', reason: result.error ?? 'unknown' } });
       setFlow('unavailable');
     } catch {
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.PATRON_KEY, kind: 'patron', reason: 'exception' } });
       setFlow('unavailable');
     }
   }, [flow, onPatronChange]);
@@ -161,22 +167,27 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     if (flow === 'working') return;
     setFlow('working');
     hapticLight();
+    logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree' } });
     try {
       const result = await purchaseProduct(PRODUCT_IDS.REMOVE_ADS);
       if (result.success) {
         // adFree reads patron OR remove-ads; refresh both flags from cache.
         setAdFree(isAdFreeSync());
         setIsPatron(isPatronSync());
+        logEvent({ type: 'iap_purchase', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree' } });
         hapticMedium();
         setFlow('idle');
         return;
       }
       if (result.cancelled) {
+        logEvent({ type: 'purchase_cancelled', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree' } });
         setFlow('idle');
         return;
       }
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree', reason: result.error ?? 'unknown' } });
       setFlow('unavailable');
     } catch {
+      logEvent({ type: 'purchase_failed', data: { productId: PRODUCT_IDS.REMOVE_ADS, kind: 'adfree', reason: 'exception' } });
       setFlow('unavailable');
     }
   }, [flow]);
