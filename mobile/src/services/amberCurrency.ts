@@ -66,6 +66,7 @@ function getDefaultProgress(): HomeWorldProgress {
     sameVariantStreak: 0,
     pendingPhaseTransition: null,
     phaseProgressFraction: 0,
+    reservedUnlockId: null,
   };
 }
 
@@ -708,6 +709,70 @@ export async function unlockRoom(roomId: string, cost: number): Promise<boolean>
   }
 
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Reserve-ahead: spend amber now for a puzzle-gated unlock, claim it when the
+// gate opens. Keeps a skilled/rich player from staring at idle amber + a wall.
+// ---------------------------------------------------------------------------
+
+/**
+ * Reserve a puzzle-gated unlock by paying its cost up front. Spends amber and
+ * records the reservation; the actual room/animal is committed later by
+ * `claimReservedUnlock` once the level gate opens. The CALLER (homeWorldData)
+ * validates that this is a legal "next, gated, affordable, unreserved" unlock.
+ */
+export async function reserveUnlock(
+  unlockId: string,
+  cost: number,
+): Promise<{ success: boolean; newBalance: number; error?: string }> {
+  const result = await spendAmber(cost, `reserve_${unlockId}`);
+  if (!result.success) {
+    return { success: false, newBalance: result.newBalance, error: result.error };
+  }
+  const progress = await loadProgress();
+  progress.reservedUnlockId = unlockId;
+  progressCache = progress;
+  await saveProgress();
+  return { success: true, newBalance: progress.amber };
+}
+
+/** The currently reserved unlock id (null when nothing is reserved). */
+export async function getReservedUnlockId(): Promise<string | null> {
+  const progress = await loadProgress();
+  return progress.reservedUnlockId ?? null;
+}
+
+/** Synchronous reserved-unlock id off the cache (null until warmed). */
+export function getReservedUnlockIdSync(): string | null {
+  return progressCache?.reservedUnlockId ?? null;
+}
+
+/**
+ * Commit a previously-reserved target into the unlocked list WITHOUT spending
+ * (it was paid for at reserve time) and clear the reservation. Idempotent.
+ */
+export async function claimReservedUnlock(
+  targetId: string,
+  type: 'room' | 'character',
+): Promise<void> {
+  const progress = await loadProgress();
+  if (type === 'character') {
+    if (!progress.unlockedAnimals.includes(targetId)) progress.unlockedAnimals.push(targetId);
+  } else {
+    if (!progress.unlockedRooms.includes(targetId)) progress.unlockedRooms.push(targetId);
+  }
+  progress.reservedUnlockId = null;
+  progressCache = progress;
+  await saveProgress();
+}
+
+/** Clear any reservation without committing (e.g. Reset All; refunds nothing). */
+export async function clearReservedUnlock(): Promise<void> {
+  const progress = await loadProgress();
+  progress.reservedUnlockId = null;
+  progressCache = progress;
+  await saveProgress();
 }
 
 function applyPuzzleExposureGuard(

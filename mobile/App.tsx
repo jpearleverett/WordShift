@@ -75,8 +75,6 @@ import {
   getFoxPitHarvestIntroLines,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
-  getNoValidMovesMessage,
-  getStuckPanelTitle,
   getDragMissMessage,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
@@ -1747,7 +1745,10 @@ function MainApp() {
               text={onboardingActions.getOnboardingFoxText()}
               buttonText={onboardingActions.getOnboardingButtonText()}
               onContinue={
-                onboardingFlow.onboardingStep === 'pit_offering' && !onboardingFlow.pitOfferDone
+                // pit_offering has no manual Continue: before offering the player
+                // taps the words; after offering it auto-returns home. pit_intro
+                // keeps its Continue to advance into the offering step.
+                onboardingFlow.onboardingStep === 'pit_offering'
                   ? undefined
                   : onboardingActions.handleOnboardingContinue
               }
@@ -2114,49 +2115,10 @@ function MainApp() {
           />
         </View>
 
-        {/* Stuck-recovery panel — appears when no legal move remains so the
-            player has a clear, non-transient way out instead of only a toast */}
-        {puzzle.isStuck && puzzle.gameState === GameState.PLAYING && !onboardingFlow.isOnboarding && (
-          <View
-            style={styles.stuckPanel}
-            accessibilityRole="alert"
-            accessibilityLabel={`${getStuckPanelTitle(persistence.currentPhase)} ${getNoValidMovesMessage(persistence.currentPhase)}`}
-          >
-            <Text style={styles.stuckPanelTitle}>{getStuckPanelTitle(persistence.currentPhase)}</Text>
-            <Text style={styles.stuckPanelBody}>{getNoValidMovesMessage(persistence.currentPhase)}</Text>
-            <View style={styles.stuckPanelButtons}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.stuckPanelButton,
-                  puzzle.history.length === 0 && styles.stuckPanelButtonDisabled,
-                  pressed && styles.stuckPanelButtonPressed,
-                ]}
-                onPress={handleUndo}
-                disabled={puzzle.history.length === 0}
-                accessibilityRole="button"
-                accessibilityLabel="Undo last move"
-              >
-                <Text style={styles.stuckPanelButtonText}>↩ Undo move</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.stuckPanelButton,
-                  styles.stuckPanelButtonPrimary,
-                  pressed && styles.stuckPanelButtonPressed,
-                ]}
-                onPress={() => {
-                  hapticLight();
-                  setRitualEchoWords([]);
-                  puzzleActions.resetCurrentPuzzle();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Restart this puzzle"
-              >
-                <Text style={styles.stuckPanelButtonText}>🔄 Restart</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
+        {/* The proactive "you're stuck — undo/restart" panel was removed by
+            design: reaching a dead-end (and deciding to undo) is part of the
+            challenge, so we don't interrupt with a popup. Undo and Restart/NEW
+            remain always available in the controls below. */}
 
         {/* Bottom Controls — simplified during onboarding (no NEW button) */}
         <View style={styles.controls}>

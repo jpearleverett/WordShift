@@ -620,28 +620,33 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
                   ? CHARACTER_SPRITES[animal.type]!.robed!
                   : CHARACTER_SPRITES[animal.type]!.idle;
               const dreadTint = getSpriteDreadTint(currentPhase);
+              // Base sprite renders with its explicit size (the known-good path).
+              const baseSprite = (
+                <Image
+                  source={spriteSource}
+                  style={styles.spriteImage}
+                  resizeMode="contain"
+                  onError={() => setSpriteLoadFailed(true)}
+                />
+              );
+              // Phases 0 and 4+ have no dread wash — render the bare sprite,
+              // exactly as before the dread-ramp refactor.
+              if (!dreadTint) return baseSprite;
+              // Phases 1-3: layer a tinted copy on top (tintColor honours the
+              // sprite's alpha, so only the animal shape cools, not the box).
               return (
                 <View style={styles.spriteImage}>
+                  {baseSprite}
                   <Image
                     source={spriteSource}
-                    style={StyleSheet.absoluteFill}
+                    style={[
+                      StyleSheet.absoluteFill,
+                      { tintColor: dreadTint.color, opacity: dreadTint.opacity },
+                    ]}
                     resizeMode="contain"
-                    onError={() => setSpriteLoadFailed(true)}
+                    importantForAccessibility="no"
+                    accessibilityElementsHidden
                   />
-                  {/* Phase 1-3 dread wash — a tinted copy that darkens only the
-                      sprite shape (tintColor honours alpha), deepening per phase. */}
-                  {dreadTint && (
-                    <Image
-                      source={spriteSource}
-                      style={[
-                        StyleSheet.absoluteFill,
-                        { tintColor: dreadTint.color, opacity: dreadTint.opacity },
-                      ]}
-                      resizeMode="contain"
-                      importantForAccessibility="no"
-                      accessibilityElementsHidden
-                    />
-                  )}
                 </View>
               );
             })()

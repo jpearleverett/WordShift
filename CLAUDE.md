@@ -339,6 +339,8 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 | Garden (Thyme the Rabbit) | 105 |
 | Bamboo Attic (Bamboo the Red Panda) | 130 |
 
+**Reserve-ahead (pay now, build at the gate):** the gates are tuned for a baseline earner, so a fast/skilled player (HARD + achievements + quests) reaches a gated room's amber cost well before its level gate and would otherwise sit on idle amber behind a wall. When the next unlock is blocked *only* by its puzzle gate and the player can afford it, they can **Reserve** it — `reserveNextUnlock` spends the amber up front and stores `reservedUnlockId` (on home progress); `claimReservedUnlockIfReady` (called from `HomeScreen.loadAllData`) commits the room for free the moment `puzzlesSolved` crosses `minPuzzles`, firing a celebration. Only the **immediate next** unlock can be reserved (one at a time, `canReserveUnlock`), so a rich player can stay one step ahead but can't pre-buy the whole house. The shop + room-unlock modals show "Unlocks at level N — reserve it now" / "✓ Reserved — arrives at level N". Reservation rides in `wordshift_home_progress` (cloud-synced; cleared by Reset All's `clearProgress`). Covered by `homeWorldData.test.ts`.
+
 ### Animal Characters (10 total, in unlock order)
 
 | Animal | Name | Surface | Cult Role | Awareness Tier |

@@ -58,6 +58,7 @@ import {
   getRoomsWithStatus,
   getAnimalsWithStatus,
   getRoomDescription,
+  claimReservedUnlockIfReady,
 } from '../../services/homeWorldData';
 import {
   ANIMAL_INFO,
@@ -246,11 +247,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Load all data from storage
   const loadAllData = useCallback(async () => {
+    // Claim any reserved unlock whose level gate has opened BEFORE reading rooms,
+    // so the freshly-built room is included below and a celebration fires.
+    const claimed = await claimReservedUnlockIfReady();
+
     const [progressData, roomsData, animalsData] = await Promise.all([
       getFullProgress(),
       getRoomsWithStatus(),
       getAnimalsWithStatus(),
     ]);
+
+    if (claimed) {
+      setShowCelebration(true);
+    }
 
     // Update puzzle count for dialogue session system
     updatePuzzleCount(progressData.puzzlesSolved);
@@ -1597,35 +1606,56 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Text style={styles.unlockCost}>
                       <AmberInline /> {unlockFlow.nextUnlock.cost} amber
                     </Text>
-                    {unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available && (
+                    {unlockFlow.reservedUnlockId === unlockFlow.nextUnlock.id ? (
                       <Text style={styles.unlockBlockedText}>
-                        {unlockFlow.unlockAvailability.reason}
+                        ✓ Reserved — arrives at level {unlockFlow.nextUnlock.minPuzzles}
                       </Text>
-                    )}
+                    ) : unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available ? (
+                      <Text style={styles.unlockBlockedText}>
+                        {unlockFlow.canReserve && unlockFlow.nextUnlock.minPuzzles
+                          ? `Unlocks at level ${unlockFlow.nextUnlock.minPuzzles} — reserve it now and it builds itself then`
+                          : unlockFlow.unlockAvailability.reason}
+                      </Text>
+                    ) : null}
                   </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.buyButton,
-                      (progress.amber < unlockFlow.nextUnlock.cost ||
-                       (unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available)) &&
-                        styles.buyButtonDisabled,
-                    ]}
-                    onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
-                    disabled={
-                      progress.amber < unlockFlow.nextUnlock.cost ||
-                      (unlockFlow.unlockAvailability !== null && !unlockFlow.unlockAvailability.available)
-                    }
-                    accessibilityLabel={`Unlock ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber`}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.buyButtonText}>
-                      {unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
-                        ? 'Locked'
-                        : progress.amber >= unlockFlow.nextUnlock.cost
-                          ? 'Unlock'
-                          : 'Need More'}
-                    </Text>
-                  </TouchableOpacity>
+                  {unlockFlow.reservedUnlockId === unlockFlow.nextUnlock.id ? (
+                    <View style={[styles.buyButton, styles.buyButtonDisabled]}>
+                      <Text style={styles.buyButtonText}>Reserved ✓</Text>
+                    </View>
+                  ) : unlockFlow.canReserve ? (
+                    <TouchableOpacity
+                      style={styles.buyButton}
+                      onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
+                      accessibilityLabel={`Reserve ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber; it builds at level ${unlockFlow.nextUnlock.minPuzzles}`}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.buyButtonText}>Reserve</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[
+                        styles.buyButton,
+                        (progress.amber < unlockFlow.nextUnlock.cost ||
+                         (unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available)) &&
+                          styles.buyButtonDisabled,
+                      ]}
+                      onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
+                      disabled={
+                        progress.amber < unlockFlow.nextUnlock.cost ||
+                        (unlockFlow.unlockAvailability !== null && !unlockFlow.unlockAvailability.available)
+                      }
+                      accessibilityLabel={`Unlock ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber`}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.buyButtonText}>
+                        {unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
+                          ? 'Locked'
+                          : progress.amber >= unlockFlow.nextUnlock.cost
+                            ? 'Unlock'
+                            : 'Need More'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             )}
@@ -1896,10 +1926,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 )}
 
                 {unlockFlow.nextUnlock && unlockFlow.nextUnlock.targetId === unlockFlow.showRoomUnlock.id && (() => {
+                  const isReserved = unlockFlow.reservedUnlockId === unlockFlow.nextUnlock.id;
                   const isGated = unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
                     && unlockFlow.unlockAvailability.reason && !unlockFlow.unlockAvailability.reason.startsWith('Already');
                   const cantAfford = progress.amber < unlockFlow.nextUnlock.cost;
                   const isDisabled = cantAfford || !!isGated;
+                  // Reserved: paid, awaiting its level gate.
+                  if (isReserved) {
+                    return (
+                      <Text style={[styles.shopSubtitle, { color: dt.nameColor, marginTop: 8, fontWeight: '700' }]}>
+                        ✓ Reserved — arrives at level {unlockFlow.nextUnlock.minPuzzles}
+                      </Text>
+                    );
+                  }
+                  // Gated but affordable: offer to reserve (pay now, auto-builds).
+                  if (unlockFlow.canReserve) {
+                    return (
+                      <>
+                        <Text style={[styles.shopSubtitle, { color: dt.subtitleColor, marginTop: 8, fontStyle: 'italic' }]}>
+                          Unlocks at level {unlockFlow.nextUnlock.minPuzzles}. Reserve it now and it builds itself the moment you get there.
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.buyButton, styles.buyButtonLarge]}
+                          onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
+                          accessibilityLabel={`Reserve room for ${unlockFlow.nextUnlock!.cost} amber; builds at level ${unlockFlow.nextUnlock!.minPuzzles}`}
+                          accessibilityRole="button"
+                        >
+                          <Text style={styles.buyButtonText}>
+                            Reserve for <AmberInline /> {unlockFlow.nextUnlock!.cost}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }
                   return (
                     <>
                       {isGated && (

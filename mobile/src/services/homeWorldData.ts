@@ -1,5 +1,5 @@
 import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
-import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead } from './amberCurrency';
+import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead, reserveUnlock, getReservedUnlockId, claimReservedUnlock } from './amberCurrency';
 import { getPhaseStartIndex } from './dialogue/animalDialogueBase';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
@@ -843,6 +843,96 @@ export async function purchaseUnlock(unlockId: string): Promise<{
   }
 
   return { success };
+}
+
+/**
+ * Whether an unlock can be RESERVED right now: it's the legitimate next unlock
+ * (all previous done), it's blocked ONLY by its puzzle-count gate, the player
+ * can afford it, and nothing else is already reserved. Reserving is the
+ * pay-now / build-when-the-gate-opens path for skilled earners.
+ */
+export async function canReserveUnlock(unlockId: string): Promise<boolean> {
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
+  if (!unlock || unlock.minPuzzles === undefined) return false;
+
+  const progress = await loadProgress();
+  if (progress.reservedUnlockId) return false; // one reservation at a time
+
+  // Must be blocked solely by the puzzle gate.
+  if (progress.puzzlesSolved >= unlock.minPuzzles) return false;
+
+  // All previous unlocks must be done (it's genuinely the next thing).
+  const previous = UNLOCK_PROGRESSION.filter(u => u.order < unlock.order);
+  for (const prev of previous) {
+    const done = prev.type === 'character'
+      ? progress.unlockedAnimals.includes(prev.targetId)
+      : progress.unlockedRooms.includes(prev.targetId);
+    if (!done) return false;
+  }
+
+  // Must be able to afford it.
+  return progress.amber >= unlock.cost;
+}
+
+/**
+ * Reserve a puzzle-gated unlock (pays now). Returns success + the new balance.
+ */
+export async function reserveNextUnlock(unlockId: string): Promise<{
+  success: boolean;
+  newBalance?: number;
+  error?: string;
+}> {
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
+  if (!unlock) return { success: false, error: 'Invalid unlock ID' };
+  if (!(await canReserveUnlock(unlockId))) {
+    return { success: false, error: 'Cannot reserve this unlock right now' };
+  }
+  const result = await reserveUnlock(unlockId, unlock.cost);
+  if (result.success) {
+    logEvent({ type: 'unlock_purchased', data: { unlockId: unlock.id, targetId: unlock.targetId, cost: unlock.cost, reserved: true } });
+  }
+  return { success: result.success, newBalance: result.newBalance, error: result.error };
+}
+
+/**
+ * If there's a reserved unlock whose level gate has now opened, commit it
+ * (no further spend — it was paid at reserve time) and return the unlocked
+ * item so the caller can celebrate / show a new-character intro. Returns null
+ * when nothing is reserved or the gate isn't met yet.
+ */
+export async function claimReservedUnlockIfReady(): Promise<Unlockable | null> {
+  const reservedId = await getReservedUnlockId();
+  if (!reservedId) return null;
+
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === reservedId);
+  if (!unlock) {
+    // Reservation points at nothing valid — clear it defensively.
+    await claimReservedUnlock('', 'room');
+    return null;
+  }
+
+  const progress = await loadProgress();
+
+  // Already unlocked somehow (e.g. double-claim) — just clear the reservation.
+  const alreadyUnlocked = unlock.type === 'character'
+    ? progress.unlockedAnimals.includes(unlock.targetId)
+    : progress.unlockedRooms.includes(unlock.targetId);
+  if (alreadyUnlocked) {
+    await claimReservedUnlock(unlock.targetId, unlock.type);
+    return null;
+  }
+
+  // Gate must now be met.
+  if (unlock.minPuzzles !== undefined && progress.puzzlesSolved < unlock.minPuzzles) {
+    return null;
+  }
+
+  await claimReservedUnlock(unlock.targetId, unlock.type);
+  if (unlock.type === 'character') {
+    await fastForwardLateUnlockDialogue(unlock.targetId);
+  }
+  logEvent({ type: 'unlock_purchased', data: { unlockId: unlock.id, targetId: unlock.targetId, cost: unlock.cost, claimedFromReserve: true } });
+  return unlock;
 }
 
 /**

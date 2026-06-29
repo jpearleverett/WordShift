@@ -6,7 +6,7 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getNoValidMovesMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
 import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords, isPostRevelation } from '../services/amberCurrency';
 import {
@@ -1015,12 +1015,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     };
 
     // Escalating move feedback: a clean run of moves builds energy via the combo
-    // message; a stuck board ends the run and shows the no-moves message. Reset
-    // happens here (stuck) and on invalid attempts / undo / new board elsewhere.
+    // message. We deliberately do NOT announce a dead-end when a move leaves the
+    // board unsolvable — discovering you've painted yourself into a corner (and
+    // choosing to undo) is part of the challenge, so a stuck board just ends the
+    // combo run and shows a normal move message rather than a "you're stuck" call.
     const moveMessageFor = (stuck: boolean): string => {
       if (stuck) {
         cleanMoveStreakRef.current = 0;
-        return getNoValidMovesMessage(currentPhase);
+        return getMoveMessage(currentPhase);
       }
       cleanMoveStreakRef.current += 1;
       return cleanMoveStreakRef.current >= 2
@@ -1056,17 +1058,15 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         cleanMoveStreakRef.current = 0;
         setMoveDirection('up');
         setActiveRowIndex(rows.length - 1);
-        if (!hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation)) {
-          setMessage(getNoValidMovesMessage(currentPhase));
-          setIsStuck(true);
-        } else {
-          setMessage(
-            currentPhase >= 3
-              ? 'The descent is complete. Return every letter to the beginning.'
-              : 'Great! Now shift letters back up to the first word.'
-          );
-          setIsStuck(false);
-        }
+        // Show the "now return upward" beat regardless; if the descent left no
+        // valid ascent we still don't announce it (player discovers + undoes).
+        const ascentStuck = !hasAnyValidMove(newRows, rows.length - 1, 'up', checkValidation);
+        setMessage(
+          currentPhase >= 3
+            ? 'The descent is complete. Return every letter to the beginning.'
+            : 'Great! Now shift letters back up to the first word.'
+        );
+        setIsStuck(ascentStuck);
       } else {
         setActiveRowIndex(prev => prev + 1);
         const stuck = !hasAnyValidMove(newRows, activeRowIndex + 1, 'down', checkValidation);
