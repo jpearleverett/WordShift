@@ -60,6 +60,7 @@ import {
   getRoomDescription,
   claimReservedUnlockIfReady,
 } from '../../services/homeWorldData';
+import { RulesModal } from '../puzzle/RulesModal';
 import {
   ANIMAL_INFO,
   getIntroDialogueLine,
@@ -206,6 +207,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [questTab, setQuestTab] = useState<'daily' | 'weekly'>('daily');
   const [showJournalModal, setShowJournalModal] = useState(false);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Ambient home line (atmospheric text when idle)
   const [ambientLine, setAmbientLine] = useState<string | null>(null);
@@ -1525,6 +1527,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>🛒 Store</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              onPress={() => {
+                setShowUtilityModal(false);
+                setShowRulesModal(true);
+              }}
+              accessibilityLabel="How to play"
+              accessibilityRole="button"
+            >
+              <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📖 How to Play</Text>
+            </TouchableOpacity>
             {onOpenSettings && (
               <TouchableOpacity
                 style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
@@ -1554,6 +1567,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* How to Play — phase-aware rules recap, reachable any time from home */}
+      <RulesModal
+        visible={showRulesModal}
+        phase={progress.currentPhase}
+        onClose={() => setShowRulesModal(false)}
+      />
 
       {/* Shop Modal */}
       <Modal
