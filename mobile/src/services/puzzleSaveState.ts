@@ -79,6 +79,11 @@ export async function loadPuzzleState(): Promise<SavedPuzzleState | null> {
   return null;
 }
 
+/** Drop the in-memory puzzle save cache after external storage writes (cloud restore). */
+export function invalidatePuzzleStateCache(): void {
+  saveCache = null;
+}
+
 export async function clearPuzzleState(): Promise<void> {
   saveCache = null;
   try {

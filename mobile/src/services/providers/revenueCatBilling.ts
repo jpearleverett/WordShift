@@ -55,8 +55,10 @@ function keyFromExtra(): string | undefined {
 
 /** Guarded load of the native SDK. Returns null when it isn't installed. */
 function loadPurchases(): any | null {
+  if (Platform.OS === 'web') return null;
   try {
-    const mod = require('react-native-purchases');
+    const runtimeRequire = eval('require') as NodeRequire;
+    const mod = runtimeRequire('react-native-purchases');
     return mod?.default ?? mod;
   } catch {
     return null;
@@ -148,14 +150,14 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       }
     },
 
-    async restorePurchases(): Promise<{ entitlements: EntitlementKey[] }> {
+    async restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }> {
       if (!ready || !Purchases) return { entitlements: [] };
       try {
         const customerInfo = await Purchases.restorePurchases();
         return { entitlements: entitlementsFrom(customerInfo) };
       } catch (error) {
         console.warn('[IAP] RevenueCat restore failed:', error);
-        return { entitlements: [] };
+        return { entitlements: [], error: 'restore_failed' };
       }
     },
   };

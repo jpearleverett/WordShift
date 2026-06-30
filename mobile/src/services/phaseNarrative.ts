@@ -714,6 +714,22 @@ export function getWordsOfferedText(totalWords: number, phase: number): string {
   return `${totalWords} words woven into the pattern`; // Phase 5 — serene
 }
 
+/**
+ * Non-spoiler journey wording for player-facing stats. Never expose the internal
+ * phase model or a numeric phase counter.
+ */
+export function getJourneyAtmosphereText(phase: number): string {
+  const labels = [
+    'Bright',
+    'Curious',
+    'Deepening',
+    'Unsettled',
+    'Reverent',
+    'Still',
+  ];
+  return labels[phase] ?? labels[0];
+}
+
 // ============================================================================
 // DAILY CHALLENGE INTRO — Animal-led unlock explanation
 // ============================================================================

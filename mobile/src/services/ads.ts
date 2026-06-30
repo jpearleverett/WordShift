@@ -15,7 +15,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 import { getLocalDateString } from './dateUtils';
-import { isPatronSync } from './entitlements';
+import { isAdFreeSync } from './entitlements';
 import {
   REWARDED_DAILY_CAP,
   INTERSTITIAL_FREQUENCY_EARLY,
@@ -131,6 +131,11 @@ export function getAdProviderName(): string {
   return provider.getName();
 }
 
+/** Whether the registered ad provider is actually initialized and ready. */
+export function isAdsReady(): boolean {
+  return provider.isReady();
+}
+
 function getDefaultPacing(): AdPacingState {
   return { lastInterstitialPuzzle: 0, rewardedDate: '', rewardedCount: 0 };
 }
@@ -172,7 +177,7 @@ export function interstitialFrequency(phase: DialoguePhase): number {
 }
 
 /**
- * Pure decision: should an interstitial show now? Patron + every narrative-beat
+ * Pure decision: should an interstitial show now? Ad-free entitlement + every narrative-beat
  * exemption is passed in as `exempt` so the single caller (App.tsx) keeps all the
  * "never interrupt a ceremony / final puzzle / Phase 5" rules in one place.
  */
@@ -180,11 +185,11 @@ export function shouldShowInterstitial(params: {
   puzzlesSolved: number;
   lastInterstitialPuzzle: number;
   phase: DialoguePhase;
-  isPatron: boolean;
+  isAdFree: boolean;
   exempt: boolean;
 }): boolean {
-  const { puzzlesSolved, lastInterstitialPuzzle, phase, isPatron, exempt } = params;
-  if (isPatron || exempt) return false;
+  const { puzzlesSolved, lastInterstitialPuzzle, phase, isAdFree, exempt } = params;
+  if (isAdFree || exempt) return false;
   const freq = interstitialFrequency(phase);
   return puzzlesSolved - lastInterstitialPuzzle >= freq;
 }
@@ -239,7 +244,7 @@ export async function showRewarded(placement: RewardedPlacement): Promise<Reward
 
 /**
  * Maybe show an interstitial on a puzzle→home/next transition. Suppressed for
- * Patron holders, for any caller-supplied exemption, and unless the cadence
+ * ad-free holders, for any caller-supplied exemption, and unless the cadence
  * threshold is met. Records the showing so the counter advances.
  */
 export async function maybeShowInterstitial(params: {
@@ -252,7 +257,7 @@ export async function maybeShowInterstitial(params: {
     puzzlesSolved: params.puzzlesSolved,
     lastInterstitialPuzzle: pacing.lastInterstitialPuzzle,
     phase: params.phase,
-    isPatron: isPatronSync(),
+    isAdFree: isAdFreeSync(),
     exempt: params.exempt ?? false,
   });
   if (!allowed) return false;

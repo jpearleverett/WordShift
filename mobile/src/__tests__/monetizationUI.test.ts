@@ -140,10 +140,12 @@ jest.mock('../services/entitlements', () => ({
 const mockShowRewarded = jest.fn();
 const mockIsRewardedCapReached = jest.fn();
 let mockAdProviderName = 'Not Connected';
+let mockAdsReady = false;
 jest.mock('../services/ads', () => ({
   showRewarded: (...args: unknown[]) => mockShowRewarded(...args),
   isRewardedCapReached: (...args: unknown[]) => mockIsRewardedCapReached(...args),
   getAdProviderName: () => mockAdProviderName,
+  isAdsReady: () => mockAdsReady,
 }));
 
 // ---------------------------------------------------------------------------
@@ -217,6 +219,7 @@ beforeEach(() => {
   mockIsPatron = false;
   mockIsAdFree = false;
   mockAdProviderName = 'Not Connected';
+  mockAdsReady = false;
   mockPurchaseProduct.mockReset();
   mockRestorePurchases.mockReset();
   mockGetProducts.mockReset().mockResolvedValue([]);
@@ -324,12 +327,21 @@ describe('RewardedAdButton', () => {
 
   it('renders nothing when no ad provider is connected', async () => {
     mockAdProviderName = 'Not Connected';
+    mockAdsReady = false;
+    const tree = await renderC(RewardedAdButton as any, { ...baseProps, onReward: jest.fn() });
+    expect(tree).toBeNull();
+  });
+
+  it('renders nothing when a provider is registered but not ready', async () => {
+    mockAdProviderName = 'Google AdMob';
+    mockAdsReady = false;
     const tree = await renderC(RewardedAdButton as any, { ...baseProps, onReward: jest.fn() });
     expect(tree).toBeNull();
   });
 
   it('renders a disabled affordance when unavailable but showWhenUnavailable is set', async () => {
     mockAdProviderName = 'Not Connected';
+    mockAdsReady = false;
     const tree = await renderC(RewardedAdButton as any, {
       ...baseProps,
       onReward: jest.fn(),
@@ -343,6 +355,7 @@ describe('RewardedAdButton', () => {
 
   it('is suppressed entirely for Patron holders even with a provider', async () => {
     mockAdProviderName = 'FakeAds';
+    mockAdsReady = true;
     mockIsPatron = true;
     const tree = await renderC(RewardedAdButton as any, {
       ...baseProps,
@@ -354,6 +367,7 @@ describe('RewardedAdButton', () => {
 
   it('fires onReward when the player completes a rewarded view', async () => {
     mockAdProviderName = 'FakeAds';
+    mockAdsReady = true;
     mockShowRewarded.mockResolvedValue({ completed: true });
     const onReward = jest.fn();
 
@@ -369,6 +383,7 @@ describe('RewardedAdButton', () => {
 
   it('does NOT fire onReward when the view is not completed (dismissed)', async () => {
     mockAdProviderName = 'FakeAds';
+    mockAdsReady = true;
     mockShowRewarded.mockResolvedValue({ completed: false, reason: 'dismissed' });
     const onReward = jest.fn();
 

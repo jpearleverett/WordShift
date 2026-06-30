@@ -57,6 +57,12 @@ async function load(): Promise<HintState> {
   return cache;
 }
 
+/** Drop the in-memory hint cache after external storage writes (cloud restore). */
+export function invalidateHintsCache(): void {
+  cache = null;
+  syncBalance = 0;
+}
+
 async function save(): Promise<void> {
   if (!cache) return;
   try {

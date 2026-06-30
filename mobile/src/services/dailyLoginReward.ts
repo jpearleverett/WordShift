@@ -80,6 +80,16 @@ export function _clearDailyLoginCache(): void {
   cache = null;
 }
 
+/** Clear daily-login reward state for Settings → Reset All. */
+export async function clearDailyLoginReward(): Promise<void> {
+  cache = null;
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Non-critical; reset should continue even if this key fails.
+  }
+}
+
 /**
  * Determine which cycle day a claim made today would land on, given prior state,
  * without mutating anything. Exposed for the UI preview ("Day N — reward").

@@ -11,6 +11,7 @@ module.exports = {
         esModuleInterop: true,
         jsx: 'react',
         strict: true,
+        types: ['jest', 'node'],
       },
     }],
   },

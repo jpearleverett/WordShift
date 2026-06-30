@@ -34,7 +34,7 @@ jest.mock('react', () => ({
   default: jest.requireActual('react'),
 }));
 
-import { getVictoryTitle, getVictoryFeedback, getRulesText } from '../services/phaseNarrative';
+import { getVictoryTitle, getVictoryFeedback, getRulesText, getJourneyAtmosphereText } from '../services/phaseNarrative';
 import { getPhaseTheme, CandyColors } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
 import type { VictoryData } from '../components/puzzle/VictoryModal';
@@ -183,6 +183,16 @@ describe('Rules modal data flow', () => {
     const step4 = getRulesText(4).steps[3];
     expect(step4.heading).toContain('Ritual');
     expect(step4.desc).toContain('Closer');
+  });
+});
+
+describe('Stats journey copy', () => {
+  test('journey atmosphere text avoids numeric phase labels', () => {
+    for (const phase of [0, 1, 2, 3, 4, 5]) {
+      const label = getJourneyAtmosphereText(phase as DialoguePhase);
+      expect(label).not.toMatch(/phase/i);
+      expect(label).not.toMatch(/\d+\s*\/\s*\d+/);
+    }
   });
 });
 

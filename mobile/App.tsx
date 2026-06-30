@@ -77,7 +77,7 @@ import {
   getSpeedTimeUpMessage,
   getDragMissMessage,
 } from './src/services/phaseNarrative';
-import { getPhaseTransitionEvent, PhaseTransitionEvent, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
+import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone } from './src/services/dailyChallenge';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
@@ -1785,6 +1785,7 @@ function MainApp() {
               pitPhaseReady={persistence.pendingPhaseTransition != null}
               initialHousePanY={homePanY}
               onHousePanChange={setHomePanY}
+              onHouseCompleted={() => setPhaseTransitionEvent(HOUSE_COMPLETION_EVENT)}
             />
             {/* Achievement toast overlay */}
             <AchievementToast

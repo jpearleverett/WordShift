@@ -17,6 +17,7 @@ import {
   grantEntitlements,
   setEntitlements,
   loadEntitlements,
+  getGrantedEntitlements,
 } from './entitlements';
 import { AMBER_PACK_GRANTS, HINT_PACK_GRANTS } from '../constants/gameBalance';
 
@@ -142,7 +143,7 @@ export interface BillingProvider {
   getProducts(productIds: ProductId[]): Promise<IapProduct[]>;
   purchase(productId: ProductId): Promise<PurchaseResult>;
   /** Returns the authoritative set of entitlement keys the store reports as owned. */
-  restorePurchases(): Promise<{ entitlements: EntitlementKey[] }>;
+  restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }>;
   isReady(): boolean;
   getName(): string;
 }
@@ -238,7 +239,9 @@ export async function getProducts(
 export async function purchaseProduct(productId: ProductId): Promise<PurchaseResult> {
   const result = await provider.purchase(productId);
   if (result.success) {
-    const ents = result.entitlements ?? entitlementsForProduct(productId);
+    const ents = result.entitlements && result.entitlements.length > 0
+      ? result.entitlements
+      : entitlementsForProduct(productId);
     await grantEntitlements(ents);
     return { ...result, entitlements: ents };
   }
@@ -278,7 +281,13 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
  * authoritative local entitlement state.
  */
 export async function restorePurchases(): Promise<{ entitlements: EntitlementKey[] }> {
-  const { entitlements } = await provider.restorePurchases();
+  if (!provider.isReady()) {
+    return { entitlements: await getGrantedEntitlements() };
+  }
+  const { entitlements, error } = await provider.restorePurchases();
+  if (error) {
+    return { entitlements: await getGrantedEntitlements() };
+  }
   await setEntitlements(entitlements);
   return { entitlements };
 }

@@ -164,6 +164,13 @@ async function load(): Promise<CosmeticState> {
   return cache;
 }
 
+/** Drop the in-memory cosmetic cache after external storage writes (cloud restore). */
+export function invalidateCosmeticsCache(): void {
+  cache = null;
+  syncEquipped = {};
+  setEquippedTileTheme(null);
+}
+
 /**
  * Warm the cosmetic cache and apply the equipped tile theme at app bootstrap
  * (mirrors initIAP/initAds). Safe to call repeatedly.

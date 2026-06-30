@@ -568,7 +568,7 @@ export const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(50, 20, 100, 0.92)',
     justifyContent: 'center',
     alignItems: 'center',

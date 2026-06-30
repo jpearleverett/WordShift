@@ -417,7 +417,7 @@ export const PhaseTransitionOverlay: React.FC<PhaseTransitionOverlayProps> = ({
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
@@ -472,14 +472,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   flash: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 1001,
   },
   // Approximated radial vignette: a thick dark border whose inner corners are
   // rounded, darkening the screen edges while leaving the center clearer.
   // (No new assets; a true radial gradient isn't available without one.)
   vignette: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderColor: 'rgba(0, 0, 0, 0.85)',
     borderWidth: Math.round(Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.32),
     borderRadius: Math.round(Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.55),

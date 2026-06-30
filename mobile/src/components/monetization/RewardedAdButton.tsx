@@ -3,7 +3,7 @@ import { Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-nat
 import {
   showRewarded,
   isRewardedCapReached,
-  getAdProviderName,
+  isAdsReady,
   RewardedPlacement,
 } from '../../services/ads';
 import { isPatronSync } from '../../services/entitlements';
@@ -56,8 +56,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
 }) => {
   // Patron suppression is synchronous and permanent for this render.
   const patron = isPatronSync();
-  // A NoOp / unconfigured backend names itself "Not Connected".
-  const providerReady = getAdProviderName() !== 'Not Connected';
+  const providerReady = isAdsReady();
 
   const [capReached, setCapReached] = useState(false);
   const [busy, setBusy] = useState(false);

@@ -69,6 +69,11 @@ export function getSettingsSync(): GameSettings {
   return settingsCache || DEFAULT_SETTINGS;
 }
 
+/** Drop the in-memory settings cache after external storage writes (cloud restore). */
+export function invalidateSettingsCache(): void {
+  settingsCache = null;
+}
+
 /**
  * Reset settings to defaults
  */

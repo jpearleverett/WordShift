@@ -161,6 +161,22 @@ describe('iap', () => {
     })());
   });
 
+  it('falls back to local entitlement mapping when a successful purchase reports no entitlements', async () => {
+    const fake: BillingProvider = {
+      initialize: async () => {},
+      getProducts: async () => [],
+      purchase: async (productId): Promise<PurchaseResult> => ({ success: true, productId, entitlements: [] }),
+      restorePurchases: async () => ({ entitlements: [] }),
+      isReady: () => true,
+      getName: () => 'Fake',
+    };
+    setBillingProvider(fake);
+    const res = await purchaseProduct(PRODUCT_IDS.REMOVE_ADS);
+    expect(res.success).toBe(true);
+    expect(res.entitlements).toEqual([ENTITLEMENTS.ADFREE]);
+    expect(await isAdFree()).toBe(true);
+  });
+
   it('restorePurchases makes the store the authoritative set', async () => {
     const fake: BillingProvider = {
       initialize: async () => {},
@@ -169,6 +185,22 @@ describe('iap', () => {
       restorePurchases: async () => ({ entitlements: [ENTITLEMENTS.PATRON] }),
       isReady: () => true,
       getName: () => 'Fake',
+    };
+    setBillingProvider(fake);
+    const { entitlements } = await restorePurchases();
+    expect(entitlements).toEqual([ENTITLEMENTS.PATRON]);
+    expect(await isPatron()).toBe(true);
+  });
+
+  it('does not clear local entitlements when restore returns an empty set from an unavailable provider', async () => {
+    await grantEntitlements([ENTITLEMENTS.PATRON]);
+    const fake: BillingProvider = {
+      initialize: async () => {},
+      getProducts: async () => [],
+      purchase: async (productId): Promise<PurchaseResult> => ({ success: false, productId }),
+      restorePurchases: async () => ({ entitlements: [] }),
+      isReady: () => false,
+      getName: () => 'Not Connected',
     };
     setBillingProvider(fake);
     const { entitlements } = await restorePurchases();
@@ -189,17 +221,17 @@ describe('ads policy', () => {
     expect(interstitialFrequency(5 as 5)).toBe(5);
   });
 
-  it('suppresses interstitials for Patron and for exemptions', () => {
+  it('suppresses interstitials for ad-free entitlements and for exemptions', () => {
     expect(
-      shouldShowInterstitial({ puzzlesSolved: 100, lastInterstitialPuzzle: 0, phase: 0, isPatron: true, exempt: false })
+      shouldShowInterstitial({ puzzlesSolved: 100, lastInterstitialPuzzle: 0, phase: 0, isAdFree: true, exempt: false })
     ).toBe(false);
     expect(
-      shouldShowInterstitial({ puzzlesSolved: 100, lastInterstitialPuzzle: 0, phase: 0, isPatron: false, exempt: true })
+      shouldShowInterstitial({ puzzlesSolved: 100, lastInterstitialPuzzle: 0, phase: 0, isAdFree: false, exempt: true })
     ).toBe(false);
   });
 
   it('shows an interstitial only once the cadence threshold is met', () => {
-    const base = { phase: 0 as const, isPatron: false, exempt: false };
+    const base = { phase: 0 as const, isAdFree: false, exempt: false };
     expect(shouldShowInterstitial({ ...base, puzzlesSolved: 2, lastInterstitialPuzzle: 0 })).toBe(false);
     expect(shouldShowInterstitial({ ...base, puzzlesSolved: 3, lastInterstitialPuzzle: 0 })).toBe(true);
   });
@@ -232,6 +264,13 @@ describe('ads runtime', () => {
   it('does not show interstitials to Patron holders', async () => {
     setAdProvider(fakeAdProvider());
     await grantEntitlements([ENTITLEMENTS.PATRON]);
+    const shown = await maybeShowInterstitial({ puzzlesSolved: 99, phase: 0 });
+    expect(shown).toBe(false);
+  });
+
+  it('does not show interstitials to Remove Ads holders', async () => {
+    setAdProvider(fakeAdProvider());
+    await grantEntitlements([ENTITLEMENTS.ADFREE]);
     const shown = await maybeShowInterstitial({ puzzlesSolved: 99, phase: 0 });
     expect(shown).toBe(false);
   });

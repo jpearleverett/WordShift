@@ -934,11 +934,11 @@ const styles = StyleSheet.create({
     transform: [{ skewX: '-20deg' }],
   },
   lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
   resonanceOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: 14,
   },
 });

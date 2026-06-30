@@ -783,7 +783,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(76, 29, 149, 0.7)',
     zIndex: 500,
   },

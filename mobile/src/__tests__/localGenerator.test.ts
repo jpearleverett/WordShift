@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -32,6 +32,16 @@ describe('validateWord', () => {
 
   test('rejects empty string', () => {
     expect(validateWord('')).toBe(false);
+  });
+});
+
+describe('getIncantationName', () => {
+  test('uses distinct serene templates at Phase 5', () => {
+    const words = ['play', 'plant', 'heart'];
+    const phase4 = getIncantationName(words, 4);
+    const phase5 = getIncantationName(words, 5);
+    expect(phase5).not.toBe(phase4);
+    expect(phase5).toMatch(/settles|Weave|Becomes|Abides|Returns/);
   });
 });
 

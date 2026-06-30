@@ -211,7 +211,7 @@ export const appStyles = StyleSheet.create({
     paddingBottom: 40,
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -498,17 +498,17 @@ export const appStyles = StyleSheet.create({
 
   // Phase change dramatic flash overlay
   phaseFlashOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#000000',
     zIndex: 999,
   },
   dreadPulseOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(100, 0, 30, 1)',
     zIndex: 998,
   },
   victoryGlitchOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
