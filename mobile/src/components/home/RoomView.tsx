@@ -89,6 +89,17 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         ]}
         onPress={() => onRoomPress(room)}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={
+          unlockCost !== null
+            ? `Build ${room.name} for ${unlockCost} amber`
+            : `Unlock ${room.name}`
+        }
+        accessibilityHint={
+          unlockCost !== null && amberBalance < unlockCost
+            ? `You have ${amberBalance} amber`
+            : undefined
+        }
       >
         <View style={styles.lockedOverlay}>
           <Text style={styles.lockIcon}>🔒</Text>
@@ -164,6 +175,19 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           style={styles.lockedAnimalContainer}
           onPress={() => onRoomPress(room)}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={
+            inviteCost === null
+              ? `Invite animal to ${room.name}`
+              : inviteCost === 0
+                ? `Invite animal to ${room.name} for free`
+                : `Invite animal to ${room.name} for ${inviteCost} amber`
+          }
+          accessibilityHint={
+            inviteCost !== null && inviteCost > 0 && amberBalance < inviteCost
+              ? `You have ${amberBalance} amber`
+              : undefined
+          }
         >
           <View style={styles.inviteAnimalBadge}>
             <Text style={styles.inviteAnimalIcon}>✨</Text>

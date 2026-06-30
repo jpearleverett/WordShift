@@ -13,6 +13,7 @@ import {
   CloudProvider,
   CloudSaveData,
 } from '../services/cloudSave';
+import { loadProgress } from '../services/amberCurrency';
 
 // Mock AsyncStorage using shared factory
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -237,6 +238,23 @@ describe('cloudSave', () => {
       await restoreFromCloudData(cloudData);
       const progress = await AsyncStorage.getItem('wordshift_home_progress');
       expect(JSON.parse(progress!).amber).toBe(999);
+    });
+
+    it('invalidates cached service state after overwriting local data', async () => {
+      await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify({ amber: 100 }));
+      expect((await loadProgress()).amber).toBe(100);
+
+      const cloudData: CloudSaveData = {
+        version: 1,
+        timestamp: Date.now(),
+        deviceId: 'test',
+        data: {
+          'wordshift_home_progress': JSON.stringify({ amber: 999 }),
+        },
+      };
+
+      await restoreFromCloudData(cloudData);
+      expect((await loadProgress()).amber).toBe(999);
     });
 
     it('handles empty data object', async () => {

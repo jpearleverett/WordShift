@@ -683,6 +683,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   tendingLevel = 0,
 }) => {
   const tendingIntensity = getTendingIntensity(tendingLevel);
+  const ambientMotionEnabled = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -719,6 +720,11 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
   // Spawn particles based on phase
   useEffect(() => {
+    if (!ambientMotionEnabled) {
+      setParticles([]);
+      return;
+    }
+
     const spawnParticle = () => {
       const emojis = PARTICLE_EMOJIS_BY_PHASE[currentPhase] || PARTICLE_EMOJIS_BY_PHASE[0];
       const newParticle: Particle = {
@@ -741,7 +747,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     spawnParticle(); // Spawn one immediately
 
     return () => clearInterval(interval);
-  }, [currentPhase]);
+  }, [currentPhase, ambientMotionEnabled]);
 
 
 
@@ -899,14 +905,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
               )}
 
               {/* Shooting stars (only at higher phases) */}
-              {currentPhase >= 2 && <ShootingStar />}
-              {currentPhase >= 3 && <ShootingStar />}
-              {currentPhase >= 4 && <ShootingStar />}
+              {ambientMotionEnabled && currentPhase >= 2 && <ShootingStar />}
+              {ambientMotionEnabled && currentPhase >= 3 && <ShootingStar />}
+              {ambientMotionEnabled && currentPhase >= 4 && <ShootingStar />}
 
               {/* Flying birds */}
-              <FlyingBird startDelay={0} yPosition={80} />
-              <FlyingBird startDelay={3000} yPosition={50} />
-              {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
+              {ambientMotionEnabled && (
+                <>
+                  <FlyingBird startDelay={0} yPosition={80} />
+                  <FlyingBird startDelay={3000} yPosition={50} />
+                  {currentPhase < 3 && <FlyingBird startDelay={6000} yPosition={110} />}
+                </>
+              )}
 
               {/* House */}
               <View style={styles.houseContainer}>

@@ -135,6 +135,11 @@ export async function loadStats(): Promise<CumulativeStats> {
   return statsCache;
 }
 
+/** Drop the in-memory stats cache after external storage writes (cloud restore). */
+export function invalidateStatsCache(): void {
+  statsCache = null;
+}
+
 /**
  * Record stats from a completed puzzle
  */

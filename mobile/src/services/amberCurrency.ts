@@ -314,6 +314,11 @@ export async function loadProgress(): Promise<HomeWorldProgress> {
   return progressCache;
 }
 
+/** Drop the in-memory progress cache after external storage writes (cloud restore). */
+export function invalidateProgressCache(): void {
+  progressCache = null;
+}
+
 /**
  * Save progress to AsyncStorage
  */

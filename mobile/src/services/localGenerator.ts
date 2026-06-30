@@ -2918,7 +2918,7 @@ export function getWordPhaseTier(word: string): number {
 
 /**
  * Generate a name for a puzzle chain (incantation name).
- * Phase 2: innocent names. Phase 3: shadowy. Phase 4: ritual.
+ * Phase 2: innocent names. Phase 3: shadowy. Phase 4: ritual. Phase 5: serene.
  * Returns null at Phase 0-1.
  */
 export function getIncantationName(words: string[], phase: number): string | null {
@@ -2961,7 +2961,15 @@ export function getIncantationName(words: string[], phase: number): string | nul
     `The ${first} Offering`,
   ];
 
-  const templates = phase >= 4 ? phase4Templates : phase >= 3 ? phase3Templates : phase2Templates;
+  const phase5Templates = [
+    `${first} settles into ${last}`,
+    `The Weave of ${last}`,
+    `${first} Becomes ${last}`,
+    `The ${last} Abides`,
+    `${first} Returns as ${last}`,
+  ];
+
+  const templates = phase >= 5 ? phase5Templates : phase >= 4 ? phase4Templates : phase >= 3 ? phase3Templates : phase2Templates;
   // Deterministic pick based on word content
   const hash = words.join('').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   return templates[hash % templates.length];

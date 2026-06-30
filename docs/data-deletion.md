@@ -5,7 +5,7 @@ title: WordShift — Data Deletion
 
 # WordShift — Data Deletion Request
 
-WordShift is a word puzzle game published by **Iridescent Studios**. This page explains how to delete the data WordShift handles. WordShift has no user accounts; data is associated only with a random, anonymous install identifier (not your name, email, or phone number).
+WordShift is a word puzzle game developed by **Jonathan Pearl Everett**. This page explains how to delete the data WordShift handles. WordShift has no user accounts; data is associated only with a random, anonymous install identifier (not your name, email, or phone number).
 
 ## Delete your on-device data
 

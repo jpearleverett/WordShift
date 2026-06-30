@@ -5,7 +5,7 @@ title: WordShift Privacy Policy
 
 # WordShift Privacy Policy
 
-**Effective date:** June 23, 2026
+**Effective date:** June 30, 2026
 
 WordShift ("the app") is a word puzzle game developed by Jonathan Pearl Everett ("we", "us"). This policy explains what information the app handles, what is sent off your device, and which third-party services are involved.
 
@@ -43,7 +43,7 @@ If you play the Daily Challenge, your result (completion time, stars, and hints 
 The app shows ads served by Google AdMob. To serve ads, Google may collect and process information including your device's advertising identifier and app-usage signals, and may use it for personalized advertising depending on your settings and consent. Where required (for example, in the EEA/UK), the app shows a consent prompt; you can also reset or limit ad personalization in your device's settings. If you purchase **Remove Ads** or **Patron's Key**, ads are turned off. See Google's [Privacy Policy](https://policies.google.com/privacy) and [how Google uses information from sites or apps that use its services](https://policies.google.com/technologies/partner-sites).
 
 ### In-app purchases
-Purchases (for example, "Patron's Key" and "Remove Ads") are processed by **Google Play Billing** and managed through **RevenueCat**. We receive a record that an entitlement was purchased so we can unlock it in the app; we do **not** receive or store your payment card details.
+Purchases (for example, "Patron's Key", "Remove Ads", amber packs, hint packs, and cosmetic bundles) are processed by **Google Play Billing** and managed through **RevenueCat**. We receive a record that an entitlement or consumable product was purchased so we can unlock or grant it in the app; we do **not** receive or store your payment card details.
 
 ## Third-party services
 

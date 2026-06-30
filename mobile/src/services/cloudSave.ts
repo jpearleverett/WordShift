@@ -1,4 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { invalidateProgressCache } from './amberCurrency';
+import { invalidatePuzzleStateCache } from './puzzleSaveState';
+import { invalidateSettingsCache } from './settings';
+import { invalidateStatsCache } from './starRating';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -371,6 +375,13 @@ export async function maybeAutoRestoreOnFreshInstall(): Promise<boolean> {
 let provider: CloudProvider = new NoOpProvider();
 let syncStatusCache: SyncStatus | null = null;
 
+function invalidateRestoredServiceCaches(): void {
+  invalidateProgressCache();
+  invalidateStatsCache();
+  invalidatePuzzleStateCache();
+  invalidateSettingsCache();
+}
+
 /**
  * Set the cloud save provider. Call this during app initialization
  * when a real backend is available.
@@ -435,6 +446,7 @@ export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<bo
     for (const [key, value] of entries) {
       await AsyncStorage.setItem(key, value);
     }
+    invalidateRestoredServiceCaches();
     return true;
   } catch {
     return false;

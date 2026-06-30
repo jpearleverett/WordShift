@@ -15,6 +15,7 @@ import { getAchievementsWithStatus, Achievement, getTotalCount } from '../servic
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getStreakInfo } from '../services/amberCurrency';
 import { Difficulty } from '../types';
+import { getJourneyAtmosphereText } from '../services/phaseNarrative';
 
 interface StatsScreenProps {
   onClose: () => void;
@@ -65,7 +66,12 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
         styles.header,
         effectivePhase >= 4 && { backgroundColor: '#4A3570' },
       ]}>
-        <TouchableOpacity style={styles.backButton} onPress={onClose}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Back to home"
+        >
           <Text style={styles.backButtonText}>{'<'} Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Statistics</Text>
@@ -78,6 +84,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
           style={[styles.tab, selectedTab === 'overview' && styles.tabActive]}
           onPress={() => setSelectedTab('overview')}
           accessibilityRole="tab"
+          accessibilityLabel="Overview stats"
           accessibilityState={{ selected: selectedTab === 'overview' }}
         >
           <Text style={[styles.tabText, selectedTab === 'overview' && styles.tabTextActive]}>
@@ -88,6 +95,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
           style={[styles.tab, selectedTab === 'achievements' && styles.tabActive]}
           onPress={() => setSelectedTab('achievements')}
           accessibilityRole="tab"
+          accessibilityLabel={`Achievements, ${unlockedAchievements.length} of ${totalAchievements} unlocked`}
           accessibilityState={{ selected: selectedTab === 'achievements' }}
         >
           <Text style={[styles.tabText, selectedTab === 'achievements' && styles.tabTextActive]}>
@@ -193,8 +201,8 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             <Text style={styles.sectionTitle}>YOUR JOURNEY</Text>
             <View style={[styles.card, phaseCardStyle]}>
               <View style={styles.journeyRow}>
-                <Text style={styles.journeyLabel}>Phase</Text>
-                <Text style={styles.journeyValue}>{currentPhase + 1}/5</Text>
+                <Text style={styles.journeyLabel}>Atmosphere</Text>
+                <Text style={styles.journeyValue}>{getJourneyAtmosphereText(effectivePhase)}</Text>
               </View>
               <View style={styles.rowDivider} />
               <View style={styles.journeyRow}>

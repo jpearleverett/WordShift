@@ -195,6 +195,7 @@ interface StarBurstProps {
 }
 
 export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 }) => {
+  const reducedMotion = getSettingsSync().reducedMotion;
   const stars = useRef(
     Array(8).fill(0).map((_, i) => ({
       scale: new Animated.Value(0),
@@ -206,7 +207,7 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
   ).current;
 
   useEffect(() => {
-    if (active) {
+    if (active && !reducedMotion) {
       const runningAnims: Animated.CompositeAnimation[] = [];
       stars.forEach((star, i) => {
         star.scale.setValue(0);
@@ -256,9 +257,9 @@ export const StarBurst: React.FC<StarBurstProps> = ({ active, x, y, phase = 0 })
       });
       return () => runningAnims.forEach(a => a.stop());
     }
-  }, [active]);
+  }, [active, reducedMotion]);
 
-  if (!active) return null;
+  if (!active || reducedMotion) return null;
 
   return (
     <View style={[styles.starBurstContainer, { left: x - 50, top: y - 50 }]} pointerEvents="none">

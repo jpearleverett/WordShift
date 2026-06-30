@@ -148,14 +148,14 @@ export function createRevenueCatBillingProvider(config: RevenueCatConfig = {}): 
       }
     },
 
-    async restorePurchases(): Promise<{ entitlements: EntitlementKey[] }> {
+    async restorePurchases(): Promise<{ entitlements: EntitlementKey[]; error?: string }> {
       if (!ready || !Purchases) return { entitlements: [] };
       try {
         const customerInfo = await Purchases.restorePurchases();
         return { entitlements: entitlementsFrom(customerInfo) };
       } catch (error) {
         console.warn('[IAP] RevenueCat restore failed:', error);
-        return { entitlements: [] };
+        return { entitlements: [], error: 'restore_failed' };
       }
     },
   };

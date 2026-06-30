@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import { isSupabaseConfigured } from '../services/supabaseClient';
-import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud } from '../services/cloudSave';
+import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus } from '../services/cloudSave';
 import { CandyColors } from '../theme/colors';
 import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
@@ -58,6 +58,7 @@ import { clearCosmetics } from '../services/cosmetics';
 import { clearAdPacing } from '../services/ads';
 import { clearHints } from '../services/hints';
 import { clearMonetPrompts } from '../services/monetizationPrompts';
+import { clearDailyLoginReward } from '../services/dailyLoginReward';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -244,6 +245,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               clearTendingState(),
               clearHints(),
               clearMonetPrompts(),
+              clearDailyLoginReward(),
+              clearSyncStatus(),
             ]);
             const fresh = await getSettings();
             setSettings(fresh);
@@ -262,7 +265,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onClose}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Back to home"
+        >
           <Text style={styles.backButtonText}>{'<'} Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Settings</Text>
@@ -284,6 +292,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
               thumbColor={settings.soundEnabled ? CandyColors.purple.main : CandyColors.gray[100]}
               accessibilityRole="switch"
+              accessibilityLabel="Sound effects"
               accessibilityState={{ checked: settings.soundEnabled }}
             />
           </View>
@@ -301,6 +310,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
               thumbColor={settings.hapticsEnabled ? CandyColors.purple.main : CandyColors.gray[100]}
               accessibilityRole="switch"
+              accessibilityLabel="Haptic feedback"
               accessibilityState={{ checked: settings.hapticsEnabled }}
             />
           </View>
@@ -320,6 +330,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
               thumbColor={settings.reducedMotion ? CandyColors.purple.main : CandyColors.gray[100]}
               accessibilityRole="switch"
+              accessibilityLabel="Reduced motion"
               accessibilityState={{ checked: settings.reducedMotion }}
             />
           </View>

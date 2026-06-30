@@ -587,5 +587,6 @@ export async function clearAchievements(): Promise<void> {
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
     await AsyncStorage.removeItem('wordshift_share_count');
+    await AsyncStorage.removeItem('wordshift_share_bonus_date');
   } catch {}
 }
