@@ -5,8 +5,8 @@ import {
   StyleSheet,
   Image,
   ImageSourcePropType,
+  Pressable,
 } from 'react-native';
-import { TouchableOpacity } from 'react-native-gesture-handler';
 import { AmberInline } from '../AmberInline';
 import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
@@ -81,24 +81,19 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   if (!room.isUnlocked) {
     // Locked room appearance
     return (
-      <TouchableOpacity
-        style={[
+      <Pressable
+        style={({ pressed }) => [
           styles.container,
           styles.lockedRoom,
           { width, height },
+          pressed && styles.pressed,
         ]}
         onPress={() => onRoomPress(room)}
-        activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={
           unlockCost !== null
             ? `Build ${room.name} for ${unlockCost} amber`
             : `Unlock ${room.name}`
-        }
-        accessibilityHint={
-          unlockCost !== null && amberBalance < unlockCost
-            ? `You have ${amberBalance} amber`
-            : undefined
         }
       >
         <View style={styles.lockedOverlay}>
@@ -122,7 +117,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
             <Text style={styles.lockedSubtext}>Tap to unlock</Text>
           )}
         </View>
-      </TouchableOpacity>
+      </Pressable>
     );
   }
 
@@ -171,10 +166,12 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
 
       {/* Empty room waiting for animal - show invite indicator */}
       {animal && !animal.isUnlocked && (
-        <TouchableOpacity
-          style={styles.lockedAnimalContainer}
+        <Pressable
+          style={({ pressed }) => [
+            styles.lockedAnimalContainer,
+            pressed && styles.pressed,
+          ]}
           onPress={() => onRoomPress(room)}
-          activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel={
             inviteCost === null
@@ -182,11 +179,6 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
               : inviteCost === 0
                 ? `Invite animal to ${room.name} for free`
                 : `Invite animal to ${room.name} for ${inviteCost} amber`
-          }
-          accessibilityHint={
-            inviteCost !== null && inviteCost > 0 && amberBalance < inviteCost
-              ? `You have ${amberBalance} amber`
-              : undefined
           }
         >
           <View style={styles.inviteAnimalBadge}>
@@ -205,7 +197,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
               </Text>
             )}
           </View>
-        </TouchableOpacity>
+        </Pressable>
       )}
 
       {/* Word Echo Overlay - ritual words faintly inscribed in rooms */}
@@ -252,6 +244,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
+  },
+  pressed: {
+    opacity: 0.75,
   },
   backgroundImage: {
     position: 'absolute',

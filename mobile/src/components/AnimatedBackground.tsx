@@ -289,11 +289,11 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     overflow: 'hidden',
   },
   pulseOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   gradientLayer1: {
     position: 'absolute',
