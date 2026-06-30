@@ -101,10 +101,11 @@ import { recordInterstitialSeen, consumePatronNudge, consumeRemoveAdsNudge } fro
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
-import { installGlobalErrorHandler } from './src/services/errorReporting';
+import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
-import { initCrashReporter } from './src/services/crashReporter';
+import * as Sentry from '@sentry/react-native';
+import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
 import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
@@ -137,9 +138,30 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
 installGlobalErrorHandler();
-// Register remote crash forwarding (no-op unless extra.sentryDsn is configured),
-// so captured errors reach a collector as soon as one is wired.
-initCrashReporter();
+// Initialize Sentry's native SDK for crash reporting. Unlike the JS-only error
+// handler above, this captures NATIVE crashes (force-closes / SIGSEGV / Java
+// FATAL EXCEPTION) that never reach JS — plus unhandled JS errors. No-op when
+// no DSN is configured (e.g. Expo Go without a key), so the app runs offline.
+// Errors routed through reportError() (ErrorBoundary, etc.) are forwarded with
+// their source/metadata context.
+const sentryDsn = getSentryDsn();
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    // Crash + error capture only; no performance tracing by default.
+    tracesSampleRate: 0,
+  });
+  setErrorForwarder((error, context) => {
+    const err = error instanceof Error ? error : new Error(String(error));
+    Sentry.withScope((scope) => {
+      scope.setTag('source', context.source);
+      if (context.metadata) {
+        scope.setExtras(context.metadata as Record<string, unknown>);
+      }
+      Sentry.captureException(err);
+    });
+  });
+}
 
 function MainApp() {
   // Screen navigation
@@ -2449,7 +2471,7 @@ function MainApp() {
  * service caches read migrated data. Never blocks forever — the app renders
  * even if migrations fail (failures are logged, not fatal).
  */
-export default function App() {
+function App() {
   const [bootReady, setBootReady] = useState(false);
 
   useEffect(() => {
@@ -2494,3 +2516,8 @@ export default function App() {
 
   return <MainApp />;
 }
+
+// Wrap the root in Sentry's higher-order component so native crash context and
+// (if enabled) profiling attach to the running app. No-op when Sentry isn't
+// initialized.
+export default Sentry.wrap(App);
