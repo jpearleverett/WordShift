@@ -95,20 +95,25 @@ interface QuestTemplate {
 
 // Daily quest pool — achievable in a dedicated single session
 const DAILY_QUEST_POOL: QuestTemplate[] = [
-  { type: 'solve_count', titleTemplate: 'Daily Solver', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: 'Offer {target} arrangements today', target: 2, rewardAmber: 10 },
+  // NOTE: single-action dailies (target 1, or trivially met by one puzzle) are
+  // tuned LOW on purpose — on a first HARD no-hints solve, several of these
+  // complete at once, and over-rewarding that one action floods early amber and
+  // rushes the house unlocks. Multi-puzzle dailies (solve 3/5, no_hints 3,
+  // stars 3) keep their fuller rewards since they take sustained play.
+  { type: 'solve_count', titleTemplate: 'Daily Solver', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: 'Offer {target} arrangements today', target: 2, rewardAmber: 8 },
   { type: 'solve_count', titleTemplate: 'Puzzle Trio', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: '{target} incantations before the day ends', target: 3, rewardAmber: 18 },
   { type: 'solve_count', titleTemplate: 'Five-Fold', descTemplate: 'Complete {target} puzzles today', darkDescTemplate: 'The pattern demands {target} today', target: 5, rewardAmber: 25 },
-  { type: 'earn_stars', titleTemplate: 'Shining Moment', descTemplate: 'Earn a three-star rating', darkDescTemplate: 'A flawless offering', target: 1, rewardAmber: 12 },
+  { type: 'earn_stars', titleTemplate: 'Shining Moment', descTemplate: 'Earn a three-star rating', darkDescTemplate: 'A flawless offering', target: 1, rewardAmber: 9 },
   { type: 'earn_stars', titleTemplate: 'Star Collector', descTemplate: 'Earn {target} three-star ratings today', darkDescTemplate: '{target} perfect arrangements', target: 3, rewardAmber: 22 },
-  { type: 'no_hints', titleTemplate: 'On Your Own', descTemplate: 'Complete a puzzle without hints', darkDescTemplate: 'The words come unbidden', target: 1, rewardAmber: 12 },
+  { type: 'no_hints', titleTemplate: 'On Your Own', descTemplate: 'Complete a puzzle without hints', darkDescTemplate: 'The words come unbidden', target: 1, rewardAmber: 9 },
   { type: 'no_hints', titleTemplate: 'Clear Mind', descTemplate: 'Complete {target} puzzles without hints', darkDescTemplate: 'You no longer need guidance', target: 3, rewardAmber: 20 },
-  { type: 'solve_difficulty', titleTemplate: 'Step Up', descTemplate: 'Complete a Medium+ or harder puzzle', darkDescTemplate: 'A weightier offering', target: 1, rewardAmber: 14, difficulty: 'MEDIUM_PLUS' },
-  { type: 'solve_difficulty', titleTemplate: 'Hard Day', descTemplate: 'Complete a Hard puzzle', darkDescTemplate: 'The difficult arrangements carry more weight', target: 1, rewardAmber: 18, difficulty: 'HARD' },
-  { type: 'challenge_mode', titleTemplate: 'Daring', descTemplate: 'Complete a challenge mode puzzle', darkDescTemplate: 'The arrangement rewards the bold', target: 1, rewardAmber: 18 },
-  { type: 'visit_animals', titleTemplate: 'Say Hello', descTemplate: 'Talk to {target} animal(s)', darkDescTemplate: 'Consult a keeper', target: 1, rewardAmber: 8 },
+  { type: 'solve_difficulty', titleTemplate: 'Step Up', descTemplate: 'Complete a Medium+ or harder puzzle', darkDescTemplate: 'A weightier offering', target: 1, rewardAmber: 9, difficulty: 'MEDIUM_PLUS' },
+  { type: 'solve_difficulty', titleTemplate: 'Hard Day', descTemplate: 'Complete a Hard puzzle', darkDescTemplate: 'The difficult arrangements carry more weight', target: 1, rewardAmber: 12, difficulty: 'HARD' },
+  { type: 'challenge_mode', titleTemplate: 'Daring', descTemplate: 'Complete a challenge mode puzzle', darkDescTemplate: 'The arrangement rewards the bold', target: 1, rewardAmber: 14 },
+  { type: 'visit_animals', titleTemplate: 'Say Hello', descTemplate: 'Talk to {target} animal(s)', darkDescTemplate: 'Consult a keeper', target: 1, rewardAmber: 6 },
   { type: 'visit_animals', titleTemplate: 'Social Call', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'Consult {target} keepers', target: 2, rewardAmber: 14 },
-  { type: 'earn_amber', titleTemplate: 'Amber Scavenger', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'Gather {target} amber', target: 30, rewardAmber: 10 },
-  { type: 'earn_amber', titleTemplate: 'Amber Seeker', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'The coffers need {target} amber', target: 60, rewardAmber: 18 },
+  { type: 'earn_amber', titleTemplate: 'Amber Scavenger', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'Gather {target} amber', target: 30, rewardAmber: 8 },
+  { type: 'earn_amber', titleTemplate: 'Amber Seeker', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'The coffers need {target} amber', target: 60, rewardAmber: 12 },
   // Tending (Phase 5+ only). Deliberately net-negative — rewards less amber than
   // it asks you to tend, so it pulls amber out of the economy (a sink disguised
   // as a quest) while giving a daily reason to deepen the pattern.
