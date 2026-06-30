@@ -75,7 +75,8 @@ function idsFromExtra(): AdMobConfig {
 
 function loadAdsModule(): any | null {
   try {
-    return require('react-native-google-mobile-ads');
+    const runtimeRequire = eval('require') as NodeRequire;
+    return runtimeRequire('react-native-google-mobile-ads');
   } catch {
     return null;
   }
@@ -83,7 +84,8 @@ function loadAdsModule(): any | null {
 
 function loadATTModule(): any | null {
   try {
-    return require('expo-tracking-transparency');
+    const runtimeRequire = eval('require') as NodeRequire;
+    return runtimeRequire('expo-tracking-transparency');
   } catch {
     return null;
   }

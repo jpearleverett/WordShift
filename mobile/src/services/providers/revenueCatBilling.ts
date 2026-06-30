@@ -56,7 +56,8 @@ function keyFromExtra(): string | undefined {
 /** Guarded load of the native SDK. Returns null when it isn't installed. */
 function loadPurchases(): any | null {
   try {
-    const mod = require('react-native-purchases');
+    const runtimeRequire = eval('require') as NodeRequire;
+    const mod = runtimeRequire('react-native-purchases');
     return mod?.default ?? mod;
   } catch {
     return null;
