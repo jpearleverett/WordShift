@@ -80,6 +80,15 @@ describe('achievements', () => {
     expect(getTotalCount()).toBe(ACHIEVEMENTS.length);
   });
 
+  test('journey achievement descriptions do not expose internal phase labels', () => {
+    const journey = ACHIEVEMENTS.filter(a => a.category === 'journey');
+    expect(journey.length).toBeGreaterThan(0);
+    for (const achievement of journey) {
+      expect(achievement.description).not.toMatch(/phase/i);
+      expect(achievement.description).not.toMatch(/\d+\s*\/\s*\d+/);
+    }
+  });
+
   test('checkAchievements returns newly unlocked achievements', async () => {
     const state = {
       ...defaultState,

@@ -148,7 +148,7 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
 // SMOKE PUFF ANIMATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
+const SmokePuff: React.FC<{ delay: number; isStatic?: boolean }> = ({ delay, isStatic = false }) => {
   const y = useRef(new Animated.Value(0)).current;
   const x = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -158,6 +158,15 @@ const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
 
   useEffect(() => {
     mountedRef.current = true;
+    if (isStatic) {
+      y.setValue(0);
+      x.setValue(0);
+      opacity.setValue(0);
+      scale.setValue(0.5);
+      return () => {
+        mountedRef.current = false;
+      };
+    }
 
     const animate = () => {
       if (!mountedRef.current) return;
@@ -215,7 +224,7 @@ const SmokePuff: React.FC<{ delay: number }> = ({ delay }) => {
       mountedRef.current = false;
       if (animationRef.current) animationRef.current.stop();
     };
-  }, []);
+  }, [isStatic, delay, y, x, opacity, scale]);
 
   return (
     <Animated.View
@@ -929,9 +938,9 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   <Image source={ROOF_IMG} style={styles.roofImage} resizeMode="stretch" />
                   {/* Animated smoke puffs rising from the baked-in chimney */}
                   <View style={styles.smokeContainer}>
-                    <SmokePuff delay={0} />
-                    <SmokePuff delay={1000} />
-                    <SmokePuff delay={2000} />
+                    <SmokePuff delay={0} isStatic={!ambientMotionEnabled} />
+                    <SmokePuff delay={1000} isStatic={!ambientMotionEnabled} />
+                    <SmokePuff delay={2000} isStatic={!ambientMotionEnabled} />
                   </View>
                 </View>
 

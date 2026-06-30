@@ -14,6 +14,13 @@ import {
   CloudSaveData,
 } from '../services/cloudSave';
 import { loadProgress } from '../services/amberCurrency';
+import { initHints, getHintBalance, clearHints } from '../services/hints';
+import {
+  recordAmberCosmeticPurchase,
+  equipCosmetic,
+  getEquipped,
+  clearCosmetics,
+} from '../services/cosmetics';
 
 // Mock AsyncStorage using shared factory
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -35,6 +42,8 @@ describe('cloudSave', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
     await clearSyncStatus();
+    await clearHints();
+    await clearCosmetics();
     // Reset to a default no-op provider
     setCloudProvider(createMockProvider({
       upload: async () => false,
@@ -255,6 +264,31 @@ describe('cloudSave', () => {
 
       await restoreFromCloudData(cloudData);
       expect((await loadProgress()).amber).toBe(999);
+    });
+
+    it('invalidates synced hint and cosmetic caches after overwriting local data', async () => {
+      await initHints();
+      expect(await getHintBalance()).toBeGreaterThan(0);
+      await recordAmberCosmeticPurchase('theme_ember');
+      await equipCosmetic('theme_ember');
+      expect(await getEquipped('tile_theme')).toBe('theme_ember');
+
+      const cloudData: CloudSaveData = {
+        version: 1,
+        timestamp: Date.now(),
+        deviceId: 'test',
+        data: {
+          'wordshift_hints': JSON.stringify({ balance: 42, seededFree: true }),
+          'wordshift_cosmetics': JSON.stringify({
+            owned: { theme_tide: Date.now() },
+            equipped: { tile_theme: 'theme_tide' },
+          }),
+        },
+      };
+
+      await restoreFromCloudData(cloudData);
+      expect(await getHintBalance()).toBe(42);
+      expect(await getEquipped('tile_theme')).toBe('theme_tide');
     });
 
     it('handles empty data object', async () => {

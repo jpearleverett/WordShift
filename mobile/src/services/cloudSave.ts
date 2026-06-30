@@ -3,6 +3,8 @@ import { invalidateProgressCache } from './amberCurrency';
 import { invalidatePuzzleStateCache } from './puzzleSaveState';
 import { invalidateSettingsCache } from './settings';
 import { invalidateStatsCache } from './starRating';
+import { invalidateHintsCache } from './hints';
+import { invalidateCosmeticsCache } from './cosmetics';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -380,6 +382,8 @@ function invalidateRestoredServiceCaches(): void {
   invalidateStatsCache();
   invalidatePuzzleStateCache();
   invalidateSettingsCache();
+  invalidateHintsCache();
+  invalidateCosmeticsCache();
 }
 
 /**
