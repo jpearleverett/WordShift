@@ -2331,8 +2331,10 @@ function MainApp() {
                 : puzzle.gameState === GameState.PLAYING
                   ? {
                       // Position well below the 3 tutorial rows
-                      // (~50px status bar + ~80px header + 3 rows * ~90px + padding)
-                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.64, 470), 580),
+                      // (~50px status bar + ~80px header + 3 rows * ~90px + padding).
+                      // Sits a touch lower (raised multiplier + cap) so the bubble
+                      // clears the third row on tall phones instead of crowding it.
+                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.69, 470), 620),
                       left: 8,
                       right: 8,
                     }

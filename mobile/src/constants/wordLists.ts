@@ -109,13 +109,14 @@ export interface CuratedPuzzle {
 }
 
 export const CURATED_EARLY_PUZZLES: CuratedPuzzle[] = [
-  // Puzzle 0 (tutorial): GLOW → ABLE → EACH — simple 3-row for EASY onboarding
-  // Pick G from GLOW → LOW; drop into ABLE → GABLE. Pick B from GABLE → GALE; drop into EACH → BEACH.
+  // Puzzle 0 (tutorial): PLAY → PANT → HEAR — gentle 3-row intro with warm, common
+  // words (PLANT, HEART) so a first-timer isn't tripped up by an obscure word.
+  // Pick L from PLAY → PAY; drop into PANT → PLANT. Pick T from PLANT → PLAN; drop into HEAR → HEART.
   {
-    words: ["GLOW", "ABLE", "EACH"],
+    words: ["PLAY", "PANT", "HEAR"],
     solution: [
-      { stepIndex: 0, sourceWord: "GLOW", targetWord: "ABLE", letterToMove: "G", explanation: "Move 'G' from GLOW to form GABLE." },
-      { stepIndex: 1, sourceWord: "ABLE", targetWord: "EACH", letterToMove: "B", explanation: "Move 'B' from GABLE to form BEACH." },
+      { stepIndex: 0, sourceWord: "PLAY", targetWord: "PANT", letterToMove: "L", explanation: "Move 'L' from PLAY to form PLANT." },
+      { stepIndex: 1, sourceWord: "PANT", targetWord: "HEAR", letterToMove: "T", explanation: "Move 'T' from PLANT to form HEART." },
     ],
   },
   // Puzzle 1: LAMP → OVER → TIME → USED — 4-row MEDIUM, satisfying mid-position moves
