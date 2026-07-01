@@ -47,7 +47,7 @@
         "backgroundColor": "#FFF0F5"
       },
       "package": "com.wordshift.app",
-      "versionCode": 11
+      "versionCode": 12
     },
     "plugins": [
       [
@@ -63,7 +63,8 @@
           "androidAppId": "ca-app-pub-6575205005908086~2045457833"
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-audio"
     ],
     "extra": {
       "telemetryEndpoint": "",

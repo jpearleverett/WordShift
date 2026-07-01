@@ -1,12 +1,12 @@
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { getSettings } from './settings';
 
 /**
  * Sound effects system for WordShift
  *
- * Plays short WAV assets from assets/sounds/ via expo-av.
- * Sounds are lazily loaded on first play and cached for instant replay;
- * hot-path sounds are preloaded during initAudio().
+ * Plays short WAV assets from assets/sounds/ via expo-audio (expo-av's SDK 56
+ * replacement). Sounds are lazily loaded on first play and cached for instant
+ * replay; hot-path sounds are preloaded during initAudio().
  * Each sound checks the user's sound preference before playing, and all
  * errors are swallowed — sounds must never crash gameplay.
  */
@@ -49,10 +49,10 @@ let audioInitialized = false;
 export async function initAudio(): Promise<void> {
   if (audioInitialized) return;
   try {
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
+    await setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      interruptionModeAndroid: 'duckOthers',
     });
     audioInitialized = true;
   } catch (err) {
@@ -70,17 +70,17 @@ async function isEnabled(): Promise<boolean> {
   return settings.soundEnabled;
 }
 
-// Sound cache for loaded sounds
-const soundCache: Map<string, Audio.Sound> = new Map();
+// Sound cache for loaded players
+const soundCache: Map<string, AudioPlayer> = new Map();
 
 // Guards against concurrent first-loads of the same sound
-const loadingSounds: Map<string, Promise<Audio.Sound | null>> = new Map();
+const loadingSounds: Map<string, Promise<AudioPlayer | null>> = new Map();
 
 /**
- * Get a sound from the cache, lazily loading it on first access.
+ * Get a player from the cache, lazily creating it on first access.
  * Returns null (never throws) when the sound can't be loaded.
  */
-async function loadSound(name: string): Promise<Audio.Sound | null> {
+async function loadSound(name: string): Promise<AudioPlayer | null> {
   const cached = soundCache.get(name);
   if (cached) return cached;
 
@@ -90,15 +90,18 @@ async function loadSound(name: string): Promise<Audio.Sound | null> {
   const source = SOUND_SOURCES[name];
   if (!source) return null;
 
-  const loadPromise = Audio.Sound.createAsync(source, { volume: SOUND_VOLUME })
-    .then(({ sound }) => {
-      soundCache.set(name, sound);
-      return sound;
-    })
-    .catch(() => null)
-    .finally(() => {
+  const loadPromise = (async (): Promise<AudioPlayer | null> => {
+    try {
+      const player = createAudioPlayer(source);
+      player.volume = SOUND_VOLUME;
+      soundCache.set(name, player);
+      return player;
+    } catch {
+      return null;
+    } finally {
       loadingSounds.delete(name);
-    });
+    }
+  })();
 
   loadingSounds.set(name, loadPromise);
   return loadPromise;
@@ -112,11 +115,12 @@ async function playSound(name: string): Promise<void> {
   if (!(await isEnabled())) return;
 
   try {
-    const sound = await loadSound(name);
-    if (!sound) return;
-    await sound.setPositionAsync(0);
-    await sound.playAsync();
-  } catch (err) {
+    const player = await loadSound(name);
+    if (!player) return;
+    // Rewind to the start so rapid re-triggers replay from the beginning.
+    await player.seekTo(0);
+    player.play();
+  } catch {
     // Sound not available - fail silently
   }
 }
@@ -126,20 +130,21 @@ async function playSound(name: string): Promise<void> {
  */
 export async function preloadSound(name: string, source: any): Promise<void> {
   try {
-    const { sound } = await Audio.Sound.createAsync(source, { volume: SOUND_VOLUME });
-    soundCache.set(name, sound);
+    const player = createAudioPlayer(source);
+    player.volume = SOUND_VOLUME;
+    soundCache.set(name, player);
   } catch (err) {
     console.warn(`Failed to preload sound ${name}:`, err);
   }
 }
 
 /**
- * Cleanup all preloaded sounds
+ * Cleanup all preloaded players
  */
 export async function unloadAllSounds(): Promise<void> {
-  for (const [, sound] of soundCache) {
+  for (const [, player] of soundCache) {
     try {
-      await sound.unloadAsync();
+      player.remove();
     } catch {}
   }
   soundCache.clear();
