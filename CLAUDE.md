@@ -30,7 +30,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **State**: React useState/useEffect (no external state library)
 - **Persistence**: AsyncStorage with in-memory cache pattern
 - **Haptics**: expo-haptics (settings-gated)
-- **Audio**: expo-av playing a bundled 14-sound WAV SFX pack (`assets/sounds/`, settings-gated, plays in iOS silent mode)
+- **Audio**: expo-audio playing a bundled 14-sound WAV SFX pack (`assets/sounds/`, settings-gated, plays in iOS silent mode). Migrated off the deprecated expo-av, whose `VideoViewModule` failed to load on SDK 56 (`NoClassDefFoundError`) and crashed the app at launch
 - **Analytics/crash**: local event log (`eventLogger.ts`) + global error handler installed at startup; remote analytics upload via `telemetry.ts`/Supabase and crash forwarding via Sentry are **configured** (`supabaseUrl`/`supabaseAnonKey`/`sentryDsn` set in `app.json` → `extra`)
 - **Testing**: Jest with ts-jest preset
 - **Target**: iOS and Android via Expo Go
