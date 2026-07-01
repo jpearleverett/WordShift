@@ -65,7 +65,7 @@ import { buildPhase5Pool } from '../services/dialogue/phase5Pool';
 function sessionEndMessage(name: string, onCooldown: boolean): string {
   return onCooldown
     ? `${name} wants to rest now. Come back after solving a few puzzles.`
-    : `${name} pauses to gather their thoughts — tap them again whenever you'd like to keep talking.`;
+    : `${name} still has more to say — tap them again to keep talking.`;
 }
 
 interface SessionInfo {
