@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus } from '../services/cloudSave';
 import { CandyColors } from '../theme/colors';
@@ -253,7 +254,28 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             const freshPrefs = await getNotificationPrefs();
             setDailyRemindersOn(freshPrefs.enabled && freshPrefs.dailyReminderEnabled);
             await refreshStreakFreeze();
-            Alert.alert('Done', 'All data has been reset.');
+            // Reload the app so it re-enters the intro tutorial from a clean slate.
+            // Onboarding only initializes at launch, so a live wipe alone would
+            // leave the running session stuck on a stale "complete" state — the
+            // player would have to kill the app by hand to see the tutorial again.
+            // reloadAsync throws in Expo Go / dev; there we just close Settings and
+            // onboarding replays on the next manual launch.
+            Alert.alert(
+              'Reset Complete',
+              'WordShift will restart and replay the intro.',
+              [
+                {
+                  text: 'OK',
+                  onPress: async () => {
+                    try {
+                      await Updates.reloadAsync();
+                    } catch {
+                      onClose();
+                    }
+                  },
+                },
+              ]
+            );
           },
         },
       ]

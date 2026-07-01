@@ -182,7 +182,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const amberPulse = useRef(new Animated.Value(1)).current;
   const playPulse = useRef(new Animated.Value(0)).current;
   const pitPulseAnim = useRef(new Animated.Value(0)).current;
-  const questPulseAnim = useRef(new Animated.Value(0)).current;
   const introDialogueSlide = useRef(new Animated.Value(0)).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
@@ -326,12 +325,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return allQuests.filter(q => !q.claimed).length;
   }, [weeklyQuestState]);
 
-  // Short "resets in Nh" hint for the daily quest reset (header pill).
-  const dailyResetHint = useMemo(() => {
-    const { hours, minutes } = getTimeUntilDailyReset();
-    return hours > 0 ? `${hours}h` : `${minutes}m`;
-  }, []);
-
   const availableRoomUpgrades = useMemo(() => {
     if (!progress) return [];
     return rooms
@@ -372,14 +365,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     !isOnboarding &&
     !isPostTutorialLightMode &&
     (onOpenLedger || onOpenGallery || weeklyQuestState)
-  );
-
-  // Quest header pill: same gating as the Journal Hub (puzzle 6+ / not onboarding),
-  // and only when quest data has loaded.
-  const shouldShowQuestPill = Boolean(
-    !isOnboarding &&
-    !isPostTutorialLightMode &&
-    weeklyQuestState
   );
 
   const shouldHighlightPitButton = Boolean(
@@ -715,34 +700,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => { loop.stop(); };
   }, [shouldHighlightPitButton, pitPulseAnim]);
 
-  // Quest pill pulse — draws attention when amber is waiting to be claimed.
-  useEffect(() => {
-    if (!shouldShowQuestPill || claimableQuestAmber <= 0) {
-      questPulseAnim.setValue(0);
-      return;
-    }
-    const reducedMotion = getSettingsSync().reducedMotion;
-    if (reducedMotion) {
-      questPulseAnim.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(questPulseAnim, {
-          toValue: 1,
-          duration: 1100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(questPulseAnim, {
-          toValue: 0,
-          duration: 1100,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => { loop.stop(); };
-  }, [shouldShowQuestPill, claimableQuestAmber, questPulseAnim]);
 
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
@@ -1002,36 +959,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               refreshSignal={progress.puzzlesSolved}
             />
           )}
-          {shouldShowQuestPill && (
-            <Animated.View
-              style={claimableQuestAmber > 0 ? {
-                transform: [{ scale: questPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }],
-              } : undefined}
-            >
-              <TouchableOpacity
-                style={[styles.questPill, claimableQuestAmber > 0 && styles.questPillReady]}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={handleOpenQuestModal}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  `Open quests. ${activeQuestCount} active.` +
-                  (claimableQuestAmber > 0 ? ` ${claimableQuestAmber} amber ready to claim.` : '') +
-                  ` Daily resets in ${dailyResetHint}.`
-                }
-              >
-                <Text style={styles.questPillIcon}>🎯</Text>
-                <View style={styles.questPillTextCol}>
-                  <Text style={styles.questPillCount}>{activeQuestCount}</Text>
-                  <Text style={styles.questPillReset}>{dailyResetHint}</Text>
-                </View>
-                {claimableQuestAmber > 0 && (
-                  <View style={styles.headerBadge}>
-                    <Text style={styles.headerBadgeText}>!</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          )}
           {!isOnboarding && onOpenPit && (
             <Animated.View style={shouldHighlightPitButton ? {
               transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
@@ -1094,13 +1021,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {!isOnboarding && (
           <Animated.View
             style={highlightPlayButton ? {
+              flexShrink: 0,
               transform: [{
                 scale: playPulse.interpolate({
                   inputRange: [0, 1],
                   outputRange: [1, 1.06],
                 }),
               }],
-            } : undefined}
+            } : { flexShrink: 0 }}
           >
             <JuicyButton
               style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
@@ -2683,8 +2611,10 @@ const styles = StyleSheet.create({
     color: '#FF3C3C',
   },
   headerRight: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 7,
     marginLeft: 8,
   },
@@ -2700,39 +2630,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(180, 120, 0, 0.3)',
     borderColor: 'rgba(255, 215, 0, 0.45)',
     borderWidth: 1.5,
-  },
-  questPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 34,
-    borderRadius: 17,
-    paddingHorizontal: 9,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  questPillReady: {
-    backgroundColor: 'rgba(180, 120, 0, 0.3)',
-    borderColor: 'rgba(255, 215, 0, 0.45)',
-    borderWidth: 1.5,
-  },
-  questPillIcon: {
-    fontSize: 14,
-    marginRight: 4,
-  },
-  questPillTextCol: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  questPillCount: {
-    color: CandyColors.white,
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 14,
-  },
-  questPillReset: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 8,
-    fontWeight: '700',
-    lineHeight: 10,
   },
   headerBadge: {
     position: 'absolute',
@@ -2767,6 +2664,7 @@ const styles = StyleSheet.create({
     height: 15,
   },
   playButton: {
+    flexShrink: 0,
     backgroundColor: CandyColors.green.main,
     paddingHorizontal: 18,
     paddingVertical: 10,
