@@ -10,6 +10,7 @@
 import {
   ANIMAL_INFO,
   POST_REVELATION_DIALOGUES,
+  PHASE2_EXTRA_DIALOGUES,
   getTotalDialogueCount,
 } from './animalDialogue';
 import { ACHIEVEMENTS, AchievementCategory } from './achievements';
@@ -53,6 +54,10 @@ const EXPECTED_DIALOGUE_COUNTS_BY_PHASE: Record<number, number> = {
 };
 const EXPECTED_TOTAL_DIALOGUES_PER_ANIMAL = 67;
 const EXPECTED_POST_REVELATION_PER_ANIMAL = 10;
+// Phase-2 exhaustion pool: extra lines served once the indexed Phase-2 base
+// block is exhausted. Deliberately OUTSIDE the base arrays (inserting there
+// would shift phase-start indices and corrupt saved lastDialogueRead values).
+const EXPECTED_PHASE2_EXTRA_PER_ANIMAL = 5;
 
 // ---------------------------------------------------------------------------
 // 1. Dialogue integrity
@@ -99,6 +104,23 @@ export function validateDialogueIntegrity(): ValidationResult {
       errors.push(
         `${animalType}: expected ${EXPECTED_POST_REVELATION_PER_ANIMAL} post-revelation dialogues, got ${postRevLines.length}`
       );
+    }
+
+    // Check PHASE2_EXTRA_DIALOGUES (Phase-2 exhaustion pool)
+    const phase2Extras = PHASE2_EXTRA_DIALOGUES[animalType];
+    if (!phase2Extras) {
+      errors.push(`PHASE2_EXTRA_DIALOGUES missing entry for '${animalType}'`);
+    } else {
+      if (phase2Extras.length !== EXPECTED_PHASE2_EXTRA_PER_ANIMAL) {
+        errors.push(
+          `${animalType}: expected ${EXPECTED_PHASE2_EXTRA_PER_ANIMAL} Phase-2 extra dialogues, got ${phase2Extras.length}`
+        );
+      }
+      for (let i = 0; i < phase2Extras.length; i++) {
+        if (!phase2Extras[i] || phase2Extras[i].trim().length === 0) {
+          errors.push(`${animalType}: Phase-2 extra dialogue at index ${i} is empty`);
+        }
+      }
     }
   }
 

@@ -5,10 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Platform,
-  StatusBar,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline } from './AmberInline';
 import { CumulativeStats, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
@@ -32,6 +31,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   amberBalance,
   phase = 0,
 }) => {
+  const screenInsets = useScreenInsets();
   const effectivePhase = phase || currentPhase;
   const [stats, setStats] = useState<CumulativeStats | null>(null);
   const [achievements, setAchievements] = useState<(Achievement & { isUnlocked: boolean; unlockedAt: number | null })[]>([]);
@@ -64,6 +64,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
       {/* Header */}
       <View style={[
         styles.header,
+        { paddingTop: screenInsets.top + 16 },
         effectivePhase >= 4 && { backgroundColor: '#4A3570' },
       ]}>
         <TouchableOpacity
@@ -356,7 +357,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
+    // paddingTop applied inline via useScreenInsets (safe-area aware)
     paddingBottom: 16,
     backgroundColor: CandyColors.purple.main,
   },

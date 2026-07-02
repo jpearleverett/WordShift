@@ -9,12 +9,14 @@
  * is unconfigured (see supabaseClient.ts). Never throws.
  *
  * Atomic increments go through an `sbRpc('bump_words_offered', ...)` Postgres
- * function so concurrent players can't clobber the counter. Reads prefer a small
- * `sbRpc('aggregate_proof', ...)` but fall back to a plain select of the
- * counters row for the day.
+ * function so concurrent players can't clobber the counter. Reads go through
+ * the aggregate-only `sbRpc('aggregate_proof', ...)` SECURITY DEFINER function
+ * — direct `daily_counters` access is RLS-denied
+ * (docs/supabase/security_setup.sql), so a missing/empty RPC degrades to null
+ * (no social proof shown) instead of selecting the table.
  */
 
-import { isSupabaseConfigured, sbSelect, sbRpc } from './supabaseClient';
+import { isSupabaseConfigured, sbRpc } from './supabaseClient';
 import { getLocalDateString } from './dateUtils';
 
 export interface AggregateProof {
@@ -54,28 +56,18 @@ export async function recordPuzzleContribution(
 }
 
 /**
- * Read today's aggregate proof numbers. Prefers an `aggregate_proof` RPC, falls
- * back to selecting the day's `daily_counters` row. Returns null when
- * unconfigured or when there's no data yet. Never throws.
+ * Read today's aggregate proof numbers via the `aggregate_proof` RPC (tolerant
+ * of both camelCase and snake_case row shapes). Returns null when unconfigured
+ * or when there's no data yet — no table fallback by design. Never throws.
  */
 export async function getAggregateProof(): Promise<AggregateProof | null> {
   if (!isSupabaseConfigured()) return null;
   const date = getLocalDateString();
 
-  // --- Preferred: RPC ----------------------------------------------------
   const rpc = await sbRpc<
     AggregateProof | DailyCounterRow | DailyCounterRow[] | null
   >('aggregate_proof', { p_date: date });
-  const normalized = normalizeProof(Array.isArray(rpc) ? rpc[0] : rpc);
-  if (normalized) return normalized;
-
-  // --- Fallback: select the counters row --------------------------------
-  const rows = await sbSelect<DailyCounterRow>(
-    'daily_counters',
-    `select=date,words_offered,active_seekers&date=eq.${encodeURIComponent(date)}`,
-  );
-  if (!rows || rows.length === 0) return null;
-  return normalizeProof(rows[0]);
+  return normalizeProof(Array.isArray(rpc) ? rpc[0] : rpc);
 }
 
 function normalizeProof(

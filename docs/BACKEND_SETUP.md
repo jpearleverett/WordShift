@@ -2,8 +2,9 @@
 
 > **Status:** ✅ Configured. `supabaseUrl` + `supabaseAnonKey` (cloud save,
 > leaderboard, social proof, analytics) and `sentryDsn` (crash reporting) are set
-> in `app.json` → `expo.extra`, and the Supabase SQL below has been run. The
-> guide remains the reference for re-provisioning or pointing at a new project.
+> in `app.json` → `expo.extra`. Provision/harden the database by running
+> **`docs/supabase/security_setup.sql`** (see section 1). The guide remains the
+> reference for re-provisioning or pointing at a new project.
 
 Everything below is **disabled by default** (until credentials are filled in, as
 they now are). The app ships and runs in Expo Go with zero network calls until you
@@ -34,126 +35,69 @@ added — all integrations use plain `fetch`, so Expo Go keeps working.
 
 ## 1. Supabase project
 
-Create a free project at supabase.com, then run this SQL in the SQL editor.
-
-```sql
--- ============================================================
--- CLOUD SAVE
--- ============================================================
-create table if not exists public.saves (
-  owner      text primary key,
-  version    integer     not null default 1,
-  timestamp  bigint      not null,
-  device_id  text        not null default '',
-  payload    text        not null,           -- JSON-stringified save blob
-  updated_at timestamptz not null default now()
-);
-alter table public.saves enable row level security;
--- Auth-free (anon key). Tighten to your threat model if you add auth later.
-create policy "anon read/write saves" on public.saves
-  for all to anon using (true) with check (true);
-
--- ============================================================
--- ANALYTICS (write-only from the client)
--- ============================================================
-create table if not exists public.events (
-  id          bigint generated always as identity primary key,
-  install_id  text        not null,
-  platform    text,
-  app_version text,
-  type        text        not null,
-  data        jsonb       not null default '{}'::jsonb,
-  created_at  timestamptz not null default now()
-);
-alter table public.events enable row level security;
-create policy "anon insert events" on public.events
-  for insert to anon with check (true);
-create index if not exists events_install_id_idx on public.events (install_id);
-create index if not exists events_created_at_idx on public.events (created_at);
-
--- ============================================================
--- DAILY CHALLENGE LEADERBOARD
--- ============================================================
-create table if not exists public.daily_scores (
-  owner      text        not null,
-  date       text        not null,           -- local-day 'YYYY-MM-DD'
-  time_ms    integer     not null check (time_ms >= 0),
-  stars      smallint    not null check (stars between 0 and 3),
-  hints      smallint    not null check (hints >= 0),
-  handle     text,
-  created_at timestamptz not null default now(),
-  primary key (owner, date)                  -- upsert conflict target
-);
-create index if not exists daily_scores_date_order_idx
-  on public.daily_scores (date, time_ms asc, stars desc, hints asc);
-alter table public.daily_scores enable row level security;
-create policy "anon rw daily_scores" on public.daily_scores
-  for all to anon using (true) with check (true);
-
--- rank: lower time wins; ties -> more stars, then fewer hints.
--- percentile = % of OTHER players beaten (0-100).
-create or replace function public.daily_rank(p_date text, p_owner text)
-returns table (rank integer, total integer, percentile integer)
-language sql stable as $$
-  with day as (
-    select owner, time_ms, stars, hints
-    from public.daily_scores where date = p_date
-  ),
-  me as (select * from day where owner = p_owner),
-  agg as (
-    select
-      (1 + count(*) filter (
-        where d.owner <> p_owner and (
-          d.time_ms < me.time_ms
-          or (d.time_ms = me.time_ms and d.stars > me.stars)
-          or (d.time_ms = me.time_ms and d.stars = me.stars and d.hints < me.hints)
-        )
-      ))::int as rnk,
-      (select count(*) from day)::int as tot
-    from day d, me
-    group by me.time_ms, me.stars, me.hints
-    limit 1
-  )
-  select rnk, tot,
-    case when tot <= 1 then 0
-         else round(((tot - rnk)::numeric / (tot - 1)) * 100)::int end
-  from agg;
-$$;
-
--- ============================================================
--- AGGREGATE SOCIAL PROOF (anonymous global daily counters)
--- ============================================================
-create table if not exists public.daily_counters (
-  date           text    primary key,
-  words_offered  bigint  not null default 0,
-  active_seekers integer not null default 0
-);
-alter table public.daily_counters enable row level security;
-create policy "anon rw daily_counters" on public.daily_counters
-  for all to anon using (true) with check (true);
-
-create or replace function public.bump_words_offered(p_date text, p_count integer)
-returns bigint language plpgsql volatile as $$
-declare new_total bigint;
-begin
-  insert into public.daily_counters (date, words_offered)
-  values (p_date, greatest(p_count, 0))
-  on conflict (date) do update
-    set words_offered = public.daily_counters.words_offered + greatest(p_count, 0)
-  returning words_offered into new_total;
-  return new_total;
-end; $$;
-
-create or replace function public.aggregate_proof(p_date text)
-returns table ("wordsOfferedToday" bigint, "activeSeekers" integer)
-language sql stable as $$
-  select coalesce(words_offered, 0), coalesce(active_seekers, 0)
-  from public.daily_counters where date = p_date;
-$$;
-```
+Create a free project at supabase.com, then run
+**[`docs/supabase/security_setup.sql`](supabase/security_setup.sql)** in the SQL
+editor (as `postgres`, the editor's default role). The script is **idempotent
+and self-contained**: it creates the four app tables (`saves`, `events`,
+`daily_scores`, `daily_counters`) if missing, locks them down, and installs the
+RPC surface the client uses. Re-run it any time — including over a project that
+was provisioned with the older (pre-hardening) SQL from this guide; it removes
+the legacy wide-open policies in place.
 
 Then paste `supabaseUrl` + `supabaseAnonKey` (Project Settings → API) into
 `app.json`. Cloud save, leaderboard, social proof, and analytics go live.
+
+> **Deploy note:** run the SQL and ship the RPC-based client together. Older
+> app builds that still issue direct table reads/writes will simply degrade
+> (every call resolves null — no crash), but their cloud sync and rank display
+> stop working until the player updates.
+
+### Security model: capability URLs, no direct table access
+
+The app has **no user auth** — the shipped anon key is public by definition, so
+the database can never trust "who" is calling, only "what they know". The
+model:
+
+- **A player's owner id is an unguessable bearer capability** — a random
+  UUIDv4 install id, or the 8-char recovery code derived from it. Presenting a
+  row's owner id is the only way to touch that row.
+- **Direct table access for `anon` is fully denied.** RLS is enabled on every
+  app table with no anon read/write policies, *and* the default table grants
+  are revoked (belt and braces — a future accidental permissive policy still
+  can't re-open access). `GET /rest/v1/saves?select=*` and friends now return
+  errors, so nobody holding the anon key can enumerate or dump rows, and
+  nobody can write another player's rows.
+- **Everything the client needs is a `SECURITY DEFINER` RPC** (owned by
+  `postgres`, `EXECUTE` granted to `anon`) that gates each operation on the
+  caller presenting the owner id, and returns only that owner's data or pure
+  aggregates:
+  - `get_save(p_owner)` / `get_save_timestamp(p_owner)` / `upsert_save(...)`
+    — cloud save, one row per capability, 1 MB payload cap.
+  - `submit_daily_score(...)` — upserts only the caller's `(owner, date)` row,
+    with hard bounds (time ≤ 24 h, stars 0–3, hints 0–50, handle ≤ 24 chars)
+    so a poisoned client can't submit absurd scores.
+  - `daily_rank(p_date, p_owner)` — aggregate-only standing
+    (rank/total/percentile); never other players' ids or scores.
+  - `bump_words_offered(...)` (bounded per call) / `aggregate_proof(...)` —
+    two anonymous global numbers, nothing per-player.
+- **The `events` telemetry table is INSERT-only** for `anon` (no select). The
+  client posts with `Prefer: return=minimal`.
+
+**Residual risks (accepted):**
+
+- Compromising a device (or its backup) reveals that device's owner id — an
+  attacker can then read/overwrite **that one player's** save and score. Same
+  blast radius as the device itself; no cross-player exposure.
+- A recovery code shown to the player is the same capability in friendlier
+  clothes — anyone who learns it can restore (and overwrite) that save. Treat
+  it like a password.
+- Telemetry is insert-only and unauthenticated, so anyone with the anon key
+  can write junk `events` rows; analytics are best-effort and this is
+  accepted. Likewise `bump_words_offered` can be spammed within its per-call
+  bound — the counter is cosmetic, aggregate-only social proof.
+- Enable Supabase's API rate limits (Dashboard → Settings → API) to blunt
+  brute-force capability guessing and junk-event floods; a UUIDv4 space makes
+  enumeration infeasible regardless.
 
 ### Recovery code (cloud save is auth-free)
 A reinstall gets a new anonymous id, so to move progress across devices the

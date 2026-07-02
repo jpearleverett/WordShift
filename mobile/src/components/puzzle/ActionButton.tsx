@@ -6,9 +6,25 @@ import {
   StyleSheet,
   Animated,
   Easing,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+
+// Generated candy-style sprites (assets/ui, generateUiIcons.mjs) replacing the
+// emoji icons App.tsx passes. Unknown icon strings still render as text, so
+// callers need no changes and new icons degrade gracefully.
+const ICON_SPRITES: { [icon: string]: ImageSourcePropType } = {
+  '↩': require('../../../assets/ui/undo.png'),
+  '💡': require('../../../assets/ui/hint.png'),
+  '🔄': require('../../../assets/ui/restart.png'),
+};
+
+// Key-membership lookup (not truthiness) — bundler asset ids and test stubs
+// may be falsy numbers.
+export const getActionIconSprite = (icon: string): ImageSourcePropType | null =>
+  icon in ICON_SPRITES ? ICON_SPRITES[icon] : null;
 
 interface ActionButtonProps {
   icon: string;
@@ -82,6 +98,8 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
     outputRange: [0.3, 0.6],
   });
 
+  const iconSprite = getActionIconSprite(icon);
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -121,7 +139,15 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
           <View style={styles.actionButtonBevel} />
 
           {/* Icon */}
-          <Text style={styles.actionButtonIconText}>{icon}</Text>
+          {iconSprite !== null ? (
+            <Image
+              source={iconSprite}
+              style={styles.actionButtonIconImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={styles.actionButtonIconText}>{icon}</Text>
+          )}
         </View>
 
         {/* 3D edge */}
@@ -189,6 +215,11 @@ const styles = StyleSheet.create({
   },
   actionButtonIconText: {
     fontSize: 28,
+  },
+  // Matches the visual footprint of the fontSize-28 emoji it replaces
+  actionButtonIconImage: {
+    width: 34,
+    height: 34,
   },
   actionButtonLabel: {
     marginTop: 12,

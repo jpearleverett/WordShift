@@ -1,6 +1,7 @@
 import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
 import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead, reserveUnlock, getReservedUnlockId, claimReservedUnlock } from './amberCurrency';
-import { getPhaseStartIndex } from './dialogue/animalDialogueBase';
+import { getPhaseStartIndex, getPhase2ExtraDialogues } from './dialogue/animalDialogueBase';
+import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
 import { logEvent } from './eventLogger';
@@ -959,6 +960,11 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const nearEndgame = progress.currentPhase >= 4;
   const tendingState = nearEndgame ? await loadTendingState() : null;
   const choiceState = nearEndgame ? await loadChoiceState() : null;
+  // Phase-2 exhaustion pool: badge honesty for animals whose base block is
+  // done but who still have undelivered pool lines. Loaded once, not per animal.
+  const phase2Cursors = progress.currentPhase >= 1 && progress.currentPhase <= 3
+    ? await getPhase2PoolCursors()
+    : {};
 
   return ANIMALS.map(animal => {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
@@ -983,6 +989,16 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
           );
           const caughtUp = tendingState.caughtUp[animal.type] ?? 0;
           hasNewDialogue = caughtUp < poolLen;
+        }
+      } else if (animalPhase === 2) {
+        const totalDialogues = getTotalDialogueCount(animal.type, 2);
+        if (dialogueIndex < totalDialogues) {
+          hasNewDialogue = true;
+        } else {
+          // Base block exhausted — lit only while the exhaustion pool still
+          // has genuinely-new lines (mirrors useDialogueFlow's honest badge).
+          const pool = getPhase2ExtraDialogues(animal.type);
+          hasNewDialogue = (phase2Cursors[animal.type] ?? 0) < pool.length;
         }
       } else {
         const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);

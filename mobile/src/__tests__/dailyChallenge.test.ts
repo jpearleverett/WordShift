@@ -13,7 +13,11 @@ import {
   generateDailyPuzzle,
   prewarmDailyPuzzle,
   loadDailyProgress,
+  grantFirstDailyMercy,
+  DAILY_CHALLENGE_UNLOCK_PUZZLES,
 } from '../services/dailyChallenge';
+import { getHintBalance, clearHints } from '../services/hints';
+import { FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { generateLocalPuzzle } from '../services/localGenerator';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 
@@ -84,23 +88,29 @@ describe('dailyChallenge', () => {
     expect(getDailyDifficulty('2026-02-11')).toBe('HARD');
   });
 
+  test('unlock threshold is 8 puzzles (aligned with the auto-collect window)', () => {
+    expect(DAILY_CHALLENGE_UNLOCK_PUZZLES).toBe(8);
+  });
+
   test('daily challenge unlocks after enough puzzle progress', () => {
     expect(isDailyChallengeUnlocked(0, 0)).toBe(false);
-    expect(isDailyChallengeUnlocked(2, 0)).toBe(false);
-    expect(isDailyChallengeUnlocked(3, 0)).toBe(true);
+    expect(isDailyChallengeUnlocked(3, 0)).toBe(false);
+    expect(isDailyChallengeUnlocked(DAILY_CHALLENGE_UNLOCK_PUZZLES - 1, 0)).toBe(false);
+    expect(isDailyChallengeUnlocked(DAILY_CHALLENGE_UNLOCK_PUZZLES, 0)).toBe(true);
+    // Phase 1+ alternative unlock is unchanged.
     expect(isDailyChallengeUnlocked(1, 1)).toBe(true);
   });
 
   test('daily challenge unlock progress reports remaining puzzles', () => {
     expect(getDailyChallengeUnlockProgress(0, 0)).toEqual({
       unlocked: false,
-      puzzlesRemaining: 3,
+      puzzlesRemaining: DAILY_CHALLENGE_UNLOCK_PUZZLES,
     });
-    expect(getDailyChallengeUnlockProgress(2, 0)).toEqual({
+    expect(getDailyChallengeUnlockProgress(DAILY_CHALLENGE_UNLOCK_PUZZLES - 1, 0)).toEqual({
       unlocked: false,
       puzzlesRemaining: 1,
     });
-    expect(getDailyChallengeUnlockProgress(3, 0)).toEqual({
+    expect(getDailyChallengeUnlockProgress(DAILY_CHALLENGE_UNLOCK_PUZZLES, 0)).toEqual({
       unlocked: true,
       puzzlesRemaining: 0,
     });
@@ -209,6 +219,45 @@ describe('dailyChallenge streak freeze mercy', () => {
     const result = await recordDailyCompletion(3, 0, 0);
     expect(result.streakFreezes).toBe(1); // granted, not spent
     expect(result.currentStreak).toBe(3);
+  });
+});
+
+describe('first-daily hint mercy', () => {
+  beforeEach(async () => {
+    (AsyncStorage.clear as jest.Mock)();
+    await clearDailyProgress();
+    await clearHints();
+  });
+
+  test('grants FIRST_DAILY_BONUS_HINTS exactly once, null afterwards', async () => {
+    const first = await grantFirstDailyMercy();
+    expect(first).toBe(FIRST_DAILY_BONUS_HINTS);
+
+    const second = await grantFirstDailyMercy();
+    expect(second).toBeNull();
+  });
+
+  test('hint balance reflects the grant', async () => {
+    expect(await getHintBalance()).toBe(0);
+    await grantFirstDailyMercy();
+    expect(await getHintBalance()).toBe(FIRST_DAILY_BONUS_HINTS);
+
+    // A repeat call grants nothing more.
+    await grantFirstDailyMercy();
+    expect(await getHintBalance()).toBe(FIRST_DAILY_BONUS_HINTS);
+  });
+
+  test('the granted flag is persisted with the daily progress record', async () => {
+    await grantFirstDailyMercy();
+    const stored = await AsyncStorage.getItem('wordshift_daily_challenge');
+    expect(stored).not.toBeNull();
+    expect(JSON.parse(stored!).firstDailyMercyGranted).toBe(true);
+  });
+
+  test('clearDailyProgress resets the mercy (Reset All re-allows it)', async () => {
+    await grantFirstDailyMercy();
+    await clearDailyProgress();
+    expect(await grantFirstDailyMercy()).toBe(FIRST_DAILY_BONUS_HINTS);
   });
 });
 

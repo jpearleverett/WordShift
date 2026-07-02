@@ -1,4 +1,4 @@
-import { StyleSheet, Platform, StatusBar } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 
 /**
@@ -63,13 +63,13 @@ export const appStyles = StyleSheet.create({
     backgroundColor: CandyColors.purple.main,
   },
 
-  // Header
+  // Header — paddingTop applied inline in App.tsx via useScreenInsets
+  // (safe-area aware; StyleSheets are static so insets can't live here)
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
     paddingBottom: 8,
     zIndex: 100,
   },
@@ -290,15 +290,20 @@ export const appStyles = StyleSheet.create({
     color: CandyColors.gray[700],
     letterSpacing: 0.3,
   },
+  // Speed rescue — opt-in rewarded continue inside the Time's-Up card
+  speedRescueButton: {
+    marginTop: 14,
+    alignSelf: 'stretch',
+  },
 
-  // Controls
+  // Controls — paddingBottom applied inline in App.tsx via useScreenInsets
+  // (max(30, safe-area bottom) so buttons clear the home indicator)
   controls: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    paddingBottom: 30,
     gap: 20,
   },
 

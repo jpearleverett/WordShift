@@ -13,12 +13,19 @@ import {
   getWordThresholdDialogue,
   getTotalDialogueCount,
   getSacrificeReaction,
+  getPhase2ExtraDialogues,
+  getPhase2PoolLine,
+  getAndMarkNarrativeSeedPage,
+  getAndMarkNarrativeCallbackPage,
+  getPhase2PoolCursors,
+  advancePhase2PoolCursor,
 } from '../services/animalDialogue';
 import { getSacrificeCount } from '../services/sacrifice';
 import {
   checkDialogueAvailability,
   recordDialogue,
   endSession,
+  getSession,
   getSessionStatus,
   isOnCooldown,
 } from '../services/dialogueSession';
@@ -136,6 +143,13 @@ export function useDialogueFlow({
   const [tendingLevel, setTendingLevel] = useState(0);
   const [tendingCaughtUp, setTendingCaughtUp] = useState<Record<string, number>>({});
 
+  // Phase-2 exhaustion pool cursors (animalType -> lines delivered). Once an
+  // animal's Phase-2 base block is exhausted while the player is still in
+  // Phase 2, extra lines are served in order (then cycling) instead of
+  // re-reading the last base line verbatim. The stored dialogue index stays
+  // pinned at the base-block end so saved progress is never inflated.
+  const [phase2Cursors, setPhase2Cursors] = useState<Record<string, number>>({});
+
   const refreshTendingState = useCallback(async () => {
     try {
       const state = await loadTendingState();
@@ -149,6 +163,9 @@ export function useDialogueFlow({
       .then(state => setPlayerChoices(state.choices ?? {}))
       .catch(() => {});
     refreshTendingState();
+    getPhase2PoolCursors()
+      .then(cursors => setPhase2Cursors(cursors))
+      .catch(() => {});
   }, [refreshTendingState]);
 
   // Build an animal's current Phase-5 line pool from loaded hook state.
@@ -292,6 +309,17 @@ export function useDialogueFlow({
       return regularDialogue?.text || 'The pattern holds.';
     }
 
+    // Phase 2: once the base block is exhausted, serve the exhaustion pool
+    // (in order, then cycling) instead of re-reading the last base line.
+    if (animalPhase === 2) {
+      const total2 = getTotalDialogueCount(selectedAnimal.type, 2);
+      const resolved = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, 2, getUnlockedTypes());
+      if (resolved >= total2) {
+        const poolLine = getPhase2PoolLine(selectedAnimal.type, phase2Cursors[selectedAnimal.type] ?? 0);
+        if (poolLine) return poolLine;
+      }
+    }
+
     const dialogue = getCurrentDialogue(
       selectedAnimal.type,
       resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase, getUnlockedTypes()),
@@ -310,6 +338,9 @@ export function useDialogueFlow({
 
     // Phase 5: post-revelation dialogues always cycle (never truly exhausted)
     if (animalPhase === 5) return true;
+
+    // Phase 2: the exhaustion pool cycles, so there is always another line
+    if (animalPhase === 2 && getPhase2ExtraDialogues(selectedAnimal.type).length > 0) return true;
 
     const unlocked = getUnlockedTypes();
     const cur = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, animalPhase, unlocked);
@@ -407,9 +438,12 @@ export function useDialogueFlow({
     if (progress && progress.puzzlesSolved > 0) {
       try {
         const consumed = progress.consumedCoordinatedEvents || [];
+        // Key events on the same weighted scale phase transitions use, so an
+        // accelerated player (phaseProgress outpacing raw puzzlesSolved)
+        // reaches the pre-finale crescendo events before the finale fires.
         const coordEvent = getCoordinatedEventLine(
           animal.type,
-          progress.puzzlesSolved,
+          progress.phaseProgress ?? progress.puzzlesSolved,
           progress.currentPhase,
           consumed,
           progress.unlockedAnimals ?? []
@@ -477,6 +511,21 @@ export function useDialogueFlow({
       }
     }
 
+    // 6b. Phase 0 narrative seed — innocent lines with dark double meanings
+    // that Phase 4 recontextualizes. Deterministic: seed 0 becomes due on the
+    // animal's 2nd dialogue session, seed 1 on its 5th; each delivers once.
+    if (progress && progress.currentPhase === 0) {
+      try {
+        const sessionNumber = (getSession(animal.id)?.sessionsCompleted ?? 0) + 1;
+        const seed = await getAndMarkNarrativeSeedPage(animal.type, sessionNumber);
+        if (seed) {
+          pages.push(seed);
+        }
+      } catch {
+        // Narrative seeds are non-critical
+      }
+    }
+
     // 7. Cross-animal reference — frequency scales with phase
     if (progress && progress.unlockedAnimals) {
       const isVanguard = ANIMAL_AWARENESS_TIERS[animal.type] === 'vanguard';
@@ -517,6 +566,19 @@ export function useDialogueFlow({
         }
       } catch {
         // Choice callbacks are non-critical
+      }
+    }
+
+    // 8b. Phase 4+: one-time callbacks recontextualizing the Phase 0 seed
+    // lines the player actually heard (one per visit, each shown once).
+    if (animalPhase >= 4) {
+      try {
+        const seedCallback = await getAndMarkNarrativeCallbackPage(animal.type);
+        if (seedCallback) {
+          pages.push(seedCallback);
+        }
+      } catch {
+        // Seed callbacks are non-critical
       }
     }
 
@@ -574,8 +636,14 @@ export function useDialogueFlow({
       return caughtUp < pool.length;
     }
     const resolved = resolveDialogueIndex(animal.type, animal.currentDialogueIndex, animalPhase, getUnlockedTypes());
+    if (animalPhase === 2 && resolved >= totalDialogues) {
+      // Base block exhausted — honest badge: lit only while the exhaustion
+      // pool still has undelivered (genuinely new) lines.
+      const pool = getPhase2ExtraDialogues(animal.type);
+      return (phase2Cursors[animal.type] ?? 0) < pool.length;
+    }
     return resolved < totalDialogues;
-  }, [progress, tendingLevel, tendingCaughtUp, playerChoices]);
+  }, [progress, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors]);
 
   // Handle closing dialogue. Manual closes keep the session warm so
   // checking in with an animal never feels punitive.
@@ -627,7 +695,13 @@ export function useDialogueFlow({
 
     // Per-animal phase awareness for dialogue progression
     const animalPhase = getAnimalPhase(progress.currentPhase, selectedAnimal.type);
-    const hasMore = hasMoreDialogues(
+    // Phase 2: the exhaustion pool means there is always another line — the
+    // base block hands off to the pool instead of dead-ending on its last line.
+    const phase2Pool = animalPhase === 2 ? getPhase2ExtraDialogues(selectedAnimal.type) : [];
+    // Phase 5: the post-revelation pool cycles forever, and it only engages at
+    // index >= totalRegular — without this clause the session would dead-end on
+    // the last regular line and the pool could never be reached.
+    const hasMore = animalPhase === 5 || phase2Pool.length > 0 || hasMoreDialogues(
       selectedAnimal.type,
       selectedAnimal.currentDialogueIndex,
       animalPhase
@@ -669,15 +743,31 @@ export function useDialogueFlow({
       const resolvePhase = (animalPhase === 5 ? 4 : animalPhase) as DialoguePhase;
       const unlocked = getUnlockedTypes();
       const cur = resolveDialogueIndex(selectedAnimal.type, selectedAnimal.currentDialogueIndex, resolvePhase, unlocked);
-      const newIndex = resolveDialogueIndex(selectedAnimal.type, cur + 1, resolvePhase, unlocked);
+      const total2 = getTotalDialogueCount(selectedAnimal.type, 2);
+      let newIndex: number;
+      let nextPhase2Cursor = phase2Cursors[selectedAnimal.type] ?? 0;
+      if (animalPhase === 2 && phase2Pool.length > 0 && cur >= total2) {
+        // A pool line was just shown: pin the stored index at the base-block
+        // end (never inflate it — Phase 3 reads it as a phase-start position)
+        // and advance the persisted pool cursor instead.
+        newIndex = total2;
+        const animalType = selectedAnimal.type;
+        nextPhase2Cursor = await advancePhase2PoolCursor(animalType);
+        setPhase2Cursors(prev => ({ ...prev, [animalType]: nextPhase2Cursor }));
+      } else {
+        newIndex = resolveDialogueIndex(selectedAnimal.type, cur + 1, resolvePhase, unlocked);
+      }
       await markDialogueRead(selectedAnimal.id, newIndex);
 
       // Honest hasNewDialogue: at Phase 5 (post-revelation) use the Tending pool /
-      // caught-up pointer; otherwise the normal index-vs-total check.
+      // caught-up pointer; at Phase 2 past the base block use the exhaustion-pool
+      // cursor; otherwise the normal index-vs-total check.
       let hasNewDialogue: boolean;
       if (animalPhase === 5 && newIndex >= totalRegular) {
         const pool = getPhase5Pool(selectedAnimal.type);
         hasNewDialogue = !isOnCooldown(selectedAnimal.id) && nextCaughtUp < pool.length;
+      } else if (animalPhase === 2 && phase2Pool.length > 0 && newIndex >= total2) {
+        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && nextPhase2Cursor < phase2Pool.length;
       } else {
         const totalDialogues = getTotalDialogueCount(selectedAnimal.type, animalPhase);
         hasNewDialogue = !isOnCooldown(selectedAnimal.id) && newIndex < totalDialogues;
@@ -720,7 +810,7 @@ export function useDialogueFlow({
       }
       closeDialogue(true);
     }
-  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingLevel, tendingCaughtUp, playerChoices]);
+  }, [selectedAnimal, progress, closeDialogue, setAnimals, preDialoguePages, onFoxPlayPrompt, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors]);
 
   // Handle player choosing a dialogue option (Phase 3 choice points)
   const handleDialogueChoice = useCallback(async (choice: PlayerChoice) => {

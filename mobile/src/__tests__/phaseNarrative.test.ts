@@ -15,6 +15,7 @@ import {
   getComboMoveMessage,
   getDragMissMessage,
   getNotificationPromptText,
+  getWinBackMessage,
   getSpeedTimeUpMessage,
   getWhisperGalleryEmptyText,
   getNextStreakMilestoneText,
@@ -553,6 +554,66 @@ describe('getNotificationPromptText', () => {
     const titles = allSixPhases.map(p => getNotificationPromptText(p).title);
     const unique = new Set(titles);
     expect(unique.size).toBe(6);
+  });
+});
+
+describe('getWinBackMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+  const rungs: (1 | 2 | 3)[] = [1, 2, 3];
+
+  test.each(
+    allSixPhases.flatMap(phase => rungs.map(rung => ({ phase, rung })))
+  )('returns a non-empty string for phase $phase, rung $rung', ({ phase, rung }) => {
+    const msg = getWinBackMessage(phase, rung);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('rungs escalate — each rung is distinct copy within a phase', () => {
+    for (const phase of allSixPhases) {
+      const unique = new Set(rungs.map(r => getWinBackMessage(phase, r)));
+      expect(unique.size).toBe(3);
+    }
+  });
+
+  test('phase 0 is warm and never leaks dark vocabulary', () => {
+    for (const rung of rungs) {
+      const msg = getWinBackMessage(0, rung);
+      expect(msg).not.toContain('arrangement');
+      expect(msg).not.toContain('void');
+      expect(msg.toLowerCase()).not.toContain('silence');
+    }
+  });
+
+  test('phases 2-3 open quietly unsettling — the house is quieter without you', () => {
+    expect(getWinBackMessage(2, 1)).toContain('The house is quieter without you');
+    expect(getWinBackMessage(3, 1)).toContain('The house is quieter without you');
+  });
+
+  test('phase 4 is reverent — the arrangement is incomplete', () => {
+    expect(getWinBackMessage(4, 1)).toContain('The arrangement is incomplete');
+  });
+
+  test('phase 5 stays serene — no urgency, no dread', () => {
+    for (const rung of rungs) {
+      const msg = getWinBackMessage(5, rung).toLowerCase();
+      expect(msg).not.toContain('incomplete');
+      expect(msg).not.toContain('waits for your hand');
+    }
+    expect(getWinBackMessage(5, 3)).toContain('Nothing is lost');
+  });
+
+  test('rung 3 marks the week away at every phase', () => {
+    for (const phase of allSixPhases) {
+      expect(getWinBackMessage(phase, 3).toLowerCase()).toMatch(/week|seven days/);
+    }
+  });
+
+  test('clamps out-of-bounds phases without throwing', () => {
+    expect(() => getWinBackMessage(-1, 1)).not.toThrow();
+    expect(() => getWinBackMessage(99, 3)).not.toThrow();
+    expect(getWinBackMessage(-1, 1)).toBe(getWinBackMessage(0, 1));
+    expect(getWinBackMessage(99, 2)).toBe(getWinBackMessage(5, 2));
   });
 });
 

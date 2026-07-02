@@ -12,6 +12,9 @@ import {
   setEntitlements,
   getGrantedEntitlements,
   clearEntitlements,
+  hasMadeAmberPurchase,
+  hasMadeAmberPurchaseSync,
+  markAmberPurchaseMade,
 } from '../services/entitlements';
 import {
   PRODUCT_IDS,
@@ -100,6 +103,32 @@ describe('entitlements', () => {
     await clearEntitlements();
     expect(isPatronSync()).toBe(false);
     expect(await getGrantedEntitlements()).toEqual([]);
+  });
+
+  it('tracks the first-amber-purchase flag (default off, idempotent mark)', async () => {
+    expect(await hasMadeAmberPurchase()).toBe(false);
+    expect(hasMadeAmberPurchaseSync()).toBe(false);
+
+    await markAmberPurchaseMade();
+    expect(await hasMadeAmberPurchase()).toBe(true);
+    expect(hasMadeAmberPurchaseSync()).toBe(true);
+
+    await markAmberPurchaseMade(); // idempotent
+    expect(await hasMadeAmberPurchase()).toBe(true);
+  });
+
+  it('setEntitlements (restore semantics) preserves the first-amber-purchase flag', async () => {
+    await markAmberPurchaseMade();
+    await setEntitlements([ENTITLEMENTS.PATRON]); // store restore replaces the granted set...
+    expect(await isPatron()).toBe(true);
+    expect(await hasMadeAmberPurchase()).toBe(true); // ...but never resurrects the one-time 2x
+  });
+
+  it('clearEntitlements resets the first-amber-purchase flag', async () => {
+    await markAmberPurchaseMade();
+    await clearEntitlements();
+    expect(await hasMadeAmberPurchase()).toBe(false);
+    expect(hasMadeAmberPurchaseSync()).toBe(false);
   });
 });
 

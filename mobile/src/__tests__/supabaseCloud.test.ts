@@ -98,11 +98,11 @@ describe('SupabaseCloudProvider', () => {
     });
   });
 
-  describe('upload', () => {
-    it('posts an upsert on owner to /rest/v1/saves', async () => {
+  describe('upload (upsert_save RPC — capability presented, no table write)', () => {
+    it('posts the save through /rest/v1/rpc/upsert_save', async () => {
       mockExtra = { ...CONFIGURED };
       installCloudProviderIfConfigured();
-      mockFetchJson([], 204, true);
+      mockFetchJson(true);
 
       const data: CloudSaveData = {
         version: 1,
@@ -114,17 +114,15 @@ describe('SupabaseCloudProvider', () => {
       expect(ok).toBe(true);
 
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toContain('/rest/v1/saves');
-      expect(url).toContain('on_conflict=owner');
+      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/upsert_save');
       expect(init.method).toBe('POST');
-      expect(init.headers.Prefer).toContain('resolution=merge-duplicates');
 
       const sent = JSON.parse(init.body);
-      expect(sent.owner).toBe('install-abc123');
-      expect(sent.version).toBe(1);
-      expect(sent.timestamp).toBe(1000);
-      expect(sent.device_id).toBe('dev-1');
-      expect(sent.payload).toBe(JSON.stringify(data.data));
+      expect(sent.p_owner).toBe('install-abc123');
+      expect(sent.p_version).toBe(1);
+      expect(sent.p_timestamp).toBe(1000);
+      expect(sent.p_device_id).toBe('dev-1');
+      expect(sent.p_payload).toBe(JSON.stringify(data.data));
     });
 
     it('returns false when the network call fails', async () => {
@@ -140,18 +138,30 @@ describe('SupabaseCloudProvider', () => {
       });
       expect(ok).toBe(false);
     });
+
+    it('returns false when the server rejects the payload (RPC returns false)', async () => {
+      mockExtra = { ...CONFIGURED };
+      installCloudProviderIfConfigured();
+      mockFetchJson(false);
+
+      const ok = await getCloudProvider().upload({
+        version: 1,
+        timestamp: 1,
+        deviceId: 'd',
+        data: {},
+      });
+      expect(ok).toBe(false);
+    });
   });
 
-  describe('download', () => {
-    it('reconstructs CloudSaveData from the newest row', async () => {
+  describe('download (get_save RPC)', () => {
+    it('reconstructs CloudSaveData from the RPC row', async () => {
       mockExtra = { ...CONFIGURED };
       installCloudProviderIfConfigured();
 
       const payload = { wordshift_home_progress: '{"amber":777}' };
       mockFetchJson([
-        { owner: 'install-abc123', version: 1, timestamp: 5, device_id: 'old', payload: '{}' },
         {
-          owner: 'install-abc123',
           version: 2,
           timestamp: 99,
           device_id: 'new',
@@ -166,8 +176,19 @@ describe('SupabaseCloudProvider', () => {
       expect(result!.deviceId).toBe('new');
       expect(result!.data).toEqual(payload);
 
-      const [url] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toContain('owner=eq.install-abc123');
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/get_save');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body).p_owner).toBe('install-abc123');
+    });
+
+    it('tolerates a bare-object RPC result', async () => {
+      mockExtra = { ...CONFIGURED };
+      installCloudProviderIfConfigured();
+      mockFetchJson({ version: 1, timestamp: 7, device_id: 'd', payload: '{}' });
+      const result = await getCloudProvider().download();
+      expect(result).not.toBeNull();
+      expect(result!.timestamp).toBe(7);
     });
 
     it('returns null when no rows exist', async () => {
@@ -178,25 +199,27 @@ describe('SupabaseCloudProvider', () => {
     });
   });
 
-  describe('hasNewerSave', () => {
+  describe('hasNewerSave (get_save_timestamp RPC)', () => {
     it('true when remote timestamp exceeds local', async () => {
       mockExtra = { ...CONFIGURED };
       installCloudProviderIfConfigured();
-      mockFetchJson([{ timestamp: 500 }]);
+      mockFetchJson(500);
       expect(await getCloudProvider().hasNewerSave(100)).toBe(true);
+      const [url] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/get_save_timestamp');
     });
 
     it('false when remote timestamp is not newer', async () => {
       mockExtra = { ...CONFIGURED };
       installCloudProviderIfConfigured();
-      mockFetchJson([{ timestamp: 100 }]);
+      mockFetchJson(100);
       expect(await getCloudProvider().hasNewerSave(100)).toBe(false);
     });
 
-    it('false when no remote save', async () => {
+    it('false when no remote save (RPC returns null)', async () => {
       mockExtra = { ...CONFIGURED };
       installCloudProviderIfConfigured();
-      mockFetchJson([]);
+      mockFetchJson(null);
       expect(await getCloudProvider().hasNewerSave(0)).toBe(false);
     });
   });
@@ -251,7 +274,6 @@ describe('SupabaseCloudProvider', () => {
       const payload = { wordshift_home_progress: '{"amber":321}' };
       mockFetchJson([
         {
-          owner: 'install-abc123',
           version: 1,
           timestamp: 10,
           device_id: 'cloud',
@@ -284,6 +306,26 @@ describe('SupabaseCloudProvider', () => {
       installCloudProviderIfConfigured();
       mockFetchJson([]);
       expect(await maybeAutoRestoreOnFreshInstall()).toBe(false);
+    });
+  });
+
+  describe('capability model: only rpc/ paths are ever requested', () => {
+    it('upload/download/hasNewerSave never issue a GET or touch a table path', async () => {
+      mockExtra = { ...CONFIGURED };
+      installCloudProviderIfConfigured();
+      mockFetchJson([]);
+
+      await getCloudProvider().upload({ version: 1, timestamp: 1, deviceId: 'd', data: {} });
+      await getCloudProvider().download();
+      await getCloudProvider().hasNewerSave(0);
+
+      const calls = (global.fetch as jest.Mock).mock.calls;
+      expect(calls.length).toBe(3);
+      for (const [url, init] of calls) {
+        expect(url).toContain('/rest/v1/rpc/');
+        expect(url).not.toContain('/rest/v1/saves');
+        expect(init.method).toBe('POST');
+      }
     });
   });
 });

@@ -15,12 +15,18 @@ import {
   PRODUCT_IDS,
   CONSUMABLE_PRODUCTS,
   ConsumableProductInfo,
+  STARTER_PACK_INFO,
   getProducts,
   purchaseConsumable,
+  purchaseStarterPack,
   purchaseProduct,
   IapProduct,
 } from '../../services/iap';
-import { hasEntitlementSync, ENTITLEMENTS } from '../../services/entitlements';
+import {
+  hasEntitlementSync,
+  hasMadeAmberPurchaseSync,
+  ENTITLEMENTS,
+} from '../../services/entitlements';
 import { awardBonusAmber } from '../../services/amberCurrency';
 import { addHints } from '../../services/hints';
 import { getSettingsSync } from '../../services/settings';
@@ -80,6 +86,13 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   const [ownsBundle, setOwnsBundle] = useState<boolean>(
     hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE),
   );
+  const [ownsStarter, setOwnsStarter] = useState<boolean>(
+    hasEntitlementSync(ENTITLEMENTS.STARTER_PACK),
+  );
+  const [firstAmberDouble, setFirstAmberDouble] = useState<boolean>(
+    !hasMadeAmberPurchaseSync(),
+  );
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
@@ -87,6 +100,9 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   useEffect(() => {
     if (visible) {
       setOwnsBundle(hasEntitlementSync(ENTITLEMENTS.COSMETIC_BUNDLE));
+      setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
+      setFirstAmberDouble(!hasMadeAmberPurchaseSync());
+      setSuccessMsg(null);
       logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
   }, [visible]);
@@ -97,7 +113,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const ids = [...AMBER_PACK_IDS, ...HINT_PACK_IDS, PRODUCT_IDS.COSMETIC_BUNDLE];
+        const ids = [
+          PRODUCT_IDS.STARTER_PACK,
+          ...AMBER_PACK_IDS,
+          ...HINT_PACK_IDS,
+          PRODUCT_IDS.COSMETIC_BUNDLE,
+        ];
         const products: IapProduct[] = await getProducts(ids);
         if (!cancelled) {
           const map: Record<string, string> = {};
@@ -139,6 +160,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     async (info: ConsumableProductInfo) => {
       if (flow === 'working') return;
       setFlow('working');
+      setSuccessMsg(null);
       hapticLight();
       logEvent({ type: 'purchase_initiated', data: { productId: info.productId, kind: info.reward.kind } });
       try {
@@ -147,9 +169,16 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           if (result.reward.kind === 'amber') {
             const balance = await awardBonusAmber(result.reward.amount, `iap_${info.productId}`);
             onAmberChange?.(balance);
+            setFirstAmberDouble(!hasMadeAmberPurchaseSync());
+            setSuccessMsg(
+              result.firstPurchaseDoubled
+                ? `+${result.reward.amount} amber added — 2× first purchase!`
+                : `+${result.reward.amount} amber added.`,
+            );
           } else {
             const balance = await addHints(result.reward.amount, `iap_${info.productId}`);
             onHintsChange?.(balance);
+            setSuccessMsg(`+${result.reward.amount} hints added.`);
           }
           logEvent({ type: 'iap_purchase', data: { productId: info.productId, kind: result.reward.kind } });
           hapticMedium();
@@ -171,9 +200,48 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     [flow, onAmberChange, onHintsChange],
   );
 
+  const handleBuyStarter = useCallback(async () => {
+    if (flow === 'working' || ownsStarter) return;
+    setFlow('working');
+    setSuccessMsg(null);
+    hapticLight();
+    logEvent({ type: 'purchase_initiated', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
+    try {
+      const result = await purchaseStarterPack();
+      if (result.success && result.reward) {
+        const balance = await awardBonusAmber(result.reward.amber, 'iap_starter');
+        onAmberChange?.(balance);
+        const hints = await addHints(result.reward.hints, 'iap_starter');
+        onHintsChange?.(hints);
+        setOwnsStarter(true);
+        setSuccessMsg(`+${result.reward.amber} amber and +${result.reward.hints} hints added.`);
+        logEvent({ type: 'iap_purchase', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
+        hapticMedium();
+        setFlow('idle');
+        return;
+      }
+      if (result.alreadyOwned) {
+        setOwnsStarter(true);
+        setFlow('idle');
+        return;
+      }
+      if (result.cancelled) {
+        logEvent({ type: 'purchase_cancelled', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });
+        setFlow('idle');
+        return;
+      }
+      logEvent({ type: 'purchase_failed', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter', reason: result.error ?? 'unknown' } });
+      setFlow('unavailable');
+    } catch {
+      logEvent({ type: 'purchase_failed', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter', reason: 'exception' } });
+      setFlow('unavailable');
+    }
+  }, [flow, ownsStarter, onAmberChange, onHintsChange]);
+
   const handleBuyBundle = useCallback(async () => {
     if (flow === 'working' || ownsBundle) return;
     setFlow('working');
+    setSuccessMsg(null);
     hapticLight();
     logEvent({ type: 'purchase_initiated', data: { productId: PRODUCT_IDS.COSMETIC_BUNDLE, kind: 'cosmetic' } });
     try {
@@ -200,6 +268,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
   const handleClose = useCallback(() => {
     setFlow('idle');
+    setSuccessMsg(null);
     onClose();
   }, [onClose]);
 
@@ -220,6 +289,11 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           <Text style={[styles.rowTitle, { color: headerColor }]}>{info.name}</Text>
           {info.bestValue && (
             <Text style={[styles.badge, { color: '#1B1206', backgroundColor: accent }]}>BEST VALUE</Text>
+          )}
+          {info.reward.kind === 'amber' && firstAmberDouble && (
+            <Text style={[styles.badge, { color: '#1B1206', backgroundColor: headerColor }]}>
+              2× FIRST PURCHASE!
+            </Text>
           )}
         </View>
         <Text style={[styles.rowDesc, { color: bodyColor }]}>
@@ -263,6 +337,33 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+            {!ownsStarter && (
+              <View style={[styles.starterCard, { backgroundColor: rowBg, borderColor: accent }]}>
+                <View style={styles.rowInfo}>
+                  <View style={styles.rowTitleLine}>
+                    <Text style={[styles.rowTitle, { color: headerColor }]}>{STARTER_PACK_INFO.name}</Text>
+                    <Text style={[styles.badge, { color: '#1B1206', backgroundColor: accent }]}>
+                      BEST VALUE · ONE TIME
+                    </Text>
+                  </View>
+                  <Text style={[styles.rowDesc, { color: bodyColor }]}>
+                    {STARTER_PACK_INFO.description} <AmberInline size={11} />
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.priceBtn, { borderColor: accent }]}
+                  onPress={handleBuyStarter}
+                  disabled={working}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Buy ${STARTER_PACK_INFO.name} for ${prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice}`}
+                >
+                  <Text style={[styles.priceBtnText, { color: accent }]}>
+                    {prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <Text style={[styles.sectionLabel, { color: accent }]}>AMBER</Text>
             {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'amber').map(info =>
               renderPackRow(info, <AmberInline size={11} />),
@@ -316,6 +417,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
               </TouchableOpacity>
             )}
           </ScrollView>
+
+          {successMsg && flow !== 'unavailable' && (
+            <View style={styles.successBox} accessibilityLiveRegion="polite">
+              <Text style={[styles.successText, { color: headerColor }]}>{successMsg}</Text>
+            </View>
+          )}
 
           {flow === 'unavailable' && (
             <View style={styles.unavailableBox}>
@@ -375,6 +482,15 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
+  starterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 12,
+    marginTop: 12,
+  },
   rowInfo: { flex: 1, paddingRight: 12 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   rowTitle: { fontSize: 16, fontWeight: '800' },
@@ -400,6 +516,8 @@ const styles = StyleSheet.create({
   ownedText: { fontSize: 13, fontWeight: '800', paddingHorizontal: 8 },
   patronLink: { marginTop: 16, paddingVertical: 6 },
   patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  successBox: { marginTop: 12 },
+  successText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontWeight: '700' },
   unavailableBox: { marginTop: 12 },
   unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center' },
   workingRow: { marginTop: 12, alignItems: 'center' },

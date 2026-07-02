@@ -50,6 +50,12 @@ interface RowProps {
   guidanceActive?: boolean;
   guidedLetterId?: string | null;
   guidedSlotIndex?: number | null;
+  /** Hint glow: id of the letter tile to highlight in this row (same visuals as the tutorial guide). */
+  hintLetterId?: string | null;
+  /** Hint glow: drop-slot index to highlight in this row (visible while slots are shown). */
+  hintSlotIndex?: number | null;
+  /** Arrival settle for the letter just placed by a committed tap move (see usePuzzleGame.lastArrival). */
+  arrival?: { letterId: string; direction: 'down' | 'up'; moveId: number } | null;
   /** Incrementing signal from parent to trigger target-row invalid shake */
   invalidDropSignal?: number;
   /** Incrementing signal from parent to trigger target-row success bounce */
@@ -415,6 +421,9 @@ export const Row: React.FC<RowProps> = memo(({
   guidanceActive = false,
   guidedLetterId = null,
   guidedSlotIndex = null,
+  hintLetterId = null,
+  hintSlotIndex = null,
+  arrival = null,
   invalidDropSignal = 0,
   successDropSignal = 0,
   slotPreviews,
@@ -653,7 +662,10 @@ export const Row: React.FC<RowProps> = memo(({
               index={slotIndex}
               compact
               phase={phase}
-              isGuided={guidanceActive && guidedSlotIndex === slotIndex}
+              isGuided={
+                (guidanceActive && guidedSlotIndex === slotIndex) ||
+                (hintSlotIndex != null && hintSlotIndex === slotIndex)
+              }
               preview={slotPreviews?.[slotIndex]}
             />
           </Animated.View>
@@ -679,7 +691,12 @@ export const Row: React.FC<RowProps> = memo(({
               phase={phase}
               compact={compactTiles}
               isResonant={isRowResonant}
-              isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
+              isGuided={
+                (guidanceActive && isSource && guidedLetterId === letter.id) ||
+                (hintLetterId != null && hintLetterId === letter.id)
+              }
+              arrivalMoveId={arrival && arrival.letterId === letter.id ? arrival.moveId : undefined}
+              arrivalDirection={arrival && arrival.letterId === letter.id ? arrival.direction : undefined}
             />
           </Animated.View>
         );
@@ -709,7 +726,12 @@ export const Row: React.FC<RowProps> = memo(({
           phase={phase}
           compact={compactTiles}
           isResonant={isRowResonant}
-          isGuided={guidanceActive && isSource && guidedLetterId === letter.id}
+          isGuided={
+            (guidanceActive && isSource && guidedLetterId === letter.id) ||
+            (hintLetterId != null && hintLetterId === letter.id)
+          }
+          arrivalMoveId={arrival && arrival.letterId === letter.id ? arrival.moveId : undefined}
+          arrivalDirection={arrival && arrival.letterId === letter.id ? arrival.direction : undefined}
         />
       );
 

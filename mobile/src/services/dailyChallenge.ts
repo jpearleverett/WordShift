@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
+import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { generateLocalPuzzle } from './localGenerator';
 import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal } from './dateUtils';
+import { addHints } from './hints';
 
 const STORAGE_KEY = 'wordshift_daily_challenge';
 
@@ -37,6 +39,8 @@ export interface DailyChallengeProgress {
    * streak was saved.
    */
   streakSavedByFreeze?: boolean;
+  /** True once the one-time first-daily hint mercy has been granted. */
+  firstDailyMercyGranted: boolean;
 }
 
 // In-memory cache
@@ -51,6 +55,7 @@ function getDefaultProgress(): DailyChallengeProgress {
     lastCompletedDate: null,
     streakFreezes: 0,
     lastFreezeGrantDate: null,
+    firstDailyMercyGranted: false,
   };
 }
 
@@ -88,15 +93,9 @@ const DAILY_STREAK_GRACE_DAYS = 1;
 const DAILY_FREE_FREEZE_INTERVAL_DAYS = 14;
 const DAILY_MAX_FREEZES = 1;
 
-/**
- * Daily challenge unlock pacing.
- * Unlocks early (Day-1 retention hook) once the core loop has been tasted.
- * Set to 3 (was 5): onboarding spends the player's first solve, so 3 means the
- * Daily Challenge appears within the first real session — letting the
- * daily-login + daily-challenge rhythm form by Day 2 instead of Day 3+, the
- * single highest-leverage early-retention nudge in the genre.
- */
-export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 3;
+// Unlock pacing lives in gameBalance.ts (single source of truth); re-exported
+// here so existing consumers of the service keep working.
+export { DAILY_CHALLENGE_UNLOCK_PUZZLES };
 
 /**
  * Daily challenge unlock condition.
@@ -275,6 +274,34 @@ export function prewarmDailyPuzzle(): void {
   generateDailyPuzzle().catch(() => {
     // Best-effort warm-up; the real generation happens again on tap if needed.
   });
+}
+
+/**
+ * One-time first-daily mercy: the daily is always HARD, so the player's very
+ * first attempt gets a small bonus-hint cushion (FIRST_DAILY_BONUS_HINTS).
+ * Grants exactly once ever (flag persisted with the daily progress record) and
+ * returns the number of hints granted, or null if already granted. Hints are
+ * convenience only — they still cost stars, and the puzzle itself is untouched
+ * (deterministic and identical for all players on a date).
+ */
+export async function grantFirstDailyMercy(): Promise<number | null> {
+  const progress = await loadDailyProgress();
+  if (progress.firstDailyMercyGranted) return null;
+
+  // Flip the flag on the shared cache before any await so a rapid double-call
+  // can't double-grant.
+  progress.firstDailyMercyGranted = true;
+  progressCache = progress;
+
+  await addHints(FIRST_DAILY_BONUS_HINTS, 'first_daily_mercy');
+
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  } catch (err) {
+    console.warn('Failed to save daily challenge progress:', err);
+  }
+
+  return FIRST_DAILY_BONUS_HINTS;
 }
 
 /**

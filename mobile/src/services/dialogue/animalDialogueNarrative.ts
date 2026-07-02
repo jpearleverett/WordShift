@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AnimalType, DialoguePhase } from '../../types/homeWorld';
 
 // =============================================================================
@@ -320,7 +321,12 @@ export function getCrossAnimalReference(
 // ============================================================================
 
 interface CoordinatedEvent {
-  puzzleThreshold: number;  // Fires when puzzlesSolved >= this
+  // Fires when the player's effective progress >= this. Effective progress is
+  // the same weighted scale phase transitions use (phaseProgress, which
+  // accelerates for engaged players), falling back to raw puzzlesSolved for
+  // legacy saves — otherwise accelerated players reach the finale (~155 real
+  // puzzles) before the 230/240/250 pre-finale crescendo ever fires.
+  puzzleThreshold: number;
   phase: number;            // Minimum phase required
   theme: string;            // Internal theme name
   lines: Partial<Record<AnimalType, string>>;  // One line per participating animal
@@ -462,7 +468,9 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
 ];
 
 /**
- * Get the coordinated event line for a specific animal at a given puzzle count.
+ * Get the coordinated event line for a specific animal at a given effective
+ * progress (weighted phaseProgress when available, else raw puzzlesSolved —
+ * the same scale phase transitions key on).
  * Returns null if no event is active or the animal doesn't participate.
  * The event is "consumed" by tracking which thresholds have been shown.
  */
@@ -494,13 +502,16 @@ function lineMentionsLockedAnimal(
 
 export function getCoordinatedEventLine(
   animalType: AnimalType,
-  puzzlesSolved: number,
+  effectiveProgress: number,
   currentPhase: number,
   consumedEvents: string[],
   unlockedAnimals: string[] = []
 ): { text: string; theme: string } | null {
+  // Events are scanned in ascending threshold order and only ONE fires per
+  // call, so a player whose effective progress leapt past several thresholds
+  // still receives the skipped events in order (one per visit) — never lost.
   for (const event of COORDINATED_EVENTS) {
-    if (puzzlesSolved >= event.puzzleThreshold &&
+    if (effectiveProgress >= event.puzzleThreshold &&
         currentPhase >= event.phase &&
         !consumedEvents.includes(event.theme)) {
       const line = event.lines[animalType];
@@ -659,4 +670,145 @@ export function getNarrativeCallback(animalType: AnimalType, callbackIndex: numb
   const animal = NARRATIVE_SEEDS[animalType];
   if (!animal || callbackIndex < 0 || callbackIndex >= animal.callbacks.length) return null;
   return animal.callbacks[callbackIndex];
+}
+
+// ============================================================================
+// NARRATIVE DELIVERY STATE
+// One-time delivery bookkeeping for the content above, persisted with the
+// same AsyncStorage + in-memory cache pattern as dialogueChoices'
+// getAndMarkPhase4CallbackPage:
+//  - Phase 0 seeds: delivered deterministically on an animal's 2nd and 5th
+//    dialogue sessions, each exactly once.
+//  - Phase 4 callbacks: one page per visit, each exactly once, and only for
+//    seeds the player actually heard (never recontextualize an unsaid line).
+//  - Phase 2 exhaustion pool cursors: how many pool lines each animal has
+//    delivered (the stored dialogue index stays pinned at the base-block end
+//    so phase-start indices are never inflated).
+// ============================================================================
+
+const DELIVERY_STORAGE_KEY = 'wordshift_narrative_delivery';
+
+interface NarrativeDeliveryState {
+  /** animalType -> seed indices already delivered at Phase 0 */
+  seedsDelivered: Record<string, number[]>;
+  /** animalType -> Phase-4 callback indices already shown */
+  callbacksShown: Record<string, number[]>;
+  /** animalType -> Phase-2 exhaustion-pool lines delivered (cycles past pool length) */
+  phase2PoolCursor: Record<string, number>;
+}
+
+let deliveryCache: NarrativeDeliveryState | null = null;
+
+function getDefaultDeliveryState(): NarrativeDeliveryState {
+  return { seedsDelivered: {}, callbacksShown: {}, phase2PoolCursor: {} };
+}
+
+async function loadDeliveryState(): Promise<NarrativeDeliveryState> {
+  if (deliveryCache) return deliveryCache;
+  try {
+    const stored = await AsyncStorage.getItem(DELIVERY_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      deliveryCache = { ...getDefaultDeliveryState(), ...parsed };
+      return deliveryCache!;
+    }
+  } catch {}
+  deliveryCache = getDefaultDeliveryState();
+  return deliveryCache;
+}
+
+async function saveDeliveryState(state: NarrativeDeliveryState): Promise<void> {
+  deliveryCache = state;
+  try {
+    await AsyncStorage.setItem(DELIVERY_STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+/** Session numbers (1-indexed) at which each Phase-0 seed becomes due. */
+const SEED_SESSION_NUMBERS = [2, 5];
+
+/**
+ * One-time Phase 0 seed page. Deterministic: seed 0 becomes due on the
+ * animal's 2nd dialogue session, seed 1 on its 5th ("due" is >=, so an
+ * existing mid-Phase-0 player still receives them). Marks each seed
+ * delivered so it never repeats. Returns null when nothing is due.
+ */
+export async function getAndMarkNarrativeSeedPage(
+  animalType: AnimalType,
+  sessionNumber: number
+): Promise<string | null> {
+  if (!NARRATIVE_SEEDS[animalType]) return null;
+  const state = await loadDeliveryState();
+  const delivered = state.seedsDelivered[animalType] ?? [];
+  for (let i = 0; i < SEED_SESSION_NUMBERS.length; i++) {
+    if (delivered.includes(i)) continue;
+    if (sessionNumber < SEED_SESSION_NUMBERS[i]) return null;
+    const text = getNarrativeSeed(animalType, i);
+    if (!text) return null;
+    await saveDeliveryState({
+      ...state,
+      seedsDelivered: { ...state.seedsDelivered, [animalType]: [...delivered, i] },
+    });
+    return text;
+  }
+  return null;
+}
+
+/**
+ * One-time Phase 4 pre-dialogue page recontextualizing a Phase 0 seed.
+ * Delivers at most one callback per call (so callbacks spread across
+ * visits), each callback exactly once, and only for seeds the player
+ * actually heard. Returns null when there's nothing left to say.
+ */
+export async function getAndMarkNarrativeCallbackPage(
+  animalType: AnimalType
+): Promise<string | null> {
+  const state = await loadDeliveryState();
+  const delivered = state.seedsDelivered[animalType] ?? [];
+  if (delivered.length === 0) return null;
+  const shown = state.callbacksShown[animalType] ?? [];
+  for (const i of [...delivered].sort((a, b) => a - b)) {
+    if (shown.includes(i)) continue;
+    const text = getNarrativeCallback(animalType, i);
+    if (!text) return null;
+    await saveDeliveryState({
+      ...state,
+      callbacksShown: { ...state.callbacksShown, [animalType]: [...shown, i] },
+    });
+    return text;
+  }
+  return null;
+}
+
+/**
+ * All Phase-2 exhaustion-pool cursors (animalType -> lines delivered).
+ * Loaded once into the dialogue hook's state on mount.
+ */
+export async function getPhase2PoolCursors(): Promise<Record<string, number>> {
+  const state = await loadDeliveryState();
+  return { ...state.phase2PoolCursor };
+}
+
+/**
+ * Advance an animal's Phase-2 pool cursor after a pool line is delivered.
+ * Returns the new cursor value.
+ */
+export async function advancePhase2PoolCursor(animalType: AnimalType): Promise<number> {
+  const state = await loadDeliveryState();
+  const next = (state.phase2PoolCursor[animalType] ?? 0) + 1;
+  await saveDeliveryState({
+    ...state,
+    phase2PoolCursor: { ...state.phase2PoolCursor, [animalType]: next },
+  });
+  return next;
+}
+
+/**
+ * Clear narrative delivery state (for Settings > Reset All and tests).
+ */
+export async function clearNarrativeDeliveryState(): Promise<void> {
+  deliveryCache = null;
+  try {
+    await AsyncStorage.removeItem(DELIVERY_STORAGE_KEY);
+  } catch {}
 }

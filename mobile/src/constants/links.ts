@@ -16,6 +16,17 @@ export const EXTERNAL_LINKS = {
   supportEmail: 'jpearleverett@gmail.com',
 } as const;
 
+/**
+ * Public install link for share CTAs. A custom-scheme (wordshift://) link is
+ * dead for recipients without the app installed — every share text must also
+ * carry this real, universally-openable URL.
+ */
+export const PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=com.wordshift.app';
+
+/** Public web landing page (GitHub Pages root, same host as the legal docs). */
+export const WEB_LANDING_URL = 'https://jpearleverett.github.io/WordShift/';
+
 export function getSupportMailto(appVersion: string): string {
   const subject = encodeURIComponent(`WordShift Support (v${appVersion})`);
   return `mailto:${EXTERNAL_LINKS.supportEmail}?subject=${subject}`;

@@ -71,8 +71,28 @@ describe('dailyLoginReward', () => {
     expect(grant!.day).toBe(1);
     expect(grant!.amount).toBe(DAILY_LOGIN_REWARDS[0]);
     expect(grant!.reset).toBe(false);
+    expect(grant!.isFirstClaim).toBe(true);
     expect(grant!.newBalance).toBe(1000 + DAILY_LOGIN_REWARDS[0]);
     expect(awardBonusAmber).toHaveBeenCalledWith(DAILY_LOGIN_REWARDS[0], 'daily_login');
+  });
+
+  test('isFirstClaim is true exactly once — the next-day claim is a returner', async () => {
+    const first = await claimDailyLoginReward();
+    expect(first!.isFirstClaim).toBe(true);
+    // Simulate the next local day: rewrite the stored claim to "yesterday".
+    await seedState(1, first!.day);
+    _clearDailyLoginCache();
+    const second = await claimDailyLoginReward();
+    expect(second).not.toBeNull();
+    expect(second!.isFirstClaim).toBe(false);
+    expect(second!.day).toBe(2);
+  });
+
+  test('isFirstClaim stays false even when a lapse resets the cycle', async () => {
+    await seedState(4, 5); // prior history exists -> a lapsed returner, not a first claim
+    const grant = await claimDailyLoginReward();
+    expect(grant!.reset).toBe(true);
+    expect(grant!.isFirstClaim).toBe(false);
   });
 
   test('a second claim on the same day returns null and does not credit again', async () => {
@@ -153,7 +173,9 @@ describe('dailyLoginReward', () => {
 
     test('first ever claim never grants a comeback bonus', async () => {
       const grant = await claimDailyLoginReward();
+      expect(grant!.isFirstClaim).toBe(true);
       expect(grant!.comebackBonus).toBe(0);
+      expect(awardBonusAmber).toHaveBeenCalledWith(DAILY_LOGIN_REWARDS[0], 'daily_login');
     });
 
     test('a consecutive-day claim grants no comeback bonus', async () => {

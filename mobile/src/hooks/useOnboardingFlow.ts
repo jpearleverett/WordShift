@@ -42,7 +42,7 @@ export interface OnboardingFlowState {
   onboardingLineIndex: number;
   /** True once the initial async check for onboarding state is done. */
   onboardingReady: boolean;
-  /** True if the auto-offer cascade has finished on the pit screen. */
+  /** True once the player has tap-offered every tutorial word at the pit. */
   pitOfferDone: boolean;
   /** Convenience: `onboardingStep !== 'complete'`. */
   isOnboarding: boolean;
@@ -62,8 +62,8 @@ export interface OnboardingFlowActions {
    */
   handleSkipOnboarding: () => Promise<void>;
   /**
-   * Called by OfferingPitScreen when the auto-offer cascade finishes
-   * during onboarding.
+   * Called by OfferingPitScreen once the player has tap-devoured every
+   * pending word during onboarding.
    */
   handlePitOnboardingOfferComplete: () => void;
   /**

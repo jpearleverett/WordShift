@@ -181,6 +181,32 @@ export async function getGalleryStats(): Promise<{
   };
 }
 
+// ============================================================================
+// Era Names (display-only)
+// ============================================================================
+
+/**
+ * Poetic era names for each phase. Display-only: internal phase numbers in
+ * data/storage stay numeric. The player must never see a literal "Phase N"
+ * label (narrative rule: the phase system is invisible to the player).
+ */
+const PHASE_ERA_NAMES: Record<number, string> = {
+  0: 'Bright Days',
+  1: 'Curious Thoughts',
+  2: 'Deeper Questions',
+  3: 'Growing Shadows',
+  4: 'The Horizon',
+  5: 'After',
+};
+
+/**
+ * Get the poetic era name for a phase (clamped to the known 0-5 range).
+ */
+export function getPhaseEraName(phase: number): string {
+  const clamped = Math.max(0, Math.min(5, Math.floor(phase)));
+  return PHASE_ERA_NAMES[clamped];
+}
+
 /**
  * Get phase-aware gallery title.
  */

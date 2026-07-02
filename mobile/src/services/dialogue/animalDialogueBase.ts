@@ -926,6 +926,110 @@ export function getTotalDialogueCount(
   return getDialoguesForAnimal(animalType, maxPhase).length;
 }
 
+// ============================================================================
+// PHASE 2 EXHAUSTION POOL
+// Phase 2 spans the longest stretch of the game (~80 puzzles) with only 11
+// base lines per animal — chatty players exhaust the block and would re-read
+// the last line verbatim for dozens of puzzles. These extra lines are served
+// (in order, then cycling) once an animal's Phase-2 base block is exhausted
+// while the player is still in Phase 2.
+//
+// CRITICAL: this pool is deliberately OUTSIDE the indexed base arrays.
+// Existing players' lastDialogueRead indices point into ALL_DIALOGUES;
+// inserting lines there would shift phase-start indices and corrupt saves.
+// Pool lines never name another animal (they are ungated plain strings).
+// ============================================================================
+
+export const PHASE2_EXTRA_DIALOGUES: Record<AnimalType, string[]> = {
+  fox: [
+    "I rearranged the den today. Moved everything back an hour later. The room felt wrong both ways. Maybe it's not the room.",
+    "There are more shadows than things to cast them tonight. I counted. I shouldn't have counted.",
+    "I told myself a story by the fire, the way my grandmother used to. Halfway through I realized I didn't know how it ended. I used to know.",
+    "The warmth leaves the stones so quickly now. I press my paw where the fire was and it's already forgetting. Everything forgets faster than I do.",
+    "Some nights I let the fire burn low on purpose, just to prove I'm not afraid of the dark. I haven't proven it yet, friend.",
+  ],
+  pangolin: [
+    "I set two bowls out tonight without thinking. Put one away. Set it out again. The table looks wrong either way, friend.",
+    "A recipe is a promise that doing the same thing gives the same result. Lately the kitchen keeps breaking that promise. Quietly. Politely.",
+    "I know every pot in this kitchen by the sound of its lid. Last night one of them sounded like a stranger.",
+    "Salt keeps things from spoiling. I've been salting everything lately. Some things spoil anyway. From the inside, where salt can't reach.",
+    "My mother taught me that a kitchen is the warmest room in any house. She never said what it means when it isn't anymore.",
+  ],
+  owl: [
+    "I alphabetized my journals last night. Twice. Order used to comfort me. Now it merely reminds me how much refuses to be ordered.",
+    "There's a word on the tip of my tongue. It has been there for eleven days. I begin to suspect it is waiting, not hiding.",
+    "I read aloud to the study now, rather than to myself. The room listens better than I do lately. Quite attentive, the walls.",
+    "The dictionary defines everything except why definitions stop helping. I checked. Rather thorough of it, leaving that out.",
+    "Books used to end when I closed them. Lately I'm not certain they do. The stories seem to continue somewhere, just out of earshot.",
+  ],
+  axolotl: [
+    "I blinked and the whole afternoon was gone. Or maybe the afternoon blinked and I was gone. Blub. Hard to say which of us keeps disappearing.",
+    "The glass shows the room behind me. Some days the room in the glass looks tidier. More finished. Like it's the real one and mine is the reflection.",
+    "I practiced saying my own name in bubbles today. By the third try it didn't sound like mine anymore. Names wear out fast underwater.",
+    "The water holds me exactly the same every day. Same pressure, same hush. It's very kind. It's how I imagine being forgotten feels.",
+    "There's a spot in the tank where the light never reaches. I float near it sometimes. Not in it. Near it. That feels important to say. Blub.",
+  ],
+  capybara: [
+    "Wrote 'nothing to report' in my notebook today. Then I underlined it. Twice. Not sure who I was reassuring.",
+    "The water in the spring goes around in a slow circle. So do my thoughts. We've synchronized. It's fine. Circles usually are.",
+    "Someone left the office chair turned toward the window. It was me. I don't remember doing it. Filed under 'probably me.'",
+    "I timed a full minute today, just to check it was still sixty seconds. It was. It felt longer. One of us is lying.",
+    "I used to sort my days into good and bad. Now they all go in one folder. The folder doesn't have a label anymore.",
+  ],
+  fennec_fox: [
+    "Every room has a hum if you listen long enough. I know them all by heart. One of them changed key last week and nobody else noticed.",
+    "I heard my own footsteps echo tonight and stopped to let them finish. They took a little too long. Just a little. I counted.",
+    "The quietest sound I know is dust settling. It's been settling a lot lately. Like the house is holding still on purpose.",
+    "I can tell how empty a room is by the way it swallows sound. The empty rooms are getting hungrier, friend.",
+    "Some nights I listen for morning. You can hear it coming if you try — birds, wind, light has a sound too. Lately morning arrives without any warm-up at all.",
+  ],
+  sloth: [
+    "Started waving to you... yesterday. If my paw is up... when you visit... that's what it's for.",
+    "The moths hold so still... when I watch them now. Like they're being... polite. Or careful. Careful, I think.",
+    "I remembered something today... from before this house. Took me all morning. The memory was... of waiting. Even then... waiting.",
+    "Everyone asks... if I'm sad... because I'm slow. I'm not sad. I just... finish feelings... long after they've left... everyone else.",
+    "A leaf touched my shoulder... on its way down. First thing... to touch me... in days. I said... thank you. Slowly.",
+  ],
+  wombat: [
+    "Started leaving a lamp lit in the tunnel I'm not using. No reason, mate. Just seemed rude to make the dark do all the work.",
+    "Measured my oldest tunnel today. It's longer than I dug it. Not by much. Just enough that I measured it twice.",
+    "Dirt used to be honest, mate. You dig, it holds or it falls. Now it holds when it should fall. That's worse. Don't ask me why that's worse.",
+    "I talk to myself down here. Everyone does, alone long enough. Lately I wait for the echo before I finish the sentence. Manners, I guess.",
+    "Filled in a tunnel for the first time in my life. Dug it, looked at where it wanted to go, and filled it back in. First time for everything.",
+  ],
+  rabbit: [
+    "I did a happy hop this morning. Out of habit. Halfway up I forgot what it was for. I finished it anyway. You have to finish them.",
+    "The chamomile stopped helping so I switched to peppermint. The peppermint knows it's only there so I have something to hold.",
+    "I keep a list of everything that's still normal. The carrots. The gate. The morning. I read it more often than I add to it.",
+    "My mother taught me the freeze, the run, the hide. Nobody taught me what to do when nothing chases you and you're still afraid.",
+    "I said good night to the garden twice yesterday. It didn't feel heard the first time. Some nights it doesn't feel heard at all.",
+  ],
+  red_panda: [
+    "I set out a second cushion years ago. Habit, tradition. Lately I catch myself leaving room for it. As if it were about to be used.",
+    "Today I practiced being exactly where I am. It took hours. When I finally arrived, the moment had moved on without me. It usually does.",
+    "There's a stillness that means peace and a stillness that means held breath. I've been teaching myself to tell them apart. I'd rather not say which one the grove has.",
+    "I swept the meditation mat clean this morning. Dust returns by evening. I sweep again. Somewhere in that loop is either enlightenment or a very polite argument I keep losing.",
+    "My teacher said: sit until you and the mountain are one. I sat. Now some evenings I can't remember which of us agreed to be the one that moves.",
+  ],
+};
+
+/**
+ * The Phase-2 exhaustion pool for an animal (empty array if none).
+ */
+export function getPhase2ExtraDialogues(animalType: AnimalType): string[] {
+  return PHASE2_EXTRA_DIALOGUES[animalType] ?? [];
+}
+
+/**
+ * Select the exhaustion-pool line for a delivery cursor: lines are served in
+ * authored order, then cycle. Returns null when the animal has no pool.
+ */
+export function getPhase2PoolLine(animalType: AnimalType, cursor: number): string | null {
+  const pool = getPhase2ExtraDialogues(animalType);
+  if (pool.length === 0) return null;
+  return pool[((cursor % pool.length) + pool.length) % pool.length];
+}
+
 /**
  * Get animal name and description
  */

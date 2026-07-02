@@ -5,11 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
 import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import {
   getCosmeticsByCategory,
   ownsCosmetic,
@@ -40,6 +40,8 @@ interface ShopScreenProps {
   onAmberChange?: (newBalance: number) => void;
   /** Open the Patron (cosmetic IAP) modal. */
   onOpenPatron?: () => void;
+  /** Open the Store (amber packs). Renders a "Need more amber?" row when provided. */
+  onOpenStore?: () => void;
 }
 
 const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
@@ -84,7 +86,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onClose,
   onAmberChange,
   onOpenPatron,
+  onOpenStore,
 }) => {
+  const screenInsets = useScreenInsets();
   const isDark = phase >= 3;
   const bgColor = isDark ? '#0A0A14' : '#1A1030';
   const textColor = isDark ? 'rgba(200, 170, 190, 0.9)' : 'rgba(220, 200, 240, 0.92)';
@@ -273,7 +277,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     <View style={[styles.container, { backgroundColor: bgColor }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: screenInsets.top + 12 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={onClose}
@@ -295,7 +299,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(48, screenInsets.bottom) }]}
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
@@ -332,6 +336,22 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               ConfettiPreview,
             )}
 
+            {onOpenStore && (
+              // Copy kept deliberately phase-neutral (reads the same under every
+              // sky); lives here rather than phaseNarrative.ts by ownership split.
+              <TouchableOpacity
+                style={styles.storeBridge}
+                onPress={() => { hapticLight(); onOpenStore(); }}
+                accessibilityRole="button"
+                accessibilityLabel="Open the Store for amber packs"
+              >
+                <Text style={styles.storeBridgeTitle}>Need more amber?</Text>
+                <Text style={[styles.storeBridgeSub, { color: textColor }]}>
+                  Amber packs are available in the Store.
+                </Text>
+              </TouchableOpacity>
+            )}
+
             <Text style={[styles.footnote, { color: textColor }]}>
               Cosmetics are for expression only — they never change the puzzle, the
               story, or your progress.
@@ -343,14 +363,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   );
 };
 
-const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 56;
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: STATUS_BAR_HEIGHT,
+    // paddingTop applied inline via useScreenInsets (safe-area aware)
     paddingHorizontal: 12,
     paddingBottom: 12,
   },
@@ -434,6 +452,19 @@ const styles = StyleSheet.create({
   actionLocked: { backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
   actionLockedText: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '700' },
   actionDisabled: { opacity: 0.45 },
+  storeBridge: {
+    backgroundColor: 'rgba(120, 100, 60, 0.14)',
+    borderColor: 'rgba(255, 212, 121, 0.35)',
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    alignItems: 'center',
+  },
+  storeBridgeTitle: { color: '#FFD479', fontSize: 14.5, fontWeight: '800', marginBottom: 2 },
+  storeBridgeSub: { fontSize: 12, fontWeight: '600' },
   footnote: {
     fontSize: 11.5,
     fontWeight: '500',

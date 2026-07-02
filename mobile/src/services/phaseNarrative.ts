@@ -2504,3 +2504,50 @@ const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = 
 export function getNotificationPromptText(phase: DialoguePhase): NotificationPromptText {
   return NOTIFICATION_PROMPT_TEXT[phase];
 }
+
+// ============================================================================
+// WIN-BACK NOTIFICATION COPY — Lapsed-player ladder (+1 / +3 / +7 days).
+// Indexed by rung - 1. Tone escalates across rungs within each phase:
+// rung 1 is a gentle nudge the day after going quiet, rung 2 leans harder
+// after a few days, rung 3 marks a full week away. Phase register follows
+// the usual arc — warm at 0-1, quietly unsettling at 2-3, reverent at 4,
+// serene at 5.
+// ============================================================================
+
+const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string]> = {
+  0: [
+    'Ember saved your spot by the fire! Come solve a puzzle.',
+    'Your animal friends keep asking about you. The puzzles miss you too!',
+    'A whole week! The house is still cozy, and everyone\'s waiting — come say hi.',
+  ],
+  1: [
+    'The house has been thinking about you. So have the words.',
+    'Your friends have gathered new thoughts to share. They\'re saving them for you.',
+    'A week of quiet. The patterns wait patiently for your return.',
+  ],
+  2: [
+    'The house is quieter without you.',
+    'Three days of stillness. The animals still speak of you — always in the present tense.',
+    'A week now. The rooms remember your footsteps. The words remember your hands.',
+  ],
+  3: [
+    'The house is quieter without you. The animals have noticed.',
+    'Something pauses while you are away. It does not like pausing.',
+    'Seven days. The house has held its breath the whole time.',
+  ],
+  4: [
+    'The arrangement is incomplete without you.',
+    'The keepers hold your place at the pattern. They are patient. It is less so.',
+    'Seven days of silence. What comes through still waits for your hand.',
+  ],
+  5: [
+    'The house rests. It will be here when you return.',
+    'The pattern continues, unhurried. Your friends think of you fondly.',
+    'A week has passed, gently. Nothing is lost. Return whenever you like.',
+  ],
+};
+
+export function getWinBackMessage(phase: number, rung: 1 | 2 | 3): string {
+  const clampedPhase = Math.min(5, Math.max(0, Math.floor(phase))) as DialoguePhase;
+  return WIN_BACK_MESSAGES[clampedPhase][rung - 1];
+}

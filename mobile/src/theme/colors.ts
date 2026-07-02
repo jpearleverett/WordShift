@@ -155,6 +155,41 @@ export const TILE_THEMES: Record<string, TilePalette> = {
     { bg: '#A8ADB6', border: '#7E8288', glow: 'rgba(168, 173, 182, 0.45)' },
     { bg: '#C4B8AE', border: '#938A82', glow: 'rgba(196, 184, 174, 0.45)' },
   ],
+  // Late-game amber catalog (Cosmetic Shop). Same phase-aware contract as the
+  // launch trio — only the base palette swaps; phase overlays still apply.
+  // Garden-grown: lush, living greens (Thyme's garden, before you knew).
+  theme_verdant: [
+    { bg: '#4FB86B', border: '#3B8A50', glow: 'rgba(79, 184, 107, 0.5)' },
+    { bg: '#6BC46A', border: '#509450', glow: 'rgba(107, 196, 106, 0.5)' },
+    { bg: '#3FA07D', border: '#2E785E', glow: 'rgba(63, 160, 125, 0.5)' },
+    { bg: '#8CBF57', border: '#6A9142', glow: 'rgba(140, 191, 87, 0.5)' },
+    { bg: '#4C9E52', border: '#39773E', glow: 'rgba(76, 158, 82, 0.5)' },
+    { bg: '#5FBF9A', border: '#479174', glow: 'rgba(95, 191, 154, 0.5)' },
+    { bg: '#79A845', border: '#5B7F34', glow: 'rgba(121, 168, 69, 0.5)' },
+    { bg: '#3E8E63', border: '#2E6B4A', glow: 'rgba(62, 142, 99, 0.5)' },
+  ],
+  // Between-signals: desaturated static grays with one cold signal cutting through.
+  theme_static: [
+    { bg: '#8E9296', border: '#6A6E72', glow: 'rgba(142, 146, 150, 0.45)' },
+    { bg: '#7B8288', border: '#5C6166', glow: 'rgba(123, 130, 136, 0.45)' },
+    { bg: '#9AA0A8', border: '#73787E', glow: 'rgba(154, 160, 168, 0.45)' },
+    { bg: '#6E747C', border: '#52575D', glow: 'rgba(110, 116, 124, 0.45)' },
+    { bg: '#5A9FB5', border: '#437788', glow: 'rgba(90, 159, 181, 0.55)' }, // the signal
+    { bg: '#868A90', border: '#64686C', glow: 'rgba(134, 138, 144, 0.45)' },
+    { bg: '#767E86', border: '#585E64', glow: 'rgba(118, 126, 134, 0.45)' },
+    { bg: '#9BA6AE', border: '#747D83', glow: 'rgba(155, 166, 174, 0.45)' },
+  ],
+  // Crown-of-the-pattern: deep violets shot through with old gold.
+  theme_sovereign: [
+    { bg: '#5A3E8E', border: '#412D68', glow: 'rgba(122, 92, 200, 0.55)' },
+    { bg: '#6E4AA5', border: '#503678', glow: 'rgba(110, 74, 165, 0.55)' },
+    { bg: '#C9A227', border: '#98791D', glow: 'rgba(201, 162, 39, 0.55)' },
+    { bg: '#4A3575', border: '#352655', glow: 'rgba(74, 53, 117, 0.5)' },
+    { bg: '#7D5BB8', border: '#5C4388', glow: 'rgba(125, 91, 184, 0.55)' },
+    { bg: '#3C2C60', border: '#2A1F45', glow: 'rgba(60, 44, 96, 0.5)' },
+    { bg: '#B08A2E', border: '#856822', glow: 'rgba(176, 138, 46, 0.55)' },
+    { bg: '#63449A', border: '#483270', glow: 'rgba(99, 68, 154, 0.55)' },
+  ],
   theme_patron: [
     { bg: '#FFD479', border: '#CCA85B', glow: 'rgba(255, 212, 121, 0.55)' },
     { bg: '#F5C04D', border: '#C4993D', glow: 'rgba(245, 192, 77, 0.55)' },
@@ -188,6 +223,9 @@ export const CONFETTI_THEMES: Record<string, string[]> = {
   confetti_gold: ['#FFD479', '#F5C04D', '#FFE6A8', '#E8B44A', '#FFCB6B', '#FFFFFF'],
   confetti_dusk: ['#9B7FCF', '#6B5B8A', '#C3A6E0', '#7E6BA8', '#B49AD8', '#E8DCF5'],
   confetti_ember: ['#FF8A5B', '#E8543A', '#FFB259', '#D94F3D', '#FF7E79', '#FFD0A0'],
+  // Late-game amber palettes, matching the Garden-grown / Crown-of-the-pattern tile themes.
+  confetti_verdant: ['#6BC46A', '#3FA07D', '#8CBF57', '#4C9E52', '#B9E4A8', '#E8F5DC'],
+  confetti_sovereign: ['#7D5BB8', '#5A3E8E', '#C9A227', '#63449A', '#B08A2E', '#E8DCF5'],
   // Exclusive to "The Keeper's Collection" cosmetic bundle (IAP).
   confetti_eclipse: ['#7A5CC8', '#B45096', '#D75F6E', '#5F58B9', '#A055B9', '#E8DCF5'],
 };

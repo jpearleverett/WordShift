@@ -12,7 +12,10 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AnimalType } from '../types/homeWorld';
-import { getDialoguesForAnimal } from '../services/dialogue/animalDialogueBase';
+import {
+  getDialoguesForAnimal,
+  PHASE2_EXTRA_DIALOGUES,
+} from '../services/dialogue/animalDialogueBase';
 import {
   CROSS_ANIMAL_REFERENCES,
   COORDINATED_EVENTS,
@@ -162,6 +165,20 @@ describe('dialogue unlock gating', () => {
               violations.push(`catchup(${speaker}, p${phase}) names later-unlocking ${mentioned}: ${text.slice(0, 60)}`);
             }
           }
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it('phase-2 exhaustion pool lines never name another animal (they are ungated)', () => {
+    // Pool lines are plain strings with no requiresAnimals tags and no
+    // runtime mention filter, so they must not name ANY other animal.
+    const violations: string[] = [];
+    for (const speaker of ALL_ANIMALS) {
+      for (const text of PHASE2_EXTRA_DIALOGUES[speaker] ?? []) {
+        for (const mentioned of namedAnimals(text, speaker)) {
+          violations.push(`phase2Extra(${speaker}) names ${mentioned}: ${text.slice(0, 60)}`);
         }
       }
     }

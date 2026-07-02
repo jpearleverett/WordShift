@@ -6,11 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  Platform,
-  StatusBar,
   Dimensions,
 } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
+import { useScreenInsets } from '../hooks/useScreenInsets';
 import { DialoguePhase } from '../types/homeWorld';
 import { getFullProgress } from '../services/amberCurrency';
 import { getWordsOfferedText } from '../services/phaseNarrative';
@@ -33,6 +32,7 @@ interface WordLedgerProps {
 }
 
 export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
+  const screenInsets = useScreenInsets();
   const [words, setWords] = useState<string[]>([]);
   const [totalFormed, setTotalFormed] = useState(0);
 
@@ -77,7 +77,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
     : '#0F0818';
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
+    <View style={[styles.container, { backgroundColor: bgColor, paddingTop: screenInsets.top + 16 }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -114,7 +114,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
       {/* Word grid */}
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.wordGrid}
+        contentContainerStyle={[styles.wordGrid, { paddingBottom: Math.max(40, screenInsets.bottom) }]}
         showsVerticalScrollIndicator={false}
       >
         {words.length === 0 ? (
@@ -162,7 +162,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
+    // paddingTop applied inline via useScreenInsets (safe-area aware)
   },
   header: {
     paddingHorizontal: 20,

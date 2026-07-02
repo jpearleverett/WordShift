@@ -173,6 +173,22 @@ export const HINT_PACK_GRANTS = {
   large: 20,
 } as const;
 
+/**
+ * One-time starter bundle (STARTER_PACK SKU). Purchasable exactly once per
+ * account — enforced via the `starter_pack` entitlement in entitlements.ts.
+ */
+export const STARTER_PACK_GRANTS = {
+  amber: 400,
+  hints: 5,
+} as const;
+
+/**
+ * The FIRST consumable amber pack a player ever buys grants this multiple of
+ * its normal amount (one-time incentive; consumed on first success and tracked
+ * in entitlements.ts alongside the other store-authoritative-adjacent state).
+ */
+export const FIRST_PURCHASE_AMBER_MULTIPLIER = 2;
+
 // ============================================================================
 // MONETIZATION SOFT PROMPTS
 // ============================================================================
@@ -368,10 +384,23 @@ export const MAX_USED_TRACKED = 500;
 // DAILY CHALLENGE
 // ============================================================================
 
-// NOTE: the daily-challenge unlock threshold lives in dailyChallenge.ts
-// (DAILY_CHALLENGE_UNLOCK_PUZZLES = 3, the value isDailyChallengeUnlocked
-// actually reads). A divergent =5 copy previously sat here, imported by nobody,
-// which silently lied about the "single source of truth". Removed.
+/**
+ * Puzzles solved before the Daily Challenge unlocks (Phase 1+ also unlocks it,
+ * see isDailyChallengeUnlocked in dailyChallenge.ts, which imports this value).
+ * The daily is ALWAYS HARD (6-letter words, 5 rows) — a brutal cliff for a
+ * player fresh out of onboarding. Set to 8 (was 3) to align with the close of
+ * the pit auto-collect window (AUTO_COLLECT_PUZZLE_LIMIT): by then the player
+ * has seen real difficulty, so the daily lands as a challenge, not a wall.
+ */
+export const DAILY_CHALLENGE_UNLOCK_PUZZLES = 8;
+
+/**
+ * One-time hint mercy granted when the player starts their very first Daily
+ * Challenge. The daily is always HARD; a small hint cushion softens that first
+ * collision. Convenience only: hints still cost stars, and the puzzle itself
+ * stays deterministic and identical for every player on a date.
+ */
+export const FIRST_DAILY_BONUS_HINTS = 2;
 
 // ============================================================================
 // WEEKLY QUESTS

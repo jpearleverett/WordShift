@@ -17,6 +17,14 @@ import { getInstallId } from './telemetry';
  * The anonymous install id (telemetry.getInstallId) is the default identity
  * for per-player rows (cloud save, leaderboard). Auth-free by design.
  *
+ * SECURITY MODEL (capability URL): the anon key alone grants NO table access.
+ * All app tables are RLS-locked with direct grants revoked (see
+ * docs/supabase/security_setup.sql); every per-player read/write goes through
+ * a SECURITY DEFINER RPC that requires presenting the row's unguessable owner
+ * id. The only direct table operation the client performs is the INSERT-only
+ * telemetry `events` sink. This module therefore exposes NO select helper —
+ * reads happen exclusively via sbRpc.
+ *
  * Remember to update the privacy policy before enabling.
  */
 
@@ -134,45 +142,33 @@ async function parseJson<T>(response: Response | null): Promise<T | null> {
   }
 }
 
-/**
- * SELECT rows. `query` is a PostgREST querystring, e.g.
- *   sbSelect('saves', 'select=*&owner=eq.abc')
- * Returns the row array, or null on failure / when disabled.
- */
-export async function sbSelect<T>(table: string, query: string): Promise<T[] | null> {
-  const sep = query ? (query.startsWith('?') ? '' : '?') : '';
-  const response = await sbFetch(`${table}${sep}${query}`, { method: 'GET' });
-  return parseJson<T[]>(response);
-}
-
 interface InsertOptions {
-  /** Upsert on conflict (sends Prefer: resolution=merge-duplicates). */
-  upsert?: boolean;
-  /** Column(s) defining the conflict target for an upsert. */
-  onConflict?: string;
-  /** Return the written rows (Prefer: return=representation). Default true. */
+  /**
+   * Return the written rows (Prefer: return=representation). Default true.
+   * NOTE: representation requires SELECT privilege, which anon does NOT have
+   * on any app table — pass `returning: false` for the insert-only `events`
+   * sink (its only legitimate target under the RLS lockdown).
+   */
   returning?: boolean;
 }
 
 /**
- * INSERT (or UPSERT) one or more rows. Returns written rows when `returning`,
- * else an empty array on success, or null on failure / when disabled.
+ * INSERT one or more rows. Under the capability-URL security model the only
+ * table the anon role may insert into directly is the telemetry `events`
+ * table (INSERT-only, no select). Everything else goes through sbRpc. There
+ * is deliberately NO upsert/on_conflict support — per-player upserts are
+ * server-side RPCs. Returns written rows when `returning`, else an empty
+ * array on success, or null on failure / when disabled.
  */
 export async function sbInsert<T>(
   table: string,
   rows: object | object[],
   opts: InsertOptions = {},
 ): Promise<T[] | null> {
-  const { upsert = false, onConflict, returning = true } = opts;
-  const preferParts: string[] = [];
-  if (returning) preferParts.push('return=representation');
-  else preferParts.push('return=minimal');
-  if (upsert) preferParts.push('resolution=merge-duplicates');
-
-  const conflictQs = upsert && onConflict ? `?on_conflict=${encodeURIComponent(onConflict)}` : '';
-  const response = await sbFetch(`${table}${conflictQs}`, {
+  const { returning = true } = opts;
+  const response = await sbFetch(table, {
     method: 'POST',
-    headers: { Prefer: preferParts.join(',') },
+    headers: { Prefer: returning ? 'return=representation' : 'return=minimal' },
     body: JSON.stringify(rows),
   });
   if (!response) return null;

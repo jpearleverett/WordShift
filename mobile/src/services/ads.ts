@@ -32,7 +32,8 @@ const STORAGE_KEY = 'wordshift_ad_pacing';
 export type RewardedPlacement =
   | 'victory_double'
   | 'hint_recovery'
-  | 'quest_bonus';
+  | 'quest_bonus'
+  | 'speed_rescue';
 
 export interface RewardedResult {
   /** True only when the user watched the full ad and earned the reward. */
@@ -50,6 +51,15 @@ export interface AdProvider {
   requestATTIfNeeded(): Promise<void>;
   /** GDPR/UK consent (UMP/CMP). */
   requestConsentIfNeeded(): Promise<void>;
+  /**
+   * Whether the CMP requires a persistent privacy-options entry point (UMP
+   * privacyOptionsRequirementStatus REQUIRED — EEA users). Optional so bare
+   * providers/test fakes predating the consent pass keep compiling; absent
+   * reads as false.
+   */
+  privacyOptionsRequired?(): Promise<boolean>;
+  /** Present the CMP privacy-options form so the user can revisit ad consent. */
+  showPrivacyOptions?(): Promise<void>;
   isReady(): boolean;
   getName(): string;
 }
@@ -80,6 +90,10 @@ class NoOpAdProvider implements AdProvider {
   }
   async requestATTIfNeeded(): Promise<void> {}
   async requestConsentIfNeeded(): Promise<void> {}
+  async privacyOptionsRequired(): Promise<boolean> {
+    return false;
+  }
+  async showPrivacyOptions(): Promise<void> {}
   isReady(): boolean {
     return false;
   }
@@ -122,6 +136,27 @@ export async function ensureAdConsent(): Promise<void> {
   }
   try {
     await provider.requestATTIfNeeded();
+  } catch {
+    /* non-fatal */
+  }
+}
+
+/**
+ * Whether the CMP requires a persistent privacy-options entry point (Google
+ * EU User Consent Policy). Drives the Settings → "Privacy Options" row.
+ */
+export async function privacyOptionsRequired(): Promise<boolean> {
+  try {
+    return (await provider.privacyOptionsRequired?.()) ?? false;
+  } catch {
+    return false;
+  }
+}
+
+/** Present the CMP privacy-options form so the user can change ad consent. */
+export async function showPrivacyOptions(): Promise<void> {
+  try {
+    await provider.showPrivacyOptions?.();
   } catch {
     /* non-fatal */
   }

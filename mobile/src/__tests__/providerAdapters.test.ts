@@ -48,6 +48,9 @@ describe('AdMob ad adapter (SDK absent)', () => {
     // ATT / consent must never throw even when nothing is wired.
     await expect(a.requestATTIfNeeded()).resolves.toBeUndefined();
     await expect(a.requestConsentIfNeeded()).resolves.toBeUndefined();
+    // Privacy-options seam degrades safely too: no CMP → no entry point.
+    expect(await a.privacyOptionsRequired!()).toBe(false);
+    await expect(a.showPrivacyOptions!()).resolves.toBeUndefined();
   });
 
   it('fails ad calls cleanly when the native module is missing', async () => {
