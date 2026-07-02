@@ -15,6 +15,7 @@ import {
   getSacrificeReaction,
   getPhase2ExtraDialogues,
   getPhase2PoolLine,
+  phase2PoolHasNew,
   getAndMarkNarrativeSeedPage,
   getAndMarkNarrativeCallbackPage,
   getPhase2PoolCursors,
@@ -639,8 +640,7 @@ export function useDialogueFlow({
     if (animalPhase === 2 && resolved >= totalDialogues) {
       // Base block exhausted — honest badge: lit only while the exhaustion
       // pool still has undelivered (genuinely new) lines.
-      const pool = getPhase2ExtraDialogues(animal.type);
-      return (phase2Cursors[animal.type] ?? 0) < pool.length;
+      return phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
     }
     return resolved < totalDialogues;
   }, [progress, tendingLevel, tendingCaughtUp, playerChoices, phase2Cursors]);
@@ -767,7 +767,7 @@ export function useDialogueFlow({
         const pool = getPhase5Pool(selectedAnimal.type);
         hasNewDialogue = !isOnCooldown(selectedAnimal.id) && nextCaughtUp < pool.length;
       } else if (animalPhase === 2 && phase2Pool.length > 0 && newIndex >= total2) {
-        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && nextPhase2Cursor < phase2Pool.length;
+        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && phase2PoolHasNew(selectedAnimal.type, nextPhase2Cursor);
       } else {
         const totalDialogues = getTotalDialogueCount(selectedAnimal.type, animalPhase);
         hasNewDialogue = !isOnCooldown(selectedAnimal.id) && newIndex < totalDialogues;

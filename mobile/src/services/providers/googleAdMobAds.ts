@@ -254,6 +254,10 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
     async privacyOptionsRequired(): Promise<boolean> {
       if (!mod?.AdsConsent || typeof mod.AdsConsent.getConsentInfo !== 'function') return false;
       try {
+        // Wait for the consent flow first: on a fresh session getConsentInfo
+        // reports UNKNOWN until requestInfoUpdate has run, which would hide the
+        // (EEA-required) Privacy Options row from Settings on early opens.
+        await resolveConsent();
         const info = await mod.AdsConsent.getConsentInfo();
         // AdsConsentPrivacyOptionsRequirementStatus.REQUIRED === 'REQUIRED'
         return info?.privacyOptionsRequirementStatus === 'REQUIRED';

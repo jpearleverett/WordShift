@@ -103,6 +103,14 @@ jest.mock('../services/puzzleBank', () => ({
   selectPreGeneratedPuzzle: jest.fn(async () => null),
 }));
 
+// The hook value-imports the shared 3-6 challenge word-count bounds from
+// shareResults; mock them so the real module (which imports react-native's
+// Share) never loads in this Node environment.
+jest.mock('../services/shareResults', () => ({
+  MIN_CHALLENGE_WORDS: 3,
+  MAX_CHALLENGE_WORDS: 6,
+}));
+
 // COMMON_WORDS needs to contain all words used in the test puzzle chain
 // and the valid words formed during moves
 jest.mock('../constants', () => ({
@@ -1187,11 +1195,11 @@ describe('usePuzzleGame', () => {
       // Lowercase input exercises normalization; player was in challenge mode.
       actions.setGameMode('challenge');
       [, actions] = callHook();
-      const ok = actions.startSharedChallengeGame(['time', 'tied']);
+      const ok = actions.startSharedChallengeGame(['lime', 'time', 'tied']);
       expect(ok).toBe(true);
 
       const [state] = callHook();
-      expect(state.rows.map(r => r.originalWord)).toEqual(['TIME', 'TIED']);
+      expect(state.rows.map(r => r.originalWord)).toEqual(['LIME', 'TIME', 'TIED']);
       expect(state.gameState).toBe(GameState.PLAYING);
       expect(state.currentVariant).toBe('standard');
       expect(state.gameMode).toBe('standard');
@@ -1204,7 +1212,7 @@ describe('usePuzzleGame', () => {
     test('rejects a chain containing a non-dictionary word without touching the board', () => {
       resetHookState();
       let [, actions] = callHook();
-      const ok = actions.startSharedChallengeGame(['TIME', 'ZZZZ']);
+      const ok = actions.startSharedChallengeGame(['LIME', 'TIME', 'ZZZZ']);
       expect(ok).toBe(false);
 
       const [state] = callHook();
@@ -1215,20 +1223,32 @@ describe('usePuzzleGame', () => {
     test('rejects mismatched word lengths', () => {
       resetHookState();
       let [, actions] = callHook();
-      expect(actions.startSharedChallengeGame(['TIME', 'TIE'])).toBe(false);
+      expect(actions.startSharedChallengeGame(['LIME', 'TIME', 'TIE'])).toBe(false);
       const [state] = callHook();
       expect(state.gameState).toBe(GameState.IDLE);
     });
 
-    test('rejects chains that are too short or malformed', () => {
+    test('rejects chains outside the shared 3-6 word bound or malformed', () => {
       resetHookState();
       let [, actions] = callHook();
       expect(actions.startSharedChallengeGame(['TIME'])).toBe(false);
       [, actions] = callHook();
+      // 2-word chains are below the MIN_CHALLENGE_WORDS bound shared with
+      // encode/decodeChallengeLink — even when both words are valid.
+      expect(actions.startSharedChallengeGame(['TIME', 'TIED'])).toBe(false);
+      [, actions] = callHook();
       expect(actions.startSharedChallengeGame([])).toBe(false);
       [, actions] = callHook();
+      // 7 words exceeds MAX_CHALLENGE_WORDS
+      expect(
+        actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED', 'LIME', 'TIME', 'TIED', 'LIME'])
+      ).toBe(false);
+      [, actions] = callHook();
       // Word lengths outside the 3-7 dictionary range
-      expect(actions.startSharedChallengeGame(['AB', 'CD'])).toBe(false);
+      expect(actions.startSharedChallengeGame(['AB', 'CD', 'EF'])).toBe(false);
+
+      const [state] = callHook();
+      expect(state.gameState).toBe(GameState.IDLE);
     });
   });
 

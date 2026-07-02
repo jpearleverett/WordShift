@@ -59,7 +59,9 @@ import React from 'react';
 import { Row } from '../components/Row';
 import { LetterTile } from '../components/LetterTile';
 import { DraggableTile } from '../components/DraggableTile';
+import { ShareCard, gridSquareKinds, SQUARE_COLORS } from '../components/share/ShareCard';
 import type { HintHighlight, ArrivalMark } from '../hooks/usePuzzleGame';
+import type { ShareableResult, MoveOutcome } from '../services/shareResults';
 
 describe('component exports', () => {
   test('Row, LetterTile, and DraggableTile are importable', () => {
@@ -129,5 +131,95 @@ describe('Row hint-glow + arrival prop contract', () => {
     expect(arrivalProp).toBe(arrival);
     expect(hintLetterProp).toBe('l3');
     expect(hintSlotProp).toBe(2);
+  });
+});
+
+// ─── ShareCard honest performance grid ──────────────────────────────────────
+// The shared PNG/preview must show the SAME grid as the shared text
+// (generateShareText): one square per move in play order when moveOutcomes is
+// present, legacy positional distribution only as fallback.
+
+const baseShareResult: ShareableResult = {
+  stars: 2,
+  difficulty: 'MEDIUM',
+  hintsUsed: 0,
+  invalidAttempts: 0,
+  moveCount: 3,
+};
+
+type RenderedNode = React.ReactElement<{ testID?: string; children?: unknown }>;
+
+/** Depth-first search of a rendered element tree for a testID. */
+function findByTestID(node: unknown, testID: string): RenderedNode | null {
+  if (node == null || typeof node !== 'object') return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findByTestID(child, testID);
+      if (found) return found;
+    }
+    return null;
+  }
+  const el = node as RenderedNode;
+  if (el.props?.testID === testID) return el;
+  return findByTestID(el.props?.children, testID);
+}
+
+type SquareElement = React.ReactElement<{ style: [unknown, { backgroundColor: string }] }>;
+
+/** Render the ShareCard (forwardRef → call its render fn) and read the grid colors. */
+function renderedGridColors(result: ShareableResult): string[] {
+  const forwardRefRender = (ShareCard as unknown as {
+    render: (props: { result: ShareableResult }, ref: null) => React.ReactElement;
+  }).render;
+  const tree = forwardRefRender({ result }, null);
+  const grid = findByTestID(tree, 'share-grid');
+  expect(grid).not.toBeNull();
+  const squares = grid!.props.children as SquareElement[];
+  return squares.map((sq) => sq.props.style[1].backgroundColor);
+}
+
+describe('ShareCard honest performance grid', () => {
+  test('gridSquareKinds preserves per-move order when moveOutcomes is present', () => {
+    const outcomes: MoveOutcome[] = ['clean', 'mistake', 'hint', 'both'];
+    expect(
+      gridSquareKinds({ ...baseShareResult, hintsUsed: 1, invalidAttempts: 2, moveCount: 4, moveOutcomes: outcomes })
+    ).toEqual(['clean', 'mistake', 'hint', 'both']);
+  });
+
+  test('gridSquareKinds does not front-load a late mistake (matches share text)', () => {
+    const kinds = gridSquareKinds({
+      ...baseShareResult,
+      invalidAttempts: 1,
+      moveOutcomes: ['clean', 'clean', 'mistake'],
+    });
+    // Legacy fallback would render mistake-first; the honest grid must not.
+    expect(kinds).toEqual(['clean', 'clean', 'mistake']);
+  });
+
+  test('gridSquareKinds legacy fallback is unchanged when moveOutcomes is absent or empty', () => {
+    const legacy = { ...baseShareResult, hintsUsed: 1, invalidAttempts: 0, moveCount: 3 };
+    expect(gridSquareKinds(legacy)).toEqual(['hint', 'clean', 'clean']);
+    expect(gridSquareKinds({ ...legacy, moveOutcomes: [] })).toEqual(['hint', 'clean', 'clean']);
+    // Both hint and mistake on the first square, mistake-only on the second.
+    expect(
+      gridSquareKinds({ ...baseShareResult, hintsUsed: 1, invalidAttempts: 2, moveCount: 3 })
+    ).toEqual(['both', 'mistake', 'clean']);
+  });
+
+  test('renders one square per outcome, in play order, with matching colors', () => {
+    const outcomes: MoveOutcome[] = ['clean', 'clean', 'mistake', 'hint'];
+    const colors = renderedGridColors({
+      ...baseShareResult,
+      hintsUsed: 1,
+      invalidAttempts: 1,
+      moveCount: 4,
+      moveOutcomes: outcomes,
+    });
+    expect(colors).toEqual(outcomes.map((k) => SQUARE_COLORS[k]));
+  });
+
+  test('renders the legacy distribution when moveOutcomes is absent', () => {
+    const colors = renderedGridColors({ ...baseShareResult, invalidAttempts: 1, moveCount: 3 });
+    expect(colors).toEqual([SQUARE_COLORS.mistake, SQUARE_COLORS.clean, SQUARE_COLORS.clean]);
   });
 });

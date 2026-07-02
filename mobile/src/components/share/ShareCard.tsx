@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
-import { ShareableResult } from '../../services/shareResults';
+import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
 
 /**
  * The shareable result card — a polished, spoiler-free, phase-aware artifact the
@@ -20,18 +20,35 @@ interface ShareCardProps {
   result: ShareableResult;
 }
 
-const SQUARE_COLORS = {
+export const SQUARE_COLORS: Record<MoveOutcome, string> = {
   clean: '#52C77E',
   hint: '#F2C14E',
   mistake: '#E8833A',
   both: '#E0524D',
 };
 
-function squareKind(i: number, hintsUsed: number, invalidAttempts: number): keyof typeof SQUARE_COLORS {
+function squareKind(i: number, hintsUsed: number, invalidAttempts: number): MoveOutcome {
   if (i < invalidAttempts && i < hintsUsed) return 'both';
   if (i < invalidAttempts) return 'mistake';
   if (i < hintsUsed) return 'hint';
   return 'clean';
+}
+
+/**
+ * Ordered square kinds for the performance grid. Prefers the honest per-move
+ * record (`moveOutcomes` — one square per actual move, in play order); falls
+ * back to the legacy positional distribution when absent. Mirrors
+ * generateShareText's grid so the shared image and shared text always agree
+ * for the same run.
+ */
+export function gridSquareKinds(result: ShareableResult): MoveOutcome[] {
+  if (result.moveOutcomes && result.moveOutcomes.length > 0) {
+    return result.moveOutcomes;
+  }
+  const moveCount = Math.max(0, result.moveCount);
+  return Array.from({ length: moveCount }, (_, i) =>
+    squareKind(i, result.hintsUsed, result.invalidAttempts)
+  );
 }
 
 const DIFFICULTY_DOT: Record<string, string> = {
@@ -53,7 +70,6 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
   const subColor = isDark ? 'rgba(200,170,195,0.8)' : 'rgba(255,255,255,0.8)';
 
   const spoilerSafe = !result.isDaily;
-  const moveCount = Math.max(0, result.moveCount);
   const diffLabel = result.difficulty === 'MEDIUM_PLUS' ? 'MED+' : result.difficulty;
 
   return (
@@ -82,12 +98,12 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
           </Text>
         </View>
 
-        {/* Performance grid (spoiler-free signal) */}
-        <View style={styles.grid}>
-          {Array.from({ length: moveCount }).map((_, i) => (
+        {/* Performance grid (spoiler-free signal, honest per-move order) */}
+        <View style={styles.grid} testID="share-grid">
+          {gridSquareKinds(result).map((kind, i) => (
             <View
               key={i}
-              style={[styles.square, { backgroundColor: SQUARE_COLORS[squareKind(i, result.hintsUsed, result.invalidAttempts)] }]}
+              style={[styles.square, { backgroundColor: SQUARE_COLORS[kind] }]}
             />
           ))}
         </View>

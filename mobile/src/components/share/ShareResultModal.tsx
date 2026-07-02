@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator, Share } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { ShareCard } from './ShareCard';
-import { ShareableResult, isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
+import { ShareableResult, isDailyShareBonusAvailable, shareChallengeText, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { shareResultImage, isImageShareAvailable } from '../../services/shareImage';
+import { getChallengeFriendLabel } from '../../services/phaseNarrative';
 import { hapticLight } from '../../services/haptics';
 
 /**
@@ -48,10 +49,11 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
     hapticLight();
     setSharing(true);
     try {
-      const outcome = await Share.share({ message: challengeText });
-      if (outcome.action === Share.sharedAction) onShared?.();
-    } catch {
-      // Player dismissed the sheet or the OS rejected it — nothing to do.
+      // Routed through shareResults so a completed challenge share records
+      // success (share count + first-share-of-day bonus) like every other
+      // share path; a dismissed sheet / OS rejection resolves false.
+      const ok = await shareChallengeText(challengeText);
+      if (ok) onShared?.();
     } finally {
       setSharing(false);
     }
@@ -118,7 +120,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
                   accessibilityRole="button"
                   accessibilityLabel="Challenge a friend with this puzzle"
                 >
-                  <Text style={styles.challengeBtnText}>⚔️ Challenge a friend</Text>
+                  <Text style={styles.challengeBtnText}>{getChallengeFriendLabel(phase)}</Text>
                 </TouchableOpacity>
               )}
             </>

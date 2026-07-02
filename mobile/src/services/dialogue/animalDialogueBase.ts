@@ -1031,6 +1031,21 @@ export function getPhase2PoolLine(animalType: AnimalType, cursor: number): strin
 }
 
 /**
+ * Badge predicate for the Phase-2 exhaustion pool: true while the delivery
+ * cursor still has genuinely-new (undelivered) lines ahead of it. Every
+ * "new dialogue" badge site (useDialogueFlow's recompute/post-advance checks
+ * and homeWorldData.getAnimalsWithStatus) routes the pool part of its
+ * exhausted-base-block check through this single helper.
+ *
+ * NOTE: this gates the BADGE only. Session continuation (hasMore) stays
+ * always-true at Phase 2 because the pool cycles — never use this to decide
+ * whether another line can be served.
+ */
+export function phase2PoolHasNew(animalType: AnimalType, cursor: number): boolean {
+  return cursor < getPhase2ExtraDialogues(animalType).length;
+}
+
+/**
  * Get animal name and description
  */
 export const ANIMAL_INFO: Record<AnimalType, { name: string; description: string; emoji: string }> = {

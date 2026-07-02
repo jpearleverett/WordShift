@@ -12,28 +12,11 @@ import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { AmberInline } from './AmberInline';
 import { DailyLoginGrant, DAILY_LOGIN_REWARDS, DAILY_LOGIN_CYCLE_LENGTH } from '../services/dailyLoginReward';
 import { getSettingsSync } from '../services/settings';
+// First-ever-claim copy — a brand-new player has never left, so "Welcome Back"
+// is wrong. Lives in phaseNarrative with the rest of the player-facing text.
+import { getDailyLoginFirstClaimCopy } from '../services/phaseNarrative';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
-
-/**
- * First-ever-claim copy — a brand-new player has never left, so "Welcome Back"
- * is wrong. Phase-aware to match the rest of the modal's theming (a first claim
- * at a later phase is rare — Reset All / cloud restore — but must stay in tone).
- * Kept local rather than in phaseNarrative.ts: that file is owned by a
- * concurrent workstream; fold these in there later if desired.
- */
-function getFirstClaimCopy(phase: number): { title: string; subtitle: string } {
-  if (phase >= 5) {
-    return { title: 'The House Knows You', subtitle: 'A small gift for each day you return' };
-  }
-  if (phase >= 4) {
-    return { title: 'The House Has Been Waiting', subtitle: 'Each return is counted' };
-  }
-  if (phase >= 2) {
-    return { title: 'The House Welcomes You', subtitle: 'It notices each day you visit' };
-  }
-  return { title: 'Welcome to the House', subtitle: 'A little gift for every day you visit' };
-}
 
 interface DailyLoginModalProps {
   /** The already-granted reward to present, or null to keep the modal closed. */
@@ -98,7 +81,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
   if (!grant) return null;
 
   const claimedDay = grant.day;
-  const firstClaimCopy = grant.isFirstClaim ? getFirstClaimCopy(phase) : null;
+  const firstClaimCopy = grant.isFirstClaim ? getDailyLoginFirstClaimCopy(phase) : null;
 
   return (
     <Modal

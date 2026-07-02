@@ -26,12 +26,18 @@ jest.mock('@react-native-async-storage/async-storage', () => {
 import {
   generateShareText,
   maybeAwardDailyShareBonus,
+  isDailyShareBonusAvailable,
   DAILY_SHARE_BONUS_AMBER,
   encodeChallengeLink,
   decodeChallengeLink,
   buildChallengeShareText,
+  shareChallengeText,
+  MIN_CHALLENGE_WORDS,
+  MAX_CHALLENGE_WORDS,
 } from '../services/shareResults';
 import { PLAY_STORE_URL, WEB_LANDING_URL } from '../constants/links';
+import { Share } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 describe('shareResults', () => {
   test('generateShareText includes WordShift header for regular puzzles', () => {
@@ -336,6 +342,72 @@ describe('shareResults', () => {
       const text = buildChallengeShareText(['CAT', 'COAT', 'GOAT']);
       expect(text).toContain('wordshift://challenge/p?w=CAT-COAT-GOAT');
       expect(text).toContain(PLAY_STORE_URL);
+    });
+
+    test('word-count bounds are exported as the single source of truth (3-6)', () => {
+      // usePuzzleGame.startSharedChallengeGame imports these — keep the two
+      // features on one authoritative limit.
+      expect(MIN_CHALLENGE_WORDS).toBe(3);
+      expect(MAX_CHALLENGE_WORDS).toBe(6);
+    });
+  });
+
+  describe('shareChallengeText', () => {
+    const SHARE_BONUS_KEY = 'wordshift_share_bonus_date';
+    const SHARE_COUNT_KEY = 'wordshift_share_count';
+    const shareMock = Share.share as jest.Mock;
+
+    beforeEach(async () => {
+      shareMock.mockReset();
+      // Leave the once-per-day bonus unclaimed for each test (and for the
+      // later daily-bonus test — this file shares one AsyncStorage store).
+      await AsyncStorage.removeItem(SHARE_BONUS_KEY);
+    });
+
+    afterEach(async () => {
+      await AsyncStorage.removeItem(SHARE_BONUS_KEY);
+    });
+
+    test('completed share records success: share count + daily bonus', async () => {
+      const { getFullProgress, clearProgress } = require('../services/amberCurrency');
+      await clearProgress();
+      await AsyncStorage.removeItem(SHARE_COUNT_KEY);
+      shareMock.mockResolvedValue({ action: 'sharedAction' });
+
+      const text = buildChallengeShareText(['FLAME', 'FAME', 'FRAME']);
+      const ok = await shareChallengeText(text);
+
+      expect(ok).toBe(true);
+      expect(shareMock).toHaveBeenCalledWith({ message: text });
+      // Share-count achievement stat bumped…
+      expect(await AsyncStorage.getItem(SHARE_COUNT_KEY)).toBe('1');
+      // …and the first-share-of-day amber bonus credited, same as the
+      // sharePuzzleResult / image paths.
+      const progress = await getFullProgress();
+      expect(progress.amber).toBe(DAILY_SHARE_BONUS_AMBER);
+      expect(await isDailyShareBonusAvailable()).toBe(false);
+    });
+
+    test('dismissed share sheet records nothing', async () => {
+      await AsyncStorage.removeItem(SHARE_COUNT_KEY);
+      shareMock.mockResolvedValue({ action: 'dismissedAction' });
+
+      const ok = await shareChallengeText('challenge text');
+
+      expect(ok).toBe(false);
+      expect(await AsyncStorage.getItem(SHARE_COUNT_KEY)).toBeNull();
+      expect(await isDailyShareBonusAvailable()).toBe(true);
+    });
+
+    test('share failure resolves false without throwing', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        shareMock.mockRejectedValue(new Error('no share sheet'));
+        await expect(shareChallengeText('challenge text')).resolves.toBe(false);
+        expect(await isDailyShareBonusAvailable()).toBe(true);
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 

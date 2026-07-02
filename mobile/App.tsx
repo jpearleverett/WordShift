@@ -79,6 +79,11 @@ import {
   getDragMissMessage,
   getStuckPanelTitle,
   getNoValidMovesMessage,
+  getFirstDailyMercyMessage,
+  getSpeedRescueLabel,
+  getDailyLockedMessage,
+  getBadChallengeLinkMessage,
+  getUnplayableChallengeMessage,
 } from './src/services/phaseNarrative';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy } from './src/services/dailyChallenge';
@@ -100,6 +105,7 @@ import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewarded
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
 import { initHints, addHints } from './src/services/hints';
+import { loadEntitlements } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, consumeRemoveAdsNudge } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
@@ -295,6 +301,13 @@ function MainApp() {
   // One rewarded rescue per board: set when a rescue is claimed, reset on every
   // fresh-board path so the next attempt gets its own rescue.
   const [speedRescueUsed, setSpeedRescueUsed] = useState(false);
+  // Every fresh-run entry point must reset BOTH pieces of speed-run state
+  // together (escalation ladder + once-per-board rescue) — one callable so a
+  // future entry point can't forget half the pair.
+  const resetSpeedRun = useCallback(() => {
+    setSpeedRound(0);
+    setSpeedRescueUsed(false);
+  }, []);
 
   // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
@@ -756,8 +769,7 @@ function MainApp() {
     hapticLight();
     soundTap();
     setIsPlayingDaily(false);
-    setSpeedRound(0);
-    setSpeedRescueUsed(false);
+    resetSpeedRun();
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
@@ -795,8 +807,7 @@ function MainApp() {
     hapticLight();
     puzzlesSinceHomeVisit.current = 0;
     setIsPlayingDaily(false);
-    setSpeedRound(0);
-    setSpeedRescueUsed(false);
+    resetSpeedRun();
     transitionTo('home', () => {
       puzzleActions.setGameState(GameState.IDLE);
       puzzleActions.setShowConfetti(false);
@@ -811,8 +822,7 @@ function MainApp() {
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     setIsPlayingDaily(true);
-    setSpeedRound(0);
-    setSpeedRescueUsed(false);
+    resetSpeedRun();
     transitionTo('puzzle', async () => {
       puzzleActions.setGameState(GameState.LOADING);
       puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
@@ -828,7 +838,7 @@ function MainApp() {
           const mercyHints = await grantFirstDailyMercy();
           if (mercyHints !== null) {
             puzzleActions.refreshHintBalance();
-            puzzleActions.setMessage(`+${mercyHints} hints for your first daily`);
+            puzzleActions.setMessage(getFirstDailyMercyMessage(persistence.currentPhase, mercyHints));
           }
         } catch {
           // Non-critical — the daily plays fine without the mercy grant.
@@ -850,23 +860,19 @@ function MainApp() {
   const handleStartSharedChallenge = useCallback((words: string[]) => {
     const ok = puzzleActions.startSharedChallengeGame(words);
     if (!ok) {
-      Alert.alert(
-        'Challenge link',
-        'That challenge could not be read — its words are not playable.'
-      );
+      Alert.alert('Challenge link', getUnplayableChallengeMessage(persistence.currentPhase));
       return;
     }
     hapticLight();
     soundTap();
     setIsPlayingDaily(false);
-    setSpeedRound(0);
-    setSpeedRescueUsed(false);
+    resetSpeedRun();
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     persistenceActions.refreshStats();
     logEvent({ type: 'puzzle_started', data: { shared: true, words: words.length } });
     transitionTo('puzzle');
-  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions]);
+  }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase]);
 
   const handleIncomingLink = useCallback((url: string) => {
     if (!url.startsWith('wordshift://')) return;
@@ -882,10 +888,7 @@ function MainApp() {
         handleStartDaily('HARD');
       } else {
         transitionTo('home');
-        Alert.alert(
-          'Daily Challenge',
-          'The Daily Challenge is still locked — solve a few more puzzles to open it.'
-        );
+        Alert.alert('Daily Challenge', getDailyLockedMessage(persistence.currentPhase));
       }
       return;
     }
@@ -895,7 +898,7 @@ function MainApp() {
       if (words) {
         handleStartSharedChallenge(words);
       } else {
-        Alert.alert('Challenge link', 'That challenge link could not be read.');
+        Alert.alert('Challenge link', getBadChallengeLinkMessage(persistence.currentPhase));
       }
       return;
     }
@@ -912,17 +915,32 @@ function MainApp() {
     handleStartSharedChallenge,
   ]);
 
+  // The handler lives in a ref so the Linking subscription is created exactly
+  // once and the launch URL is processed exactly once. With the callback in the
+  // dep array the effect re-ran whenever its identity changed (every solve /
+  // phase change), re-invoking getInitialURL() — which keeps returning the
+  // app's original launch URL — and re-launching a shared-challenge link
+  // mid-session. The launch URL is routed after a short delay so persistence
+  // state has hydrated before any daily/challenge routing decision.
+  const handleIncomingLinkRef = useRef(handleIncomingLink);
+  handleIncomingLinkRef.current = handleIncomingLink;
   useEffect(() => {
+    let launchTimer: ReturnType<typeof setTimeout> | null = null;
     Linking.getInitialURL().then(url => {
-      if (url) handleIncomingLink(url);
+      if (url) {
+        launchTimer = setTimeout(() => handleIncomingLinkRef.current(url), 1200);
+      }
     }).catch(() => {});
 
     const subscription = Linking.addEventListener('url', event => {
-      handleIncomingLink(event.url);
+      handleIncomingLinkRef.current(event.url);
     });
 
-    return () => subscription.remove();
-  }, [handleIncomingLink]);
+    return () => {
+      if (launchTimer) clearTimeout(launchTimer);
+      subscription.remove();
+    };
+  }, []);
 
   // Notification tap routing: scheduled notifications carry a data.target
   // payload ('daily' → the daily-challenge start path, 'home' → home screen).
@@ -946,6 +964,7 @@ function MainApp() {
   };
   useEffect(() => {
     let subscription: { remove?: () => void } | null = null;
+    let coldStartTimer: ReturnType<typeof setTimeout> | null = null;
     try {
       const Notifications = require('expo-notifications');
       subscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
@@ -953,10 +972,24 @@ function MainApp() {
           response?.notification?.request?.content?.data?.target
         );
       });
+      // Cold-start taps never reach the runtime listener — the notification
+      // that LAUNCHED the app is only available via getLastNotificationResponseAsync.
+      // Deferred briefly so persistence state hydrates before routing to the daily.
+      Notifications.getLastNotificationResponseAsync?.()
+        .then((response: any) => {
+          const target = response?.notification?.request?.content?.data?.target;
+          if (target != null) {
+            coldStartTimer = setTimeout(() => routeNotificationTargetRef.current(target), 1200);
+          }
+        })
+        .catch(() => {});
     } catch {
       subscription = null;
     }
-    return () => { subscription?.remove?.(); };
+    return () => {
+      if (coldStartTimer) clearTimeout(coldStartTimer);
+      subscription?.remove?.();
+    };
   }, []);
 
   const handleSlotPress = useCallback(async (
@@ -1806,8 +1839,7 @@ function MainApp() {
     hapticLight();
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
-    setSpeedRound(0);
-    setSpeedRescueUsed(false);
+    resetSpeedRun();
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.selectedVariant, orchestrationActions]);
 
@@ -1819,8 +1851,7 @@ function MainApp() {
     soundTap();
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
-    setSpeedRound(0);
-    setSpeedRescueUsed(false);
+    resetSpeedRun();
     puzzleActions.setSelectedVariant(variant);
     puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, variant);
   }, [
@@ -1836,8 +1867,7 @@ function MainApp() {
     hapticMedium();
     setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
-    setSpeedRound(0);
-    setSpeedRescueUsed(false);
+    resetSpeedRun();
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
     puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
   }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions]);
@@ -2287,7 +2317,7 @@ function MainApp() {
                   <RewardedAdButton
                     placement={SPEED_RESCUE_PLACEMENT}
                     phase={persistence.currentPhase}
-                    label={`Keep going (+${SPEED_RESCUE_EXTRA_SEC}s)`}
+                    label={getSpeedRescueLabel(persistence.currentPhase, SPEED_RESCUE_EXTRA_SEC)}
                     onReward={handleSpeedRescue}
                     style={styles.speedRescueButton}
                   />
@@ -2301,8 +2331,7 @@ function MainApp() {
                       // Abandoning the timed-out run resets the escalation
                       // ladder (time-up no longer resets it — a rescue may
                       // continue the run).
-                      setSpeedRound(0);
-                      setSpeedRescueUsed(false);
+                      resetSpeedRun();
                       puzzleActions.startNewGame();
                     }}
                     accessibilityRole="button"
@@ -2314,8 +2343,7 @@ function MainApp() {
                     style={styles.timeUpButtonSecondary}
                     onPress={() => {
                       hapticLight();
-                      setSpeedRound(0);
-                      setSpeedRescueUsed(false);
+                      resetSpeedRun();
                       setCurrentScreen('home');
                       puzzleActions.setGameState(GameState.IDLE);
                     }}
@@ -2800,7 +2828,11 @@ function App() {
         void initAds().catch((err) => console.warn('initAds failed:', err));
         // initHints seeds the one-time free hint stash; awaited before MainApp
         // mounts, so usePuzzleGame reads the correct balance on its first render.
-        await Promise.all([initCosmetics(), initHints()]);
+        // loadEntitlements warms the sync cache (isPatronSync / ad suppression /
+        // Store first-purchase badge) — a cheap local read that must NOT ride on
+        // the fire-and-forget initIAP, or a cold cache briefly misreports
+        // Patron/ad-free status and the Store's 2x-first-purchase badge.
+        await Promise.all([initCosmetics(), initHints(), loadEntitlements()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
       } finally {

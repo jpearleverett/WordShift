@@ -22,8 +22,8 @@ describe('bootstrap is non-blocking', () => {
     expect(APP_TSX).toMatch(/void initAds\(\)\.catch/);
   });
 
-  test('cosmetics + hints stay awaited (sync caches must be warm at first render)', () => {
-    expect(APP_TSX).toMatch(/await Promise\.all\(\[initCosmetics\(\), initHints\(\)\]\)/);
+  test('cosmetics + hints + entitlements stay awaited (sync caches must be warm at first render)', () => {
+    expect(APP_TSX).toMatch(/await Promise\.all\(\[initCosmetics\(\), initHints\(\), loadEntitlements\(\)\]\)/);
     // The old blocking form must not come back.
     expect(APP_TSX).not.toMatch(/Promise\.all\(\[initIAP\(\)/);
   });
@@ -98,10 +98,14 @@ describe('speed rescue', () => {
   });
 
   test('every fresh-board path re-arms the rescue', () => {
-    const resets = APP_TSX.match(/setSpeedRescueUsed\(false\)/g) || [];
-    // Play, home, daily, difficulty, variant, challenge toggle, next level,
-    // shared challenge, and the two Time's-Up exits.
-    expect(resets.length).toBeGreaterThanOrEqual(9);
+    // The ladder + rescue pair resets through one shared callable so a new
+    // entry point can't forget half the pair. Next Level intentionally resets
+    // only the rescue (the ladder continues), hence one standalone setter.
+    expect(APP_TSX).toMatch(/const resetSpeedRun = useCallback/);
+    const calls = APP_TSX.match(/resetSpeedRun\(\);/g) || [];
+    // Play, home, daily, difficulty, variant, challenge toggle, shared
+    // challenge, and the two Time's-Up exits.
+    expect(calls.length).toBeGreaterThanOrEqual(9);
   });
 });
 

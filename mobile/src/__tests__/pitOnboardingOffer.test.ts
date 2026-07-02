@@ -2,18 +2,24 @@
  * Onboarding pit-offering contract (FTUE integrity).
  *
  * During the pit_offering step the FoxGuide says "tap each glowing word" and
- * the step must advance ONLY once the player has devoured every pending word
- * themselves. A previous auto-offer effect fired handleHarvestAll ~900ms in,
- * contradicting the instruction and stealing the player's first meaningful
- * pit interaction. These tests pin the fixed behavior via the exported pure
- * decisions in OfferingPitScreen.tsx:
+ * the step advances through the player's own taps. A previous auto-offer
+ * effect fired handleHarvestAll ~900ms in, contradicting the instruction and
+ * stealing the player's first meaningful pit interaction. These tests pin the
+ * fixed behavior via the exported pure decisions in OfferingPitScreen.tsx:
  *
  *  - isPitWordTapEnabled: the tap-to-devour path is live during pit_offering
  *    (and inert during earlier onboarding beats like pit_intro).
  *  - getPitOnboardingOfferAction: completion fires only after the player
  *    drains pendingBatches to 0; the 4s fallback covers reaching the step
  *    with nothing offerable (empty batch, or relaunch after offering).
- *  - A source tripwire ensures the auto-offer machinery doesn't reappear.
+ *  - createPitOnboardingStallRescue: the stalled-pending safety net — words
+ *    pending but NO devour for a generous window (~30s) auto-offers the
+ *    remainder so a player whose taps never register (or who taps
+ *    some-but-not-all chips) can never be soft-locked. Every successful
+ *    devour resets the clock, so the manual flow stays primary and an
+ *    actively-tapping player is never preempted.
+ *  - A source tripwire ensures the near-instant auto-offer machinery doesn't
+ *    reappear (the ONLY auto-offer allowed is the generous stall rescue).
  */
 
 // OfferingPitScreen imports react-native + side-effectful services at module
@@ -104,6 +110,8 @@ import {
   isPitWordTapEnabled,
   getPitOnboardingOfferAction,
   PitOnboardingOfferAction,
+  createPitOnboardingStallRescue,
+  PIT_ONBOARDING_STALL_RESCUE_MS,
 } from '../components/OfferingPitScreen';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -187,11 +195,84 @@ describe('getPitOnboardingOfferAction (player-driven completion)', () => {
   });
 });
 
+describe('createPitOnboardingStallRescue (stalled-pending safety net)', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('the rescue window is generous — never a near-instant auto-offer', () => {
+    // The old defect was an auto-offer ~900ms in. The stall rescue must stay
+    // slow enough that a player reading Fox's prompt and tapping at their own
+    // pace never sees it.
+    expect(PIT_ONBOARDING_STALL_RESCUE_MS).toBeGreaterThanOrEqual(15000);
+  });
+
+  test('fires only after the full stall window with no devour', () => {
+    const onStall = jest.fn();
+    const rescue = createPitOnboardingStallRescue(onStall);
+    rescue.arm();
+    jest.advanceTimersByTime(PIT_ONBOARDING_STALL_RESCUE_MS - 1);
+    expect(onStall).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(onStall).toHaveBeenCalledTimes(1);
+  });
+
+  test('every player devour resets the clock — an actively-tapping player is never preempted', () => {
+    const onStall = jest.fn();
+    const rescue = createPitOnboardingStallRescue(onStall);
+    rescue.arm();
+    // Player keeps devouring words just inside the window, repeatedly.
+    for (let i = 0; i < 5; i++) {
+      jest.advanceTimersByTime(PIT_ONBOARDING_STALL_RESCUE_MS - 1000);
+      rescue.arm(); // successful devour → handleWordDevoured re-arms
+      expect(onStall).not.toHaveBeenCalled();
+    }
+    // Then they stall (tapped some-but-not-all chips) — the rescue fires once.
+    jest.advanceTimersByTime(PIT_ONBOARDING_STALL_RESCUE_MS);
+    expect(onStall).toHaveBeenCalledTimes(1);
+  });
+
+  test('fires at most once per arm (no repeat auto-offers)', () => {
+    const onStall = jest.fn();
+    const rescue = createPitOnboardingStallRescue(onStall);
+    rescue.arm();
+    jest.advanceTimersByTime(PIT_ONBOARDING_STALL_RESCUE_MS * 3);
+    expect(onStall).toHaveBeenCalledTimes(1);
+  });
+
+  test('cancel (step change / unmount / effect cleanup) prevents the rescue', () => {
+    const onStall = jest.fn();
+    const rescue = createPitOnboardingStallRescue(onStall);
+    rescue.arm();
+    rescue.cancel();
+    jest.advanceTimersByTime(PIT_ONBOARDING_STALL_RESCUE_MS * 2);
+    expect(onStall).not.toHaveBeenCalled();
+    // cancel is idempotent and safe when nothing is armed
+    rescue.cancel();
+  });
+
+  test('supports a custom timeout for callers/tests', () => {
+    const onStall = jest.fn();
+    const rescue = createPitOnboardingStallRescue(onStall, 5000);
+    rescue.arm();
+    jest.advanceTimersByTime(4999);
+    expect(onStall).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(onStall).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('auto-offer removal tripwire', () => {
-  test('OfferingPitScreen contains no onboarding auto-offer machinery', () => {
+  test('OfferingPitScreen contains no near-instant onboarding auto-offer machinery', () => {
     // Regression guard for the FTUE defect: an effect that invoked
-    // handleHarvestAll on the player's behalf during pit_offering. The step
-    // must be completed by the player's own taps.
+    // handleHarvestAll on the player's behalf ~900ms into pit_offering. The
+    // step is completed by the player's own taps; the ONLY auto-offer is the
+    // generous stalled-pending rescue (createPitOnboardingStallRescue),
+    // which arms for PIT_ONBOARDING_STALL_RESCUE_MS and resets on every
+    // successful devour.
     const src = fs.readFileSync(
       path.join(__dirname, '..', 'components', 'OfferingPitScreen.tsx'),
       'utf8',

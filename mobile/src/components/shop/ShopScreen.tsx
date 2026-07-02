@@ -29,6 +29,7 @@ import {
   getShopConfettiSectionLabel,
   getShopDefaultConfettiName,
   getShopPatronLockedLabel,
+  getShopStoreBridgeText,
 } from '../../services/phaseNarrative';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { isPatronSync } from '../../services/entitlements';
@@ -337,17 +338,15 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             )}
 
             {onOpenStore && (
-              // Copy kept deliberately phase-neutral (reads the same under every
-              // sky); lives here rather than phaseNarrative.ts by ownership split.
               <TouchableOpacity
                 style={styles.storeBridge}
                 onPress={() => { hapticLight(); onOpenStore(); }}
                 accessibilityRole="button"
                 accessibilityLabel="Open the Store for amber packs"
               >
-                <Text style={styles.storeBridgeTitle}>Need more amber?</Text>
+                <Text style={styles.storeBridgeTitle}>{getShopStoreBridgeText(phase).title}</Text>
                 <Text style={[styles.storeBridgeSub, { color: textColor }]}>
-                  Amber packs are available in the Store.
+                  {getShopStoreBridgeText(phase).subtitle}
                 </Text>
               </TouchableOpacity>
             )}

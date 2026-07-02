@@ -446,19 +446,21 @@ describe('whisperGallery', () => {
   // ===========================================================================
 
   describe('getPhaseEraName', () => {
-    it('returns the poetic era name for each phase', () => {
+    it('returns the canonical PHASE_DESCRIPTIONS title for each phase', () => {
+      // Delegates to types/homeWorld PHASE_DESCRIPTIONS — the single source of
+      // truth for era names (the gallery must never drift from it).
       expect(getPhaseEraName(0)).toBe('Bright Days');
       expect(getPhaseEraName(1)).toBe('Curious Thoughts');
       expect(getPhaseEraName(2)).toBe('Deeper Questions');
       expect(getPhaseEraName(3)).toBe('Growing Shadows');
       expect(getPhaseEraName(4)).toBe('The Horizon');
-      expect(getPhaseEraName(5)).toBe('After');
+      expect(getPhaseEraName(5)).toBe('Terrible Peace');
     });
 
     it('clamps out-of-range phases to the known era range', () => {
       expect(getPhaseEraName(-1)).toBe('Bright Days');
-      expect(getPhaseEraName(6)).toBe('After');
-      expect(getPhaseEraName(99)).toBe('After');
+      expect(getPhaseEraName(6)).toBe('Terrible Peace');
+      expect(getPhaseEraName(99)).toBe('Terrible Peace');
     });
 
     it('never leaks a literal phase number in any display-string builder', () => {

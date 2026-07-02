@@ -219,8 +219,13 @@ export function generateShareText(result: ShareableResult): string {
 
 const CHALLENGE_LINK_PREFIX = 'wordshift://challenge/p?w=';
 const CHALLENGE_WORD_RE = /^[A-Z]{3,7}$/;
-const MIN_CHALLENGE_WORDS = 3;
-const MAX_CHALLENGE_WORDS = 6;
+/**
+ * Single source of truth for the friend-challenge chain size. Shared by
+ * encode/decodeChallengeLink here and usePuzzleGame.startSharedChallengeGame —
+ * keep them importing these rather than restating the bound.
+ */
+export const MIN_CHALLENGE_WORDS = 3;
+export const MAX_CHALLENGE_WORDS = 6;
 
 function isValidChallengeWords(words: unknown): words is string[] {
   return (
@@ -321,6 +326,25 @@ export async function maybeAwardDailyShareBonus(): Promise<number> {
 export async function recordShareSuccess(): Promise<void> {
   await incrementShareCount();
   await maybeAwardDailyShareBonus();
+}
+
+/**
+ * Share pre-built friend-challenge text via the system share sheet.
+ * Mirrors sharePuzzleResult: a completed share records success (share-count
+ * achievement + once-per-day amber bonus) exactly like the other share paths.
+ */
+export async function shareChallengeText(text: string): Promise<boolean> {
+  try {
+    const shareResult = await Share.share({ message: text });
+    if (shareResult.action === Share.sharedAction) {
+      await recordShareSuccess();
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Failed to share challenge:', err);
+    return false;
+  }
 }
 
 /**

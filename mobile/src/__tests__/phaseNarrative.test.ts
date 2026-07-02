@@ -1130,3 +1130,64 @@ describe('Phase 5 victory register (serene, distinct from Phase 4 offering)', ()
     expect(p5).not.toMatch(/Offering|Incantation|Descends/);
   });
 });
+
+describe('small interaction copy (toasts, alerts, buttons)', () => {
+  const {
+    getFirstDailyMercyMessage,
+    getSpeedRescueLabel,
+    getDailyLockedMessage,
+    getBadChallengeLinkMessage,
+    getUnplayableChallengeMessage,
+    getShopStoreBridgeText,
+    getDailyLoginFirstClaimCopy,
+  } = require('../services/phaseNarrative');
+
+  const phases = [0, 1, 2, 3, 4, 5];
+
+  it('mercy message always names the hint count and shifts tone by phase', () => {
+    for (const p of phases) {
+      expect(getFirstDailyMercyMessage(p, 2)).toContain('+2');
+    }
+    expect(getFirstDailyMercyMessage(0, 2)).not.toBe(getFirstDailyMercyMessage(4, 2));
+  });
+
+  it('speed rescue label always names the seconds granted', () => {
+    for (const p of phases) {
+      expect(getSpeedRescueLabel(p, 30)).toContain('+30s');
+    }
+    expect(getSpeedRescueLabel(0, 30)).not.toBe(getSpeedRescueLabel(4, 30));
+  });
+
+  it('alert copy is non-empty at every phase and never leaks phase numbers', () => {
+    for (const p of phases) {
+      for (const text of [
+        getDailyLockedMessage(p),
+        getBadChallengeLinkMessage(p),
+        getUnplayableChallengeMessage(p),
+      ]) {
+        expect(typeof text).toBe('string');
+        expect(text.length).toBeGreaterThan(0);
+        expect(text).not.toMatch(/Phase \d/);
+      }
+    }
+  });
+
+  it('shop store bridge gives title + subtitle at every phase', () => {
+    for (const p of phases) {
+      const { title, subtitle } = getShopStoreBridgeText(p);
+      expect(title.length).toBeGreaterThan(0);
+      expect(subtitle.length).toBeGreaterThan(0);
+    }
+    expect(getShopStoreBridgeText(0).title).toBe('Need more amber?');
+    expect(getShopStoreBridgeText(0).title).not.toBe(getShopStoreBridgeText(4).title);
+  });
+
+  it('first-claim login copy never says Welcome Back and stays phase-toned', () => {
+    for (const p of phases) {
+      const { title, subtitle } = getDailyLoginFirstClaimCopy(p);
+      expect(title.toLowerCase()).not.toContain('welcome back');
+      expect(subtitle.length).toBeGreaterThan(0);
+    }
+    expect(getDailyLoginFirstClaimCopy(0).title).toBe('Welcome to the House');
+  });
+});

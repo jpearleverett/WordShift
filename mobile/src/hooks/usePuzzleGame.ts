@@ -20,7 +20,7 @@ import {
   VARIANT_CONFIGS,
   PuzzleVariant,
 } from '../services/puzzleVariety';
-import type { MoveOutcome } from '../services/shareResults';
+import { MIN_CHALLENGE_WORDS, MAX_CHALLENGE_WORDS, type MoveOutcome } from '../services/shareResults';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -750,7 +750,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // untouched, unlimited undos) with strict input validation — the words come
   // from outside the app, so a malformed link must fail cleanly, not crash.
   const startSharedChallengeGame = useCallback((words: string[]): boolean => {
-    if (!Array.isArray(words) || words.length < 2 || words.length > 6) return false;
+    // Same 3-6 word bound as encode/decodeChallengeLink — one shared limit,
+    // not two authoritative-looking ones.
+    if (
+      !Array.isArray(words) ||
+      words.length < MIN_CHALLENGE_WORDS ||
+      words.length > MAX_CHALLENGE_WORDS
+    ) return false;
     const normalized = words.map(w => (typeof w === 'string' ? w.trim().toUpperCase() : ''));
     const wordLength = normalized[0]?.length ?? 0;
     // Standard-chain shape (see startDailyGame): every row starts at the same

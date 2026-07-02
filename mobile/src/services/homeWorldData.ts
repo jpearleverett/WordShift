@@ -1,6 +1,6 @@
 import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
 import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead, reserveUnlock, getReservedUnlockId, claimReservedUnlock } from './amberCurrency';
-import { getPhaseStartIndex, getPhase2ExtraDialogues } from './dialogue/animalDialogueBase';
+import { getPhaseStartIndex, phase2PoolHasNew, resolveDialogueIndex } from './dialogue/animalDialogueBase';
 import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
 import { isOnCooldown } from './dialogueSession';
@@ -965,6 +965,10 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
   const phase2Cursors = progress.currentPhase >= 1 && progress.currentPhase <= 3
     ? await getPhase2PoolCursors()
     : {};
+  // Animal types currently unlocked — needed to resolve stored dialogue
+  // indices past lines gated on still-locked animals. Animal ids double as
+  // types (mirrors useDialogueFlow.getUnlockedTypes).
+  const unlockedTypes = new Set(progress.unlockedAnimals as AnimalType[]);
 
   return ANIMALS.map(animal => {
     const unlocked = progress.unlockedAnimals.includes(animal.id);
@@ -992,13 +996,18 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
         }
       } else if (animalPhase === 2) {
         const totalDialogues = getTotalDialogueCount(animal.type, 2);
-        if (dialogueIndex < totalDialogues) {
+        // Resolve the raw stored index past lines gated on still-locked
+        // animals (resolveDialogueIndex is pure and cheap), mirroring
+        // useDialogueFlow.recomputeHasNewDialogue — the raw index can sit
+        // below the total while every remaining line is blocked, which would
+        // misreport "new" instead of consulting the exhaustion pool.
+        const resolvedIndex = resolveDialogueIndex(animal.type, dialogueIndex, 2, unlockedTypes);
+        if (resolvedIndex < totalDialogues) {
           hasNewDialogue = true;
         } else {
           // Base block exhausted — lit only while the exhaustion pool still
           // has genuinely-new lines (mirrors useDialogueFlow's honest badge).
-          const pool = getPhase2ExtraDialogues(animal.type);
-          hasNewDialogue = (phase2Cursors[animal.type] ?? 0) < pool.length;
+          hasNewDialogue = phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
         }
       } else {
         const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
