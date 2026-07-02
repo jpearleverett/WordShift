@@ -156,12 +156,15 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "See? Amber, from the words you formed.\nThe pit takes the words and gives back what the house needs.\n...It always does.",
   ],
 
-  // Step 8: Back on home screen — explain unlocks and keep playing (trimmed to
-  // three beats so the text-dense tail right after the first-win dopamine hit
-  // doesn't drag).
+  // Step 8: Back on home screen — explain unlocks and keep playing (kept to
+  // four short beats so the text-dense tail right after the first-win dopamine
+  // hit doesn't drag). The third beat points at the pit entrance below the
+  // house — the in-world path is the only way back to the pit, so the player
+  // must hear where it lives before onboarding lets go of their hand.
   unlock_explained: [
     "Now you know the cycle.\nSolve puzzles, offer words, earn amber.",
     "Amber builds rooms, and rooms let us invite more friends in.",
+    "When you have words to offer, the pit waits just below the house.\nScroll down and give it a tap.",
     "Come back each day, and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],
 };

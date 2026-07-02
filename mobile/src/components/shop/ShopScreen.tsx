@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
+import { AmberInline } from '../AmberInline';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import {
   getCosmeticsByCategory,
@@ -206,7 +207,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           accessibilityState={{ disabled: !affordable || busy != null }}
           accessibilityLabel={`Buy ${item.name} for ${cost} amber`}
         >
-          <Text style={styles.actionBuyText}>{'💎'} {cost}</Text>
+          <Text style={styles.actionBuyText}><AmberInline size={14} /> {cost}</Text>
         </TouchableOpacity>
       );
     }
@@ -294,7 +295,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </Text>
         </View>
         <View style={styles.amberPill}>
-          <Text style={styles.amberPillText}>{'💎'} {Math.max(0, balance)}</Text>
+          <Text style={styles.amberPillText}><AmberInline size={14} /> {Math.max(0, balance)}</Text>
         </View>
       </View>
 

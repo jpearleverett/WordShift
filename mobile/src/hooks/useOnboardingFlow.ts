@@ -7,6 +7,7 @@ import {
 } from '../services/onboarding';
 import { hasTutorialCompleted, markTutorialCompleted } from '../components/Tutorial';
 import { markTutorialSeedsPlanted } from '../services/amberCurrency';
+import { clearPuzzleState } from '../services/puzzleSaveState';
 import { hapticLight, hapticSelection } from '../services/haptics';
 import { logEvent } from '../services/eventLogger';
 import { ONBOARDING_TRANSITION_DELAY_MS } from '../constants/timing';
@@ -27,6 +28,8 @@ export interface OnboardingCallbacks {
   startNewGame: (difficulty: string) => void;
   /** Set the puzzle game state (e.g. GameState.IDLE). */
   setGameState: (state: string) => void;
+  /** Clear the puzzle board entirely (rows, selection, history, highlights). */
+  clearBoard: () => void;
   /** Hide confetti. */
   setShowConfetti: (show: boolean) => void;
   /** Refresh persistence stats (phase, amber, etc.). */
@@ -58,7 +61,8 @@ export interface OnboardingFlowActions {
   /**
    * Skip onboarding.  During pre-puzzle steps this jumps to the
    * tutorial puzzle; at or after the puzzle step it completes onboarding
-   * entirely.
+   * entirely and lands the player on a clean home screen (guided board
+   * abandoned, all tutorial UI torn down).
    */
   handleSkipOnboarding: () => Promise<void>;
   /**
@@ -319,13 +323,36 @@ export function useOnboardingFlow(
     if (onboardingStep === 'fox_invited' || onboardingStep === 'home_empty') {
       // Skip dialogue but continue to tutorial puzzle
       await navigateToPuzzleTutorial();
-    } else {
-      // During/after puzzle: complete onboarding entirely
-      await markTutorialCompleted();
-      await markTutorialSeedsPlanted().catch(() => {});
-      await advanceOnboarding('complete');
+      return;
     }
-  }, [onboardingStep, advanceOnboarding, navigateToPuzzleTutorial]);
+
+    // During/after the tutorial puzzle: complete onboarding entirely and land
+    // the player on a clean home screen — never a guided board in limbo.
+    // Cancel any pending step-transition timers first so a queued advance
+    // (e.g. the pit auto-return) can't resurrect onboarding after the skip.
+    pendingTimeouts.current.forEach(clearTimeout);
+    pendingTimeouts.current = [];
+
+    await markTutorialCompleted();
+    await markTutorialSeedsPlanted().catch(() => {});
+    await advanceOnboarding('complete');
+    // 'complete' collapses every derived tutorial surface: FoxGuide unmounts,
+    // tutorialGuidance/row guidance highlights go null, and the full home UI
+    // (header actions, Play) renders. Tear down the transient remnants too.
+    hapticLight();
+    callbacks.setShowConfetti(false);
+    callbacks.resetVictory();
+    clearRitualEchoWords();
+    setPitOfferDone(false);
+    callbacks.refreshStats();
+    // Go home, abandoning the guided board: clear it and drop its autosave
+    // while the transition overlay covers the swap, so the next Play always
+    // starts a fresh puzzle instead of resuming the tutorial board.
+    callbacks.transitionTo('home', () => {
+      callbacks.clearBoard();
+      clearPuzzleState().catch(() => {});
+    });
+  }, [onboardingStep, advanceOnboarding, navigateToPuzzleTutorial, callbacks, clearRitualEchoWords]);
 
   // ------------------------------------------------------------------
   // handlePitOnboardingOfferComplete

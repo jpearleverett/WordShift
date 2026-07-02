@@ -21,6 +21,7 @@ import {
   PIT_DEVOUR_COLORS as DEVOUR_COLORS,
 } from '../theme/colors';
 import { useScreenInsets } from '../hooks/useScreenInsets';
+import { AmberInline } from './AmberInline';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   getPitOfferAllLabel,
@@ -2240,7 +2241,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         <View style={styles.headerLeft}>
           <View style={styles.amberContainer} accessibilityLabel={`${Math.max(0, displayBalance)} amber`}>
             <View style={styles.amberInner}>
-              <Text style={styles.amberEmoji}>{'\uD83D\uDC8E'}</Text>
+              <AmberInline size={20} />
               <Text style={styles.amberCount}>{Math.max(0, displayBalance)}</Text>
             </View>
           </View>
@@ -2352,7 +2353,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               <>
                 <View style={styles.tendingCostRow}>
                   <Text style={styles.tendingCostText}>
-                    {'💎'} {tendingNext.cost}
+                    <AmberInline size={20} /> {tendingNext.cost}
                   </Text>
                   {tendingNext.dailyBonusApplied && (
                     <Text style={styles.tendingCostStrike}>{tendingNext.baseCost}</Text>
@@ -2448,7 +2449,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               }]}>
                 <View style={styles.summaryItem}>
                   <Text style={[styles.summaryValue, { color: bt.textColor, textShadowColor: bt.textShadowColor }]}>
-                    {'\uD83D\uDC8E'} {Math.max(0, pendingAmber - pendingAmberOffset)}
+                    <AmberInline size={16} /> {Math.max(0, pendingAmber - pendingAmberOffset)}
                   </Text>
                   <Text style={[styles.summaryLabel, { color: bt.secondaryTextColor }]}>
                     {getPitPendingAmberLabel(phase)}
@@ -2477,7 +2478,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
               accessibilityRole="button"
             >
               <Text style={styles.harvestAllText}>
-                {getPitOfferAllLabel(phase)} ({'\uD83D\uDC8E'} {Math.max(0, pendingAmber - pendingAmberOffset)})
+                {getPitOfferAllLabel(phase)} (<AmberInline size={14} /> {Math.max(0, pendingAmber - pendingAmberOffset)})
               </Text>
             </TouchableOpacity>
           )}
@@ -2528,7 +2529,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  amberEmoji: { fontSize: 20 },
   amberCount: {
     color: '#FFFFFF',
     fontSize: 16,

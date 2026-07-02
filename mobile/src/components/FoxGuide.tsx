@@ -150,6 +150,9 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   }, [text]);
 
   if (!visible) return null;
+  // Never render an empty shell: with no text Fox has nothing to say, and a
+  // bare card (or a lone Skip button in an empty box) reads as a broken overlay.
+  if (!text || text.trim().length === 0) return null;
 
   const isTop = position === 'top';
   const isMiddle = position === 'middle';
@@ -344,19 +347,23 @@ const styles = StyleSheet.create({
   },
 
   // ---- Compact variant (floating card) ----
+  // Light treatment: every FoxGuide call site is a Phase-0 Fox moment
+  // (onboarding + Fox intros), so the compact card shares the same soft
+  // white/lavender language as the dialogue variant instead of the old
+  // near-black box that clashed with the bright tutorial screen.
   guideCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(26, 16, 44, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.97)',
     borderRadius: 20,
     padding: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    elevation: 16,
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: 'rgba(190, 145, 255, 0.28)',
+    borderColor: 'rgba(168, 85, 247, 0.22)',
   },
   foxContainer: {
     width: 58,
@@ -364,6 +371,11 @@ const styles = StyleSheet.create({
     marginRight: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(168, 85, 247, 0.25)',
+    overflow: 'hidden',
   },
   foxImage: {
     width: 58,
@@ -376,7 +388,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   speechBubble: {
-    backgroundColor: 'rgba(248, 244, 255, 0.97)',
+    backgroundColor: '#F5F0FF',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -384,7 +396,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(128, 83, 210, 0.24)',
+    borderColor: 'rgba(128, 83, 210, 0.18)',
   },
   speechAccentBar: {
     position: 'absolute',
@@ -425,7 +437,8 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.62)',
+    // Quiet purple text button — >=4.5:1 on the white card.
+    color: CandyColors.purple.dark,
     fontWeight: '600',
   },
   continueButton: {

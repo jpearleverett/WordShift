@@ -95,6 +95,27 @@ describe('tutorial fox bubble avoidance', () => {
   });
 });
 
+describe('onboarding skip clean exit', () => {
+  test('the onboarding hook receives the board-clearing escape hatch', () => {
+    // handleSkipOnboarding abandons the guided board via this callback —
+    // without it, skip strands the player on a half-guided puzzle.
+    expect(APP_TSX).toMatch(/clearBoard: puzzleActions\.clearBoard/);
+  });
+
+  test('tutorial FoxGuides stay wired to the skip handler', () => {
+    expect(APP_TSX).toMatch(/onSkip=\{onboardingActions\.handleSkipOnboarding\}/);
+  });
+
+  test('all tutorial guidance UI derives from the onboarding step (skip clears it atomically)', () => {
+    // Both the guidance memo and the dashed row overlays key on
+    // onboardingStep === 'puzzle_tutorial'; advancing to 'complete' on skip
+    // therefore removes every highlight in the same render — no orphaned
+    // dashed boxes.
+    expect(APP_TSX).toMatch(/if \(onboardingFlow\.onboardingStep !== 'puzzle_tutorial'\) return null;/);
+    expect(APP_TSX).toMatch(/guidanceActive=\{onboardingFlow\.onboardingStep === 'puzzle_tutorial'\}/);
+  });
+});
+
 describe('reset-all wiring', () => {
   test('Settings receives the full in-memory reset handler', () => {
     // Without this, the Expo Go / dev fallback (Updates.reloadAsync throws)
