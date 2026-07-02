@@ -15,10 +15,10 @@ the codebase and are the remaining gates to submission.
       Tokens, scope `project:releases`) and add it as an EAS secret:
       `eas secret:create --name SENTRY_AUTH_TOKEN --value <token>`.
       Dev/preview builds still skip upload for speed.
-- [ ] **Supabase hardening** — run `docs/supabase/security_setup.sql` in the
-      Supabase SQL editor (enables RLS, removes direct table access, installs
-      the capability-scoped RPCs). The client already talks to the new RPCs;
-      until the SQL is applied, cloud save/leaderboard degrade gracefully.
+- [x] **Supabase hardening** — DONE (2026-07-02): `security_setup.sql` applied
+      and verified in the SQL editor — RLS `true` on all four tables, anon's
+      only direct table privilege is `events INSERT`, and all seven RPCs are
+      executable by anon. The client already talks to the RPCs.
 - [ ] **AdMob console** — publish an EU consent (UMP) message for the app and
       confirm the Android app ID + both unit IDs in `mobile/app.json` match the
       console. The client now gathers consent before any ad request and exposes
