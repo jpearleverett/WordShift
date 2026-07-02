@@ -31,6 +31,10 @@ import {
   hasSeenJournalIntro,
   markJournalIntroSeen,
   setSurpriseRng,
+  markPostRevelation,
+  isPostRevelation,
+  getFullProgress,
+  invalidateProgressCache,
 } from '../services/amberCurrency';
 import { SURPRISE_BONUS_AMOUNTS, SURPRISE_BONUS_MIN_PUZZLES } from '../constants/gameBalance';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
@@ -694,6 +698,80 @@ describe('challenge intro tracking', () => {
     expect(await hasSeenChallengeIntro()).toBe(true);
     await clearProgress();
     expect(await hasSeenChallengeIntro()).toBe(false);
+  });
+});
+
+// ============================================================================
+// Post-Revelation Phase Pinning (Phase 5)
+// ============================================================================
+
+describe('post-revelation phase pinning (Phase 5)', () => {
+  test('markPostRevelation sets currentPhase to 5 and clears any pending transition', async () => {
+    await devAddPuzzles(235); // Reach phase 4
+    await markPostRevelation();
+
+    expect(await isPostRevelation()).toBe(true);
+    const progress = await getFullProgress();
+    expect(progress.currentPhase).toBe(5);
+    expect(progress.pendingPhaseTransition).toBeNull();
+    expect(await getCurrentPhase()).toBe(5);
+  });
+
+  test('awardPuzzleAmber never downgrades the phase after post-revelation', async () => {
+    await devAddPuzzles(235);
+    await markPostRevelation();
+
+    const result = await awardPuzzleAmber('EASY', 1);
+    expect(result.newPhase).toBe(5);
+    expect(result.phaseChanged).toBe(false);
+    expect(result.phaseTransitionPending).toBe(false);
+    expect(await getCurrentPhase()).toBe(5);
+  });
+
+  test('devAddPuzzles keeps the phase pinned at 5 after post-revelation', async () => {
+    await devAddPuzzles(235);
+    await markPostRevelation();
+
+    const { phase } = await devAddPuzzles(10);
+    expect(phase).toBe(5);
+    expect(await getCurrentPhase()).toBe(5);
+  });
+
+  test('legacy save with postRevelation=true but currentPhase=4 self-heals on load', async () => {
+    // Older builds set postRevelation without bumping currentPhase (calculatePhase caps at 4).
+    const legacy = {
+      ...(await loadProgress()),
+      currentPhase: 4,
+      puzzlesSolved: 300,
+      phaseProgress: 300,
+      postRevelation: true,
+      pendingPhaseTransition: 4,
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(legacy));
+    invalidateProgressCache();
+
+    const progress = await loadProgress();
+    expect(progress.currentPhase).toBe(5);
+    expect(progress.pendingPhaseTransition).toBeNull();
+
+    // Heal is persisted — a fresh load from storage stays at 5
+    invalidateProgressCache();
+    const reloaded = await loadProgress();
+    expect(reloaded.currentPhase).toBe(5);
+  });
+
+  test('non-post-revelation saves are untouched on load', async () => {
+    const save = {
+      ...(await loadProgress()),
+      currentPhase: 4,
+      puzzlesSolved: 300,
+      phaseProgress: 300,
+    };
+    await AsyncStorage.setItem('wordshift_home_progress', JSON.stringify(save));
+    invalidateProgressCache();
+
+    const progress = await loadProgress();
+    expect(progress.currentPhase).toBe(4);
   });
 });
 

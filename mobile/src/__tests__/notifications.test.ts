@@ -153,19 +153,9 @@ describe('notifications', () => {
       }
     });
 
-    it('returns a string for reengagement type at each phase', () => {
-      for (let phase = 0; phase <= 4; phase++) {
-        const message = getNotificationMessage('reengagement', phase);
-        expect(typeof message).toBe('string');
-        expect(message.length).toBeGreaterThan(0);
-      }
-    });
-
     it('clamps phase to valid range (no error for out-of-bounds)', () => {
       expect(() => getNotificationMessage('daily', -1)).not.toThrow();
       expect(() => getNotificationMessage('daily', 10)).not.toThrow();
-      expect(() => getNotificationMessage('reengagement', -5)).not.toThrow();
-      expect(() => getNotificationMessage('reengagement', 99)).not.toThrow();
     });
 
     it('streak risk messages include the streak length at each phase', () => {
@@ -227,30 +217,6 @@ describe('notifications', () => {
       expect(foundDark).toBe(true);
     });
 
-    it('phase 4 reengagement messages reference dark themes', () => {
-      let foundDark = false;
-      for (let i = 0; i < 30; i++) {
-        const msg = getNotificationMessage('reengagement', 4);
-        if (msg.includes('keepers') || msg.includes('arrangement') || msg.includes('pattern')) {
-          foundDark = true;
-          break;
-        }
-      }
-      expect(foundDark).toBe(true);
-    });
-
-    it('phase 0 reengagement messages mention animals/friends', () => {
-      let foundFriendly = false;
-      for (let i = 0; i < 20; i++) {
-        const message = getNotificationMessage('reengagement', 0);
-        if (message.includes('Ember') || message.includes('friends') || message.includes('house')) {
-          foundFriendly = true;
-          break;
-        }
-      }
-      expect(foundFriendly).toBe(true);
-    });
-
     it('phase 1 messages hint at patterns', () => {
       let foundCurious = false;
       for (let i = 0; i < 30; i++) {
@@ -275,18 +241,6 @@ describe('notifications', () => {
       expect(found).toBe(true);
     });
 
-    it('phase 2 reengagement messages mention absence', () => {
-      let found = false;
-      for (let i = 0; i < 30; i++) {
-        const message = getNotificationMessage('reengagement', 2);
-        if (message.includes('absence') || message.includes('quieter') || message.includes('remember')) {
-          found = true;
-          break;
-        }
-      }
-      expect(found).toBe(true);
-    });
-
     it('phase 3 daily messages have dread', () => {
       let found = false;
       for (let i = 0; i < 30; i++) {
@@ -299,17 +253,6 @@ describe('notifications', () => {
       expect(found).toBe(true);
     });
 
-    it('phase 3 reengagement messages note absence', () => {
-      let found = false;
-      for (let i = 0; i < 30; i++) {
-        const message = getNotificationMessage('reengagement', 3);
-        if (message.includes('waiting') || message.includes('absence') || message.includes('pauses')) {
-          found = true;
-          break;
-        }
-      }
-      expect(found).toBe(true);
-    });
   });
 
   // ===========================================================================
@@ -489,37 +432,106 @@ describe('notifications', () => {
     });
 
     // Classify scheduled notifications by their trigger HOUR. Daily reminders
-    // fire at the configured reminder hour (default 9), re-engagement at 18:00,
-    // streak-risk at 19:00. This is more robust than fixed call counts/indices
-    // now that the daily reminder pre-arms a non-repeating multi-day ladder.
-    function scheduledTriggers(): { hour: number; date: Date; body: string }[] {
+    // fire at the configured reminder hour (default 9), win-back rungs at
+    // 18:00, streak-risk at 19:00. This is more robust than fixed call
+    // counts/indices now that both ladders pre-arm multiple one-shots.
+    function scheduledTriggers(): { hour: number; date: Date; body: string; data: any }[] {
       return (expoMock.scheduleNotificationAsync.mock.calls as any[][]).map((c) => {
         const arg = c[0];
         const date: Date = arg.trigger.date;
-        return { hour: date.getHours(), date, body: arg.content.body as string };
+        return { hour: date.getHours(), date, body: arg.content.body as string, data: arg.content.data };
       });
     }
 
-    it('schedules a multi-day daily reminder ladder + next-day re-engagement when there is no streak', async () => {
+    function expectedDayOfMonth(daysFromNow: number): number {
+      const d = new Date();
+      d.setDate(d.getDate() + daysFromNow);
+      return d.getDate();
+    }
+
+    it('schedules a 7-day daily reminder ladder + the +1/+3/+7 win-back ladder when there is no streak', async () => {
       const svc = loadWithStatus('granted');
       await svc.scheduleAllNotifications(0);
 
       const triggers = scheduledTriggers();
-      // Daily reminders fire at hour 9 (the default reminder hour).
+      // Daily reminders fire at hour 9 (the default reminder hour). The ladder
+      // is pre-armed a full week ahead (7 future days; today's rung is included
+      // only if 9am hasn't passed yet).
       const daily = triggers.filter((t) => t.hour === 9);
-      expect(daily.length).toBeGreaterThan(0);
-      // Pre-armed for multiple future days (non-repeating one-shots, not a single repeat).
-      expect(daily.length).toBeGreaterThanOrEqual(3);
+      expect(daily.length).toBeGreaterThanOrEqual(7);
+      expect(daily.length).toBeLessThanOrEqual(8);
 
-      // Re-engagement is the 18:00 ping. No streak ⇒ no 19:00 streak-risk.
-      const reengagement = triggers.filter((t) => t.hour === 18);
+      // Win-back rungs are the 18:00 pings. No streak ⇒ no 19:00 streak-risk.
+      const winBack = triggers.filter((t) => t.hour === 18);
       const streakRisk = triggers.filter((t) => t.hour === 19);
-      expect(reengagement.length).toBe(1);
+      expect(winBack.length).toBe(3);
       expect(streakRisk.length).toBe(0);
 
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      expect(reengagement[0].date.getDate()).toBe(tomorrow.getDate());
+      // Rungs are scheduled in order: +1, +3, +7 days.
+      expect(winBack.map((t) => t.date.getDate())).toEqual([
+        expectedDayOfMonth(1),
+        expectedDayOfMonth(3),
+        expectedDayOfMonth(7),
+      ]);
+    });
+
+    it('win-back rungs carry phase-and-rung-aware escalating copy', async () => {
+      const svc = loadWithStatus('granted');
+      await svc.scheduleAllNotifications(4);
+
+      const { getWinBackMessage } = require('../services/phaseNarrative');
+      const winBack = scheduledTriggers().filter((t) => t.hour === 18);
+      expect(winBack.map((t) => t.body)).toEqual([
+        getWinBackMessage(4, 1),
+        getWinBackMessage(4, 2),
+        getWinBackMessage(4, 3),
+      ]);
+      // Rung 1 at Phase 4 is the reverent register.
+      expect(winBack[0].body).toContain('arrangement is incomplete');
+    });
+
+    it('every scheduled notification carries a tap-routing data payload', async () => {
+      const svc = loadWithStatus('granted');
+      await svc.scheduleAllNotifications(0);
+
+      const triggers = scheduledTriggers();
+      expect(triggers.length).toBeGreaterThan(0);
+      for (const t of triggers) {
+        expect(t.data).toBeDefined();
+        expect(['daily', 'home']).toContain(t.data.target);
+      }
+      // Daily reminders route to the daily challenge; win-backs route home.
+      triggers.filter((t) => t.hour === 9).forEach((t) => expect(t.data).toEqual({ target: 'daily' }));
+      triggers.filter((t) => t.hour === 18).forEach((t) => expect(t.data).toEqual({ target: 'home' }));
+    });
+
+    it('quest-expiry ping is scheduled with a home-routing payload when quests are in flight', async () => {
+      expoMock = createExpoMock('granted');
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      jest.doMock('../services/weeklyQuests', () => ({
+        loadWeeklyQuests: jest.fn(() => Promise.resolve({ weekly: { quests: [] } })),
+        getUnclaimedAmber: jest.fn(() => 40), // unclaimed reward ⇒ remind
+      }));
+      const svc = require('../services/notifications');
+
+      await svc.scheduleAllNotifications(2);
+
+      // The quest ping targets the upcoming Sunday 18:00; if that window has
+      // already passed this week (test running Sunday evening), it is skipped.
+      const now = new Date();
+      let daysUntilMonday = (1 - now.getDay() + 7) % 7;
+      if (daysUntilMonday === 0) daysUntilMonday = 7;
+      const nextMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilMonday);
+      const questTrigger = new Date(nextMonday.getTime() - 6 * 60 * 60 * 1000);
+      const questEligible = questTrigger.getTime() > now.getTime();
+
+      // 18:00 pings = 3 win-back rungs + the quest-expiry ping (when eligible).
+      const evening = scheduledTriggers().filter((t) => t.hour === 18);
+      expect(evening.length).toBe(questEligible ? 4 : 3);
+      evening.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
+
+      jest.dontMock('../services/weeklyQuests');
     });
 
     it('does not schedule a daily reminder to fire on an already-played day', async () => {
@@ -552,7 +564,7 @@ describe('notifications', () => {
       jest.dontMock('../services/amberCurrency');
     });
 
-    it('schedules streak-risk and defers re-engagement when a streak is active and not played today', async () => {
+    it('schedules streak-risk and defers the first win-back rung when a streak is active and not played today', async () => {
       expoMock = createExpoMock('granted');
       jest.resetModules();
       jest.doMock('expo-notifications', () => expoMock, { virtual: true });
@@ -565,16 +577,20 @@ describe('notifications', () => {
       await svc.scheduleAllNotifications(2);
 
       const triggers = scheduledTriggers();
-      // 19:00 streak-risk ping present, carrying the streak length.
+      // 19:00 streak-risk ping present, carrying the streak length + routing to the daily.
       const streakRisk = triggers.filter((t) => t.hour === 19);
       expect(streakRisk.length).toBe(1);
       expect(streakRisk[0].body).toContain('5');
-      // Re-engagement deferred to +2 days (the streak ping leads the ladder).
-      const reengagement = triggers.filter((t) => t.hour === 18);
-      expect(reengagement.length).toBe(1);
-      const twoDays = new Date();
-      twoDays.setDate(twoDays.getDate() + 2);
-      expect(reengagement[0].date.getDate()).toBe(twoDays.getDate());
+      expect(streakRisk[0].data).toEqual({ target: 'daily' });
+      // Win-back rung 1 deferred to +2 days (the streak ping leads the ladder);
+      // rungs 2 and 3 hold at +3 and +7.
+      const winBack = triggers.filter((t) => t.hour === 18);
+      expect(winBack.length).toBe(3);
+      expect(winBack.map((t) => t.date.getDate())).toEqual([
+        expectedDayOfMonth(2),
+        expectedDayOfMonth(3),
+        expectedDayOfMonth(7),
+      ]);
 
       jest.dontMock('../services/amberCurrency');
     });
@@ -597,12 +613,15 @@ describe('notifications', () => {
       const triggers = scheduledTriggers();
       const streakRisk = triggers.filter((t) => t.hour === 19);
       expect(streakRisk.length).toBe(0);
-      // Re-engagement falls back to next-day (no streak-risk leading the ladder).
-      const reengagement = triggers.filter((t) => t.hour === 18);
-      expect(reengagement.length).toBe(1);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      expect(reengagement[0].date.getDate()).toBe(tomorrow.getDate());
+      // Win-back rung 1 falls back to next-day (no streak-risk leading the
+      // ladder) — never today, so a player who played today hears nothing.
+      const winBack = triggers.filter((t) => t.hour === 18);
+      expect(winBack.length).toBe(3);
+      expect(winBack.map((t) => t.date.getDate())).toEqual([
+        expectedDayOfMonth(1),
+        expectedDayOfMonth(3),
+        expectedDayOfMonth(7),
+      ]);
 
       jest.dontMock('../services/amberCurrency');
     });

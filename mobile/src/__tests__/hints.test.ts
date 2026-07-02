@@ -8,7 +8,7 @@ import {
   addHints,
   clearHints,
 } from '../services/hints';
-import { STARTING_FREE_HINTS } from '../constants/gameBalance';
+import { STARTING_FREE_HINTS, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
@@ -61,6 +61,17 @@ describe('hints economy', () => {
     const balance = await addHints(20, 'iap_test');
     expect(balance).toBe(STARTING_FREE_HINTS + 20);
     expect(getHintBalanceSync()).toBe(STARTING_FREE_HINTS + 20);
+  });
+
+  it('credits the first-daily mercy grant on top of the free stash', async () => {
+    // FIRST_DAILY_BONUS_HINTS is a small cushion, not a second stash.
+    expect(FIRST_DAILY_BONUS_HINTS).toBe(2);
+    expect(FIRST_DAILY_BONUS_HINTS).toBeLessThan(STARTING_FREE_HINTS);
+
+    await initHints();
+    const balance = await addHints(FIRST_DAILY_BONUS_HINTS, 'first_daily_mercy');
+    expect(balance).toBe(STARTING_FREE_HINTS + FIRST_DAILY_BONUS_HINTS);
+    expect(getHintBalanceSync()).toBe(STARTING_FREE_HINTS + FIRST_DAILY_BONUS_HINTS);
   });
 
   it('ignores non-positive grants', async () => {

@@ -10,17 +10,16 @@
  * Scoring: lower time wins, ties broken by more stars (then fewer hints). A
  * player's "percentile" is the percent of OTHER players they beat that day.
  *
- * SQL to provision this (see leaderboard report notes) lives alongside the
- * socialProof counters — both share the `daily` date key (local-day string).
+ * SECURITY: everything goes through SECURITY DEFINER RPCs
+ * (docs/supabase/security_setup.sql). Direct `daily_scores` access is
+ * RLS-denied, so the client can never enumerate other players' owner ids —
+ * `submit_daily_score` writes only the caller's (owner, date) row and
+ * `daily_rank` returns aggregate standing only (rank/total/percentile).
+ * When the rank RPC is missing/empty we degrade to "no rank shown" (null)
+ * rather than reading the table.
  */
 
-import {
-  isSupabaseConfigured,
-  getBackendIdentity,
-  sbSelect,
-  sbInsert,
-  sbRpc,
-} from './supabaseClient';
+import { isSupabaseConfigured, getBackendIdentity, sbRpc } from './supabaseClient';
 
 /** A single submitted daily result (mirrors the `daily_scores` row shape). */
 export interface DailyScoreRow {
@@ -54,9 +53,11 @@ export interface DailyRank {
 }
 
 /**
- * Submit (upsert) the player's daily result. Keyed unique on (owner, date), so
- * re-submitting the same day overwrites the previous attempt. No-op (null) when
- * the backend is unconfigured. Never throws.
+ * Submit (upsert) the player's daily result via the `submit_daily_score`
+ * SECURITY DEFINER RPC — keyed unique on (owner, date), so re-submitting the
+ * same day overwrites the previous attempt. The server bounds-checks the score
+ * fields and rejects absurd values (an empty result → null here). No-op (null)
+ * when the backend is unconfigured. Never throws.
  */
 export async function submitDailyResult(
   args: SubmitDailyArgs,
@@ -66,39 +67,27 @@ export async function submitDailyResult(
   const owner = await getBackendIdentity();
   if (!owner) return null;
 
-  const row: DailyScoreRow = {
-    owner,
-    date: args.date,
-    time_ms: Math.max(0, Math.round(args.timeMs)),
-    stars: Math.max(0, Math.round(args.stars)),
-    hints: Math.max(0, Math.round(args.hintsUsed)),
-    handle: args.handle ?? null,
-    created_at: new Date().toISOString(),
-  };
-
-  const result = await sbInsert<DailyScoreRow>('daily_scores', row, {
-    upsert: true,
-    onConflict: 'owner,date',
-    returning: true,
-  });
-  if (!result) return null;
-  return result[0] ?? row;
+  const result = await sbRpc<DailyScoreRow | DailyScoreRow[] | null>(
+    'submit_daily_score',
+    {
+      p_owner: owner,
+      p_date: args.date,
+      p_time_ms: Math.max(0, Math.round(args.timeMs)),
+      p_stars: Math.max(0, Math.round(args.stars)),
+      p_hints: Math.max(0, Math.round(args.hintsUsed)),
+      p_handle: args.handle ?? null,
+    },
+  );
+  const row = Array.isArray(result) ? result[0] : result;
+  if (!row || typeof row.time_ms !== 'number') return null;
+  return row;
 }
 
 /**
- * Order comparator: lower time first, then more stars, then fewer hints.
- * Returns negative when `a` ranks ahead of `b`.
- */
-function compareScores(a: DailyScoreRow, b: DailyScoreRow): number {
-  if (a.time_ms !== b.time_ms) return a.time_ms - b.time_ms;
-  if (a.stars !== b.stars) return b.stars - a.stars;
-  return a.hints - b.hints;
-}
-
-/**
- * Compute the player's standing for `date`. Prefers an atomic server RPC
- * (`daily_rank`) for efficiency; falls back to selecting the day's scores and
- * ranking client-side if the RPC is absent / returns nothing.
+ * Compute the player's standing for `date` via the aggregate-only `daily_rank`
+ * SECURITY DEFINER RPC (rank/total/percentile — never other players' rows).
+ * There is deliberately NO client-side fallback: direct `daily_scores` reads
+ * are RLS-denied, so a missing/empty RPC degrades to "no rank shown" (null).
  *
  * Returns null when unconfigured or when there's no data for the player.
  */
@@ -108,7 +97,6 @@ export async function getDailyRank(date: string): Promise<DailyRank | null> {
   const owner = await getBackendIdentity();
   if (!owner) return null;
 
-  // --- Preferred: server-side RPC ---------------------------------------
   const rpc = await sbRpc<
     DailyRank | DailyRank[] | null
   >('daily_rank', { p_date: date, p_owner: owner });
@@ -129,23 +117,7 @@ export async function getDailyRank(date: string): Promise<DailyRank | null> {
       ),
     };
   }
-
-  // --- Fallback: client-side ranking ------------------------------------
-  const rows = await sbSelect<DailyScoreRow>(
-    'daily_scores',
-    `select=owner,date,time_ms,stars,hints&date=eq.${encodeURIComponent(date)}`,
-  );
-  if (!rows || rows.length === 0) return null;
-
-  const me = rows.find((r) => r.owner === owner);
-  if (!me) return null;
-
-  const total = rows.length;
-  // rank = 1 + number of players strictly better than me.
-  const rank =
-    1 + rows.filter((r) => r.owner !== owner && compareScores(r, me) < 0).length;
-
-  return { rank, total, percentile: computePercentile(rank, total) };
+  return null;
 }
 
 /**

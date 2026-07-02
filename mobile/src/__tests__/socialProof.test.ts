@@ -88,33 +88,37 @@ describe('socialProof', () => {
       expect(proof).toEqual({ wordsOfferedToday: 12408, activeSeekers: 642 });
       const [url] = (global.fetch as jest.Mock).mock.calls[0];
       expect(url).toContain('/rest/v1/rpc/aggregate_proof');
-      // RPC succeeded → no fallback select.
       expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
     });
 
-    test('getAggregateProof falls back to selecting the counters row', async () => {
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null)) // RPC empty
-        .mockResolvedValueOnce(
-          okJson([{ date: 'd', words_offered: 5000, active_seekers: 300 }])
-        );
+    test('getAggregateProof normalizes a snake_case RPC row (array form)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(
+        okJson([{ date: 'd', words_offered: 5000, active_seekers: 300 }])
+      );
       const proof = await getAggregateProof();
       expect(proof).toEqual({ wordsOfferedToday: 5000, activeSeekers: 300 });
-      const secondUrl = (global.fetch as jest.Mock).mock.calls[1][0];
-      expect(secondUrl).toContain('/rest/v1/daily_counters');
     });
 
-    test('getAggregateProof returns null when there is no data', async () => {
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null))
-        .mockResolvedValueOnce(okJson([]));
+    test('getAggregateProof returns null when the RPC has no data — NO table fallback', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(okJson(null));
       expect(await getAggregateProof()).toBeNull();
+      // Exactly one request, the RPC — never a daily_counters select.
+      const calls = (global.fetch as jest.Mock).mock.calls;
+      expect(calls.length).toBe(1);
+      expect(calls[0][0]).toContain('/rest/v1/rpc/aggregate_proof');
+      expect(calls[0][0]).not.toContain('/rest/v1/daily_counters');
+    });
+
+    test('getAggregateProof degrades to null when the RPC is missing (404)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 404 });
+      await expect(getAggregateProof()).resolves.toBeNull();
+      expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
     });
 
     test('getAggregateProof tolerates a missing active_seekers field', async () => {
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null))
-        .mockResolvedValueOnce(okJson([{ date: 'd', words_offered: 10 }]));
+      (global.fetch as jest.Mock).mockResolvedValue(
+        okJson([{ date: 'd', words_offered: 10 }])
+      );
       const proof = await getAggregateProof();
       expect(proof).toEqual({ wordsOfferedToday: 10, activeSeekers: 0 });
     });

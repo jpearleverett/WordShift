@@ -93,6 +93,7 @@ const SYNC_KEYS = [
   // Narrative state
   'wordshift_dialogue_sessions',
   'wordshift_dialogue_choices',
+  'wordshift_narrative_delivery',
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
   'wordshift_tending',
@@ -147,9 +148,12 @@ class NoOpProvider implements CloudProvider {
 // Supabase Cloud Provider (real backend, installed when configured)
 // ============================================================================
 
-/** Shape of a row in the `saves` table. */
+/**
+ * Row shape returned by the `get_save` RPC (docs/supabase/security_setup.sql).
+ * Direct `saves` table access is RLS-denied — the owner id is the capability
+ * presented to the SECURITY DEFINER functions, never selected back.
+ */
 interface SaveRow {
-  owner: string;
   version: number;
   timestamp: number;
   device_id: string;
@@ -180,31 +184,28 @@ export async function getCloudOwnerId(): Promise<string> {
 class SupabaseCloudProvider implements CloudProvider {
   async upload(data: CloudSaveData): Promise<boolean> {
     const owner = await getCloudOwnerId();
-    const row = {
-      owner,
-      version: data.version,
-      timestamp: data.timestamp,
-      device_id: data.deviceId,
-      payload: JSON.stringify(data.data),
-    };
-    const result = await sb().sbInsert<SaveRow>('saves', row, {
-      upsert: true,
-      onConflict: 'owner',
-      returning: false,
+    // SECURITY DEFINER RPC — the only write path; returns true when stored.
+    const result = await sb().sbRpc<boolean>('upsert_save', {
+      p_owner: owner,
+      p_version: data.version,
+      p_timestamp: data.timestamp,
+      p_device_id: data.deviceId,
+      p_payload: JSON.stringify(data.data),
     });
-    return result !== null;
+    return result === true;
   }
 
   async download(): Promise<CloudSaveData | null> {
     const owner = await getCloudOwnerId();
-    const rows = await sb().sbSelect<SaveRow>(
-      'saves',
-      `select=*&owner=eq.${encodeURIComponent(owner)}`,
-    );
-    if (!rows || rows.length === 0) return null;
-    // Reconstruct the newest row (defensive — owner is a unique key, but a
-    // stale duplicate should never win).
+    const result = await sb().sbRpc<SaveRow | SaveRow[] | null>('get_save', {
+      p_owner: owner,
+    });
+    // PostgREST returns `returns table` results as an array; tolerate a bare
+    // object defensively.
+    const rows = Array.isArray(result) ? result : result ? [result] : [];
+    if (rows.length === 0) return null;
     const newest = rows.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+    if (typeof newest.payload !== 'string') return null;
     let parsed: Record<string, string> = {};
     try {
       const obj = JSON.parse(newest.payload);
@@ -222,13 +223,10 @@ class SupabaseCloudProvider implements CloudProvider {
 
   async hasNewerSave(localTimestamp: number): Promise<boolean> {
     const owner = await getCloudOwnerId();
-    const rows = await sb().sbSelect<{ timestamp: number }>(
-      'saves',
-      `select=timestamp&owner=eq.${encodeURIComponent(owner)}`,
-    );
-    if (!rows || rows.length === 0) return false;
-    const remoteMax = rows.reduce((max, r) => (r.timestamp > max ? r.timestamp : max), 0);
-    return remoteMax > localTimestamp;
+    const remote = await sb().sbRpc<number | null>('get_save_timestamp', {
+      p_owner: owner,
+    });
+    return typeof remote === 'number' && remote > localTimestamp;
   }
 
   getName(): string {

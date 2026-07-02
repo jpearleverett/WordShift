@@ -83,7 +83,7 @@ export interface WeeklyQuestGenerationContext {
 // Quest Templates
 // ============================================================================
 
-interface QuestTemplate {
+export interface QuestTemplate {
   type: QuestType;
   titleTemplate: string;
   descTemplate: string;
@@ -93,8 +93,9 @@ interface QuestTemplate {
   difficulty?: Difficulty;
 }
 
-// Daily quest pool — achievable in a dedicated single session
-const DAILY_QUEST_POOL: QuestTemplate[] = [
+// Daily quest pool — achievable in a dedicated single session.
+// Exported for the economy guard test (sink quests must stay net-negative).
+export const DAILY_QUEST_POOL: QuestTemplate[] = [
   // NOTE: single-action dailies (target 1, or trivially met by one puzzle) are
   // tuned LOW on purpose — on a first HARD no-hints solve, several of these
   // complete at once, and over-rewarding that one action floods early amber and
@@ -120,8 +121,9 @@ const DAILY_QUEST_POOL: QuestTemplate[] = [
   { type: 'tend_amber', titleTemplate: 'Daily Tending', descTemplate: 'Deepen the pattern by {target} amber', darkDescTemplate: 'Tend the pattern with {target} amber today', target: 100, rewardAmber: 25 },
 ];
 
-// Weekly quest pool — harder, multi-day objectives with bigger rewards
-const WEEKLY_QUEST_POOL: QuestTemplate[] = [
+// Weekly quest pool — harder, multi-day objectives with bigger rewards.
+// Exported for the economy guard test (sink quests must stay net-negative).
+export const WEEKLY_QUEST_POOL: QuestTemplate[] = [
   { type: 'solve_count', titleTemplate: 'Dedicated Shifter', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} incantations for the arrangement', target: 15, rewardAmber: 85 },
   { type: 'solve_count', titleTemplate: 'Word Marathon', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: 'The void hungers for {target} offerings', target: 28, rewardAmber: 150 },
   { type: 'solve_count', titleTemplate: 'Relentless', descTemplate: 'Complete {target} puzzles this week', darkDescTemplate: '{target} arrangements. No rest.', target: 40, rewardAmber: 220 },
@@ -137,9 +139,13 @@ const WEEKLY_QUEST_POOL: QuestTemplate[] = [
   { type: 'visit_animals', titleTemplate: 'Social Butterfly', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'Every keeper has something to say', target: 9, rewardAmber: 110 },
   { type: 'streak_days', titleTemplate: 'Consistent', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Do not break the chain for {target} days', target: 5, rewardAmber: 80 },
   { type: 'streak_days', titleTemplate: 'Unbroken', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Seven days. The ritual deepens.', target: 7, rewardAmber: 120 },
-  // Sacrifice (Phase 4+ only)
-  { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 100, rewardAmber: 60 },
-  { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 200, rewardAmber: 110 },
+  // Sacrifice (Phase 4+ only). Deliberately net-negative like tend_amber — the
+  // quest can only appear at Phase 4+ where the reward multiplier is 2.0x, so
+  // the base reward must stay below target/2 or the quest becomes an amber
+  // faucet and inverts the sacrifice mechanic's "you get nothing in return"
+  // design. Guarded by the economy test in weeklyQuests.test.ts.
+  { type: 'sacrifice_amber', titleTemplate: 'Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'Sacrifice {target} amber to the void', target: 100, rewardAmber: 30 },
+  { type: 'sacrifice_amber', titleTemplate: 'Greater Offering', descTemplate: 'Offer {target} amber to the arrangement', darkDescTemplate: 'The arrangement hungers for {target} amber', target: 200, rewardAmber: 55 },
   // Tending (Phase 5+ only) — net-negative sink, weekly cadence for the Shrine.
   { type: 'tend_amber', titleTemplate: 'The Long Tending', descTemplate: 'Deepen the pattern by {target} amber this week', darkDescTemplate: 'Tend the pattern with {target} amber', target: 500, rewardAmber: 90 },
 ];

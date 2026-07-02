@@ -75,6 +75,7 @@ jest.mock('../services/localGenerator', () => ({
 
 jest.mock('../services/phaseNarrative', () => ({
   getMoveMessage: jest.fn(() => 'Nice move!'),
+  getComboMoveMessage: jest.fn((_s: number, _p: number) => 'Combo!'),
   getHintMessage: jest.fn((_l: string, _w: string, _p: number) => 'Hint: move letter'),
   getHintFallback: jest.fn(() => 'Try undoing!'),
   getOutOfHintsMessage: jest.fn((_p: number) => 'Out of hints!'),
@@ -102,6 +103,14 @@ jest.mock('../services/puzzleBank', () => ({
   selectPreGeneratedPuzzle: jest.fn(async () => null),
 }));
 
+// The hook value-imports the shared 3-6 challenge word-count bounds from
+// shareResults; mock them so the real module (which imports react-native's
+// Share) never loads in this Node environment.
+jest.mock('../services/shareResults', () => ({
+  MIN_CHALLENGE_WORDS: 3,
+  MAX_CHALLENGE_WORDS: 6,
+}));
+
 // COMMON_WORDS needs to contain all words used in the test puzzle chain
 // and the valid words formed during moves
 jest.mock('../constants', () => ({
@@ -113,6 +122,11 @@ jest.mock('../constants', () => ({
     'SUIT', 'SITE', 'WHAT', 'HERE', 'SCRAP', 'THERE', 'LATER', 'TIMES', 'THEIR',
     // Curated puzzle words
     'GLOW', 'ABLE', 'EACH',
+    // Synthetic chain for multi-move tests: ABCD → EFGH → IJKL
+    // (move A down forming AEFGH, then E down forming EIJKL)
+    'BCD', 'AEFGH', 'AFGH', 'EIJKL',
+    // Synthetic double-shift step: ABCDE → FGHIJ (move A then B → ABFGHIJ)
+    'CDE', 'ABFGHIJ',
   ]),
   CURATED_EARLY_PUZZLES: [
     { words: ['GLOW', 'ABLE', 'EACH'], solution: [
@@ -788,6 +802,518 @@ describe('usePuzzleGame', () => {
 
     test('HARD difficulty gets 1 undo', () => {
       expect(CHALLENGE_MODE_CONFIG.getMaxUndos('HARD')).toBe(1);
+    });
+  });
+
+  // =========================================================================
+  // Slot previews must AND source-word validity (false-positive fix)
+  // =========================================================================
+
+  describe('slotPreviews source-word validity', () => {
+    /** Select the first unlocked letter with the given char from the active row. */
+    function selectLetter(char: string) {
+      const [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        l => l.char === char && !l.isLocked
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+    }
+
+    test('marks ALL slots invalid when removing the selected letter breaks the source word', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      // MIST: removing M leaves IST (not a word). Inserting M into TIED at
+      // slot 2 forms TIMED (a word) — the old target-only preview marked that
+      // slot ✓ even though handleSlotPress would reject the move.
+      actions.initGame(['MIST', 'TIED']);
+      selectLetter('M');
+
+      const [state] = callHook();
+      expect(state.slotPreviews).toBeDefined();
+      expect(state.slotPreviews![2].word).toBe('TIMED');
+      expect(state.slotPreviews!.every(p => !p.isValid)).toBe(true);
+    });
+
+    test('preview validity matches actual move acceptance (the ✗ slot really rejects)', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['MIST', 'TIED']);
+      selectLetter('M');
+
+      let [, actions2] = callHook();
+      const result = await actions2.handleSlotPress(2);
+      expect(result).toBeNull();
+      const [state] = callHook();
+      expect(state.invalidAttempts).toBe(1);
+    });
+
+    test('keeps slots valid when both resulting words are valid', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      // TIME: removing M leaves TIE (valid); slot 2 into TIED forms TIMED (valid)
+      actions.initGame(['TIME', 'TIED']);
+      selectLetter('M');
+
+      const [state] = callHook();
+      expect(state.slotPreviews![2].word).toBe('TIMED');
+      expect(state.slotPreviews![2].isValid).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Hint board glow (hintHighlight)
+  // =========================================================================
+
+  describe('hintHighlight', () => {
+    test('solution-step hint pinpoints the exact tile and slot from step positions', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      const solution = [
+        {
+          stepIndex: 0, sourceWord: 'TIME', targetWord: 'TIED', letterToMove: 'M',
+          explanation: '', removalPosition: 2, insertionPosition: 2,
+        },
+      ];
+      actions.initGame(['TIME', 'TIED'], undefined, solution);
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(state.hintHighlight).not.toBeNull();
+      expect(state.hintHighlight!.rowIndex).toBe(0);
+      expect(state.hintHighlight!.letterIndex).toBe(2);
+      expect(state.hintHighlight!.letterId).toBe(state.rows[0].words[2].id);
+      expect(state.hintHighlight!.targetRowIndex).toBe(1);
+      expect(state.hintHighlight!.targetSlotIndex).toBe(2);
+    });
+
+    test('fallback-search hint (off solution path) still pinpoints letter and slot', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      // No solution provided — handleHint scans the board: moving M leaves TIE
+      // (valid) and inserting at slot 2 forms TIMED (valid).
+      actions.initGame(['TIME', 'TIED']);
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(state.hintHighlight).not.toBeNull();
+      expect(state.hintHighlight!.letterIndex).toBe(2);
+      expect(state.hintHighlight!.targetSlotIndex).toBe(2);
+    });
+
+    test('cleared when a move commits', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+
+      [, actions] = callHook();
+      actions.handleHint(); // fallback search: A → slot 0 (AEFGH)
+      let [state] = callHook();
+      expect(state.hintHighlight).not.toBeNull();
+
+      const a = state.rows[0].words[0];
+      [, actions] = callHook();
+      actions.handleLetterPress(a, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(0);
+
+      [state] = callHook();
+      expect(state.hintHighlight).toBeNull();
+    });
+
+    test('cleared on undo and on a new board', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+
+      // Commit a move, then hint, then undo — the glow must not survive.
+      let [state] = callHook();
+      const a = state.rows[0].words[0];
+      [, actions] = callHook();
+      actions.handleLetterPress(a, 0);
+      [, actions] = callHook();
+      await actions.handleSlotPress(0);
+
+      [, actions] = callHook();
+      actions.handleHint();
+      [state] = callHook();
+      expect(state.hintHighlight).not.toBeNull();
+
+      [, actions] = callHook();
+      actions.handleUndo();
+      [state] = callHook();
+      expect(state.hintHighlight).toBeNull();
+
+      // Hint again, then start a fresh board — glow resets with the board.
+      [, actions] = callHook();
+      actions.handleHint();
+      [state] = callHook();
+      expect(state.hintHighlight).not.toBeNull();
+      [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+      [state] = callHook();
+      expect(state.hintHighlight).toBeNull();
+    });
+  });
+
+  // =========================================================================
+  // Per-move outcomes (honest share grid)
+  // =========================================================================
+
+  describe('moveOutcomes', () => {
+    /** Select the first unlocked letter with the given char, then drop it. */
+    async function playMove(char: string, slot: number, inputSource?: 'tap' | 'drag') {
+      let [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        l => l.char === char && !l.isLocked
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+      [, actions] = callHook();
+      return actions.handleSlotPress(slot, inputSource);
+    }
+
+    test('clean moves record clean, and completion carries the full record', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+
+      const first = await playMove('A', 0); // BCD + AEFGH
+      expect(first?.completed).toBe(false);
+      let [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['clean']);
+
+      const second = await playMove('E', 0); // AFGH + EIJKL — completes
+      expect(second?.completed).toBe(true);
+      expect(second?.moveOutcomes).toEqual(['clean', 'clean']);
+      [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['clean', 'clean']);
+    });
+
+    test('an invalid attempt marks the next committed move as mistake', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+
+      // Invalid drop first (EAFGH is not a word), then the valid slot.
+      const bad = await playMove('A', 1);
+      expect(bad).toBeNull();
+      let [, actions2] = callHook();
+      await actions2.handleSlotPress(0); // letter still selected
+
+      const [state] = callHook();
+      expect(state.invalidAttempts).toBe(1);
+      expect(state.moveOutcomes).toEqual(['mistake']);
+    });
+
+    test('a delivered hint marks the next committed move as hint; hint+mistake → both', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+
+      [, actions] = callHook();
+      actions.handleHint(); // delivered via fallback search
+      await playMove('A', 0);
+      let [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['hint']);
+
+      // Second move: hint + invalid attempt → both
+      [, actions] = callHook();
+      actions.handleHint();
+      const bad = await playMove('E', 2); // IJEKL is not a word
+      expect(bad).toBeNull();
+      [, actions] = callHook();
+      const done = await actions.handleSlotPress(0);
+      expect(done?.completed).toBe(true);
+      [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['hint', 'both']);
+    });
+
+    test('undo pops the entry and re-marks the redone move (grid stays honest)', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+
+      [, actions] = callHook();
+      actions.handleHint();
+      await playMove('A', 0);
+      let [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['hint']);
+
+      [, actions] = callHook();
+      actions.handleUndo();
+      [state] = callHook();
+      expect(state.moveOutcomes).toEqual([]);
+
+      // Redo without a new hint — the earlier hint still marks this move.
+      await playMove('A', 0);
+      [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['hint']);
+    });
+
+    test('resets on a new board', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      await playMove('A', 0);
+      let [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['clean']);
+
+      [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+      [state] = callHook();
+      expect(state.moveOutcomes).toEqual([]);
+    });
+
+    test('double shift records one outcome per completed two-letter step', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+
+      // drop1 (half a move) — no outcome yet
+      await playMove('A', 0);
+      let [state] = callHook();
+      expect(state.doubleShiftPhase).toBe('pick2');
+      expect(state.moveOutcomes).toEqual([]);
+
+      // drop2 completes the step: source CDE, target ABFGHIJ
+      const result = await playMove('B', 1);
+      expect(result?.completed).toBe(true);
+      [state] = callHook();
+      expect(state.moveOutcomes).toEqual(['clean']);
+    });
+  });
+
+  // =========================================================================
+  // Arrival mark (tap-path landing juice)
+  // =========================================================================
+
+  describe('lastArrival', () => {
+    async function playMove(char: string, slot: number, inputSource?: 'tap' | 'drag') {
+      let [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        l => l.char === char && !l.isLocked
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+      [, actions] = callHook();
+      return actions.handleSlotPress(slot, inputSource);
+    }
+
+    test('null on a fresh board', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      const [state] = callHook();
+      expect(state.lastArrival).toBeNull();
+    });
+
+    test('set with landing spot and direction on a committed tap move', async () => {
+      resetHookState();
+      let [state, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      [state] = callHook();
+      const movedId = state.rows[0].words[0].id;
+
+      await playMove('A', 0);
+      [state] = callHook();
+      expect(state.lastArrival).not.toBeNull();
+      expect(state.lastArrival!.rowIndex).toBe(1);
+      expect(state.lastArrival!.slotIndex).toBe(0);
+      expect(state.lastArrival!.letterId).toBe(movedId);
+      expect(state.lastArrival!.direction).toBe('down');
+      expect(state.lastArrival!.moveId).toBeGreaterThan(0);
+    });
+
+    test('NOT set for drag-drop input (drag keeps its own feedback)', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+
+      await playMove('A', 0, 'drag');
+      const [state] = callHook();
+      expect(state.lastArrival).toBeNull();
+    });
+
+    test('cleared by undo', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      await playMove('A', 0);
+      let [state] = callHook();
+      expect(state.lastArrival).not.toBeNull();
+
+      [, actions] = callHook();
+      actions.handleUndo();
+      [state] = callHook();
+      expect(state.lastArrival).toBeNull();
+    });
+
+    test('reverse ascent arrivals travel up', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED'], undefined, undefined, 4, 'reverse');
+
+      // Descend: M → TIMED
+      await playMove('M', 2);
+      let [state] = callHook();
+      expect(state.lastArrival!.direction).toBe('down');
+      expect(state.moveDirection).toBe('up');
+
+      // Ascend: D from TIMED back up → TIED
+      await playMove('D', 3);
+      [state] = callHook();
+      expect(state.lastArrival!.direction).toBe('up');
+      expect(state.lastArrival!.rowIndex).toBe(0);
+    });
+
+    test('double-shift drop1 half-move also marks an arrival on the tap path', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+
+      await playMove('A', 0);
+      const [state] = callHook();
+      expect(state.doubleShiftPhase).toBe('pick2');
+      expect(state.lastArrival).not.toBeNull();
+      expect(state.lastArrival!.rowIndex).toBe(1);
+      expect(state.lastArrival!.slotIndex).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // Shared challenge boards
+  // =========================================================================
+
+  describe('startSharedChallengeGame', () => {
+    test('starts a standard, hint-enabled board from a valid chain', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      // Lowercase input exercises normalization; player was in challenge mode.
+      actions.setGameMode('challenge');
+      [, actions] = callHook();
+      const ok = actions.startSharedChallengeGame(['lime', 'time', 'tied']);
+      expect(ok).toBe(true);
+
+      const [state] = callHook();
+      expect(state.rows.map(r => r.originalWord)).toEqual(['LIME', 'TIME', 'TIED']);
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.currentVariant).toBe('standard');
+      expect(state.gameMode).toBe('standard');
+      expect(state.undosRemaining).toBe(Infinity);
+      expect(state.currentWordLength).toBe(4);
+      // The player's difficulty preference is untouched.
+      expect(state.difficulty).toBe('MEDIUM');
+    });
+
+    test('rejects a chain containing a non-dictionary word without touching the board', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      const ok = actions.startSharedChallengeGame(['LIME', 'TIME', 'ZZZZ']);
+      expect(ok).toBe(false);
+
+      const [state] = callHook();
+      expect(state.rows).toHaveLength(0);
+      expect(state.gameState).toBe(GameState.IDLE);
+    });
+
+    test('rejects mismatched word lengths', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      expect(actions.startSharedChallengeGame(['LIME', 'TIME', 'TIE'])).toBe(false);
+      const [state] = callHook();
+      expect(state.gameState).toBe(GameState.IDLE);
+    });
+
+    test('rejects chains outside the shared 3-6 word bound or malformed', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      expect(actions.startSharedChallengeGame(['TIME'])).toBe(false);
+      [, actions] = callHook();
+      // 2-word chains are below the MIN_CHALLENGE_WORDS bound shared with
+      // encode/decodeChallengeLink — even when both words are valid.
+      expect(actions.startSharedChallengeGame(['TIME', 'TIED'])).toBe(false);
+      [, actions] = callHook();
+      expect(actions.startSharedChallengeGame([])).toBe(false);
+      [, actions] = callHook();
+      // 7 words exceeds MAX_CHALLENGE_WORDS
+      expect(
+        actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED', 'LIME', 'TIME', 'TIED', 'LIME'])
+      ).toBe(false);
+      [, actions] = callHook();
+      // Word lengths outside the 3-7 dictionary range
+      expect(actions.startSharedChallengeGame(['AB', 'CD', 'EF'])).toBe(false);
+
+      const [state] = callHook();
+      expect(state.gameState).toBe(GameState.IDLE);
+    });
+  });
+
+  // =========================================================================
+  // Speed rescue (continue from Time's Up)
+  // =========================================================================
+
+  describe('resumeSpeedAfterRescue', () => {
+    test('from GAME_OVER returns to PLAYING and raises the rescue signal', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      [, actions] = callHook();
+      actions.setGameState(GameState.GAME_OVER);
+
+      [, actions] = callHook();
+      const ok = actions.resumeSpeedAfterRescue(20);
+      expect(ok).toBe(true);
+
+      const [state] = callHook();
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.speedRescueSignal).toEqual({ extraSec: 20, id: 1 });
+    });
+
+    test('is a no-op outside GAME_OVER', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']); // PLAYING
+
+      [, actions] = callHook();
+      const ok = actions.resumeSpeedAfterRescue(20);
+      expect(ok).toBe(false);
+
+      const [state] = callHook();
+      expect(state.gameState).toBe(GameState.PLAYING);
+      expect(state.speedRescueSignal).toBeNull();
+    });
+
+    test('rejects a non-positive grant and stays in GAME_OVER', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      [, actions] = callHook();
+      actions.setGameState(GameState.GAME_OVER);
+
+      [, actions] = callHook();
+      expect(actions.resumeSpeedAfterRescue(0)).toBe(false);
+      const [state] = callHook();
+      expect(state.gameState).toBe(GameState.GAME_OVER);
+      expect(state.speedRescueSignal).toBeNull();
+    });
+
+    test('rescue signal resets with a new board', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      [, actions] = callHook();
+      actions.setGameState(GameState.GAME_OVER);
+      [, actions] = callHook();
+      actions.resumeSpeedAfterRescue(15);
+
+      [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      const [state] = callHook();
+      expect(state.speedRescueSignal).toBeNull();
     });
   });
 });

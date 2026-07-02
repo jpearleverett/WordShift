@@ -5,17 +5,18 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
   StatusBar,
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { useScreenInsets } from '../hooks/useScreenInsets';
 import {
   getGroupedEntries,
   getGalleryStats,
   getGalleryTitle,
   getGallerySubtitle,
+  getPhaseEraName,
   WhisperEntry,
 } from '../services/whisperGallery';
 import { ANIMAL_INFO } from '../services/animalDialogue';
@@ -33,6 +34,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
   phase,
   onClose,
 }) => {
+  const screenInsets = useScreenInsets();
   const [grouped, setGrouped] = useState<Record<string, WhisperEntry[]>>({});
   const [totalCollected, setTotalCollected] = useState(0);
   const [expandedAnimal, setExpandedAnimal] = useState<string | null>(null);
@@ -69,8 +71,8 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
     <View style={[styles.container, { backgroundColor: bgColor }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Header — safe-area top inset applied inline */}
+      <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={onClose}
@@ -88,7 +90,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(40, screenInsets.bottom) }]}
         showsVerticalScrollIndicator={false}
       >
         {loading && (
@@ -137,12 +139,15 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                   key={entry.id || i}
                   style={[styles.entryCard, { backgroundColor: entryBg, borderColor: entryBorder }]}
                 >
-                  <Text style={[styles.entryType, { color: textColor }]}>
+                  <Text
+                    style={[styles.entryType, { color: textColor }]}
+                    accessibilityLabel={getPhaseEraName(entry.phase)}
+                  >
                     {entry.type === 'whisper' ? '💭' :
                      entry.type === 'dialogue' ? '💬' :
                      entry.type === 'cross_reference' ? '🔗' :
                      entry.type === 'trigger_reaction' ? '⚡' : '📜'}
-                    {' '}Phase {entry.phase}
+                    {' '}{getPhaseEraName(entry.phase)}
                   </Text>
                   <Text style={[styles.entryText, { color: textColor }]}>
                     &ldquo;{entry.text}&rdquo;
@@ -165,7 +170,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
+    // paddingTop applied inline via useScreenInsets (safe-area aware)
     paddingBottom: 12,
   },
   backButton: {

@@ -1,15 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
 import { getLocalDateString } from './dateUtils';
+import { getWinBackMessage } from './phaseNarrative';
 
 /**
  * Push notification scheduling service for WordShift.
  *
  * Schedules local notifications for:
- * - Daily puzzle reminders (morning)
+ * - Daily puzzle reminders (morning, 7-day one-shot ladder)
  * - Streak-at-risk reminders (evening of the first missed day, streak >= 2)
- * - Re-engagement after inactivity (1-2 days depending on streak)
- * - Phase-aware animal messages (Phase 3+)
+ * - Escalating win-back ladder after inactivity (+1/+3/+7 days, 6pm)
+ * - Weekly-quest-expiry nudge (Sunday evening before the reset)
+ *
+ * Every notification carries a content.data.target payload ('daily' | 'home')
+ * so a tap can be routed by App.tsx's notification-response listener.
  *
  * Uses expo-notifications when available, falls back to no-op.
  * All notification logic is self-contained so the rest of the app
@@ -32,7 +36,7 @@ export interface NotificationPreferences {
 
 interface ScheduledNotification {
   id: string;
-  type: 'daily_reminder' | 'reengagement' | 'streak_risk' | 'animal_message' | 'quest_expiry';
+  type: 'daily_reminder' | 'win_back' | 'streak_risk' | 'animal_message' | 'quest_expiry';
   scheduledAt: number;
 }
 
@@ -69,33 +73,8 @@ const DAILY_REMINDER_MESSAGES: Record<number, string[]> = {
   ],
 };
 
-const REENGAGEMENT_MESSAGES: Record<number, string[]> = {
-  0: [
-    'Ember is wondering where you\'ve been! Come say hi.',
-    'Your animal friends miss you! Solve a puzzle today.',
-    'The house feels quiet without you. Come back and play!',
-  ],
-  1: [
-    'Your friends have been talking about you...',
-    'The house waits. Your friends have new thoughts to share.',
-  ],
-  2: [
-    'The animals have noticed your absence. Come back.',
-    'The house is quieter. But the walls still remember.',
-  ],
-  3: [
-    'The animals are... waiting. They need you to continue.',
-    'Your absence has been noted. The arrangement pauses.',
-  ],
-  4: [
-    'The keepers await your return. The pattern is incomplete.',
-    'The arrangement cannot continue without you.',
-  ],
-  5: [
-    'The house is quiet. The pattern waits, unhurried.',
-    'Your friends are at peace. They\'ll be here when you return.',
-  ],
-};
+// Win-back (lapsed-player) copy lives in phaseNarrative.getWinBackMessage —
+// phase-aware AND rung-aware (+1/+3/+7 days), escalating in tone.
 
 // {streak} is replaced with the player's current streak length
 const STREAK_RISK_MESSAGES: Record<number, string[]> = {
@@ -310,10 +289,11 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday);
   }
 
-  // Re-engagement ladder. Players with an active streak hear about the
-  // streak first (tomorrow evening), then standard re-engagement a day
-  // later; everyone else gets re-engaged tomorrow. Each app session
-  // reschedules, so these only fire on days the player actually missed.
+  // Win-back ladder. Players with an active streak hear about the streak
+  // first (this/next evening), then the win-back ladder starts a day later;
+  // everyone else starts the ladder tomorrow. Rungs escalate at +1, +3 and
+  // +7 days. Each app session reschedules, so these only fire on days the
+  // player actually missed — an active player never sees a win-back.
   if (prefs.reengagementEnabled) {
     const streak = await getCurrentStreakSafe();
     // Streak-risk only fires when genuinely at risk: a real streak (>= 2) that
@@ -323,7 +303,7 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     if (hasStreakRisk) {
       await scheduleStreakRisk(mod, currentPhase, streak);
     }
-    await scheduleReengagement(mod, currentPhase, hasStreakRisk ? 2 : 1);
+    await scheduleWinBackLadder(mod, currentPhase, hasStreakRisk ? 2 : 1);
 
     // Weekly-quest-expiry nudge: the evening before the weekly reset, but only
     // when the player has quests in flight (progress made, or completed-but-
@@ -346,16 +326,15 @@ export async function cancelAllNotifications(): Promise<void> {
 }
 
 /**
- * Get a phase-aware notification message.
+ * Get a phase-aware daily-reminder message. Win-back copy comes from
+ * phaseNarrative.getWinBackMessage (phase- and rung-aware).
  */
 export function getNotificationMessage(
-  type: 'daily' | 'reengagement',
+  type: 'daily',
   phase: number
 ): string {
   const clampedPhase = Math.min(5, Math.max(0, phase));
-  const messages = type === 'daily'
-    ? DAILY_REMINDER_MESSAGES[clampedPhase]
-    : REENGAGEMENT_MESSAGES[clampedPhase];
+  const messages = DAILY_REMINDER_MESSAGES[clampedPhase];
   return messages[Math.floor(Math.random() * messages.length)];
 }
 
@@ -383,7 +362,13 @@ export function getQuestExpiryMessage(phase: number): string {
 // ============================================================================
 
 /** How many days ahead the daily reminder is pre-armed as one-shots. */
-const DAILY_REMINDER_LOOKAHEAD_DAYS = 3;
+const DAILY_REMINDER_LOOKAHEAD_DAYS = 7;
+
+/**
+ * Days-from-reschedule offsets for the escalating win-back ladder. Rung 1
+ * shifts to +2 for streak holders (the streak-risk ping leads the ladder).
+ */
+const WIN_BACK_RUNG_OFFSETS: [number, number, number] = [1, 3, 7];
 
 async function scheduleDailyReminder(
   mod: any,
@@ -424,6 +409,7 @@ async function scheduleDailyReminder(
           title: 'WordShift',
           body: message,
           sound: true,
+          data: { target: 'daily' },
         },
         trigger: {
           date: triggerDate,
@@ -433,28 +419,42 @@ async function scheduleDailyReminder(
   } catch {}
 }
 
-async function scheduleReengagement(
+/**
+ * Escalating win-back ladder for lapsed players: 6pm one-shots at +1, +3 and
+ * +7 days after the reschedule (rung 1 shifts to firstRungDays for streak
+ * holders, whose streak-risk ping leads the ladder). Every session cancels and
+ * reschedules everything, so active players never see a rung fire — each rung
+ * only lands on a day the player genuinely hasn't launched by then.
+ */
+async function scheduleWinBackLadder(
   mod: any,
   phase: number,
-  daysFromNow: number
+  firstRungDays: number
 ): Promise<void> {
-  const message = getNotificationMessage('reengagement', phase);
-  try {
-    const triggerDate = new Date();
-    triggerDate.setDate(triggerDate.getDate() + daysFromNow);
-    triggerDate.setHours(18, 0, 0, 0); // 6pm
+  const rungs: { rung: 1 | 2 | 3; daysFromNow: number }[] = [
+    { rung: 1, daysFromNow: firstRungDays },
+    { rung: 2, daysFromNow: WIN_BACK_RUNG_OFFSETS[1] },
+    { rung: 3, daysFromNow: WIN_BACK_RUNG_OFFSETS[2] },
+  ];
+  for (const { rung, daysFromNow } of rungs) {
+    try {
+      const triggerDate = new Date();
+      triggerDate.setDate(triggerDate.getDate() + daysFromNow);
+      triggerDate.setHours(18, 0, 0, 0); // 6pm
 
-    await mod.scheduleNotificationAsync({
-      content: {
-        title: 'WordShift',
-        body: message,
-        sound: true,
-      },
-      trigger: {
-        date: triggerDate,
-      },
-    });
-  } catch {}
+      await mod.scheduleNotificationAsync({
+        content: {
+          title: 'WordShift',
+          body: getWinBackMessage(phase, rung),
+          sound: true,
+          data: { target: 'home' },
+        },
+        trigger: {
+          date: triggerDate,
+        },
+      });
+    } catch {}
+  }
 }
 
 /**
@@ -533,6 +533,7 @@ async function scheduleQuestExpiry(mod: any, phase: number): Promise<void> {
         title: 'WordShift',
         body: message,
         sound: true,
+        data: { target: 'home' },
       },
       trigger: {
         date: triggerDate,
@@ -566,6 +567,7 @@ async function scheduleStreakRisk(
         title: 'WordShift',
         body: message,
         sound: true,
+        data: { target: 'daily' },
       },
       trigger: {
         date: triggerDate,

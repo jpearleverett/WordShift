@@ -102,6 +102,39 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
   let loadedInterstitial: any | null = null;
   let loadedRewarded: any | null = null;
 
+  /** Single-flight UMP consent gate; fulfills once consent is resolved. */
+  let consentPromise: Promise<void> | null = null;
+
+  /**
+   * Gather UMP consent (Google EU User Consent Policy). Resolves once consent
+   * is obtained / not required / errored ("error-continue" — ads then serve
+   * non-personalized). MUST complete before any ad request is made; single-
+   * flight so init + ensureAdConsent() share one flow and the form never
+   * double-presents.
+   */
+  function resolveConsent(): Promise<void> {
+    if (!consentPromise) {
+      consentPromise = (async () => {
+        const AdsConsent = mod?.AdsConsent;
+        if (!AdsConsent) return;
+        try {
+          if (typeof AdsConsent.gatherConsent === 'function') {
+            // One-shot helper: requestInfoUpdate + load/show form if required.
+            await AdsConsent.gatherConsent();
+          } else {
+            await AdsConsent.requestInfoUpdate();
+            if (typeof AdsConsent.loadAndShowConsentFormIfRequired === 'function') {
+              await AdsConsent.loadAndShowConsentFormIfRequired();
+            }
+          }
+        } catch {
+          /* error-continue — ads still serve non-personalized */
+        }
+      })();
+    }
+    return consentPromise;
+  }
+
   /** Build + preload an interstitial; resolves when ready (or times out). */
   function preloadInterstitial(): Promise<void> {
     if (!mod || !interstitialId) return Promise.resolve();
@@ -175,26 +208,28 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
       // is the mobileAds() initializer. Conflating them makes every ad request throw
       // silently (ads never load, 0 requests reach AdMob).
       mod = loaded;
-      try {
-        const mobileAds = loaded.default ?? loaded;
-        await mobileAds().initialize();
-        ready = true;
-        // NOTE: GDPR/UMP consent + iOS ATT are deliberately NOT requested here.
-        // This runs in the cold-start bootstrap, and a consent/tracking dialog
-        // before the player has seen a single frame is the classic permission-
-        // wall anti-pattern (hurts D1, especially for EEA users). Consent/ATT are
-        // deferred to first actual ad exposure via `ensureAdConsent()` in ads.ts,
-        // which calls `requestConsentIfNeeded()` / `requestATTIfNeeded()` below.
-        // The first preloaded ad may serve non-personalized; subsequent loads are
-        // personalized once consent resolves — an acceptable trade for not
-        // interrupting the first session.
-        //
-        // Warm one of each so the first show is instant.
-        await Promise.all([preloadInterstitial(), preloadRewarded()]);
-      } catch (error) {
-        console.warn('[Ads] AdMob initialize failed:', error);
-        ready = false;
-      }
+      // EU User Consent Policy: UMP consent must be RESOLVED (obtained /
+      // not-required / error-continue) before ANY ad request leaves the device,
+      // so the consent gate runs strictly before SDK init + preloads. The whole
+      // chain is fired in the background — never awaited — because this runs in
+      // the cold-start boot gate: initialize() resolves immediately instead of
+      // blocking the app on a consent form or ad-network round-trips. `ready`
+      // flips once the SDK is up; the show paths already treat !ready as
+      // "no ad this time".
+      void resolveConsent()
+        .then(async () => {
+          const mobileAds = loaded.default ?? loaded;
+          await mobileAds().initialize();
+          ready = true;
+          // Warm one of each so the first show is instant — fired, not awaited
+          // (each preload keeps its own retry/timeout guard).
+          preloadInterstitial();
+          preloadRewarded();
+        })
+        .catch((error) => {
+          console.warn('[Ads] AdMob initialize failed:', error);
+          ready = false;
+        });
     },
 
     async requestATTIfNeeded(): Promise<void> {
@@ -210,15 +245,35 @@ export function createAdMobAdProvider(config: AdMobConfig = {}): AdProvider {
 
     async requestConsentIfNeeded(): Promise<void> {
       if (!mod) return;
+      // Single-flight with the init-time gate: consent normally resolved during
+      // initialize(), so this (called from ensureAdConsent at first ad exposure)
+      // is a cheap await on the same settled promise.
+      await resolveConsent();
+    },
+
+    async privacyOptionsRequired(): Promise<boolean> {
+      if (!mod?.AdsConsent || typeof mod.AdsConsent.getConsentInfo !== 'function') return false;
       try {
-        const AdsConsent = mod.AdsConsent;
-        if (!AdsConsent) return;
-        await AdsConsent.requestInfoUpdate();
-        if (typeof AdsConsent.loadAndShowConsentFormIfRequired === 'function') {
-          await AdsConsent.loadAndShowConsentFormIfRequired();
-        }
+        // Wait for the consent flow first: on a fresh session getConsentInfo
+        // reports UNKNOWN until requestInfoUpdate has run, which would hide the
+        // (EEA-required) Privacy Options row from Settings on early opens.
+        await resolveConsent();
+        const info = await mod.AdsConsent.getConsentInfo();
+        // AdsConsentPrivacyOptionsRequirementStatus.REQUIRED === 'REQUIRED'
+        return info?.privacyOptionsRequirementStatus === 'REQUIRED';
       } catch {
-        /* non-fatal — ads still serve non-personalized */
+        return false;
+      }
+    },
+
+    async showPrivacyOptions(): Promise<void> {
+      if (!mod?.AdsConsent || typeof mod.AdsConsent.showPrivacyOptionsForm !== 'function') return;
+      try {
+        // The form needs up-to-date consent info; the init-time gate provides it.
+        await resolveConsent();
+        await mod.AdsConsent.showPrivacyOptionsForm();
+      } catch {
+        /* non-fatal */
       }
     },
 

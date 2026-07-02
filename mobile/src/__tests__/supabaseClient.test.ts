@@ -20,7 +20,6 @@ import {
   getSentryDsn,
   getBackendIdentity,
   sbFetch,
-  sbSelect,
   sbInsert,
   sbRpc,
 } from '../services/supabaseClient';
@@ -64,15 +63,14 @@ describe('supabaseClient', () => {
 
   describe('no network when unconfigured', () => {
     test('every helper resolves to null and fetch is never called', async () => {
-      expect(await sbFetch('saves')).toBeNull();
-      expect(await sbSelect('saves', 'select=*')).toBeNull();
-      expect(await sbInsert('saves', { a: 1 })).toBeNull();
+      expect(await sbFetch('rpc/get_save')).toBeNull();
+      expect(await sbInsert('events', { a: 1 })).toBeNull();
       expect(await sbRpc('bump', {})).toBeNull();
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
     test('helpers never throw when disabled', async () => {
-      await expect(sbSelect('saves', 'select=*')).resolves.toBeNull();
+      await expect(sbRpc('get_save', {})).resolves.toBeNull();
     });
   });
 
@@ -81,38 +79,33 @@ describe('supabaseClient', () => {
       mockExtra = { supabaseUrl: 'https://x.supabase.co', supabaseAnonKey: 'anon-key' };
     });
 
-    test('sbSelect issues a GET with auth headers to the rest endpoint', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => [{ id: 1 }],
-      });
-      const rows = await sbSelect<{ id: number }>('saves', 'select=*&owner=eq.abc');
-      expect(rows).toEqual([{ id: 1 }]);
+    test('sbInsert posts with auth headers to the rest endpoint', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 204 });
+      await sbInsert('events', { type: 'x' }, { returning: false });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toBe('https://x.supabase.co/rest/v1/saves?select=*&owner=eq.abc');
-      expect(init.method).toBe('GET');
+      expect(url).toBe('https://x.supabase.co/rest/v1/events');
+      expect(init.method).toBe('POST');
       expect(init.headers.apikey).toBe('anon-key');
       expect(init.headers.Authorization).toBe('Bearer anon-key');
-    });
-
-    test('sbInsert with upsert sends merge-duplicates Prefer header', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({
-        ok: true,
-        status: 200,
-        json: async () => [{ id: 1 }],
-      });
-      await sbInsert('saves', { owner: 'abc' }, { upsert: true, onConflict: 'owner' });
-      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toContain('on_conflict=owner');
-      expect(init.method).toBe('POST');
-      expect(init.headers.Prefer).toContain('resolution=merge-duplicates');
+      expect(init.headers.Prefer).toBe('return=minimal');
     });
 
     test('sbInsert returns [] on a 204 success without representation', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 204 });
       const result = await sbInsert('events', { type: 'x' }, { returning: false });
       expect(result).toEqual([]);
+    });
+
+    test('sbInsert has no upsert path — legacy options are ignored, no on_conflict', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 204 });
+      await sbInsert(
+        'events',
+        { type: 'x' },
+        { upsert: true, onConflict: 'owner', returning: false } as never,
+      );
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).not.toContain('on_conflict');
+      expect(init.headers.Prefer).not.toContain('merge-duplicates');
     });
 
     test('sbRpc posts to the rpc endpoint and returns the result', async () => {
@@ -129,18 +122,53 @@ describe('supabaseClient', () => {
 
     test('a non-ok response resolves to null, not a throw', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 });
-      expect(await sbSelect('saves', 'select=*')).toBeNull();
+      expect(await sbRpc('get_save', {})).toBeNull();
     });
 
     test('a fetch rejection resolves to null, not a throw', async () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error('network down'));
-      expect(await sbSelect('saves', 'select=*')).toBeNull();
+      expect(await sbRpc('get_save', {})).toBeNull();
     });
 
     test('getBackendIdentity returns the persisted anonymous install id', async () => {
       const id = await getBackendIdentity();
       expect(typeof id).toBe('string');
       expect(id.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('capability-URL hardening: no direct-table read path in the client', () => {
+    // Everything except the INSERT-only telemetry `events` sink must go through
+    // SECURITY DEFINER RPCs (docs/supabase/security_setup.sql). Guard against a
+    // regression that reintroduces a PostgREST table select anywhere.
+    const SERVICE_FILES = [
+      'supabaseClient.ts',
+      'cloudSave.ts',
+      'leaderboard.ts',
+      'socialProof.ts',
+      'telemetry.ts',
+    ];
+
+    test('the client exports no table-select helper', () => {
+      const mod = require('../services/supabaseClient');
+      expect(mod.sbSelect).toBeUndefined();
+    });
+
+    test('no backend service builds a direct-table select query', () => {
+      const fs = require('fs');
+      const path = require('path');
+      for (const file of SERVICE_FILES) {
+        const src = fs.readFileSync(
+          path.join(__dirname, '..', 'services', file),
+          'utf8',
+        );
+        expect(src).not.toMatch(/sbSelect/);
+        // PostgREST reads are built as `?select=...` querystrings — none allowed.
+        expect(src).not.toMatch(/select=/);
+        // No owner/date row filters outside RPC bodies either.
+        expect(src).not.toMatch(/owner=eq\./);
+        expect(src).not.toMatch(/date=eq\./);
+      }
     });
   });
 });

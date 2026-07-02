@@ -12,6 +12,9 @@ import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { AmberInline } from './AmberInline';
 import { DailyLoginGrant, DAILY_LOGIN_REWARDS, DAILY_LOGIN_CYCLE_LENGTH } from '../services/dailyLoginReward';
 import { getSettingsSync } from '../services/settings';
+// First-ever-claim copy — a brand-new player has never left, so "Welcome Back"
+// is wrong. Lives in phaseNarrative with the rest of the player-facing text.
+import { getDailyLoginFirstClaimCopy } from '../services/phaseNarrative';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
@@ -78,6 +81,7 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
   if (!grant) return null;
 
   const claimedDay = grant.day;
+  const firstClaimCopy = grant.isFirstClaim ? getDailyLoginFirstClaimCopy(phase) : null;
 
   return (
     <Modal
@@ -100,10 +104,16 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
           <View style={[styles.glow, { backgroundColor: phaseTheme.victoryGlowColor }]} />
 
           <Text style={[styles.title, { color: phaseTheme.modalTextColor }]}>
-            Welcome Back
+            {firstClaimCopy ? firstClaimCopy.title : 'Welcome Back'}
           </Text>
 
-          {grant.reset && (
+          {firstClaimCopy && (
+            <Text style={[styles.resetLine, { color: phaseTheme.modalSecondaryTextColor }]}>
+              {firstClaimCopy.subtitle}
+            </Text>
+          )}
+
+          {!firstClaimCopy && grant.reset && (
             <Text style={[styles.resetLine, { color: phaseTheme.modalSecondaryTextColor }]}>
               A new chain begins
             </Text>
@@ -167,7 +177,8 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
             <Text style={[styles.claimedText, { color: phaseTheme.modalTextColor }]}>
               You received <AmberInline size={18} /> {grant.amount + grant.comebackBonus}
             </Text>
-            {grant.comebackBonus > 0 && (
+            {/* Win-back line — a first claim can never be a comeback. */}
+            {!grant.isFirstClaim && grant.comebackBonus > 0 && (
               <Text style={[styles.jackpotText, { color: CandyColors.yellow.dark }]}>
                 +{grant.comebackBonus} welcome-back bonus
               </Text>

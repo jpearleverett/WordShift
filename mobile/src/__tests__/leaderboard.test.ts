@@ -18,7 +18,6 @@ import {
   submitDailyResult,
   getDailyRank,
   getBeatPercentText,
-  DailyScoreRow,
 } from '../services/leaderboard';
 import { getBackendIdentity } from '../services/supabaseClient';
 
@@ -66,9 +65,9 @@ describe('leaderboard', () => {
       mockExtra = { ...CONFIGURED };
     });
 
-    test('submitDailyResult posts an upsert keyed on owner,date', async () => {
+    test('submitDailyResult posts through the submit_daily_score RPC', async () => {
       (global.fetch as jest.Mock).mockResolvedValue(
-        okJson([{ owner: 'o', date: '2026-06-21', time_ms: 1000, stars: 3, hints: 0 }])
+        okJson([{ owner: 'o', date: '2026-06-21', time_ms: 1001, stars: 3, hints: 1, handle: 'anon' }])
       );
 
       const owner = await getBackendIdentity();
@@ -80,30 +79,48 @@ describe('leaderboard', () => {
         handle: 'anon',
       });
 
-      expect(r).not.toBeNull();
+      expect(r).toEqual({
+        owner: 'o',
+        date: '2026-06-21',
+        time_ms: 1001,
+        stars: 3,
+        hints: 1,
+        handle: 'anon',
+      });
       const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
-      expect(url).toContain('/rest/v1/daily_scores');
-      expect(url).toContain('on_conflict=owner%2Cdate');
+      expect(url).toBe('https://x.supabase.co/rest/v1/rpc/submit_daily_score');
       expect(init.method).toBe('POST');
-      expect(init.headers.Prefer).toContain('resolution=merge-duplicates');
       const sent = JSON.parse(init.body);
-      expect(sent.owner).toBe(owner);
-      expect(sent.date).toBe('2026-06-21');
-      expect(sent.time_ms).toBe(1001); // rounded
-      expect(sent.stars).toBe(3);
-      expect(sent.hints).toBe(1);
-      expect(sent.handle).toBe('anon');
+      expect(sent.p_owner).toBe(owner);
+      expect(sent.p_date).toBe('2026-06-21');
+      expect(sent.p_time_ms).toBe(1001); // rounded
+      expect(sent.p_stars).toBe(3);
+      expect(sent.p_hints).toBe(1);
+      expect(sent.p_handle).toBe('anon');
     });
 
     test('submitDailyResult clamps negatives and defaults handle to null', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue(okJson([]));
+      (global.fetch as jest.Mock).mockResolvedValue(
+        okJson([{ owner: 'o', date: '2026-06-21', time_ms: 0, stars: 0, hints: 0, handle: null }])
+      );
       await submitDailyResult({ date: '2026-06-21', timeMs: -5, stars: -1, hintsUsed: -3 });
       const init = (global.fetch as jest.Mock).mock.calls[0][1];
       const sent = JSON.parse(init.body);
-      expect(sent.time_ms).toBe(0);
-      expect(sent.stars).toBe(0);
-      expect(sent.hints).toBe(0);
-      expect(sent.handle).toBeNull();
+      expect(sent.p_time_ms).toBe(0);
+      expect(sent.p_stars).toBe(0);
+      expect(sent.p_hints).toBe(0);
+      expect(sent.p_handle).toBeNull();
+    });
+
+    test('submitDailyResult returns null when the server rejects the score (empty RPC result)', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(okJson([]));
+      const r = await submitDailyResult({
+        date: '2026-06-21',
+        timeMs: 999999999, // absurd — server bounds-check rejects
+        stars: 3,
+        hintsUsed: 0,
+      });
+      expect(r).toBeNull();
     });
 
     test('getDailyRank uses the RPC result when present', async () => {
@@ -114,7 +131,6 @@ describe('leaderboard', () => {
       expect(r).toEqual({ rank: 3, total: 100, percentile: 97 });
       const [url] = (global.fetch as jest.Mock).mock.calls[0];
       expect(url).toContain('/rest/v1/rpc/daily_rank');
-      // RPC succeeded → no fallback select.
       expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
     });
 
@@ -127,74 +143,38 @@ describe('leaderboard', () => {
       expect(r).toEqual({ rank: 1, total: 10, percentile: 100 });
     });
 
-    test('getDailyRank falls back to client-side ranking when RPC is empty', async () => {
-      const owner = await getBackendIdentity();
-      const rows: DailyScoreRow[] = [
-        { owner: 'a', date: '2026-06-21', time_ms: 500, stars: 3, hints: 0 },
-        { owner: 'b', date: '2026-06-21', time_ms: 800, stars: 3, hints: 0 },
-        { owner, date: '2026-06-21', time_ms: 1200, stars: 3, hints: 0 },
-        { owner: 'd', date: '2026-06-21', time_ms: 2000, stars: 2, hints: 1 },
-      ];
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null)) // RPC absent/empty
-        .mockResolvedValueOnce(okJson(rows)); // fallback select
-
-      const r = await getDailyRank('2026-06-21');
-      // 2 players strictly better → rank 3 of 4.
-      // beaten = 1 (player d), of 3 others → 33%.
-      expect(r).toEqual({ rank: 3, total: 4, percentile: 33 });
-      const [, secondUrl] = (global.fetch as jest.Mock).mock.calls.map((c) => c[0]);
-      expect(secondUrl).toContain('/rest/v1/daily_scores');
-      expect(secondUrl).toContain('date=eq.2026-06-21');
-    });
-
-    test('client-side tie-break: more stars beats slower-by-stars at equal time', async () => {
-      const owner = await getBackendIdentity();
-      const rows: DailyScoreRow[] = [
-        { owner: 'a', date: 'd', time_ms: 1000, stars: 3, hints: 0 }, // better (more stars)
-        { owner, date: 'd', time_ms: 1000, stars: 2, hints: 0 },
-      ];
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null))
-        .mockResolvedValueOnce(okJson(rows));
-      const r = await getDailyRank('d');
-      expect(r).toEqual({ rank: 2, total: 2, percentile: 0 });
-    });
-
-    test('getDailyRank returns null when the player has no row in fallback', async () => {
-      const rows: DailyScoreRow[] = [
-        { owner: 'someone', date: 'd', time_ms: 500, stars: 3, hints: 0 },
-      ];
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null))
-        .mockResolvedValueOnce(okJson(rows));
-      const r = await getDailyRank('d');
-      expect(r).toBeNull();
-    });
-
-    test('getDailyRank returns null when there is no data at all', async () => {
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null))
-        .mockResolvedValueOnce(okJson([]));
-      const r = await getDailyRank('d');
-      expect(r).toBeNull();
-    });
-  });
-
-  describe('percentile math (via lone-player RPC and fallback)', () => {
-    beforeEach(() => {
-      mockExtra = { ...CONFIGURED };
-    });
-
     test('a lone player beats 0% of others', async () => {
-      const owner = await getBackendIdentity();
-      (global.fetch as jest.Mock)
-        .mockResolvedValueOnce(okJson(null))
-        .mockResolvedValueOnce(
-          okJson([{ owner, date: 'd', time_ms: 100, stars: 3, hints: 0 }])
-        );
-      const r = await getDailyRank('d');
+      (global.fetch as jest.Mock).mockResolvedValue(okJson([{ rank: 1, total: 1 }]));
+      const r = await getDailyRank('2026-06-21');
       expect(r).toEqual({ rank: 1, total: 1, percentile: 0 });
+    });
+
+    test('getDailyRank degrades to "no rank shown" (null) when the RPC is empty — NO table fallback', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(okJson(null));
+      const r = await getDailyRank('2026-06-21');
+      expect(r).toBeNull();
+      // Exactly one request, and it was the RPC — never a daily_scores select.
+      const calls = (global.fetch as jest.Mock).mock.calls;
+      expect(calls.length).toBe(1);
+      expect(calls[0][0]).toContain('/rest/v1/rpc/daily_rank');
+      expect(calls[0][0]).not.toContain('/rest/v1/daily_scores');
+    });
+
+    test('getDailyRank degrades to null when the RPC is missing (404) — never crashes', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 404 });
+      await expect(getDailyRank('2026-06-21')).resolves.toBeNull();
+      expect((global.fetch as jest.Mock).mock.calls.length).toBe(1);
+    });
+
+    test('no leaderboard call ever enumerates the daily_scores table', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(okJson(null));
+      await submitDailyResult({ date: '2026-06-21', timeMs: 1, stars: 1, hintsUsed: 0 });
+      await getDailyRank('2026-06-21');
+      for (const [url, init] of (global.fetch as jest.Mock).mock.calls) {
+        expect(url).toContain('/rest/v1/rpc/');
+        expect(url).not.toContain('/rest/v1/daily_scores');
+        expect(init.method).toBe('POST');
+      }
     });
   });
 

@@ -23,6 +23,14 @@ interface LetterTileProps {
   isResonant?: boolean;
   /** Tutorial guidance highlight for the recommended tile */
   isGuided?: boolean;
+  /**
+   * When set (and changed), plays the arrival settle: the tile scales in from
+   * ~0.65 and slides from the direction it travelled, replacing the tap-path
+   * teleport. Provided only for the letter just placed by a committed tap move.
+   */
+  arrivalMoveId?: number;
+  /** Direction the letter travelled: 'down' = it came from the row above. */
+  arrivalDirection?: 'down' | 'up';
 }
 
 // Compact tile dimensions for 6+ letter words
@@ -42,6 +50,8 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   compact = false,
   isResonant = false,
   isGuided = false,
+  arrivalMoveId,
+  arrivalDirection,
 }) => {
   const settings = getSettingsSync();
 
@@ -54,6 +64,8 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   const trailGlowAnim = useRef(new Animated.Value(0)).current;
   const resonanceAnim = useRef(new Animated.Value(0)).current;
   const guidePulseAnim = useRef(new Animated.Value(0)).current;
+  const arrivalScaleAnim = useRef(new Animated.Value(1)).current;
+  const arrivalTranslateYAnim = useRef(new Animated.Value(0)).current;
 
   // Loop refs for proper cleanup (prevents memory leaks)
   const glowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -63,6 +75,7 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   const trailGlowLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const resonanceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const guideLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const arrivalAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const trailParticleAnims = useRef(
     Array.from({ length: 4 }, () => ({
       opacity: new Animated.Value(0),
@@ -378,6 +391,51 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- guidePulseAnim is a stable ref
   }, [isGuided, settings.reducedMotion]);
 
+  // Arrival settle: the tile just placed by a committed tap move scales in
+  // from ~0.65 and slides from the direction it travelled, settling with the
+  // phase-aware spring (heavy at Phase 4, bouncy at Phase 0). Replaces the
+  // tap-path teleport; drag-drops are suppressed upstream (they keep the
+  // floating-tile collapse + catch bounce).
+  useEffect(() => {
+    if (!arrivalMoveId) return;
+    if (settings.reducedMotion || shouldSimplifyAnimations()) {
+      arrivalScaleAnim.setValue(1);
+      arrivalTranslateYAnim.setValue(0);
+      return;
+    }
+
+    const springParams = getSelectedSpringParams();
+    arrivalScaleAnim.setValue(0.65);
+    // 'down' move = the letter came from the row above → slide down into place.
+    arrivalTranslateYAnim.setValue(arrivalDirection === 'up' ? 14 : -14);
+    const arrivalAnim = Animated.parallel([
+      Animated.spring(arrivalScaleAnim, {
+        toValue: 1,
+        friction: springParams.friction,
+        tension: springParams.tension,
+        useNativeDriver: true,
+      }),
+      Animated.spring(arrivalTranslateYAnim, {
+        toValue: 0,
+        friction: springParams.friction,
+        tension: springParams.tension,
+        useNativeDriver: true,
+      }),
+    ]);
+    arrivalAnimRef.current = arrivalAnim;
+    arrivalAnim.start();
+
+    return () => {
+      if (arrivalAnimRef.current) {
+        arrivalAnimRef.current.stop();
+        arrivalAnimRef.current = null;
+      }
+      arrivalScaleAnim.setValue(1);
+      arrivalTranslateYAnim.setValue(0);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- anim values are stable refs; direction/phase ride with moveId
+  }, [arrivalMoveId, settings.reducedMotion]);
+
   // Particle trail for selected tiles
   useEffect(() => {
     if (!isSelected || settings.reducedMotion || shouldSimplifyAnimations()) {
@@ -622,8 +680,10 @@ const LetterTileComponent: React.FC<LetterTileProps> = ({
         compact && { width: COMPACT_TILE_W, height: COMPACT_OUTER_H, marginHorizontal: COMPACT_TILE_MARGIN_H },
         {
           transform: [
-            { scale: scaleAnim },
-            { translateY: bounceAnim },
+            // Arrival settle composes with the press/bounce animations
+            // (arrival values rest at 1/0 outside the settle window).
+            { scale: Animated.multiply(scaleAnim, arrivalScaleAnim) },
+            { translateY: Animated.add(bounceAnim, arrivalTranslateYAnim) },
             { rotate: isSelected ? wobbleRotate : '0deg' },
           ],
         },

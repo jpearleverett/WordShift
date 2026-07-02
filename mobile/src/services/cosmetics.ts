@@ -69,6 +69,29 @@ export const COSMETICS: CosmeticItem[] = [
     description: 'A hushed, desaturated set for the terrible peace.',
     acquisition: { kind: 'amber', cost: 500 },
   },
+  // Late-game amber tile themes — deeper sinks for players sitting on a full
+  // house and a long faucet tail. Palettes live in TILE_THEMES (theme/colors.ts).
+  {
+    id: 'theme_verdant',
+    category: 'tile_theme',
+    name: 'Garden-grown',
+    description: 'Lush greens from the garden. Some of them still lean toward the light.',
+    acquisition: { kind: 'amber', cost: 650 },
+  },
+  {
+    id: 'theme_static',
+    category: 'tile_theme',
+    name: 'Between-signals',
+    description: 'The gray between stations, and one cold signal that is not noise.',
+    acquisition: { kind: 'amber', cost: 800 },
+  },
+  {
+    id: 'theme_sovereign',
+    category: 'tile_theme',
+    name: 'Crown-of-the-pattern',
+    description: 'Deep violet and old gold, for the one the pattern favors.',
+    acquisition: { kind: 'amber', cost: 1000 },
+  },
   {
     id: 'theme_patron',
     category: 'tile_theme',
@@ -97,6 +120,21 @@ export const COSMETICS: CosmeticItem[] = [
     name: 'Ember Rain',
     description: 'Embers raining upward, to match a kept fire.',
     acquisition: { kind: 'amber', cost: 350 },
+  },
+  // Late-game amber confetti, matching the Garden-grown / Crown-of-the-pattern themes.
+  {
+    id: 'confetti_verdant',
+    category: 'confetti',
+    name: 'Garden Fall',
+    description: 'Green things falling, as if the garden let them go.',
+    acquisition: { kind: 'amber', cost: 450 },
+  },
+  {
+    id: 'confetti_sovereign',
+    category: 'confetti',
+    name: 'Crowned Fall',
+    description: 'Violet and old gold for a well-arranged victory.',
+    acquisition: { kind: 'amber', cost: 550 },
   },
   // "The Keeper's Collection" — a one-time IAP cosmetic bundle. Both items are
   // owned together via the COSMETIC_BUNDLE entitlement (granted by the bundle

@@ -11,7 +11,11 @@ import {
   getUnclaimedAmber,
   clearWeeklyQuests,
   recordAnimalVisit,
+  getPhaseRewardMultiplier,
+  DAILY_QUEST_POOL,
+  WEEKLY_QUEST_POOL,
   Quest,
+  QuestTemplate,
   CombinedQuestState,
 } from '../services/weeklyQuests';
 
@@ -737,6 +741,45 @@ describe('weeklyQuests', () => {
       const updatedQuest = allUpdated.find(q => q.id === tendQuest.id);
       expect(updatedQuest?.progress).toBeGreaterThanOrEqual(40);
     });
+  });
+
+  // ===========================================================================
+  // Economy guard: sink quests must stay net-negative
+  // ===========================================================================
+
+  describe('sink quests are net-negative at every phase they can appear', () => {
+    // Mirrors the generation gates in generateQuestsFromPool: sacrifice_amber
+    // appears at Phase 4+, tend_amber at Phase 5+ (max phase is 5). At every
+    // one of those phases, the phase-scaled claim reward must be STRICTLY less
+    // than the amber the quest asks the player to destroy/tend — otherwise the
+    // quest becomes an amber faucet and inverts the sink's "you get nothing in
+    // return" design.
+    const MAX_PHASE = 5;
+    const SINK_QUEST_PHASES: Record<string, number[]> = {
+      sacrifice_amber: [4, 5],
+      tend_amber: [5],
+    };
+    const allTemplates: QuestTemplate[] = [...DAILY_QUEST_POOL, ...WEEKLY_QUEST_POOL];
+
+    it.each(Object.entries(SINK_QUEST_PHASES))(
+      '%s scaled reward is strictly less than the amber spent',
+      (type, phases) => {
+        const templates = allTemplates.filter(t => t.type === type);
+        // If the templates vanish or get renamed this guard must fail loudly,
+        // not silently pass on an empty list.
+        expect(templates.length).toBeGreaterThan(0);
+        expect(Math.max(...phases)).toBe(MAX_PHASE);
+
+        for (const template of templates) {
+          for (const phase of phases) {
+            const scaledReward = Math.round(
+              template.rewardAmber * getPhaseRewardMultiplier(phase)
+            );
+            expect(scaledReward).toBeLessThan(template.target);
+          }
+        }
+      }
+    );
   });
 
   // ===========================================================================

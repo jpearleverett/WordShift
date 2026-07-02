@@ -2504,3 +2504,119 @@ const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = 
 export function getNotificationPromptText(phase: DialoguePhase): NotificationPromptText {
   return NOTIFICATION_PROMPT_TEXT[phase];
 }
+
+// ============================================================================
+// WIN-BACK NOTIFICATION COPY — Lapsed-player ladder (+1 / +3 / +7 days).
+// Indexed by rung - 1. Tone escalates across rungs within each phase:
+// rung 1 is a gentle nudge the day after going quiet, rung 2 leans harder
+// after a few days, rung 3 marks a full week away. Phase register follows
+// the usual arc — warm at 0-1, quietly unsettling at 2-3, reverent at 4,
+// serene at 5.
+// ============================================================================
+
+const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string]> = {
+  0: [
+    'Ember saved your spot by the fire! Come solve a puzzle.',
+    'Your animal friends keep asking about you. The puzzles miss you too!',
+    'A whole week! The house is still cozy, and everyone\'s waiting — come say hi.',
+  ],
+  1: [
+    'The house has been thinking about you. So have the words.',
+    'Your friends have gathered new thoughts to share. They\'re saving them for you.',
+    'A week of quiet. The patterns wait patiently for your return.',
+  ],
+  2: [
+    'The house is quieter without you.',
+    'Three days of stillness. The animals still speak of you — always in the present tense.',
+    'A week now. The rooms remember your footsteps. The words remember your hands.',
+  ],
+  3: [
+    'The house is quieter without you. The animals have noticed.',
+    'Something pauses while you are away. It does not like pausing.',
+    'Seven days. The house has held its breath the whole time.',
+  ],
+  4: [
+    'The arrangement is incomplete without you.',
+    'The keepers hold your place at the pattern. They are patient. It is less so.',
+    'Seven days of silence. What comes through still waits for your hand.',
+  ],
+  5: [
+    'The house rests. It will be here when you return.',
+    'The pattern continues, unhurried. Your friends think of you fondly.',
+    'A week has passed, gently. Nothing is lost. Return whenever you like.',
+  ],
+};
+
+export function getWinBackMessage(phase: number, rung: 1 | 2 | 3): string {
+  const clampedPhase = Math.min(5, Math.max(0, Math.floor(phase))) as DialoguePhase;
+  return WIN_BACK_MESSAGES[clampedPhase][rung - 1];
+}
+
+// ─── Small interaction copy (toasts, alerts, buttons) ───────────────────────
+
+/** Toast shown when the one-time first-daily hint mercy is granted. */
+export function getFirstDailyMercyMessage(phase: number, hints: number): string {
+  if (phase >= 5) return `+${hints} hints. The pattern provides.`;
+  if (phase >= 4) return `+${hints} hints. The first offering is always guided.`;
+  if (phase >= 2) return `+${hints} hints for your first daily. Use them well.`;
+  return `+${hints} hints for your first daily — good luck!`;
+}
+
+/** Label for the rewarded continue on the speed Time's-Up overlay. */
+export function getSpeedRescueLabel(phase: number, seconds: number): string {
+  if (phase >= 5) return `Continue (+${seconds}s)`;
+  if (phase >= 4) return `It isn't finished (+${seconds}s)`;
+  if (phase >= 2) return `Not yet (+${seconds}s)`;
+  return `Keep going (+${seconds}s)`;
+}
+
+/** Alert body when a daily deep link / notification arrives before the daily is unlocked. */
+export function getDailyLockedMessage(phase: number): string {
+  if (phase >= 4) return 'The daily offering is not yet yours. Solve more, and it opens.';
+  if (phase >= 2) return 'The daily ritual is still closed to you. A few more puzzles first.';
+  return 'The Daily Challenge is still locked — solve a few more puzzles to open it.';
+}
+
+/** Alert body for a malformed friend-challenge link. */
+export function getBadChallengeLinkMessage(phase: number): string {
+  if (phase >= 4) return 'The link is broken. Its words never arrived.';
+  if (phase >= 2) return 'That challenge link could not be read. Its words are lost.';
+  return 'That challenge link could not be read.';
+}
+
+/** Alert body for a well-formed challenge link whose words cannot make a board. */
+export function getUnplayableChallengeMessage(phase: number): string {
+  if (phase >= 4) return 'The words arrived, but they refuse the arrangement.';
+  if (phase >= 2) return 'That challenge could not be read — its words refuse the board.';
+  return 'That challenge could not be read — its words are not playable.';
+}
+
+/** Label for the friend-challenge share button on the share preview. */
+export function getChallengeFriendLabel(phase: number): string {
+  if (phase >= 5) return '⚔️ Pass the pattern along';
+  if (phase >= 4) return '⚔️ Draw a friend in';
+  if (phase >= 2) return '⚔️ Send this to a friend';
+  return '⚔️ Challenge a friend';
+}
+
+/** Cosmetic-shop → Store bridge row (title + subtitle). */
+export function getShopStoreBridgeText(phase: number): { title: string; subtitle: string } {
+  if (phase >= 5) return { title: 'A little more amber?', subtitle: 'The Store is always open.' };
+  if (phase >= 4) return { title: 'The pattern asks more than you hold?', subtitle: 'The Store provides.' };
+  if (phase >= 2) return { title: 'Short on amber?', subtitle: 'The Store carries more.' };
+  return { title: 'Need more amber?', subtitle: 'Amber packs are available in the Store.' };
+}
+
+/** Title/subtitle for the very first daily-login reward claim. */
+export function getDailyLoginFirstClaimCopy(phase: number): { title: string; subtitle: string } {
+  if (phase >= 5) {
+    return { title: 'The House Knows You', subtitle: 'A small gift for each day you return' };
+  }
+  if (phase >= 4) {
+    return { title: 'The House Has Been Waiting', subtitle: 'Each return is counted' };
+  }
+  if (phase >= 2) {
+    return { title: 'The House Welcomes You', subtitle: 'It notices each day you visit' };
+  }
+  return { title: 'Welcome to the House', subtitle: 'A little gift for every day you visit' };
+}

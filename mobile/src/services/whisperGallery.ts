@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PHASE_DESCRIPTIONS, DialoguePhase } from '../types/homeWorld';
 
 /**
  * Whisper Gallery — Collectible dialogue and whisper archive.
@@ -179,6 +180,23 @@ export async function getGalleryStats(): Promise<{
     byPhase,
     byType,
   };
+}
+
+// ============================================================================
+// Era Names (display-only)
+// ============================================================================
+
+/**
+ * Get the poetic era name for a phase (clamped to the known 0-5 range).
+ * Delegates to the canonical PHASE_DESCRIPTIONS titles in types/homeWorld so
+ * the gallery never drifts from the rest of the game. Display-only: internal
+ * phase numbers in data/storage stay numeric. The player must never see a
+ * literal "Phase N" label (narrative rule: the phase system is invisible to
+ * the player).
+ */
+export function getPhaseEraName(phase: number): string {
+  const clamped = Math.max(0, Math.min(5, Math.floor(phase))) as DialoguePhase;
+  return PHASE_DESCRIPTIONS[clamped].title;
 }
 
 /**

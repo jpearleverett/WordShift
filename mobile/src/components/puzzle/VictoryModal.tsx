@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   ScrollView,
   Animated,
@@ -100,6 +101,8 @@ interface VictoryModalProps {
   onReturnHome: () => void;
   onGoToPit: () => void;
   onShare: () => void;
+  /** Tap-anywhere during the entrance choreography — skips stars/modal animation */
+  onSkip?: () => void;
   // Onboarding mode
   isOnboarding?: boolean;
   onOnboardingContinue?: () => void;
@@ -171,6 +174,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onReturnHome,
   onGoToPit,
   onShare,
+  onSkip,
   isOnboarding,
   onOnboardingContinue,
   variant,
@@ -197,6 +201,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const contentOpacity2 = useRef(new Animated.Value(0)).current;
   const contentOpacity3 = useRef(new Animated.Value(0)).current;
   const contentOpacity4 = useRef(new Animated.Value(0)).current;
+  // While the entrance choreography (stars + content cascade) runs, a
+  // tap-anywhere layer skips it; once complete the layer unmounts so the
+  // action buttons receive touches normally.
+  const [entranceComplete, setEntranceComplete] = useState(false);
+  const cascadeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -207,20 +216,45 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         contentOpacity2.setValue(1);
         contentOpacity3.setValue(1);
         contentOpacity4.setValue(1);
+        setEntranceComplete(true);
         return;
       }
+      setEntranceComplete(false);
       contentOpacity1.setValue(0);
       contentOpacity2.setValue(0);
       contentOpacity3.setValue(0);
       contentOpacity4.setValue(0);
-      Animated.stagger(200, [
+      const cascade = Animated.stagger(200, [
         Animated.timing(contentOpacity1, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity2, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity3, { toValue: 1, duration: 350, useNativeDriver: true }),
         Animated.timing(contentOpacity4, { toValue: 1, duration: 350, useNativeDriver: true }),
-      ]).start();
+      ]);
+      cascadeAnimRef.current = cascade;
+      cascade.start(({ finished }) => {
+        cascadeAnimRef.current = null;
+        // stop() (skip/hide) fires with finished:false — skip handles the state.
+        if (finished) setEntranceComplete(true);
+      });
+      return () => {
+        cascade.stop();
+        cascadeAnimRef.current = null;
+      };
     }
+    setEntranceComplete(false);
   }, [visible]);
+
+  const handleSkipEntrance = useCallback(() => {
+    cascadeAnimRef.current?.stop();
+    cascadeAnimRef.current = null;
+    contentOpacity1.setValue(1);
+    contentOpacity2.setValue(1);
+    contentOpacity3.setValue(1);
+    contentOpacity4.setValue(1);
+    setEntranceComplete(true);
+    // Let the orchestrator snap the star/modal animation to its final state
+    onSkip?.();
+  }, [contentOpacity1, contentOpacity2, contentOpacity3, contentOpacity4, onSkip]);
 
   if (!visible) return null;
 
@@ -777,6 +811,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             </Animated.View>
           </Animated.View>
         </ScrollView>
+
+        {/* Tap-anywhere-to-skip layer — only mounted while the entrance
+            choreography runs, so completed modals pass touches straight
+            through to the action buttons. */}
+        {!entranceComplete && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleSkipEntrance}
+            accessibilityRole="button"
+            accessibilityLabel="Skip celebration animation"
+          />
+        )}
       </View>
   );
 };

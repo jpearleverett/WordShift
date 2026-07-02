@@ -2,6 +2,7 @@ import { Share, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { incrementShareCount } from './achievements';
+import { PLAY_STORE_URL } from '../constants/links';
 
 /**
  * Share results system for WordShift
@@ -10,11 +11,20 @@ import { incrementShareCount } from './achievements';
  * for puzzle completions and daily challenges.
  */
 
+/** Outcome of a single committed move, in play order */
+export type MoveOutcome = 'clean' | 'hint' | 'mistake' | 'both';
+
 export interface ShareableResult {
   stars: number;
   difficulty: Difficulty;
   hintsUsed: number;
   invalidAttempts: number;
+  /**
+   * Per-move outcomes in the order they happened. When present, the share grid
+   * is honest — one square per actual move. When absent, falls back to the
+   * legacy distribution (colors the first N squares regardless of position).
+   */
+  moveOutcomes?: MoveOutcome[];
   isDaily?: boolean;
   dailyDate?: string;
   moveCount: number;
@@ -67,11 +77,31 @@ function difficultyEmoji(difficulty: Difficulty): string {
   }
 }
 
+const OUTCOME_SQUARES: Record<MoveOutcome, string> = {
+  clean: '🟩',
+  hint: '🟨',
+  mistake: '🟧',
+  both: '🟥',
+};
+
 /**
- * Generate performance grid (based on hints/mistakes per step)
- * Shows green for clean steps, yellow for hint-needed, red for mistakes
+ * Generate performance grid.
+ *
+ * With `moveOutcomes` (preferred): one square per actual move, in play order —
+ * an honest record of where hints/mistakes happened.
+ * Without: legacy fallback that distributes hint/mistake counts across the
+ * first squares (positional fiction, kept for callers that lack per-move data).
  */
-function performanceGrid(moveCount: number, hintsUsed: number, invalidAttempts: number): string {
+function performanceGrid(
+  moveCount: number,
+  hintsUsed: number,
+  invalidAttempts: number,
+  moveOutcomes?: MoveOutcome[]
+): string {
+  if (moveOutcomes && moveOutcomes.length > 0) {
+    return moveOutcomes.map((outcome) => OUTCOME_SQUARES[outcome]).join('');
+  }
+
   const squares: string[] = [];
   const totalMoves = moveCount;
 
@@ -139,7 +169,9 @@ export function generateShareText(result: ShareableResult): string {
 
   const challengeTag = result.isChallenge ? ' 🔒' : '';
   lines.push(`${starString(result.stars)} ${difficultyEmoji(result.difficulty)} ${result.difficulty}${challengeTag}`);
-  lines.push(performanceGrid(result.moveCount, result.hintsUsed, result.invalidAttempts));
+  lines.push(
+    performanceGrid(result.moveCount, result.hintsUsed, result.invalidAttempts, result.moveOutcomes)
+  );
 
   // Daily challenges are the same puzzle for everyone today, so the word chain
   // and the (word-bearing) incantation name would SPOIL it for friends. Keep the
@@ -172,11 +204,77 @@ export function generateShareText(result: ShareableResult): string {
 
   lines.push('');
   lines.push(getChallengeCTA(result));
+  // Custom-scheme link for recipients who already have the app installed…
   lines.push(challengeLink);
+  // …plus a real install CTA for everyone else (custom schemes are dead links
+  // without the app).
+  lines.push(`Get WordShift: ${PLAY_STORE_URL}`);
 
   // Apply cosmetic frame
   const framed = applyFrame(lines, result.shareFrame);
   return framed.join('\n');
+}
+
+// ─── Friend challenge links ─────────────────────────────────────────────────
+
+const CHALLENGE_LINK_PREFIX = 'wordshift://challenge/p?w=';
+const CHALLENGE_WORD_RE = /^[A-Z]{3,7}$/;
+/**
+ * Single source of truth for the friend-challenge chain size. Shared by
+ * encode/decodeChallengeLink here and usePuzzleGame.startSharedChallengeGame —
+ * keep them importing these rather than restating the bound.
+ */
+export const MIN_CHALLENGE_WORDS = 3;
+export const MAX_CHALLENGE_WORDS = 6;
+
+function isValidChallengeWords(words: unknown): words is string[] {
+  return (
+    Array.isArray(words) &&
+    words.length >= MIN_CHALLENGE_WORDS &&
+    words.length <= MAX_CHALLENGE_WORDS &&
+    words.every((w) => typeof w === 'string' && CHALLENGE_WORD_RE.test(w))
+  );
+}
+
+/**
+ * Encode a starting word chain as a friend-challenge deep link:
+ * 'wordshift://challenge/p?w=WORD1-WORD2-…'.
+ * Requires 3-6 words, each 3-7 uppercase A-Z letters; throws otherwise.
+ */
+export function encodeChallengeLink(words: string[]): string {
+  if (!isValidChallengeWords(words)) {
+    throw new Error('encodeChallengeLink: expected 3-6 words of 3-7 uppercase A-Z letters');
+  }
+  return CHALLENGE_LINK_PREFIX + words.join('-');
+}
+
+/**
+ * Strictly parse a friend-challenge deep link back into its word chain.
+ * Input is untrusted (arbitrary inbound URL) — returns null on ANY deviation
+ * from the exact encodeChallengeLink format.
+ */
+export function decodeChallengeLink(url: string): string[] | null {
+  if (typeof url !== 'string' || !url.startsWith(CHALLENGE_LINK_PREFIX)) return null;
+  const payload = url.slice(CHALLENGE_LINK_PREFIX.length);
+  // Payload may contain ONLY uppercase letters and dashes — rejects extra query
+  // params, fragments, encodings, whitespace, and anything injection-shaped.
+  if (!/^[A-Z-]+$/.test(payload)) return null;
+  const words = payload.split('-');
+  if (!isValidChallengeWords(words)) return null;
+  return words;
+}
+
+/**
+ * Build share text for challenging a friend with a specific starting chain.
+ * The starting words ARE the challenge (non-daily), so encoding them in the
+ * link is not a spoiler; nothing beyond the starting chain is included.
+ */
+export function buildChallengeShareText(words: string[], playerName?: string): string {
+  const link = encodeChallengeLink(words);
+  const taunt = playerName
+    ? `${playerName} challenges you to a WordShift puzzle. Think you can shift it?`
+    : 'I challenge you to a WordShift puzzle. Think you can shift it?';
+  return [taunt, link, `Get WordShift: ${PLAY_STORE_URL}`].join('\n');
 }
 
 const SHARE_BONUS_KEY = 'wordshift_share_bonus_date';
@@ -228,6 +326,25 @@ export async function maybeAwardDailyShareBonus(): Promise<number> {
 export async function recordShareSuccess(): Promise<void> {
   await incrementShareCount();
   await maybeAwardDailyShareBonus();
+}
+
+/**
+ * Share pre-built friend-challenge text via the system share sheet.
+ * Mirrors sharePuzzleResult: a completed share records success (share-count
+ * achievement + once-per-day amber bonus) exactly like the other share paths.
+ */
+export async function shareChallengeText(text: string): Promise<boolean> {
+  try {
+    const shareResult = await Share.share({ message: text });
+    if (shareResult.action === Share.sharedAction) {
+      await recordShareSuccess();
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Failed to share challenge:', err);
+    return false;
+  }
 }
 
 /**

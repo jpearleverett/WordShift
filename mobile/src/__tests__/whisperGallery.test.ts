@@ -7,6 +7,7 @@ import {
   getGalleryStats,
   getGalleryTitle,
   getGallerySubtitle,
+  getPhaseEraName,
   clearWhisperGallery,
   WhisperEntry,
 } from '../services/whisperGallery';
@@ -437,6 +438,43 @@ describe('whisperGallery', () => {
       expect(getGallerySubtitle(0, 0)).toBe('0 moments collected');
       expect(getGallerySubtitle(0, 1)).toBe('1 moments collected');
       expect(getGallerySubtitle(0, 999)).toBe('999 moments collected');
+    });
+  });
+
+  // ===========================================================================
+  // getPhaseEraName
+  // ===========================================================================
+
+  describe('getPhaseEraName', () => {
+    it('returns the canonical PHASE_DESCRIPTIONS title for each phase', () => {
+      // Delegates to types/homeWorld PHASE_DESCRIPTIONS — the single source of
+      // truth for era names (the gallery must never drift from it).
+      expect(getPhaseEraName(0)).toBe('Bright Days');
+      expect(getPhaseEraName(1)).toBe('Curious Thoughts');
+      expect(getPhaseEraName(2)).toBe('Deeper Questions');
+      expect(getPhaseEraName(3)).toBe('Growing Shadows');
+      expect(getPhaseEraName(4)).toBe('The Horizon');
+      expect(getPhaseEraName(5)).toBe('Terrible Peace');
+    });
+
+    it('clamps out-of-range phases to the known era range', () => {
+      expect(getPhaseEraName(-1)).toBe('Bright Days');
+      expect(getPhaseEraName(6)).toBe('Terrible Peace');
+      expect(getPhaseEraName(99)).toBe('Terrible Peace');
+    });
+
+    it('never leaks a literal phase number in any display-string builder', () => {
+      // Narrative rule 7: the phase system must never be revealed to the player.
+      for (let phase = 0; phase <= 5; phase++) {
+        const rendered = [
+          getPhaseEraName(phase),
+          getGalleryTitle(phase),
+          getGallerySubtitle(phase, 42),
+        ];
+        for (const text of rendered) {
+          expect(text).not.toMatch(/Phase \d/i);
+        }
+      }
     });
   });
 

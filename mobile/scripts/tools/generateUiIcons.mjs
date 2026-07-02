@@ -1,4 +1,5 @@
-// Candy-style UI icon sprites: flame (streak), journal book, pit mouth.
+// Candy-style UI icon sprites: flame (streak), journal book, pit mouth,
+// plus the puzzle action-button set (hint bulb, undo arrow, restart arrows).
 // Matches the star/amber set in assets/ui (smooth, supersampled 2x).
 // Run: node scripts/tools/generateUiIcons.mjs
 import zlib from 'zlib';
@@ -73,6 +74,71 @@ function flameLobe(cv, cx, topY, botY, maxR, color, alpha = 1) {
     }
   }
 }
+// thick line segment with round caps (zero-length = filled circle)
+function capsule(cv, x1, y1, x2, y2, th, color, alpha = 1) {
+  const [r, g, b] = hex(color);
+  const half = th / 2;
+  const vx = x2 - x1, vy = y2 - y1, len2 = vx * vx + vy * vy || 1;
+  for (let y = Math.max(0, ~~(Math.min(y1, y2) - half - 2)); y <= Math.min(cv.h - 1, ~~(Math.max(y1, y2) + half + 2)); y++)
+    for (let x = Math.max(0, ~~(Math.min(x1, x2) - half - 2)); x <= Math.min(cv.w - 1, ~~(Math.max(x1, x2) + half + 2)); x++) {
+      const wx = x + 0.5 - x1, wy = y + 0.5 - y1;
+      const t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / len2));
+      const d = Math.hypot(wx - vx * t, wy - vy * t) - half;
+      const a = Math.max(0, Math.min(1, 0.5 - d));
+      if (a > 0) blend(cv, x, y, r, g, b, a * alpha);
+    }
+}
+// thick circular arc stroke with round caps; radians, a0 < a1 (y-down: increasing = clockwise)
+function arcStroke(cv, cx, cy, radius, th, a0, a1, color, alpha = 1) {
+  const [r, g, b] = hex(color);
+  const half = th / 2, ext = radius + half + 2;
+  for (let y = Math.max(0, ~~(cy - ext)); y <= Math.min(cv.h - 1, ~~(cy + ext)); y++)
+    for (let x = Math.max(0, ~~(cx - ext)); x <= Math.min(cv.w - 1, ~~(cx + ext)); x++) {
+      const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+      let ang = Math.atan2(dy, dx);
+      while (ang < a0) ang += Math.PI * 2;
+      if (ang > a1) continue;
+      const d = Math.abs(Math.hypot(dx, dy) - radius) - half;
+      const a = Math.max(0, Math.min(1, 0.5 - d));
+      if (a > 0) blend(cv, x, y, r, g, b, a * alpha);
+    }
+  for (const ang of [a0, a1]) {
+    const px = cx + Math.cos(ang) * radius, py = cy + Math.sin(ang) * radius;
+    capsule(cv, px, py, px, py, th, color, alpha);
+  }
+}
+// filled anti-aliased triangle
+function tri(cv, p0, p1, p2, color, alpha = 1) {
+  const [r, g, b] = hex(color);
+  const xs = [p0[0], p1[0], p2[0]], ys = [p0[1], p1[1], p2[1]];
+  const segD = (px, py, ax, ay, bx, by) => {
+    const vx = bx - ax, vy = by - ay, wx = px - ax, wy = py - ay;
+    const t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / (vx * vx + vy * vy || 1)));
+    return Math.hypot(wx - vx * t, wy - vy * t);
+  };
+  for (let y = Math.max(0, ~~(Math.min(...ys) - 2)); y <= Math.min(cv.h - 1, ~~(Math.max(...ys) + 2)); y++)
+    for (let x = Math.max(0, ~~(Math.min(...xs) - 2)); x <= Math.min(cv.w - 1, ~~(Math.max(...xs) + 2)); x++) {
+      const px = x + 0.5, py = y + 0.5;
+      const s0 = (p1[0] - p0[0]) * (py - p0[1]) - (p1[1] - p0[1]) * (px - p0[0]);
+      const s1 = (p2[0] - p1[0]) * (py - p1[1]) - (p2[1] - p1[1]) * (px - p1[0]);
+      const s2 = (p0[0] - p2[0]) * (py - p2[1]) - (p0[1] - p2[1]) * (px - p2[0]);
+      const inside = (s0 >= 0 && s1 >= 0 && s2 >= 0) || (s0 <= 0 && s1 <= 0 && s2 <= 0);
+      const d = Math.min(segD(px, py, p0[0], p0[1], p1[0], p1[1]), segD(px, py, p1[0], p1[1], p2[0], p2[1]), segD(px, py, p2[0], p2[1], p0[0], p0[1]));
+      const a = Math.max(0, Math.min(1, 0.5 - (inside ? -d : d)));
+      if (a > 0) blend(cv, x, y, r, g, b, a * alpha);
+    }
+}
+// arrowhead riding an arcStroke tip; dir +1 points along increasing angle, -1 decreasing
+function arrowHead(cv, cx, cy, radius, ang, dir, size, color, alpha = 1) {
+  const px = cx + Math.cos(ang) * radius, py = cy + Math.sin(ang) * radius;
+  const tx = -Math.sin(ang) * dir, ty = Math.cos(ang) * dir;
+  const nx = Math.cos(ang), ny = Math.sin(ang);
+  tri(cv,
+    [px + tx * size * 1.2, py + ty * size * 1.2],
+    [px - tx * size * 0.3 + nx * size * 0.9, py - ty * size * 0.3 + ny * size * 0.9],
+    [px - tx * size * 0.3 - nx * size * 0.9, py - ty * size * 0.3 - ny * size * 0.9],
+    color, alpha);
+}
 function down2(cv, ow, oh) {
   const out = Buffer.alloc(ow * oh * 4);
   for (let y = 0; y < oh; y++) for (let x = 0; x < ow; x++) {
@@ -134,4 +200,54 @@ fs.mkdirSync(UI, { recursive: true });
     ellipse(cv, c + dx, c + dy, r, r, '#5FF6DC', 1, 4);          // rising motes
   }
   savePNG(path.join(UI, 'pit.png'), W, W, down2(cv, W, W));
+}
+
+// === hint.png (256) — glowing bulb for the HINT action button ================
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W, by = c - 30; // bulb glass center
+  ellipse(cv, c, by, 214, 214, '#FFE9A0', 0.28, 100);            // ambient glow
+  for (const deg of [-150, -115, -90, -65, -30]) {               // light rays
+    const ang = (deg * Math.PI) / 180;
+    capsule(cv, c + Math.cos(ang) * 164, by + Math.sin(ang) * 164,
+      c + Math.cos(ang) * 212, by + Math.sin(ang) * 212, 24, '#FFE066', 0.95);
+  }
+  ellipse(cv, c + 8, by + 12, 132, 140, '#2A2040', 0.3, 8);      // drop shadow
+  ellipse(cv, c, by, 128, 136, '#F5A623');                       // amber rim
+  ellipse(cv, c - 4, by - 8, 114, 122, '#FFD84D');               // glass
+  ellipse(cv, c - 14, by - 22, 86, 92, '#FFE985');               // inner light
+  ellipse(cv, c - 46, by - 62, 30, 42, '#FFFFFF', 0.85, 12);     // highlight
+  capsule(cv, c - 30, c + 64, c, c + 38, 13, '#E8890C');         // filament V
+  capsule(cv, c, c + 38, c + 30, c + 64, 13, '#E8890C');
+  roundRect(cv, c, c + 130, 56, 34, 12, '#C9C2DE', 1, '#9A93B6'); // screw cap
+  for (const dy of [124, 142]) capsule(cv, c - 46, c + dy, c + 46, c + dy, 9, '#8E86AD');
+  ellipse(cv, c, c + 172, 24, 13, '#8E86AD');                    // contact tip
+  savePNG(path.join(UI, 'hint.png'), W, W, down2(cv, W, W));
+}
+
+// === undo.png (256) — counterclockwise arrow for the UNDO action button ======
+// White glyph over a dark sticker edge so it stays readable on the yellow pill.
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const R = 128, T = 54, a0 = -Math.PI * 0.88, a1 = Math.PI * 0.55, HEAD = 62;
+  arcStroke(cv, c, c + 6, R, T + 22, a0, a1, '#2A2040', 0.85);   // ink edge + grounding
+  arrowHead(cv, c, c + 6, R, a0, -1, HEAD + 13, '#2A2040', 0.85);
+  arcStroke(cv, c, c, R, T, a0, a1, '#FFFFFF');                  // white glyph
+  arrowHead(cv, c, c, R, a0, -1, HEAD, '#FFFFFF');
+  savePNG(path.join(UI, 'undo.png'), W, W, down2(cv, W, W));
+}
+
+// === restart.png (256) — twin refresh arrows for RESTART/NEW =================
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const R = 122, T = 50, HEAD = 58;
+  const arcs = [[-Math.PI * 0.83, -Math.PI * 0.2], [Math.PI * 0.17, Math.PI * 0.8]];
+  for (const [a0, a1] of arcs) {                                  // ink edge + grounding
+    arcStroke(cv, c, c + 6, R, T + 22, a0, a1, '#2A2040', 0.85);
+    arrowHead(cv, c, c + 6, R, a1, 1, HEAD + 13, '#2A2040', 0.85);
+  }
+  for (const [a0, a1] of arcs) {                                  // white glyphs
+    arcStroke(cv, c, c, R, T, a0, a1, '#FFFFFF');
+    arrowHead(cv, c, c, R, a1, 1, HEAD, '#FFFFFF');
+  }
+  savePNG(path.join(UI, 'restart.png'), W, W, down2(cv, W, W));
 }

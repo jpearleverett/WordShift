@@ -26,8 +26,18 @@ jest.mock('@react-native-async-storage/async-storage', () => {
 import {
   generateShareText,
   maybeAwardDailyShareBonus,
+  isDailyShareBonusAvailable,
   DAILY_SHARE_BONUS_AMBER,
+  encodeChallengeLink,
+  decodeChallengeLink,
+  buildChallengeShareText,
+  shareChallengeText,
+  MIN_CHALLENGE_WORDS,
+  MAX_CHALLENGE_WORDS,
 } from '../services/shareResults';
+import { PLAY_STORE_URL, WEB_LANDING_URL } from '../constants/links';
+import { Share } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 describe('shareResults', () => {
   test('generateShareText includes WordShift header for regular puzzles', () => {
@@ -171,6 +181,234 @@ describe('shareResults', () => {
     });
     expect(text).toContain('Play WordShift:');
     expect(text).toContain('wordshift://home');
+  });
+
+  describe('install CTA', () => {
+    test('regular puzzle share includes both the deep link and the store link', () => {
+      const text = generateShareText({
+        stars: 3,
+        difficulty: 'MEDIUM',
+        hintsUsed: 0,
+        invalidAttempts: 0,
+        moveCount: 3,
+      });
+      expect(text).toContain('wordshift://home');
+      expect(text).toContain(PLAY_STORE_URL);
+    });
+
+    test('daily share includes both the daily deep link and the store link', () => {
+      const text = generateShareText({
+        stars: 2,
+        difficulty: 'HARD',
+        hintsUsed: 1,
+        invalidAttempts: 0,
+        isDaily: true,
+        dailyDate: '2026-06-21',
+        moveCount: 5,
+      });
+      expect(text).toContain('wordshift://challenge/daily?date=2026-06-21');
+      expect(text).toContain(PLAY_STORE_URL);
+    });
+
+    test('challenge-mode share includes the store link', () => {
+      const text = generateShareText({
+        stars: 3,
+        difficulty: 'HARD',
+        hintsUsed: 0,
+        invalidAttempts: 0,
+        moveCount: 5,
+        isChallenge: true,
+      });
+      expect(text).toContain(PLAY_STORE_URL);
+    });
+
+    test('framed share still carries the store link', () => {
+      const text = generateShareText({
+        stars: 2,
+        difficulty: 'MEDIUM',
+        hintsUsed: 0,
+        invalidAttempts: 1,
+        moveCount: 3,
+        shareFrame: 'frame_ritual',
+      });
+      expect(text).toContain(PLAY_STORE_URL);
+    });
+
+    test('link constants are real https URLs', () => {
+      expect(PLAY_STORE_URL).toMatch(/^https:\/\/play\.google\.com\//);
+      expect(WEB_LANDING_URL).toMatch(/^https:\/\//);
+    });
+  });
+
+  describe('honest performance grid (moveOutcomes)', () => {
+    test('renders one square per move in play order', () => {
+      const text = generateShareText({
+        stars: 1,
+        difficulty: 'MEDIUM',
+        hintsUsed: 1,
+        invalidAttempts: 2,
+        moveCount: 4,
+        moveOutcomes: ['clean', 'mistake', 'hint', 'both'],
+      });
+      expect(text).toContain('🟩🟧🟨🟥');
+    });
+
+    test('mistake position is preserved (not front-loaded)', () => {
+      const text = generateShareText({
+        stars: 2,
+        difficulty: 'EASY',
+        hintsUsed: 0,
+        invalidAttempts: 1,
+        moveCount: 3,
+        moveOutcomes: ['clean', 'clean', 'mistake'],
+      });
+      // Legacy fallback would front-load: 🟧🟩🟩. Honest grid keeps order.
+      expect(text).toContain('🟩🟩🟧');
+      expect(text).not.toContain('🟧🟩🟩');
+    });
+
+    test('legacy distribution fallback is unchanged when moveOutcomes absent', () => {
+      const text = generateShareText({
+        stars: 2,
+        difficulty: 'EASY',
+        hintsUsed: 0,
+        invalidAttempts: 1,
+        moveCount: 3,
+      });
+      expect(text).toContain('🟧🟩🟩');
+    });
+  });
+
+  describe('friend challenge links', () => {
+    test('encode/decode round-trip', () => {
+      const words = ['FLAME', 'FAME', 'FRAME'];
+      const link = encodeChallengeLink(words);
+      expect(link).toBe('wordshift://challenge/p?w=FLAME-FAME-FRAME');
+      expect(decodeChallengeLink(link)).toEqual(words);
+    });
+
+    test('round-trip at bounds (3-letter and 7-letter words, 6 words)', () => {
+      const words = ['CAT', 'COAT', 'COAST', 'COASTS', 'ROASTED', 'DOG'];
+      expect(decodeChallengeLink(encodeChallengeLink(words))).toEqual(words);
+    });
+
+    test('encode rejects invalid word sets', () => {
+      expect(() => encodeChallengeLink([])).toThrow();
+      expect(() => encodeChallengeLink(['CAT', 'DOG'])).toThrow(); // too few
+      expect(() =>
+        encodeChallengeLink(['CAT', 'DOG', 'FOX', 'OWL', 'BAT', 'RAT', 'PIG'])
+      ).toThrow(); // too many
+      expect(() => encodeChallengeLink(['cat', 'dog', 'fox'])).toThrow(); // lowercase
+      expect(() => encodeChallengeLink(['CAT', 'DOG', 'PANGOLIN'])).toThrow(); // 8 letters
+      expect(() => encodeChallengeLink(['CAT', 'DOG', 'AB'])).toThrow(); // 2 letters
+    });
+
+    test('decode returns null on malformed / untrusted input', () => {
+      const malformed = [
+        '',
+        'wordshift://challenge/p?w=',
+        'wordshift://challenge/p?w=cat-dog-fox', // lowercase
+        'wordshift://challenge/p?w=CAT-DOG', // too few words
+        'wordshift://challenge/p?w=CAT-DOG-FOX-OWL-BAT-RAT-PIG', // too many
+        'wordshift://challenge/p?w=CAT-DOG-PANGOLIN', // 8-letter word
+        'wordshift://challenge/p?w=CAT-DOG-FOX&x=1', // extra param
+        'wordshift://challenge/p?w=CAT-DOG-FOX#frag', // fragment
+        'wordshift://challenge/p?w=CAT DOG FOX', // spaces
+        'wordshift://challenge/p?w=CAT-DOG-F0X', // digit
+        "wordshift://challenge/p?w=CAT-DOG-';DROP", // injection-ish
+        'wordshift://challenge/p?w=CAT-DOG-%46OX', // percent-encoding
+        'wordshift://challenge/p?w=-CAT-DOG-FOX', // leading dash → empty word
+        'wordshift://challenge/p?w=CAT--DOG-FOX', // double dash → empty word
+        'wordshift://challenge/daily', // wrong path
+        'wordshift://home',
+        'https://evil.example/challenge/p?w=CAT-DOG-FOX', // wrong scheme
+        'WORDSHIFT://CHALLENGE/P?W=CAT-DOG-FOX', // wrong-case prefix
+      ];
+      for (const url of malformed) {
+        expect(decodeChallengeLink(url)).toBeNull();
+      }
+    });
+
+    test('buildChallengeShareText includes taunt, deep link, and store link only', () => {
+      const text = buildChallengeShareText(['FLAME', 'FAME', 'FRAME'], 'Ember');
+      expect(text).toContain('Ember');
+      expect(text).toContain('wordshift://challenge/p?w=FLAME-FAME-FRAME');
+      expect(text).toContain(PLAY_STORE_URL);
+      // No spoilers beyond the starting chain: exactly 3 lines.
+      expect(text.split('\n')).toHaveLength(3);
+    });
+
+    test('buildChallengeShareText works without a player name', () => {
+      const text = buildChallengeShareText(['CAT', 'COAT', 'GOAT']);
+      expect(text).toContain('wordshift://challenge/p?w=CAT-COAT-GOAT');
+      expect(text).toContain(PLAY_STORE_URL);
+    });
+
+    test('word-count bounds are exported as the single source of truth (3-6)', () => {
+      // usePuzzleGame.startSharedChallengeGame imports these — keep the two
+      // features on one authoritative limit.
+      expect(MIN_CHALLENGE_WORDS).toBe(3);
+      expect(MAX_CHALLENGE_WORDS).toBe(6);
+    });
+  });
+
+  describe('shareChallengeText', () => {
+    const SHARE_BONUS_KEY = 'wordshift_share_bonus_date';
+    const SHARE_COUNT_KEY = 'wordshift_share_count';
+    const shareMock = Share.share as jest.Mock;
+
+    beforeEach(async () => {
+      shareMock.mockReset();
+      // Leave the once-per-day bonus unclaimed for each test (and for the
+      // later daily-bonus test — this file shares one AsyncStorage store).
+      await AsyncStorage.removeItem(SHARE_BONUS_KEY);
+    });
+
+    afterEach(async () => {
+      await AsyncStorage.removeItem(SHARE_BONUS_KEY);
+    });
+
+    test('completed share records success: share count + daily bonus', async () => {
+      const { getFullProgress, clearProgress } = require('../services/amberCurrency');
+      await clearProgress();
+      await AsyncStorage.removeItem(SHARE_COUNT_KEY);
+      shareMock.mockResolvedValue({ action: 'sharedAction' });
+
+      const text = buildChallengeShareText(['FLAME', 'FAME', 'FRAME']);
+      const ok = await shareChallengeText(text);
+
+      expect(ok).toBe(true);
+      expect(shareMock).toHaveBeenCalledWith({ message: text });
+      // Share-count achievement stat bumped…
+      expect(await AsyncStorage.getItem(SHARE_COUNT_KEY)).toBe('1');
+      // …and the first-share-of-day amber bonus credited, same as the
+      // sharePuzzleResult / image paths.
+      const progress = await getFullProgress();
+      expect(progress.amber).toBe(DAILY_SHARE_BONUS_AMBER);
+      expect(await isDailyShareBonusAvailable()).toBe(false);
+    });
+
+    test('dismissed share sheet records nothing', async () => {
+      await AsyncStorage.removeItem(SHARE_COUNT_KEY);
+      shareMock.mockResolvedValue({ action: 'dismissedAction' });
+
+      const ok = await shareChallengeText('challenge text');
+
+      expect(ok).toBe(false);
+      expect(await AsyncStorage.getItem(SHARE_COUNT_KEY)).toBeNull();
+      expect(await isDailyShareBonusAvailable()).toBe(true);
+    });
+
+    test('share failure resolves false without throwing', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        shareMock.mockRejectedValue(new Error('no share sheet'));
+        await expect(shareChallengeText('challenge text')).resolves.toBe(false);
+        expect(await isDailyShareBonusAvailable()).toBe(true);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
   });
 
   test('daily share bonus is awarded once per day', async () => {

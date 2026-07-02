@@ -47,6 +47,16 @@ describe('Configuration Validation', () => {
       const result = validateDialogueIntegrity();
       expectValid(result);
     });
+
+    test('phase-2 exhaustion pool has exactly 5 extra lines for each of the 10 animals', () => {
+      // The pool lives OUTSIDE the indexed base arrays (base counts stay
+      // 12/14/11/15/15) so existing lastDialogueRead indices are never shifted.
+      const { PHASE2_EXTRA_DIALOGUES } = require('../services/dialogue/animalDialogueBase');
+      expect(Object.keys(PHASE2_EXTRA_DIALOGUES)).toHaveLength(10);
+      for (const lines of Object.values(PHASE2_EXTRA_DIALOGUES) as string[][]) {
+        expect(lines).toHaveLength(5);
+      }
+    });
   });
 
   describe('validatePhaseThresholds', () => {

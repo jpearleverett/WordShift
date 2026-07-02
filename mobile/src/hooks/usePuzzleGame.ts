@@ -20,6 +20,7 @@ import {
   VARIANT_CONFIGS,
   PuzzleVariant,
 } from '../services/puzzleVariety';
+import { MIN_CHALLENGE_WORDS, MAX_CHALLENGE_WORDS, type MoveOutcome } from '../services/shareResults';
 
 // Simple ID generator (React Native compatible)
 let idCounter = 0;
@@ -140,6 +141,38 @@ export function hasAnyValidDoubleShiftMove(
   return false;
 }
 
+/**
+ * Board coordinates for the hint glow. Set when a hint is actually delivered;
+ * reuses the SAME tutorial-guide visuals (LetterTile guide ring / Slot halo).
+ * `targetSlotIndex` may be undefined when only the letter can be pinpointed
+ * (e.g. the first half of a double-shift step).
+ */
+export interface HintHighlight {
+  rowIndex: number;
+  letterIndex: number;
+  /** Id of the letter tile to glow (convenience for Row prop threading). */
+  letterId: string;
+  /** Row the glowing drop slot belongs to (the current target row). */
+  targetRowIndex: number;
+  targetSlotIndex?: number;
+}
+
+/**
+ * Marks where the letter placed by the last committed tap move landed, so the
+ * arriving LetterTile can play its arrival settle instead of teleporting.
+ * Never set for drag-drops (they keep the floating-tile collapse + catch
+ * bounce), initial board layout, undo, or restore-from-autosave.
+ */
+export interface ArrivalMark {
+  rowIndex: number;
+  slotIndex: number;
+  letterId: string;
+  /** Direction the letter travelled: 'down' = from the row above. */
+  direction: 'down' | 'up';
+  /** Monotonic per-board id so consumers can detect a fresh arrival. */
+  moveId: number;
+}
+
 export interface PuzzleGameState {
   rows: RowData[];
   activeRowIndex: number;
@@ -187,6 +220,14 @@ export interface PuzzleGameState {
   hintBalance: number;
   /** Increments each time HINT is tapped with an empty balance (App offers ad/store). */
   outOfHintsSignal: number;
+  /** Board glow for the last delivered hint (null when no hint is active). */
+  hintHighlight: HintHighlight | null;
+  /** Per-committed-move outcomes for the honest share grid, in play order. */
+  moveOutcomes: MoveOutcome[];
+  /** Landing spot of the last committed tap move (null for drag/initial/undo/restore). */
+  lastArrival: ArrivalMark | null;
+  /** Set by resumeSpeedAfterRescue so App can restart the speed clock with the granted seconds. */
+  speedRescueSignal: { extraSec: number; id: number } | null;
 }
 
 export interface PuzzleGameActions {
@@ -204,7 +245,12 @@ export interface PuzzleGameActions {
     variant?: PuzzleVariant
   ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
-  handleSlotPress: (targetIndex: number) => Promise<{
+  /**
+   * Commit a drop into the target row. `inputSource` distinguishes tap from
+   * drag-drop so the arrival settle animation only plays on the tap path
+   * (drag-drops already have the floating-tile collapse + catch bounce).
+   */
+  handleSlotPress: (targetIndex: number, inputSource?: 'tap' | 'drag') => Promise<{
     completed: boolean;
     hintsUsed: number;
     invalidAttempts: number;
@@ -214,6 +260,8 @@ export interface PuzzleGameActions {
     variant?: PuzzleVariant;
     /** True on the reverse-shift move that completes the descent (midpoint). */
     reverseMidpoint?: boolean;
+    /** Full per-move outcome record, present on the completing move (for the share grid). */
+    moveOutcomes?: MoveOutcome[];
   } | null>;
   handleUndo: () => void;
   grantExtraUndo: () => void;
@@ -227,6 +275,22 @@ export interface PuzzleGameActions {
    * player's chosen difficulty preference.
    */
   startDailyGame: (words: string[], puzzleHint: string | undefined, wordLength: number) => void;
+  /**
+   * Start a puzzle from a friend-shared word chain. Mirrors startDailyGame's
+   * bypass pattern: standard, hint-enabled board; the player's difficulty
+   * preference is left untouched. Validates every word is in the dictionary
+   * and all words share one length (the standard-chain shape — rows grow and
+   * shrink by exactly one letter only transiently during a move). Returns
+   * false without touching the board when the input is invalid (App toasts).
+   */
+  startSharedChallengeGame: (words: string[]) => boolean;
+  /**
+   * Speed variant rescue: from GAME_OVER (speed time-up is its only source),
+   * return to PLAYING and raise `speedRescueSignal` so App restarts the clock
+   * with `extraSec`. Returns false (no-op) outside GAME_OVER or for a
+   * non-positive grant. The hook stays the source of truth for gameState.
+   */
+  resumeSpeedAfterRescue: (extraSec: number) => boolean;
   setShowRules: (show: boolean) => void;
   setShowDifficultyMenu: (show: boolean) => void;
   setShowConfetti: (show: boolean) => void;
@@ -284,6 +348,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [doubleShiftPhase, setDoubleShiftPhase] = useState<'pick1' | 'pick2' | 'drop1' | 'drop2' | null>(null);
   const [isEchoPuzzle, setIsEchoPuzzle] = useState(false);
   const [isStuck, setIsStuck] = useState(false);
+  // Hint glow on the board (same visuals as the tutorial guide). Cleared on
+  // any move/undo/restart/new board so a stale glow never outlives its advice.
+  const [hintHighlight, setHintHighlight] = useState<HintHighlight | null>(null);
+  // Per-committed-move outcomes for the honest share grid. A ref mirror keeps
+  // an always-current snapshot so the completion result can carry the full
+  // record atomically (state reads at victory time would be a render behind).
+  const [moveOutcomes, setMoveOutcomes] = useState<MoveOutcome[]>([]);
+  const moveOutcomesRef = useRef<MoveOutcome[]>([]);
+  // Whether a hint / an invalid attempt happened since the last committed move
+  // (classifies the NEXT committed move for the share grid).
+  const pendingHintRef = useRef(false);
+  const pendingMistakeRef = useRef(false);
+  // Arrival settle for the tap path (drag-drops keep their own feedback).
+  const [lastArrival, setLastArrival] = useState<ArrivalMark | null>(null);
+  const arrivalMoveIdRef = useRef(0);
+  // Speed-rescue handshake with App/useSpeedTimer.
+  const [speedRescueSignal, setSpeedRescueSignal] = useState<{ extraSec: number; id: number } | null>(null);
 
   const validWordsCache = useRef<Set<string>>(new Set(COMMON_WORDS));
   const shakeErrorTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -384,6 +465,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMessage(getStartMessage(currentPhase));
     setError(null);
     setIsStuck(false);
+    setHintHighlight(null);
+    moveOutcomesRef.current = [];
+    setMoveOutcomes([]);
+    pendingHintRef.current = false;
+    pendingMistakeRef.current = false;
+    setLastArrival(null);
+    setSpeedRescueSignal(null);
     setHint(puzzleHint || "");
     setSolution(puzzleSolution);
     setReverseSolution(options?.reverseSolution);
@@ -657,6 +745,40 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMessage(getStartMessage(currentPhase));
   }, [applyBoard, currentPhase]);
 
+  // Shared-challenge bypass: build a standard, hint-enabled board directly
+  // from a friend's word chain. Mirrors startDailyGame (difficulty preference
+  // untouched, unlimited undos) with strict input validation — the words come
+  // from outside the app, so a malformed link must fail cleanly, not crash.
+  const startSharedChallengeGame = useCallback((words: string[]): boolean => {
+    // Same 3-6 word bound as encode/decodeChallengeLink — one shared limit,
+    // not two authoritative-looking ones.
+    if (
+      !Array.isArray(words) ||
+      words.length < MIN_CHALLENGE_WORDS ||
+      words.length > MAX_CHALLENGE_WORDS
+    ) return false;
+    const normalized = words.map(w => (typeof w === 'string' ? w.trim().toUpperCase() : ''));
+    const wordLength = normalized[0]?.length ?? 0;
+    // Standard-chain shape (see startDailyGame): every row starts at the same
+    // length; rows only grow/shrink by one letter transiently during a move.
+    if (wordLength < 3 || wordLength > 7) return false;
+    if (normalized.some(w => w.length !== wordLength)) return false;
+    if (normalized.some(w => !validWordsCache.current.has(w))) return false;
+
+    // Invalidate any in-flight startNewGame generation so a slow async commit
+    // can't clobber the shared board after it starts.
+    generationIdRef.current++;
+    setGameMode('standard');
+    setIsEchoPuzzle(false);
+    applyBoard(normalized, undefined, undefined, wordLength, {
+      resetPerformance: true,
+      variant: 'standard',
+    });
+    setUndosRemaining(Infinity);
+    setMessage(getStartMessage(currentPhase));
+    return true;
+  }, [applyBoard, currentPhase]);
+
   const handleLetterPress = useCallback((letter: Letter, rowIndex: number) => {
     if (gameState !== GameState.PLAYING) return;
     if (rowIndex !== activeRowIndex) return;
@@ -769,15 +891,82 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
     }
 
+    // Build the board glow for a delivered hint: pinpoint the letter tile to
+    // pick (preferring the solution's exact removal position — critical with
+    // duplicate letters) and, when determinable, the drop slot. Reuses the
+    // tutorial-guide visuals via Row's hintLetterId/hintSlotIndex props.
+    const buildHintHighlight = (
+      letterChar: string,
+      preferredLetterIndex?: number,
+      preferredSlotIndex?: number
+    ): HintHighlight | null => {
+      const srcLetters = rows[activeRowIndex].words;
+      let letterIndex = -1;
+      if (
+        preferredLetterIndex !== undefined &&
+        srcLetters[preferredLetterIndex] &&
+        srcLetters[preferredLetterIndex].char === letterChar &&
+        !srcLetters[preferredLetterIndex].isLocked
+      ) {
+        letterIndex = preferredLetterIndex;
+      } else {
+        for (let i = 0; i < srcLetters.length; i++) {
+          if (!srcLetters[i].isLocked && srcLetters[i].char === letterChar) {
+            letterIndex = i;
+            break;
+          }
+        }
+      }
+      if (letterIndex < 0) return null;
+
+      const targetChars = rows[hintTargetRowIndex].words.map(l => l.char);
+      let targetSlotIndex: number | undefined;
+      if (
+        preferredSlotIndex !== undefined &&
+        preferredSlotIndex >= 0 &&
+        preferredSlotIndex <= targetChars.length
+      ) {
+        targetSlotIndex = preferredSlotIndex;
+      } else {
+        // Fall back to the first insertion that yields a valid target word
+        // while the removal leaves a valid source (mirrors move validation).
+        const sourceRemainder = srcLetters
+          .filter((_, idx) => idx !== letterIndex)
+          .map(l => l.char)
+          .join('');
+        const sourceOk = validWordsCache.current.has(sourceRemainder);
+        for (let j = 0; j <= targetChars.length; j++) {
+          const candidate =
+            targetChars.slice(0, j).join('') + letterChar + targetChars.slice(j).join('');
+          if (sourceOk && validWordsCache.current.has(candidate)) {
+            targetSlotIndex = j;
+            break;
+          }
+        }
+      }
+
+      return {
+        rowIndex: activeRowIndex,
+        letterIndex,
+        letterId: srcLetters[letterIndex].id,
+        targetRowIndex: hintTargetRowIndex,
+        targetSlotIndex,
+      };
+    };
+
     if (relevantStep) {
       setHintsUsed(prev => prev + 1);
       consumeHintSync();
       setHintBalance(getHintBalanceSync());
+      pendingHintRef.current = true;
       if (relevantStep.lettersToMove && doubleShiftMidStep) {
         // Double shift mid-step: only show the second letter (first was already placed)
         setMessage(
           getHintMessage(relevantStep.lettersToMove[1], relevantStep.targetWord, currentPhase)
         );
+        // Positions in the step refer to the original words; the board has
+        // shifted since drop1, so locate the second letter/slot by search.
+        setHintHighlight(buildHintHighlight(relevantStep.lettersToMove[1]));
       } else if (relevantStep.lettersToMove) {
         // Double shift hint: show both letters
         setMessage(
@@ -787,16 +976,24 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             currentPhase
           )
         );
+        // Glow the first letter only — the intermediate drop slot isn't a
+        // dictionary word, so a slot glow here would be a guess.
+        setHintHighlight(buildHintHighlight(relevantStep.lettersToMove[0]));
       } else {
         setMessage(
           getHintMessage(relevantStep.letterToMove, relevantStep.targetWord, currentPhase)
         );
+        setHintHighlight(buildHintHighlight(
+          relevantStep.letterToMove,
+          relevantStep.removalPosition,
+          relevantStep.insertionPosition
+        ));
       }
     } else {
       // Off solution path — try to find any valid move from the current board state
       const sourceLetters = rows[activeRowIndex].words;
       const targetWord = currentTargetWord;
-      let foundMove: { letter: string; resultWord: string } | null = null;
+      let foundMove: { letter: string; resultWord: string; letterIndex: number; slotIndex: number } | null = null;
 
       for (let i = 0; i < sourceLetters.length; i++) {
         if (sourceLetters[i].isLocked) continue;
@@ -812,7 +1009,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         for (let j = 0; j <= targetWord.length; j++) {
           const candidate = targetWord.slice(0, j) + letter + targetWord.slice(j);
           if (validWordsCache.current.has(candidate)) {
-            foundMove = { letter, resultWord: candidate };
+            foundMove = { letter, resultWord: candidate, letterIndex: i, slotIndex: j };
             break;
           }
         }
@@ -823,14 +1020,23 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setHintsUsed(prev => prev + 1);
         consumeHintSync();
         setHintBalance(getHintBalanceSync());
+        pendingHintRef.current = true;
         setMessage(getHintMessage(foundMove.letter, foundMove.resultWord, currentPhase));
+        setHintHighlight(buildHintHighlight(
+          foundMove.letter,
+          foundMove.letterIndex,
+          foundMove.slotIndex
+        ));
       } else {
         setMessage(getHintFallback(currentPhase));
       }
     }
   }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode]);
 
-  const handleSlotPress = useCallback(async (targetIndex: number): Promise<{
+  const handleSlotPress = useCallback(async (
+    targetIndex: number,
+    inputSource: 'tap' | 'drag' = 'tap'
+  ): Promise<{
     completed: boolean;
     hintsUsed: number;
     invalidAttempts: number;
@@ -839,6 +1045,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     formedWord?: string;
     variant?: PuzzleVariant;
     reverseMidpoint?: boolean;
+    moveOutcomes?: MoveOutcome[];
   } | null> => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return null;
 
@@ -889,6 +1096,20 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setSelectedLetter(null);
       setDoubleShiftPhase('pick2');
       setError(null);
+      setHintHighlight(null);
+      // Half-move arrival: the first letter still teleports on the tap path,
+      // so it gets the same arrival settle (drag keeps its collapse feedback).
+      if (inputSource !== 'drag') {
+        setLastArrival({
+          rowIndex: targetRowIndex,
+          slotIndex: targetIndex,
+          letterId: selectedLetter.id,
+          direction: moveDirection,
+          moveId: ++arrivalMoveIdRef.current,
+        });
+      } else {
+        setLastArrival(null);
+      }
       setIsProcessing(false);
       // Return a (non-null) result with no formedWord. The first letter is now
       // placed but the word isn't complete, so this routes App.tsx to the
@@ -934,6 +1155,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isSourceValid) {
       shakeError(getInvalidWordMessage(sourceWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
+      pendingMistakeRef.current = true;
       cleanMoveStreakRef.current = 0;
       // For double shift drop2, go back to pick2 (let player try different letter/slot)
       if (isDoubleShift && doubleShiftPhase === 'drop2') {
@@ -948,6 +1170,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (!isTargetValid) {
       shakeError(getInvalidWordMessage(targetWordStr, currentPhase));
       setInvalidAttempts(prev => prev + 1);
+      pendingMistakeRef.current = true;
       cleanMoveStreakRef.current = 0;
       // For double shift drop2, go back to pick2 (let player try different letter/slot)
       if (isDoubleShift && doubleShiftPhase === 'drop2') {
@@ -991,6 +1214,34 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setRows(newRows);
     setSelectedLetter(null);
     setError(null);
+    setHintHighlight(null);
+
+    // Per-move outcome for the honest share grid: one entry per COMMITTED
+    // move (double shift: per completed two-letter step), classified by
+    // whether a hint and/or an invalid attempt occurred since the previous
+    // committed move.
+    const moveOutcome: MoveOutcome = pendingHintRef.current
+      ? (pendingMistakeRef.current ? 'both' : 'hint')
+      : (pendingMistakeRef.current ? 'mistake' : 'clean');
+    moveOutcomesRef.current = [...moveOutcomesRef.current, moveOutcome];
+    setMoveOutcomes(moveOutcomesRef.current);
+    pendingHintRef.current = false;
+    pendingMistakeRef.current = false;
+
+    // Arrival settle for the tap path — the moved letter lands with a
+    // scale/translate spring instead of teleporting. Drag-drops keep the
+    // floating-tile collapse + catch bounce (App passes inputSource='drag').
+    if (inputSource !== 'drag') {
+      setLastArrival({
+        rowIndex: targetRowIndex,
+        slotIndex: targetIndex,
+        letterId: selectedLetter.id,
+        direction: moveDirection,
+        moveId: ++arrivalMoveIdRef.current,
+      });
+    } else {
+      setLastArrival(null);
+    }
 
     // Reset double shift phase for next step
     if (isDoubleShift) {
@@ -1011,6 +1262,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         gameMode,
         completedWords,
         variant: currentVariant,
+        // Full per-move record including the completing move (ref mirror is
+        // already current; state would be a render behind at this point).
+        moveOutcomes: moveOutcomesRef.current,
       };
     };
 
@@ -1142,6 +1396,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setDoubleShiftPhase('pick1');
       setSelectedLetter(null);
       setError(null);
+      setHintHighlight(null);
+      setLastArrival(null);
       return;
     }
 
@@ -1177,6 +1433,18 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSelectedLetter(null);
     setError(null);
     setIsStuck(false);
+    setHintHighlight(null);
+    setLastArrival(null);
+    // Pop the undone move's outcome and re-merge its flags into the pending
+    // window: a hint/mistake spent on the undone move still marks whatever
+    // move replaces it — the share grid stays honest across undo/redo.
+    if (moveOutcomesRef.current.length > 0) {
+      const undone = moveOutcomesRef.current[moveOutcomesRef.current.length - 1];
+      if (undone === 'hint' || undone === 'both') pendingHintRef.current = true;
+      if (undone === 'mistake' || undone === 'both') pendingMistakeRef.current = true;
+      moveOutcomesRef.current = moveOutcomesRef.current.slice(0, -1);
+      setMoveOutcomes(moveOutcomesRef.current);
+    }
     setMessage("Let's try again!");
 
     // After undoing one delta of a double shift completed step, we're now mid-step
@@ -1226,6 +1494,21 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     const targetLetters = rows[targetRowIndex].words.map(l => l.char);
     const previews: Array<{ word: string; isValid: boolean }> = [];
 
+    // Source-word validity after removing the selected letter. handleSlotPress
+    // validates BOTH resulting words, so a preview that only checks the target
+    // is a false positive whenever the removal breaks the source word — the
+    // player taps a ✓ slot and still gets the error shake + invalid-attempt
+    // star penalty. Constant across slots, so compute once per selection.
+    // Drag snapping (findClosestValidSlot) keys off these flags too, so this
+    // also stops drags redirecting INTO slots that would be rejected.
+    // (Not used for double-shift drop1, whose look-ahead already accounts for
+    // the final source word.)
+    const sourceWordAfterRemoval = rows[activeRowIndex].words
+      .filter(l => l.id !== selectedLetter.id)
+      .map(l => l.char)
+      .join('');
+    const isSourceValidAfterRemoval = validWordsCache.current.has(sourceWordAfterRemoval);
+
     // For each possible insertion position (0 through targetLetters.length)
     for (let i = 0; i <= targetLetters.length; i++) {
       const newWord = [
@@ -1254,23 +1537,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
             (w) => validWordsCache.current.has(w)
           ),
         });
-      } else if (isDoubleShift && doubleShiftPhase === 'drop2') {
-        // During drop2, both source and target must be valid words.
-        // Source validity is the same for all slots (doesn't depend on drop position),
-        // so compute once outside the loop would be ideal, but for clarity we AND here.
-        const sourceWordAfterBothRemovals = rows[activeRowIndex].words
-          .filter(l => l.id !== selectedLetter.id)
-          .map(l => l.char)
-          .join('');
-        const isSourceValid = validWordsCache.current.has(sourceWordAfterBothRemovals);
-        previews.push({
-          word: newWord,
-          isValid: isSourceValid && validWordsCache.current.has(newWord),
-        });
       } else {
+        // Both the standard/reverse full move AND double-shift drop2 validate
+        // the source word (letter removed) as well as the target word — the
+        // preview must AND both or it promises a move the game will reject.
         previews.push({
           word: newWord,
-          isValid: validWordsCache.current.has(newWord),
+          isValid: isSourceValidAfterRemoval && validWordsCache.current.has(newWord),
         });
       }
     }
@@ -1314,6 +1587,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setEarnedStars(0);
     // Resume without an active combo (the saved streak isn't persisted).
     cleanMoveStreakRef.current = 0;
+    // Restore never replays an arrival and drops any stale hint glow. The
+    // per-move outcome record isn't persisted, so it restarts empty — the
+    // share grid falls back to the legacy distribution for restored runs.
+    setHintHighlight(null);
+    setLastArrival(null);
+    setSpeedRescueSignal(null);
+    moveOutcomesRef.current = [];
+    setMoveOutcomes([]);
+    pendingHintRef.current = false;
+    pendingMistakeRef.current = false;
   }, []);
 
   // Re-apply the same puzzle from its starting words (each row preserves its
@@ -1336,6 +1619,26 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setHintBalance(getHintBalanceSync());
   }, []);
 
+  // Speed rescue: the Time's Up overlay (GAME_OVER, set solely on speed
+  // time-up) can offer a continue — e.g. after a rewarded clip. Flips back to
+  // PLAYING and raises speedRescueSignal; App restarts the clock with the
+  // granted seconds (the hook remains the source of truth for gameState).
+  const resumeSpeedAfterRescue = useCallback((extraSec: number): boolean => {
+    if (gameState !== GameState.GAME_OVER) return false;
+    if (!Number.isFinite(extraSec) || extraSec <= 0) return false;
+    setGameState(GameState.PLAYING);
+    setSelectedLetter(null);
+    setError(null);
+    setSpeedRescueSignal(prev => ({ extraSec, id: (prev?.id ?? 0) + 1 }));
+    // Local copy: phaseNarrative.ts is owned by another workstream this pass.
+    setMessage(
+      currentPhase >= 3
+        ? 'The clock relents. Briefly.'
+        : 'Back in it — extra time on the clock!'
+    );
+    return true;
+  }, [gameState, currentPhase]);
+
   const clearBoard = useCallback(() => {
     setRows([]);
     setActiveRowIndex(0);
@@ -1350,6 +1653,13 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setDoubleShiftPhase(null);
     setIsEchoPuzzle(false);
     setIsStuck(false);
+    setHintHighlight(null);
+    setLastArrival(null);
+    setSpeedRescueSignal(null);
+    moveOutcomesRef.current = [];
+    setMoveOutcomes([]);
+    pendingHintRef.current = false;
+    pendingMistakeRef.current = false;
   }, []);
 
   const state: PuzzleGameState = {
@@ -1387,12 +1697,18 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     isStuck,
     hintBalance,
     outOfHintsSignal,
+    hintHighlight,
+    moveOutcomes,
+    lastArrival,
+    speedRescueSignal,
   };
 
   const actions: PuzzleGameActions = {
     initGame,
     startNewGame,
     startDailyGame,
+    startSharedChallengeGame,
+    resumeSpeedAfterRescue,
     handleLetterPress,
     handleSlotPress,
     handleUndo,

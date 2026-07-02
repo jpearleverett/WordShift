@@ -45,6 +45,8 @@ export interface DailyLoginGrant {
   newBalance: number;
   /** True if the previous chain lapsed and the cycle reset to Day 1. */
   reset: boolean;
+  /** True only for the very first claim ever (no prior claim state existed). */
+  isFirstClaim: boolean;
 }
 
 let cache: DailyLoginState | null = null;
@@ -139,6 +141,7 @@ export async function claimDailyLoginReward(): Promise<DailyLoginGrant | null> {
 
   const { day, reset } = computeNextCycleDay(state, today);
   const amount = DAILY_LOGIN_REWARDS[day - 1];
+  const isFirstClaim = !state.lastClaimedDate;
 
   // Win-back: only for a returning player (has prior history) whose gap since
   // the last claim is a real lapse — never for a brand-new first claim.
@@ -152,5 +155,5 @@ export async function claimDailyLoginReward(): Promise<DailyLoginGrant | null> {
 
   await save({ lastClaimedDate: today, cycleDay: day });
 
-  return { day, amount, comebackBonus, newBalance, reset };
+  return { day, amount, comebackBonus, newBalance, reset, isFirstClaim };
 }

@@ -23,10 +23,7 @@
       }
     },
     "production": {
-      "channel": "production",
-      "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
-      }
+      "channel": "production"
     }
   },
   "submit": {

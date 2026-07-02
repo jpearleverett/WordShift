@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  Platform,
-  StatusBar,
   Alert,
   Linking,
   Modal,
@@ -19,6 +17,7 @@ import * as Updates from 'expo-updates';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus } from '../services/cloudSave';
 import { CandyColors } from '../theme/colors';
+import { useScreenInsets } from '../hooks/useScreenInsets';
 import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
 import { clearStats } from '../services/starRating';
@@ -46,6 +45,7 @@ import { clearTendingState } from '../services/tending';
 import { clearWeeklyQuests } from '../services/weeklyQuests';
 import { clearWhisperGallery } from '../services/whisperGallery';
 import { clearChoiceState } from '../services/dialogueChoices';
+import { clearNarrativeDeliveryState } from '../services/dialogue/animalDialogueNarrative';
 import { resetMicroBeats } from '../services/phaseNarrative';
 import {
   resetNotificationPrefs,
@@ -56,7 +56,7 @@ import {
 import { clearRoomUpgrades } from '../services/roomUpgrades';
 import { clearEntitlements } from '../services/entitlements';
 import { clearCosmetics } from '../services/cosmetics';
-import { clearAdPacing } from '../services/ads';
+import { clearAdPacing, privacyOptionsRequired, showPrivacyOptions } from '../services/ads';
 import { clearHints } from '../services/hints';
 import { clearMonetPrompts } from '../services/monetizationPrompts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
@@ -68,6 +68,7 @@ interface SettingsScreenProps {
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
+  const screenInsets = useScreenInsets();
   const [settings, setSettings] = useState<GameSettings | null>(null);
   const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
   const [freezeCount, setFreezeCount] = useState(0);
@@ -79,6 +80,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [restoreInput, setRestoreInput] = useState('');
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [purchaseRestoreBusy, setPurchaseRestoreBusy] = useState(false);
+  // UMP privacy-options entry point (required to stay visible for EEA users
+  // under the Google EU User Consent Policy; hidden everywhere else).
+  const [privacyOptionsAvailable, setPrivacyOptionsAvailable] = useState(false);
 
   // Restore previously-purchased IAP entitlements (Patron / ad-free). Store
   // policy requires an accessible restore path outside the purchase modal, so
@@ -151,6 +155,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
     getNotificationPrefs().then((prefs) => {
       setDailyRemindersOn(prefs.enabled && prefs.dailyReminderEnabled);
     });
+    privacyOptionsRequired().then(setPrivacyOptionsAvailable);
     refreshStreakFreeze();
   }, []);
 
@@ -237,6 +242,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               clearWeeklyQuests(),
               clearWhisperGallery(),
               clearChoiceState(),
+              clearNarrativeDeliveryState(),
               resetMicroBeats(),
               resetNotificationPrefs(),
               clearRoomUpgrades(),
@@ -286,7 +292,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={onClose}
@@ -484,6 +490,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             <Text style={styles.linkText}>Data Deletion</Text>
             <Text style={styles.linkChevron}>{'>'}</Text>
           </TouchableOpacity>
+          {privacyOptionsAvailable && (
+            <>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.aboutRow}
+                onPress={() => {
+                  hapticLight();
+                  showPrivacyOptions();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Privacy Options"
+              >
+                <Text style={styles.linkText}>Privacy Options</Text>
+                <Text style={styles.linkChevron}>{'>'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <View style={styles.divider} />
           <TouchableOpacity
             style={styles.aboutRow}
@@ -550,7 +573,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
+    // paddingTop applied inline via useScreenInsets (safe-area aware)
     paddingBottom: 16,
     backgroundColor: CandyColors.purple.main,
   },

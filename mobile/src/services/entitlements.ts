@@ -31,6 +31,8 @@ export const ENTITLEMENTS = {
   ADFREE: 'adfree',
   /** The Keeper's Collection — a one-time cosmetic bundle (exclusive tile theme + confetti). */
   COSMETIC_BUNDLE: 'cosmetic_bundle',
+  /** Starter Pack — one-time-per-account welcome bundle (amber + hints). */
+  STARTER_PACK: 'starter_pack',
 } as const;
 
 export type EntitlementKey = string;
@@ -38,6 +40,12 @@ export type EntitlementKey = string;
 export interface EntitlementState {
   /** entitlement key → granted timestamp (ms) */
   granted: Record<string, number>;
+  /**
+   * Set once the player's first consumable AMBER pack purchase lands (the
+   * one-time first-purchase 2x has been consumed). Store-authoritative-adjacent,
+   * so it lives here — under wordshift_entitlements, excluded from cloud sync.
+   */
+  amberPurchaseMade?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +65,7 @@ async function load(): Promise<EntitlementState> {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (parsed && typeof parsed.granted === 'object' && parsed.granted !== null) {
-        cache = { granted: parsed.granted };
+        cache = { granted: parsed.granted, amberPurchaseMade: parsed.amberPurchaseMade === true };
         return cache;
       }
     }
@@ -152,7 +160,9 @@ export async function setEntitlements(keys: EntitlementKey[]): Promise<void> {
   const now = Date.now();
   const granted: Record<string, number> = {};
   for (const key of keys) granted[key] = prev.granted[key] ?? now;
-  cache = { granted };
+  // The first-purchase flag is local purchase-history state, not an entitlement
+  // the store reports — a restore must not resurrect the one-time 2x.
+  cache = { granted, amberPurchaseMade: prev.amberPurchaseMade };
   await save();
 }
 
@@ -160,6 +170,29 @@ export async function setEntitlements(keys: EntitlementKey[]): Promise<void> {
 export async function getGrantedEntitlements(): Promise<EntitlementKey[]> {
   const state = await load();
   return Object.keys(state.granted);
+}
+
+/** Has the player ever completed a consumable amber pack purchase? */
+export async function hasMadeAmberPurchase(): Promise<boolean> {
+  const state = await load();
+  return state.amberPurchaseMade === true;
+}
+
+/** Synchronous variant off the in-memory cache (false until warmed). */
+export function hasMadeAmberPurchaseSync(): boolean {
+  return cache ? cache.amberPurchaseMade === true : false;
+}
+
+/**
+ * Record that the player's first consumable amber pack purchase landed
+ * (consumes the one-time first-purchase 2x). Idempotent.
+ */
+export async function markAmberPurchaseMade(): Promise<void> {
+  const state = await load();
+  if (state.amberPurchaseMade) return;
+  state.amberPurchaseMade = true;
+  cache = state;
+  await save();
 }
 
 /**

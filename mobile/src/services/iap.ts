@@ -18,8 +18,16 @@ import {
   setEntitlements,
   loadEntitlements,
   getGrantedEntitlements,
+  hasEntitlement,
+  hasMadeAmberPurchase,
+  markAmberPurchaseMade,
 } from './entitlements';
-import { AMBER_PACK_GRANTS, HINT_PACK_GRANTS } from '../constants/gameBalance';
+import {
+  AMBER_PACK_GRANTS,
+  HINT_PACK_GRANTS,
+  STARTER_PACK_GRANTS,
+  FIRST_PURCHASE_AMBER_MULTIPLIER,
+} from '../constants/gameBalance';
 
 // ---------------------------------------------------------------------------
 // Product catalog
@@ -32,6 +40,8 @@ export const PRODUCT_IDS = {
   COSMETIC_BUNDLE: 'com.wordshift.cosmetic_bundle',
   /** Remove Ads / Supporter — ad-free + the victory 2x granted with no ad. */
   REMOVE_ADS: 'com.wordshift.remove_ads',
+  /** Starter Pack — one-time-per-account welcome bundle (amber + hints). */
+  STARTER_PACK: 'com.wordshift.starter',
   // Consumable amber packs (repeatable; credit the amber reward balance).
   AMBER_SMALL: 'com.wordshift.amber_small',
   AMBER_MEDIUM: 'com.wordshift.amber_medium',
@@ -115,6 +125,18 @@ export const CONSUMABLE_PRODUCTS: ConsumableProductInfo[] = [
 export function consumableReward(productId: ProductId): ConsumableReward | undefined {
   return CONSUMABLE_PRODUCTS.find(p => p.productId === productId)?.reward;
 }
+
+// ---------------------------------------------------------------------------
+// Starter pack (one-time welcome bundle)
+// ---------------------------------------------------------------------------
+
+/** Display info for the one-time starter bundle (not part of the consumable catalog). */
+export const STARTER_PACK_INFO = {
+  productId: PRODUCT_IDS.STARTER_PACK as ProductId,
+  name: "Keeper's Welcome",
+  description: `${STARTER_PACK_GRANTS.amber} amber + ${STARTER_PACK_GRANTS.hints} hints. One per player, ever.`,
+  fallbackPrice: '$1.99',
+} as const;
 
 export interface IapProduct {
   productId: ProductId;
@@ -203,6 +225,7 @@ export function entitlementsForProduct(productId: ProductId): EntitlementKey[] {
   if (productId === PRODUCT_IDS.PATRON_KEY) return [ENTITLEMENTS.PATRON];
   if (productId === PRODUCT_IDS.REMOVE_ADS) return [ENTITLEMENTS.ADFREE];
   if (productId === PRODUCT_IDS.COSMETIC_BUNDLE) return [ENTITLEMENTS.COSMETIC_BUNDLE];
+  if (productId === PRODUCT_IDS.STARTER_PACK) return [ENTITLEMENTS.STARTER_PACK];
   return [productId];
 }
 
@@ -251,8 +274,10 @@ export async function purchaseProduct(productId: ProductId): Promise<PurchaseRes
 export interface ConsumablePurchaseResult {
   success: boolean;
   productId?: ProductId;
-  /** The reward to apply on success (caller credits amber/hints). */
+  /** The reward to apply on success (caller credits amber/hints). Already doubled when `firstPurchaseDoubled`. */
   reward?: ConsumableReward;
+  /** True when this was the player's first-ever amber pack — the amount was doubled. */
+  firstPurchaseDoubled?: boolean;
   cancelled?: boolean;
   error?: string;
 }
@@ -263,6 +288,10 @@ export interface ConsumablePurchaseResult {
  * `reward` to apply, and the caller credits amber (`awardBonusAmber`) or hints
  * (`addHints`). This mirrors the codebase convention where the purchase layer
  * records the transaction and the caller orchestrates the currency grant.
+ *
+ * First-purchase incentive: the first amber pack a player EVER buys grants
+ * `FIRST_PURCHASE_AMBER_MULTIPLIER`x amber — the returned reward is already
+ * doubled, and the one-time flag is consumed (persisted in entitlements.ts).
  */
 export async function purchaseConsumable(productId: ProductId): Promise<ConsumablePurchaseResult> {
   const reward = consumableReward(productId);
@@ -271,7 +300,50 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
   }
   const result = await provider.purchase(productId);
   if (result.success) {
+    if (reward.kind === 'amber') {
+      const isFirst = !(await hasMadeAmberPurchase());
+      await markAmberPurchaseMade();
+      if (isFirst) {
+        return {
+          success: true,
+          productId,
+          reward: { kind: 'amber', amount: reward.amount * FIRST_PURCHASE_AMBER_MULTIPLIER },
+          firstPurchaseDoubled: true,
+        };
+      }
+    }
     return { success: true, productId, reward };
+  }
+  return { success: false, productId, cancelled: result.cancelled, error: result.error };
+}
+
+export interface StarterPackPurchaseResult {
+  success: boolean;
+  productId?: ProductId;
+  /** The bundle to apply on success (caller credits amber + hints). */
+  reward?: { amber: number; hints: number };
+  /** True when the one-per-account limit blocked the purchase. */
+  alreadyOwned?: boolean;
+  cancelled?: boolean;
+  error?: string;
+}
+
+/**
+ * Purchase the one-time STARTER PACK bundle. One-per-account enforcement is the
+ * `starter_pack` entitlement: owned → the purchase is refused before hitting
+ * billing. On success the entitlement is granted (so it can never be re-bought
+ * and survives store restore) and the amber+hints grants are returned for the
+ * caller to apply — same convention as `purchaseConsumable`.
+ */
+export async function purchaseStarterPack(): Promise<StarterPackPurchaseResult> {
+  const productId = PRODUCT_IDS.STARTER_PACK;
+  if (await hasEntitlement(ENTITLEMENTS.STARTER_PACK)) {
+    return { success: false, productId, alreadyOwned: true, error: 'already_owned' };
+  }
+  const result = await provider.purchase(productId);
+  if (result.success) {
+    await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
+    return { success: true, productId, reward: { ...STARTER_PACK_GRANTS } };
   }
   return { success: false, productId, cancelled: result.cancelled, error: result.error };
 }

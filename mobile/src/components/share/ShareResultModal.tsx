@@ -1,8 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { ShareCard } from './ShareCard';
-import { ShareableResult, isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
+import { ShareableResult, isDailyShareBonusAvailable, shareChallengeText, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { shareResultImage, isImageShareAvailable } from '../../services/shareImage';
+import { getChallengeFriendLabel } from '../../services/phaseNarrative';
 import { hapticLight } from '../../services/haptics';
 
 /**
@@ -16,9 +17,11 @@ interface ShareResultModalProps {
   result: ShareableResult | null;
   onClose: () => void;
   onShared?: () => void;
+  /** Pre-built friend-challenge share text (standard non-daily boards only). */
+  challengeText?: string | null;
 }
 
-export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onClose, onShared }) => {
+export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onClose, onShared, challengeText }) => {
   const cardRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
   const [bonusAvailable, setBonusAvailable] = useState(false);
@@ -35,6 +38,21 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
     setSharing(true);
     try {
       const ok = await shareResultImage(cardRef.current, result);
+      if (ok) onShared?.();
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleChallengeShare = async () => {
+    if (!challengeText || sharing) return;
+    hapticLight();
+    setSharing(true);
+    try {
+      // Routed through shareResults so a completed challenge share records
+      // success (share count + first-share-of-day bonus) like every other
+      // share path; a dismissed sheet / OS rejection resolves false.
+      const ok = await shareChallengeText(challengeText);
       if (ok) onShared?.();
     } finally {
       setSharing(false);
@@ -93,6 +111,18 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
                   <Text style={styles.closeBtnText}>Close</Text>
                 </TouchableOpacity>
               </View>
+
+              {challengeText != null && (
+                <TouchableOpacity
+                  style={[styles.challengeBtn, isDark && styles.challengeBtnDark]}
+                  onPress={handleChallengeShare}
+                  disabled={sharing}
+                  accessibilityRole="button"
+                  accessibilityLabel="Challenge a friend with this puzzle"
+                >
+                  <Text style={styles.challengeBtnText}>{getChallengeFriendLabel(phase)}</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
         </View>
@@ -140,4 +170,17 @@ const styles = StyleSheet.create({
   shareBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
   closeBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
   closeBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '700' },
+  challengeBtn: {
+    marginTop: 12,
+    minWidth: 252,
+    paddingVertical: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(200,170,240,0.45)',
+  },
+  challengeBtnDark: { borderColor: 'rgba(200,120,150,0.45)' },
+  challengeBtnText: { color: 'rgba(235,225,250,0.95)', fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
 });

@@ -95,6 +95,11 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
  * Get the effective phase for a specific animal based on their awareness tier
  */
 export function getAnimalPhase(globalPhase: DialoguePhase, animalType: AnimalType): DialoguePhase {
+  // Post-revelation the shadow has settled and every animal is serene — the
+  // awareness tiers only stagger the descent, never the arrival. Without this
+  // clamp the lagging four would stay at Phase 4 forever and never reach their
+  // post-revelation dialogue.
+  if (globalPhase === 5) return 5;
   const tier = ANIMAL_AWARENESS_TIERS[animalType];
   let offset = 0;
   if (tier === 'vanguard') offset = 1;

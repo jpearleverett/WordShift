@@ -15,6 +15,7 @@ import {
   getComboMoveMessage,
   getDragMissMessage,
   getNotificationPromptText,
+  getWinBackMessage,
   getSpeedTimeUpMessage,
   getWhisperGalleryEmptyText,
   getNextStreakMilestoneText,
@@ -556,6 +557,66 @@ describe('getNotificationPromptText', () => {
   });
 });
 
+describe('getWinBackMessage', () => {
+  const allSixPhases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+  const rungs: (1 | 2 | 3)[] = [1, 2, 3];
+
+  test.each(
+    allSixPhases.flatMap(phase => rungs.map(rung => ({ phase, rung })))
+  )('returns a non-empty string for phase $phase, rung $rung', ({ phase, rung }) => {
+    const msg = getWinBackMessage(phase, rung);
+    expect(typeof msg).toBe('string');
+    expect(msg.length).toBeGreaterThan(0);
+  });
+
+  test('rungs escalate — each rung is distinct copy within a phase', () => {
+    for (const phase of allSixPhases) {
+      const unique = new Set(rungs.map(r => getWinBackMessage(phase, r)));
+      expect(unique.size).toBe(3);
+    }
+  });
+
+  test('phase 0 is warm and never leaks dark vocabulary', () => {
+    for (const rung of rungs) {
+      const msg = getWinBackMessage(0, rung);
+      expect(msg).not.toContain('arrangement');
+      expect(msg).not.toContain('void');
+      expect(msg.toLowerCase()).not.toContain('silence');
+    }
+  });
+
+  test('phases 2-3 open quietly unsettling — the house is quieter without you', () => {
+    expect(getWinBackMessage(2, 1)).toContain('The house is quieter without you');
+    expect(getWinBackMessage(3, 1)).toContain('The house is quieter without you');
+  });
+
+  test('phase 4 is reverent — the arrangement is incomplete', () => {
+    expect(getWinBackMessage(4, 1)).toContain('The arrangement is incomplete');
+  });
+
+  test('phase 5 stays serene — no urgency, no dread', () => {
+    for (const rung of rungs) {
+      const msg = getWinBackMessage(5, rung).toLowerCase();
+      expect(msg).not.toContain('incomplete');
+      expect(msg).not.toContain('waits for your hand');
+    }
+    expect(getWinBackMessage(5, 3)).toContain('Nothing is lost');
+  });
+
+  test('rung 3 marks the week away at every phase', () => {
+    for (const phase of allSixPhases) {
+      expect(getWinBackMessage(phase, 3).toLowerCase()).toMatch(/week|seven days/);
+    }
+  });
+
+  test('clamps out-of-bounds phases without throwing', () => {
+    expect(() => getWinBackMessage(-1, 1)).not.toThrow();
+    expect(() => getWinBackMessage(99, 3)).not.toThrow();
+    expect(getWinBackMessage(-1, 1)).toBe(getWinBackMessage(0, 1));
+    expect(getWinBackMessage(99, 2)).toBe(getWinBackMessage(5, 2));
+  });
+});
+
 // ============================================================================
 // Narrative Micro-Beats (B3)
 // ============================================================================
@@ -1067,5 +1128,66 @@ describe('Phase 5 victory register (serene, distinct from Phase 4 offering)', ()
     expect((p5 as string).length).toBeGreaterThan(0);
     // Phase 5 templates never use the Phase 4 "Offering:"/"Incantation" framing
     expect(p5).not.toMatch(/Offering|Incantation|Descends/);
+  });
+});
+
+describe('small interaction copy (toasts, alerts, buttons)', () => {
+  const {
+    getFirstDailyMercyMessage,
+    getSpeedRescueLabel,
+    getDailyLockedMessage,
+    getBadChallengeLinkMessage,
+    getUnplayableChallengeMessage,
+    getShopStoreBridgeText,
+    getDailyLoginFirstClaimCopy,
+  } = require('../services/phaseNarrative');
+
+  const phases = [0, 1, 2, 3, 4, 5];
+
+  it('mercy message always names the hint count and shifts tone by phase', () => {
+    for (const p of phases) {
+      expect(getFirstDailyMercyMessage(p, 2)).toContain('+2');
+    }
+    expect(getFirstDailyMercyMessage(0, 2)).not.toBe(getFirstDailyMercyMessage(4, 2));
+  });
+
+  it('speed rescue label always names the seconds granted', () => {
+    for (const p of phases) {
+      expect(getSpeedRescueLabel(p, 30)).toContain('+30s');
+    }
+    expect(getSpeedRescueLabel(0, 30)).not.toBe(getSpeedRescueLabel(4, 30));
+  });
+
+  it('alert copy is non-empty at every phase and never leaks phase numbers', () => {
+    for (const p of phases) {
+      for (const text of [
+        getDailyLockedMessage(p),
+        getBadChallengeLinkMessage(p),
+        getUnplayableChallengeMessage(p),
+      ]) {
+        expect(typeof text).toBe('string');
+        expect(text.length).toBeGreaterThan(0);
+        expect(text).not.toMatch(/Phase \d/);
+      }
+    }
+  });
+
+  it('shop store bridge gives title + subtitle at every phase', () => {
+    for (const p of phases) {
+      const { title, subtitle } = getShopStoreBridgeText(p);
+      expect(title.length).toBeGreaterThan(0);
+      expect(subtitle.length).toBeGreaterThan(0);
+    }
+    expect(getShopStoreBridgeText(0).title).toBe('Need more amber?');
+    expect(getShopStoreBridgeText(0).title).not.toBe(getShopStoreBridgeText(4).title);
+  });
+
+  it('first-claim login copy never says Welcome Back and stays phase-toned', () => {
+    for (const p of phases) {
+      const { title, subtitle } = getDailyLoginFirstClaimCopy(p);
+      expect(title.toLowerCase()).not.toContain('welcome back');
+      expect(subtitle.length).toBeGreaterThan(0);
+    }
+    expect(getDailyLoginFirstClaimCopy(0).title).toBe('Welcome to the House');
   });
 });

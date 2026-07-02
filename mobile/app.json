@@ -64,7 +64,8 @@
         }
       ],
       "@sentry/react-native",
-      "expo-audio"
+      "expo-audio",
+      "expo-sharing"
     ],
     "extra": {
       "telemetryEndpoint": "",

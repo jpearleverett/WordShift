@@ -304,6 +304,13 @@ export async function loadProgress(): Promise<HomeWorldProgress> {
     const stored = await AsyncStorage.getItem(PROGRESS_STORAGE_KEY);
     if (stored) {
       progressCache = JSON.parse(stored);
+      // Self-heal legacy saves: post-revelation locks the world at phase 5,
+      // but older builds left currentPhase at 4 (calculatePhase caps there).
+      if (progressCache!.postRevelation === true && progressCache!.currentPhase !== 5) {
+        progressCache!.currentPhase = effectivePhaseFor(progressCache!);
+        progressCache!.pendingPhaseTransition = null;
+        await saveProgress();
+      }
       return progressCache!;
     }
   } catch (error) {
@@ -551,9 +558,10 @@ export async function awardPuzzleAmber(
   }
 
   // Check for phase transition using weighted phase progress
+  // (effectivePhaseFor pins phase 5 once post-revelation).
   const previousPhase = progress.currentPhase;
   const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
-  let newPhase = calculatePhase(effectiveProgress, progress.puzzlesSolved);
+  let newPhase = effectivePhaseFor(progress);
   // Prevent phase skipping — only advance one phase at a time
   if (newPhase > previousPhase + 1) {
     newPhase = (previousPhase + 1) as DialoguePhase;
@@ -802,6 +810,19 @@ function calculatePhase(effectiveProgress: number, puzzlesSolved: number): Dialo
   else if (effectiveProgress >= PHASE_THRESHOLDS[2]) candidate = 2;
   else if (effectiveProgress >= PHASE_THRESHOLDS[1]) candidate = 1;
   return applyPuzzleExposureGuard(candidate, puzzlesSolved);
+}
+
+/**
+ * Effective dialogue phase for a progress snapshot. Post-revelation
+ * permanently pins the world at phase 5 — calculatePhase caps at 4 and must
+ * never win once the revelation has happened. EVERY phase recompute
+ * (award-time, dev tools, load-time self-heal, markPostRevelation) routes
+ * through this helper so the invariant lives in exactly one place.
+ */
+function effectivePhaseFor(progress: HomeWorldProgress): DialoguePhase {
+  if (progress.postRevelation === true) return 5;
+  const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
+  return calculatePhase(effectiveProgress, progress.puzzlesSolved);
 }
 
 /**
@@ -1338,6 +1359,10 @@ export async function isFinalPuzzleCompleted(): Promise<boolean> {
 export async function markPostRevelation(): Promise<void> {
   const progress = await loadProgress();
   progress.postRevelation = true;
+  // Phase 5 is read directly from currentPhase by the home/dialogue path
+  // (useDialogueFlow, HomeScreen, homeWorldData) — pin it here.
+  progress.currentPhase = effectivePhaseFor(progress);
+  progress.pendingPhaseTransition = null;
   progressCache = progress;
   await saveProgress();
 }
@@ -1606,10 +1631,8 @@ export async function devAddPuzzles(amount: number): Promise<{ puzzles: number; 
   // Keep phaseProgress in sync for tests
   progress.phaseProgress = (progress.phaseProgress || 0) + amount;
 
-  // Update phase based on effective progress
-  const effectiveProgress = progress.phaseProgress ?? progress.puzzlesSolved;
-  const newPhase = calculatePhase(effectiveProgress, progress.puzzlesSolved);
-  progress.currentPhase = newPhase;
+  // Update phase based on effective progress (post-revelation stays pinned at 5)
+  progress.currentPhase = effectivePhaseFor(progress);
 
   progressCache = progress;
   await saveProgress();

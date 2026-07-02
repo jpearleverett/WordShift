@@ -8,7 +8,6 @@ import {
   Animated,
   Dimensions,
   Platform,
-  StatusBar,
   Image,
   ScrollView,
   Pressable,
@@ -36,6 +35,7 @@ import {
   markDailyChallengeIntroSeen,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
@@ -142,6 +142,35 @@ interface HomeScreenProps {
   onHouseCompleted?: () => void;
 }
 
+// --- Header quest pill: pure decisions (node-testable, see questPill.test.ts) ---
+
+/** Count of in-progress quests (not yet completed, not claimed) across daily + weekly. */
+export const getActiveIncompleteQuestCount = (state: CombinedQuestState | null): number => {
+  if (!state) return 0;
+  return [...state.daily.quests, ...state.weekly.quests]
+    .filter(q => !q.completed && !q.claimed).length;
+};
+
+/**
+ * Quest pill gating — exactly the Journal Hub's gate (puzzle 6+ via the
+ * post-tutorial light mode, never during onboarding), plus loaded quest data.
+ */
+export const isQuestPillVisible = (
+  isOnboarding: boolean,
+  isPostTutorialLightMode: boolean,
+  hasQuestState: boolean,
+): boolean => !isOnboarding && !isPostTutorialLightMode && hasQuestState;
+
+/** Screen-reader label for the quest pill: active count, claimable amber, daily reset. */
+export const getQuestPillAccessibilityLabel = (
+  activeIncompleteCount: number,
+  claimableAmber: number,
+  dailyResetHint: string,
+): string =>
+  `Open quests. ${activeIncompleteCount} in progress.` +
+  (claimableAmber > 0 ? ` ${claimableAmber} amber ready to claim.` : '') +
+  ` Daily quests reset in ${dailyResetHint}.`;
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
@@ -160,6 +189,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onHousePanChange,
   onHouseCompleted,
 }) => {
+  const screenInsets = useScreenInsets();
   const isOnboarding = onboardingStep !== undefined && onboardingStep !== 'complete';
   const [progress, setProgress] = useState<HomeWorldProgress | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -325,6 +355,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return allQuests.filter(q => !q.claimed).length;
   }, [weeklyQuestState]);
 
+  const activeIncompleteQuestCount = useMemo(
+    () => getActiveIncompleteQuestCount(weeklyQuestState),
+    [weeklyQuestState]
+  );
+
+  // Short "resets in N hours" hint for the quest pill accessibility label.
+  const dailyResetHint = useMemo(() => {
+    const { hours, minutes } = getTimeUntilDailyReset();
+    return hours > 0 ? `${hours} hours` : `${minutes} minutes`;
+  }, []);
+
   const availableRoomUpgrades = useMemo(() => {
     if (!progress) return [];
     return rooms
@@ -365,6 +406,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     !isOnboarding &&
     !isPostTutorialLightMode &&
     (onOpenLedger || onOpenGallery || weeklyQuestState)
+  );
+
+  // Header quest pill — same gate as the Journal Hub; puts quests one tap away.
+  const showQuestPill = isQuestPillVisible(
+    isOnboarding,
+    isPostTutorialLightMode,
+    weeklyQuestState !== null
   );
 
   const shouldHighlightPitButton = Boolean(
@@ -922,12 +970,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
-      {/* Header — single row, simplified during onboarding */}
-      <View style={styles.header}>
+      {/* Header — single row, simplified during onboarding; safe-area aware */}
+      <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <View style={styles.headerLeft}>
-          <View
+          <TouchableOpacity
             style={styles.amberContainer}
-            accessibilityLabel={`${progress.amber} amber`}
+            disabled={!onOpenStore || isOnboarding}
+            onPress={() => {
+              hapticLight();
+              onOpenStore?.();
+            }}
+            activeOpacity={0.7}
+            accessibilityLabel={
+              onOpenStore && !isOnboarding
+                ? `${progress.amber} amber. Opens the store.`
+                : `${progress.amber} amber`
+            }
+            accessibilityRole={onOpenStore && !isOnboarding ? 'button' : undefined}
           >
             <View style={styles.amberInner}>
               <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
@@ -936,7 +995,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={styles.amberCount}>{progress.amber}</Text>
               {!isOnboarding && <AmberSparkle />}
             </View>
-          </View>
+          </TouchableOpacity>
           {(progress.currentStreak > 1 || isStreakAtRisk) && (
             <View
               style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
@@ -958,6 +1017,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               phase={progress.currentPhase}
               refreshSignal={progress.puzzlesSolved}
             />
+          )}
+          {showQuestPill && (
+            <TouchableOpacity
+              style={styles.questPill}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              onPress={() => { handleOpenQuestModal().catch(() => {}); }}
+              accessibilityLabel={getQuestPillAccessibilityLabel(
+                activeIncompleteQuestCount,
+                claimableQuestAmber,
+                dailyResetHint
+              )}
+              accessibilityRole="button"
+            >
+              <Text style={styles.questPillText}>🎯 {activeIncompleteQuestCount}</Text>
+              {claimableQuestAmber > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>!</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           )}
           {!isOnboarding && onOpenPit && (
             <Animated.View style={shouldHighlightPitButton ? {
@@ -2314,6 +2393,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={[
               styles.journalSpotlightPointer,
               {
+                // Legacy offsets: Android +26 over the status bar, iOS 60 (44 base + 16)
+                top: screenInsets.top + (Platform.OS === 'android' ? 26 : 16),
                 backgroundColor: dt.modalBg,
                 borderColor: dt.modalBorder,
                 shadowColor: phaseTheme.victoryGlowColor,
@@ -2552,7 +2633,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60,
+    // paddingTop applied inline via useScreenInsets (safe-area aware)
     paddingBottom: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 100,
@@ -2630,6 +2711,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(180, 120, 0, 0.3)',
     borderColor: 'rgba(255, 215, 0, 0.45)',
     borderWidth: 1.5,
+  },
+  // Compact on purpose (single line, no reset column): the header overflowed
+  // once before — right group clips left, PLAY stays pinned (flexShrink: 0).
+  questPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 34,
+    borderRadius: 17,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  questPillText: {
+    color: CandyColors.white,
+    fontSize: 13,
+    fontWeight: '800',
   },
   headerBadge: {
     position: 'absolute',
@@ -3455,7 +3551,7 @@ const styles = StyleSheet.create({
   },
   journalSpotlightPointer: {
     position: 'absolute',
-    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 26 : 60,
+    // top applied inline via useScreenInsets (safe-area aware)
     right: 50,
     maxWidth: 180,
     borderRadius: 16,

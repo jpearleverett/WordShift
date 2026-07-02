@@ -20,6 +20,7 @@ import {
   PIT_BACKGROUND_COLORS as PIT_BG_COLORS,
   PIT_DEVOUR_COLORS as DEVOUR_COLORS,
 } from '../theme/colors';
+import { useScreenInsets } from '../hooks/useScreenInsets';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   getPitOfferAllLabel,
@@ -96,6 +97,8 @@ const PIT_OVAL = {
   radiusY: SCREEN_HEIGHT * 0.06,
 };
 
+// Pre-inset header-height estimate — only positions the module-level FLOAT_ZONE
+// for spawning word chips. The rendered header uses useScreenInsets instead.
 const STATUS_BAR_HEIGHT =
   Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 60;
 
@@ -597,6 +600,93 @@ ShockwaveRingView.displayName = 'ShockwaveRingView';
 // Main component
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Onboarding pit-offering decisions (pure, exported for tests)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether floating word chips respond to taps. Taps are live outside
+ * onboarding and during the pit_offering step — the FoxGuide tells the player
+ * to tap each glowing word, so the tap path must never be suppressed there.
+ * Earlier onboarding beats (pit_intro) keep taps inert so the player can't
+ * offer words before Fox explains them.
+ */
+export function isPitWordTapEnabled(
+  isOnboarding: boolean | undefined,
+  onboardingStep: string | undefined,
+): boolean {
+  return !isOnboarding || onboardingStep === 'pit_offering';
+}
+
+/**
+ * What the pit_offering progress effect should do for the current harvest
+ * state. The step completes ONLY through the player's own taps (each devoured
+ * word finalizes its batch; pendingBatches drains to 0) — there is no
+ * auto-offer. 'arm_fallback' covers reaching the step with nothing offerable
+ * (missing/empty batch, or a relaunch after the words were already offered),
+ * where no tap interaction exists that could ever complete the step.
+ */
+export type PitOnboardingOfferAction =
+  | 'reset'          // not in pit_offering — clear tracking
+  | 'wait'           // harvest state not loaded yet
+  | 'track_pending'  // words remain — remember we had something to offer
+  | 'complete'       // player devoured the last pending batch
+  | 'arm_fallback';  // nothing was ever pending — schedule completion
+
+export function getPitOnboardingOfferAction(
+  onboardingStep: string | undefined,
+  hadPending: boolean,
+  pendingBatchCount: number | null,
+): PitOnboardingOfferAction {
+  if (onboardingStep !== 'pit_offering') return 'reset';
+  if (pendingBatchCount == null) return 'wait';
+  if (pendingBatchCount > 0) return 'track_pending';
+  return hadPending ? 'complete' : 'arm_fallback';
+}
+
+/**
+ * How long the pit_offering step may sit with pending words and no successful
+ * devour before the stalled-pending safety net auto-offers the remainder.
+ * Generous on purpose: the manual tap-to-devour flow is primary, and every
+ * player devour resets this clock — the net only catches a player whose taps
+ * never register (or who is genuinely stuck), never one actively tapping.
+ */
+export const PIT_ONBOARDING_STALL_RESCUE_MS = 30000;
+
+/**
+ * Stalled-pending safety net for the pit_offering onboarding step.
+ *
+ * The player-driven flow ('track_pending' → taps drain batches → 'complete')
+ * has no way out if the player taps some-but-not-all word chips, or their
+ * taps never register: nothing else can ever complete the step, soft-locking
+ * onboarding forever. This watchdog rescues that case: `arm()` (re)starts a
+ * generous clock — called when words become pending and again after every
+ * successful devour, so an actively-tapping player is never preempted — and
+ * `cancel()` clears it (unmount / step change / effect re-run). If the clock
+ * runs out, `onStall` auto-offers the remaining batches and completes the
+ * step. Pure timer logic, exported for tests (fake timers).
+ */
+export function createPitOnboardingStallRescue(
+  onStall: () => void,
+  timeoutMs: number = PIT_ONBOARDING_STALL_RESCUE_MS,
+): { arm: () => void; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const cancel = () => {
+    if (timer != null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  const arm = () => {
+    cancel();
+    timer = setTimeout(() => {
+      timer = null;
+      onStall();
+    }, timeoutMs);
+  };
+  return { arm, cancel };
+}
+
 interface OfferingPitScreenProps {
   phase: DialoguePhase;
   amberBalance: number;
@@ -612,9 +702,9 @@ interface OfferingPitScreenProps {
   onPhaseTransitionConfirmed?: (newPhase: DialoguePhase) => void;
   /** Whether onboarding is active — suppresses normal interaction */
   isOnboarding?: boolean;
-  /** Current onboarding step (for auto-offer triggering) */
+  /** Current onboarding step (gates the manual tap-to-offer flow) */
   onboardingStep?: string;
-  /** Called after auto-offer completes during onboarding */
+  /** Called once the player has tap-devoured every pending word during onboarding */
   onOnboardingOfferComplete?: () => void;
 }
 
@@ -632,6 +722,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   onboardingStep,
   onOnboardingOfferComplete,
 }) => {
+  const screenInsets = useScreenInsets();
   const phaseTheme = getPhaseTheme(phase);
   const reducedMotion = getSettingsSync()?.reducedMotion ?? false;
   const simplify = shouldSimplifyAnimations();
@@ -663,6 +754,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const devouredPerBatch = useRef<Map<string, Set<string>>>(new Map());
   const batchWordCounts = useRef<Map<string, number>>(new Map());
   const finalizingBatches = useRef<Set<string>>(new Set());
+
+  // Onboarding stalled-pending safety net (see the effect below handleHarvestAll).
+  // Held in a ref so every successful player devour can reset its clock without
+  // re-running the effect. Null outside the pit_offering onboarding step.
+  const stallRescueRef = useRef<{ arm: () => void; cancel: () => void } | null>(null);
 
   // Surge glow — flashes on devour impact / inhale
   const pitSurgeOpacity = useRef(new Animated.Value(0)).current;
@@ -1512,6 +1608,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Handle word devoured ----
   const handleWordDevoured = useCallback((fw: FlyingWord) => {
     if (!mountedRef.current) return;
+    // A successful devour resets the onboarding stalled-pending rescue clock,
+    // so an actively-tapping player is never preempted by the auto-offer.
+    stallRescueRef.current?.arm();
     flashPitSurge();
     spawnImpactBurst();
     spawnShockwave();
@@ -1629,32 +1728,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   // Keep devourWordRef in sync
   useEffect(() => { devourWordRef.current = devourWord; }, [devourWord]);
-
-  // ---- Onboarding: detect when player has manually offered all words ----
-  const onboardingHadPending = useRef(false);
-  useEffect(() => {
-    if (onboardingStep !== 'pit_offering') {
-      onboardingHadPending.current = false;
-      return;
-    }
-    // Track that we had pending batches at the start
-    if (harvestState && harvestState.pendingBatches.length > 0) {
-      onboardingHadPending.current = true;
-    }
-    // Once player has devoured all pending batches, notify completion
-    if (onboardingHadPending.current && harvestState && harvestState.pendingBatches.length === 0) {
-      onOnboardingOfferComplete?.();
-    }
-    // Safety net: if we reach pit_offering with nothing to offer (a missing/empty
-    // harvest batch), there's no devour interaction that can complete the step,
-    // so the onboarding Fox guide would never appear and the flow could soft-lock.
-    // Fire completion after a short delay in that case. If batches load late, this
-    // effect re-runs, marks hadPending, and the timer is cleared before it fires.
-    if (!onboardingHadPending.current && harvestState && harvestState.pendingBatches.length === 0) {
-      const fallback = setTimeout(() => onOnboardingOfferComplete?.(), 4000);
-      return () => clearTimeout(fallback);
-    }
-  }, [onboardingStep, harvestState, onOnboardingOfferComplete]);
 
   // ---- Harvest All (with spiral paths) ----
   const handleHarvestAll = useCallback(async () => {
@@ -1788,28 +1861,64 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }, cascadeDuration);
   }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
 
-  // Stable ref for handleHarvestAll (used by onboarding auto-offer effect)
-  const handleHarvestAllRef = useRef(handleHarvestAll);
-  useEffect(() => { handleHarvestAllRef.current = handleHarvestAll; }, [handleHarvestAll]);
-
-  const onboardingAutoOfferStarted = useRef(false);
+  // ---- Onboarding: advance when the PLAYER has offered every word ----
+  // The pit_offering step is completed by the player's own taps (each word
+  // devoured → batch finalized → pendingBatches drains to 0) — the manual
+  // flow is primary and there is no early auto-offer; the FoxGuide instructs
+  // "tap each glowing word" and the pit waits for the player to do that.
+  // Two safety nets guarantee the step can never soft-lock:
+  //  - 'arm_fallback': reached the step with nothing offerable (missing/empty
+  //    batch, or a relaunch after the words were already offered) — no devour
+  //    interaction exists, so completion fires after a short delay. If
+  //    batches load late, this effect re-runs, tracks pending, and the timer
+  //    is cleared before it fires.
+  //  - 'track_pending' stall rescue: words ARE pending but nothing has been
+  //    devoured for a generous window (taps not registering, player stuck on
+  //    some-but-not-all chips) — auto-offer the REMAINING batches via the
+  //    existing handleHarvestAll path and complete the step. Every successful
+  //    devour re-arms the clock (handleWordDevoured → stallRescueRef), so an
+  //    actively-tapping player is never preempted. Completion upstream
+  //    (handlePitOnboardingOfferComplete) is idempotent, so the 'complete'
+  //    branch firing again once pending drains is harmless.
+  // (This effect lives below handleHarvestAll because it calls it directly.)
+  const onboardingHadPending = useRef(false);
   useEffect(() => {
-    if (onboardingStep !== 'pit_offering') {
-      onboardingAutoOfferStarted.current = false;
-      return;
+    const action = getPitOnboardingOfferAction(
+      onboardingStep,
+      onboardingHadPending.current,
+      harvestState ? harvestState.pendingBatches.length : null,
+    );
+    switch (action) {
+      case 'reset':
+        onboardingHadPending.current = false;
+        return;
+      case 'track_pending': {
+        onboardingHadPending.current = true;
+        const rescue = createPitOnboardingStallRescue(() => {
+          // Offer whatever the player hasn't devoured (credits amber
+          // atomically up front), then advance the step even if the offer
+          // path failed — a stuck player must always get unstuck.
+          handleHarvestAll().finally(() => onOnboardingOfferComplete?.());
+        });
+        stallRescueRef.current = rescue;
+        rescue.arm();
+        return () => {
+          rescue.cancel();
+          if (stallRescueRef.current === rescue) stallRescueRef.current = null;
+        };
+      }
+      case 'complete':
+        // Last pending batch devoured by the player's taps
+        onOnboardingOfferComplete?.();
+        return;
+      case 'arm_fallback': {
+        const fallback = setTimeout(() => onOnboardingOfferComplete?.(), 4000);
+        return () => clearTimeout(fallback);
+      }
+      default:
+        return;
     }
-    if (onboardingAutoOfferStarted.current || isOffering) return;
-    if (!harvestState || harvestState.pendingBatches.length === 0) return;
-
-    onboardingAutoOfferStarted.current = true;
-    const timer = setTimeout(() => {
-      handleHarvestAllRef.current().catch(() => {
-        onboardingAutoOfferStarted.current = false;
-      });
-    }, reducedMotion ? 250 : 900);
-
-    return () => clearTimeout(timer);
-  }, [onboardingStep, harvestState, isOffering, reducedMotion]);
+  }, [onboardingStep, harvestState, onOnboardingOfferComplete, handleHarvestAll]);
 
   // ---- Summary stats ----
   const pendingAmber = useMemo(() => {
@@ -2051,11 +2160,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
       {/* Floating word chips — taps disabled during onboarding except during pit_offering step */}
       {flyingWords.map(fw => (
-        <FloatingWordChip key={fw.id} fw={fw} onTap={isOnboarding && onboardingStep !== 'pit_offering' ? noopDevour : stableDevourWord} />
+        <FloatingWordChip key={fw.id} fw={fw} onTap={isPitWordTapEnabled(isOnboarding, onboardingStep) ? stableDevourWord : noopDevour} />
       ))}
 
-      {/* Header — matches HomeScreen frosted glass style */}
-      <View style={[styles.header, { paddingTop: STATUS_BAR_HEIGHT }]}>
+      {/* Header — matches HomeScreen frosted glass style; safe-area aware */}
+      <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <View style={styles.headerLeft}>
           <View style={styles.amberContainer} accessibilityLabel={`${Math.max(0, displayBalance)} amber`}>
             <View style={styles.amberInner}>
@@ -2257,7 +2366,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
       {/* Bottom panel — hidden during onboarding (FoxGuide occupies this space) */}
       {!isOnboarding && (
-        <View style={styles.bottomPanel}>
+        <View style={[styles.bottomPanel, { paddingBottom: Math.max(Platform.OS === 'ios' ? 34 : 16, screenInsets.bottom) }]}>
           {(() => {
             const bt = getOverlayBannerTheme(phase);
             return (
@@ -2551,7 +2660,7 @@ const styles = StyleSheet.create({
   bottomPanel: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+    // paddingBottom applied inline via useScreenInsets (home-indicator aware)
     paddingHorizontal: 16,
   },
   summaryRow: {
