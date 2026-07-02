@@ -83,7 +83,7 @@ function getPhaseRowColors(phase: number) {
       dropBadgeColor: CandyColors.pink.main,
       slotGlowColor: CandyColors.pink.main,
       slotBorderColor: CandyColors.pink.light,
-      plusColor: CandyColors.pink.main,
+      dropHintColor: CandyColors.pink.main,
       cornerDotColor: CandyColors.pink.light,
     };
   }
@@ -101,7 +101,7 @@ function getPhaseRowColors(phase: number) {
       dropBadgeColor: theme.bgPrimary,
       slotGlowColor: theme.bgPrimary,
       slotBorderColor: theme.bgPrimary,
-      plusColor: theme.bgPrimary,
+      dropHintColor: theme.bgPrimary,
       cornerDotColor: theme.bgPrimary,
     };
   }
@@ -117,7 +117,7 @@ function getPhaseRowColors(phase: number) {
       dropBadgeColor: '#7A5A8E',
       slotGlowColor: '#4A3875',
       slotBorderColor: '#5B4890',
-      plusColor: '#7A5A8E',
+      dropHintColor: '#7A5A8E',
       cornerDotColor: '#5B4890',
     };
   }
@@ -133,7 +133,7 @@ function getPhaseRowColors(phase: number) {
     dropBadgeColor: '#4A3065',
     slotGlowColor: '#2A1845',
     slotBorderColor: '#5A4075',
-    plusColor: '#4A3065',
+    dropHintColor: '#4A3065',
     cornerDotColor: '#5A4075',
   };
 }
@@ -360,11 +360,18 @@ const Slot: React.FC<{
           {/* Inner shimmer */}
           <View style={styles.slotShimmer} />
 
-          {/* Plus icon */}
-          <View style={[styles.plusContainer, compact && styles.plusContainerCompact]}>
-            <View style={[styles.plusHorizontal, compact && styles.plusHorizontalCompact, { backgroundColor: phaseColors.plusColor }]} />
-            <View style={[styles.plusVertical, compact && styles.plusVerticalCompact, { backgroundColor: phaseColors.plusColor }]} />
-          </View>
+          {/* Drop indicator: single flexbox-centered dot (View-based, so it stays
+              crisply centered under the arc rotation + trapezoid transform).
+              Hidden while the guided arrow shows so the two never stack. */}
+          {!isGuided && (
+            <View
+              style={[
+                styles.dropDot,
+                compact && styles.dropDotCompact,
+                { backgroundColor: phaseColors.dropHintColor },
+              ]}
+            />
+          )}
 
           {/* Corner decorations - hide in compact mode */}
           {!compact && (
@@ -1110,37 +1117,21 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 8, // Match compact slot top radius
     borderTopRightRadius: 8,
   },
-  plusContainer: {
-    width: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  plusContainerCompact: {
-    width: 10,
-    height: 10,
-  },
-  plusHorizontal: {
-    position: 'absolute',
-    width: 12,
-    height: 3,
-    backgroundColor: CandyColors.pink.main,
-    borderRadius: 2,
-  },
-  plusHorizontalCompact: {
+  // Single drop-hint dot. A plain View child of the flex-centered slot, so it
+  // is geometrically centered with no font metrics involved (replaces the old
+  // two-bar plus glyph, which stacked with the guided arrow and read as a
+  // misaligned cross over a down arrow).
+  dropDot: {
     width: 8,
-    height: 2,
-  },
-  plusVertical: {
-    position: 'absolute',
-    width: 3,
-    height: 12,
-    backgroundColor: CandyColors.pink.main,
-    borderRadius: 2,
-  },
-  plusVerticalCompact: {
-    width: 2,
     height: 8,
+    borderRadius: 4,
+    opacity: 0.55,
+    backgroundColor: CandyColors.pink.main,
+  },
+  dropDotCompact: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   cornerDot: {
     position: 'absolute',
@@ -1168,6 +1159,9 @@ const styles = StyleSheet.create({
   slotGuideText: {
     position: 'absolute',
     fontSize: 18,
+    lineHeight: 18,
+    textAlign: 'center',
+    includeFontPadding: false, // Android: strip font padding so the arrow truly centers
     fontWeight: '900',
     color: CandyColors.orange.main,
   },

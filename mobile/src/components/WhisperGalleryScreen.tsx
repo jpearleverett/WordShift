@@ -8,6 +8,7 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
 import { useScreenInsets } from '../hooks/useScreenInsets';
@@ -21,7 +22,8 @@ import {
 } from '../services/whisperGallery';
 import { ANIMAL_INFO } from '../services/animalDialogue';
 import { getWhisperGalleryEmptyText } from '../services/phaseNarrative';
-import { DialoguePhase } from '../types/homeWorld';
+import { AnimalType, DialoguePhase } from '../types/homeWorld';
+import { CHARACTER_SPRITES } from './home/AnimalSprite';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -112,6 +114,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
           const typedAnimal = animalType as keyof typeof ANIMAL_INFO;
           const animalName = ANIMAL_INFO[typedAnimal]?.name || animalType;
           const animalEmoji = ANIMAL_INFO[typedAnimal]?.emoji || '🐾';
+          const animalSprite = CHARACTER_SPRITES[animalType as AnimalType]?.idle;
           const isExpanded = expandedAnimal === animalType;
 
           return (
@@ -122,7 +125,18 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                 accessibilityLabel={`${animalName}: ${entries.length} entries`}
                 accessibilityRole="button"
               >
-                <Text style={styles.animalEmoji}>{animalEmoji}</Text>
+                <View style={[styles.animalPortrait, { borderColor: entryBorder }]}>
+                  {animalSprite ? (
+                    <Image
+                      source={animalSprite}
+                      style={styles.animalPortraitImage}
+                      resizeMode="contain"
+                      accessibilityLabel={animalName}
+                    />
+                  ) : (
+                    <Text style={styles.animalEmoji}>{animalEmoji}</Text>
+                  )}
+                </View>
                 <Text style={[styles.animalName, { color: headerColor }]}>
                   {animalName}
                 </Text>
@@ -224,6 +238,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
     gap: 10,
+  },
+  animalPortrait: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  animalPortraitImage: {
+    width: 34,
+    height: 34,
   },
   animalEmoji: {
     fontSize: 22,

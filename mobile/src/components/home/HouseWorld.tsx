@@ -417,21 +417,20 @@ const PHASE_BG_COLORS: Record<number, string> = {
   5: '#050816', // Phase 5 renders sky_shadow too — same top row
 };
 
-// Ground extension below the sky image. The sky Image ends 5% above the
-// container bottom (its `top` offset frames the artwork lower), and the pit
-// pan slack shifts the whole scene up at rest — both can expose the container
-// backdrop BELOW the artwork, which is sky-top blue and reads as "the house
-// floats on water". This band paints that region with the average color of
-// the sky asset's BOTTOM pixel row (grass/ground), so the artwork appears to
-// extend downward seamlessly. Sampled via the same scratch pngjs approach as
-// PHASE_BG_COLORS — re-sample if the sky assets are regenerated.
+// Ground seam guard below the sky image. The sky Image is bottom-anchored to
+// the container, so its artwork always reaches the last visible pixel row —
+// this band sits BELOW the container bottom (with a 1px overlap) purely to
+// guard against sub-pixel rounding seams. It is painted with the average
+// color of the sky asset's BOTTOM pixel row so even that 1px reads as grass.
+// Sampled via the same scratch pngjs approach as PHASE_BG_COLORS — re-sample
+// if the sky assets are regenerated.
 const PHASE_GROUND_COLORS: Record<number, string> = {
-  0: '#355223', // sky_day.png bottom row (grass)
-  1: '#224116', // sky_afternoon.png bottom row
-  2: '#312512', // sky_dusk.png bottom row
-  3: '#061626', // sky_storm.png bottom row
-  4: '#040913', // sky_shadow.png bottom row
-  5: '#040913', // Phase 5 renders sky_shadow too
+  0: '#8ba232', // sky_day.png bottom row (meadow grass)
+  1: '#557718', // sky_afternoon.png bottom row
+  2: '#6d4018', // sky_dusk.png bottom row
+  3: '#153150', // sky_storm.png bottom row
+  4: '#182131', // sky_shadow.png bottom row
+  5: '#182131', // Phase 5 renders sky_shadow too
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -728,33 +727,47 @@ const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (312 / 792)); // roof.png asp
 const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (84 / 792)); // foundation.png aspect
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
-// Player-visible ground fix (v2 — direction REVERSED): the first nudge (+16,
-// lowering the group) made things worse. Device screenshots show the sky art's
-// river runs along the BOTTOM edge of the image, so lowering the house planted
-// the foundation IN the water; the correct grass bank sits HIGHER in the art.
-// ORIGINAL baseline margin — the art alignment the playtest screenshots
-// confirmed as correct (foundation on the lower meadow, river passing to the
-// left). Do not nudge this to move the house on the artwork; the sky tuck
-// below is the single lever for house-vs-art alignment.
+// Baseline gap between the pit entrance and the container bottom (before the
+// PLAY-dock clearance below is added). House-vs-art alignment comes from the
+// bottom-anchored sky geometry (SKY_BOX_HEIGHT below), not from nudging this.
 const HOUSE_BOTTOM_MARGIN = 30;
 
-// HomeScreen overlays a ~56dp PLAY dock across the bottom of the world. Two
-// coordinated constants keep the pit usable and the artwork gap-free WITHOUT
-// any render-time transform tricks (a previous slack hack shifted the whole
-// container up, exposing the blue backdrop below the art — it read as the
-// house floating on water):
-//
-// 1. PIT_DOCK_CLEARANCE: extra in-flow bottom margin (only when the pit
-//    renders) so the pit entrance sits fully above the dock at rest.
-// 2. SKY_BOTTOM_TUCK: the sky image is raised by this amount (its bottom edge
-//    lands behind the dock zone, never above it), so the artwork still covers
-//    every visible pixel AND the house lands slightly LOWER on the art than
-//    the original baseline — per the marked-up playtest feedback. The
-//    ground-extension band behind the dock's translucency + side margins is
-//    painted with the art's own bottom-row color, so nothing reads as sky.
-const HOME_PLAY_DOCK_HEIGHT = 56;
+// HomeScreen overlays a ~56dp PLAY dock across the bottom of the world; this
+// extra in-flow bottom margin (only when the pit renders) keeps the pit
+// entrance fully above the dock at rest.
 const PIT_DOCK_CLEARANCE = 80;
-const SKY_BOTTOM_TUCK = HOME_PLAY_DOCK_HEIGHT + 36; // 92 — hidden behind the dock zone
+
+// ─── Sky geometry: the house sits BELOW the river, on every device ─────────
+// All five sky assets are 941x1972 (skyGeometry.test.ts pins this). The river
+// crosses the artwork no lower than row ~1335 in every variant; rows
+// 1335-1972 are open meadow (the bottom 300 rows are a mirrored meadow
+// extension added specifically to give the house below-river seating room).
+//
+// The sky Image is anchored to the container BOTTOM (bottom: 0) with
+// resizeMode="cover". Cover scales by max(boxW/imgW, boxH/imgH); forcing the
+// box height to at least boxWidth * imgH/imgW makes the HEIGHT ratio win, so
+// the artwork's full height maps exactly onto the box: the art's bottom row
+// sits on the container bottom, always, with zero vertical crop. Two
+// consequences:
+//   1. No fill band can ever show below the art (the old failure mode).
+//   2. A feature at image row Y sits exactly (1972 - Y) * scale dp above the
+//      container bottom, where scale = SKY_BOX_HEIGHT / 1972 — independent of
+//      the container height, header height, or insets.
+// The house column is bottom-anchored too (margins below), so the foundation
+// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + pit 95 + foundation
+// 30) = 235dp ≈ image rows 1360-1470 across real devices — on the meadow,
+// just below the river, in every sky variant.
+const SKY_IMG_WIDTH = 941;
+const SKY_IMG_HEIGHT = 1972;
+// The 760 floor guarantees the seat even on very small / display-size-scaled
+// windows (e.g. 320x640dp): scale >= 760/1972 puts the foundation top at
+// image row <= ~1362, still below every river. Larger boxes only push the
+// house further down the meadow, never back into the water.
+const SKY_BOX_HEIGHT = Math.max(
+  SCREEN_HEIGHT,
+  Math.ceil(SCREEN_WIDTH * (SKY_IMG_HEIGHT / SKY_IMG_WIDTH)) + 2,
+  760,
+);
 
 
 interface HouseWorldProps {
@@ -976,8 +989,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
             ]}
           >
               {/* Sky background - inside transform so it moves with the scene.
-                  Keep the same image size, but frame it slightly lower on the
-                  home screen so more of the lower artwork is visible. */}
+                  Bottom-anchored: the artwork's bottom row sits exactly on the
+                  container bottom (see the SKY_BOX_HEIGHT geometry notes), so
+                  the art always covers every visible pixel and the house seats
+                  at a device-independent spot on the meadow below the river. */}
               <Image
                 source={
                   currentPhase >= 4 ? SKY_SHADOW :
@@ -986,19 +1001,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   currentPhase >= 1 ? SKY_AFTERNOON :
                   SKY_DAY
                 }
-                style={[styles.skyBackground, {
-                  // Raised so the artwork's bottom edge lands behind the PLAY
-                  // dock zone (never above it) — the image covers every
-                  // visible pixel while seating the house lower on the art.
-                  top: -SKY_BOTTOM_TUCK,
-                }]}
+                style={styles.skyBackground}
                 resizeMode="cover"
               />
 
-              {/* Ground extension: paints everything below the sky artwork's
-                  bottom edge in the art's own ground color so the pan slack /
-                  sky framing can never expose the blue backdrop under the
-                  grass (which read as the house floating on water). */}
+              {/* Ground seam guard: a band below the container bottom (1px
+                  overlap) in the art's own bottom-row grass color, purely to
+                  guard against sub-pixel rounding seams at the art's bottom
+                  edge. Never visibly a "fill" — the artwork itself reaches
+                  the last visible row. */}
               <View
                 pointerEvents="none"
                 style={[
@@ -1166,26 +1177,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#439cf2',
   },
 
-  // Sky background - moves with scene, oversized to prevent gaps during pan.
+  // Sky background - bottom-anchored so the artwork's bottom row sits exactly
+  // on the container bottom (see SKY_BOX_HEIGHT notes). Pan only ever moves
+  // the scene DOWN (translateY >= 0), so the art can never lift off the
+  // bottom edge; upward exposure is covered by the PHASE_BG_COLORS backdrop
+  // (sky top-row samples).
   skyBackground: {
     position: 'absolute',
-    top: -SCREEN_HEIGHT * 0,
-    left: -SCREEN_WIDTH * 0,
-    width: SCREEN_WIDTH * 1,
-    height: SCREEN_HEIGHT * 1,
+    bottom: 0,
+    left: 0,
+    width: SCREEN_WIDTH,
+    height: SKY_BOX_HEIGHT,
     zIndex: -1,
   },
-  // Sits exactly where the sky Image ends (its top offset is -0.05H and its
-  // height is 1H, so its bottom edge lands at H - SKY_BOTTOM_TUCK, behind the
-  // PLAY dock zone). Insurance only: fills the dock-covered strip and any
-  // device-height slop with the art's own ground color so nothing can ever
-  // read as sky below the grass.
+  // Below the container bottom with a 1px overlap over the art's bottom row —
+  // sub-pixel seam insurance only (see PHASE_GROUND_COLORS notes).
   groundExtension: {
     position: 'absolute',
-    top: SCREEN_HEIGHT - SKY_BOTTOM_TUCK - 1, // 1px overlap so no hairline seam
+    bottom: -SCREEN_HEIGHT,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT,
+    height: SCREEN_HEIGHT + 1,
     zIndex: -1,
   },
   // Clouds - inside transform container
@@ -1235,8 +1247,8 @@ const styles = StyleSheet.create({
 
   // House container. marginBottom here is the pit-less baseline; the render
   // site overrides it with houseBottomMargin (baseline + dock clearance when
-  // the pit entrance is shown). House-vs-art alignment is set by
-  // SKY_BOTTOM_TUCK, not this margin.
+  // the pit entrance is shown). These margins ARE part of the house-vs-art
+  // seat math — see the SKY_BOX_HEIGHT geometry notes before nudging them.
   houseContainer: {
     alignItems: 'center',
     marginTop: 50,

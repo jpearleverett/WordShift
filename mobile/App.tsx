@@ -19,7 +19,7 @@ import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
 import { AnimatedBackground } from './src/components/AnimatedBackground';
 import { Confetti, StarBurst } from './src/components/Confetti';
-import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu, RitualEchoChain } from './src/components/puzzle';
+import { ActionButton, AnimatedLogo, Toast, VictoryModal, RulesModal, DifficultyMenu } from './src/components/puzzle';
 import { HomeScreen } from './src/components/home';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { CandyColors } from './src/theme/colors';
@@ -233,10 +233,6 @@ function MainApp() {
   // Store drop-shake animation so it can be stopped if a new one starts before it finishes
   const dropShakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // In-progress ritual echo chain — words formed during current puzzle
-  const [ritualEchoWords, setRitualEchoWords] = useState<string[]>([]);
-  const clearRitualEchoWords = useCallback(() => setRitualEchoWords([]), []);
-
   // Track victory-flow setTimeout IDs so they can be cleared on navigation/unmount
   const victoryTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const addVictoryTimeout = useCallback((fn: () => void, ms: number) => {
@@ -432,7 +428,7 @@ function MainApp() {
     resetVictory: victoryActions.resetVictory,
   }), [transitionTo, puzzleActions.startNewGame, puzzleActions.setGameState, puzzleActions.clearBoard, puzzleActions.setShowConfetti, persistenceActions.refreshStats, victoryActions.resetVictory]);
 
-  const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks, clearRitualEchoWords);
+  const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks);
 
   // Auto-save puzzle state during active play
   useAutosave({
@@ -764,7 +760,6 @@ function MainApp() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
-    setRitualEchoWords([]);
 
     if (queuedPostVictoryIntrosRef.current.length > 0) {
       pendingPostVictoryActionRef.current = action;
@@ -792,7 +787,6 @@ function MainApp() {
     // Refresh persistence data (phase, stats) before starting puzzle
     persistenceActions.refreshStats();
     const diff = difficulty || puzzle.difficulty;
-    setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     transitionTo('puzzle', async () => {
       // Check for saved in-progress puzzle
@@ -848,7 +842,6 @@ function MainApp() {
     puzzleActions.refreshHintBalance();
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
-    setRitualEchoWords([]);
     setIsPlayingDaily(false);
     resetSpeedRun();
     setVictoryDoubleClaimed(false);
@@ -887,7 +880,6 @@ function MainApp() {
     hapticLight();
     soundTap();
     persistenceActions.refreshStats();
-    setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     setIsPlayingDaily(true);
     resetSpeedRun();
@@ -935,7 +927,6 @@ function MainApp() {
     soundTap();
     setIsPlayingDaily(false);
     resetSpeedRun();
-    setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     persistenceActions.refreshStats();
     logEvent({ type: 'puzzle_started', data: { shared: true, words: words.length } });
@@ -1418,11 +1409,6 @@ function MainApp() {
         hapticSuccess();
       }
 
-      // Track formed word for in-puzzle ritual echo chain
-      if (result.formedWord) {
-        setRitualEchoWords(prev => [...prev, result.formedWord!]);
-      }
-
       // Dread word visual feedback — subtle dark pulse when a dread word is formed
       if (persistence.currentPhase >= 2 && result.formedWord && isDreadWord(result.formedWord)) {
         dreadActions.triggerDreadPulse(persistence.currentPhase);
@@ -1814,7 +1800,6 @@ function MainApp() {
     puzzleActions.setShowConfetti(false);
     victoryActions.resetVictory();
     orchestrationActions.resetOrchestration();
-    setRitualEchoWords([]);
     await onboardingActions.advanceOnboarding('puzzle_complete');
   }, [onboardingActions, puzzleActions, victoryActions, orchestrationActions, clearVictoryTimeouts]);
 
@@ -1919,7 +1904,6 @@ function MainApp() {
 
   const handleSelectDifficulty = useCallback((d: Difficulty) => {
     hapticLight();
-    setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.startNewGame(d, puzzle.gameMode, puzzle.selectedVariant);
@@ -1931,7 +1915,6 @@ function MainApp() {
     }
     hapticSelection();
     soundTap();
-    setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     puzzleActions.setSelectedVariant(variant);
@@ -1947,7 +1930,6 @@ function MainApp() {
 
   const handleToggleChallengeMode = useCallback(() => {
     hapticMedium();
-    setRitualEchoWords([]);
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
@@ -2409,7 +2391,6 @@ function MainApp() {
                     style={styles.timeUpButtonPrimary}
                     onPress={() => {
                       hapticLight();
-                      setRitualEchoWords([]);
                       // Abandoning the timed-out run resets the escalation
                       // ladder (time-up no longer resets it — a rescue may
                       // continue the run).
@@ -2494,13 +2475,6 @@ function MainApp() {
               />
             ))}
           </ScrollView>
-
-          {/* In-puzzle ritual echo chain — shows word chain building in real-time */}
-          <RitualEchoChain
-            words={ritualEchoWords}
-            phase={persistence.currentPhase}
-            visible={puzzle.gameState === GameState.PLAYING && ritualEchoWords.length > 0}
-          />
         </View>
 
         {/* No stuck-panel / no immediate "unwinnable" announcement — product
@@ -2551,7 +2525,6 @@ function MainApp() {
             }}
             onPress={() => {
               hapticLight();
-              setRitualEchoWords([]);
               // RESTART while playing resets THIS board (a true retry); NEW (idle)
               // fetches a fresh puzzle.
               if (puzzle.gameState === GameState.PLAYING) {
