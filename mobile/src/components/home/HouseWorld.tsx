@@ -648,6 +648,54 @@ const DriftingCloud: React.FC<{
   );
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PIT ATTENTION GLOW - Warm pulse around the pit entrance when offerings wait
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * PitAttentionGlow — a soft warm halo behind the pit entrance, shown when
+ * harvest batches are waiting to be offered. Pre-styled overlay Views with a
+ * single native-driven opacity loop (no JS-bridge color animation); renders
+ * at a static mid-opacity under reducedMotion / simplified animations.
+ */
+const PitAttentionGlow: React.FC = () => {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const isStatic = getSettingsSync().reducedMotion || shouldSimplifyAnimations();
+
+  useEffect(() => {
+    if (isStatic) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1400,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isStatic, pulse]);
+
+  const opacity = isStatic
+    ? 0.7 // static mid-opacity — still reads as "the pit wants attention"
+    : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] });
+
+  return (
+    <Animated.View pointerEvents="none" style={[styles.pitGlow, { opacity }]}>
+      <View style={styles.pitGlowOuter} />
+      <View style={styles.pitGlowInner} />
+    </Animated.View>
+  );
+};
+
 // House dimensions (single-column layout)
 // Room PNGs are 1456x720 (approx 2:1 aspect ratio)
 const ROOM_WIDTH = 250;
@@ -663,13 +711,32 @@ const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (312 / 792)); // roof.png asp
 const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (84 / 792)); // foundation.png aspect
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
-// Player-visible ground fix: the house + pit group sat a touch too high on the
-// sky artwork (foundation read as standing in the river). Lower the whole
-// group by this many px — applied as reduced bottom margin on houseContainer,
-// so it moves in layout flow while the absolutely-positioned sky image stays
-// exactly where it was. Also subtracted from the pan-bounds content height.
-const HOUSE_GROUND_NUDGE = 16; // ~13% of ROOM_HEIGHT (123px)
-const HOUSE_BOTTOM_MARGIN = 30 - HOUSE_GROUND_NUDGE;
+// Player-visible ground fix (v2 — direction REVERSED): the first nudge (+16,
+// lowering the group) made things worse. Device screenshots show the sky art's
+// river runs along the BOTTOM edge of the image, so lowering the house planted
+// the foundation IN the water; the correct grass bank sits HIGHER in the art.
+// A NEGATIVE nudge raises the group: the bottom margin grows, the house + pit
+// move up in layout flow while the absolutely-positioned sky image stays put.
+// -20 seats the foundation on the grass bank ~20px above the ORIGINAL
+// (pre-nudge, marginBottom: 30) baseline. Also feeds the pan-bounds content
+// height below so the clamp stays honest.
+const HOUSE_GROUND_NUDGE = -20; // negative = raise the house off the river
+const HOUSE_BOTTOM_MARGIN = 30 - HOUSE_GROUND_NUDGE; // 50
+
+// HomeScreen overlays a ~56dp PLAY dock across the bottom of the world, which
+// left the pit entrance clipped at the screen's bottom edge / hidden under the
+// dock on tall screens. Extra downward pan slack lets the player pull the
+// WHOLE scene up past its resting position (house and sky translate together,
+// so the ground fix above is preserved) until the entire pit entrance is
+// visible with ~90dp of clear space beneath it, above the dock. Applied as a
+// render-time offset on the pan transform — the stored pan value keeps its
+// [0, max] space so saved positions and clampHomeScenePanY stay compatible.
+const HOME_PLAY_DOCK_HEIGHT = 56;
+const PIT_CLEAR_SPACE_BELOW = 90;
+const PIT_BOTTOM_PAN_SLACK = Math.max(
+  0,
+  HOME_PLAY_DOCK_HEIGHT + PIT_CLEAR_SPACE_BELOW - HOUSE_BOTTOM_MARGIN
+); // 96
 
 
 interface HouseWorldProps {
@@ -686,6 +753,11 @@ interface HouseWorldProps {
   onPanYChange?: (panY: number) => void;
   /** Tapping the in-world pit entrance opens the Offering Pit. */
   onPitPress?: () => void;
+  /**
+   * Offerings are waiting in the pit — renders a soft warm pulsing glow
+   * around the pit entrance and extends its accessibility label.
+   */
+  pitNeedsAttention?: boolean;
   /** Phase-5 Tending Level — drives the "deepening" of the arrangement sigils. */
   tendingLevel?: number;
 }
@@ -703,6 +775,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   savedPanY = null,
   onPanYChange,
   onPitPress,
+  pitNeedsAttention = false,
   tendingLevel = 0,
 }) => {
   const tendingIntensity = getTendingIntensity(tendingLevel);
@@ -798,6 +871,10 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
       HOUSE_PADDING * 2;
   }, [numRows]);
 
+  // Extra downward pan slack so the pit entrance can be pulled fully clear of
+  // HomeScreen's bottom PLAY dock. Only needed when the pit entrance renders.
+  const bottomPanSlack = onPitPress ? PIT_BOTTOM_PAN_SLACK : 0;
+
   const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
@@ -805,20 +882,29 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
-      min: 0, // Don't allow panning below the house (prevents empty space below foundation)
-      max: Math.max(0, overflow + 50), // Allow panning up to see the roof + small padding
+      // Pan value 0 renders the scene lifted by bottomPanSlack (see
+      // syncPanPosition), giving the pit entrance clear space above the dock;
+      // the clamp itself keeps the stored value non-negative.
+      min: 0,
+      // Allow panning up to see the roof + small padding. bottomPanSlack is
+      // added so the roof-most framing (render offset overflow + 50) is
+      // unchanged after the render-time slack subtraction.
+      max: Math.max(0, overflow + 50) + bottomPanSlack,
     };
-  }, [containerHeight, houseHeight, numRows, onPitPress]);
+  }, [containerHeight, houseHeight, numRows, onPitPress, bottomPanSlack]);
 
   const syncPanPosition = useCallback((nextPanY: number, notify = false) => {
     const clampedPanY = clampHomeScenePanY(nextPanY, panBounds.max);
-    translateY.setValue(clampedPanY);
+    // Stored pan stays in [0, max]; the rendered offset is shifted down by the
+    // pit slack so pan value 0 lifts the whole scene (house + sky together)
+    // above the HomeScreen dock.
+    translateY.setValue(clampedPanY - bottomPanSlack);
     currentPanYRef.current = clampedPanY;
     baseTranslateY.current = clampedPanY;
     if (notify) {
       onPanYChange?.(clampedPanY);
     }
-  }, [onPanYChange, panBounds.max, translateY]);
+  }, [onPanYChange, panBounds.max, translateY, bottomPanSlack]);
 
   // Pan gesture handler - vertical only to prevent horizontal gaps
   const onPanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
@@ -826,7 +912,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 
     const newY = clampHomeScenePanY(baseTranslateY.current + translationY, panBounds.max);
 
-    translateY.setValue(newY);
+    translateY.setValue(newY - bottomPanSlack);
     currentPanYRef.current = newY;
   };
 
@@ -1020,10 +1106,15 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   <TouchableOpacity
                     style={styles.pitEntrance}
                     onPress={onPitPress}
-                    accessibilityLabel="Enter the Offering Pit"
+                    accessibilityLabel={
+                      pitNeedsAttention
+                        ? 'Enter the Offering Pit, offerings waiting'
+                        : 'Enter the Offering Pit'
+                    }
                     accessibilityRole="button"
                     activeOpacity={0.8}
                   >
+                    {pitNeedsAttention && <PitAttentionGlow />}
                     <Image
                       source={PIT_ENTRANCE_IMG}
                       style={styles.pitEntranceImage}
@@ -1102,8 +1193,10 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
 
-  // House container — bottom margin reduced by HOUSE_GROUND_NUDGE so the
-  // house + pit sit lower on the sky art (see constant above).
+  // House container — bottom margin enlarged by the (negative) ground nudge
+  // so the house + pit sit HIGHER on the sky art: the river runs along the
+  // art's bottom edge and the foundation belongs on the grass bank above it
+  // (see HOUSE_GROUND_NUDGE above).
   houseContainer: {
     alignItems: 'center',
     marginTop: 50,
@@ -1135,6 +1228,31 @@ const styles = StyleSheet.create({
   pitEntranceImage: {
     width: '100%',
     height: '100%',
+  },
+  // Warm attention halo behind the pit entrance (offerings waiting). Layered
+  // rgba ovals under a single animated-opacity wrapper — no color animation.
+  pitGlow: {
+    position: 'absolute',
+    top: -10,
+    left: -20,
+    right: -20,
+    bottom: -8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pitGlowOuter: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 80,
+    backgroundColor: 'rgba(255, 176, 74, 0.32)',
+  },
+  pitGlowInner: {
+    position: 'absolute',
+    width: '62%',
+    height: '58%',
+    borderRadius: 48,
+    backgroundColor: 'rgba(255, 214, 130, 0.38)',
   },
   smokeEmoji: {
     fontSize: 18,

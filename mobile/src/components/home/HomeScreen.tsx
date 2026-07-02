@@ -42,7 +42,6 @@ import { AmberInline } from '../AmberInline';
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const JOURNAL_ICON = require('../../../assets/ui/journal.png');
-const PIT_ICON = require('../../../assets/ui/pit.png');
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -104,7 +103,7 @@ import {
 import { getSettingsSync } from '../../services/settings';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getPitHomeBadgeLabel, getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
+import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade, areDeepeningsAvailable, getDeepenedRooms, getRoomDeepening, purchaseRoomDeepening } from '../../services/roomUpgrades';
@@ -225,7 +224,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Animations
   const amberPulse = useRef(new Animated.Value(1)).current;
   const playPulse = useRef(new Animated.Value(0)).current;
-  const pitPulseAnim = useRef(new Animated.Value(0)).current;
   const introDialogueSlide = useRef(new Animated.Value(0)).current;
   const [highlightPlayButton, setHighlightPlayButton] = useState(false);
 
@@ -414,8 +412,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return progress.puzzlesSolved <= 5;
   }, [progress, isOnboarding]);
 
-  const shouldShowPitShortcut = !isOnboarding;
-
   const shouldShowJournalButton = Boolean(
     !isOnboarding &&
     !isPostTutorialLightMode &&
@@ -429,8 +425,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     weeklyQuestState !== null
   );
 
-  const shouldHighlightPitButton = Boolean(
-    pitPhaseReady
+  // The pit no longer has a header button — the physical pit entrance below
+  // the house is the route to the Offering Pit. The attention state the header
+  // badge used to carry (pending harvest batches / a pending phase transition)
+  // now flows into HouseWorld so the in-world entrance can glow instead.
+  const pitNeedsAttention = Boolean(
+    (pendingHarvest && pendingHarvest.pendingBatches > 0) || pitPhaseReady
   );
 
   // Load data on mount
@@ -733,36 +733,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     };
   }, [highlightPlayButton, playPulse]);
 
-  // Pit button pulse when it needs attention.
-  useEffect(() => {
-    if (!shouldHighlightPitButton) {
-      pitPulseAnim.setValue(0);
-      return;
-    }
-    const reducedMotion = getSettingsSync().reducedMotion;
-    if (reducedMotion) {
-      pitPulseAnim.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pitPulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pitPulseAnim, {
-          toValue: 0,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    loop.start();
-    return () => { loop.stop(); };
-  }, [shouldHighlightPitButton, pitPulseAnim]);
-
-
   // Handle advancing intro dialogue
   const handleAdvanceIntroDialogue = async () => {
     if (!introAnimal || !progress) return;
@@ -987,15 +957,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
-      {/* Header — two rows so nothing can overlap at narrow (360dp) widths.
-          Row 1 is a slim status strip: amber pill (tap → store) + streak on the
-          left, utility menu (☰) pinned right. Row 2 holds the action buttons
-          (daily / quests / pit / journal) as fixed-size items, with PLAY
-          growing into all remaining width as the dominant primary action.
-          Row 2 disappears entirely during onboarding (every item is gated). */}
+      {/* Header — ONE row so the world stays dominant. Left cluster: amber
+          pill (tap → store) + streak badge; the pill is the only shrinkable
+          item (numberOfLines={1} truncation), so nothing can overlap. Right
+          cluster: fixed-size actions in order daily (📅) / quests (🎯) /
+          journal (📚) / utility menu (☰). There is NO pit button up here —
+          the physical pit entrance below the house is the route to the
+          Offering Pit. PLAY lives in the bottom-center dock over the world
+          (rendered after the house stage). During onboarding only amber +
+          streak render;
+          the ☰ menu shows whenever onboarding is over (including the
+          post-tutorial light mode, so Settings is always reachable).
+          Width budget at 360dp (10dp side padding → 340 inner), worst case
+          all unlocked: daily 42 + quest ≤54 + journal 38 + ☰ 38 + 3×6 gaps
+          = 190; 340 − 190 − 8 cluster gap = 142 for amber + streak (streak
+          ≈50 fixed → amber pill ≥84dp before truncating). Early game the
+          right cluster is just ☰ (38), leaving ~294dp. */}
       <View style={[styles.header, { paddingTop: screenInsets.top + 10 }]}>
-        <View style={styles.headerStatusRow}>
-          <View style={styles.headerStatusLeft}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeftCluster}>
             <TouchableOpacity
               style={styles.amberContainer}
               disabled={!onOpenStore || isOnboarding}
@@ -1031,126 +1011,72 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             )}
           </View>
-          {!isOnboarding && !isPostTutorialLightMode && (
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              onPress={handleOpenUtilityMenu}
-              accessibilityLabel="Open utility menu"
-              accessibilityRole="button"
-            >
-              <Text style={styles.headerIconText}>☰</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {!isOnboarding && (
-          <View style={styles.headerActionsRow}>
-            {onStartDaily &&
-              isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
-              <DailyChallengeCard
-                onStartDaily={onStartDaily}
-                phase={progress.currentPhase}
-                refreshSignal={progress.puzzlesSolved}
-              />
-            )}
-            {showQuestPill && (
-              <TouchableOpacity
-                style={styles.questPill}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={() => { handleOpenQuestModal().catch(() => {}); }}
-                accessibilityLabel={getQuestPillAccessibilityLabel(
-                  activeIncompleteQuestCount,
-                  claimableQuestAmber,
-                  dailyResetHint
-                )}
-                accessibilityRole="button"
-              >
-                <Text style={styles.questPillText}>{getQuestPillLabel(activeIncompleteQuestCount)}</Text>
-                {claimableQuestAmber > 0 && (
-                  <View style={styles.headerBadge}>
-                    <Text style={styles.headerBadgeText}>!</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
-            {onOpenPit && (
-              <Animated.View style={shouldHighlightPitButton ? {
-                transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
-                opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
-              } : undefined}>
+          {!isOnboarding && (
+            <View style={styles.headerRightCluster}>
+              {onStartDaily &&
+                isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
+                <DailyChallengeCard
+                  onStartDaily={onStartDaily}
+                  phase={progress.currentPhase}
+                  refreshSignal={progress.puzzlesSolved}
+                />
+              )}
+              {showQuestPill && (
                 <TouchableOpacity
-                  style={[styles.headerIconBtn, shouldHighlightPitButton && styles.pitHeaderIconBtn]}
+                  style={styles.questPill}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  onPress={() => {
-                    hapticLight();
-                    onOpenPit?.();
-                  }}
-                  accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
+                  onPress={() => { handleOpenQuestModal().catch(() => {}); }}
+                  accessibilityLabel={getQuestPillAccessibilityLabel(
+                    activeIncompleteQuestCount,
+                    claimableQuestAmber,
+                    dailyResetHint
+                  )}
                   accessibilityRole="button"
                 >
-                  <Image source={PIT_ICON} style={styles.headerIconImage} />
-                  {pendingHarvest && pendingHarvest.pendingWords > 0 && (
+                  <Text style={styles.questPillText}>{getQuestPillLabel(activeIncompleteQuestCount)}</Text>
+                  {claimableQuestAmber > 0 && (
                     <View style={styles.headerBadge}>
-                      <Text style={styles.headerBadgeText}>{pendingHarvest.pendingWords}</Text>
+                      <Text style={styles.headerBadgeText}>!</Text>
                     </View>
                   )}
                 </TouchableOpacity>
-              </Animated.View>
-            )}
-            {shouldShowJournalButton && (
+              )}
+              {shouldShowJournalButton && (
+                <TouchableOpacity
+                  style={[
+                    styles.headerIconBtn,
+                    journalSpotlightActive && styles.journalSpotlightIcon,
+                  ]}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  onPress={journalSpotlightActive ? async () => {
+                    // Spotlight: tapping icon advances to journal modal
+                    await markJournalIntroSeen();
+                    setJournalSpotlightActive(false);
+                    setShowJournalModal(true);
+                  } : handleOpenJournal}
+                  accessibilityLabel={journalSpotlightActive ? 'Tap to open journal' : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
+                  accessibilityRole="button"
+                >
+                  <Image source={JOURNAL_ICON} style={styles.headerIconImage} />
+                  {!journalSpotlightActive && claimableQuestAmber > 0 && (
+                    <View style={styles.headerBadge}>
+                      <Text style={styles.headerBadgeText}>!</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                style={[
-                  styles.headerIconBtn,
-                  journalSpotlightActive && styles.journalSpotlightIcon,
-                ]}
+                style={styles.headerIconBtn}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={journalSpotlightActive ? async () => {
-                  // Spotlight: tapping icon advances to journal modal
-                  await markJournalIntroSeen();
-                  setJournalSpotlightActive(false);
-                  setShowJournalModal(true);
-                } : handleOpenJournal}
-                accessibilityLabel={journalSpotlightActive ? 'Tap to open journal' : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
+                onPress={handleOpenUtilityMenu}
+                accessibilityLabel="Open utility menu"
                 accessibilityRole="button"
               >
-                <Image source={JOURNAL_ICON} style={styles.headerIconImage} />
-                {!journalSpotlightActive && claimableQuestAmber > 0 && (
-                  <View style={styles.headerBadge}>
-                    <Text style={styles.headerBadgeText}>!</Text>
-                  </View>
-                )}
+                <Text style={styles.headerIconText}>☰</Text>
               </TouchableOpacity>
-            )}
-            <Animated.View
-              style={[
-                styles.playButtonWrap,
-                highlightPlayButton && {
-                  transform: [{
-                    scale: playPulse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1, 1.06],
-                    }),
-                  }],
-                },
-              ]}
-            >
-              <JuicyButton
-                style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
-                onPress={() => {
-                  hapticSelection();
-                  setHighlightPlayButton(false);
-                  onPlayPuzzle();
-                }}
-                bounceScale={0.9}
-                accessibilityLabel="Play puzzle"
-                accessibilityRole="button"
-              >
-                <Text style={styles.playButtonText}>PLAY</Text>
-              </JuicyButton>
-            </Animated.View>
-          </View>
-        )}
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.houseStage}>
@@ -1168,6 +1094,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           tendingLevel={tendingLevel}
           savedPanY={initialHousePanY}
           onPanYChange={onHousePanChange}
+          pitNeedsAttention={pitNeedsAttention}
           onPitPress={!isOnboarding && onOpenPit ? () => {
             hapticLight();
             onOpenPit();
@@ -1255,6 +1182,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <CelebrationConfetti onComplete={() => setShowCelebration(false)} />
         )}
       </View>
+
+      {/* PLAY dock — the primary action, docked bottom-center over the world.
+          Shown exactly when the old header PLAY was (never during onboarding).
+          The world's own pan slack (inside HouseWorld) lets the pit entrance
+          scroll clear of the dock. */}
+      {!isOnboarding && (
+        <Animated.View
+          style={[
+            styles.playDock,
+            { bottom: screenInsets.bottom + 12 },
+            highlightPlayButton && {
+              transform: [{
+                scale: playPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.06],
+                }),
+              }],
+            },
+          ]}
+        >
+          <JuicyButton
+            style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
+            onPress={() => {
+              hapticSelection();
+              setHighlightPlayButton(false);
+              onPlayPuzzle();
+            }}
+            bounceScale={0.9}
+            accessibilityLabel="Play puzzle"
+            accessibilityRole="button"
+          >
+            <Text style={styles.playButtonText}>PLAY</Text>
+          </JuicyButton>
+        </Animated.View>
+      )}
 
       {/* Cooldown Message Toast */}
       {Boolean(dialogueFlow.cooldownMessage) && (
@@ -2656,10 +2618,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.2,
   },
-  // Two-row header. Both rows are non-wrapping with fixed-size items (row 2's
-  // only flexible item is the PLAY wrapper), so nothing can overlap or push
-  // PLAY offscreen at 360dp — worst case (daily 42 + quest pill ~54 + pit 38 +
-  // journal 38 + 4×8 gaps ≈ 204) still leaves PLAY ~130dp wide.
+  // Single-row header. Everything on the right is fixed-size and non-wrapping;
+  // the amber pill is the only shrinkable item (numberOfLines={1} truncation),
+  // so nothing can overlap at 360dp — worst case (daily 42 + quest ≤54 +
+  // journal 38 + ☰ 38 + 3×6 gaps = 190) still leaves ≥134dp for amber+streak.
   header: {
     paddingHorizontal: 10,
     // paddingTop applied inline via useScreenInsets (safe-area aware)
@@ -2667,25 +2629,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 100,
   },
-  headerStatusRow: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    minHeight: 38,
+    minHeight: 44,
   },
-  headerStatusLeft: {
+  headerLeftCluster: {
     flex: 1,
-    minWidth: 0, // let the amber pill truncate instead of pushing ☰ out
+    minWidth: 0, // let the amber pill truncate instead of pushing actions out
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  headerActionsRow: {
+  headerRightCluster: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-    height: 44,
+    flexShrink: 0,
+    gap: 6,
   },
   amberContainer: {
     flexShrink: 1,
@@ -2747,11 +2708,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pitHeaderIconBtn: {
-    backgroundColor: 'rgba(180, 120, 0, 0.3)',
-    borderColor: 'rgba(255, 215, 0, 0.45)',
-    borderWidth: 1.5,
-  },
   // Compact on purpose (single line, no reset column) — a fixed-size item in
   // the actions row; the count caps at 10 so it never grows past ~54dp.
   questPill: {
@@ -2800,15 +2756,18 @@ const styles = StyleSheet.create({
     width: 15,
     height: 15,
   },
-  // PLAY is the actions row's only flexible item: it grows into all remaining
-  // width (visually dominant) but can never be crushed below minWidth.
-  playButtonWrap: {
-    flex: 1,
-    minWidth: 88,
+  // PLAY dock — bottom-center primary action floating over the world view.
+  // `bottom` is applied inline (safe-area inset + 12). Above the world
+  // (zIndex 60) but below the header (100) and toasts (1000).
+  playDock: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 60,
   },
   playButton: {
-    height: 44,
-    borderRadius: 22,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: CandyColors.green.main,

@@ -132,6 +132,19 @@ describe('onboarding', () => {
       // Should mention the puzzle-to-amber cycle since Fox just showed the pit
       expect(allText.toLowerCase()).toContain('amber');
     });
+
+    test('unlock_explained points the player to the pit entrance below the house', () => {
+      // The world entrance (below the house) is the only route back to the
+      // pit, so the closing beat must tell the player where it lives.
+      const allText = ONBOARDING_FOX_LINES.unlock_explained.join(' ').toLowerCase();
+      expect(allText).toContain('pit');
+      expect(allText).toContain('below the house');
+      expect(allText).toContain('scroll down');
+    });
+
+    test('unlock_explained stays a tight closing beat (four lines)', () => {
+      expect(ONBOARDING_FOX_LINES.unlock_explained.length).toBe(4);
+    });
   });
 
   describe('onboarding flow ordering', () => {

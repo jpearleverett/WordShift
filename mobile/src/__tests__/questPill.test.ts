@@ -1,9 +1,14 @@
 /**
- * Header quest pill contract (HomeScreen).
+ * Header quest pill contract (HomeScreen) + one-row header layout scan.
  *
  * Quests were buried two taps deep (header → Journal Hub → Quests) with no
  * in-flight feedback. The header quest pill surfaces them one tap away, in
- * the two-row header's actions row (row 2, between the daily card and pit):
+ * the single-row header's right cluster (daily → quests → journal → ☰).
+ * Per owner direction the header is ONE row: no pit button (the physical
+ * pit entrance below the house is the route to the Offering Pit), PLAY
+ * docked bottom-center over the world, and the ☰ utility menu visible
+ * whenever onboarding is over (including the post-tutorial light mode, so
+ * Settings is always reachable from home).
  *
  *  - getActiveIncompleteQuestCount: the pill count is quests still in
  *    progress (not completed, not claimed) across daily + weekly tiers —
@@ -236,7 +241,7 @@ describe('getQuestPillAccessibilityLabel', () => {
   });
 });
 
-describe('header wiring (source scan of the two-row header)', () => {
+describe('header wiring (source scan of the one-row header)', () => {
   const src = fs.readFileSync(
     path.join(__dirname, '../components/home/HomeScreen.tsx'),
     'utf8'
@@ -244,12 +249,19 @@ describe('header wiring (source scan of the two-row header)', () => {
   const pillStart = src.indexOf('styles.questPill');
   // The pill's JSX block (style → badge) is well under this window.
   const pillBlock = src.slice(pillStart, pillStart + 1200);
+  // First JSX usage of the header row (the styles definition comes later).
+  const headerRowStart = src.indexOf('styles.headerRow');
 
-  test('quest pill is rendered (header actions row)', () => {
+  test('header is a single row (the old two-row layout is gone)', () => {
+    expect(headerRowStart).toBeGreaterThan(-1);
+    expect(src).not.toContain('headerStatusRow');
+    expect(src).not.toContain('headerActionsRow');
+  });
+
+  test('quest pill is rendered in the header right cluster', () => {
     expect(pillStart).toBeGreaterThan(-1);
-    // It sits in the actions row alongside the other action buttons.
-    expect(src.indexOf('headerActionsRow')).toBeGreaterThan(-1);
-    expect(src.indexOf('styles.headerActionsRow')).toBeLessThan(pillStart);
+    expect(src.indexOf('styles.headerRightCluster')).toBeGreaterThan(-1);
+    expect(src.indexOf('styles.headerRightCluster')).toBeLessThan(pillStart);
   });
 
   test('pill opens the quest modal directly (not the Journal Hub)', () => {
@@ -263,5 +275,39 @@ describe('header wiring (source scan of the two-row header)', () => {
 
   test('the "!" badge keys on claimable amber only', () => {
     expect(pillBlock).toContain('claimableQuestAmber > 0');
+  });
+
+  test('no pit button in the header; attention flows to the world entrance', () => {
+    // The header pit shortcut (icon, highlight style, badge label) is gone…
+    expect(src).not.toContain('PIT_ICON');
+    expect(src).not.toContain('pitHeaderIconBtn');
+    expect(src).not.toContain('getPitHomeBadgeLabel');
+    // …but the attention computation survives and is handed to HouseWorld so
+    // the physical pit entrance below the house can glow instead.
+    expect(src).toContain('pitNeedsAttention={pitNeedsAttention}');
+    expect(src).toContain('pendingHarvest && pendingHarvest.pendingBatches > 0) || pitPhaseReady');
+  });
+
+  test('PLAY lives in a bottom-center dock, not the header', () => {
+    const dockStart = src.indexOf('styles.playDock');
+    expect(dockStart).toBeGreaterThan(-1);
+    // The dock's JSX block carries the primary action + a11y contract.
+    const dockBlock = src.slice(dockStart, dockStart + 1500);
+    expect(dockBlock).toContain('onPlayPuzzle');
+    expect(dockBlock).toContain('accessibilityLabel="Play puzzle"');
+    expect(dockBlock).toContain('accessibilityRole="button"');
+    // The old in-header flexible PLAY wrapper is gone.
+    expect(src).not.toContain('playButtonWrap');
+  });
+
+  test('☰ utility menu is visible post-tutorial (light mode no longer hides it)', () => {
+    const menuIdx = src.indexOf('Open utility menu');
+    expect(menuIdx).toBeGreaterThan(headerRowStart);
+    const headerBlock = src.slice(headerRowStart, menuIdx);
+    // The right cluster (and thus ☰) is gated on onboarding only — the
+    // post-tutorial light mode must NOT hide the menu, or Settings becomes
+    // unreachable from home right after the tutorial.
+    expect(headerBlock).toContain('{!isOnboarding && (');
+    expect(headerBlock).not.toContain('isPostTutorialLightMode');
   });
 });

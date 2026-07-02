@@ -426,10 +426,11 @@ function MainApp() {
     transitionTo: transitionTo as (screen: string, callback?: () => void) => void,
     startNewGame: puzzleActions.startNewGame as (difficulty: string) => void,
     setGameState: puzzleActions.setGameState as (state: string) => void,
+    clearBoard: puzzleActions.clearBoard,
     setShowConfetti: puzzleActions.setShowConfetti,
     refreshStats: persistenceActions.refreshStats,
     resetVictory: victoryActions.resetVictory,
-  }), [transitionTo, puzzleActions.startNewGame, puzzleActions.setGameState, puzzleActions.setShowConfetti, persistenceActions.refreshStats, victoryActions.resetVictory]);
+  }), [transitionTo, puzzleActions.startNewGame, puzzleActions.setGameState, puzzleActions.clearBoard, puzzleActions.setShowConfetti, persistenceActions.refreshStats, victoryActions.resetVictory]);
 
   const [onboardingFlow, onboardingActions] = useOnboardingFlow(onboardingCallbacks, clearRitualEchoWords);
 
