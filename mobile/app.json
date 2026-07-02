@@ -63,7 +63,13 @@
           "androidAppId": "ca-app-pub-6575205005908086~2045457833"
         }
       ],
-      "@sentry/react-native",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "iridescent-games-9n",
+          "project": "wordshift"
+        }
+      ],
       "expo-audio",
       "expo-sharing"
     ],
