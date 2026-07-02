@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -81,8 +81,13 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   const slideAnim = useRef(new Animated.Value(30)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const textFadeAnim = useRef(new Animated.Value(1)).current;
+  const [isTalking, setIsTalking] = useState(false);
   const reducedMotion = getSettingsSync().reducedMotion;
   const hasInteractiveControls = Boolean(onContinue || (showSkip && onSkip));
+  // The card renders nothing without text (see the early returns below), so the
+  // talk toggle must also key on this — otherwise a visible-but-textless guide
+  // would leak a running interval behind a null render.
+  const hasText = Boolean(text && text.trim().length > 0);
 
   // Show/hide animation
   useEffect(() => {
@@ -141,6 +146,26 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     return () => loop.stop();
   }, [speaking, visible]);
 
+  // Talking animation - alternate between idle and talk sprites, mirroring the
+  // HomeScreen dialogue portrait (useDialogueFlow): 300ms toggle while the card
+  // is showing text; under reduced motion the talk frame is pinned (static, no
+  // interval). Deliberately NOT keyed on `text` — line changes within a step
+  // keep the toggle running uninterrupted, exactly like paging home dialogue.
+  useEffect(() => {
+    if (visible && hasText && speaking) {
+      if (reducedMotion) {
+        setIsTalking(true);
+        return;
+      }
+      const interval = setInterval(() => {
+        setIsTalking(prev => !prev);
+      }, 300);
+      return () => clearInterval(interval);
+    } else {
+      setIsTalking(false);
+    }
+  }, [visible, hasText, speaking, reducedMotion]);
+
   // Animate text changes
   useEffect(() => {
     if (reducedMotion) {
@@ -168,7 +193,10 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   // is a Phase-0 Fox moment)
   const dt = getDialogueTheme(0);
   const isCompact = variant === 'compact';
-  const foxSprite = speaking ? foxTalkSprite : foxIdleSprite;
+  // Talk frame while the toggle is "on" (same source selection as the
+  // HomeScreen dialogue portrait); fall back across missing sprites so the
+  // portrait never flips to the emoji mid-conversation.
+  const foxSprite = isTalking && foxTalkSprite ? foxTalkSprite : (foxIdleSprite ?? foxTalkSprite);
 
   return (
     <Animated.View

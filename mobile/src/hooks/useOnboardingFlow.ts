@@ -79,8 +79,6 @@ export interface OnboardingFlowActions {
   getOnboardingFoxText: () => string;
   /** Get the button label for the current onboarding step/line. */
   getOnboardingButtonText: () => string;
-  /** Clear ritual echo words callback — set externally. */
-  clearRitualEchoWords: () => void;
 }
 
 /**
@@ -124,7 +122,6 @@ export function normalizeResumeStep(step: OnboardingStep): OnboardingStep {
  */
 export function useOnboardingFlow(
   callbacks: OnboardingCallbacks,
-  clearRitualEchoWords: () => void,
 ): [OnboardingFlowState, OnboardingFlowActions] {
   const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
   const [onboardingLineIndex, setOnboardingLineIndex] = useState(0);
@@ -207,13 +204,12 @@ export function useOnboardingFlow(
       await advanceOnboarding('puzzle_tutorial');
       if (!mountedRef.current) return;
       callbacks.refreshStats();
-      clearRitualEchoWords();
       callbacks.transitionTo('puzzle', () => {
         callbacks.startNewGame('EASY');
         logEvent({ type: 'puzzle_started', data: { difficulty: 'EASY', onboarding: true } });
       });
     }, ONBOARDING_TRANSITION_DELAY_MS);
-  }, [advanceOnboarding, callbacks, clearRitualEchoWords, addTimeout]);
+  }, [advanceOnboarding, callbacks, addTimeout]);
 
   // ------------------------------------------------------------------
   // handleOnboardingContinue — main FoxGuide "Next" handler
@@ -252,7 +248,6 @@ export function useOnboardingFlow(
           hapticLight();
           callbacks.setShowConfetti(false);
           callbacks.resetVictory();
-          clearRitualEchoWords();
           setPitOfferDone(false);
           pitAutoReturnedRef.current = false;
           addTimeout(async () => {
@@ -312,7 +307,6 @@ export function useOnboardingFlow(
     advanceOnboarding,
     navigateToPuzzleTutorial,
     callbacks,
-    clearRitualEchoWords,
     addTimeout,
   ]);
 
@@ -342,7 +336,6 @@ export function useOnboardingFlow(
     hapticLight();
     callbacks.setShowConfetti(false);
     callbacks.resetVictory();
-    clearRitualEchoWords();
     setPitOfferDone(false);
     callbacks.refreshStats();
     // Go home, abandoning the guided board: clear it and drop its autosave
@@ -352,7 +345,7 @@ export function useOnboardingFlow(
       callbacks.clearBoard();
       clearPuzzleState().catch(() => {});
     });
-  }, [onboardingStep, advanceOnboarding, navigateToPuzzleTutorial, callbacks, clearRitualEchoWords]);
+  }, [onboardingStep, advanceOnboarding, navigateToPuzzleTutorial, callbacks]);
 
   // ------------------------------------------------------------------
   // handlePitOnboardingOfferComplete
@@ -438,7 +431,6 @@ export function useOnboardingFlow(
     advanceOnboarding,
     getOnboardingFoxText,
     getOnboardingButtonText,
-    clearRitualEchoWords,
   };
 
   return [state, actions];

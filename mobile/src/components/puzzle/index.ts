@@ -6,4 +6,3 @@ export { VictoryModal } from './VictoryModal';
 export type { VictoryData } from './VictoryModal';
 export { RulesModal } from './RulesModal';
 export { DifficultyMenu } from './DifficultyMenu';
-export { RitualEchoChain } from './RitualEchoChain';

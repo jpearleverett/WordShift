@@ -213,13 +213,11 @@ async function flushAsync(rounds = 20) {
   }
 }
 
-const clearRitualEchoWords = jest.fn();
-
 /** Render the hook fresh against the shared synchronous state store. */
 function renderOnboardingHook(cbs: MockCallbacks) {
   rewindHookIndices();
   // eslint-disable-next-line react-hooks/rules-of-hooks -- test harness drives the hook against a manual React mock
-  return useOnboardingFlow(cbs as unknown as OnboardingCallbacks, clearRitualEchoWords);
+  return useOnboardingFlow(cbs as unknown as OnboardingCallbacks);
 }
 
 /** Boot the hook at a persisted step: initial render + mount effects + settle. */
@@ -268,7 +266,6 @@ describe('handleSkipOnboarding (clean exit, no guided-board limbo)', () => {
     // Transient tutorial remnants are torn down.
     expect(cbs.setShowConfetti).toHaveBeenCalledWith(false);
     expect(cbs.resetVictory).toHaveBeenCalled();
-    expect(clearRitualEchoWords).toHaveBeenCalled();
   });
 
   test('skip cancels pending step-transition timers so they cannot resurrect onboarding', async () => {
