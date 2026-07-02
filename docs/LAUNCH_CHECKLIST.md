@@ -9,12 +9,11 @@ the codebase and are the remaining gates to submission.
 - [ ] **Store screenshots** — capture at least 2 phone screenshots (8 recommended)
       per the shot list in `docs/STORE_LISTING.md`, plus the existing
       `docs/feature-graphic.png`. Upload in Play Console → Store listing.
-- [ ] **Sentry source maps** — production builds now upload source maps
-      (`SENTRY_DISABLE_AUTO_UPLOAD` was removed from the production profile in
-      `mobile/eas.json`). Create an auth token in Sentry (org: settings → Auth
-      Tokens, scope `project:releases`) and add it as an EAS secret:
-      `eas secret:create --name SENTRY_AUTH_TOKEN --value <token>`.
-      Dev/preview builds still skip upload for speed.
+- [x] **Sentry source maps** — DONE (2026-07-02): org/project slugs are set in
+      the `@sentry/react-native` plugin config (`mobile/app.json`) and
+      `SENTRY_AUTH_TOKEN` is stored as a secret EAS environment variable
+      (production). Verify on the next production build: the logs should show a
+      sentry-cli source-map upload step. Dev/preview builds still skip upload.
 - [x] **Supabase hardening** — DONE (2026-07-02): `security_setup.sql` applied
       and verified in the SQL editor — RLS `true` on all four tables, anon's
       only direct table privilege is `events INSERT`, and all seven RPCs are
