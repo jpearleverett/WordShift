@@ -1,19 +1,23 @@
 # WordShift Backend Setup (optional, drop-in)
 
-> **Status:** ✅ Configured. `supabaseUrl` + `supabaseAnonKey` (cloud save,
-> leaderboard, social proof, analytics) and `sentryDsn` (crash reporting) are set
-> in `app.json` → `expo.extra`. Provision/harden the database by running
-> **`docs/supabase/security_setup.sql`** (see section 1). The guide remains the
-> reference for re-provisioning or pointing at a new project.
+> **Status:** ✅ Configured AND hardened. `supabaseUrl` + `supabaseAnonKey`
+> (cloud save, leaderboard, social proof, analytics) and `sentryDsn` (crash
+> reporting) are set in `app.json` → `expo.extra`, and
+> **`docs/supabase/security_setup.sql` has been applied and verified live**
+> (2026-07-02): RLS enabled on all four tables, anon's only direct table
+> privilege is `events` INSERT, and all seven RPCs are executable by anon. The
+> guide remains the reference for re-provisioning or pointing at a new project.
 
 Everything below is **disabled by default** (until credentials are filled in, as
 they now are). The app ships and runs in Expo Go with zero network calls until you
-fill in credentials in `mobile/app.json` under `expo.extra`. No native SDKs are
-added — all integrations use plain `fetch`, so Expo Go keeps working.
+fill in credentials in `mobile/app.json` under `expo.extra`. The Supabase
+integrations use plain `fetch` (no native SDK), so Expo Go keeps working; crash
+reporting uses the `@sentry/react-native` SDK (see section 2), which no-ops
+when no DSN is set.
 
-> **Privacy:** before enabling any of these, update `docs/privacy-policy.md`
-> to disclose cloud save, analytics, and crash reporting, and review the data
-> you collect against the App Store / Play data-safety forms.
+> **Privacy:** ✅ done — `docs/privacy-policy.md` discloses cloud save,
+> analytics, and crash reporting, and the Play data-safety declarations were
+> submitted (2026-07-02). Re-review both if the data you collect ever changes.
 
 ## What turns on with each credential
 
@@ -34,6 +38,9 @@ added — all integrations use plain `fetch`, so Expo Go keeps working.
 ```
 
 ## 1. Supabase project
+
+> ✅ Already done for the live project (applied + verified 2026-07-02). The
+> steps below are for re-provisioning or pointing at a new project.
 
 Create a free project at supabase.com, then run
 **[`docs/supabase/security_setup.sql`](supabase/security_setup.sql)** in the SQL
@@ -108,21 +115,33 @@ has a cloud save.
 
 ## 2. Sentry (crash reporting)
 
-Create a project at sentry.io, copy its DSN, and set `sentryDsn` in `app.json`.
-JS errors and unhandled rejections (already captured locally) will forward to
-Sentry via its HTTP store API — no native SDK, Expo-Go-safe. For native crash
-symbolication later, swap in the real `@sentry/react-native` SDK behind the
-same `setErrorForwarder()` seam in `src/services/errorReporting.ts`.
+> ✅ Live. The app uses the real **`@sentry/react-native` SDK** (not the old
+> HTTP-store-API forwarder): `Sentry.init` runs at App.tsx module load when
+> `sentryDsn` is set (crash + error capture only, `tracesSampleRate: 0`), and
+> captures **native** crashes (force-closes / SIGSEGV / Java FATAL EXCEPTION)
+> in dev-client/EAS builds — plus unhandled JS errors. Errors routed through
+> `reportError()` (ErrorBoundary etc.) are forwarded via the
+> `setErrorForwarder()` seam in `src/services/errorReporting.ts` with their
+> source/metadata as Sentry tags/extras. No DSN → fully disabled.
+
+To re-provision: create a project at sentry.io, copy its DSN into `sentryDsn`
+in `app.json`, and set the org/project slugs in the `@sentry/react-native`
+config plugin (`app.json` → `plugins`; currently `iridescent-games-9n` /
+`wordshift`). **Source maps:** production EAS builds upload them automatically
+— `SENTRY_AUTH_TOKEN` is stored as a secret EAS environment variable, and
+`SENTRY_DISABLE_AUTO_UPLOAD` is set only in the `development`/`preview` build
+profiles (`eas.json`).
 
 ## 3. Store submission (separate from the above)
 
-- `eas init` to populate `expo.extra.eas.projectId` / `owner`.
-- Fill `eas.json` → `submit.production` with App Store Connect / Play Console
-  credentials before `eas submit`.
+- ✅ `expo.extra.eas.projectId` / `owner` are populated (`eas init` done).
+- ✅ `eas.json` → `submit.production.android` is wired (service-account key at
+  `./secrets/play-service-account.json`, internal track) — `eas submit -p
+  android` works. App Store Connect credentials are still open (iOS track).
 
 ## 4. Monetization (in-app purchases + ads)
 
-Separate, also drop-in. The RevenueCat (IAP) and AdMob (ads) provider adapters are
-already written behind the `iap.ts` / `ads.ts` seams and stay inert until you
-install the SDKs and add keys. See **`docs/MONETIZATION_SETUP.md`** for the exact
-steps.
+Separate, and ✅ live on Android: the RevenueCat (IAP) and AdMob (ads) provider
+adapters behind the `iap.ts` / `ads.ts` seams are registered in `App.tsx`, with
+SDKs installed and Android keys set (iOS keys blank → NoOp fallback). See
+**`docs/MONETIZATION_SETUP.md`** for the details and the iOS steps.

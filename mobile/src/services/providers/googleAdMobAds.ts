@@ -12,10 +12,10 @@
  * no ad shown, reward not granted), so `setAdProvider()` is always safe. The
  * native module is loaded with a guarded dynamic `require` inside `initialize()`.
  *
- * NOTE (verified June 2026): `react-native-google-mobile-ads` v16.x has reported
- * config-plugin breakage on Expo SDK 54 / RN 0.81 (invertase issue #835). Pin a
- * patched release before building. The AdMob *app* ids go in the config plugin in
- * app.json; the *ad unit* ids are read here at runtime.
+ * NOTE: the AdMob *app* ids go in the `react-native-google-mobile-ads` config
+ * plugin in app.json (Android id set; iOS pending); the *ad unit* ids are read
+ * here at runtime from `expo.extra`. The package is pinned in package.json —
+ * check invertase release notes before bumping across Expo SDK majors.
  *
  * Wiring (after install + adding ids):
  *   import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';

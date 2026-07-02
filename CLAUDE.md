@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,528 tests across 64 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,548 tests across 64 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -77,7 +77,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 
 ```
 mobile/
-├── App.tsx                      # Bootstrap gate (cloud auto-restore → migrations → cosmetics/hints; IAP/ads init fire-and-forget; error handler) wrapping MainApp (~2800 lines): screen routing, onboarding, post-victory intros, deep-link + notification-tap routing, Android back handling
+├── App.tsx                      # Bootstrap gate (cloud auto-restore → migrations → cosmetics/hints/entitlements; IAP/ads init fire-and-forget; error handler) wrapping MainApp (~2800 lines): screen routing, onboarding, post-victory intros, deep-link + notification-tap routing (incl. cold-start), Android back handling
 ├── assets/                      # Image assets (characters/, rooms/, house/, environment/)
 ├── src/
 │   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
@@ -188,10 +188,10 @@ mobile/
 │       ├── homeScenePan.ts, shareResults.ts (emoji-grid text share + challenge links + Play Store CTA; daily shares are spoiler-free)
 │       ├── shareImage.ts        # Pluggable result-image capture (react-native-view-shot + expo-sharing are real deps — PNG ShareCard ships in dev-client/EAS builds; text fallback in Expo Go)
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,528 tests, 64 suites
+├── src/__tests__/               # ~1,548 tests, 64 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
-├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console. Production no longer disables Sentry source-map upload (needs the `SENTRY_AUTH_TOKEN` EAS secret; dev/preview still set `SENTRY_DISABLE_AUTO_UPLOAD`). `docs/LAUNCH_CHECKLIST.md` tracks the remaining human release tasks.
+├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console. Production no longer disables Sentry source-map upload (the `@sentry/react-native` plugin in app.json carries `organization`/`project`; the `SENTRY_AUTH_TOKEN` EAS env secret provides auth; dev/preview still set `SENTRY_DISABLE_AUTO_UPLOAD`). `docs/LAUNCH_CHECKLIST.md` tracks the remaining human release tasks.
 └── eslint.config.js             # ESLint 9 flat config. Overrides downgrade CommonJS/unused-var idioms in `scripts/**` (generators) and test files so real app-code warnings aren't drowned (baseline: 0 errors, ~690 warnings — dominated by `react-hooks/refs` notices in components, plus intentional guarded `require`s + hook-dep notes)
 ```
 
@@ -249,7 +249,7 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### Deep Links & Friend Challenges
 
-`wordshift://` URLs (ignored mid-onboarding): `challenge/daily` starts the daily when unlocked (else routes home with an Alert); `challenge/p?w=WORD1-WORD2-…` → `decodeChallengeLink()` → `puzzleActions.startSharedChallengeGame(words)` (validated, standard hint-enabled board). **Friend challenges**: `ShareResultModal` adds a "Challenge a friend" button on standard non-daily boards (`buildChallengeShareText` — taunt + link). All share text ends with a Play Store CTA (`PLAY_STORE_URL`/`WEB_LANDING_URL` in `constants/links.ts`). The emoji grid is an **honest per-move record** via `moveOutcomes` threaded from `usePuzzleGame` (falls back to the legacy distribution grid when absent, e.g. after autosave restore).
+`wordshift://` URLs (ignored mid-onboarding): `challenge/daily` starts the daily when unlocked (else routes home with an Alert); `challenge/p?w=WORD1-WORD2-…` → `decodeChallengeLink()` → `puzzleActions.startSharedChallengeGame(words)` (validated, standard hint-enabled board). **Friend challenges**: `ShareResultModal` adds a challenge-share button on standard non-daily boards (label via `getChallengeFriendLabel(phase)`; text via `buildChallengeShareText` — taunt + link; chains are 3-6 words, `MIN/MAX_CHALLENGE_WORDS` exported from shareResults and enforced by both the encoder and `startSharedChallengeGame`). The challenge share routes through `shareChallengeText()` so it records share count + the daily share bonus like every other share path. All share text ends with a Play Store CTA (`PLAY_STORE_URL`/`WEB_LANDING_URL` in `constants/links.ts`). The emoji grid is an **honest per-move record** via `moveOutcomes` threaded from `usePuzzleGame` (falls back to the legacy distribution grid when absent, e.g. after autosave restore).
 
 ## App Architecture
 
@@ -283,8 +283,8 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 - `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log. `ErrorBoundary.componentDidCatch` also forwards React render errors through `reportError()` (source `react_error_boundary`), so both async and render-time failures land in the same pipeline. **Render coverage:** `home` and `puzzle` carry their own inner boundaries; an outer catch-all boundary wraps `renderScreen()` so a render error on the secondary screens (settings/stats/ledger/gallery/pit) returns the player home instead of crashing the whole app. Crash capture is local-only (500-entry buffer).
 - Frame-rate monitoring (`performanceMonitor.startFrameMonitoring`) is diagnostic-only — its samples are never read in production — so it is gated behind `__DEV__` (and stopped on unmount) and never runs a perpetual `requestAnimationFrame` loop on a player's device.
-- The default export `App` is a bootstrap gate: it installs the cloud provider + auto-restores a fresh install, then awaits `runMigrations()` (dataMigration.ts), `initCosmetics()` and `initHints()` **before** mounting `MainApp`, so service caches always read migrated data. `initIAP()`/`initAds()` are **fire-and-forget** — the first frame never waits on billing config or the ads consent → SDK init → preload chain. Renders a quiet dark view while booting; failures log and never block launch.
-- Every scheduled notification carries `data.target` (`'daily' | 'home'`); App's `addNotificationResponseReceivedListener` routes taps accordingly. An AppState listener re-runs the daily launch effects (login reward, streak-freeze check, notification reschedule, stats refresh) when the app foregrounds on a **new local day**.
+- The default export `App` is a bootstrap gate: it installs the cloud provider + auto-restores a fresh install, then awaits `runMigrations()` (dataMigration.ts), `initCosmetics()`, `initHints()` and `loadEntitlements()` **before** mounting `MainApp`, so service caches (including the Patron/ad-free/first-purchase sync cache) always read correct values on first render. `initIAP()`/`initAds()` are **fire-and-forget** — the first frame never waits on billing config or the ads consent → SDK init → preload chain. Renders a quiet dark view while booting; failures log and never block launch.
+- Every scheduled notification carries `data.target` (`'daily' | 'home'`); App's `addNotificationResponseReceivedListener` routes taps accordingly, and a **cold-start tap** (notification launched the app — never delivered to the runtime listener) is routed once via `getLastNotificationResponseAsync`, deferred ~1.2s so persistence state hydrates first. Deep links use the same pattern: the Linking subscription mounts once (handler in a ref) and the launch URL is processed exactly once with the same deferral. An AppState listener re-runs the daily launch effects (login reward, streak-freeze check, notification reschedule, stats refresh) when the app foregrounds on a **new local day**.
 - Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
 - `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Active**: sends to the Supabase `events` table (`supabaseUrl`/`supabaseAnonKey` set in `app.json` → `extra`); falls back to a custom `telemetryEndpoint` if that's set instead. Only anonymous events (install id, platform, app version, event type) are sent.
 - FTUE funnel events: `app_open`, `onboarding_step` / `onboarding_complete` (logged from `setOnboardingStep`), `puzzle_started/completed`, `daily_completed`, `notification_permission_result`, `pit_offer` — recorded to the local event log.
@@ -474,7 +474,7 @@ The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is *
 Fox guides new players through real screens:
 1. `home_empty` → `fox_invited`: See empty den, invite Fox, Fox intro (4 lines)
 2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights. The FoxGuide bubble gives a **proactive first-action prompt** on load (`Tap the glowing "X" tile to pick it up.`, `App.tsx` ~L2157) — the player is never left guessing what to do first; it then advances to drop guidance, a between-moves reinforcement beat, and tile/slot glow highlights driven by `tutorialGuidance`
-3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains the pit, then a standing FoxGuide prompt (`pit_offering_prompt`, no continue button until offered) tells the player to **tap each floating word** to offer it — the step only advances once every word is devoured (no auto-offer; a fallback only arms if the step is reached with nothing offerable)
+3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains the pit, then a standing FoxGuide prompt (`pit_offering_prompt`, no continue button until offered) tells the player to **tap each floating word** to offer it — the step only advances once every word is devoured (no auto-offer; a fallback only arms if the step is reached with nothing offerable). A **stalled-pending safety net** (`PIT_ONBOARDING_STALL_RESCUE_MS` = 30s, reset on every successful devour) auto-offers the remainder and completes the step so a confused player can never soft-lock onboarding
 4. `returning_home` → `unlock_explained` → `complete`: Fox explains the cycle
 
 During onboarding: simplified UI (no difficulty selector, stats, NEW button). Backward compatible with legacy tutorial flag. Persisted via `wordshift_onboarding_step`. **Resume resilience:** transient/puzzle steps (`going_to_puzzle`/`puzzle_tutorial`/`puzzle_complete`/`going_to_pit`/`returning_home`) only exist for a `setTimeout` window and have no owning screen on relaunch; `useOnboardingFlow.normalizeResumeStep` snaps them forward to a stable target on resume, and `App.tsx`'s resume effect routes the puzzle step back to a freshly-initialized guided tutorial board — so a kill mid-onboarding can never strand a new player on a dead home screen. The puzzle-screen FoxGuide also exposes a skip button (`handleSkipOnboarding`).
@@ -521,7 +521,7 @@ Core economy manager. Key functions:
 Two rotating quest tiers (seeded deterministic, local-day bucketing): **5 daily** quests + **5 weekly** quests (`loadWeeklyQuests` returns a `CombinedQuestState`). Types: solve_count, solve_difficulty, earn_stars, daily_complete, no_hints, challenge_mode, earn_amber, visit_animals, streak_days, sacrifice_amber (Phase 4+ only), daily_streak, tend_amber (Phase 5+ only). Rewards: 30-140 amber base, phase-scaled (1.0x → 2.0x). The sink quests (`sacrifice_amber`/`tend_amber`) are strictly **net-negative at every phase** they can appear (reward < required spend even after phase scaling) — pinned by an economy guard test in `weeklyQuests.test.ts`.
 
 ### Whisper Gallery (`whisperGallery.ts`)
-Collectible archive of all whispers, dialogue snippets, and narrative moments. Cap: 500 entries. Phase-aware titles. Entries are labeled with **poetic era names** (`getPhaseEraName`: Bright Days / Curious Thoughts / … / After) — never "Phase N" (narrative rule 7).
+Collectible archive of all whispers, dialogue snippets, and narrative moments. Cap: 500 entries. Phase-aware titles. Entries are labeled with **poetic era names** (`getPhaseEraName` delegates to the canonical `PHASE_DESCRIPTIONS` titles in `types/homeWorld.ts`: Bright Days / Curious Thoughts / Deeper Questions / Growing Shadows / The Horizon / Terrible Peace) — never "Phase N" (narrative rule 7).
 
 ### Sacrifice Mechanic (`sacrifice.ts`)
 Phase 4+: voluntary amber destruction. No gameplay benefit. Phase-aware responses. Milestone messages at 1/5/10/25/50/100.
@@ -667,6 +667,7 @@ Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250:
 
 ## Known Constraints
 
+- `app.json` → `android.blockedPermissions` strips `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK` (expo-audio injects them; the game plays foreground SFX only, and shipping the typed FGS permission triggers Play's Android-14 foreground-service declaration for a capability the app doesn't have). Do NOT remove the block unless background audio actually ships
 - Standard/reverse/double_shift at ALL difficulties from pre-generated banks (lazy-loaded); speed generates on-device
 - On-device timeout: 2.5s standard, 25s reverse, 5s double-shift. Wrapper: 4s/30s
 - Fallback pool: 15 pre-validated puzzles across 3 tiers

@@ -5,7 +5,7 @@ title: WordShift Terms of Service
 
 # WordShift Terms of Service
 
-**Effective date:** June 30, 2026
+**Effective date:** July 2, 2026
 
 These terms apply to your use of the WordShift mobile app ("the app"), developed by Jonathan Pearl Everett.
 
@@ -15,13 +15,17 @@ We grant you a personal, non-exclusive, non-transferable license to install and 
 
 ## 2. The game and your progress
 
-WordShift stores progress locally on your device and may sync a backup to our backend if you use Backup & Restore or features that require online services. We are not responsible for loss of progress caused by deleting the app, device failure, operating system actions, or use of the in-app "Reset All Progress" option.
+WordShift stores progress locally on your device and, while online, syncs a backup of your game save to our backend (restorable on another device via Backup & Restore). We are not responsible for loss of progress caused by deleting the app, device failure, operating system actions, or use of the in-app "Reset All Progress" option.
 
-In-game currency ("amber") and hints have no real-world cash value. Amber and hint packs may be offered as optional in-app purchases, but they cannot be sold, transferred, redeemed for money, or exchanged outside the app. Game balance, rewards, and prices may be adjusted in updates.
+In-game currency ("amber") and hints have no real-world cash value. Amber packs, hint packs, and other optional items are offered as in-app purchases, but they cannot be sold, transferred, redeemed for money, or exchanged outside the app. Game balance, rewards, and prices may be adjusted in updates.
+
+All purchases are processed by the app store you bought them through (Google Play, or Apple's App Store on iOS); the app itself cannot issue refunds, and refunds are handled under that store's policies. Consumable items (amber and hint packs) are credited to your game immediately on purchase and are used up as you spend them. One-time purchases (such as Remove Ads or the starter bundle) can be restored on a new device via **Settings → Restore Purchases**.
+
+The app shows advertising (occasional interstitial ads and reward ads you choose to watch). An optional one-time purchase removes interstitial ads.
 
 ## 3. Content
 
-The game's narrative includes dark-fantasy and horror themes and is recommended for ages 12 and up. Word puzzles are generated from a curated English dictionary; if you encounter a word you believe should not appear, contact us and we will review it.
+The game's narrative includes dark-fantasy and horror themes and is recommended for ages 13 and up. Word puzzles are generated from a curated English dictionary; if you encounter a word you believe should not appear, contact us and we will review it.
 
 ## 4. Updates
 
@@ -33,11 +37,11 @@ The app is provided "as is" and "as available", without warranties of any kind, 
 
 ## 6. Limitation of liability
 
-To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of data or progress, arising from your use of the app. Our total liability for any claim shall not exceed the amount you paid for the app (currently: nothing).
+To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of data or progress, arising from your use of the app. Our total liability for any claim shall not exceed the amounts you have paid for in-app purchases in the app (the app itself is free to download).
 
 ## 7. Privacy
 
-Our handling of information is described in the [Privacy Policy](./privacy-policy). In short: gameplay data is stored on your device, and limited data is sent off-device only for the online features described there, such as analytics, crash reporting, cloud backup, purchases, ads, and the daily leaderboard.
+Our handling of information is described in the [Privacy Policy](../privacy-policy/). In short: gameplay data is stored on your device, and limited data is sent off-device only for the online features described there, such as analytics, crash reporting, cloud backup, purchases, ads, and the daily leaderboard.
 
 ## 8. Termination
 
