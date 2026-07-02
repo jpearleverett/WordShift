@@ -191,7 +191,7 @@ export function generateShareText(result: ShareableResult): string {
   }
 
   if (result.isChallenge && result.hintsUsed === 0 && result.invalidAttempts <= 1) {
-    lines.push('Challenge Mode — flawless!');
+    lines.push('Challenge Mode. Flawless!');
   } else if (result.hintsUsed === 0 && result.invalidAttempts <= 1) {
     lines.push('No hints, no mistakes!');
   }

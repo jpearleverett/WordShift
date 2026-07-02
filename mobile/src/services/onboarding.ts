@@ -99,14 +99,14 @@ export async function resetOnboarding(): Promise<void> {
 export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 1: Empty home — guide to invite Fox
   home_empty: [
-    "Hey — down here by the den.\nTap the invite and let me in.",
+    "Hey! Down here by the den.\nTap the invite and let me in.",
   ],
 
   // Step 2: Fox just invited — intro dialogue
   fox_invited: [
     "You opened the door for me. Thank you.\nI'm Ember.",
     "Words shift. Patterns form. The house grows with every puzzle.",
-    "Come on — one quick puzzle together, then we build.",
+    "Come on, one quick puzzle together, then we build.",
   ],
 
   // Step 3: On puzzle screen — guide through the puzzle
@@ -120,26 +120,26 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Good. Now drop it into the glowing slot below.",
   ],
   puzzle_tutorial_valid_move: [
-    "There it is — that little click when a word falls into place.\nMade a wrong move? Tap undo, no harm done. Stuck? Tap hint.\nKeep going, all the way down.",
+    "There it is, that little click when a word falls into place.\nMade a wrong move? Tap undo, no harm done. Stuck? Tap hint.\nKeep going, all the way down.",
   ],
   puzzle_tutorial_invalid: [
     "Hmm, that didn't land quite right.\nTry undoing and picking a different spot.",
   ],
   puzzle_tutorial_complete: [
     "Perfect. Feel how the house settled just a little? That's what your words do.",
-    "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
+    "Those words you just formed? They're worth something.\nFollow me. I'll show you where they go.",
   ],
 
   // Step 5.5: Transition to pit — Fox introduces word harvesting
   going_to_pit: [
-    "Those words you just formed? They're worth something.\nFollow me — I'll show you where they go.",
+    "Those words you just formed? They're worth something.\nFollow me. I'll show you where they go.",
   ],
 
   // Step 6: On pit screen — Fox explains the Offering Pit (kept short: the player
   // already had their first-win reward moment, so this is trimmed to two beats).
   pit_intro: [
-    "Here we are. The pit — where your words drift after every puzzle, waiting.",
-    "Offer them and they turn to amber: the warm gold that builds the house.\nGo on — the pit is hungry. Feed it.",
+    "Here we are. The pit... where your words drift after every puzzle, waiting.",
+    "Offer them and they turn to amber: the warm gold that builds the house.\nGo on... the pit is hungry. Feed it.",
   ],
 
   // Step 6.5: On the pit screen, before the player has offered — a standing
@@ -161,7 +161,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // doesn't drag).
   unlock_explained: [
     "Now you know the cycle.\nSolve puzzles, offer words, earn amber.",
-    "Amber builds rooms — and rooms let us invite more friends in.",
+    "Amber builds rooms, and rooms let us invite more friends in.",
     "Come back each day, and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
   ],
 };

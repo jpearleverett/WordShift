@@ -126,11 +126,11 @@ const FRESH_INSTALL_SENTINEL_KEY = 'wordshift_home_progress';
 
 class NoOpProvider implements CloudProvider {
   async upload(_data: CloudSaveData): Promise<boolean> {
-    console.log('[CloudSave] NoOp upload — no backend configured');
+    console.log('[CloudSave] NoOp upload - no backend configured');
     return false;
   }
   async download(): Promise<CloudSaveData | null> {
-    console.log('[CloudSave] NoOp download — no backend configured');
+    console.log('[CloudSave] NoOp download - no backend configured');
     return null;
   }
   async hasNewerSave(_localTimestamp: number): Promise<boolean> {

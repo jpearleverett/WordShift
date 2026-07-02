@@ -15,7 +15,7 @@ import {
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import { isSupabaseConfigured } from '../services/supabaseClient';
-import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus } from '../services/cloudSave';
+import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud } from '../services/cloudSave';
 import { CandyColors } from '../theme/colors';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
@@ -63,11 +63,95 @@ import { clearDailyLoginReward } from '../services/dailyLoginReward';
 
 interface SettingsScreenProps {
   onClose: () => void;
+  /**
+   * Called after Reset All when an in-place reload is unavailable
+   * (Updates.reloadAsync throws in Expo Go / dev clients). The host (App.tsx)
+   * must rebuild ALL in-memory session state from the now-cleared services —
+   * a plain onClose would return the player to their stale in-memory save.
+   */
+  onReset?: () => void;
 }
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
+/**
+ * Reset All Progress — the full local wipe, exported for regression testing.
+ *
+ * Root-cause notes for the "Reset All doesn't reset" player report:
+ *  1. The clears used to run under Promise.all: a single rejection abandoned
+ *     the batch mid-flight and skipped the restart flow entirely.
+ *     Promise.allSettled makes every clear independent; failures are logged
+ *     and returned, never fatal.
+ *  2. With cloud save configured, the pre-reset save survived in the backend.
+ *     The wipe clears `wordshift_home_progress` — the very key
+ *     maybeAutoRestoreOnFreshInstall() uses as its fresh-install sentinel — so
+ *     the next launch looked like a reinstall and silently restored the OLD
+ *     cloud save. The reset must therefore overwrite the cloud row with the
+ *     cleared state (uploadToCloud below) before the app reloads.
+ *
+ * Every service clear also resets its in-memory cache, so services report
+ * virgin state immediately (no process restart required).
+ *
+ * Returns the names of any clears that failed (empty array on full success).
+ */
+export async function performFullReset(): Promise<string[]> {
+  const clears: Array<[string, () => Promise<unknown>]> = [
+    ['stats', clearStats],
+    ['achievements', clearAchievements],
+    ['dailyChallenge', clearDailyProgress],
+    ['progress', clearProgress],
+    ['wordHistory', clearWordHistory],
+    ['dialogueSessions', clearAllSessions],
+    ['events', clearEvents],
+    ['tutorial', resetTutorial],
+    ['onboarding', resetOnboarding],
+    ['settings', resetSettings],
+    ['puzzleState', clearPuzzleState],
+    ['harvest', clearHarvestState],
+    ['sacrifice', clearSacrificeState],
+    ['weeklyQuests', clearWeeklyQuests],
+    ['whisperGallery', clearWhisperGallery],
+    ['dialogueChoices', clearChoiceState],
+    ['narrativeDelivery', clearNarrativeDeliveryState],
+    ['microBeats', resetMicroBeats],
+    ['notificationPrefs', resetNotificationPrefs],
+    ['roomUpgrades', clearRoomUpgrades],
+    ['entitlements', clearEntitlements],
+    ['cosmetics', clearCosmetics],
+    ['adPacing', clearAdPacing],
+    ['tending', clearTendingState],
+    ['hints', clearHints],
+    ['monetPrompts', clearMonetPrompts],
+    ['dailyLogin', clearDailyLoginReward],
+    ['syncStatus', clearSyncStatus],
+  ];
+
+  // The async wrapper converts a synchronous throw (e.g. a broken import
+  // making `fn` undefined) into a rejection, so one bad entry can never
+  // abort the remaining clears.
+  const results = await Promise.allSettled(clears.map(async ([, fn]) => fn()));
+  const failures: string[] = [];
+  results.forEach((result, i) => {
+    if (result.status === 'rejected') {
+      failures.push(clears[i][0]);
+      console.warn(`Reset All: clearing "${clears[i][0]}" failed:`, result.reason);
+    }
+  });
+
+  // Overwrite the cloud row with the now-empty local state so the bootstrap's
+  // fresh-install auto-restore can't resurrect the pre-reset save after the
+  // reload. NoOp provider (cloud unconfigured) makes this a harmless no-op;
+  // an offline failure must never block the reset itself.
+  try {
+    await uploadToCloud();
+  } catch {
+    // Non-fatal: the local wipe already succeeded.
+  }
+
+  return failures;
+}
+
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onReset }) => {
   const screenInsets = useScreenInsets();
   const [settings, setSettings] = useState<GameSettings | null>(null);
   const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
@@ -225,36 +309,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           text: 'Reset Everything',
           style: 'destructive',
           onPress: async () => {
-            await Promise.all([
-              clearStats(),
-              clearAchievements(),
-              clearDailyProgress(),
-              clearProgress(),
-              clearWordHistory(),
-              clearAllSessions(),
-              clearEvents(),
-              resetTutorial(),
-              resetOnboarding(),
-              resetSettings(),
-              clearPuzzleState(),
-              clearHarvestState(),
-              clearSacrificeState(),
-              clearWeeklyQuests(),
-              clearWhisperGallery(),
-              clearChoiceState(),
-              clearNarrativeDeliveryState(),
-              resetMicroBeats(),
-              resetNotificationPrefs(),
-              clearRoomUpgrades(),
-              clearEntitlements(),
-              clearCosmetics(),
-              clearAdPacing(),
-              clearTendingState(),
-              clearHints(),
-              clearMonetPrompts(),
-              clearDailyLoginReward(),
-              clearSyncStatus(),
-            ]);
+            await performFullReset();
             const fresh = await getSettings();
             setSettings(fresh);
             const freshPrefs = await getNotificationPrefs();
@@ -264,8 +319,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             // Onboarding only initializes at launch, so a live wipe alone would
             // leave the running session stuck on a stale "complete" state — the
             // player would have to kill the app by hand to see the tutorial again.
-            // reloadAsync throws in Expo Go / dev; there we just close Settings and
-            // onboarding replays on the next manual launch.
+            // reloadAsync throws in Expo Go / dev; there onReset lets App.tsx
+            // rebuild its in-memory session (persistence, puzzle board, victory
+            // state, onboarding) so the reset is real without a process restart.
             Alert.alert(
               'Reset Complete',
               'WordShift will restart and replay the intro.',
@@ -276,7 +332,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
                     try {
                       await Updates.reloadAsync();
                     } catch {
-                      onClose();
+                      if (onReset) {
+                        onReset();
+                      } else {
+                        onClose();
+                      }
                     }
                   },
                 },
@@ -391,7 +451,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
               <Text style={styles.settingLabel}>Streak Freezes</Text>
               <Text style={styles.settingDescription}>
                 {freezeCount > 0
-                  ? `${freezeCount} ready — each protects your streak for one missed day.`
+                  ? `${freezeCount} ready. Each protects your streak for one missed day.`
                   : 'Protects your streak the next time you miss a day.'}
               </Text>
             </View>

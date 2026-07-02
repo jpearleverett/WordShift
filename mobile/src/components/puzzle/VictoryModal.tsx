@@ -111,39 +111,46 @@ interface VictoryModalProps {
   gameMode?: string;
 }
 
-// Phase-aware 3D button colors — matches LetterTile's phase palette
+// Phase-aware 3D button colors — matches LetterTile's phase palette.
+// Text/background pairs are WCAG AA-checked (>=4.5:1) against the phase's
+// modal background (see getPhaseTheme) — ratios noted inline where a color
+// was tuned for contrast.
 function getButtonTheme(phase: DialoguePhase) {
   if (phase >= 4) return {
     primary:   { bg: '#7C3AED', edge: '#5B21B6', shadow: '#5B21B6' },
     harvest:   { bg: '#C2410C', edge: '#9A3412', shadow: '#9A3412' },
-    secondary: { bg: '#2A2040', edge: '#1A1030', text: '#908098' },
-    share:     { bg: '#3A3050', edge: '#2A2040' },
-    harvestPill: { bg: 'rgba(194, 65, 12, 0.15)', border: 'rgba(194, 65, 12, 0.3)', text: '#E87040' },
+    secondary: { bg: '#2A2040', edge: '#1A1030', text: '#B0A8C0' }, // 6.7:1 (was #908098 @ 4.2:1)
+    share:     { bg: '#3A3050', edge: '#2A2040', text: '#B0A8C0' }, // 5.4:1
+    harvestPill: { bg: 'rgba(194, 65, 12, 0.15)', border: 'rgba(194, 65, 12, 0.3)', text: '#E87040' }, // 5.2:1
+    streakChip: { bg: 'rgba(234, 88, 12, 0.16)', border: 'rgba(234, 88, 12, 0.35)', text: '#FFB27A' }, // 8.6:1
     modalBorder: 'rgba(90, 30, 90, 0.25)',
   };
   if (phase >= 3) return {
     primary:   { bg: '#9333EA', edge: '#7C3AED', shadow: '#7C3AED' },
     harvest:   { bg: '#EA580C', edge: '#C2410C', shadow: '#C2410C' },
-    secondary: { bg: '#3A3555', edge: '#2E3040', text: '#A0A0B0' },
-    share:     { bg: '#4A4570', edge: '#3A3555' },
-    harvestPill: { bg: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.25)', text: '#E87040' },
+    secondary: { bg: '#3A3555', edge: '#2E3040', text: '#B8B8C8' }, // 5.9:1 (was #A0A0B0 @ 4.5:1 borderline)
+    share:     { bg: '#4A4570', edge: '#3A3555', text: '#B8B8C8' }, // 4.5:1
+    harvestPill: { bg: 'rgba(234, 88, 12, 0.12)', border: 'rgba(234, 88, 12, 0.25)', text: '#F08050' }, // 5.0:1 (was #E87040 @ 4.3:1)
+    streakChip: { bg: 'rgba(234, 88, 12, 0.16)', border: 'rgba(234, 88, 12, 0.35)', text: '#FFB27A' }, // 7.3:1
     modalBorder: 'rgba(147, 51, 234, 0.2)',
   };
   if (phase >= 2) return {
     primary:   { bg: CandyColors.pink.main, edge: CandyColors.pink.dark, shadow: CandyColors.pink.dark },
     harvest:   { bg: CandyColors.orange.main, edge: CandyColors.orange.dark, shadow: CandyColors.orange.dark },
-    secondary: { bg: CandyColors.gray[300], edge: CandyColors.gray[400], text: CandyColors.gray[600] },
-    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main },
-    harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: CandyColors.orange.dark },
+    secondary: { bg: CandyColors.gray[300], edge: CandyColors.gray[400], text: CandyColors.gray[600] }, // 5.1:1
+    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main, text: CandyColors.gray[700] }, // 4.6:1 (secondary.text was 3.0:1 on blue)
+    harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: '#9A3412' }, // 5.2:1 (orange.dark was 3.2:1)
+    streakChip: { bg: '#FFE0C2', border: 'rgba(234, 88, 12, 0.35)', text: '#9A3412' }, // 5.8:1 (was orange.dark on orange.light @ 1.6:1)
     modalBorder: 'rgba(255, 255, 255, 0.3)',
   };
   // Phase 0-1: bright candy
   return {
     primary:   { bg: CandyColors.pink.main, edge: CandyColors.pink.dark, shadow: CandyColors.pink.dark },
     harvest:   { bg: CandyColors.orange.main, edge: CandyColors.orange.dark, shadow: CandyColors.orange.dark },
-    secondary: { bg: CandyColors.gray[200], edge: CandyColors.gray[300], text: CandyColors.gray[600] },
-    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main },
-    harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: CandyColors.orange.dark },
+    secondary: { bg: CandyColors.gray[200], edge: CandyColors.gray[300], text: CandyColors.gray[600] }, // 6.2:1
+    share:     { bg: CandyColors.blue.light, edge: CandyColors.blue.main, text: CandyColors.gray[700] }, // 4.6:1 (secondary.text was 3.0:1 on blue)
+    harvestPill: { bg: 'rgba(249, 115, 22, 0.10)', border: 'rgba(249, 115, 22, 0.2)', text: '#9A3412' }, // 6.6:1 (orange.dark was 3.2:1)
+    streakChip: { bg: '#FFE0C2', border: 'rgba(234, 88, 12, 0.35)', text: '#9A3412' }, // 5.8:1 (was orange.dark on orange.light @ 1.6:1)
     modalBorder: 'rgba(255, 255, 255, 0.4)',
   };
 }
@@ -184,6 +191,22 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const btn = getButtonTheme(phase);
   const totalPuzzlesCompleted = cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const isEarlyGameVictory = totalPuzzlesCompleted > 0 && totalPuzzlesCompleted <= 5;
+
+  // Ritual echo chain + de-duplicated feedback register: the performance
+  // feedback line and the ritual-echo footer occupy the same emotional slot,
+  // so when the chain renders with a footer (Phase 1+), the footer wins.
+  // The feedback line still carries Phase 0 (footer intentionally empty there)
+  // and chain-less boards (e.g. autosave-restored victories).
+  const echoWords = completedWords && completedWords.length > 0 ? completedWords : null;
+  const echoFooter = echoWords ? getRitualEchoFooter(phase, echoWords.length) : '';
+  const showPerformanceFeedback = !(echoWords && echoFooter !== '');
+
+  // Amber-breakdown accent colors — bright candy accents only read on the dark
+  // stat card (Phase 3+); light phases get deepened variants that hold >=4.5:1
+  // on the palest stat background (#DDD5E8 at Phase 2 is the binding case).
+  const accent = phase >= 3
+    ? { gold: '#FFD700', silver: '#C0C0C0', challenge: '#FF6B6B', variant: '#B088D0', streak: '#FF8C00', green: '#50C878' }
+    : { gold: '#755A00', silver: CandyColors.gray[600], challenge: CandyColors.red.shadow, variant: CandyColors.purple.shadow, streak: '#9A3412', green: '#166534' };
 
   // First share of the day earns a small amber bonus — hint it on the button
   const [shareBonusAvailable, setShareBonusAvailable] = useState(false);
@@ -316,11 +339,15 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {getVictoryTitle(earnedStars, phase)}
             </Text>
-            <Text style={[styles.victorySubtitle, {
-              color: phaseTheme.modalSecondaryTextColor,
-            }]}>
-              {isPlayingDaily ? 'Daily Challenge Complete' : 'Puzzle Complete'}
-            </Text>
+            {/* Subtitle only where it disambiguates — the stars + title already
+                say "puzzle complete", so the generic label was trimmed. */}
+            {isPlayingDaily && (
+              <Text style={[styles.victorySubtitle, {
+                color: phaseTheme.modalSecondaryTextColor,
+              }]}>
+                Daily Challenge Complete
+              </Text>
+            )}
 
             {isPlayingDaily && dailyRank && (
               <DailyLeaderboardCard
@@ -330,15 +357,6 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 beatText={getBeatPercentText(dailyRank.percentile, phase)}
                 phase={phase}
               />
-            )}
-
-            {!!socialProofLine && (
-              <Text
-                style={[styles.socialProofLine, { color: phaseTheme.modalSecondaryTextColor }]}
-                accessibilityLabel={socialProofLine}
-              >
-                {socialProofLine}
-              </Text>
             )}
 
             {/* Group 1: Harvest, bonuses, streak, milestone */}
@@ -362,12 +380,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               return (
                 <>
                   <View
-                    style={styles.winStreakContainer}
+                    style={[styles.winStreakContainer, {
+                      backgroundColor: btn.streakChip.bg,
+                      borderColor: btn.streakChip.border,
+                    }]}
                     accessible
                     accessibilityLabel={`${victoryData.currentStreak} day streak`}
                   >
                     <Image source={FLAME_ICON} style={styles.winStreakIcon} />
-                    <Text style={styles.winStreakText}>{victoryData.currentStreak} Day Streak!</Text>
+                    <Text style={[styles.winStreakText, { color: btn.streakChip.text }]}>
+                      {victoryData.currentStreak} Day Streak!
+                    </Text>
                   </View>
                   {Boolean(nextMilestoneText) && (
                     <Text style={[styles.streakMilestoneHint, { color: phaseTheme.modalSecondaryTextColor }]}>
@@ -446,18 +469,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </View>
             )}
 
-            {/* Performance feedback — phase-aware tone */}
-            <Text style={[styles.victoryFeedback, {
-              color: phaseTheme.modalSecondaryTextColor,
-            }]}>
-              {getVictoryFeedback(earnedStars, phase)}
-            </Text>
+            {/* Performance feedback — phase-aware tone. Suppressed when the
+                ritual-echo footer below will speak in the same register. */}
+            {showPerformanceFeedback && (
+              <Text style={[styles.victoryFeedback, {
+                color: phaseTheme.modalSecondaryTextColor,
+              }]}>
+                {getVictoryFeedback(earnedStars, phase)}
+              </Text>
+            )}
             </Animated.View>
 
             {/* Group 2: Ritual echo chain */}
             <Animated.View style={{ opacity: contentOpacity2 }}>
             {/* Ritual Echo — word chain from completed puzzle (all phases) */}
-            {completedWords && completedWords.length > 0 && (
+            {echoWords && (
               <View style={[
                 styles.ritualEchoContainer,
                 phase <= 1 && styles.ritualEchoContainerBright,
@@ -471,7 +497,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   {getRitualEchoHeader(phase)}
                 </Text>
                 <View style={styles.ritualEchoChain}>
-                  {completedWords.map((word, i) => (
+                  {echoWords.map((word, i) => (
                     <React.Fragment key={i}>
                       <Text style={[
                         styles.ritualEchoWord,
@@ -480,10 +506,11 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       ]}>
                         {word}
                       </Text>
-                      {i < completedWords.length - 1 && (
+                      {i < echoWords.length - 1 && (
                         <Text style={[
                           styles.ritualEchoArrow,
                           phase <= 1 && styles.ritualEchoArrowBright,
+                          phase >= 3 && styles.ritualEchoArrowDark,
                         ]}>
                           {phase >= 3 ? '\u2193' : '\u2192'}
                         </Text>
@@ -495,17 +522,18 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   <Text style={[
                     styles.ritualIncantationName,
                     phase <= 1 && styles.ritualIncantationNameBright,
-                    phase >= 4 && styles.ritualIncantationNameDark,
+                    phase >= 3 && styles.ritualIncantationNameDark,
                   ]}>
                     {incantationName}
                   </Text>
                 )}
-                {getRitualEchoFooter(phase, completedWords.length) !== '' && (
+                {echoFooter !== '' && (
                   <Text style={[
                     styles.ritualEchoFooter,
                     phase <= 1 && styles.ritualEchoFooterBright,
+                    phase >= 3 && styles.ritualEchoFooterDark,
                   ]}>
-                    {getRitualEchoFooter(phase, completedWords.length)}
+                    {echoFooter}
                   </Text>
                 )}
               </View>
@@ -515,9 +543,21 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             {victoryData && victoryData.totalWordsFormed != null && victoryData.totalWordsFormed > 0 && (
               <Text style={[
                 styles.wordsOfferedText,
+                { color: phaseTheme.modalSecondaryTextColor },
                 phase >= 3 && styles.wordsOfferedTextDark,
               ]}>
                 {getWordsOfferedText(victoryData.totalWordsFormed, phase)}
+              </Text>
+            )}
+
+            {/* Community line — a global daily stat, kept quiet and low in the
+                hierarchy (stars → amber → chain come first). */}
+            {!!socialProofLine && (
+              <Text
+                style={[styles.socialProofLine, { color: phaseTheme.modalSecondaryTextColor }]}
+                accessibilityLabel={socialProofLine}
+              >
+                {socialProofLine}
               </Text>
             )}
             </Animated.View>
@@ -572,13 +612,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                               {earnedStars >= 3 ? '3\u2605 Perfect' : '2\u2605 Great'}
                             </Text>
-                            <Text style={[styles.bonusValue, { color: earnedStars >= 3 ? '#FFD700' : '#C0C0C0' }]}>+{starBonus}</Text>
+                            <Text style={[styles.bonusValue, { color: earnedStars >= 3 ? accent.gold : accent.silver }]}>+{starBonus}</Text>
                           </View>
                         )}
                         {challengeBonusAmber > 0 && (
                           <View style={styles.bonusRow}>
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>Challenge</Text>
-                            <Text style={[styles.bonusValue, { color: '#FF6B6B' }]}>+{challengeBonusAmber}</Text>
+                            <Text style={[styles.bonusValue, { color: accent.challenge }]}>+{challengeBonusAmber}</Text>
                           </View>
                         )}
                         {surpriseBonusAmber > 0 && (
@@ -586,7 +626,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                               {'✨'} Lucky Find
                             </Text>
-                            <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+{surpriseBonusAmber}</Text>
+                            <Text style={[styles.bonusValue, { color: accent.gold }]}>+{surpriseBonusAmber}</Text>
                           </View>
                         )}
                         {variantBonusAmber > 0 && variant && variant !== 'standard' && (
@@ -594,7 +634,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                               {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS]?.title || 'Variant'}
                             </Text>
-                            <Text style={[styles.bonusValue, { color: '#B088D0' }]}>+{variantBonusAmber}</Text>
+                            <Text style={[styles.bonusValue, { color: accent.variant }]}>+{variantBonusAmber}</Text>
                           </View>
                         )}
                         {streakBonusAmber > 0 && (
@@ -602,7 +642,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                               {'\uD83D\uDD25'} {victoryData.currentStreak}-day Streak
                             </Text>
-                            <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakBonusAmber}</Text>
+                            <Text style={[styles.bonusValue, { color: accent.streak }]}>+{streakBonusAmber}</Text>
                           </View>
                         )}
                         {firstCompBonus > 0 && (
@@ -610,7 +650,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                               First {difficulty} Clear
                             </Text>
-                            <Text style={[styles.bonusValue, { color: '#50C878' }]}>+{firstCompBonus}</Text>
+                            <Text style={[styles.bonusValue, { color: accent.green }]}>+{firstCompBonus}</Text>
                           </View>
                         )}
                         {milestoneAmber > 0 && (
@@ -618,7 +658,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                               {'\uD83C\uDFC6'} Milestone
                             </Text>
-                            <Text style={[styles.bonusValue, { color: '#FFD700' }]}>+{milestoneAmber}</Text>
+                            <Text style={[styles.bonusValue, { color: accent.gold }]}>+{milestoneAmber}</Text>
                           </View>
                         )}
                         {streakMilestoneAmber > 0 && (
@@ -626,17 +666,19 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                             <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
                               {'\uD83D\uDD25'} Streak Milestone
                             </Text>
-                            <Text style={[styles.bonusValue, { color: '#FF8C00' }]}>+{streakMilestoneAmber}</Text>
+                            <Text style={[styles.bonusValue, { color: accent.streak }]}>+{streakMilestoneAmber}</Text>
                           </View>
                         )}
                       </>
                     )}
                     <View style={[styles.bonusDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
+                    {/* Total — the amber earned is second only to the stars in
+                        visual weight, so it renders larger than the line items */}
                     <View style={styles.bonusRow}>
                       <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>Total</Text>
                       <View style={styles.amberValueRow}>
-                        <Image source={AMBER_ICON} style={styles.amberIcon} />
-                        <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 15, fontWeight: '900' }]}>
+                        <Image source={AMBER_ICON} style={[styles.amberIcon, styles.amberIconTotal]} />
+                        <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 19, fontWeight: '900' }]}>
                           {totalAmber}
                         </Text>
                       </View>
@@ -777,7 +819,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   backgroundColor: btn.share.bg,
                   borderColor: btn.share.edge,
                 }]}>
-                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>
+                  <Text style={[styles.btnFlatUniform, { color: btn.share.text }]}>
                     {'\uD83D\uDCE4'} Share{shareBonusAvailable ? ` +${DAILY_SHARE_BONUS_AMBER}` : ''}
                     {shareBonusAvailable && (
                       <>
@@ -881,28 +923,23 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginBottom: 12,
-  },
-  victoryStar: {
-    fontSize: 36,
-    marginHorizontal: 4,
-  },
-  victoryStarBig: {
-    fontSize: 52,
-    marginBottom: 4,
+    marginBottom: 14,
   },
   victoryStarEmpty: {
     opacity: 0.3,
   },
+  // The stars are the emotional centerpiece — rendered large (the source PNGs
+  // are generated at high resolution). 2×56 + 76 + margins ≈ 218dp, well
+  // within the modal's ~280dp content width at a 360dp viewport.
   victoryStarImage: {
-    width: 38,
-    height: 38,
-    marginHorizontal: 4,
+    width: 56,
+    height: 56,
+    marginHorizontal: 5,
   },
   victoryStarImageBig: {
-    width: 52,
-    height: 52,
-    marginBottom: 4,
+    width: 76,
+    height: 76,
+    marginBottom: 6,
   },
   streakMilestoneHint: {
     fontSize: 12,
@@ -930,6 +967,10 @@ const styles = StyleSheet.create({
     width: 15,
     height: 15,
   },
+  amberIconTotal: {
+    width: 19,
+    height: 19,
+  },
   victoryTitle: {
     fontSize: 42,
     fontWeight: '900',
@@ -950,9 +991,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 2,
-    opacity: 0.85,
+    marginTop: 2,
+    marginBottom: 12,
+    // No opacity fade — the phase secondary text color is already AA-tuned;
+    // dimming it below 4.5:1 was the old readability bug.
   },
   rewardedDoubleButton: {
     marginTop: 10,
@@ -981,13 +1023,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(180, 110, 70, 0.4)',
   },
   freeDoubleText: { fontSize: 13.5, fontWeight: '800' },
-  freeDoubleTextLight: { color: '#FFD479' },
-  freeDoubleTextDark: { color: '#E0B080' },
+  // Deep antique gold — 5.8:1 on the pale gold pill over light stat cards
+  // (the old #FFD479 measured ~1.3:1, gold-on-cream)
+  freeDoubleTextLight: { color: '#755A00' },
+  freeDoubleTextDark: { color: '#E0B080' }, // 7.3:1 on the dark pill
   victoryFeedback: {
     fontSize: 13,
     fontWeight: '600',
-    color: CandyColors.gray[400],
-    marginBottom: 14,
+    marginBottom: 10,
     textAlign: 'center',
   },
   victoryStats: {
@@ -996,7 +1039,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 14,
     width: '100%',
   },
   bonusBreakdown: {
@@ -1125,7 +1168,9 @@ const styles = StyleSheet.create({
   },
   btn3dPrimaryText: {
     color: CandyColors.white,
-    fontSize: 15,
+    // 19px/900 qualifies as WCAG large text (3:1 threshold — white on the
+    // candy-pink body is 3.5:1) and gives the primary CTA its visual rank.
+    fontSize: 19,
     fontWeight: '900',
     letterSpacing: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
@@ -1222,13 +1267,15 @@ const styles = StyleSheet.create({
   },
 
   // === Other info rows ===
+  // Streak chip colors come from getButtonTheme().streakChip — the old fixed
+  // orange-on-orange (orange.dark on orange.light) measured 1.6:1.
   winStreakContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CandyColors.orange.light,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
+    borderWidth: 1,
     marginBottom: 8,
   },
   winStreakEmoji: {
@@ -1243,7 +1290,6 @@ const styles = StyleSheet.create({
   winStreakText: {
     fontSize: 14,
     fontWeight: '800',
-    color: CandyColors.orange.dark,
   },
   milestoneContainer: {
     alignItems: 'center',
@@ -1262,7 +1308,8 @@ const styles = StyleSheet.create({
   milestoneMessage: {
     fontSize: 16,
     fontWeight: '800',
-    color: CandyColors.yellow.dark,
+    // Deep amber-brown — 6.6:1 on the yellow.light chip (yellow.dark was 1.5:1)
+    color: '#713F12',
     marginBottom: 2,
   },
   questCompletedContainer: {
@@ -1344,7 +1391,7 @@ const styles = StyleSheet.create({
   phaseChangeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.92)', // 5.1:1 on purple.dark (0.8 was 4.2:1)
     textAlign: 'center',
     lineHeight: 18,
   },
@@ -1353,13 +1400,16 @@ const styles = StyleSheet.create({
     borderColor: '#3D1560',
   },
 
-  // Ritual Echo styles (word chain visualization)
+  // Ritual Echo styles (word chain visualization).
+  // Base (non-Bright/non-Dark) text styles serve Phase 2's light lavender
+  // modal; Bright serves Phase 0-1; Dark serves Phase 3+. All pairs are WCAG
+  // AA-checked against their effective container backgrounds.
   ritualEchoContainer: {
     backgroundColor: 'rgba(147, 51, 234, 0.08)',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginBottom: 12,
+    marginBottom: 10,
     width: '100%',
     alignItems: 'center',
     borderWidth: 1,
@@ -1376,16 +1426,16 @@ const styles = StyleSheet.create({
   ritualEchoHeader: {
     fontSize: 10,
     fontWeight: '700',
-    color: CandyColors.gray[400],
+    color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
     letterSpacing: 2,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
   ritualEchoHeaderBright: {
-    color: CandyColors.pink.main,
+    color: '#C21E63', // 5.3:1 on the bright container (pink.main was 3.3:1)
   },
   ritualEchoHeaderDark: {
-    color: 'rgba(180, 100, 130, 0.8)',
+    color: '#C8809A', // 4.8:1 on the Phase 3 container (old value was 2.7:1)
   },
   ritualEchoChain: {
     flexDirection: 'row',
@@ -1395,65 +1445,70 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ritualEchoWord: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
-    color: CandyColors.purple.main,
+    color: CandyColors.purple.shadow, // 5.5:1 on the word chip (purple.main was 3.3:1)
     backgroundColor: 'rgba(147, 51, 234, 0.1)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
   ritualEchoWordBright: {
-    color: CandyColors.pink.dark,
+    color: '#C91E6B', // 4.9:1 on the pink chip (pink.dark was 4.1:1)
     backgroundColor: 'rgba(255, 150, 220, 0.15)',
   },
   ritualEchoWordDark: {
-    color: '#C77DBA',
+    color: '#C77DBA', // 4.6:1 on the dark chip
     backgroundColor: 'rgba(100, 30, 60, 0.3)',
   },
   ritualEchoArrow: {
     fontSize: 12,
-    color: CandyColors.gray[400],
+    color: '#655483',
     marginHorizontal: 2,
+  },
+  ritualEchoArrowDark: {
+    color: CandyColors.gray[400],
   },
   ritualIncantationName: {
     fontSize: 12,
     fontWeight: '700',
     fontStyle: 'italic',
-    color: CandyColors.purple.dark,
+    color: CandyColors.purple.shadow, // 6.3:1 on the Phase 2 container (purple.dark was 4.0:1)
     marginTop: 8,
     textAlign: 'center',
   },
   ritualIncantationNameBright: {
-    color: CandyColors.pink.main,
+    color: '#C21E63',
     fontStyle: 'italic',
   },
   ritualIncantationNameDark: {
-    color: '#9B4DCA',
+    color: '#BC80DC', // 4.9:1 on the Phase 3 container (#9B4DCA was 2.5:1 there)
   },
   ritualEchoFooter: {
     fontSize: 10,
     fontWeight: '600',
-    color: CandyColors.gray[400],
+    color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
     marginTop: 6,
     fontStyle: 'italic',
+  },
+  ritualEchoFooterDark: {
+    color: CandyColors.gray[400], // 5.6:1 on the Phase 3+ containers
   },
   wordsOfferedText: {
     fontSize: 11,
     fontWeight: '600',
-    color: CandyColors.gray[400],
     marginBottom: 12,
     textAlign: 'center',
     letterSpacing: 0.5,
   },
   ritualEchoArrowBright: {
-    color: CandyColors.pink.main,
+    color: '#C21E63',
   },
   ritualEchoFooterBright: {
     color: CandyColors.pink.shadow,
   },
   wordsOfferedTextDark: {
-    color: 'rgba(180, 100, 130, 0.8)',
+    color: '#C8809A', // 5.1:1 on the Phase 3 modal (old rgba value was 2.8:1)
     fontStyle: 'italic',
   },
 });

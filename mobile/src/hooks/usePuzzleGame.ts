@@ -214,7 +214,12 @@ export interface PuzzleGameState {
   doubleShiftPhase: 'pick1' | 'pick2' | 'drop1' | 'drop2' | null;
   /** Phase 5 echo puzzle: one word is seeded from the player's ritual history */
   isEchoPuzzle: boolean;
-  /** True when no legal move remains from the active row — surfaces a recovery panel */
+  /**
+   * True when no legal move remains from the active row. Internal signal
+   * only — it deliberately drives NOTHING player-visible (no panel, no
+   * message): discovering a dead-end and choosing to undo or restart is
+   * part of the challenge.
+   */
   isStuck: boolean;
   /** Player's spendable hint balance (consumable hint economy). */
   hintBalance: number;
@@ -697,8 +702,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         // standard puzzle. Tell the player instead of silently swapping it.
         setMessage(
           currentPhase >= 3
-            ? 'The arrangement could not sustain that pattern — a plain offering instead.'
-            : 'That puzzle style wasn\'t available — here\'s a standard puzzle instead.'
+            ? 'The arrangement could not sustain that pattern... a plain offering instead.'
+            : 'That puzzle style wasn\'t available. Here\'s a standard puzzle instead.'
         );
       }
     } catch (localErr) {
@@ -721,7 +726,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(
           currentPhase >= 3
             ? 'The arrangement could not sustain that pattern.'
-            : 'That puzzle style wasn\'t available \u2014 starting a standard puzzle instead.'
+            : 'That puzzle style wasn\'t available. Starting a standard puzzle instead.'
         );
       }
     }
@@ -1634,7 +1639,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMessage(
       currentPhase >= 3
         ? 'The clock relents. Briefly.'
-        : 'Back in it — extra time on the clock!'
+        : 'Back in it! Extra time on the clock!'
     );
     return true;
   }, [gameState, currentPhase]);

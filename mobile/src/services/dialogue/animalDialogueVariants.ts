@@ -15,7 +15,7 @@ const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = 
   },
   double_shift: {
     light: 'Double shifts move two letters at once. Pick two from a word, place each into the next. More to juggle, more to explore.',
-    dark: 'Two offerings per step. The arrangement demands a heavier hand — two letters wrenched free and placed in a single breath.',
+    dark: 'Two offerings per step. The arrangement demands a heavier hand... two letters wrenched free and placed in a single breath.',
   },
 };
 

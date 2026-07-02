@@ -111,7 +111,7 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
         {/* Clean-run badge */}
         {result.hintsUsed === 0 && result.invalidAttempts <= 1 && (
           <Text style={[styles.badge, { color: '#FFD479' }]}>
-            {result.isChallenge ? 'Challenge — flawless' : 'No hints, no mistakes'}
+            {result.isChallenge ? 'Challenge. Flawless' : 'No hints, no mistakes'}
           </Text>
         )}
 

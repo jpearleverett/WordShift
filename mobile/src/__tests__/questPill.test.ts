@@ -2,16 +2,25 @@
  * Header quest pill contract (HomeScreen).
  *
  * Quests were buried two taps deep (header → Journal Hub → Quests) with no
- * in-flight feedback. The header quest pill surfaces them one tap away:
+ * in-flight feedback. The header quest pill surfaces them one tap away, in
+ * the two-row header's actions row (row 2, between the daily card and pit):
  *
  *  - getActiveIncompleteQuestCount: the pill count is quests still in
  *    progress (not completed, not claimed) across daily + weekly tiers —
  *    completed-but-unclaimed quests are the badge's job, not the count's.
+ *  - getQuestPillLabel: the number only renders while something is still in
+ *    progress. When every current quest is completed AND claimed the pill is
+ *    the bare 🎯 — no lingering "🎯 0" reading as a permanent to-do (player
+ *    report: "always shows a number, even if I've claimed all rewards").
  *  - isQuestPillVisible: gated exactly like the Journal Hub (puzzle 6+ via
  *    the post-tutorial light mode, hidden during onboarding), and only once
  *    quest data has loaded.
- *  - getQuestPillAccessibilityLabel: describes active count, claimable amber
- *    (only when > 0), and the daily reset — never conveyed by color alone.
+ *  - getQuestPillAccessibilityLabel: describes active count (or "All quests
+ *    complete"), claimable amber (only when > 0), and the daily reset —
+ *    never conveyed by color alone.
+ *  - Source scan: the pill lives in the header, opens the quest modal
+ *    DIRECTLY (not via the Journal Hub), and its '!' badge keys on claimable
+ *    amber only.
  *
  * HomeScreen imports react-native + native-adjacent modules at module scope;
  * stub them so the pure helpers can be imported in the Node test env
@@ -87,11 +96,15 @@ jest.mock('../services/deviceTier', () => ({
   shouldSimplifyAnimations: () => true,
 }));
 
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   getActiveIncompleteQuestCount,
+  getQuestPillLabel,
   isQuestPillVisible,
   getQuestPillAccessibilityLabel,
 } from '../components/home/HomeScreen';
+import { getUnclaimedAmber } from '../services/weeklyQuests';
 import type { Quest, QuestState, CombinedQuestState } from '../services/weeklyQuests';
 
 const makeQuest = (overrides: Partial<Quest> = {}): Quest => ({
@@ -148,6 +161,36 @@ describe('getActiveIncompleteQuestCount', () => {
   });
 });
 
+describe('getQuestPillLabel (badge/number semantics)', () => {
+  test('in-progress quests show the count', () => {
+    expect(getQuestPillLabel(3)).toBe('🎯 3');
+  });
+
+  test('completed-but-unclaimed: no number, but the "!" badge condition holds', () => {
+    const state = makeState(
+      [makeQuest({ id: 'd1', completed: true, progress: 3 })],
+      [makeQuest({ id: 'w1', tier: 'weekly', completed: true, progress: 3 })]
+    );
+    const count = getActiveIncompleteQuestCount(state);
+    expect(count).toBe(0);
+    expect(getQuestPillLabel(count)).toBe('🎯');
+    // The '!' badge keys on claimable amber — still lit while rewards wait.
+    expect(getUnclaimedAmber(state, 0)).toBeGreaterThan(0);
+  });
+
+  test('ALL quests completed AND claimed: bare 🎯 — no number, no badge', () => {
+    const state = makeState(
+      [makeQuest({ id: 'd1', completed: true, claimed: true, progress: 3 })],
+      [makeQuest({ id: 'w1', tier: 'weekly', completed: true, claimed: true, progress: 3 })]
+    );
+    const count = getActiveIncompleteQuestCount(state);
+    expect(count).toBe(0);
+    expect(getQuestPillLabel(count)).toBe('🎯');
+    expect(getQuestPillLabel(count)).not.toMatch(/\d/);
+    expect(getUnclaimedAmber(state, 0)).toBe(0); // badge stays off too
+  });
+});
+
 describe('isQuestPillVisible', () => {
   test('hidden during onboarding', () => {
     expect(isQuestPillVisible(true, false, true)).toBe(false);
@@ -178,5 +221,47 @@ describe('getQuestPillAccessibilityLabel', () => {
   test('announces claimable amber when a reward is waiting', () => {
     const label = getQuestPillAccessibilityLabel(2, 45, '30 minutes');
     expect(label).toContain('45 amber ready to claim');
+  });
+
+  test('announces completion when nothing is in progress or claimable', () => {
+    const label = getQuestPillAccessibilityLabel(0, 0, '2 hours');
+    expect(label).toContain('All quests complete');
+    expect(label).not.toContain('0 in progress');
+  });
+
+  test('does not claim completion while a reward is still waiting', () => {
+    const label = getQuestPillAccessibilityLabel(0, 45, '2 hours');
+    expect(label).toContain('45 amber ready to claim');
+    expect(label).not.toContain('All quests complete');
+  });
+});
+
+describe('header wiring (source scan of the two-row header)', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../components/home/HomeScreen.tsx'),
+    'utf8'
+  );
+  const pillStart = src.indexOf('styles.questPill');
+  // The pill's JSX block (style → badge) is well under this window.
+  const pillBlock = src.slice(pillStart, pillStart + 1200);
+
+  test('quest pill is rendered (header actions row)', () => {
+    expect(pillStart).toBeGreaterThan(-1);
+    // It sits in the actions row alongside the other action buttons.
+    expect(src.indexOf('headerActionsRow')).toBeGreaterThan(-1);
+    expect(src.indexOf('styles.headerActionsRow')).toBeLessThan(pillStart);
+  });
+
+  test('pill opens the quest modal directly (not the Journal Hub)', () => {
+    expect(pillBlock).toContain('handleOpenQuestModal');
+    expect(pillBlock).not.toContain('setShowJournalModal');
+  });
+
+  test('pill text routes through getQuestPillLabel (no hardcoded count)', () => {
+    expect(pillBlock).toContain('getQuestPillLabel(activeIncompleteQuestCount)');
+  });
+
+  test('the "!" badge keys on claimable amber only', () => {
+    expect(pillBlock).toContain('claimableQuestAmber > 0');
   });
 });

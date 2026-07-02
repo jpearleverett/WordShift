@@ -19,6 +19,7 @@ import {
   getAggregateProof,
   getWordsOfferedText,
   getActiveSeekersText,
+  SOCIAL_PROOF_MIN_WORDS,
 } from '../services/socialProof';
 
 const CONFIGURED = {
@@ -124,28 +125,43 @@ describe('socialProof', () => {
     });
   });
 
-  describe('getWordsOfferedText (phase-aware, spoiler-safe)', () => {
-    test('bright phases are plain & friendly with thousands separators', () => {
-      expect(getWordsOfferedText(12408, 0)).toBe('12,408 words shared by players today');
-      expect(getWordsOfferedText(12408, 1)).toBe('12,408 words shared by players today');
+  describe('getWordsOfferedText (phase-aware, spoiler-safe, self-explanatory)', () => {
+    test('bright phases lead with the community ("Players everywhere"), commas intact', () => {
+      expect(getWordsOfferedText(12408, 0)).toBe('Players everywhere shared 12,408 words today');
+      expect(getWordsOfferedText(12408, 1)).toBe('Players everywhere shared 12,408 words today');
     });
 
-    test('mid phases weight the language', () => {
-      expect(getWordsOfferedText(12408, 2)).toBe('12,408 words woven by players today');
-      expect(getWordsOfferedText(12408, 3)).toBe('12,408 words offered by seekers today');
+    test('mid phases weight the language while staying explicitly global', () => {
+      expect(getWordsOfferedText(12408, 2)).toBe('Players everywhere wove 12,408 words today');
+      expect(getWordsOfferedText(12408, 3)).toBe('Seekers everywhere offered 12,408 words today');
     });
 
-    test('phase 4 uses the arrangement framing', () => {
-      expect(getWordsOfferedText(12408, 4)).toBe(
-        '12,408 words offered to the arrangement today'
+    test('phase 4+ keeps the ritual register the player has earned', () => {
+      expect(getWordsOfferedText(12408, 4)).toBe('12,408 words joined the arrangement today');
+      expect(getWordsOfferedText(12408, 5)).toBe('12,408 words joined the arrangement today');
+    });
+
+    test('suppresses the line entirely below the minimum count (a weak number reads as a dead game)', () => {
+      for (const phase of [0, 1, 2, 3, 4, 5]) {
+        expect(getWordsOfferedText(SOCIAL_PROOF_MIN_WORDS - 1, phase)).toBeNull();
+        expect(getWordsOfferedText(0, phase)).toBeNull();
+        expect(getWordsOfferedText(-5, phase)).toBeNull();
+      }
+    });
+
+    test('shows exactly at the threshold', () => {
+      expect(SOCIAL_PROOF_MIN_WORDS).toBe(100);
+      expect(getWordsOfferedText(SOCIAL_PROOF_MIN_WORDS, 0)).toBe(
+        'Players everywhere shared 100 words today'
       );
-      expect(getWordsOfferedText(12408, 5)).toBe(
-        '12,408 words offered to the arrangement today'
-      );
     });
 
-    test('formats small numbers without commas', () => {
-      expect(getWordsOfferedText(42, 0)).toBe('42 words shared by players today');
+    test('never mentions the internal phase model', () => {
+      for (const phase of [0, 1, 2, 3, 4, 5]) {
+        const line = getWordsOfferedText(5000, phase);
+        expect(line).not.toBeNull();
+        expect(line!.toLowerCase()).not.toContain('phase');
+      }
     });
   });
 

@@ -36,10 +36,12 @@ spoiling the reveal, while the age rating must declare it honestly.
 >
 > ---
 >
-> No accounts required. Core puzzles play offline. Free to play, with optional
-> ads and a couple of cosmetic/convenience purchases — including a one-time
-> Remove Ads if you'd rather not see them. A slow-burn story for players 13+ —
-> things in the cozy house are not quite what they seem.
+> No accounts required. Core puzzles play offline. Free to play, supported by
+> occasional ads and optional in-app purchases (amber and hint packs, cosmetic
+> themes, a one-time starter bundle) — including a one-time Remove Ads if
+> you'd rather not see the ads at all. Purchases are convenience and cosmetics
+> only: the story unfolds at the same pace for everyone. A slow-burn story for
+> players 13+ — things in the cozy house are not quite what they seem.
 
 ## Keywords (iOS, ≤100 chars)
 
@@ -50,18 +52,20 @@ spoiling the reveal, while the age rating must declare it honestly.
 - **ESRB:** Teen (fantasy themes, mild horror) — answer "infrequent/mild horror/fear themes" honestly in the questionnaire.
 - **PEGI:** 12 (moderate horror themes, no violence, no profanity — dictionary is filtered).
 - **Apple:** 12+ — "Infrequent/Mild Horror/Fear Themes."
-- **Contains ads:** Yes (Google AdMob — interstitial + opt-in rewarded). Declare it in the Play "Ads" question.
+- **Contains ads:** Yes (Google AdMob — interstitial + opt-in rewarded). Declare it in the Play "Ads" question. `app-ads.txt` is live at the domain root (`https://jpearleverett.github.io/app-ads.txt`, pub-6575205005908086).
+- **Contains in-app purchases:** Yes — 9 products (amber packs, hint packs, one-time starter bundle, Remove Ads, Patron's Key, cosmetic bundle; all created + activated in Play Console 2026-07-02). Play derives the displayed price range from the active products automatically.
 - **Target audience:** 13+ (do not target children — ads + dark themes). Avoids the Families policy.
 
 ## Data safety / privacy (Play Data Safety + Apple Privacy)
 
-Backend features are LIVE (Supabase + Sentry + AdMob + Google Play Billing), so you must declare data collection — do **not** mark "no data collected". Declare:
+Backend features are LIVE (Supabase + Sentry + AdMob + Google Play Billing), so you must declare data collection — do **not** mark "no data collected". The Play data-safety form was submitted with this inventory (2026-07-02); keep the list, the privacy policy, and the form in sync. Declare:
 
-- **App activity / analytics** — anonymous events (install id, platform, app version, event type) → Supabase. Purpose: analytics. Not linked to identity, not shared for ads.
-- **Crash logs / diagnostics** — device model, OS, app version, stack traces → Sentry. Purpose: app functionality / diagnostics.
+- **App interactions / analytics** — anonymous events (install id, platform, app version, event type + non-identifying event details) → Supabase. Purpose: analytics. Not linked to identity, not shared for ads.
+- **Crash logs & Diagnostics** — device model, OS, app version, stack traces → Sentry. Purpose: app functionality / diagnostics.
 - **Device or other IDs — Advertising ID** — collected by Google AdMob. Purpose: advertising/marketing. May be shared with Google.
-- **Purchase history** — entitlement records via Google Play Billing / RevenueCat. Purpose: app functionality.
-- **App info & performance / "Other" save data** — optional cloud backup (game save under a random install id) + daily leaderboard result (time/stars/hints) → Supabase, only if the player uses those features.
+- **Approximate location** — coarse, IP-derived, collected by Google AdMob for ad serving. Purpose: advertising/marketing.
+- **Purchase history** — entitlement/purchase records via Google Play Billing / RevenueCat. Purpose: app functionality.
+- **App info & performance / "Other" save data** — cloud backup of the game save (stored under a random install id, synced automatically when online) + daily leaderboard result (time/stars/hints, only if the player plays the daily) → Supabase.
 
 Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from branch, `/docs`). Use these URLs in the store consoles and in-app Settings (all three are also wired into `mobile/src/constants/links.ts`):
 

@@ -17,12 +17,15 @@
  * Wiring (after `npx expo install react-native-purchases` + adding keys):
  *   import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
  *   setBillingProvider(createRevenueCatBillingProvider());
- *   // ...then the existing `await initIAP()` in the App bootstrap configures it.
+ *   // ...then the fire-and-forget `initIAP()` in the App bootstrap configures it.
  *
- * RevenueCat dashboard setup: create Entitlements named `patron` and `adfree`
- * and attach the matching store products (`com.wordshift.patron_key`,
- * `com.wordshift.remove_ads`). Active entitlement identifiers map straight to
- * `ENTITLEMENTS.PATRON` / `ENTITLEMENTS.ADFREE`.
+ * RevenueCat dashboard setup (LIVE for Android as of 2026-07-02): four
+ * Entitlements — `patron`, `adfree`, `cosmetic_bundle`, `starter_pack` —
+ * attached to `com.wordshift.patron_key` / `remove_ads` / `cosmetic_bundle` /
+ * `starter` (non-consumable); the amber/hint packs are consumable with no
+ * entitlement. Active entitlement identifiers map straight to the
+ * `ENTITLEMENTS` values in entitlements.ts. No Offerings are configured —
+ * purchases go through getProducts + purchaseStoreProduct by product id.
  */
 
 import { Platform } from 'react-native';

@@ -33,6 +33,12 @@ Each build profile (`eas.json`) is tied to an update channel:
 | `preview` | `preview` | internal preview APKs |
 | `development` | `development` | dev-client builds |
 
+> **Sentry note:** the `production` profile uploads Sentry source maps during
+> the build (`@sentry/react-native` plugin in `app.json`, org
+> `iridescent-games-9n` / project `wordshift`; `SENTRY_AUTH_TOKEN` is a secret
+> EAS environment variable). `SENTRY_DISABLE_AUTO_UPLOAD` is set only in the
+> `development` / `preview` profiles.
+
 ## Pushing an update
 
 From `mobile/`, after committing your JS/asset change:

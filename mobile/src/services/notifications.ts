@@ -80,7 +80,7 @@ const DAILY_REMINDER_MESSAGES: Record<number, string[]> = {
 const STREAK_RISK_MESSAGES: Record<number, string[]> = {
   0: [
     'Your {streak}-day streak is on the line! One quick puzzle keeps it alive.',
-    '{streak} days and counting — don\'t break the chain today!',
+    '{streak} days and counting. Don\'t break the chain today!',
   ],
   1: [
     'A {streak}-day pattern. It would be a shame to let it fade.',
@@ -100,7 +100,7 @@ const STREAK_RISK_MESSAGES: Record<number, string[]> = {
   ],
   5: [
     '{streak} days. The pattern holds, if you wish it to.',
-    'The chain rests at {streak} days. It will wait — but not forever.',
+    'The chain rests at {streak} days. It will wait... but not forever.',
   ],
 };
 
@@ -108,7 +108,7 @@ const STREAK_RISK_MESSAGES: Record<number, string[]> = {
 // progress that would otherwise expire unclaimed. Phase-aware tone.
 const QUEST_EXPIRY_MESSAGES: Record<number, string[]> = {
   0: [
-    'Your weekly quests reset soon — finish them before they\'re gone!',
+    'Your weekly quests reset soon. Finish them before they\'re gone!',
     'Last chance this week! Wrap up your quests for bonus amber.',
   ],
   1: [

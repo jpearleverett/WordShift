@@ -59,6 +59,8 @@ import {
   getAnimalsWithStatus,
   getRoomDescription,
   claimReservedUnlockIfReady,
+  getReservedArrivalText,
+  getReserveGateText,
 } from '../../services/homeWorldData';
 import { RulesModal } from '../puzzle/RulesModal';
 import {
@@ -161,13 +163,25 @@ export const isQuestPillVisible = (
   hasQuestState: boolean,
 ): boolean => !isOnboarding && !isPostTutorialLightMode && hasQuestState;
 
+/**
+ * Quest pill label: 🎯 plus the in-progress count — or the bare 🎯 when
+ * nothing is left to do (all current daily + weekly quests completed and
+ * claimed). A lingering "🎯 0" read as a permanent to-do; the number only
+ * appears while a quest is actually actionable.
+ */
+export const getQuestPillLabel = (activeIncompleteCount: number): string =>
+  activeIncompleteCount > 0 ? `🎯 ${activeIncompleteCount}` : '🎯';
+
 /** Screen-reader label for the quest pill: active count, claimable amber, daily reset. */
 export const getQuestPillAccessibilityLabel = (
   activeIncompleteCount: number,
   claimableAmber: number,
   dailyResetHint: string,
 ): string =>
-  `Open quests. ${activeIncompleteCount} in progress.` +
+  'Open quests.' +
+  (activeIncompleteCount > 0
+    ? ` ${activeIncompleteCount} in progress.`
+    : claimableAmber > 0 ? '' : ' All quests complete.') +
   (claimableAmber > 0 ? ` ${claimableAmber} amber ready to claim.` : '') +
   ` Daily quests reset in ${dailyResetHint}.`;
 
@@ -957,9 +971,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
   }
 
+  // Sampled from the sky assets' top rows (sampleSkyTops scratch script) so the
+  // screen background meets the sky PNG without a seam — keep in sync with
+  // HouseWorld/appStyles; re-sample if the sky assets regenerate.
   const phaseBgColor = {
-    0: '#6fb7df', 1: '#104c83', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830',
-  }[progress.currentPhase] || '#6fb7df';
+    0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000212', 4: '#050816', 5: '#050816',
+  }[progress.currentPhase] || '#439cf2';
 
   // Phase-aware dialogue theme for all modals and dialogue boxes
   const dt = getDialogueTheme(progress.currentPhase);
@@ -970,122 +987,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <View style={[styles.container, { backgroundColor: phaseBgColor }]}>
-      {/* Header — single row, simplified during onboarding; safe-area aware */}
-      <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={styles.amberContainer}
-            disabled={!onOpenStore || isOnboarding}
-            onPress={() => {
-              hapticLight();
-              onOpenStore?.();
-            }}
-            activeOpacity={0.7}
-            accessibilityLabel={
-              onOpenStore && !isOnboarding
-                ? `${progress.amber} amber. Opens the store.`
-                : `${progress.amber} amber`
-            }
-            accessibilityRole={onOpenStore && !isOnboarding ? 'button' : undefined}
-          >
-            <View style={styles.amberInner}>
-              <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
-                <Image source={AMBER_ICON} style={styles.amberIconImage} />
-              </Animated.View>
-              <Text style={styles.amberCount}>{progress.amber}</Text>
-              {!isOnboarding && <AmberSparkle />}
-            </View>
-          </TouchableOpacity>
-          {(progress.currentStreak > 1 || isStreakAtRisk) && (
-            <View
-              style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
-              accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
-            >
-              <Image source={FLAME_ICON} style={styles.streakBadgeIcon} />
-              <Text style={[styles.streakBadgeCount, isStreakAtRisk && styles.streakAtRiskCount]}>
-                {progress.currentStreak}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.headerRight}>
-          {!isOnboarding && onStartDaily &&
-            isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
-            <DailyChallengeCard
-              onStartDaily={onStartDaily}
-              phase={progress.currentPhase}
-              refreshSignal={progress.puzzlesSolved}
-            />
-          )}
-          {showQuestPill && (
+      {/* Header — two rows so nothing can overlap at narrow (360dp) widths.
+          Row 1 is a slim status strip: amber pill (tap → store) + streak on the
+          left, utility menu (☰) pinned right. Row 2 holds the action buttons
+          (daily / quests / pit / journal) as fixed-size items, with PLAY
+          growing into all remaining width as the dominant primary action.
+          Row 2 disappears entirely during onboarding (every item is gated). */}
+      <View style={[styles.header, { paddingTop: screenInsets.top + 10 }]}>
+        <View style={styles.headerStatusRow}>
+          <View style={styles.headerStatusLeft}>
             <TouchableOpacity
-              style={styles.questPill}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              onPress={() => { handleOpenQuestModal().catch(() => {}); }}
-              accessibilityLabel={getQuestPillAccessibilityLabel(
-                activeIncompleteQuestCount,
-                claimableQuestAmber,
-                dailyResetHint
-              )}
-              accessibilityRole="button"
+              style={styles.amberContainer}
+              disabled={!onOpenStore || isOnboarding}
+              onPress={() => {
+                hapticLight();
+                onOpenStore?.();
+              }}
+              activeOpacity={0.7}
+              accessibilityLabel={
+                onOpenStore && !isOnboarding
+                  ? `${progress.amber} amber. Opens the store.`
+                  : `${progress.amber} amber`
+              }
+              accessibilityRole={onOpenStore && !isOnboarding ? 'button' : undefined}
             >
-              <Text style={styles.questPillText}>🎯 {activeIncompleteQuestCount}</Text>
-              {claimableQuestAmber > 0 && (
-                <View style={styles.headerBadge}>
-                  <Text style={styles.headerBadgeText}>!</Text>
-                </View>
-              )}
+              <View style={styles.amberInner}>
+                <Animated.View style={{ transform: [{ scale: amberPulse }] }}>
+                  <Image source={AMBER_ICON} style={styles.amberIconImage} />
+                </Animated.View>
+                <Text style={styles.amberCount} numberOfLines={1}>{progress.amber}</Text>
+                {!isOnboarding && <AmberSparkle />}
+              </View>
             </TouchableOpacity>
-          )}
-          {!isOnboarding && onOpenPit && (
-            <Animated.View style={shouldHighlightPitButton ? {
-              transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
-              opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
-            } : undefined}>
-              <TouchableOpacity
-                style={[styles.headerIconBtn, shouldHighlightPitButton && styles.pitHeaderIconBtn]}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                onPress={() => {
-                  hapticLight();
-                  onOpenPit?.();
-                }}
-                accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
-                accessibilityRole="button"
+            {(progress.currentStreak > 1 || isStreakAtRisk) && (
+              <View
+                style={[styles.streakBadge, isStreakAtRisk && styles.streakAtRiskBadge]}
+                accessibilityLabel={`${progress.currentStreak} day streak${isStreakAtRisk ? ', at risk' : ''}`}
               >
-                <Image source={PIT_ICON} style={styles.headerIconImage} />
-                {pendingHarvest && pendingHarvest.pendingWords > 0 && (
-                  <View style={styles.headerBadge}>
-                    <Text style={styles.headerBadgeText}>{pendingHarvest.pendingWords}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-          {shouldShowJournalButton && (
-            <TouchableOpacity
-              style={[
-                styles.headerIconBtn,
-                journalSpotlightActive && styles.journalSpotlightIcon,
-              ]}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              onPress={journalSpotlightActive ? async () => {
-                // Spotlight: tapping icon advances to journal modal
-                await markJournalIntroSeen();
-                setJournalSpotlightActive(false);
-                setShowJournalModal(true);
-              } : handleOpenJournal}
-              accessibilityLabel={journalSpotlightActive ? 'Tap to open journal' : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
-              accessibilityRole="button"
-            >
-              <Image source={JOURNAL_ICON} style={styles.headerIconImage} />
-              {!journalSpotlightActive && claimableQuestAmber > 0 && (
-                <View style={styles.headerBadge}>
-                  <Text style={styles.headerBadgeText}>!</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
+                <Image source={FLAME_ICON} style={styles.streakBadgeIcon} />
+                <Text style={[styles.streakBadgeCount, isStreakAtRisk && styles.streakAtRiskCount]}>
+                  {progress.currentStreak}
+                </Text>
+              </View>
+            )}
+          </View>
           {!isOnboarding && !isPostTutorialLightMode && (
             <TouchableOpacity
               style={styles.headerIconBtn}
@@ -1097,34 +1042,115 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Text style={styles.headerIconText}>☰</Text>
             </TouchableOpacity>
           )}
-          {!isOnboarding && (
-          <Animated.View
-            style={highlightPlayButton ? {
-              flexShrink: 0,
-              transform: [{
-                scale: playPulse.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [1, 1.06],
-                }),
-              }],
-            } : { flexShrink: 0 }}
-          >
-            <JuicyButton
-              style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
-              onPress={() => {
-                hapticSelection();
-                setHighlightPlayButton(false);
-                onPlayPuzzle();
-              }}
-              bounceScale={0.9}
-              accessibilityLabel="Play puzzle"
-              accessibilityRole="button"
-            >
-              <Text style={styles.playButtonText}>PLAY</Text>
-            </JuicyButton>
-          </Animated.View>
-          )}
         </View>
+
+        {!isOnboarding && (
+          <View style={styles.headerActionsRow}>
+            {onStartDaily &&
+              isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
+              <DailyChallengeCard
+                onStartDaily={onStartDaily}
+                phase={progress.currentPhase}
+                refreshSignal={progress.puzzlesSolved}
+              />
+            )}
+            {showQuestPill && (
+              <TouchableOpacity
+                style={styles.questPill}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                onPress={() => { handleOpenQuestModal().catch(() => {}); }}
+                accessibilityLabel={getQuestPillAccessibilityLabel(
+                  activeIncompleteQuestCount,
+                  claimableQuestAmber,
+                  dailyResetHint
+                )}
+                accessibilityRole="button"
+              >
+                <Text style={styles.questPillText}>{getQuestPillLabel(activeIncompleteQuestCount)}</Text>
+                {claimableQuestAmber > 0 && (
+                  <View style={styles.headerBadge}>
+                    <Text style={styles.headerBadgeText}>!</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+            {onOpenPit && (
+              <Animated.View style={shouldHighlightPitButton ? {
+                transform: [{ scale: pitPulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+                opacity: pitPulseAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.75, 1] }),
+              } : undefined}>
+                <TouchableOpacity
+                  style={[styles.headerIconBtn, shouldHighlightPitButton && styles.pitHeaderIconBtn]}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  onPress={() => {
+                    hapticLight();
+                    onOpenPit?.();
+                  }}
+                  accessibilityLabel={`${getPitHomeBadgeLabel(progress.currentPhase)}${pendingHarvest && pendingHarvest.pendingBatches > 0 ? `: ${pendingHarvest.pendingWords} words pending` : ''}`}
+                  accessibilityRole="button"
+                >
+                  <Image source={PIT_ICON} style={styles.headerIconImage} />
+                  {pendingHarvest && pendingHarvest.pendingWords > 0 && (
+                    <View style={styles.headerBadge}>
+                      <Text style={styles.headerBadgeText}>{pendingHarvest.pendingWords}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+            {shouldShowJournalButton && (
+              <TouchableOpacity
+                style={[
+                  styles.headerIconBtn,
+                  journalSpotlightActive && styles.journalSpotlightIcon,
+                ]}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                onPress={journalSpotlightActive ? async () => {
+                  // Spotlight: tapping icon advances to journal modal
+                  await markJournalIntroSeen();
+                  setJournalSpotlightActive(false);
+                  setShowJournalModal(true);
+                } : handleOpenJournal}
+                accessibilityLabel={journalSpotlightActive ? 'Tap to open journal' : `Open journal${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready in quests` : ''}`}
+                accessibilityRole="button"
+              >
+                <Image source={JOURNAL_ICON} style={styles.headerIconImage} />
+                {!journalSpotlightActive && claimableQuestAmber > 0 && (
+                  <View style={styles.headerBadge}>
+                    <Text style={styles.headerBadgeText}>!</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+            <Animated.View
+              style={[
+                styles.playButtonWrap,
+                highlightPlayButton && {
+                  transform: [{
+                    scale: playPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.06],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <JuicyButton
+                style={[styles.playButton, highlightPlayButton && styles.playButtonHighlighted]}
+                onPress={() => {
+                  hapticSelection();
+                  setHighlightPlayButton(false);
+                  onPlayPuzzle();
+                }}
+                bounceScale={0.9}
+                accessibilityLabel="Play puzzle"
+                accessibilityRole="button"
+              >
+                <Text style={styles.playButtonText}>PLAY</Text>
+              </JuicyButton>
+            </Animated.View>
+          </View>
+        )}
       </View>
 
       <View style={styles.houseStage}>
@@ -1623,12 +1649,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     </Text>
                     {unlockFlow.reservedUnlockId === unlockFlow.nextUnlock.id ? (
                       <Text style={styles.unlockBlockedText}>
-                        ✓ Reserved — arrives at level {unlockFlow.nextUnlock.minPuzzles}
+                        {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                       </Text>
                     ) : unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available ? (
                       <Text style={styles.unlockBlockedText}>
                         {unlockFlow.canReserve && unlockFlow.nextUnlock.minPuzzles
-                          ? `Unlocks at level ${unlockFlow.nextUnlock.minPuzzles} — reserve it now and it builds itself then`
+                          ? `${getReserveGateText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}. Reserve it now and it builds itself then`
                           : unlockFlow.unlockAvailability.reason}
                       </Text>
                     ) : null}
@@ -1641,7 +1667,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <TouchableOpacity
                       style={styles.buyButton}
                       onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
-                      accessibilityLabel={`Reserve ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber; it builds at level ${unlockFlow.nextUnlock.minPuzzles}`}
+                      accessibilityLabel={`Reserve ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber; it builds at level ${unlockFlow.nextUnlock.minPuzzles}, you're at ${progress.puzzlesSolved}`}
                       accessibilityRole="button"
                     >
                       <Text style={styles.buyButtonText}>Reserve</Text>
@@ -1950,7 +1976,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   if (isReserved) {
                     return (
                       <Text style={[styles.shopSubtitle, { color: dt.nameColor, marginTop: 8, fontWeight: '700' }]}>
-                        ✓ Reserved — arrives at level {unlockFlow.nextUnlock.minPuzzles}
+                        {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                       </Text>
                     );
                   }
@@ -1959,12 +1985,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     return (
                       <>
                         <Text style={[styles.shopSubtitle, { color: dt.subtitleColor, marginTop: 8, fontStyle: 'italic' }]}>
-                          Unlocks at level {unlockFlow.nextUnlock.minPuzzles}. Reserve it now and it builds itself the moment you get there.
+                          {getReserveGateText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}. Reserve it now and it builds itself the moment you get there.
                         </Text>
                         <TouchableOpacity
                           style={[styles.buyButton, styles.buyButtonLarge]}
                           onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
-                          accessibilityLabel={`Reserve room for ${unlockFlow.nextUnlock!.cost} amber; builds at level ${unlockFlow.nextUnlock!.minPuzzles}`}
+                          accessibilityLabel={`Reserve room for ${unlockFlow.nextUnlock!.cost} amber; builds at level ${unlockFlow.nextUnlock!.minPuzzles}, you're at ${progress.puzzlesSolved}`}
                           accessibilityRole="button"
                         >
                           <Text style={styles.buyButtonText}>
@@ -2584,7 +2610,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#6fb7df',
+    // Phase-0 sky top-row color, sampled from the sky assets (sampleSkyTops
+    // scratch script) — re-sample if sky assets regenerate.
+    backgroundColor: '#439cf2',
   },
   houseStage: {
     flex: 1,
@@ -2628,26 +2656,43 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.2,
   },
+  // Two-row header. Both rows are non-wrapping with fixed-size items (row 2's
+  // only flexible item is the PLAY wrapper), so nothing can overlap or push
+  // PLAY offscreen at 360dp — worst case (daily 42 + quest pill ~54 + pit 38 +
+  // journal 38 + 4×8 gaps ≈ 204) still leaves PLAY ~130dp wide.
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     // paddingTop applied inline via useScreenInsets (safe-area aware)
     paddingBottom: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 100,
   },
-  headerLeft: {
+  headerStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexShrink: 0,
+    minHeight: 38,
+  },
+  headerStatusLeft: {
+    flex: 1,
+    minWidth: 0, // let the amber pill truncate instead of pushing ☰ out
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    height: 44,
   },
   amberContainer: {
+    flexShrink: 1,
+    minWidth: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
@@ -2665,10 +2710,12 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontSize: 16,
     fontWeight: '800',
+    flexShrink: 1,
   },
   streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     backgroundColor: 'rgba(255,165,0,0.15)',
     borderRadius: 12,
     paddingHorizontal: 8,
@@ -2691,18 +2738,11 @@ const styles = StyleSheet.create({
   streakAtRiskCount: {
     color: '#FF3C3C',
   },
-  headerRight: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 7,
-    marginLeft: 8,
-  },
   headerIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    flexShrink: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2712,13 +2752,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 215, 0, 0.45)',
     borderWidth: 1.5,
   },
-  // Compact on purpose (single line, no reset column): the header overflowed
-  // once before — right group clips left, PLAY stays pinned (flexShrink: 0).
+  // Compact on purpose (single line, no reset column) — a fixed-size item in
+  // the actions row; the count caps at 10 so it never grows past ~54dp.
   questPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 34,
-    borderRadius: 17,
+    flexShrink: 0,
+    height: 38,
+    borderRadius: 19,
     paddingHorizontal: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
@@ -2759,12 +2800,19 @@ const styles = StyleSheet.create({
     width: 15,
     height: 15,
   },
+  // PLAY is the actions row's only flexible item: it grows into all remaining
+  // width (visually dominant) but can never be crushed below minWidth.
+  playButtonWrap: {
+    flex: 1,
+    minWidth: 88,
+  },
   playButton: {
-    flexShrink: 0,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: CandyColors.green.main,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 12,
     shadowColor: CandyColors.green.dark,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
@@ -2781,9 +2829,9 @@ const styles = StyleSheet.create({
   },
   playButtonText: {
     color: CandyColors.white,
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
 
   // Words Offered Counter (persistent on home screen)

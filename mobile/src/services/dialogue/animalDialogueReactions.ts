@@ -15,7 +15,7 @@ import { AnimalType, DialoguePhase } from '../../types/homeWorld';
 const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, string>>> = {
   fox: {
     1: {
-      FLAME: "I felt the fire flicker just now. Not the draft kind of flicker — the listening kind. Did you use that word?",
+      FLAME: "I felt the fire flicker just now. Not the draft kind of flicker... the listening kind. Did you use that word?",
       FIRE: "The hearth crackled when you solved that puzzle. Funny timing, don't you think?",
       EMBER: "My name echoed somewhere in the room. In the flames, maybe. You must have said something interesting.",
       BURN: "Something warm passed through the den just now. Like a word made of heat and memory.",
@@ -111,13 +111,13 @@ const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, s
       MEAL: "The last meal. Your word serves it. We feast on the arrangement and it feasts on us. Beautiful.",
       FOOD: "FOOD for what descends. Your words nourish it. It is grateful. We are all so grateful.",
       SPICE: "SPICE. The final flavor. The arrangement tastes complete at last. Perfect seasoning. Perfect you.",
-      ROLL: "I uncurl for the last time. Your word gave me the courage. ROLL — and stop. And be still.",
+      ROLL: "I uncurl for the last time. Your word gave me the courage. ROLL... and stop. And be still.",
       _default: "The final recipe writes itself in the words you arrange. The feast is upon us. Sit down.",
     },
   },
   axolotl: {
     1: {
-      WATER: "Blub! The water just rippled from your puzzle. Not the surface — the deep part. The old part.",
+      WATER: "Blub! The water just rippled from your puzzle. Not the surface... the deep part. The old part.",
       SWIM: "I felt pulled in a direction when you solved that. Like a current made of letters and wanting.",
       FLOAT: "The water level changed when you formed that word. Just a little. Just enough to wonder about.",
       DEEP: "Something stirred in the deep water when you spelled that. Down where the light doesn't go.",
@@ -151,9 +151,9 @@ const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, s
   },
   fennec_fox: {
     1: {
-      HEAR: "I heard that! Not the puzzle — something underneath it. A tone. A frequency I've never encountered.",
+      HEAR: "I heard that! Not the puzzle... something underneath it. A tone. A frequency I've never encountered.",
       SOUND: "The sound changed when you solved that. The air itself vibrates differently now. Do you feel it?",
-      ECHO: "Your word echoed. Not off the walls — off something further away. Something that isn't here yet.",
+      ECHO: "Your word echoed. Not off the walls... off something further away. Something that isn't here yet.",
       QUIET: "It got quieter when you formed that word. Too quiet. Like the whole world held its breath for you.",
       LISTEN: "I'm always listening. But after your puzzle, there is something new to hear. Something patient.",
       _default: "A new frequency appeared after your puzzle. Faint. But my ears always find the faint ones.",
@@ -287,7 +287,7 @@ const TRIGGER_WORD_REACTIONS: Record<AnimalType, Record<number, Record<string, s
   },
   rabbit: {
     1: {
-      RUN: "I felt my legs twitch when you solved that. The urge to bolt. But also — weirdly — to stay put.",
+      RUN: "I felt my legs twitch when you solved that. The urge to bolt. But also, weirdly, to stay put.",
       FEAR: "A shiver ran through me. From your word, not the cold. Just awareness. My ears went straight up.",
       HIDE: "The garden felt less safe for a heartbeat after your puzzle. Then more safe. Very confusing.",
       JUMP: "I hopped involuntarily! Your word went through me like electricity through a wire.",

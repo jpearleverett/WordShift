@@ -83,7 +83,6 @@ jest.mock('../services/phaseNarrative', () => ({
   getStartMessage: jest.fn(() => 'Tap a tile to begin!'),
   getInvalidWordMessage: jest.fn((word: string, _p: number) => `${word} isn't a word!`),
   getLockedLetterMessage: jest.fn((_p: number) => 'That letter is locked!'),
-  getNoValidMovesMessage: jest.fn((_p: number) => 'No words fit from here! Undo a move or clear the board to try a fresh path.'),
 }));
 
 jest.mock('../services/hints', () => ({
@@ -1314,6 +1313,27 @@ describe('usePuzzleGame', () => {
       actions.initGame(['TIME', 'TIED']);
       const [state] = callHook();
       expect(state.speedRescueSignal).toBeNull();
+    });
+  });
+
+  // =========================================================================
+  // Stuck detection stays silent (product decision)
+  // =========================================================================
+
+  describe('stuck detection stays silent', () => {
+    test('the hook computes isStuck but never announces an unwinnable board', () => {
+      // Product decision: no immediate "you're stuck" message — the player
+      // discovers the dead-end and chooses to undo or restart. isStuck stays
+      // a computed internal signal that drives nothing player-visible.
+      const fs = require('fs');
+      const path = require('path');
+      const HOOK_SRC = fs.readFileSync(
+        path.resolve(__dirname, '../hooks/usePuzzleGame.ts'),
+        'utf8'
+      );
+      expect(HOOK_SRC).toMatch(/setIsStuck\(/); // internal computation kept
+      expect(HOOK_SRC).not.toMatch(/getNoValidMovesMessage/);
+      expect(HOOK_SRC).not.toMatch(/getStuckPanelTitle/);
     });
   });
 });

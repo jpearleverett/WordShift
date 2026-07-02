@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,528 tests across 64 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,548 tests across 64 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -77,7 +77,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 
 ```
 mobile/
-├── App.tsx                      # Bootstrap gate (cloud auto-restore → migrations → cosmetics/hints; IAP/ads init fire-and-forget; error handler) wrapping MainApp (~2800 lines): screen routing, onboarding, post-victory intros, deep-link + notification-tap routing, Android back handling
+├── App.tsx                      # Bootstrap gate (cloud auto-restore → migrations → cosmetics/hints/entitlements; IAP/ads init fire-and-forget; error handler) wrapping MainApp (~2800 lines): screen routing, onboarding, post-victory intros, deep-link + notification-tap routing (incl. cold-start), Android back handling
 ├── assets/                      # Image assets (characters/, rooms/, house/, environment/)
 ├── src/
 │   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
@@ -115,7 +115,7 @@ mobile/
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst
 │   │   ├── FoxGuide.tsx         # Floating Fox speech bubble (onboarding)
-│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, Restore Purchases (PURCHASES section), Privacy Options row (ABOUT — visible only when UMP consent requires it), legal links (Privacy Policy / Terms of Service / Data Deletion — all live), support contact, Reset All
+│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, Restore Purchases (PURCHASES section), Privacy Options row (ABOUT — visible only when UMP consent requires it), legal links (Privacy Policy / Terms of Service / Data Deletion — all live), support contact, Reset All (`performFullReset` — Promise.allSettled over every service clear, then **overwrites the cloud row with the cleared state** so the bootstrap's fresh-install auto-restore can't resurrect the old save; App's `onReset` rebuilds all in-memory state when in-place reload is unavailable)
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
 │   │   ├── DailyChallengeCard.tsx # Compact daily challenge button (header)
@@ -139,7 +139,6 @@ mobile/
 │   │       ├── RoomView.tsx     # Individual room rendering
 │   │       ├── AnimalSprite.tsx # Animated animal characters
 │   │       ├── JuicyButton.tsx, AmberSparkle.tsx, CelebrationConfetti.tsx
-│   │       └── FeatureTooltip.tsx # Post-onboarding floating tooltip
 │   ├── theme/colors.ts          # CandyColors palette, tile colors, PhaseTheme system
 │   ├── styles/appStyles.ts      # App.tsx StyleSheet, getScreenBackgroundColor()
 │   └── services/
@@ -188,10 +187,10 @@ mobile/
 │       ├── homeScenePan.ts, shareResults.ts (emoji-grid text share + challenge links + Play Store CTA; daily shares are spoiler-free)
 │       ├── shareImage.ts        # Pluggable result-image capture (react-native-view-shot + expo-sharing are real deps — PNG ShareCard ships in dev-client/EAS builds; text fallback in Expo Go)
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,528 tests, 64 suites
+├── src/__tests__/               # ~1,548 tests, 64 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler
-├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console. Production no longer disables Sentry source-map upload (needs the `SENTRY_AUTH_TOKEN` EAS secret; dev/preview still set `SENTRY_DISABLE_AUTO_UPLOAD`). `docs/LAUNCH_CHECKLIST.md` tracks the remaining human release tasks.
+├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console. Production no longer disables Sentry source-map upload (the `@sentry/react-native` plugin in app.json carries `organization`/`project`; the `SENTRY_AUTH_TOKEN` EAS env secret provides auth; dev/preview still set `SENTRY_DISABLE_AUTO_UPLOAD`). `docs/LAUNCH_CHECKLIST.md` tracks the remaining human release tasks.
 └── eslint.config.js             # ESLint 9 flat config. Overrides downgrade CommonJS/unused-var idioms in `scripts/**` (generators) and test files so real app-code warnings aren't drowned (baseline: 0 errors, ~690 warnings — dominated by `react-hooks/refs` notices in components, plus intentional guarded `require`s + hook-dep notes)
 ```
 
@@ -249,13 +248,13 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### Deep Links & Friend Challenges
 
-`wordshift://` URLs (ignored mid-onboarding): `challenge/daily` starts the daily when unlocked (else routes home with an Alert); `challenge/p?w=WORD1-WORD2-…` → `decodeChallengeLink()` → `puzzleActions.startSharedChallengeGame(words)` (validated, standard hint-enabled board). **Friend challenges**: `ShareResultModal` adds a "Challenge a friend" button on standard non-daily boards (`buildChallengeShareText` — taunt + link). All share text ends with a Play Store CTA (`PLAY_STORE_URL`/`WEB_LANDING_URL` in `constants/links.ts`). The emoji grid is an **honest per-move record** via `moveOutcomes` threaded from `usePuzzleGame` (falls back to the legacy distribution grid when absent, e.g. after autosave restore).
+`wordshift://` URLs (ignored mid-onboarding): `challenge/daily` starts the daily when unlocked (else routes home with an Alert); `challenge/p?w=WORD1-WORD2-…` → `decodeChallengeLink()` → `puzzleActions.startSharedChallengeGame(words)` (validated, standard hint-enabled board). **Friend challenges**: `ShareResultModal` adds a challenge-share button on standard non-daily boards (label via `getChallengeFriendLabel(phase)`; text via `buildChallengeShareText` — taunt + link; chains are 3-6 words, `MIN/MAX_CHALLENGE_WORDS` exported from shareResults and enforced by both the encoder and `startSharedChallengeGame`). The challenge share routes through `shareChallengeText()` so it records share count + the daily share bonus like every other share path. All share text ends with a Play Store CTA (`PLAY_STORE_URL`/`WEB_LANDING_URL` in `constants/links.ts`). The emoji grid is an **honest per-move record** via `moveOutcomes` threaded from `usePuzzleGame` (falls back to the legacy distribution grid when absent, e.g. after autosave restore).
 
 ## App Architecture
 
 ### Custom Hooks
 
-**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()` (guarded by a monotonic `generationIdRef` — every `initGame` commit aborts if a newer call superseded it, so rapid Play/Next-Level taps or a mid-generation variant switch can't clobber a started board), `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `startSharedChallengeGame(words)` (friend-challenge link path, validated), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. `handleHint()` also raises `hintHighlight` — the hinted tile + target slot glow on the board, reusing the tutorial-glow rendering (cleared on move/undo/new board; never restored from autosave). Tracks per-move `moveOutcomes` for the honest share grid, and raises `speedRescueSignal` from `resumeSpeedAfterRescue`. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection: it sets `isStuck` (exposed on state) and surfaces `getNoValidMovesMessage()` when no legal move remains. App.tsx renders a non-transient **stuck-recovery panel** (Undo / Restart, phase-aware headline via `getStuckPanelTitle()`) while `isStuck` — not just the toast. `isStuck` resets on undo/restart/new board.
+**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()` (guarded by a monotonic `generationIdRef` — every `initGame` commit aborts if a newer call superseded it, so rapid Play/Next-Level taps or a mid-generation variant switch can't clobber a started board), `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `startSharedChallengeGame(words)` (friend-challenge link path, validated), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. `handleHint()` also raises `hintHighlight` — the hinted tile + target slot glow on the board, reusing the tutorial-glow rendering (cleared on move/undo/new board; never restored from autosave). Tracks per-move `moveOutcomes` for the honest share grid, and raises `speedRescueSignal` from `resumeSpeedAfterRescue`. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection and sets `isStuck` — a **silent internal signal by product decision**: nothing player-visible renders from it (no panel, no toast — discovering a dead-end and choosing Undo/Restart is part of the challenge; `appIntegration.test.ts` pins the absence). `getStuckPanelTitle()`/`getNoValidMovesMessage()` remain in phaseNarrative but are intentionally unused. `isStuck` resets on undo/restart/new board.
 
 **`useGamePersistence()`** — Persistence: amber, stats, phases, streak. Key: `recordVictory()` returns VictoryData (includes `phaseTransitionPending`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus`). `refreshStats()` reloads from storage. Reports phase 5 when post-revelation.
 
@@ -283,8 +282,8 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 - `installGlobalErrorHandler()` (errorReporting.ts) is called at App.tsx module load — global JS errors and unhandled promise rejections are captured into the event log. `ErrorBoundary.componentDidCatch` also forwards React render errors through `reportError()` (source `react_error_boundary`), so both async and render-time failures land in the same pipeline. **Render coverage:** `home` and `puzzle` carry their own inner boundaries; an outer catch-all boundary wraps `renderScreen()` so a render error on the secondary screens (settings/stats/ledger/gallery/pit) returns the player home instead of crashing the whole app. Crash capture is local-only (500-entry buffer).
 - Frame-rate monitoring (`performanceMonitor.startFrameMonitoring`) is diagnostic-only — its samples are never read in production — so it is gated behind `__DEV__` (and stopped on unmount) and never runs a perpetual `requestAnimationFrame` loop on a player's device.
-- The default export `App` is a bootstrap gate: it installs the cloud provider + auto-restores a fresh install, then awaits `runMigrations()` (dataMigration.ts), `initCosmetics()` and `initHints()` **before** mounting `MainApp`, so service caches always read migrated data. `initIAP()`/`initAds()` are **fire-and-forget** — the first frame never waits on billing config or the ads consent → SDK init → preload chain. Renders a quiet dark view while booting; failures log and never block launch.
-- Every scheduled notification carries `data.target` (`'daily' | 'home'`); App's `addNotificationResponseReceivedListener` routes taps accordingly. An AppState listener re-runs the daily launch effects (login reward, streak-freeze check, notification reschedule, stats refresh) when the app foregrounds on a **new local day**.
+- The default export `App` is a bootstrap gate: it installs the cloud provider + auto-restores a fresh install, then awaits `runMigrations()` (dataMigration.ts), `initCosmetics()`, `initHints()` and `loadEntitlements()` **before** mounting `MainApp`, so service caches (including the Patron/ad-free/first-purchase sync cache) always read correct values on first render. `initIAP()`/`initAds()` are **fire-and-forget** — the first frame never waits on billing config or the ads consent → SDK init → preload chain. Renders a quiet dark view while booting; failures log and never block launch.
+- Every scheduled notification carries `data.target` (`'daily' | 'home'`); App's `addNotificationResponseReceivedListener` routes taps accordingly, and a **cold-start tap** (notification launched the app — never delivered to the runtime listener) is routed once via `getLastNotificationResponseAsync`, deferred ~1.2s so persistence state hydrates first. Deep links use the same pattern: the Linking subscription mounts once (handler in a ref) and the launch URL is processed exactly once with the same deferral. An AppState listener re-runs the daily launch effects (login reward, streak-freeze check, notification reschedule, stats refresh) when the app foregrounds on a **new local day**.
 - Android hardware back: sub-screens navigate home (puzzle screen also resets transient UI state); home lets the OS exit; back is swallowed during onboarding.
 - `telemetry.ts`: anonymous-install-id event uploader, fired from the event logger's flush. **Active**: sends to the Supabase `events` table (`supabaseUrl`/`supabaseAnonKey` set in `app.json` → `extra`); falls back to a custom `telemetryEndpoint` if that's set instead. Only anonymous events (install id, platform, app version, event type) are sent.
 - FTUE funnel events: `app_open`, `onboarding_step` / `onboarding_complete` (logged from `setOnboardingStep`), `puzzle_started/completed`, `daily_completed`, `notification_permission_result`, `pit_offer` — recorded to the local event log.
@@ -348,7 +347,7 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 | Garden (Thyme the Rabbit) | 105 |
 | Bamboo Attic (Bamboo the Red Panda) | 130 |
 
-**Reserve-ahead (pay now, build at the gate):** the gates are tuned for a baseline earner, so a fast/skilled player (HARD + achievements + quests) reaches a gated room's amber cost well before its level gate and would otherwise sit on idle amber behind a wall. When the next unlock is blocked *only* by its puzzle gate and the player can afford it, they can **Reserve** it — `reserveNextUnlock` spends the amber up front and stores `reservedUnlockId` (on home progress); `claimReservedUnlockIfReady` (called from `HomeScreen.loadAllData`) commits the room for free the moment `puzzlesSolved` crosses `minPuzzles`, firing a celebration. Only the **immediate next** unlock can be reserved (one at a time, `canReserveUnlock`), so a rich player can stay one step ahead but can't pre-buy the whole house. The shop + room-unlock modals show "Unlocks at level N — reserve it now" / "✓ Reserved — arrives at level N". Reservation rides in `wordshift_home_progress` (cloud-synced; cleared by Reset All's `clearProgress`). Covered by `homeWorldData.test.ts`.
+**Reserve-ahead (pay now, build at the gate):** the gates are tuned for a baseline earner, so a fast/skilled player (HARD + achievements + quests) reaches a gated room's amber cost well before its level gate and would otherwise sit on idle amber behind a wall. When the next unlock is blocked *only* by its puzzle gate and the player can afford it, they can **Reserve** it — `reserveNextUnlock` spends the amber up front and stores `reservedUnlockId` (on home progress); `claimReservedUnlockIfReady` (called from `HomeScreen.loadAllData`) commits the room for free the moment `puzzlesSolved` crosses `minPuzzles`, firing a celebration. Only the **immediate next** unlock can be reserved (one at a time, `canReserveUnlock`), so a rich player can stay one step ahead but can't pre-buy the whole house. The shop + room-unlock modals show gate/reserved copy via `getReserveGateText`/`getReservedArrivalText` (homeWorldData) — both include the player's current level ("Unlocks at level 42. You're at 35.") so progress-to-arrival is always visible; exact strings pinned in `homeWorldData.test.ts`. Reservation rides in `wordshift_home_progress` (cloud-synced; cleared by Reset All's `clearProgress`). Covered by `homeWorldData.test.ts`.
 
 ### Animal Characters (10 total, in unlock order)
 
@@ -391,7 +390,7 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 - **Player choice points** (Phase 3): Each animal offers one binary choice. Both paths converge. Phase 4 delivers a one-time pre-dialogue callback recontextualizing the choice (`getAndMarkPhase4CallbackPage`), and Phase 5 weaves a serene choice callback into each animal's post-revelation cycle (`getPhase5ChoiceCallback`).
 
 ### Home Header
-The HomeScreen header carries the amber count + streak badge (left) and, on the right, the **Daily Challenge card** (📅, gated by `isDailyChallengeUnlocked`), a **quest pill** (🎯 — active quest count + daily-reset hint + a badge when amber is claimable; same gating as the Journal Hub, opens the quest modal directly), the Offering Pit button, the Journal Hub button, the utility menu, and Play.
+Two-row header (redesigned after playtest feedback; overlap-proof down to 320dp — fixed-size items, PLAY is the only flexible one, `minWidth` guards). **Row 1 (status strip)**: amber pill (tap → Store, `numberOfLines={1}` so big balances truncate) + streak badge left; ☰ utility menu far right. **Row 2 (actions, hidden during onboarding)**: Daily Challenge card (📅, gated by `isDailyChallengeUnlocked`) → quest pill (🎯 via `getQuestPillLabel` — shows a count only while quests are in progress, bare icon when everything's claimed; `!` badge keys on claimable amber; opens the quest modal directly) → Offering Pit → Journal Hub → **PLAY** as the wide primary button ending the row.
 
 ### Journal Hub Modal
 📚 icon in header groups Word Ledger, Whisper Gallery, and Weekly Quests. Gated until puzzle 6. Fox introduces with 5-line walkthrough.
@@ -428,7 +427,7 @@ The core system making puzzles feel like rituals:
 - **Resonance glow** (Phase 1+): Dread-tier words show inner glow (gold shimmer → crimson breathing)
 
 ### Home Background Colors
-Phase 0-1: `#6fb7df` (sky_day) → Phase 2: `#514378` (sky_dusk) → Phase 3: `#060612` (sky_storm) → Phase 4: `#1a122a` (sky_shadow)
+Backdrop colors are **sampled from the top pixel row of each sky asset** (seamless "sky extends forever" — re-sample via the scratch `sampleSkyTops` approach if skies regenerate): Phase 0 `#439cf2` (sky_day), 1 `#1583f9` (sky_afternoon), 2 `#684381` (sky_dusk), 3 `#000212` (sky_storm), 4/5 `#050816` (sky_shadow). Kept in sync across THREE places: `PHASE_BG_COLORS` in HouseWorld.tsx, the HomeScreen duplicate map, and `getScreenBackgroundColor('home')` in appStyles.ts.
 
 ### Phase-Aware Text (`phaseNarrative.ts`)
 ALL player-facing text shifts with phase. Key functions:
@@ -436,7 +435,7 @@ ALL player-facing text shifts with phase. Key functions:
 - `getLoadingMessage()`, `getStartMessage()`, `getRulesText()`, `getPhaseChangeNarrative()`
 - `getRitualEchoHeader/Footer()`, `getIncantationName()`, `getWordsOfferedText()`
 - `getAnimalWhisper()`, `getAnimalInterjection()`, `getRitualMicroEvent()`
-- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`, `getNoValidMovesMessage()`, `getStuckPanelTitle()`
+- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`; `getNoValidMovesMessage()`/`getStuckPanelTitle()` exist but are intentionally unused (stuck detection is silent by product decision)
 - `getNotificationPromptText()` — phase-aware copy for the one-time in-app notification pre-permission prompt; `getWinBackMessage(phase, rung)` — lapsed-player win-back ladder copy
 - Pit functions: `getPitScreenTitle/Subtitle()`, `getPitButtonLabel()`, `getPitOfferAllLabel()`, etc.
 - Ward functions: `getPitWardHint()`, `getPitTransitionReadyText/CeremonyText()`, `getWardMarkColors()`
@@ -473,8 +472,8 @@ The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is *
 
 Fox guides new players through real screens:
 1. `home_empty` → `fox_invited`: See empty den, invite Fox, Fox intro (4 lines)
-2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights. The FoxGuide bubble gives a **proactive first-action prompt** on load (`Tap the glowing "X" tile to pick it up.`, `App.tsx` ~L2157) — the player is never left guessing what to do first; it then advances to drop guidance, a between-moves reinforcement beat, and tile/slot glow highlights driven by `tutorialGuidance`
-3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains the pit, then a standing FoxGuide prompt (`pit_offering_prompt`, no continue button until offered) tells the player to **tap each floating word** to offer it — the step only advances once every word is devoured (no auto-offer; a fallback only arms if the step is reached with nothing offerable)
+2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights. The FoxGuide bubble gives a **proactive first-action prompt** on load (`Tap the glowing "X" tile to pick it up.`, `App.tsx` ~L2157) — the player is never left guessing what to do first; it then advances to drop guidance, a between-moves reinforcement beat, and tile/slot glow highlights driven by `tutorialGuidance`. While a move is required, the bubble switches to the small `compact` card and **dodges the active board zone** (`tutorialFoxAnchor` in App.tsx: lower-half target rows flip it to the top of the screen; upper-row moves keep it bottom-anchored above UNDO/HINT) so it never covers the row being played
+3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains the pit, then a standing FoxGuide prompt (`pit_offering_prompt`, no continue button until offered) tells the player to **tap each floating word** to offer it — the step only advances once every word is devoured (no auto-offer; a fallback only arms if the step is reached with nothing offerable). A **stalled-pending safety net** (`PIT_ONBOARDING_STALL_RESCUE_MS` = 30s, reset on every successful devour) auto-offers the remainder and completes the step so a confused player can never soft-lock onboarding
 4. `returning_home` → `unlock_explained` → `complete`: Fox explains the cycle
 
 During onboarding: simplified UI (no difficulty selector, stats, NEW button). Backward compatible with legacy tutorial flag. Persisted via `wordshift_onboarding_step`. **Resume resilience:** transient/puzzle steps (`going_to_puzzle`/`puzzle_tutorial`/`puzzle_complete`/`going_to_pit`/`returning_home`) only exist for a `setTimeout` window and have no owning screen on relaunch; `useOnboardingFlow.normalizeResumeStep` snaps them forward to a stable target on resume, and `App.tsx`'s resume effect routes the puzzle step back to a freshly-initialized guided tutorial board — so a kill mid-onboarding can never strand a new player on a dead home screen. The puzzle-screen FoxGuide also exposes a skip button (`handleSkipOnboarding`).
@@ -521,7 +520,7 @@ Core economy manager. Key functions:
 Two rotating quest tiers (seeded deterministic, local-day bucketing): **5 daily** quests + **5 weekly** quests (`loadWeeklyQuests` returns a `CombinedQuestState`). Types: solve_count, solve_difficulty, earn_stars, daily_complete, no_hints, challenge_mode, earn_amber, visit_animals, streak_days, sacrifice_amber (Phase 4+ only), daily_streak, tend_amber (Phase 5+ only). Rewards: 30-140 amber base, phase-scaled (1.0x → 2.0x). The sink quests (`sacrifice_amber`/`tend_amber`) are strictly **net-negative at every phase** they can appear (reward < required spend even after phase scaling) — pinned by an economy guard test in `weeklyQuests.test.ts`.
 
 ### Whisper Gallery (`whisperGallery.ts`)
-Collectible archive of all whispers, dialogue snippets, and narrative moments. Cap: 500 entries. Phase-aware titles. Entries are labeled with **poetic era names** (`getPhaseEraName`: Bright Days / Curious Thoughts / … / After) — never "Phase N" (narrative rule 7).
+Collectible archive of all whispers, dialogue snippets, and narrative moments. Cap: 500 entries. Phase-aware titles. Entries are labeled with **poetic era names** (`getPhaseEraName` delegates to the canonical `PHASE_DESCRIPTIONS` titles in `types/homeWorld.ts`: Bright Days / Curious Thoughts / Deeper Questions / Growing Shadows / The Horizon / Terrible Peace) — never "Phase N" (narrative rule 7).
 
 ### Sacrifice Mechanic (`sacrifice.ts`)
 Phase 4+: voluntary amber destruction. No gameplay benefit. Phase-aware responses. Milestone messages at 1/5/10/25/50/100.
@@ -588,6 +587,7 @@ mobile/assets/
 - **Narrative consistency**: Any new feature must respect current phase. Cheerful-only-at-Phase-0.
 - **No over-engineering**: Only make directly requested changes. Don't add features, refactoring, or docstrings beyond what's asked.
 - Accessibility: `accessibilityLabel` and `accessibilityRole` on interactive elements; never convey information by color alone (see the ✓/✗ slot-preview prefixes); dark-phase text colors must hold ≥4.5:1 contrast against their backgrounds
+- **No em dashes (—/–) in player-facing text** — dialogue, UI strings, alerts, accessibility labels. Use `...` for dramatic pauses, commas for asides, or split sentences (`noEmDashes.test.ts` guards this at runtime over the real content pools)
 - Store/legal: privacy policy, terms, and data-deletion pages are **live and publicly accessible** via GitHub Pages (served from `docs/`). All three URLs are wired into `src/constants/links.ts` and surfaced in Settings → About (Privacy Policy / Terms of Service / Data Deletion rows); store-listing metadata in `docs/STORE_LISTING.md` points at the same live URLs
 
 ## Testing Patterns
@@ -667,6 +667,7 @@ Engaged players can reach Phase 4 in ~120-150 puzzles instead of 250:
 
 ## Known Constraints
 
+- `app.json` → `android.blockedPermissions` strips `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK` (expo-audio injects them; the game plays foreground SFX only, and shipping the typed FGS permission triggers Play's Android-14 foreground-service declaration for a capability the app doesn't have). Do NOT remove the block unless background audio actually ships
 - Standard/reverse/double_shift at ALL difficulties from pre-generated banks (lazy-loaded); speed generates on-device
 - On-device timeout: 2.5s standard, 25s reverse, 5s double-shift. Wrapper: 4s/30s
 - Fallback pool: 15 pre-validated puzzles across 3 tiers

@@ -79,7 +79,7 @@ interface AdPacingState {
 
 class NoOpAdProvider implements AdProvider {
   async initialize(): Promise<void> {
-    console.log('[Ads] NoOp provider — no ad SDK configured');
+    console.log('[Ads] NoOp provider - no ad SDK configured');
   }
   async loadRewarded(): Promise<void> {}
   async showRewarded(): Promise<RewardedResult> {
