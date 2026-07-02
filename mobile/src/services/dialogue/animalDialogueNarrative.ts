@@ -24,7 +24,7 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
     ],
     1: [
       { text: "Archimedes found something in one of his oldest books. He won't show me yet. Says I'm not ready for it.", mentions: 'owl' },
-      { text: "Panko said something strange yesterday — about recipes having a purpose beyond nourishment. I can't stop thinking about it.", mentions: 'pangolin' },
+      { text: "Panko said something strange yesterday... about recipes having a purpose beyond nourishment. I can't stop thinking about it.", mentions: 'pangolin' },
       { text: "Fennick heard something in the walls last night. I told him it was the fire settling. I'm not sure it was.", mentions: 'fennec_fox' },
     ],
     2: [
@@ -87,7 +87,7 @@ export const CROSS_ANIMAL_REFERENCES: Record<AnimalType, Record<number, CrossAni
       { text: "Archimedes found a recipe in one of his ancient texts. I followed it exactly. The result wasn't food. I don't know what it was.", mentions: 'owl' },
     ],
     3: [
-      { text: "The recipe Archimedes found in that old book — we make it every night now. The kitchen smells different. Sacred, almost.", mentions: 'owl' },
+      { text: "The recipe Archimedes found in that old book... we make it every night now. The kitchen smells different. Sacred, almost.", mentions: 'owl' },
       { text: "Ember tends the fire while I cook in silence. We don't speak anymore. We don't need to. The work speaks for us.", mentions: 'fox' },
       { text: "Fennick says he can smell my cooking from every room in the house. All at once. That should not be possible.", mentions: 'fennec_fox' },
     ],
@@ -407,7 +407,7 @@ export const COORDINATED_EVENTS: CoordinatedEvent[] = [
       fennec_fox: "I am the Sentinel. I heard it first, long before the others. I have been listening since the very beginning.",
       sloth: "I... am... the... Anchor... Holding... everything... perfectly... in... place... Until... it... arrives...",
       wombat: "I am the Foundation. I built what lies beneath this house with my own two paws. You built what lies above.",
-      rabbit: "I am the Witness. I was meant to watch and remember and be terrified — and to stay anyway. Despite everything.",
+      rabbit: "I am the Witness. I was meant to watch and remember and be terrified... and to stay anyway. Despite everything.",
       red_panda: "I am the Guide. When the pattern completes itself, I will lead us through. That is my purpose. My only purpose.",
     },
   },

@@ -199,21 +199,61 @@ cloud([[14, 23, 9, 6], [28, 18, 12, 9], [44, 22, 11, 7], [55, 25, 6, 4]], 'cloud
 }
 
 // === foundation (132x14 grid, x6 = 792x84) ===================================
+// Warm mortared stonework in the roof's visual language: same 1px outline
+// weight, top-left key light (lit tops/left, shaded bottoms/right), clean
+// banded courses. Palette pulls from the room interiors' fireplace masonry and
+// the timber walls so the house base reads as part of the same build. Corner
+// quoins + full-height side outlines make the house column's edges read as
+// deliberate walls instead of raw sprite edges.
 {
   const g = G(132, 14);
-  const M = '#5B5474', A = '#8D86A8', B = '#9C95B5', HI = '#B5AECB', LO = '#736C8E';
-  box(g, 0, 0, g.w - 1, g.h - 1, M);
-  // two staggered courses of chunky stones
-  for (let row = 0; row < 2; row++) {
-    const y0 = 1 + row * 7, y1 = y0 + 5;
-    for (let x = (row % 2) * 9; x < g.w; x += 18) {
-      const x1 = Math.min(x + 16, g.w - 1);
-      box(g, x, y0, x1, y1, row % 2 ? A : B);
-      box(g, x, y0, x1, y0, HI);
-      box(g, x, y1, x1, y1, LO);
-      put(g, x, y0, HI);
+  const EDGE = '#3B2A22';                        // outer outline (roof-fascia weight)
+  const MORTAR = '#4E3A2E';                      // warm mortar shadow
+  const SILL = '#7A4E36', SILL_HI = '#9A6B4A';   // timber sill where the walls land
+  const A = '#9A8672', B = '#8A7562';            // stone faces (warm taupe)
+  const HI = '#BCA98F', LO = '#6B5847';          // sun side / shade side
+  const QUOIN = '#AB9781', QUOIN_HI = '#CDBBA0'; // protruding corner stones
+  const PLINTH = '#5F4A38', PLINTH_D = '#52402F';// footing band
+
+  box(g, 0, 0, g.w - 1, g.h - 1, MORTAR);
+  // timber sill: the wall→stone junction reads as a deliberate trim line
+  box(g, 0, 0, g.w - 1, 0, SILL_HI);
+  box(g, 0, 1, g.w - 1, 1, SILL);
+  // two staggered courses of varied-width beveled stones
+  const courses = [{ y0: 2, y1: 6, off: 0 }, { y0: 8, y1: 11, off: -8 }];
+  courses.forEach(({ y0, y1, off }, row) => {
+    let x0 = off, i = row;
+    while (x0 < g.w) {
+      const x1 = Math.min(x0 + 13 + ((rng() * 6) | 0), g.w - 1);
+      const xs = Math.max(x0, 0);
+      box(g, xs, y0, x1, y1, i++ % 2 ? A : B);
+      box(g, xs, y0, x1, y0, HI);                     // lit top
+      box(g, xs, y1, x1, y1, LO);                     // shaded base
+      if (x0 >= 0) box(g, x0, y0 + 1, x0, y1 - 1, HI); // lit left face
+      box(g, x1, y0 + 1, x1, y1, LO);                 // shaded right face
+      if (rng() < 0.5 && x1 - xs > 5)                 // weathering pock
+        put(g, xs + 2 + ((rng() * (x1 - xs - 4)) | 0), y0 + 2 + ((rng() * (y1 - y0 - 2)) | 0), LO);
+      x0 = x1 + 2;
     }
+  });
+  // corner quoins: alternating widths per course, anchoring both edges
+  for (const side of [0, 1]) {
+    courses.forEach(({ y0, y1 }, row) => {
+      const wq = row ? 6 : 8;
+      const qx0 = side ? g.w - 2 - wq : 1, qx1 = qx0 + wq;
+      box(g, qx0, y0, qx1, y1, QUOIN);
+      box(g, qx0, y0, qx1, y0, QUOIN_HI);
+      box(g, qx0, y1, qx1, y1, LO);
+      box(g, side ? qx1 : qx0, y0 + 1, side ? qx1 : qx0, y1, side ? LO : QUOIN_HI);
+    });
   }
+  // footing band + ground-contact shadow
+  box(g, 0, 12, g.w - 1, 12, PLINTH);
+  for (let x = 2; x < g.w - 2; x += 3 + ((rng() * 4) | 0)) put(g, x, 12, PLINTH_D);
+  box(g, 0, 13, g.w - 1, 13, EDGE);
+  // full-height side outlines continue the wall border down through the base
+  box(g, 0, 0, 0, g.h - 1, EDGE);
+  box(g, g.w - 1, 0, g.w - 1, g.h - 1, EDGE);
   save(g, 6, 'foundation.png');
 }
 
@@ -223,11 +263,14 @@ cloud([[14, 23, 9, 6], [28, 18, 12, 9], [44, 22, 11, 7], [55, 25, 6, 4]], 'cloud
 {
   const g = G(96, 72);
   const HOLE = '#120A24', DEEP = '#1E1240', GLOW1 = '#3FD9C0', GLOW2 = '#2BA897', RIM1 = '#8D86A8', RIM2 = '#736C8E', RIM3 = '#B5AECB', GRASS = '#6FBE63';
+  const PATH = '#9A8672', PATH_HI = '#BCA98F', PATH_LO = '#6B5847'; // foundation stone palette
   const oy = 12; // everything below shifts down to make room for the path
-  // stone path from the house down to the pit mouth
+  // warm stone path from the house down to the pit mouth — same masonry as the
+  // foundation it tucks under (the pit's own rim stays cold, otherworldly stone)
   for (const [px, py, w] of [[44, 0, 8], [42, 4, 9], [45, 8, 8], [43, 12, 9], [44, 16, 8]]) {
-    box(g, px, py, px + w, py + 2, RIM1);
-    box(g, px, py, px + w, py, RIM3);
+    box(g, px, py, px + w, py + 2, PATH);
+    box(g, px, py, px + w, py, PATH_HI);
+    box(g, px, py + 2, px + w, py + 2, PATH_LO);
   }
   // mound shadow
   disc(g, 48, 40 + oy, 38, 14, '#3E7E42');

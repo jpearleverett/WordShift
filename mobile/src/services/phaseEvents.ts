@@ -108,7 +108,7 @@ const PHASE_EVENTS: Record<number, PhaseTransitionEvent> = {
         effectIntensity: 0.4,
       },
       {
-        text: 'Your friends speak softly now —\nof stillness, of endings, of things that pass.',
+        text: 'Your friends speak softly now...\nof stillness, of endings, of things that pass.',
         delay: 6400,
         duration: 3500,
         effect: 'fade',

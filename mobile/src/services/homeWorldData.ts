@@ -937,6 +937,32 @@ export async function claimReservedUnlockIfReady(): Promise<Unlockable | null> {
 }
 
 /**
+ * Reserve-ahead copy: the "reserved, awaiting its gate" line. Includes the
+ * player's current level so the wait has a visible distance-to-go
+ * ("arrives at level 42 (you're at 35)"), instead of naming a target with no
+ * sense of how far off it is.
+ */
+export function getReservedArrivalText(
+  minPuzzles: number | undefined,
+  puzzlesSolved: number,
+): string {
+  if (minPuzzles === undefined) return '✓ Reserved';
+  return `✓ Reserved. Arrives at level ${minPuzzles} (you're at ${puzzlesSolved})`;
+}
+
+/**
+ * Reserve-ahead copy: the "gated, offer to reserve" lead-in. Callers append
+ * their own reserve pitch after it ("…— you're at 35. Reserve it now and …").
+ */
+export function getReserveGateText(
+  minPuzzles: number | undefined,
+  puzzlesSolved: number,
+): string {
+  if (minPuzzles === undefined) return `Unlocks later. You're at level ${puzzlesSolved}`;
+  return `Unlocks at level ${minPuzzles}. You're at ${puzzlesSolved}`;
+}
+
+/**
  * Get rooms with unlock status
  */
 export async function getRoomsWithStatus(): Promise<Room[]> {

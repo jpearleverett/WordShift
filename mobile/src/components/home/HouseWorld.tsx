@@ -401,14 +401,20 @@ const ShootingStar: React.FC = () => {
   );
 };
 
-// Phase-aware background colors (blends with each sky image's edges)
+// Phase-aware backdrop colors behind the sky image. Each value is the average
+// of the TOP row of pixels of that phase's sky asset, so when the scene is
+// panned up the sky appears to extend upward seamlessly (no color step).
+// Sampled from assets/environment/sky_*.png via a scratch pngjs script —
+// re-sample these if the sky assets are ever regenerated.
+// Phase→sky mapping mirrors the <Image source> below: 0=day, 1=afternoon,
+// 2=dusk, 3=storm, 4+=shadow (Phase 5 reuses sky_shadow).
 const PHASE_BG_COLORS: Record<number, string> = {
-  0: '#6fb7df',
-  1: '#104c83',
-  2: '#514378',
-  3: '#060612',
-  4: '#1a122a',
-  5: '#1E1830',
+  0: '#439cf2', // sky_day.png top row
+  1: '#1583f9', // sky_afternoon.png top row
+  2: '#684381', // sky_dusk.png top row
+  3: '#000212', // sky_storm.png top row
+  4: '#050816', // sky_shadow.png top row
+  5: '#050816', // Phase 5 renders sky_shadow too — same top row
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -657,6 +663,14 @@ const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (312 / 792)); // roof.png asp
 const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (84 / 792)); // foundation.png aspect
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
+// Player-visible ground fix: the house + pit group sat a touch too high on the
+// sky artwork (foundation read as standing in the river). Lower the whole
+// group by this many px — applied as reduced bottom margin on houseContainer,
+// so it moves in layout flow while the absolutely-positioned sky image stays
+// exactly where it was. Also subtracted from the pan-bounds content height.
+const HOUSE_GROUND_NUDGE = 16; // ~13% of ROOM_HEIGHT (123px)
+const HOUSE_BOTTOM_MARGIN = 30 - HOUSE_GROUND_NUDGE;
+
 
 interface HouseWorldProps {
   rooms: Room[];
@@ -787,7 +801,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + (ROOF_RENDER_HEIGHT - 6) + houseHeight + FOUNDATION_RENDER_HEIGHT + (onPitPress ? 95 : 0) + 40 + connectorHeight; // marginTop + roof + body + foundation + pit + marginBottom + connectors
+    const totalContentHeight = 50 + (ROOF_RENDER_HEIGHT - 6) + houseHeight + FOUNDATION_RENDER_HEIGHT + (onPitPress ? 95 : 0) + (HOUSE_BOTTOM_MARGIN + 10) + connectorHeight; // marginTop + roof + body + foundation + pit + marginBottom(+slack) + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
@@ -837,7 +851,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   }, [containerHeight, panBounds.max, savedPanY, syncPanPosition]);
 
   return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || '#6fb7df' }]}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: PHASE_BG_COLORS[currentPhase] || PHASE_BG_COLORS[0] }]}>
       {/* Floating particles */}
       {particles.map(particle => (
         <FloatingParticle key={particle.id} particle={particle} />
@@ -1030,7 +1044,8 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     zIndex: 1, // Keep below header (zIndex: 100)
-    backgroundColor: '#6fb7df', // Matches sky_day bottom edge so no gaps when zoomed out
+    // Fallback only — overridden inline with PHASE_BG_COLORS (sky top-row samples)
+    backgroundColor: '#439cf2',
   },
 
   // Sky background - moves with scene, oversized to prevent gaps during pan.
@@ -1087,11 +1102,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
 
-  // House container
+  // House container — bottom margin reduced by HOUSE_GROUND_NUDGE so the
+  // house + pit sit lower on the sky art (see constant above).
   houseContainer: {
     alignItems: 'center',
     marginTop: 50,
-    marginBottom: 30,
+    marginBottom: HOUSE_BOTTOM_MARGIN,
   },
 
   // Roof

@@ -330,7 +330,9 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         modalOverlayColor: 'rgba(76, 29, 149, 0.7)',
         modalBgColor: CandyColors.white,
         modalTextColor: CandyColors.purple.main,
-        modalSecondaryTextColor: CandyColors.gray[400],
+        // WCAG AA-checked: 4.8:1 on modalBg #FFFFFF, 4.6:1 on statBg #F8FAFC
+        // (gray[400] measured only 2.6:1 — unreadable secondary text)
+        modalSecondaryTextColor: CandyColors.gray[500],
         modalStatBgColor: CandyColors.gray[50],
         modalDividerColor: CandyColors.gray[200],
         vignetteColor: '#4C1D95',
@@ -360,7 +362,9 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         modalOverlayColor: 'rgba(60, 25, 120, 0.7)',
         modalBgColor: '#FAF8FF',
         modalTextColor: '#7050A0',
-        modalSecondaryTextColor: CandyColors.gray[400],
+        // WCAG AA-checked: 5.8:1 on modalBg #FAF8FF, 5.2:1 on statBg #F0ECF5
+        // (violet-gray keeps the Phase 1 lavender character; gray[400] was 2.5:1)
+        modalSecondaryTextColor: '#665E7A',
         modalStatBgColor: '#F0ECF5',
         modalDividerColor: CandyColors.gray[200],
         vignetteColor: '#3D1870',
@@ -390,7 +394,9 @@ export function getPhaseTheme(phase: number): PhaseTheme {
         modalOverlayColor: 'rgba(40, 20, 80, 0.75)',
         modalBgColor: '#E8E0F0',
         modalTextColor: '#5A4080',
-        modalSecondaryTextColor: '#8878A0',
+        // WCAG AA-checked: 5.2:1 on modalBg #E8E0F0, 4.7:1 on statBg #DDD5E8
+        // (same cool violet family, one step deeper; #8878A0 was 3.1:1 / 2.8:1)
+        modalSecondaryTextColor: '#655483',
         modalStatBgColor: '#DDD5E8',
         modalDividerColor: '#C8C0D8',
         vignetteColor: '#2A1050',

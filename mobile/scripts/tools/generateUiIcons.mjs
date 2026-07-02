@@ -1,6 +1,9 @@
 // Candy-style UI icon sprites: flame (streak), journal book, pit mouth,
-// plus the puzzle action-button set (hint bulb, undo arrow, restart arrows).
-// Matches the star/amber set in assets/ui (smooth, supersampled 2x).
+// the puzzle action-button set (hint bulb, undo arrow, restart arrows),
+// plus the victory stars (star_filled/star_empty) and the amber gem.
+// All smooth, supersampled 2x, 256x256. This script runs LAST in
+// `npm run generate:assets`, so its star/amber versions intentionally
+// override the older ones drawn by generateWorldArt.mjs.
 // Run: node scripts/tools/generateUiIcons.mjs
 import zlib from 'zlib';
 import fs from 'fs';
@@ -139,6 +142,44 @@ function arrowHead(cv, cx, cy, radius, ang, dir, size, color, alpha = 1) {
     [px - tx * size * 0.3 - nx * size * 0.9, py - ty * size * 0.3 - ny * size * 0.9],
     color, alpha);
 }
+// filled anti-aliased polygon (even-odd rule), optional vertical gradient
+function poly(cv, pts, color, alpha = 1, gradTo = null) {
+  const [r, g, b] = hex(color); const grad = gradTo ? hex(gradTo) : null;
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const segD = (px, py, ax, ay, bx, by) => {
+    const vx = bx - ax, vy = by - ay, wx = px - ax, wy = py - ay;
+    const t = Math.max(0, Math.min(1, (wx * vx + wy * vy) / (vx * vx + vy * vy || 1)));
+    return Math.hypot(wx - vx * t, wy - vy * t);
+  };
+  for (let y = Math.max(0, ~~(minY - 2)); y <= Math.min(cv.h - 1, ~~(maxY + 2)); y++) {
+    const t = (y - minY) / (maxY - minY || 1);
+    const rr = grad ? r + (grad[0] - r) * t : r, gg = grad ? g + (grad[1] - g) * t : g, bb = grad ? b + (grad[2] - b) * t : b;
+    for (let x = Math.max(0, ~~(minX - 2)); x <= Math.min(cv.w - 1, ~~(maxX + 2)); x++) {
+      const px = x + 0.5, py = y + 0.5;
+      let inside = false;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const [xi, yi] = pts[i], [xj, yj] = pts[j];
+        if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      let d = Infinity;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        d = Math.min(d, segD(px, py, pts[j][0], pts[j][1], pts[i][0], pts[i][1]));
+      }
+      const a = Math.max(0, Math.min(1, 0.5 - (inside ? -d : d)));
+      if (a > 0) blend(cv, x, y, rr, gg, bb, a * alpha);
+    }
+  }
+}
+// 5-point star / regular hexagon vertex generators
+const starPts = (cx, cy, rOut, rIn, rot = -Math.PI / 2) => Array.from({ length: 10 }, (_, i) => {
+  const r = i % 2 ? rIn : rOut, a = rot + (i * Math.PI) / 5;
+  return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+});
+const hexPts = (cx, cy, R, rot = -Math.PI / 2) => Array.from({ length: 6 }, (_, i) => {
+  const a = rot + (i * Math.PI) / 3;
+  return [cx + Math.cos(a) * R, cy + Math.sin(a) * R];
+});
 function down2(cv, ow, oh) {
   const out = Buffer.alloc(ow * oh * 4);
   for (let y = 0; y < oh; y++) for (let x = 0; x < ow; x++) {
@@ -250,4 +291,62 @@ fs.mkdirSync(UI, { recursive: true });
     arrowHead(cv, c, c, R, a1, 1, HEAD, '#FFFFFF');
   }
   savePNG(path.join(UI, 'restart.png'), W, W, down2(cv, W, W));
+}
+
+// === star_filled.png (256) — plump victory star, golden gradient + rim light =
+// Fills ~80% of the canvas (the old star used ~45%) so it stays crisp at the
+// larger render sizes in the victory modal.
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const IN = 0.52;                                                          // fat arms
+  poly(cv, starPts(c + 5, c + 18, 196, 196 * IN), '#8A5800', 0.35);         // drop shadow
+  poly(cv, starPts(c, c, 208, 208 * IN), '#9C5E06');                        // warm dark outline
+  poly(cv, starPts(c - 3, c - 5, 190, 190 * IN), '#FFF3BE');                // rim light (peeks top-left)
+  poly(cv, starPts(c + 2, c + 3, 184, 184 * IN), '#FFD84E', 1, '#F0990C');  // golden gradient body
+  poly(cv, starPts(c, c - 8, 134, 134 * IN), '#FFE68C', 0.55);              // inner bloom
+  poly(cv, starPts(c, c - 12, 82, 82 * 0.5), '#FFF3B8', 0.5);               // hot center
+  ellipse(cv, c - 60, c - 56, 19, 19, '#FFFFFF', 0.9, 8);                   // sparkle
+  ellipse(cv, c - 32, c - 90, 9, 9, '#FFFFFF', 0.75, 4);
+  savePNG(path.join(UI, 'star_filled.png'), W, W, down2(cv, W, W));
+}
+
+// === star_empty.png (256) — clean dark-outlined hollow socket ================
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const IN = 0.52;
+  poly(cv, starPts(c + 4, c + 16, 194, 194 * IN), '#2A2040', 0.22);         // soft shadow
+  poly(cv, starPts(c, c, 208, 208 * IN), '#544C6C');                        // dark outline
+  poly(cv, starPts(c, c + 5, 178, 178 * IN), '#F0EDF7');                    // lit bottom inner edge
+  poly(cv, starPts(c, c - 2, 172, 172 * IN), '#DAD5E7', 1, '#C2BBD6');      // socket fill
+  poly(cv, starPts(c, c - 10, 128, 128 * IN), '#ACA4C2', 0.45);             // sunken top shade
+  poly(cv, starPts(c, c - 12, 78, 78 * 0.5), '#B9B2CC', 0.4);               // deep center
+  savePNG(path.join(UI, 'star_empty.png'), W, W, down2(cv, W, W));
+}
+
+// === amber.png (256) — faceted amber gem with warm internal glow =============
+// Hexagonal cut, dark warm outline for contrast on light AND dark pills,
+// facet fan from an upper-left key light, trapped fleck, crisp specular.
+{
+  const W = 256, cv = C(W * 2, W * 2), c = W;
+  const R = 172;
+  const [V0, V1, V2, V3, V4, V5] = hexPts(c, c, R);
+  poly(cv, hexPts(c + 5, c + 18, 196), '#5A3600', 0.32);                    // drop shadow
+  poly(cv, hexPts(c, c, 206), '#6B3D05');                                   // dark warm outline
+  poly(cv, hexPts(c, c, 190), '#F5940E', 1, '#D9770A');                     // rim bevel
+  poly(cv, hexPts(c, c, R), '#FFC845', 1, '#F5A315');                       // body
+  const F = [c - 16, c - 14];                                               // facet focus (key light)
+  tri(cv, V5, V0, F, '#FFEDA6', 0.7);                                       // crown left — brightest
+  tri(cv, V0, V1, F, '#FFDC70', 0.5);                                       // crown right
+  tri(cv, V1, V2, F, '#F5A928', 0.4);                                       // right side
+  tri(cv, V2, V3, F, '#E1830A', 0.5);                                       // pavilion right — deepest
+  tri(cv, V3, V4, F, '#EE9612', 0.45);                                      // pavilion left
+  tri(cv, V4, V5, F, '#FFC554', 0.35);                                      // left side
+  poly(cv, hexPts(c - 12, c - 10, 58), '#FFE596', 0.55);                    // polished table
+  ellipse(cv, c, c + 12, 118, 128, '#FFDF80', 0.5, 60);                     // warm internal glow
+  ellipse(cv, c - 10, c - 2, 64, 74, '#FFF0AE', 0.5, 40);                   // glow core
+  ellipse(cv, c + 36, c + 46, 13, 19, '#7A4A0E', 0.45, 8);                  // the trapped fleck
+  capsule(cv, c + 20, c + 148, c + 124, c + 78, 8, '#FFDF8E', 0.55);        // bottom rim light
+  ellipse(cv, c - 62, c - 86, 20, 32, '#FFFFFF', 0.92, 9);                  // crisp specular
+  ellipse(cv, c - 26, c - 116, 9, 9, '#FFFFFF', 0.8, 4);                    // micro sparkle
+  savePNG(path.join(UI, 'amber.png'), W, W, down2(cv, W, W));
 }

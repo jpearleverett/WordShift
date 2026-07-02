@@ -317,7 +317,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={styles.patronBannerTitle}>{'✦'} Become a Patron</Text>
-                <Text style={styles.patronBannerSub}>Support WordShift — a small amber bonus + an exclusive gold tile set</Text>
+                <Text style={styles.patronBannerSub}>Support WordShift. A small amber bonus + an exclusive gold tile set</Text>
               </TouchableOpacity>
             )}
             {renderSection(
@@ -352,7 +352,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             )}
 
             <Text style={[styles.footnote, { color: textColor }]}>
-              Cosmetics are for expression only — they never change the puzzle, the
+              Cosmetics are for expression only. They never change the puzzle, the
               story, or your progress.
             </Text>
           </>

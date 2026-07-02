@@ -115,7 +115,7 @@ mobile/
 │   │   ├── PhaseTransitionOverlay.tsx # Cinematic multi-scene interstitial
 │   │   ├── Confetti.tsx         # Phase-aware confetti + StarBurst
 │   │   ├── FoxGuide.tsx         # Floating Fox speech bubble (onboarding)
-│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, Restore Purchases (PURCHASES section), Privacy Options row (ABOUT — visible only when UMP consent requires it), legal links (Privacy Policy / Terms of Service / Data Deletion — all live), support contact, Reset All
+│   │   ├── SettingsScreen.tsx   # Sound/Haptics/Reduced Motion/Daily Reminders toggles, Restore Purchases (PURCHASES section), Privacy Options row (ABOUT — visible only when UMP consent requires it), legal links (Privacy Policy / Terms of Service / Data Deletion — all live), support contact, Reset All (`performFullReset` — Promise.allSettled over every service clear, then **overwrites the cloud row with the cleared state** so the bootstrap's fresh-install auto-restore can't resurrect the old save; App's `onReset` rebuilds all in-memory state when in-place reload is unavailable)
 │   │   ├── StatsScreen.tsx      # Stats overview + achievements
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
 │   │   ├── DailyChallengeCard.tsx # Compact daily challenge button (header)
@@ -139,7 +139,6 @@ mobile/
 │   │       ├── RoomView.tsx     # Individual room rendering
 │   │       ├── AnimalSprite.tsx # Animated animal characters
 │   │       ├── JuicyButton.tsx, AmberSparkle.tsx, CelebrationConfetti.tsx
-│   │       └── FeatureTooltip.tsx # Post-onboarding floating tooltip
 │   ├── theme/colors.ts          # CandyColors palette, tile colors, PhaseTheme system
 │   ├── styles/appStyles.ts      # App.tsx StyleSheet, getScreenBackgroundColor()
 │   └── services/
@@ -255,7 +254,7 @@ Deterministic seeded generation. Always HARD: 6-letter words, 5 rows. Streak tra
 
 ### Custom Hooks
 
-**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()` (guarded by a monotonic `generationIdRef` — every `initGame` commit aborts if a newer call superseded it, so rapid Play/Next-Level taps or a mid-generation variant switch can't clobber a started board), `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `startSharedChallengeGame(words)` (friend-challenge link path, validated), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. `handleHint()` also raises `hintHighlight` — the hinted tile + target slot glow on the board, reusing the tutorial-glow rendering (cleared on move/undo/new board; never restored from autosave). Tracks per-move `moveOutcomes` for the honest share grid, and raises `speedRescueSignal` from `resumeSpeedAfterRescue`. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection: it sets `isStuck` (exposed on state) and surfaces `getNoValidMovesMessage()` when no legal move remains. App.tsx renders a non-transient **stuck-recovery panel** (Undo / Restart, phase-aware headline via `getStuckPanelTitle()`) while `isStuck` — not just the toast. `isStuck` resets on undo/restart/new board.
+**`usePuzzleGame()`** — All puzzle state: rows, selected letter, game state, hints, validation, variant handling. Key methods: `initGame()`, `startNewGame()` (guarded by a monotonic `generationIdRef` — every `initGame` commit aborts if a newer call superseded it, so rapid Play/Next-Level taps or a mid-generation variant switch can't clobber a started board), `startDailyGame()` (Daily Challenge bypass path — standard board from seeded words, leaves difficulty pref intact), `startSharedChallengeGame(words)` (friend-challenge link path, validated), `handleLetterPress()`, `handleSlotPress()`, `handleHint()`, `handleUndo()`, `clearBoard()`. Returns `slotPreviews` for word preview mechanic. `handleHint()` also raises `hintHighlight` — the hinted tile + target slot glow on the board, reusing the tutorial-glow rendering (cleared on move/undo/new board; never restored from autosave). Tracks per-move `moveOutcomes` for the honest share grid, and raises `speedRescueSignal` from `resumeSpeedAfterRescue`. After each committed move (non-double-shift), `hasAnyValidMove()` runs stuck detection and sets `isStuck` — a **silent internal signal by product decision**: nothing player-visible renders from it (no panel, no toast — discovering a dead-end and choosing Undo/Restart is part of the challenge; `appIntegration.test.ts` pins the absence). `getStuckPanelTitle()`/`getNoValidMovesMessage()` remain in phaseNarrative but are intentionally unused. `isStuck` resets on undo/restart/new board.
 
 **`useGamePersistence()`** — Persistence: amber, stats, phases, streak. Key: `recordVictory()` returns VictoryData (includes `phaseTransitionPending`, `harvestedWords`, `pendingHarvest`, `firstCompletionBonus`). `refreshStats()` reloads from storage. Reports phase 5 when post-revelation.
 
@@ -348,7 +347,7 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 | Garden (Thyme the Rabbit) | 105 |
 | Bamboo Attic (Bamboo the Red Panda) | 130 |
 
-**Reserve-ahead (pay now, build at the gate):** the gates are tuned for a baseline earner, so a fast/skilled player (HARD + achievements + quests) reaches a gated room's amber cost well before its level gate and would otherwise sit on idle amber behind a wall. When the next unlock is blocked *only* by its puzzle gate and the player can afford it, they can **Reserve** it — `reserveNextUnlock` spends the amber up front and stores `reservedUnlockId` (on home progress); `claimReservedUnlockIfReady` (called from `HomeScreen.loadAllData`) commits the room for free the moment `puzzlesSolved` crosses `minPuzzles`, firing a celebration. Only the **immediate next** unlock can be reserved (one at a time, `canReserveUnlock`), so a rich player can stay one step ahead but can't pre-buy the whole house. The shop + room-unlock modals show "Unlocks at level N — reserve it now" / "✓ Reserved — arrives at level N". Reservation rides in `wordshift_home_progress` (cloud-synced; cleared by Reset All's `clearProgress`). Covered by `homeWorldData.test.ts`.
+**Reserve-ahead (pay now, build at the gate):** the gates are tuned for a baseline earner, so a fast/skilled player (HARD + achievements + quests) reaches a gated room's amber cost well before its level gate and would otherwise sit on idle amber behind a wall. When the next unlock is blocked *only* by its puzzle gate and the player can afford it, they can **Reserve** it — `reserveNextUnlock` spends the amber up front and stores `reservedUnlockId` (on home progress); `claimReservedUnlockIfReady` (called from `HomeScreen.loadAllData`) commits the room for free the moment `puzzlesSolved` crosses `minPuzzles`, firing a celebration. Only the **immediate next** unlock can be reserved (one at a time, `canReserveUnlock`), so a rich player can stay one step ahead but can't pre-buy the whole house. The shop + room-unlock modals show gate/reserved copy via `getReserveGateText`/`getReservedArrivalText` (homeWorldData) — both include the player's current level ("Unlocks at level 42. You're at 35.") so progress-to-arrival is always visible; exact strings pinned in `homeWorldData.test.ts`. Reservation rides in `wordshift_home_progress` (cloud-synced; cleared by Reset All's `clearProgress`). Covered by `homeWorldData.test.ts`.
 
 ### Animal Characters (10 total, in unlock order)
 
@@ -391,7 +390,7 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 - **Player choice points** (Phase 3): Each animal offers one binary choice. Both paths converge. Phase 4 delivers a one-time pre-dialogue callback recontextualizing the choice (`getAndMarkPhase4CallbackPage`), and Phase 5 weaves a serene choice callback into each animal's post-revelation cycle (`getPhase5ChoiceCallback`).
 
 ### Home Header
-The HomeScreen header carries the amber count + streak badge (left) and, on the right, the **Daily Challenge card** (📅, gated by `isDailyChallengeUnlocked`), a **quest pill** (🎯 — active quest count + daily-reset hint + a badge when amber is claimable; same gating as the Journal Hub, opens the quest modal directly), the Offering Pit button, the Journal Hub button, the utility menu, and Play.
+Two-row header (redesigned after playtest feedback; overlap-proof down to 320dp — fixed-size items, PLAY is the only flexible one, `minWidth` guards). **Row 1 (status strip)**: amber pill (tap → Store, `numberOfLines={1}` so big balances truncate) + streak badge left; ☰ utility menu far right. **Row 2 (actions, hidden during onboarding)**: Daily Challenge card (📅, gated by `isDailyChallengeUnlocked`) → quest pill (🎯 via `getQuestPillLabel` — shows a count only while quests are in progress, bare icon when everything's claimed; `!` badge keys on claimable amber; opens the quest modal directly) → Offering Pit → Journal Hub → **PLAY** as the wide primary button ending the row.
 
 ### Journal Hub Modal
 📚 icon in header groups Word Ledger, Whisper Gallery, and Weekly Quests. Gated until puzzle 6. Fox introduces with 5-line walkthrough.
@@ -428,7 +427,7 @@ The core system making puzzles feel like rituals:
 - **Resonance glow** (Phase 1+): Dread-tier words show inner glow (gold shimmer → crimson breathing)
 
 ### Home Background Colors
-Phase 0-1: `#6fb7df` (sky_day) → Phase 2: `#514378` (sky_dusk) → Phase 3: `#060612` (sky_storm) → Phase 4: `#1a122a` (sky_shadow)
+Backdrop colors are **sampled from the top pixel row of each sky asset** (seamless "sky extends forever" — re-sample via the scratch `sampleSkyTops` approach if skies regenerate): Phase 0 `#439cf2` (sky_day), 1 `#1583f9` (sky_afternoon), 2 `#684381` (sky_dusk), 3 `#000212` (sky_storm), 4/5 `#050816` (sky_shadow). Kept in sync across THREE places: `PHASE_BG_COLORS` in HouseWorld.tsx, the HomeScreen duplicate map, and `getScreenBackgroundColor('home')` in appStyles.ts.
 
 ### Phase-Aware Text (`phaseNarrative.ts`)
 ALL player-facing text shifts with phase. Key functions:
@@ -436,7 +435,7 @@ ALL player-facing text shifts with phase. Key functions:
 - `getLoadingMessage()`, `getStartMessage()`, `getRulesText()`, `getPhaseChangeNarrative()`
 - `getRitualEchoHeader/Footer()`, `getIncantationName()`, `getWordsOfferedText()`
 - `getAnimalWhisper()`, `getAnimalInterjection()`, `getRitualMicroEvent()`
-- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`, `getNoValidMovesMessage()`, `getStuckPanelTitle()`
+- `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`; `getNoValidMovesMessage()`/`getStuckPanelTitle()` exist but are intentionally unused (stuck detection is silent by product decision)
 - `getNotificationPromptText()` — phase-aware copy for the one-time in-app notification pre-permission prompt; `getWinBackMessage(phase, rung)` — lapsed-player win-back ladder copy
 - Pit functions: `getPitScreenTitle/Subtitle()`, `getPitButtonLabel()`, `getPitOfferAllLabel()`, etc.
 - Ward functions: `getPitWardHint()`, `getPitTransitionReadyText/CeremonyText()`, `getWardMarkColors()`
@@ -473,7 +472,7 @@ The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is *
 
 Fox guides new players through real screens:
 1. `home_empty` → `fox_invited`: See empty den, invite Fox, Fox intro (4 lines)
-2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights. The FoxGuide bubble gives a **proactive first-action prompt** on load (`Tap the glowing "X" tile to pick it up.`, `App.tsx` ~L2157) — the player is never left guessing what to do first; it then advances to drop guidance, a between-moves reinforcement beat, and tile/slot glow highlights driven by `tutorialGuidance`
+2. `going_to_puzzle` → `puzzle_tutorial` → `puzzle_complete`: Real EASY puzzle with guided highlights. The FoxGuide bubble gives a **proactive first-action prompt** on load (`Tap the glowing "X" tile to pick it up.`, `App.tsx` ~L2157) — the player is never left guessing what to do first; it then advances to drop guidance, a between-moves reinforcement beat, and tile/slot glow highlights driven by `tutorialGuidance`. While a move is required, the bubble switches to the small `compact` card and **dodges the active board zone** (`tutorialFoxAnchor` in App.tsx: lower-half target rows flip it to the top of the screen; upper-row moves keep it bottom-anchored above UNDO/HINT) so it never covers the row being played
 3. `going_to_pit` → `pit_intro` → `pit_offering`: Fox explains the pit, then a standing FoxGuide prompt (`pit_offering_prompt`, no continue button until offered) tells the player to **tap each floating word** to offer it — the step only advances once every word is devoured (no auto-offer; a fallback only arms if the step is reached with nothing offerable). A **stalled-pending safety net** (`PIT_ONBOARDING_STALL_RESCUE_MS` = 30s, reset on every successful devour) auto-offers the remainder and completes the step so a confused player can never soft-lock onboarding
 4. `returning_home` → `unlock_explained` → `complete`: Fox explains the cycle
 
@@ -588,6 +587,7 @@ mobile/assets/
 - **Narrative consistency**: Any new feature must respect current phase. Cheerful-only-at-Phase-0.
 - **No over-engineering**: Only make directly requested changes. Don't add features, refactoring, or docstrings beyond what's asked.
 - Accessibility: `accessibilityLabel` and `accessibilityRole` on interactive elements; never convey information by color alone (see the ✓/✗ slot-preview prefixes); dark-phase text colors must hold ≥4.5:1 contrast against their backgrounds
+- **No em dashes (—/–) in player-facing text** — dialogue, UI strings, alerts, accessibility labels. Use `...` for dramatic pauses, commas for asides, or split sentences (`noEmDashes.test.ts` guards this at runtime over the real content pools)
 - Store/legal: privacy policy, terms, and data-deletion pages are **live and publicly accessible** via GitHub Pages (served from `docs/`). All three URLs are wired into `src/constants/links.ts` and surfaced in Settings → About (Privacy Policy / Terms of Service / Data Deletion rows); store-listing metadata in `docs/STORE_LISTING.md` points at the same live URLs
 
 ## Testing Patterns

@@ -483,7 +483,7 @@ export const MILESTONE_BONUSES: {
   // Phase 4 reveal doesn't land until ~155, leaving a stretch with no new unlocks.
   // These keep the amber faucet pulsing through that gap so the climb to the climax
   // never feels rewardless. Kept modest so they don't outpace the room-upgrade sink.
-  { puzzles: 135, amber: 90, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole — and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
+  { puzzles: 135, amber: 90, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole... and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
   { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'Every room is full, yet something still feels unfinished.', dreadMessage: 'The walls are full. The space between them is not.' },
   { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },
   { puzzles: 165, amber: 130, message: 'Unstoppable!', darkMessage: 'You no longer wonder why you keep going. You just go.', dreadMessage: 'One hundred sixty-five offerings. The horizon leans closer.' },

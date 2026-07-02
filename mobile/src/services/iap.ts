@@ -93,14 +93,14 @@ export const CONSUMABLE_PRODUCTS: ConsumableProductInfo[] = [
     productId: PRODUCT_IDS.AMBER_MEDIUM,
     reward: { kind: 'amber', amount: AMBER_PACK_GRANTS.medium },
     name: 'Jar of Amber',
-    description: `${AMBER_PACK_GRANTS.medium} amber — more per coin.`,
+    description: `${AMBER_PACK_GRANTS.medium} amber. More per coin.`,
     fallbackPrice: '$2.99',
   },
   {
     productId: PRODUCT_IDS.AMBER_LARGE,
     reward: { kind: 'amber', amount: AMBER_PACK_GRANTS.large },
     name: 'Hoard of Amber',
-    description: `${AMBER_PACK_GRANTS.large} amber — best value.`,
+    description: `${AMBER_PACK_GRANTS.large} amber. Best value.`,
     bestValue: true,
     fallbackPrice: '$6.99',
   },
@@ -115,7 +115,7 @@ export const CONSUMABLE_PRODUCTS: ConsumableProductInfo[] = [
     productId: PRODUCT_IDS.HINTS_LARGE,
     reward: { kind: 'hints', amount: HINT_PACK_GRANTS.large },
     name: 'Satchel of Hints',
-    description: `${HINT_PACK_GRANTS.large} hints — never caught short.`,
+    description: `${HINT_PACK_GRANTS.large} hints. Never caught short.`,
     bestValue: true,
     fallbackPrice: '$2.99',
   },
@@ -176,13 +176,13 @@ export interface BillingProvider {
 
 class NoOpBillingProvider implements BillingProvider {
   async initialize(): Promise<void> {
-    console.log('[IAP] NoOp provider — no billing SDK configured');
+    console.log('[IAP] NoOp provider - no billing SDK configured');
   }
   async getProducts(): Promise<IapProduct[]> {
     return [];
   }
   async purchase(productId: ProductId): Promise<PurchaseResult> {
-    console.log('[IAP] NoOp purchase — no billing SDK configured:', productId);
+    console.log('[IAP] NoOp purchase - no billing SDK configured:', productId);
     return { success: false, productId, error: 'billing_unavailable' };
   }
   async restorePurchases(): Promise<{ entitlements: EntitlementKey[] }> {

@@ -87,13 +87,13 @@ export function getVictoryTitle(stars: number, phase: DialoguePhase): string {
 const VICTORY_FEEDBACK: Record<DialoguePhase, { three: string; two: string; one: string }> = {
   0: {
     three: 'Flawless! The words knew exactly where to go.',
-    two: 'Lovely work — the whole house felt that one land.',
+    two: 'Lovely work! The whole house felt that one land.',
     one: 'You got there! The puzzle settled happily into place.',
   },
   1: {
-    three: 'Elegant solution — you see the patterns.',
-    two: 'Good solve — the words are starting to speak.',
-    one: 'Completed — every puzzle teaches something.',
+    three: 'Elegant solution. You see the patterns.',
+    two: 'Good solve. The words are starting to speak.',
+    one: 'Completed. Every puzzle teaches something.',
   },
   2: {
     three: 'The words bend to your will... for now.',
@@ -175,11 +175,11 @@ export function getMoveMessage(phase: DialoguePhase): string {
 
 const COMBO_MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
   // Index by tier: [streak 2, streak 3, streak 4+]
-  0: ['Nice — 2 in a row!', "Sweet! 3 chain!", "On fire! 🔥"],
-  1: ['Two clean. Keep going.', 'Three in a row — flowing now.', 'A perfect run.'],
+  0: ['Nice! 2 in a row!', "Sweet! 3 chain!", "On fire! 🔥"],
+  1: ['Two clean. Keep going.', 'Three in a row. Flowing now.', 'A perfect run.'],
   2: ['Two without a stumble.', 'The pattern gathers pace.', 'Unbroken. It builds.'],
-  3: ['Two, cleanly.', 'The chain holds — three deep.', 'An unbroken descent.'],
-  4: ['Two offered, unbroken.', 'Three — the arrangement leans closer.', 'A flawless verse. It hears.'],
+  3: ['Two, cleanly.', 'The chain holds... three deep.', 'An unbroken descent.'],
+  4: ['Two offered, unbroken.', 'Three... the arrangement leans closer.', 'A flawless verse. It hears.'],
   5: ['Two threads, true.', 'Three, woven without a snag.', 'The weave sings, unbroken.'],
 };
 
@@ -215,11 +215,11 @@ const HINT_SUFFIX: Record<DialoguePhase, string> = {
 export function getHintMessage(letterToMove: string, targetWord: string, phase: DialoguePhase): string {
   const prefix = HINT_PREFIX[phase];
   const suffix = HINT_SUFFIX[phase];
-  return `${prefix} '${letterToMove}' — ${suffix} "${targetWord}"!`;
+  return `${prefix} '${letterToMove}'... ${suffix} "${targetWord}"!`;
 }
 
 const HINT_FALLBACK: Record<DialoguePhase, string> = {
-  0: 'Not quite right — try undoing your last move!',
+  0: 'Not quite right. Try undoing your last move!',
   1: 'Hmm, not the right path. Try undoing.',
   2: 'You\'ve wandered off course. Undo.',
   3: 'Wrong path. Is there a right one?',
@@ -235,7 +235,7 @@ export function getHintFallback(phase: DialoguePhase): string {
 const OUT_OF_HINTS_MESSAGES: Record<DialoguePhase, string> = {
   0: "You're out of hints! Watch a quick clip or grab more to keep going.",
   1: 'No hints left. Earn one with a short clip, or stock up.',
-  2: 'Your hints are spent. The pattern offers more — for a price.',
+  2: 'Your hints are spent. The pattern offers more... for a price.',
   3: 'No hints remain. Something will trade you one.',
   4: 'The arrangement has taken your hints. It will give more, if you ask.',
   5: 'Your hints are gone, like everything else. More can be drawn.',
@@ -285,7 +285,7 @@ export function getLockedLetterMessage(phase: DialoguePhase): string {
 
 const NO_VALID_MOVES_MESSAGES: Record<DialoguePhase, string> = {
   0: 'No words fit from here! Undo a move or clear the board to try a fresh path.',
-  1: 'Hmm — no word works from here. Undo a move, or clear the board and try another way.',
+  1: 'Hmm... no word works from here. Undo a move, or clear the board and try another way.',
   2: 'The letters refuse every path from here. Even they seem to know this arrangement was wrong. Undo, or clear the board and begin anew.',
   3: 'No word can form from this arrangement. Unmake a move, or clear it all away.',
   4: 'The arrangement admits no further words. Unmake your moves, or begin again.',
@@ -317,8 +317,8 @@ export function getStuckPanelTitle(phase: DialoguePhase): string {
 // ============================================================================
 
 const DRAG_MISS_MESSAGES: Record<DialoguePhase, string> = {
-  0: 'Oops — drop the letter onto a row to place it.',
-  1: 'Not quite there — release the letter over a row.',
+  0: 'Oops! Drop the letter onto a row to place it.',
+  1: 'Not quite there. Release the letter over a row.',
   2: 'The letter found no row. Bring it down onto one.',
   3: 'It slipped free. Settle the letter onto a row.',
   4: 'The letter would not settle. Lay it upon a row.',
@@ -368,7 +368,7 @@ export function getStartMessage(phase: DialoguePhase): string {
 // ============================================================================
 
 const SPEED_TIME_UP_MESSAGES: Record<DialoguePhase, string> = {
-  0: "Time's up! Shake it off — a fresh puzzle awaits.",
+  0: "Time's up! Shake it off. A fresh puzzle awaits.",
   1: 'Time slipped away! Another puzzle is ready whenever you are.',
   2: 'The clock ran dry. The letters scattered before you finished.',
   3: 'Time collapsed. The arrangement closed this path.',
@@ -387,10 +387,10 @@ export function getSpeedTimeUpMessage(phase: DialoguePhase): string {
 const REWARDED_DOUBLE_LABELS: Record<DialoguePhase, string> = {
   0: 'Double this reward',
   1: 'Double this reward',
-  2: 'Linger a moment — double the offering',
-  3: 'Stay a while — double the offering',
-  4: 'Give it your attention — double the offering',
-  5: 'Tend it longer — double the offering',
+  2: 'Linger a moment... double the offering',
+  3: 'Stay a while... double the offering',
+  4: 'Give it your attention... double the offering',
+  5: 'Tend it longer... double the offering',
 };
 
 const REWARDED_DOUBLE_CONFIRM: Record<DialoguePhase, string> = {
@@ -416,7 +416,7 @@ export function getRewardedDoubleConfirm(phase: DialoguePhase): string {
 
 const WHISPER_GALLERY_EMPTY_TEXT: Record<DialoguePhase, string> = {
   0: 'No whispers collected yet. Play puzzles and talk to your animal friends!',
-  1: 'No whispers collected yet. Play puzzles and visit your friends — they have things to say.',
+  1: 'No whispers collected yet. Play puzzles and visit your friends. They have things to say.',
   2: 'Nothing collected yet. The house is listening for your words.',
   3: 'The walls are quiet... for now.',
   4: 'The walls are quiet... for now.',
@@ -748,7 +748,7 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
   }
   if (phase >= 3) {
     return [
-      "There's a new puzzle path now — one special arrangement each day.",
+      "There's a new puzzle path now... one special arrangement each day.",
       "It's called the Daily Challenge. Same words for everyone, and it asks a little more of you.",
       "Try it from the header when you want to test yourself. The house notices the daily ones.",
     ];
@@ -756,14 +756,14 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
   if (phase >= 2) {
     return [
       "You've grown stronger with these words, so I want to show you something new.",
-      "The Daily Challenge appears once each day — one shared puzzle, a little tougher than usual.",
+      "The Daily Challenge appears once each day. One shared puzzle, a little tougher than usual.",
       "You'll find it in the header. The same arrangement for everyone, every day. There's something to that.",
     ];
   }
   return [
     "Something new showed up this morning, friend. Come see.",
-    "There's a Daily Challenge now — one special puzzle each day, the same one for everyone. A little harder than usual.",
-    "You'll find it up in the header. Try it when you're feeling brave — the amber's worth it.",
+    "There's a Daily Challenge now. One special puzzle each day, the same one for everyone. A little harder than usual.",
+    "You'll find it up in the header. Try it when you're feeling brave. The amber's worth it.",
   ];
 }
 
@@ -779,45 +779,45 @@ export function getDailyChallengeIntroLines(phase: number): string[] {
 export function getJournalIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 4) {
     return [
-      "The arrangement speaks through many voices now. I've gathered them all into one place — a living record.",
+      "The arrangement speaks through many voices now. I've gathered them all into one place, a living record.",
       "The Word Ledger holds every word you've offered. Scroll through it and you'll see the shape of what you've built.",
-      "The Whisper Gallery preserves every voice — mine, the others', the echoes that linger after each puzzle. Nothing is lost.",
-      "And the quests — daily tasks and weekly challenges... the arrangement sets them. Complete them and the amber flows deeper.",
+      "The Whisper Gallery preserves every voice... mine, the others', the echoes that linger after each puzzle. Nothing is lost.",
+      "And the quests, daily tasks and weekly challenges... the arrangement sets them. Complete them and the amber flows deeper.",
       "Find it all behind the book icon. The pages have been filling themselves. They were always going to.",
     ];
   }
   if (phase >= 3) {
     return [
-      "There's a record now. Every voice, every word, every echo that refused to fade — I've been keeping them.",
+      "There's a record now. Every voice, every word, every echo that refused to fade... I've been keeping them.",
       "The Word Ledger tracks every word that's passed through your puzzles. Some of them... linger longer than others.",
-      "The Whisper Gallery holds what we've said to you — conversations, whispers, the things spoken between puzzles.",
+      "The Whisper Gallery holds what we've said to you. Conversations, whispers, the things spoken between puzzles.",
       "Daily and weekly quests appear in there too. New tasks each day and week, fresh amber for completing them.",
       "The book icon in the header opens it all. I think the house wants you to read what's been written.",
     ];
   }
   if (phase >= 2) {
     return [
-      "I've been writing things down, friend. The words, the whispers — everything that passes through this house.",
+      "I've been writing things down, friend. The words, the whispers... everything that passes through this house.",
       "The Word Ledger keeps a record of every word you've shifted. It's longer than you might expect.",
-      "The Whisper Gallery collects what the animals say to you — every conversation, every quiet thought shared after a puzzle.",
+      "The Whisper Gallery collects what the animals say to you. Every conversation, every quiet thought shared after a puzzle.",
       "There are daily and weekly quests in there too. Fresh challenges each day and week with amber waiting at the end.",
       "Tap the book icon up top to open the journal. Some of it reads differently now than when it was first spoken.",
     ];
   }
   if (phase >= 1) {
     return [
-      "I started keeping a journal. The words you shift, the things we say to you — it all gets written down.",
+      "I started keeping a journal. The words you shift, the things we say to you... it all gets written down.",
       "There's a Word Ledger that tracks every word from your puzzles. It's nice to look back on where you've been.",
       "The Whisper Gallery saves the conversations and little whispers the animals share with you. Every voice, remembered.",
-      "You'll also find daily and weekly quests — small goals that refresh each day and week with amber rewards.",
+      "You'll also find daily and weekly quests, small goals that refresh each day and week with amber rewards.",
       "Look for the book icon in the header. Take a peek when you have a quiet moment.",
     ];
   }
   return [
-    "I've been keeping something for you — a journal! Let me show you what's inside.",
+    "I've been keeping something for you... a journal! Let me show you what's inside.",
     "See this first part? That's your Word Ledger. Every word you shift in a puzzle gets written down here. It's like a scrapbook of everywhere you've been.",
-    "And this — the Whisper Gallery. When the animals talk to you, or whisper something after a puzzle, it all gets saved. So you can come back and read it anytime.",
-    "There are daily and weekly quests in here too! Little goals that refresh each day and week — finish them and you'll earn extra amber.",
+    "And this... the Whisper Gallery. When the animals talk to you, or whisper something after a puzzle, it all gets saved. So you can come back and read it anytime.",
+    "There are daily and weekly quests in here too! Little goals that refresh each day and week. Finish them and you'll earn extra amber.",
     "Tap the book icon up top whenever you want to look back. It's yours, friend.",
   ];
 }
@@ -1331,7 +1331,7 @@ const INTERJECTION_MESSAGES: Record<number, string[]> = {
   0: [
     '{name} is waiting to chat with you!',
     '{name} has something to share. Visit the house!',
-    'Check in on {name} — they love visitors!',
+    'Check in on {name}, they love visitors!',
   ],
   1: [
     '{name} has been thinking about something...',
@@ -1530,7 +1530,7 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
   },
   70: {
     type: 'ambient_whisper',
-    text: 'The rooms are quieter now. Not empty — listening.',
+    text: 'The rooms are quieter now. Not empty... listening.',
     durationMs: 3000,
   },
   74: {
@@ -1792,13 +1792,13 @@ const VARIANT_SUGGESTIONS: Record<DialoguePhase, Record<string, string>> = {
     speed: 'New style unlocked: Speed Shift!',
   },
   1: {
-    reverse: 'Reverse Shift is available — try going backward.',
-    double_shift: 'Double Shift unlocked — move two letters at once.',
-    speed: 'Speed Shift is ready — race the clock.',
+    reverse: 'Reverse Shift is available. Try going backward.',
+    double_shift: 'Double Shift unlocked. Move two letters at once.',
+    speed: 'Speed Shift is ready. Race the clock.',
   },
   2: {
     reverse: 'Reverse Shift... the words can be undone.',
-    double_shift: 'Double Shift — twice the letters, twice the weight.',
+    double_shift: 'Double Shift. Twice the letters, twice the weight.',
     speed: 'Speed Shift. The clock ticks.',
   },
   3: {
@@ -2265,7 +2265,7 @@ export function getVictoryPitHint(targetPhase: DialoguePhase): string | null {
  */
 const FOX_PIT_NUDGE_LINES: Record<number, string[]> = {
   1: [
-    'Something is ready in the pit. I can feel it from here — a kind of warmth.',
+    'Something is ready in the pit. I can feel it from here... a kind of warmth.',
     'The marks along the edge are glowing. They weren\'t doing that before.\nYou should go see what your words woke up.',
   ],
   2: [
@@ -2273,7 +2273,7 @@ const FOX_PIT_NUDGE_LINES: Record<number, string[]> = {
     'Your words grew heavy enough to wake something. Go see what the marks have to say.',
   ],
   3: [
-    'The dark stirs below. The pit is calling — not with sound, but with... pull.',
+    'The dark stirs below. The pit is calling, not with sound, but with... pull.',
     'The marks burn. They need you there.',
   ],
   4: [
@@ -2300,20 +2300,20 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 3) {
     return [
       'The patterns grow more complex. There are harder paths, if you dare.',
-      'Challenge Mode strips away your safety — no hints, limited undos. But the amber flows thicker.',
+      'Challenge Mode strips away your safety. No hints, limited undos. But the amber flows thicker.',
       'Look for it in the puzzle setup. The arrangement rewards those who commit fully.',
     ];
   }
   if (phase >= 2) {
     return [
       "You've grown stronger with the letters, friend. Curious about a harder path?",
-      'Challenge Mode takes away your hints and limits your undos. Rougher going — but the amber comes back half again as heavy.',
+      'Challenge Mode takes away your hints and limits your undos. Rougher going, but the amber comes back half again as heavy.',
       'You\'ll find it in the puzzle setup. The words feel different when there\'s no safety net.',
     ];
   }
   return [
     "I've been watching you work, friend. You've got a feel for this now.",
-    'There\'s something called Challenge Mode — no hints, fewer undos. Tougher, but the amber reward is half again as much.',
+    'There\'s something called Challenge Mode. No hints, fewer undos. Tougher, but the amber reward is half again as much.',
     'It\'s tucked into the puzzle setup. Give it a try when you want the letters to push back a little.',
   ];
 }
@@ -2393,7 +2393,7 @@ export function getTendingMilestoneCeremonyText(level: number): string[] {
     case 25:
       return ['Twenty-five.', 'The shape is yours now, as much as anyone\'s. The keepers know your devotion by heart.'];
     case 50:
-      return ['Fifty tendings offered.', 'There was never anything to summon. There was only this — the deepening, and the keeping. You understand that now.'];
+      return ['Fifty tendings offered.', 'There was never anything to summon. There was only this... the deepening, and the keeping. You understand that now.'];
     case 100:
       return ['One hundred.', 'The pattern and the keeper have become the same gesture. Breathe in. It deepens. Breathe out. So do you.'];
     default:
@@ -2477,7 +2477,7 @@ const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = 
   },
   2: {
     title: 'Shall we call for you?',
-    body: 'A quiet reminder when the day\'s puzzle is ready — nothing more. You can turn this off anytime in Settings.',
+    body: 'A quiet reminder when the day\'s puzzle is ready, nothing more. You can turn this off anytime in Settings.',
     accept: 'Remind me',
     decline: 'Not now',
   },
@@ -2489,7 +2489,7 @@ const NOTIFICATION_PROMPT_TEXT: Record<DialoguePhase, NotificationPromptText> = 
   },
   4: {
     title: 'The arrangement keeps its hours',
-    body: 'Each day, a puzzle is prepared. We can tell you when it is ready — that is all this enables. Settings can end it at any time.',
+    body: 'Each day, a puzzle is prepared. We can tell you when it is ready. That is all this enables. Settings can end it at any time.',
     accept: 'Tell me',
     decline: 'Not now',
   },
@@ -2518,7 +2518,7 @@ const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string]> = {
   0: [
     'Ember saved your spot by the fire! Come solve a puzzle.',
     'Your animal friends keep asking about you. The puzzles miss you too!',
-    'A whole week! The house is still cozy, and everyone\'s waiting — come say hi.',
+    'A whole week! The house is still cozy, and everyone\'s waiting. Come say hi.',
   ],
   1: [
     'The house has been thinking about you. So have the words.',
@@ -2527,7 +2527,7 @@ const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string]> = {
   ],
   2: [
     'The house is quieter without you.',
-    'Three days of stillness. The animals still speak of you — always in the present tense.',
+    'Three days of stillness. The animals still speak of you... always in the present tense.',
     'A week now. The rooms remember your footsteps. The words remember your hands.',
   ],
   3: [
@@ -2559,7 +2559,7 @@ export function getFirstDailyMercyMessage(phase: number, hints: number): string 
   if (phase >= 5) return `+${hints} hints. The pattern provides.`;
   if (phase >= 4) return `+${hints} hints. The first offering is always guided.`;
   if (phase >= 2) return `+${hints} hints for your first daily. Use them well.`;
-  return `+${hints} hints for your first daily — good luck!`;
+  return `+${hints} hints for your first daily. Good luck!`;
 }
 
 /** Label for the rewarded continue on the speed Time's-Up overlay. */
@@ -2574,7 +2574,7 @@ export function getSpeedRescueLabel(phase: number, seconds: number): string {
 export function getDailyLockedMessage(phase: number): string {
   if (phase >= 4) return 'The daily offering is not yet yours. Solve more, and it opens.';
   if (phase >= 2) return 'The daily ritual is still closed to you. A few more puzzles first.';
-  return 'The Daily Challenge is still locked — solve a few more puzzles to open it.';
+  return 'The Daily Challenge is still locked. Solve a few more puzzles to open it.';
 }
 
 /** Alert body for a malformed friend-challenge link. */
@@ -2587,8 +2587,8 @@ export function getBadChallengeLinkMessage(phase: number): string {
 /** Alert body for a well-formed challenge link whose words cannot make a board. */
 export function getUnplayableChallengeMessage(phase: number): string {
   if (phase >= 4) return 'The words arrived, but they refuse the arrangement.';
-  if (phase >= 2) return 'That challenge could not be read — its words refuse the board.';
-  return 'That challenge could not be read — its words are not playable.';
+  if (phase >= 2) return 'That challenge could not be read... its words refuse the board.';
+  return 'That challenge could not be read. Its words are not playable.';
 }
 
 /** Label for the friend-challenge share button on the share preview. */

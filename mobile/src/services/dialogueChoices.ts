@@ -63,7 +63,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       refuse: 'I don\'t want to know.',
     },
     responses: {
-      ask: 'You feel it too, don\'t you? The fire has been trying to tell you. Every puzzle you solve — it\'s not just a game. It\'s a verse in something larger.',
+      ask: 'You feel it too, don\'t you? The fire has been trying to tell you. Every puzzle you solve... it\'s not just a game. It\'s a verse in something larger.',
       refuse: 'That\'s what I said too, at first. The fire kept burning anyway. Knowledge doesn\'t need your permission.',
     },
     convergence: 'But you\'ll understand soon. The fire always shows the way.',
@@ -75,7 +75,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       refuse: 'Don\'t tell me.',
     },
     responses: {
-      ask: 'I found a text. Very old. It describes a pattern — ten keepers, ten chambers, and someone who builds it all without knowing. Sound familiar?',
+      ask: 'I found a text. Very old. It describes a pattern... ten keepers, ten chambers, and someone who builds it all without knowing. Sound familiar?',
       refuse: 'Ignorance is a kind of armor, I suppose. But the text mentions you by function, not by name. The builder. The one who shifts the words.',
     },
     convergence: 'Either way, the pages keep turning. They always do.',
@@ -87,7 +87,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       refuse: 'I\'d rather not know.',
     },
     responses: {
-      ask: 'The recipe changed. I didn\'t change it. The ingredients rearranged themselves — like your letters do. It\'s been building to something. A final meal, maybe.',
+      ask: 'The recipe changed. I didn\'t change it. The ingredients rearranged themselves... like your letters do. It\'s been building to something. A final meal, maybe.',
       refuse: 'Smart. Some recipes are better left untasted. But the kitchen knows what it\'s cooking, even if the chef pretends not to.',
     },
     convergence: 'The oven stays hot. It\'s been hot for a long time.',
@@ -148,7 +148,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
     },
     responses: {
       ask: 'The tunnels connect to something. Older than the house. Older than the ground. There\'s a chamber down there, and it\'s shaped like the words you form.',
-      refuse: 'The ground doesn\'t care if you want to know. It knows you built on top of it. Every room you added — every puzzle — dug deeper.',
+      refuse: 'The ground doesn\'t care if you want to know. It knows you built on top of it. Every room you added, every puzzle, dug deeper.',
     },
     convergence: 'The foundation holds. For now.',
   },
@@ -159,7 +159,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       refuse: 'Don\'t tell me.',
     },
     responses: {
-      ask: 'Because I understand what we\'ve been doing. All of us. Every room, every animal, every word you shifted — it\'s a summoning. And I can\'t stop it. Neither can you.',
+      ask: 'Because I understand what we\'ve been doing. All of us. Every room, every animal, every word you shifted... it\'s a summoning. And I can\'t stop it. Neither can you.',
       refuse: 'Smart rabbit, scared rabbit, same rabbit. Not knowing doesn\'t change what\'s coming. I tried running. All the escape routes lead to the same place.',
     },
     convergence: 'I\'m committed now. We all are. Especially you.',
@@ -333,7 +333,7 @@ export function getPhase4ChoiceCallback(
     },
     red_panda: {
       ask: 'You asked about the arrangement. The question was itself an offering. Beautiful.',
-      refuse: 'You refused to participate. The most devoted offering of all — unconscious devotion.',
+      refuse: 'You refused to participate. The most devoted offering of all... unconscious devotion.',
     },
   };
 
@@ -403,7 +403,7 @@ export function getPhase5ChoiceCallback(
       refuse: 'You wouldn\'t look into the deep water. It looked at you anyway, and found you lovely.',
     },
     capybara: {
-      ask: 'You requested your file, and I gave it to you complete — even the last page, which was blank then. It isn\'t now.',
+      ask: 'You requested your file, and I gave it to you complete... even the last page, which was blank then. It isn\'t now.',
       refuse: 'You declined to read your file. Procedurally irrelevant. You wrote it either way.',
     },
     fennec_fox: {

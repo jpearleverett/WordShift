@@ -687,6 +687,36 @@ export function createPitOnboardingStallRescue(
   return { arm, cancel };
 }
 
+// ---------------------------------------------------------------------------
+// Pit amber display accounting (pure, exported for tests)
+// ---------------------------------------------------------------------------
+
+/**
+ * Display increment for the k-th devoured word of a batch (or Offer All
+ * cascade) worth `batchValue` amber across `totalWords` words.
+ *
+ * Both harvest paths route their on-screen accounting through this: as each
+ * word is devoured, the displayed pending amber goes DOWN by this amount and
+ * the displayed total goes UP by the same amount. Increments partition
+ * `batchValue` exactly — the cumulative sum after k words is
+ * `round(batchValue * k / totalWords)` — so the running display total can
+ * never exceed the real credited balance and the last word always lands
+ * exactly on it. (Naive per-word rounding, e.g. round(10/4)=3 four times,
+ * overshoots by 2; this never does.)
+ */
+export function computeDevourAmberIncrement(
+  batchValue: number,
+  totalWords: number,
+  devouredCount: number,
+): number {
+  if (totalWords <= 0 || batchValue <= 0) return 0;
+  const k = Math.floor(devouredCount);
+  if (k < 1 || k > totalWords) return 0;
+  const cumulative = Math.round((batchValue * k) / totalWords);
+  const previous = Math.round((batchValue * (k - 1)) / totalWords);
+  return Math.max(0, cumulative - previous);
+}
+
 interface OfferingPitScreenProps {
   phase: DialoguePhase;
   amberBalance: number;
@@ -783,6 +813,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   const harvestStateRef = useRef(harvestState);
   const amberBalanceRef = useRef(amberBalance);
+  // Mirrors isOffering synchronously (state lags a render) so async callbacks
+  // and the amberBalance prop-sync effect can tell when the Offer All cascade
+  // owns the displayed balance.
+  const isOfferingRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -793,7 +827,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     };
   }, []);
   useEffect(() => { flyingWordsRef.current = flyingWords; }, [flyingWords]);
-  useEffect(() => { setDisplayBalance(amberBalance); }, [amberBalance]);
+  useEffect(() => {
+    // During the Offer All cascade the parent echoes the already-credited
+    // FINAL balance back through this prop (onAmberChange fires before the
+    // words animate). Syncing here would jump the display straight to that
+    // final value while the per-word increments keep adding on top — the
+    // overshoot-then-snap-down bug. The cascade settles the display itself.
+    if (isOfferingRef.current) return;
+    setDisplayBalance(amberBalance);
+  }, [amberBalance]);
   useEffect(() => { amberBalanceRef.current = amberBalance; }, [amberBalance]);
   useEffect(() => { harvestStateRef.current = harvestState; }, [harvestState]);
 
@@ -1582,6 +1624,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) {
+        // Settle on the real credited balance. The per-word optimistic bumps
+        // for this batch summed to exactly its amberValue, so this lands
+        // where the display already is (no jump). It also rolls back bumps
+        // for any OTHER partially-devoured batch — consistent, because those
+        // chips respawn when the flying words rebuild from the fresh harvest
+        // state below (devour tracking resets with them).
         setDisplayBalance(newBalance);
         onAmberChange?.(newBalance);
         spawnAmberRise(result.amberAwarded);
@@ -1620,13 +1668,25 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     devouredPerBatch.current.get(fw.batchId)!.add(fw.id);
     setFlyingWords(prev => prev.filter(w => w.id !== fw.id));
 
-    // Decrement displayed pending amber per word devoured
+    // Per-word display accounting: pending amber goes DOWN and the displayed
+    // total goes UP by the same amount as each word is devoured. The real
+    // credit lands when the whole batch finalizes (offerBatch is atomic per
+    // batch), so the total is bumped optimistically here; increments
+    // partition the batch's amberValue exactly, so the display lands on the
+    // settled balance at finalize with no jump and can never overshoot it.
+    // Skipped during the Offer All cascade — a tap-devour that completes
+    // mid-cascade is already accounted for by the cascade's own increments
+    // (offerAllBatches swept its batch, so its value is in amberAwarded).
     const currentState = harvestStateRef.current;
-    if (currentState) {
+    if (currentState && !isOfferingRef.current) {
       const batch = currentState.pendingBatches.find(b => b.id === fw.batchId);
-      if (batch && batch.words.length > 0) {
-        const perWordAmber = Math.round(batch.amberValue / batch.words.length);
-        setPendingAmberOffset(prev => prev + perWordAmber);
+      if (batch) {
+        const devouredCount = devouredPerBatch.current.get(fw.batchId)?.size ?? 0;
+        const increment = computeDevourAmberIncrement(batch.amberValue, batch.words.length, devouredCount);
+        if (increment > 0) {
+          setPendingAmberOffset(prev => prev + increment);
+          setDisplayBalance(prev => prev + increment);
+        }
       }
     }
 
@@ -1732,32 +1792,43 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // ---- Harvest All (with spiral paths) ----
   const handleHarvestAll = useCallback(async () => {
     if (isOffering || !harvestState || harvestState.pendingBatches.length === 0) return;
+    isOfferingRef.current = true;
     setIsOffering(true);
     hapticHeavy();
 
     const totalAmber = harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
     const totalWordCount = harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
 
+    // Pre-offer REAL balance — the cascade counts the display up from here to
+    // the final credited balance, never beyond it.
+    const baseBalance = amberBalanceRef.current;
+
     // Offer all batches atomically first
     const result = await offerAllBatches();
     logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
+    let finalBalance = baseBalance;
     if (result.amberAwarded > 0) {
-      const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
-      if (mountedRef.current) onAmberChange?.(newBalance);
+      finalBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
+      if (mountedRef.current) onAmberChange?.(finalBalance);
     }
 
-    // Reset pending amber offset for visual countdown during cascade
+    // Reset display accounting for the cascade: pending counts down from the
+    // full pending value while the total counts up from the pre-offer balance
+    // (this also rolls back optimistic tap bumps for any partially-devoured
+    // batch — its value is included in amberAwarded and will be re-counted).
     setPendingAmberOffset(0);
+    setDisplayBalance(baseBalance);
 
     const words = flyingWordsRef.current.filter(w => !w.isDevoured);
     if (words.length === 0) {
       if (mountedRef.current) {
-        setDisplayBalance(prev => prev + result.amberAwarded);
+        setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         const freshState = await getHarvestState();
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setOverflowCount(0);
+        isOfferingRef.current = false;
         setIsOffering(false);
         // Trigger ceremony if pending
         if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
@@ -1768,9 +1839,6 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     }
 
     // Animate balance incrementally as words fly in
-    const amberPerWord = words.length > 0 ? result.amberAwarded / words.length : 0;
-    let amberAccumulated = 0;
-
     const staggerDelay = Math.min(70, 1800 / words.length);
 
     words.forEach((fw, i) => {
@@ -1786,13 +1854,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         if (i % 3 === 0) spawnTrail(currentPos.x, currentPos.y);
         const duration = getDevourDuration(phase);
 
-        // Increment displayed balance and decrement visual pending amber as each word flies
-        amberAccumulated += amberPerWord;
-        const incrementNow = Math.round(amberAccumulated);
-        if (incrementNow > 0) {
-          amberAccumulated -= incrementNow;
-          setDisplayBalance(prev => prev + incrementNow);
-          setPendingAmberOffset(prev => prev + incrementNow);
+        // Count the displayed total up and the visual pending amber down as
+        // each word flies in. Increments partition amberAwarded exactly
+        // across the cascade (computeDevourAmberIncrement), and the clamp
+        // pins the running total at the true post-offer balance — it can
+        // never overshoot and then "snap down".
+        const increment = computeDevourAmberIncrement(result.amberAwarded, words.length, i + 1);
+        if (increment > 0) {
+          setDisplayBalance(prev => Math.min(prev + increment, finalBalance));
+          setPendingAmberOffset(prev => prev + increment);
         }
 
         if (reducedMotion) {
@@ -1844,14 +1914,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       if (!mountedRef.current) return;
       const freshState = await getHarvestState();
       if (mountedRef.current) {
-        // Sync display to latest prop value (use ref to avoid stale closure)
-        setDisplayBalance(amberBalanceRef.current);
+        // Settle exactly on the credited balance (the increments already sum
+        // to it; this also corrects any drift from a concurrent credit).
+        setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setFlyingWords([]);
         setOverflowCount(0);
         setPendingAmberOffset(0);
+        isOfferingRef.current = false;
         setIsOffering(false);
         // Trigger ceremony if pending
         if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {

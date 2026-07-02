@@ -11,6 +11,8 @@ import {
   canReserveUnlock,
   reserveNextUnlock,
   claimReservedUnlockIfReady,
+  getReservedArrivalText,
+  getReserveGateText,
 } from '../services/homeWorldData';
 import { clearProgress, loadProgress, devAddAmber, getReservedUnlockId } from '../services/amberCurrency';
 import { PHASE_THRESHOLDS } from '../constants/gameBalance';
@@ -349,6 +351,26 @@ describe('reserve-ahead (pay-now, build-when-gate-opens)', () => {
     expect(await getReservedUnlockId()).toBeNull();
     p = await loadProgress();
     expect(p.unlockedRooms).toContain('jungle_room');
+  });
+
+  // Player report: the reserve copy named the arrival level but not the
+  // player's current level, so the wait had no visible distance-to-go. Both
+  // builders must carry "you're at N" alongside the gate level.
+  describe('reserve copy includes current progress', () => {
+    test('reserved line: arrival level plus current level', () => {
+      expect(getReservedArrivalText(42, 35)).toBe(
+        "✓ Reserved. Arrives at level 42 (you're at 35)"
+      );
+    });
+
+    test('gate offer line: gate level plus current level', () => {
+      expect(getReserveGateText(42, 35)).toBe("Unlocks at level 42. You're at 35");
+    });
+
+    test('degrade gracefully when an unlock has no gate (defensive)', () => {
+      expect(getReservedArrivalText(undefined, 35)).toBe('✓ Reserved');
+      expect(getReserveGateText(undefined, 35)).toBe("Unlocks later. You're at level 35");
+    });
   });
 
   test('reserve spends amber up front (no double charge on claim)', async () => {

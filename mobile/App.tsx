@@ -77,8 +77,6 @@ import {
   getNotificationPromptText,
   getSpeedTimeUpMessage,
   getDragMissMessage,
-  getStuckPanelTitle,
-  getNoValidMovesMessage,
   getFirstDailyMercyMessage,
   getSpeedRescueLabel,
   getDailyLockedMessage,
@@ -673,6 +671,26 @@ function MainApp() {
     puzzle.rows,
   ]);
 
+  // Tutorial Fox bubble avoidance: the bubble must never cover the rows the
+  // player is being asked to touch. While the guided move happens in the
+  // LOWER half of the board (e.g. rows 3-4), the bubble flips to the top of
+  // the screen (over the header — spent upper rows only); while acting on
+  // the upper rows it sits at the bottom, above the UNDO/HINT controls.
+  // The flip is an instant style swap — never an animated reposition — so
+  // reducedMotion needs no special casing, and the row-index heuristic works
+  // on any screen height (640dp included) because the involved rows are
+  // always on the opposite half from the bubble.
+  const tutorialFoxAnchor = useMemo(() => {
+    const rowCount = puzzle.rows.length;
+    // Source is activeRowIndex, target the row below (tutorial boards only
+    // descend); the pair's lower row decides which half the action is in.
+    const targetRowIndex = puzzle.activeRowIndex + 1;
+    const actionInLowerHalf = rowCount > 0 && targetRowIndex * 2 >= rowCount;
+    return actionInLowerHalf
+      ? { top: screenInsets.top + 8, left: 8, right: 8 }
+      : { bottom: Math.max(30, screenInsets.bottom) + 104, left: 8, right: 8 };
+  }, [puzzle.rows.length, puzzle.activeRowIndex, screenInsets.top, screenInsets.bottom]);
+
   const maybeShowSetupSelectorIntro = useCallback(async () => {
     if (onboardingFlow.isOnboarding) return;
     const seen = await hasSeenSetupSelectorIntro();
@@ -813,6 +831,55 @@ function MainApp() {
       puzzleActions.setShowConfetti(false);
     });
   }, [puzzleActions, transitionTo]);
+
+  // Reset All completed but an in-place reload wasn't available (Expo Go /
+  // dev client — Updates.reloadAsync throws there). Storage and service
+  // caches are already wiped by performFullReset; this rebuilds every piece
+  // of App-level in-memory state from the cleared services so the live
+  // session genuinely starts over: fresh persistence (amber 0 / phase 0 /
+  // no stats), an empty board, no victory/ceremony remnants, and onboarding
+  // restarted from the empty den — instead of dumping the player back onto
+  // a home screen still rendering their old save.
+  const handleResetComplete = useCallback(() => {
+    clearVictoryTimeouts();
+    puzzleActions.clearBoard();
+    puzzleActions.setShowConfetti(false);
+    puzzleActions.refreshHintBalance();
+    victoryActions.resetVictory();
+    orchestrationActions.resetOrchestration();
+    setRitualEchoWords([]);
+    setIsPlayingDaily(false);
+    resetSpeedRun();
+    setVictoryDoubleClaimed(false);
+    setDailyRank(null);
+    setSocialProofLine(null);
+    setShareResultData(null);
+    setShareChallengeText(null);
+    setDailyLoginGrant(null);
+    setPhaseTransitionEvent(null);
+    setShowSetupSelectorIntro(false);
+    setPostVictoryIntro(null);
+    queuedPostVictoryIntrosRef.current = [];
+    pendingPostVictoryActionRef.current = null;
+    setHomePanY(null);
+    puzzlesSinceHomeVisit.current = 0;
+    // Re-read the wiped persistence (amber, phase, stats, pending transition).
+    persistenceActions.refreshStats().catch(() => {});
+    // Onboarding storage is back to 'not_started'; mirror the fresh-launch
+    // init by advancing the live state machine to the first step so the
+    // intro actually replays this session.
+    onboardingActions.advanceOnboarding('home_empty').catch(() => {});
+    transitionTo('home');
+  }, [
+    clearVictoryTimeouts,
+    puzzleActions,
+    victoryActions,
+    orchestrationActions,
+    persistenceActions,
+    onboardingActions,
+    resetSpeedRun,
+    transitionTo,
+  ]);
 
   // Start the Daily Challenge (seeded, always HARD: 6-letter words, 5 rows).
   const handleStartDaily = useCallback((_difficulty: Difficulty) => {
@@ -1111,7 +1178,7 @@ function MainApp() {
             // A banked freeze forgave a missed day — let the player know the
             // chain survived so the protection feels real, not silent.
             addVictoryTimeout(() => {
-              puzzleActions.setMessage('🛡️ A missed day — but your daily streak held.');
+              puzzleActions.setMessage('🛡️ A missed day, but your daily streak held.');
             }, 1100);
           }
         } catch {
@@ -1417,6 +1484,20 @@ function MainApp() {
     setPuzzleScrollEnabled(!active);
   }, []);
 
+  // Every fresh board must present from the FIRST word. All board-building
+  // paths (Play, Next Level, RESTART, daily, shared challenge, variant /
+  // difficulty switch — they all route through the hook's applyBoard, which
+  // mints new row ids — plus autosave restore, which swaps in saved rows)
+  // change the first row's identity, so one effect here covers every entry
+  // point instead of sprinkling scroll calls across eight call sites.
+  const puzzleScrollRef = useRef<ScrollView>(null);
+  const boardIdentity = puzzle.rows.length > 0 ? puzzle.rows[0].id : null;
+  useEffect(() => {
+    if (boardIdentity !== null) {
+      puzzleScrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [boardIdentity]);
+
   // Drag-and-drop: when a letter is dragged onto the target row area, find the
   // closest valid slot and press it. The letter was already selected via onDragStart.
   // Uses refs + setTimeout to ensure React has processed the letter selection state
@@ -1565,7 +1646,7 @@ function MainApp() {
         hapticSuccess();
         puzzleActions.setMessage(`+${REWARDED_HINT_GRANT} hint`);
       } else if (res.reason === 'daily_cap') {
-        puzzleActions.setMessage('Daily clip limit reached — try the store.');
+        puzzleActions.setMessage('Daily clip limit reached. Try the store.');
       } else {
         setShowStoreModal(true);
       }
@@ -1909,7 +1990,7 @@ function MainApp() {
       return (
         <View style={{ flex: 1 }}>
           <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-          <SettingsScreen onClose={() => transitionTo('home')} />
+          <SettingsScreen onClose={() => transitionTo('home')} onReset={handleResetComplete} />
         </View>
       );
     }
@@ -2358,6 +2439,7 @@ function MainApp() {
           )}
 
           <ScrollView
+            ref={puzzleScrollRef}
             contentContainerStyle={styles.rowsContainer}
             showsVerticalScrollIndicator={false}
             scrollEnabled={puzzleScrollEnabled}
@@ -2420,52 +2502,11 @@ function MainApp() {
           />
         </View>
 
-        {/* Stuck-recovery panel — non-transient: while no legal move remains
-            the player gets a persistent way out (Undo / Restart) instead of a
-            toast that fades. Sits between the board and the action row so it
-            can never cover the rows. puzzle.isStuck clears on undo, restart,
-            or a new board. */}
-        {puzzle.isStuck && puzzle.gameState === GameState.PLAYING && (
-          <View style={styles.stuckPanel} accessibilityRole="alert">
-            <Text style={styles.stuckPanelTitle}>
-              {getStuckPanelTitle(persistence.currentPhase)}
-            </Text>
-            <Text style={styles.stuckPanelBody}>
-              {getNoValidMovesMessage(persistence.currentPhase)}
-            </Text>
-            <View style={styles.stuckPanelButtons}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.stuckPanelButton,
-                  puzzle.history.length === 0 && styles.stuckPanelButtonDisabled,
-                  pressed && styles.stuckPanelButtonPressed,
-                ]}
-                onPress={handleUndo}
-                disabled={puzzle.history.length === 0}
-                accessibilityRole="button"
-                accessibilityLabel="Undo the last move"
-              >
-                <Text style={styles.stuckPanelButtonText}>Undo</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.stuckPanelButton,
-                  styles.stuckPanelButtonPrimary,
-                  pressed && styles.stuckPanelButtonPressed,
-                ]}
-                onPress={() => {
-                  hapticLight();
-                  setRitualEchoWords([]);
-                  puzzleActions.resetCurrentPuzzle();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Restart this puzzle from the beginning"
-              >
-                <Text style={styles.stuckPanelButtonText}>Restart</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
+        {/* No stuck-panel / no immediate "unwinnable" announcement — product
+            decision: discovering a dead-end and choosing to undo or restart
+            is part of the challenge. puzzle.isStuck stays a silent internal
+            signal; the always-available UNDO / RESTART controls below are the
+            player's way out. */}
 
         {/* Bottom Controls — simplified during onboarding (no NEW button).
             Bottom padding grows past the legacy 30 to clear the home
@@ -2614,11 +2655,21 @@ function MainApp() {
           pointerEvents="none"
         />
 
-        {/* Fox Guide overlay — shown during onboarding on puzzle screen (hidden when victory modal is showing) */}
+        {/* Fox Guide overlay — shown during onboarding on puzzle screen (hidden when victory modal is showing).
+            While a move is required (puzzle_tutorial + PLAYING) the guide
+            drops to the small compact card and dynamically dodges the active
+            rows (tutorialFoxAnchor): the full dialogue card was tall enough
+            to blot out the lower rows — and the UNDO/HINT controls — on
+            small screens. The dialogue variant returns for the intro and
+            completion beats, where no board interaction is needed. */}
         {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_tutorial' || onboardingFlow.onboardingStep === 'puzzle_complete') && !(onboardingFlow.onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.WON) && (
           <FoxGuide
             visible={true}
-            variant="dialogue"
+            variant={
+              onboardingFlow.onboardingStep === 'puzzle_tutorial' && puzzle.gameState === GameState.PLAYING
+                ? 'compact'
+                : 'dialogue'
+            }
             text={
               onboardingFlow.onboardingStep === 'puzzle_complete'
                 ? ONBOARDING_FOX_LINES.puzzle_tutorial_complete[
@@ -2672,15 +2723,10 @@ function MainApp() {
                     right: 8,
                   }
                 : puzzle.gameState === GameState.PLAYING
-                  ? {
-                      // Position well below the 3 tutorial rows
-                      // (~50px status bar + ~80px header + 3 rows * ~90px + padding).
-                      // Sits a touch lower (raised multiplier + cap) so the bubble
-                      // clears the third row on tall phones instead of crowding it.
-                      top: Math.min(Math.max(SCREEN_HEIGHT * 0.69, 470), 620),
-                      left: 8,
-                      right: 8,
-                    }
+                  // Dynamic avoidance: top of screen while acting on the
+                  // lower rows, above the controls while acting on the
+                  // upper rows — the active rows are never covered.
+                  ? tutorialFoxAnchor
                   : undefined
             }
           />

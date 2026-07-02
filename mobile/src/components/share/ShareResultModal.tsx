@@ -84,7 +84,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
               <Text style={styles.captureHint}>
                 {isImageShareAvailable()
                   ? 'Shares as an image.'
-                  : 'Shares your result — or screenshot the card above.'}
+                  : 'Shares your result, or screenshot the card above.'}
               </Text>
 
               <View style={styles.buttons}>

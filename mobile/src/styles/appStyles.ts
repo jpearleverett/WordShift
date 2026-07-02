@@ -9,7 +9,11 @@ import { CandyColors, getPhaseTheme } from '../theme/colors';
 export function getScreenBackgroundColor(screen: string, phase: number): string {
   switch (screen) {
     case 'home':
-      return { 0: '#6fb7df', 1: '#104c83', 2: '#514378', 3: '#060612', 4: '#1a122a', 5: '#1E1830' }[phase] ?? '#6fb7df';
+      // Must match PHASE_BG_COLORS in HouseWorld.tsx: each value is sampled
+      // from the TOP row of that phase's sky asset (sky_day/afternoon/dusk/
+      // storm/shadow.png; Phase 5 reuses sky_shadow) so the backdrop extends
+      // the sky seamlessly. Re-sample if the sky assets are regenerated.
+      return { 0: '#439cf2', 1: '#1583f9', 2: '#684381', 3: '#000212', 4: '#050816', 5: '#050816' }[phase] ?? '#439cf2';
     case 'puzzle':
       return getPhaseTheme(phase as any).bgPrimary;
     case 'settings':

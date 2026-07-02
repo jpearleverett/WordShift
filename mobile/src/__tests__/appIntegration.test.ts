@@ -3,8 +3,9 @@
  *
  * App.tsx is the orchestration point where the ship-readiness fix-set lands:
  * non-blocking boot, day-rollover daily tasks, deep-link/notification routing,
- * the stuck-recovery panel, victory-flow skip/spinner fixes, the pit-exit
- * interstitial gate, the speed rescue, and the core-loop prop threading
+ * victory-flow skip/spinner fixes, the pit-exit interstitial gate, the speed
+ * rescue, the reset-all in-memory rebuild, fresh-board scroll reset, and the
+ * core-loop prop threading
  * (hint highlight / arrival / move outcomes). None of that is reachable from
  * Node-side unit tests (App.tsx pulls the full native surface), so — following
  * the actionButtonIcons.test.ts precedent — these tests source-scan App.tsx
@@ -60,11 +61,48 @@ describe('deep links and notification taps', () => {
   });
 });
 
-describe('stuck-recovery panel', () => {
-  test('non-transient panel renders while isStuck, with phase-aware copy', () => {
-    expect(APP_TSX).toMatch(/puzzle\.isStuck && puzzle\.gameState === GameState\.PLAYING/);
-    expect(APP_TSX).toMatch(/getStuckPanelTitle\(persistence\.currentPhase\)/);
-    expect(APP_TSX).toMatch(/getNoValidMovesMessage\(persistence\.currentPhase\)/);
+describe('stuck popup stays removed (product decision)', () => {
+  test('App renders NO stuck panel and never announces an unwinnable board', () => {
+    // Discovering a dead-end and choosing to undo/restart is part of the
+    // challenge — the old immediate "you're stuck" panel must not return.
+    expect(APP_TSX).not.toMatch(/getStuckPanelTitle/);
+    expect(APP_TSX).not.toMatch(/getNoValidMovesMessage/);
+    expect(APP_TSX).not.toMatch(/styles\.stuckPanel/);
+    // isStuck stays an internal hook signal; App must not render off it.
+    expect(APP_TSX).not.toMatch(/puzzle\.isStuck &&/);
+  });
+});
+
+describe('fresh boards present from the first word', () => {
+  test('the puzzle ScrollView snaps to the top whenever a new board commits', () => {
+    // One effect keyed on board identity (first row id changes on every
+    // applyBoard/restore) covers Play, Next Level, RESTART, daily, shared
+    // challenge, and variant/difficulty switches without per-call-site code.
+    expect(APP_TSX).toMatch(/ref=\{puzzleScrollRef\}/);
+    expect(APP_TSX).toMatch(/puzzle\.rows\[0\]\.id/);
+    expect(APP_TSX).toMatch(/puzzleScrollRef\.current\?\.scrollTo\(\{ y: 0, animated: false \}\)/);
+  });
+});
+
+describe('tutorial fox bubble avoidance', () => {
+  test('the guided-move bubble dodges the active rows', () => {
+    // Lower-half moves flip the bubble to the top of the screen; upper-half
+    // moves keep it above the UNDO/HINT controls — and the move-required
+    // state uses the small compact card so 640dp screens stay clear.
+    expect(APP_TSX).toMatch(/const tutorialFoxAnchor = useMemo/);
+    expect(APP_TSX).toMatch(/targetRowIndex \* 2 >= rowCount/);
+    expect(APP_TSX).toMatch(/\? 'compact'\s*\n\s*: 'dialogue'/);
+  });
+});
+
+describe('reset-all wiring', () => {
+  test('Settings receives the full in-memory reset handler', () => {
+    // Without this, the Expo Go / dev fallback (Updates.reloadAsync throws)
+    // returned the player to a home screen still rendering the old save.
+    expect(APP_TSX).toMatch(/onReset=\{handleResetComplete\}/);
+    // The rebuild refreshes persistence and restarts onboarding live.
+    expect(APP_TSX).toMatch(/advanceOnboarding\('home_empty'\)/);
+    expect(APP_TSX).toMatch(/puzzleActions\.clearBoard\(\)/);
   });
 });
 

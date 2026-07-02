@@ -9,7 +9,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { getPhaseTheme } from '../../theme/colors';
+import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { AmberInline } from '../AmberInline';
 import {
   PRODUCT_IDS,
@@ -54,6 +54,41 @@ const AMBER_PACK_IDS = [PRODUCT_IDS.AMBER_SMALL, PRODUCT_IDS.AMBER_MEDIUM, PRODU
 const HINT_PACK_IDS = [PRODUCT_IDS.HINTS_SMALL, PRODUCT_IDS.HINTS_LARGE];
 
 /**
+ * Store/Patron surface theming — speaks the same visual language as the game's
+ * best modals (VictoryModal / DailyLoginModal): the card takes the phase's
+ * `getPhaseTheme` modal background, sections sit in the phase's stat-box tone
+ * with subtle divider borders, and ONE warm amber accent is reserved for
+ * prices and amber amounts. Every text/background pair below holds >= 4.5:1
+ * WCAG contrast across phases 0-5 (the theme's light cards need deeper body
+ * tones than its gray-400 secondary; the dark cards' secondary passes as-is).
+ */
+function getStoreSurfaceTheme(phase: number) {
+  const pt = getPhaseTheme(phase);
+  const dark = phase >= 3;
+  const body = dark
+    ? pt.modalSecondaryTextColor
+    : phase >= 2 ? '#493C66' : phase >= 1 ? '#554B70' : '#475569';
+  return {
+    overlay: pt.modalOverlayColor,
+    cardBg: pt.modalBgColor,
+    cardBorder: dark ? 'rgba(147, 51, 234, 0.22)' : 'rgba(255, 255, 255, 0.4)',
+    glow: pt.victoryGlowColor,
+    title: pt.modalTextColor,
+    body,
+    sectionBg: pt.modalStatBgColor,
+    sectionBorder: pt.modalDividerColor,
+    // The single warm amber accent (prices + amber amounts). Muted at dark
+    // phases so the endgame never turns cheerful-gold.
+    amberText: dark ? '#E9B468' : '#7A4E00',
+    amberTint: dark ? 'rgba(255, 201, 77, 0.10)' : 'rgba(202, 138, 4, 0.10)',
+    amberTintBorder: dark ? 'rgba(255, 201, 77, 0.30)' : 'rgba(202, 138, 4, 0.35)',
+    pillBg: dark ? '#C98A4A' : '#F6BA3F',
+    pillEdge: dark ? '#8F5F2E' : '#C8901E',
+    pillText: dark ? '#241302' : '#3F2B04',
+  };
+}
+
+/**
  * The Store — consumable amber & hint packs plus the one-time cosmetic bundle.
  *
  * Consumables credit the amber reward balance / hint balance directly (the caller
@@ -77,9 +112,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   onHintsChange,
   onOpenPatron,
 }) => {
-  const phaseTheme = getPhaseTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
-  const isDark = phase >= 3;
 
   const [flow, setFlow] = useState<FlowState>('idle');
   const [prices, setPrices] = useState<Record<string, string>>({});
@@ -172,7 +205,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             setFirstAmberDouble(!hasMadeAmberPurchaseSync());
             setSuccessMsg(
               result.firstPurchaseDoubled
-                ? `+${result.reward.amount} amber added — 2× first purchase!`
+                ? `+${result.reward.amount} amber added. 2× first purchase!`
                 : `+${result.reward.amount} amber added.`,
             );
           } else {
@@ -272,43 +305,59 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     onClose();
   }, [onClose]);
 
-  // Theming
-  const bgOverlay = phaseTheme.modalOverlayColor;
-  const cardBg = isDark ? '#13101F' : '#241640';
-  const cardBorder = isDark ? 'rgba(150, 90, 60, 0.4)' : 'rgba(255, 210, 140, 0.38)';
-  const headerColor = isDark ? '#E0B080' : '#FFD479';
-  const bodyColor = isDark ? 'rgba(220, 200, 180, 0.9)' : 'rgba(232, 222, 250, 0.92)';
-  const accent = isDark ? '#C98A4A' : '#FFC94D';
-  const rowBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)';
+  const t = getStoreSurfaceTheme(phase);
   const working = flow === 'working';
 
+  /** Price pinned right in a weighty amber pill — the store's single accent. */
+  const renderPricePill = (
+    label: string,
+    onPress: () => void,
+    accessibilityLabel: string,
+  ) => (
+    <TouchableOpacity
+      style={[
+        styles.pricePill,
+        { backgroundColor: t.pillBg, borderBottomColor: t.pillEdge },
+        working && styles.pricePillDisabled,
+      ]}
+      onPress={onPress}
+      disabled={working}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: working }}
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Text style={[styles.pricePillText, { color: t.pillText }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
   const renderPackRow = (info: ConsumableProductInfo, suffix: React.ReactNode) => (
-    <View key={info.productId} style={[styles.row, { backgroundColor: rowBg }]}>
+    <View
+      key={info.productId}
+      style={[styles.row, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}
+    >
       <View style={styles.rowInfo}>
         <View style={styles.rowTitleLine}>
-          <Text style={[styles.rowTitle, { color: headerColor }]}>{info.name}</Text>
+          <Text style={[styles.rowTitle, { color: t.title }]}>{info.name}</Text>
           {info.bestValue && (
-            <Text style={[styles.badge, { color: '#1B1206', backgroundColor: accent }]}>BEST VALUE</Text>
+            <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
+              BEST VALUE
+            </Text>
           )}
           {info.reward.kind === 'amber' && firstAmberDouble && (
-            <Text style={[styles.badge, { color: '#1B1206', backgroundColor: headerColor }]}>
+            <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
               2× FIRST PURCHASE!
             </Text>
           )}
         </View>
-        <Text style={[styles.rowDesc, { color: bodyColor }]}>
+        <Text style={[styles.rowDesc, { color: t.body }]}>
           {info.description} {suffix}
         </Text>
       </View>
-      <TouchableOpacity
-        style={[styles.priceBtn, { borderColor: accent }]}
-        onPress={() => handleBuyConsumable(info)}
-        disabled={working}
-        accessibilityRole="button"
-        accessibilityLabel={`Buy ${info.name} for ${priceLabel(info)}`}
-      >
-        <Text style={[styles.priceBtnText, { color: accent }]}>{priceLabel(info)}</Text>
-      </TouchableOpacity>
+      {renderPricePill(
+        priceLabel(info),
+        () => handleBuyConsumable(info),
+        `Buy ${info.name} for ${priceLabel(info)}`,
+      )}
     </View>
   );
 
@@ -319,89 +368,81 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       animationType={reducedMotion ? 'none' : 'fade'}
       onRequestClose={handleClose}
     >
-      <View style={[styles.overlay, { backgroundColor: bgOverlay }]}>
+      <View style={[styles.overlay, { backgroundColor: t.overlay }]}>
         <Animated.View
           style={[
             styles.card,
-            { backgroundColor: cardBg, borderColor: cardBorder, opacity: cardOpacity, transform: [{ scale: cardScale }] },
+            { backgroundColor: t.cardBg, borderColor: t.cardBorder, opacity: cardOpacity, transform: [{ scale: cardScale }] },
           ]}
         >
+          <View style={[styles.glow, { backgroundColor: t.glow }]} />
+
           <View style={styles.headerRow}>
-            <Text style={[styles.title, { color: headerColor }]}>Store</Text>
-            <View style={styles.balances}>
-              <Text style={[styles.balanceText, { color: bodyColor }]}>
+            <Text style={[styles.title, { color: t.title }]}>Store</Text>
+            <View style={[styles.balances, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+              <Text style={[styles.balanceText, { color: t.amberText }]}>
                 <AmberInline size={13} /> {amberBalance}
               </Text>
-              <Text style={[styles.balanceText, { color: bodyColor }]}>💡 {hintBalance}</Text>
+              <Text style={[styles.balanceText, { color: t.body }]}>💡 {hintBalance}</Text>
             </View>
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {!ownsStarter && (
-              <View style={[styles.starterCard, { backgroundColor: rowBg, borderColor: accent }]}>
-                <View style={styles.rowInfo}>
-                  <View style={styles.rowTitleLine}>
-                    <Text style={[styles.rowTitle, { color: headerColor }]}>{STARTER_PACK_INFO.name}</Text>
-                    <Text style={[styles.badge, { color: '#1B1206', backgroundColor: accent }]}>
-                      BEST VALUE · ONE TIME
-                    </Text>
-                  </View>
-                  <Text style={[styles.rowDesc, { color: bodyColor }]}>
-                    {STARTER_PACK_INFO.description} <AmberInline size={11} />
+              <View style={[styles.heroCard, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
+                <View style={styles.heroRibbonRow}>
+                  <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
+                    BEST VALUE · ONE TIME
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={[styles.priceBtn, { borderColor: accent }]}
-                  onPress={handleBuyStarter}
-                  disabled={working}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Buy ${STARTER_PACK_INFO.name} for ${prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice}`}
-                >
-                  <Text style={[styles.priceBtnText, { color: accent }]}>
-                    {prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.heroBody}>
+                  <View style={styles.rowInfo}>
+                    <Text style={[styles.heroTitle, { color: t.title }]}>{STARTER_PACK_INFO.name}</Text>
+                    <Text style={[styles.rowDesc, { color: t.body }]}>
+                      {STARTER_PACK_INFO.description} <AmberInline size={11} />
+                    </Text>
+                  </View>
+                  {renderPricePill(
+                    prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice,
+                    handleBuyStarter,
+                    `Buy ${STARTER_PACK_INFO.name} for ${prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice}`,
+                  )}
+                </View>
               </View>
             )}
 
-            <Text style={[styles.sectionLabel, { color: accent }]}>AMBER</Text>
+            <Text style={[styles.sectionLabel, { color: t.body }]}>AMBER</Text>
             {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'amber').map(info =>
               renderPackRow(info, <AmberInline size={11} />),
             )}
 
-            <Text style={[styles.sectionLabel, { color: accent }]}>HINTS</Text>
+            <Text style={[styles.sectionLabel, { color: t.body }]}>HINTS</Text>
             {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'hints').map(info =>
               renderPackRow(info, '💡'),
             )}
 
-            <Text style={[styles.sectionLabel, { color: accent }]}>COSMETIC BUNDLE</Text>
-            <View style={[styles.row, { backgroundColor: rowBg }]}>
+            <Text style={[styles.sectionLabel, { color: t.body }]}>COSMETIC BUNDLE</Text>
+            <View style={[styles.row, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
               <View style={styles.rowInfo}>
-                <Text style={[styles.rowTitle, { color: headerColor }]}>The Keeper&apos;s Collection</Text>
-                <Text style={[styles.rowDesc, { color: bodyColor }]}>
-                  The exclusive Eclipse tile set + Eclipse confetti — equip them in the Cosmetic Shop.
+                <Text style={[styles.rowTitle, { color: t.title }]}>The Keeper&apos;s Collection</Text>
+                <Text style={[styles.rowDesc, { color: t.body }]}>
+                  The exclusive Eclipse tile set + Eclipse confetti. Equip them in the Cosmetic Shop.
                 </Text>
               </View>
               {ownsBundle ? (
-                <Text style={[styles.ownedText, { color: accent }]}>Owned ✦</Text>
+                <Text style={[styles.ownedText, { color: t.amberText }]}>Owned ✦</Text>
               ) : (
-                <TouchableOpacity
-                  style={[styles.priceBtn, { borderColor: accent }]}
-                  onPress={handleBuyBundle}
-                  disabled={working}
-                  accessibilityRole="button"
-                  accessibilityLabel="Buy The Keeper's Collection"
-                >
-                  <Text style={[styles.priceBtnText, { color: accent }]}>
-                    {prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? '$4.99'}
-                  </Text>
-                </TouchableOpacity>
+                renderPricePill(
+                  prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? '$4.99',
+                  handleBuyBundle,
+                  "Buy The Keeper's Collection",
+                )
               )}
             </View>
 
             {onOpenPatron && (
               <TouchableOpacity
-                style={styles.patronLink}
+                style={[styles.patronLink, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}
                 onPress={() => {
                   hapticLight();
                   onClose();
@@ -410,41 +451,44 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Learn about Patron"
               >
-                <Text style={[styles.patronLinkText, { color: bodyColor }]}>
+                <Text style={[styles.patronLinkText, { color: t.body }]}>
                   Want a quieter table and a little amber every puzzle?{' '}
-                  <Text style={{ fontWeight: '800', color: headerColor }}>Become a Patron →</Text>
+                  <Text style={{ fontWeight: '800', color: t.title }}>Become a Patron →</Text>
                 </Text>
               </TouchableOpacity>
             )}
           </ScrollView>
 
           {successMsg && flow !== 'unavailable' && (
-            <View style={styles.successBox} accessibilityLiveRegion="polite">
-              <Text style={[styles.successText, { color: headerColor }]}>{successMsg}</Text>
+            <View
+              style={[styles.successBox, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}
+              accessibilityLiveRegion="polite"
+            >
+              <Text style={[styles.successText, { color: t.amberText }]}>{successMsg}</Text>
             </View>
           )}
 
           {flow === 'unavailable' && (
-            <View style={styles.unavailableBox}>
-              <Text style={[styles.unavailableText, { color: bodyColor }]}>
-                The store isn&apos;t available right now. Nothing was charged — please try again later.
+            <View style={[styles.unavailableBox, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+              <Text style={[styles.unavailableText, { color: t.body }]}>
+                The store isn&apos;t available right now. Nothing was charged. Please try again later.
               </Text>
             </View>
           )}
 
           {working && (
             <View style={styles.workingRow}>
-              <ActivityIndicator size="small" color={accent} />
+              <ActivityIndicator size="small" color={t.amberText} />
             </View>
           )}
 
           <TouchableOpacity
-            style={[styles.closeBtn, { borderColor: cardBorder }]}
+            style={[styles.closeBtn, { borderColor: t.sectionBorder }]}
             onPress={handleClose}
             accessibilityRole="button"
             accessibilityLabel="Close store"
           >
-            <Text style={[styles.closeBtnText, { color: bodyColor }]}>Close</Text>
+            <Text style={[styles.closeBtnText, { color: t.body }]}>Close</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -458,9 +502,25 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     maxHeight: '86%',
-    borderRadius: 22,
-    borderWidth: 1,
+    borderRadius: 28,
+    borderWidth: 1.5,
     padding: 20,
+    shadowColor: CandyColors.purple.dark,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 32,
+    elevation: 20,
+    overflow: 'hidden',
+  },
+  // Soft top glow, matching VictoryModal / DailyLoginModal.
+  glow: {
+    position: 'absolute',
+    top: -50,
+    left: -50,
+    right: -50,
+    height: 160,
+    opacity: 0.25,
+    borderRadius: 100,
   },
   headerRow: {
     flexDirection: 'row',
@@ -468,57 +528,97 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  title: { fontSize: 24, fontWeight: '800' },
-  balances: { flexDirection: 'row', gap: 14 },
+  title: { fontSize: 24, fontWeight: '800', letterSpacing: 0.5 },
+  balances: {
+    flexDirection: 'row',
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
   balanceText: { fontSize: 14, fontWeight: '700' },
   scroll: { flexGrow: 0 },
   scrollContent: { paddingBottom: 4 },
-  sectionLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 1, marginTop: 14, marginBottom: 6 },
+  sectionLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 16, marginBottom: 6 },
+
+  // Starter pack hero — first card, framed by the amber accent border.
+  heroCard: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 14,
+    marginTop: 12,
+  },
+  heroRibbonRow: { flexDirection: 'row', marginBottom: 8 },
+  heroBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroTitle: { fontSize: 18, fontWeight: '900', marginBottom: 2 },
+
+  // Section rows — quiet phase-toned cards; consistent heights.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 14,
+    borderRadius: 16,
+    borderWidth: 1,
     padding: 12,
     marginBottom: 8,
-  },
-  starterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    padding: 12,
-    marginTop: 12,
+    minHeight: 68,
   },
   rowInfo: { flex: 1, paddingRight: 12 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  rowTitle: { fontSize: 16, fontWeight: '800' },
-  badge: {
+  rowTitle: { fontSize: 15, fontWeight: '800' },
+  ribbon: {
     fontSize: 9,
     fontWeight: '900',
     letterSpacing: 0.5,
-    paddingHorizontal: 6,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 7,
     overflow: 'hidden',
   },
   rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17 },
-  priceBtn: {
-    borderWidth: 1.5,
-    borderRadius: 12,
+
+  // Price pill — solid amber, weighty bottom edge (JuicyButton-style mass).
+  pricePill: {
+    borderRadius: 14,
+    borderBottomWidth: 3,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    minWidth: 72,
+    minWidth: 76,
     alignItems: 'center',
   },
-  priceBtnText: { fontSize: 14, fontWeight: '800' },
+  pricePillDisabled: { opacity: 0.5 },
+  pricePillText: { fontSize: 14, fontWeight: '900' },
   ownedText: { fontSize: 13, fontWeight: '800', paddingHorizontal: 8 },
-  patronLink: { marginTop: 16, paddingVertical: 6 },
+
+  patronLink: {
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
   patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center' },
-  successBox: { marginTop: 12 },
+
+  successBox: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
   successText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontWeight: '700' },
-  unavailableBox: { marginTop: 12 },
+  unavailableBox: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
   unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center' },
   workingRow: { marginTop: 12, alignItems: 'center' },
   closeBtn: {

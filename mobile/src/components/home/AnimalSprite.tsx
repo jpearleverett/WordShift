@@ -221,14 +221,16 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
 // art isn't uniformly bottom-aligned in its frame — some characters are drawn
 // higher, so with the same room placement they read as floating. These offsets
 // push those few down so everyone walks on the floor. 0 = already grounded.
+// Tuned from player feedback: pangolin/owl previously sat 3px too low (feet
+// stepped just past the room's bottom edge), so their offsets were eased back.
 const FLOOR_OFFSET: Record<AnimalType, number> = {
   red_panda: 0,
   axolotl: 0, // lives in the tank — placement handled by the water, leave as-is
-  pangolin: 14,
+  pangolin: 11,
   sloth: 0,
   fennec_fox: 0,
   fox: 0,
-  owl: 18,
+  owl: 15,
   capybara: 0,
   wombat: 0,
   rabbit: 0,
