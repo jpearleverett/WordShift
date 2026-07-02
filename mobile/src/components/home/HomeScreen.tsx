@@ -145,11 +145,20 @@ interface HomeScreenProps {
 
 // --- Header quest pill: pure decisions (node-testable, see questPill.test.ts) ---
 
-/** Count of in-progress quests (not yet completed, not claimed) across daily + weekly. */
-export const getActiveIncompleteQuestCount = (state: CombinedQuestState | null): number => {
+/**
+ * Count of ACTIONABLE quests across daily + weekly: quests still in progress
+ * (not completed) PLUS completed-but-unclaimed (the claim is still an action).
+ * Claimed quests are done and never count. This is the single shared count
+ * behind BOTH the header quest pill and the Journal Hub "Quests (N)" row, so
+ * the two surfaces can never disagree. (Player report: every reward claimed on
+ * both tabs, yet the pill read "5" and the journal "Quests (5)" — the old
+ * journal count included all unclaimed quests while the pill excluded
+ * completed-but-unclaimed ones; neither matched what was actually left to do.)
+ */
+export const getActionableQuestCount = (state: CombinedQuestState | null): number => {
   if (!state) return 0;
   return [...state.daily.quests, ...state.weekly.quests]
-    .filter(q => !q.completed && !q.claimed).length;
+    .filter(q => !q.claimed).length;
 };
 
 /**
@@ -163,23 +172,36 @@ export const isQuestPillVisible = (
 ): boolean => !isOnboarding && !isPostTutorialLightMode && hasQuestState;
 
 /**
- * Quest pill label: 🎯 plus the in-progress count — or the bare 🎯 when
+ * Quest pill label: 🎯 plus the actionable count — or the bare 🎯 when
  * nothing is left to do (all current daily + weekly quests completed and
  * claimed). A lingering "🎯 0" read as a permanent to-do; the number only
  * appears while a quest is actually actionable.
  */
-export const getQuestPillLabel = (activeIncompleteCount: number): string =>
-  activeIncompleteCount > 0 ? `🎯 ${activeIncompleteCount}` : '🎯';
+export const getQuestPillLabel = (actionableCount: number): string =>
+  actionableCount > 0 ? `🎯 ${actionableCount}` : '🎯';
 
-/** Screen-reader label for the quest pill: active count, claimable amber, daily reset. */
+/**
+ * Journal Hub "Quests" row label. Prefers the claimable-amber call-out, then
+ * the actionable count, and drops the parenthetical entirely when nothing is
+ * left to do (an all-claimed board must never read "Quests (5)").
+ */
+export const getJournalQuestLabel = (
+  actionableCount: number,
+  claimableAmber: number,
+): string => {
+  if (claimableAmber > 0) return `🗓 Quests (+${claimableAmber})`;
+  return actionableCount > 0 ? `🗓 Quests (${actionableCount})` : '🗓 Quests';
+};
+
+/** Screen-reader label for the quest pill: actionable count, claimable amber, daily reset. */
 export const getQuestPillAccessibilityLabel = (
-  activeIncompleteCount: number,
+  actionableCount: number,
   claimableAmber: number,
   dailyResetHint: string,
 ): string =>
   'Open quests.' +
-  (activeIncompleteCount > 0
-    ? ` ${activeIncompleteCount} in progress.`
+  (actionableCount > 0
+    ? ` ${actionableCount} to do.`
     : claimableAmber > 0 ? '' : ' All quests complete.') +
   (claimableAmber > 0 ? ` ${claimableAmber} amber ready to claim.` : '') +
   ` Daily quests reset in ${dailyResetHint}.`;
@@ -361,14 +383,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return getUnclaimedAmber(weeklyQuestState, progress.currentPhase);
   }, [weeklyQuestState, progress]);
 
-  const activeQuestCount = useMemo(() => {
-    if (!weeklyQuestState) return 0;
-    const allQuests = [...weeklyQuestState.daily.quests, ...weeklyQuestState.weekly.quests];
-    return allQuests.filter(q => !q.claimed).length;
-  }, [weeklyQuestState]);
-
-  const activeIncompleteQuestCount = useMemo(
-    () => getActiveIncompleteQuestCount(weeklyQuestState),
+  // ONE count for every quest surface (header pill + Journal Hub row), so the
+  // two can never drift apart again. Re-derives whenever weeklyQuestState is
+  // replaced (mount load, modal open, and immediately after every claim).
+  const actionableQuestCount = useMemo(
+    () => getActionableQuestCount(weeklyQuestState),
     [weeklyQuestState]
   );
 
@@ -819,7 +838,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       dailyUnlocked: false,
       challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
     });
-    setWeeklyQuestState({ ...refreshed });
+    // loadWeeklyQuests returns the module-level cache objects that
+    // claimQuestReward mutated IN PLACE — the same references this component
+    // already holds in state. Clone every level so the pill/journal counts
+    // (and anything memoized on tier or quest identity) re-derive from the
+    // post-claim state immediately, not from a stale snapshot.
+    setWeeklyQuestState({
+      daily: { ...refreshed.daily, quests: refreshed.daily.quests.map(q => ({ ...q })) },
+      weekly: { ...refreshed.weekly, quests: refreshed.weekly.quests.map(q => ({ ...q })) },
+    });
   }, [progress, onAmberChange, animals]);
 
   const handlePurchaseUpgrade = useCallback(async (roomId: string) => {
@@ -1027,13 +1054,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   onPress={() => { handleOpenQuestModal().catch(() => {}); }}
                   accessibilityLabel={getQuestPillAccessibilityLabel(
-                    activeIncompleteQuestCount,
+                    actionableQuestCount,
                     claimableQuestAmber,
                     dailyResetHint
                   )}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.questPillText}>{getQuestPillLabel(activeIncompleteQuestCount)}</Text>
+                  <Text style={styles.questPillText}>{getQuestPillLabel(actionableQuestCount)}</Text>
                   {claimableQuestAmber > 0 && (
                     <View style={styles.headerBadge}>
                       <Text style={styles.headerBadgeText}>!</Text>
@@ -1213,6 +1240,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             accessibilityLabel="Play puzzle"
             accessibilityRole="button"
           >
+            {/* Inner top gloss — the candy-tile glass sheen (see LetterTile's
+                glossyShine). Purely decorative; never intercepts touches. */}
+            <View style={styles.playButtonGloss} pointerEvents="none" />
             <Text style={styles.playButtonText}>PLAY</Text>
           </JuicyButton>
         </Animated.View>
@@ -1428,12 +1458,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityRole="button"
               >
                 <Text style={[styles.hubButtonText, { color: dt.textColor }]}>
-                  🗓 Quests
-                  {claimableQuestAmber > 0
-                    ? ` (+${claimableQuestAmber})`
-                    : activeQuestCount > 0
-                      ? ` (${activeQuestCount})`
-                      : ''}
+                  {getJournalQuestLabel(actionableQuestCount, claimableQuestAmber)}
                 </Text>
               </TouchableOpacity>
             )}
@@ -2765,32 +2790,60 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 60,
   },
+  // Candy-glass treatment (playtest: the flat green bar read as a web button).
+  // Same recipe as the letter tiles: translucent body over the world, a light
+  // top-edge rim + inner gloss for the glassy bevel, and a darker 4px bottom
+  // edge for the tiles' "weighty base" (CandyColors.green.shadow, the tile
+  // edge shade). Static styles only — the press/pulse springs stay in
+  // JuicyButton on the native driver.
   playButton: {
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: CandyColors.green.main,
+    backgroundColor: 'rgba(34, 197, 94, 0.88)', // green.main as glass
     paddingHorizontal: 12,
-    shadowColor: CandyColors.green.dark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: 'rgba(74, 222, 128, 0.45)',    // green.light rim
+    borderTopColor: 'rgba(255, 255, 255, 0.55)', // lit top edge
+    borderBottomWidth: 4,
+    borderBottomColor: CandyColors.green.shadow, // deep bottom edge (tile language)
+    shadowColor: CandyColors.green.shadow,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
   },
   playButtonHighlighted: {
     borderWidth: 2,
     borderColor: CandyColors.yellow.main,
+    borderTopColor: CandyColors.yellow.light,
+    borderBottomWidth: 4,
+    borderBottomColor: CandyColors.yellow.dark,
     shadowColor: CandyColors.yellow.main,
     shadowOpacity: 0.65,
     shadowRadius: 10,
     elevation: 8,
   },
+  // Inner top gloss (nested rounded View, like LetterTile's glossyShine) —
+  // sells the candy-glass curve without any extra library or animation.
+  playButtonGloss: {
+    position: 'absolute',
+    top: 4,
+    left: 14,
+    right: 14,
+    height: 20,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+  },
   playButtonText: {
     color: CandyColors.white,
     fontSize: 17,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 2.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 2,
   },
 
   // Words Offered Counter (persistent on home screen)

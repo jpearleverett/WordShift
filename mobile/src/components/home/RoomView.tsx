@@ -43,6 +43,40 @@ const WORD_ECHO_POSITIONS = [
   { top: '30%', left: '55%', rotate: '-8deg' },
 ];
 
+// Amber gem sprite for the invite chip cost rows. Rendered as a plain Image
+// inside a row (NOT embedded inline in a Text run) so the gem gets an explicit
+// size and a consistent 4px gap on one shared baseline — text-embedded images
+// at this small font size render with inconsistent spacing/baselines.
+const AMBER_ICON = require('../../../assets/ui/amber.png');
+
+/**
+ * Content contract for the invite chip shown in an unlocked room whose
+ * animal hasn't been invited yet. Pure + exported for tests.
+ */
+export type InviteChipContent =
+  | { kind: 'tap'; label: string }
+  | { kind: 'free'; label: string }
+  | { kind: 'cost'; label: string; cost: number; affordable: boolean };
+
+export const getInviteChipContent = (
+  inviteCost: number | null,
+  amberBalance: number,
+): InviteChipContent => {
+  if (inviteCost === null) return { kind: 'tap', label: 'Tap to Invite' };
+  if (inviteCost === 0) return { kind: 'free', label: 'Invite (FREE)' };
+  return { kind: 'cost', label: 'Invite', cost: inviteCost, affordable: amberBalance >= inviteCost };
+};
+
+/** Accessibility label for the invite chip (strings unchanged by the redesign). */
+export const getInviteAccessibilityLabel = (
+  roomName: string,
+  inviteCost: number | null,
+): string => {
+  if (inviteCost === null) return `Invite animal to ${roomName}`;
+  if (inviteCost === 0) return `Invite animal to ${roomName} for free`;
+  return `Invite animal to ${roomName} for ${inviteCost} amber`;
+};
+
 interface RoomViewProps {
   room: Room;
   animal: Animal | null;
@@ -164,41 +198,48 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
         />
       )}
 
-      {/* Empty room waiting for animal - show invite indicator */}
-      {animal && !animal.isUnlocked && (
-        <Pressable
-          style={({ pressed }) => [
-            styles.lockedAnimalContainer,
-            pressed && styles.pressed,
-          ]}
-          onPress={() => onRoomPress(room)}
-          accessibilityRole="button"
-          accessibilityLabel={
-            inviteCost === null
-              ? `Invite animal to ${room.name}`
-              : inviteCost === 0
-                ? `Invite animal to ${room.name} for free`
-                : `Invite animal to ${room.name} for ${inviteCost} amber`
-          }
-        >
-          <View style={styles.inviteAnimalBadge}>
-            <Text style={styles.inviteAnimalIcon}>✨</Text>
-            <Text style={styles.inviteAnimalText}>
-              {inviteCost === null
-                ? 'Tap to Invite'
-                : inviteCost === 0
-                  ? 'Invite (FREE)'
-                  : <>Invite <AmberInline /> {inviteCost}</>
-              }
-            </Text>
-            {inviteCost !== null && inviteCost > 0 && (
-              <Text style={styles.inviteAnimalCostSubtext}>
-                {amberBalance >= inviteCost ? 'Tap to welcome' : <>You: <AmberInline /> {amberBalance}</>}
-              </Text>
-            )}
+      {/* Empty room waiting for animal - show invite chip.
+          Centered by an absolute-fill wrapper (box-none: only the chip itself
+          is tappable) instead of hand-tuned translate offsets, so it stays
+          truly centered whatever size the chip renders at. */}
+      {animal && !animal.isUnlocked && (() => {
+        const chip = getInviteChipContent(inviteCost, amberBalance);
+        return (
+          <View style={styles.inviteCenterWrap} pointerEvents="box-none">
+            <Pressable
+              style={({ pressed }) => [pressed && styles.pressed]}
+              onPress={() => onRoomPress(room)}
+              accessibilityRole="button"
+              accessibilityLabel={getInviteAccessibilityLabel(room.name, inviteCost)}
+            >
+              <View style={styles.inviteAnimalBadge}>
+                {chip.kind === 'cost' ? (
+                  <View style={styles.inviteCostRow}>
+                    <Text style={styles.inviteAnimalText}>{chip.label}</Text>
+                    <Image source={AMBER_ICON} style={styles.inviteCostGem} />
+                    <Text style={styles.inviteCostAmount}>{chip.cost}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.inviteAnimalText}>{chip.label}</Text>
+                )}
+                {chip.kind === 'cost' && (
+                  chip.affordable ? (
+                    <Text style={[styles.inviteAnimalCostSubtext, styles.inviteSubtextAffordable]}>
+                      Tap to welcome
+                    </Text>
+                  ) : (
+                    <View style={styles.inviteBalanceRow}>
+                      <Text style={styles.inviteAnimalCostSubtext}>You:</Text>
+                      <Image source={AMBER_ICON} style={styles.inviteBalanceGem} />
+                      <Text style={styles.inviteAnimalCostSubtext}>{amberBalance}</Text>
+                    </View>
+                  )
+                )}
+              </View>
+            </Pressable>
           </View>
-        </Pressable>
-      )}
+        );
+      })()}
 
       {/* Word Echo Overlay - ritual words faintly inscribed in rooms */}
       {currentPhase >= 2 && ritualWords.length > 0 && (() => {
@@ -329,41 +370,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginBottom: 4,
   },
-  lockedAnimalContainer: {
+  // Invite chip: absolute-fill wrapper centers the chip in the room without
+  // hardcoded offsets; box-none keeps touches limited to the chip itself.
+  inviteCenterWrap: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -40 }, { translateY: -35 }],
-  },
-  lockedAnimalBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: CandyColors.gray[400],
-    borderStyle: 'dashed',
-  },
-  lockedAnimalIcon: {
-    fontSize: 20,
-  },
-  lockedAnimalText: {
-    color: CandyColors.gray[300],
-    fontSize: 10,
-    fontWeight: '700',
   },
   inviteAnimalBadge: {
-    width: 104,
-    minHeight: 76,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    minWidth: 96,
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    borderWidth: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 2,
     borderColor: CandyColors.yellow.main,
     shadowColor: CandyColors.yellow.main,
     shadowOffset: { width: 0, height: 2 },
@@ -371,22 +398,50 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
-  inviteAnimalIcon: {
-    fontSize: 24,
-    marginBottom: 2,
+  // Action line: "Invite [gem] 100" as an explicit row so the 16px gem and
+  // the bold amount share one baseline with a fixed 4px gap.
+  inviteCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inviteCostGem: {
+    width: 16,
+    height: 16,
+    marginLeft: 5,
+    marginRight: 4,
+  },
+  inviteCostAmount: {
+    color: CandyColors.purple.main,
+    fontSize: 12,
+    fontWeight: '800',
   },
   inviteAnimalText: {
     color: CandyColors.purple.main,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
     textAlign: 'center',
   },
+  // Dimmed balance line: "You: [gem] 30" with the same gap treatment (12px gem).
+  inviteBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  inviteBalanceGem: {
+    width: 12,
+    height: 12,
+    marginLeft: 4,
+    marginRight: 4,
+  },
   inviteAnimalCostSubtext: {
-    marginTop: 2,
-    color: CandyColors.gray[700],
-    fontSize: 9,
+    color: CandyColors.gray[600],
+    fontSize: 10,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  inviteSubtextAffordable: {
+    marginTop: 3,
+    color: CandyColors.green.shadow,
   },
   // Word echo overlay - ritual words inscribed in rooms
   wordEchoOverlay: {

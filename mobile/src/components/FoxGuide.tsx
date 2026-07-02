@@ -34,7 +34,7 @@ interface FoxGuideProps {
   visible: boolean;
   /** The text Fox says */
   text: string;
-  /** Button label (defaults to "Continue") */
+  /** Button label (defaults to "Next", matching the home dialogue card) */
   buttonText?: string;
   /** Called when the player taps the button */
   onContinue?: () => void;
@@ -56,13 +56,19 @@ interface FoxGuideProps {
  * FoxGuide — a floating Fox speech bubble overlay used during onboarding.
  * Appears at the bottom (or top) of any screen to guide the player.
  *
- * variant='compact' — small floating card (used on home screen onboarding)
- * variant='dialogue' — side-by-side layout matching the HomeScreen animal dialogue box
+ * Both variants share the HomeScreen animal-dialogue card anatomy (accent
+ * line, full-height lavender sprite panel, name header + underline, lavender
+ * bubble, footer with quiet Skip + solid purple pill) so the tutorial reads
+ * as the same app as the home dialogue:
+ *
+ * variant='dialogue' — full-size card, exact HomeScreen dialogue values
+ * variant='compact'  — the same anatomy shrunk down so it never covers the
+ *                      board during move-required tutorial steps
  */
 export const FoxGuide: React.FC<FoxGuideProps> = ({
   visible,
   text,
-  buttonText = 'Continue',
+  buttonText = 'Next',
   onContinue,
   position = 'bottom',
   anchorStyle,
@@ -158,99 +164,12 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   const isMiddle = position === 'middle';
   const resolvedPositionStyle = anchorStyle || (isTop ? { top: Math.max(80, SCREEN_HEIGHT * 0.12) } : isMiddle ? { top: Math.max(180, SCREEN_HEIGHT * 0.25) } : { bottom: Math.max(30, SCREEN_HEIGHT * 0.04) });
 
-  // Dialogue theme for the dialogue variant (always Phase 0 during tutorial)
+  // Dialogue theme (always Phase 0 during tutorial — every FoxGuide call site
+  // is a Phase-0 Fox moment)
   const dt = getDialogueTheme(0);
+  const isCompact = variant === 'compact';
+  const foxSprite = speaking ? foxTalkSprite : foxIdleSprite;
 
-  if (variant === 'dialogue') {
-    const foxSprite = speaking ? foxTalkSprite : foxIdleSprite;
-    return (
-      <Animated.View
-        style={[
-          styles.container,
-          resolvedPositionStyle,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: Animated.multiply(slideAnim, isTop ? -1 : 1) }],
-          },
-        ]}
-        pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
-      >
-        <View style={[
-          styles.dialogueCard,
-          {
-            backgroundColor: dt.modalBg,
-            borderColor: dt.modalBorder,
-            shadowColor: dt.modalShadowColor,
-          },
-        ]}>
-          {/* Accent line at top */}
-          <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
-
-          <View style={styles.dialogueRow}>
-            {/* Sprite column — 28% width */}
-            <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
-              <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
-                {foxSprite ? (
-                  <Image
-                    source={foxSprite}
-                    style={styles.dialogueSpriteImage}
-                    resizeMode="cover"
-                    accessibilityLabel="Ember portrait"
-                  />
-                ) : (
-                  <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
-                )}
-              </Animated.View>
-            </View>
-
-            {/* Text column — 72% */}
-            <View style={styles.dialogueTextCol}>
-              <Text style={[styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
-              <View style={[styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
-
-              <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
-                <Animated.Text
-                  style={[styles.dialogueText, { color: dt.textColor, opacity: textFadeAnim }]}
-                >
-                  {text}
-                </Animated.Text>
-              </View>
-
-              {/* Action row */}
-              <View style={styles.dialogueFooter}>
-                {showSkip && onSkip && (
-                  <TouchableOpacity
-                    style={styles.dialogueSkipBtn}
-                    onPress={onSkip}
-                    accessibilityLabel="Skip intro"
-                    accessibilityRole="button"
-                  >
-                    <Text style={[styles.dialogueSkipText, { color: dt.subtitleColor }]}>Skip</Text>
-                  </TouchableOpacity>
-                )}
-                {onContinue && (
-                  <TouchableOpacity
-                    style={[
-                      styles.dialogueContinueBtn,
-                      { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
-                    ]}
-                    onPress={onContinue}
-                    accessibilityLabel={buttonText}
-                    accessibilityRole="button"
-                  >
-                    <View style={styles.dialogueBtnShine} />
-                    <Text style={styles.dialogueContinueBtnText}>{buttonText}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-          </View>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  // Compact variant (original floating card)
   return (
     <Animated.View
       style={[
@@ -263,63 +182,82 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       ]}
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
-      accessibilityRole="alert"
-      accessibilityLabel={`Ember says: ${text}`}
+      accessibilityRole={isCompact ? 'alert' : undefined}
+      accessibilityLabel={isCompact ? `Ember says: ${text}` : undefined}
     >
-      <View style={styles.guideCard}>
-        {/* Fox sprite */}
-        <Animated.View
-          style={[
-            styles.foxContainer,
-            { transform: [{ translateY: bounceAnim }] },
-          ]}
-        >
-          {foxTalkSprite ? (
-            <Image
-              source={foxTalkSprite}
-              style={styles.foxImage}
-              resizeMode="contain"
-            />
-          ) : (
-            <Text style={styles.foxEmoji}>🦊</Text>
-          )}
-        </Animated.View>
+      <View
+        style={[
+          isCompact ? styles.compactCard : styles.dialogueCard,
+          {
+            backgroundColor: dt.modalBg,
+            borderColor: dt.modalBorder,
+            shadowColor: dt.modalShadowColor,
+          },
+        ]}
+      >
+        {/* Decorative accent line at top (same as HomeScreen dialogue modal) */}
+        <View style={[styles.accentLine, { backgroundColor: dt.accentLine }]} />
 
-        {/* Speech content */}
-        <View style={styles.speechArea}>
-          <View style={styles.speechBubble}>
-            <View style={styles.speechAccentBar} />
-            <View style={styles.speechShine} />
-            <Animated.Text
-              style={[styles.speechText, { opacity: textFadeAnim }]}
-            >
-              {text}
-            </Animated.Text>
+        <View style={styles.cardRow}>
+          {/* Sprite panel — full card height, lavender, sprite zoomed to fill */}
+          <View style={[isCompact ? styles.compactSpriteCol : styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
+            <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
+              {foxSprite ? (
+                <Image
+                  source={foxSprite}
+                  style={isCompact ? styles.compactSpriteImage : styles.dialogueSpriteImage}
+                  resizeMode="cover"
+                  accessibilityLabel="Ember portrait"
+                />
+              ) : (
+                <Text style={isCompact ? styles.compactSpriteEmoji : styles.dialogueSpriteEmoji}>🦊</Text>
+              )}
+            </Animated.View>
           </View>
 
-          {/* Action row */}
-          <View style={styles.actionRow}>
-            {showSkip && onSkip && (
-              <TouchableOpacity
-                style={styles.skipButton}
-                onPress={onSkip}
-                accessibilityLabel="Skip intro"
-                accessibilityRole="button"
+          {/* Text column */}
+          <View style={isCompact ? styles.compactTextCol : styles.dialogueTextCol}>
+            <Text style={[isCompact ? styles.compactName : styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
+            <View style={[isCompact ? styles.compactNameSep : styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
+
+            <View style={[isCompact ? styles.compactBubble : styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+              <Animated.Text
+                style={[isCompact ? styles.compactText : styles.dialogueText, { color: dt.textColor, opacity: textFadeAnim }]}
               >
-                <Text style={styles.skipButtonText}>Skip</Text>
-              </TouchableOpacity>
-            )}
-            {onContinue && (
-              <TouchableOpacity
-                style={styles.continueButton}
-                onPress={onContinue}
-                accessibilityLabel={buttonText}
-                accessibilityRole="button"
-              >
-                <View style={styles.continueButtonShine} />
-                <Text style={styles.continueButtonText}>{buttonText}</Text>
-              </TouchableOpacity>
-            )}
+                {text}
+              </Animated.Text>
+            </View>
+
+            {/* Footer: quiet Skip + solid purple pill. The footer keeps a
+                stable min height even when no pill renders (move-required
+                steps advance via the board), so the card never jumps when a
+                continue action appears/disappears. */}
+            <View style={isCompact ? styles.compactFooter : styles.dialogueFooter}>
+              {showSkip && onSkip && (
+                <TouchableOpacity
+                  style={styles.skipBtn}
+                  onPress={onSkip}
+                  accessibilityLabel="Skip intro"
+                  accessibilityRole="button"
+                >
+                  <Text style={[isCompact ? styles.compactSkipText : styles.dialogueSkipText, { color: dt.subtitleColor }]}>Skip</Text>
+                </TouchableOpacity>
+              )}
+              {onContinue && (
+                <TouchableOpacity
+                  style={[
+                    isCompact ? styles.compactContinueBtn : styles.dialogueContinueBtn,
+                    { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
+                  ]}
+                  onPress={onContinue}
+                  accessibilityLabel={buttonText}
+                  accessibilityRole="button"
+                >
+                  <View style={isCompact ? styles.compactBtnShine : styles.dialogueBtnShine} />
+                  <Text style={isCompact ? styles.compactContinueBtnText : styles.dialogueContinueBtnText}>{buttonText}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </View>
@@ -336,201 +274,75 @@ const styles = StyleSheet.create({
     zIndex: 9000,
     paddingHorizontal: 16,
   },
-  containerBottom: {
-    bottom: 30,
+  // Shared card anatomy (values copied from HomeScreen's dialogue modal)
+  accentLine: {
+    height: 3,
+    width: '100%',
   },
-  containerTop: {
-    top: 100,
-  },
-  containerMiddle: {
-    top: 220,
-  },
-
-  // ---- Compact variant (floating card) ----
-  // Light treatment: every FoxGuide call site is a Phase-0 Fox moment
-  // (onboarding + Fox intros), so the compact card shares the same soft
-  // white/lavender language as the dialogue variant instead of the old
-  // near-black box that clashed with the bright tutorial screen.
-  guideCard: {
+  cardRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
-    borderRadius: 20,
-    padding: 12,
-    alignItems: 'center',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.22)',
   },
-  foxContainer: {
-    width: 58,
-    height: 58,
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F3E8FF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(168, 85, 247, 0.25)',
-    overflow: 'hidden',
-  },
-  foxImage: {
-    width: 58,
-    height: 58,
-  },
-  foxEmoji: {
-    fontSize: 40,
-  },
-  speechArea: {
-    flex: 1,
-  },
-  speechBubble: {
-    backgroundColor: '#F5F0FF',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    paddingLeft: 14,
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(128, 83, 210, 0.18)',
-  },
-  speechAccentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 5,
-    bottom: 5,
-    width: 2,
-    borderRadius: 2,
-    backgroundColor: CandyColors.purple.light,
-    opacity: 0.85,
-  },
-  speechShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '40%',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  speechText: {
-    fontSize: 14,
-    color: '#3D3158',
-    lineHeight: 20,
-    letterSpacing: 0.1,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: 7,
-    gap: 10,
-  },
-  skipButton: {
+  skipBtn: {
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  skipButtonText: {
-    fontSize: 13,
-    // Quiet purple text button — >=4.5:1 on the white card.
-    color: CandyColors.purple.dark,
-    fontWeight: '600',
-  },
-  continueButton: {
-    backgroundColor: '#7A49D8',
-    paddingVertical: 9,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    shadowColor: CandyColors.purple.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  continueButtonShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  continueButtonText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: CandyColors.white,
-    letterSpacing: 0.4,
-  },
 
-  // ---- Dialogue variant (matches HomeScreen dialogue box) ----
+  // ---- Dialogue variant (exact HomeScreen dialogue card values) ----
   dialogueCard: {
     borderRadius: 22,
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 12,
     overflow: 'hidden',
     borderWidth: 1,
   },
-  dialogueAccentLine: {
-    height: 3,
-    width: '100%',
-  },
-  dialogueRow: {
-    flexDirection: 'row',
-  },
+  // Sprite column - 30% width, zoomed in to fill (HomeScreen dialogueSpriteCol)
   dialogueSpriteCol: {
-    width: '28%',
+    width: '30%',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
   dialogueSpriteImage: {
-    width: SCREEN_WIDTH * 0.30,
-    height: SCREEN_WIDTH * 0.36,
+    width: SCREEN_WIDTH * 0.36,
+    height: SCREEN_WIDTH * 0.48,
   },
   dialogueSpriteEmoji: {
-    fontSize: Math.min(60, SCREEN_WIDTH * 0.15),
+    fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
   },
+  // HomeScreen dialogueTextCol uses paddingBottom 34 because it is a bottom
+  // sheet clearing the home indicator; this is a floating card, so the bottom
+  // padding stays symmetric with the top instead.
   dialogueTextCol: {
     flex: 1,
-    paddingTop: 14,
-    paddingBottom: 16,
-    paddingHorizontal: 14,
+    paddingTop: 20,
+    paddingBottom: 18,
+    paddingHorizontal: 18,
   },
   dialogueName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0.5,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   dialogueNameSep: {
     height: 2,
-    width: 28,
+    width: 32,
     borderRadius: 1,
     opacity: 0.5,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   dialogueBubble: {
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
     borderWidth: 1,
   },
   dialogueText: {
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 23,
     letterSpacing: 0.1,
   },
   dialogueFooter: {
@@ -538,19 +350,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 10,
-  },
-  dialogueSkipBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    // Pill height (12 + 20 + 12 + 2 border): stable whether or not it renders.
+    minHeight: 46,
   },
   dialogueSkipText: {
     fontSize: 14,
     fontWeight: '600',
   },
   dialogueContinueBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 22,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius: 8,
@@ -566,13 +376,113 @@ const styles = StyleSheet.create({
     right: 0,
     height: '50%',
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
   },
   dialogueContinueBtnText: {
     color: CandyColors.white,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
+    lineHeight: 20,
+  },
+
+  // ---- Compact variant: the same anatomy shrunk down (move-required steps,
+  // must not cover the board) ----
+  compactCard: {
+    borderRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  compactSpriteCol: {
+    width: 78,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  // Same 3:4 crop-to-fill treatment as the dialogue sprite, smaller.
+  compactSpriteImage: {
+    width: 86,
+    height: 114,
+  },
+  compactSpriteEmoji: {
+    fontSize: 48,
+  },
+  compactTextCol: {
+    flex: 1,
+    paddingTop: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+  },
+  compactName: {
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  compactNameSep: {
+    height: 2,
+    width: 24,
+    borderRadius: 1,
+    opacity: 0.5,
+    marginBottom: 8,
+  },
+  compactBubble: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  compactText: {
+    fontSize: 14,
+    lineHeight: 21,
+    letterSpacing: 0.1,
+  },
+  compactFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+    // Pill height (8 + 17 + 8 + 2 border): stable whether or not it renders —
+    // during move-required steps only Skip shows and the card doesn't jump.
+    minHeight: 36,
+  },
+  compactSkipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  compactContinueBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  compactBtnShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  compactContinueBtnText: {
+    color: CandyColors.white,
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 17,
+    letterSpacing: 0.4,
   },
 });
 
