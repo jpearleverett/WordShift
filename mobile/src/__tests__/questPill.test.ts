@@ -10,22 +10,29 @@
  * whenever onboarding is over (including the post-tutorial light mode, so
  * Settings is always reachable from home).
  *
- *  - getActiveIncompleteQuestCount: the pill count is quests still in
- *    progress (not completed, not claimed) across daily + weekly tiers —
- *    completed-but-unclaimed quests are the badge's job, not the count's.
- *  - getQuestPillLabel: the number only renders while something is still in
- *    progress. When every current quest is completed AND claimed the pill is
- *    the bare 🎯 — no lingering "🎯 0" reading as a permanent to-do (player
- *    report: "always shows a number, even if I've claimed all rewards").
+ *  - getActionableQuestCount: the ONE shared count for every quest surface
+ *    (header pill + Journal Hub row). Actionable = still in progress (not
+ *    completed) PLUS completed-but-unclaimed (claiming is still an action),
+ *    across daily AND weekly. Claimed quests never count. Player report
+ *    (screenshot): all rewards claimed on both tabs, yet the pill read
+ *    "🎯 5" and the journal "Quests (5)" — the two surfaces derived their
+ *    numbers differently (journal: all unclaimed quests; pill: in-progress
+ *    only) and neither matched what was actually left to do.
+ *  - getQuestPillLabel: the number only renders while something is still
+ *    actionable. When every current quest is completed AND claimed the pill
+ *    is the bare 🎯 — no lingering count reading as a permanent to-do.
+ *  - getJournalQuestLabel: same count feeds the Journal Hub row; the (N)
+ *    suffix is omitted entirely when nothing is left to do.
  *  - isQuestPillVisible: gated exactly like the Journal Hub (puzzle 6+ via
  *    the post-tutorial light mode, hidden during onboarding), and only once
  *    quest data has loaded.
- *  - getQuestPillAccessibilityLabel: describes active count (or "All quests
- *    complete"), claimable amber (only when > 0), and the daily reset —
- *    never conveyed by color alone.
+ *  - getQuestPillAccessibilityLabel: describes the actionable count (or "All
+ *    quests complete"), claimable amber (only when > 0), and the daily reset
+ *    — never conveyed by color alone.
  *  - Source scan: the pill lives in the header, opens the quest modal
- *    DIRECTLY (not via the Journal Hub), and its '!' badge keys on claimable
- *    amber only.
+ *    DIRECTLY (not via the Journal Hub), its '!' badge keys on claimable
+ *    amber only, and claiming inside the quest modal replaces the quest
+ *    state (fresh references) so both counts re-derive immediately.
  *
  * HomeScreen imports react-native + native-adjacent modules at module scope;
  * stub them so the pure helpers can be imported in the Node test env
@@ -104,8 +111,9 @@ jest.mock('../services/deviceTier', () => ({
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  getActiveIncompleteQuestCount,
+  getActionableQuestCount,
   getQuestPillLabel,
+  getJournalQuestLabel,
   isQuestPillVisible,
   getQuestPillAccessibilityLabel,
 } from '../components/home/HomeScreen';
@@ -136,9 +144,9 @@ const makeState = (daily: Quest[], weekly: Quest[]): CombinedQuestState => {
   return { daily: tier('2026-07-02', daily), weekly: tier('2026-W27', weekly) };
 };
 
-describe('getActiveIncompleteQuestCount', () => {
+describe('getActionableQuestCount (the ONE shared count)', () => {
   test('returns 0 when quest state has not loaded', () => {
-    expect(getActiveIncompleteQuestCount(null)).toBe(0);
+    expect(getActionableQuestCount(null)).toBe(0);
   });
 
   test('counts in-progress quests across both daily and weekly tiers', () => {
@@ -146,40 +154,61 @@ describe('getActiveIncompleteQuestCount', () => {
       [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2', progress: 2 })],
       [makeQuest({ id: 'w1', tier: 'weekly' })]
     );
-    expect(getActiveIncompleteQuestCount(state)).toBe(3);
+    expect(getActionableQuestCount(state)).toBe(3);
   });
 
-  test('excludes completed-but-unclaimed quests (those are the badge, not the count)', () => {
+  test('counts completed-but-unclaimed quests (claiming is still an action)', () => {
     const state = makeState(
       [makeQuest({ id: 'd1', completed: true, progress: 3 })],
       [makeQuest({ id: 'w1', tier: 'weekly' })]
     );
-    expect(getActiveIncompleteQuestCount(state)).toBe(1);
+    expect(getActionableQuestCount(state)).toBe(2);
   });
 
-  test('excludes claimed quests', () => {
+  test('excludes claimed quests — ALL claimed on both tabs means 0', () => {
     const state = makeState(
-      [makeQuest({ id: 'd1', completed: true, claimed: true })],
+      [
+        makeQuest({ id: 'd1', completed: true, claimed: true }),
+        makeQuest({ id: 'd2', completed: true, claimed: true }),
+      ],
       [makeQuest({ id: 'w1', tier: 'weekly', completed: true, claimed: true })]
     );
-    expect(getActiveIncompleteQuestCount(state)).toBe(0);
+    expect(getActionableQuestCount(state)).toBe(0);
+  });
+
+  test('mixed board: in-progress + unclaimed-complete count, claimed does not', () => {
+    const state = makeState(
+      [
+        makeQuest({ id: 'd1' }),                                        // in progress
+        makeQuest({ id: 'd2', completed: true, progress: 3 }),          // unclaimed
+        makeQuest({ id: 'd3', completed: true, claimed: true }),        // done
+      ],
+      [makeQuest({ id: 'w1', tier: 'weekly', completed: true, claimed: true })]
+    );
+    expect(getActionableQuestCount(state)).toBe(2);
   });
 });
 
 describe('getQuestPillLabel (badge/number semantics)', () => {
   test('in-progress quests show the count', () => {
-    expect(getQuestPillLabel(3)).toBe('🎯 3');
+    const state = makeState(
+      [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2' })],
+      [makeQuest({ id: 'w1', tier: 'weekly' })]
+    );
+    const count = getActionableQuestCount(state);
+    expect(count).toBe(3);
+    expect(getQuestPillLabel(count)).toBe('🎯 3');
   });
 
-  test('completed-but-unclaimed: no number, but the "!" badge condition holds', () => {
+  test('completed-but-unclaimed quests are counted too, and the "!" badge condition holds', () => {
     const state = makeState(
       [makeQuest({ id: 'd1', completed: true, progress: 3 })],
       [makeQuest({ id: 'w1', tier: 'weekly', completed: true, progress: 3 })]
     );
-    const count = getActiveIncompleteQuestCount(state);
-    expect(count).toBe(0);
-    expect(getQuestPillLabel(count)).toBe('🎯');
-    // The '!' badge keys on claimable amber — still lit while rewards wait.
+    const count = getActionableQuestCount(state);
+    expect(count).toBe(2);
+    expect(getQuestPillLabel(count)).toBe('🎯 2');
+    // The '!' badge keys on claimable amber — lit while rewards wait.
     expect(getUnclaimedAmber(state, 0)).toBeGreaterThan(0);
   });
 
@@ -188,11 +217,37 @@ describe('getQuestPillLabel (badge/number semantics)', () => {
       [makeQuest({ id: 'd1', completed: true, claimed: true, progress: 3 })],
       [makeQuest({ id: 'w1', tier: 'weekly', completed: true, claimed: true, progress: 3 })]
     );
-    const count = getActiveIncompleteQuestCount(state);
+    const count = getActionableQuestCount(state);
     expect(count).toBe(0);
     expect(getQuestPillLabel(count)).toBe('🎯');
     expect(getQuestPillLabel(count)).not.toMatch(/\d/);
     expect(getUnclaimedAmber(state, 0)).toBe(0); // badge stays off too
+  });
+});
+
+describe('getJournalQuestLabel (Journal Hub row shares the same count)', () => {
+  test('in-progress quests show the count', () => {
+    const state = makeState(
+      [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2' })],
+      [makeQuest({ id: 'w1', tier: 'weekly' })]
+    );
+    expect(getJournalQuestLabel(getActionableQuestCount(state), 0)).toBe('🗓 Quests (3)');
+  });
+
+  test('claimable amber takes precedence over the plain count', () => {
+    expect(getJournalQuestLabel(2, 45)).toBe('🗓 Quests (+45)');
+  });
+
+  test('ALL quests completed AND claimed: no count suffix at all', () => {
+    const state = makeState(
+      [makeQuest({ id: 'd1', completed: true, claimed: true, progress: 3 })],
+      [makeQuest({ id: 'w1', tier: 'weekly', completed: true, claimed: true, progress: 3 })]
+    );
+    const count = getActionableQuestCount(state);
+    const label = getJournalQuestLabel(count, getUnclaimedAmber(state, 0));
+    expect(label).toBe('🗓 Quests');
+    expect(label).not.toMatch(/\d/);
+    expect(label).not.toContain('(');
   });
 });
 
@@ -215,10 +270,10 @@ describe('isQuestPillVisible', () => {
 });
 
 describe('getQuestPillAccessibilityLabel', () => {
-  test('describes active count and daily reset', () => {
+  test('describes actionable count and daily reset', () => {
     const label = getQuestPillAccessibilityLabel(3, 0, '5 hours');
     expect(label).toContain('Open quests');
-    expect(label).toContain('3 in progress');
+    expect(label).toContain('3 to do');
     expect(label).toContain('reset in 5 hours');
     expect(label).not.toContain('ready to claim');
   });
@@ -228,10 +283,10 @@ describe('getQuestPillAccessibilityLabel', () => {
     expect(label).toContain('45 amber ready to claim');
   });
 
-  test('announces completion when nothing is in progress or claimable', () => {
+  test('announces completion when nothing is actionable', () => {
     const label = getQuestPillAccessibilityLabel(0, 0, '2 hours');
     expect(label).toContain('All quests complete');
-    expect(label).not.toContain('0 in progress');
+    expect(label).not.toContain('0 to do');
   });
 
   test('does not claim completion while a reward is still waiting', () => {
@@ -269,8 +324,27 @@ describe('header wiring (source scan of the one-row header)', () => {
     expect(pillBlock).not.toContain('setShowJournalModal');
   });
 
-  test('pill text routes through getQuestPillLabel (no hardcoded count)', () => {
-    expect(pillBlock).toContain('getQuestPillLabel(activeIncompleteQuestCount)');
+  test('pill text routes through getQuestPillLabel fed by the shared count', () => {
+    expect(pillBlock).toContain('getQuestPillLabel(actionableQuestCount)');
+  });
+
+  test('journal row routes through getJournalQuestLabel fed by the SAME count', () => {
+    expect(src).toContain('getJournalQuestLabel(actionableQuestCount, claimableQuestAmber)');
+    // The old journal-only derivation (all unclaimed quests) is gone.
+    expect(src).not.toContain('activeQuestCount');
+    expect(src).not.toContain('getActiveIncompleteQuestCount');
+  });
+
+  test('claiming inside the quest modal replaces quest state so counts re-derive', () => {
+    const claimStart = src.indexOf('const handleClaimQuest');
+    expect(claimStart).toBeGreaterThan(-1);
+    const claimBlock = src.slice(claimStart, claimStart + 1600);
+    expect(claimBlock).toContain('claimQuestReward');
+    // Fresh references at every level — loadWeeklyQuests hands back the same
+    // in-place-mutated cache objects the component already holds in state.
+    expect(claimBlock).toContain('setWeeklyQuestState({');
+    expect(claimBlock).toContain('quests: refreshed.daily.quests.map(q => ({ ...q }))');
+    expect(claimBlock).toContain('quests: refreshed.weekly.quests.map(q => ({ ...q }))');
   });
 
   test('the "!" badge keys on claimable amber only', () => {

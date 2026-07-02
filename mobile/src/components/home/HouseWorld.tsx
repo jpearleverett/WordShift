@@ -417,6 +417,23 @@ const PHASE_BG_COLORS: Record<number, string> = {
   5: '#050816', // Phase 5 renders sky_shadow too — same top row
 };
 
+// Ground extension below the sky image. The sky Image ends 5% above the
+// container bottom (its `top` offset frames the artwork lower), and the pit
+// pan slack shifts the whole scene up at rest — both can expose the container
+// backdrop BELOW the artwork, which is sky-top blue and reads as "the house
+// floats on water". This band paints that region with the average color of
+// the sky asset's BOTTOM pixel row (grass/ground), so the artwork appears to
+// extend downward seamlessly. Sampled via the same scratch pngjs approach as
+// PHASE_BG_COLORS — re-sample if the sky assets are regenerated.
+const PHASE_GROUND_COLORS: Record<number, string> = {
+  0: '#355223', // sky_day.png bottom row (grass)
+  1: '#224116', // sky_afternoon.png bottom row
+  2: '#312512', // sky_dusk.png bottom row
+  3: '#061626', // sky_storm.png bottom row
+  4: '#040913', // sky_shadow.png bottom row
+  5: '#040913', // Phase 5 renders sky_shadow too
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
 // ═══════════════════════════════════════════════════════════════════════════
@@ -980,6 +997,18 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 resizeMode="cover"
               />
 
+              {/* Ground extension: paints everything below the sky artwork's
+                  bottom edge in the art's own ground color so the pan slack /
+                  sky framing can never expose the blue backdrop under the
+                  grass (which read as the house floating on water). */}
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.groundExtension,
+                  { backgroundColor: PHASE_GROUND_COLORS[currentPhase] ?? PHASE_GROUND_COLORS[0] },
+                ]}
+              />
+
               {/* Drifting clouds - Phase 0-2 only; the storm sky takes over at Phase 3.
                   Rendered before the house so they layer behind the shadow figure. */}
               {currentPhase <= 2 && (
@@ -1146,6 +1175,17 @@ const styles = StyleSheet.create({
     left: -SCREEN_WIDTH * 0,
     width: SCREEN_WIDTH * 1,
     height: SCREEN_HEIGHT * 1,
+    zIndex: -1,
+  },
+  // Sits exactly where the sky Image ends (its top offset is -0.05H and its
+  // height is 1H, so its bottom edge lands at 0.95H) and extends far enough
+  // down to cover any pan-slack exposure below the artwork.
+  groundExtension: {
+    position: 'absolute',
+    top: SCREEN_HEIGHT * 0.95 - 1, // 1px overlap so no hairline seam
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT,
     zIndex: -1,
   },
   // Clouds - inside transform container
