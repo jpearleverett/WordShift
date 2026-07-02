@@ -47,7 +47,11 @@
         "backgroundColor": "#FFF0F5"
       },
       "package": "com.wordshift.app",
-      "versionCode": 12
+      "versionCode": 13,
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "plugins": [
       [
@@ -63,7 +67,13 @@
           "androidAppId": "ca-app-pub-6575205005908086~2045457833"
         }
       ],
-      "@sentry/react-native",
+      [
+        "@sentry/react-native",
+        {
+          "organization": "iridescent-games-9n",
+          "project": "wordshift"
+        }
+      ],
       "expo-audio",
       "expo-sharing"
     ],
