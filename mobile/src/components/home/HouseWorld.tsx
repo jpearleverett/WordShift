@@ -35,7 +35,16 @@ const SKY_SHADOW = require('../../../assets/environment/sky_shadow.png');
 const CLOUD_1 = require('../../../assets/environment/cloud_1.png');
 const CLOUD_2 = require('../../../assets/environment/cloud_2.png');
 const ROOF_IMG = require('../../../assets/environment/roof.png');
-const FOUNDATION_IMG = require('../../../assets/environment/foundation.png');
+// Per-phase foundations (hand-lit per phase: day green -> dusk dry -> night
+// blue), indexed by game phase; phase 5 reuses the shadow foundation, like the
+// sky. All normalized to one box size so the house never jumps between phases.
+const FOUNDATION_IMGS = [
+  require('../../../assets/environment/foundation_0.png'),
+  require('../../../assets/environment/foundation_1.png'),
+  require('../../../assets/environment/foundation_2.png'),
+  require('../../../assets/environment/foundation_3.png'),
+  require('../../../assets/environment/foundation_4.png'),
+];
 const WALL_IMG = require('../../../assets/environment/wall.png');
 const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
 const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
@@ -757,17 +766,18 @@ const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 // keep these aspect constants in sync with the processed asset dims).
 const ROOF_WIDTH = HOUSE_WIDTH + 30; // Rendered roof width (slight overhang)
 const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (283 / 792)); // roof.png 792x283
-// foundation.png is 792x120 — stone courses with grass tufts + a center dirt
-// path gap baked into the base (the house plants itself into the meadow).
+// Foundations are all normalized to 792x120 — stone courses with grass tufts +
+// a center dirt path gap baked into the base (the house plants itself into the
+// meadow). One box size across phases so the house never jumps.
 const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (120 / 792));
-// pit_entrance.png is 460x540 (stone well + a stone path leading up to it).
+// pit_entrance.png is 460x496 (stone well + a stone path leading up to it).
 // Rendered box + the tuck under the foundation edge.
 const PIT_RENDER_WIDTH = 130;
-const PIT_RENDER_HEIGHT = Math.round(PIT_RENDER_WIDTH * (540 / 460)); // 153
+const PIT_RENDER_HEIGHT = Math.round(PIT_RENDER_WIDTH * (496 / 460)); // 140
 const PIT_MARGIN_TOP = -16; // path tail tucks behind the foundation edge
 // Net flow height the pit adds below the foundation — used by the pan bounds,
 // the contact shadow seat, and the house-vs-art geometry notes below.
-const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 137
+const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 124
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
 // Baseline gap between the pit entrance and the container bottom (before the
@@ -797,8 +807,8 @@ const PIT_DOCK_CLEARANCE = 80;
 //      container bottom, where scale = SKY_BOX_HEIGHT / 1972 — independent of
 //      the container height, header height, or insets.
 // The house column is bottom-anchored too (margins below), so the foundation
-// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 137
-// + foundation 42) = 289dp above the container bottom.
+// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 124
+// + foundation 43) = 277dp above the container bottom.
 const SKY_IMG_WIDTH = 941;
 const SKY_IMG_HEIGHT = 1972;
 // The 940 floor guarantees the seat even on very small / display-size-scaled
@@ -1248,16 +1258,14 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   )}
                 </View>
 
-                {/* Foundation — pixel stone courses */}
+                {/* Foundation — hand-lit per-phase stone + baked grass (no
+                    tint overlay: the art is already colored for the phase). */}
                 <View style={styles.foundationWrap}>
-                  <Image source={FOUNDATION_IMG} style={styles.foundationImageInner} resizeMode="stretch" />
-                  {houseTint.ext > 0 && (
-                    <Image
-                      source={FOUNDATION_IMG}
-                      style={[styles.foundationImageInner, styles.tintFill, { tintColor: houseTint.color, opacity: houseTint.ext }]}
-                      resizeMode="stretch"
-                    />
-                  )}
+                  <Image
+                    source={FOUNDATION_IMGS[Math.min(currentPhase, FOUNDATION_IMGS.length - 1)]}
+                    style={styles.foundationImageInner}
+                    resizeMode="stretch"
+                  />
                 </View>
 
                 {/* The Offering Pit's mouth in the front yard, a stone path

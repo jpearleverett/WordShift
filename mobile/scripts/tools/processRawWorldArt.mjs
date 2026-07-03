@@ -136,51 +136,37 @@ function dropTop(png, dropTopFrac) {
   return out;
 }
 
-// Dissolve the bottom `frac` of an image's alpha to 0 so a hard bottom edge
-// melts into the ground instead of reading as a pasted rectangle. The fade
-// line is perturbed per-column (two summed sines) so the stone meets the
-// grass on an irregular, organic edge rather than a dead-straight cut —
-// deterministic, so regenerating is byte-stable.
-function featherBottom(png, frac) {
-  const { width: w, height: h, data } = png;
-  const band = h * frac;
-  const base = h - band;
-  for (let x = 0; x < w; x++) {
-    // wobble the fade's start row +/- ~25% of the band
-    const wob = (Math.sin(x * 0.11) + Math.sin(x * 0.037 + 1.7)) * 0.5; // [-1,1]
-    const start = base + wob * band * 0.28;
-    const span = h - start;
-    for (let y = 0; y < h; y++) {
-      if (y <= start) continue;
-      const t = Math.max(0, 1 - (y - start) / span); // 1 -> 0 downward
-      const ramp = t * t;
-      const i = (y * w + x) * 4;
-      data[i + 3] = Math.round(data[i + 3] * ramp);
-    }
-  }
-}
-
 function processSprite(rawName, outName, targetWidth, opts = {}) {
-  const { dropTopFrac = 0, featherBottomFrac = 0 } = opts;
+  const { dropTopFrac = 0 } = opts;
   const png = load(path.join(RAW, rawName));
   keyBackground(png);
   const cropped = dropTopFrac > 0 ? dropTop(png, dropTopFrac) : cropToContent(png);
   const th = Math.round(targetWidth * (cropped.height / cropped.width));
   const final = resize(cropped, targetWidth, th);
-  if (featherBottomFrac > 0) featherBottom(final, featherBottomFrac);
   save(final, path.join(ENV, outName));
   console.log(`  ${outName}: content aspect ${(cropped.width / cropped.height).toFixed(3)} (w/h)`);
   return final;
 }
 
 processSprite('roof_raw.png', 'roof.png', 792);
-// Foundation art has grass tufts + a center dirt path gap baked into its base,
-// so it seats into the meadow on its own — no bottom feather (that would erode
-// the soft grass tips).
-processSprite('foundation_raw.png', 'foundation.png', 792);
-// Pit: the newer art (stone well + long stone path). Drop the top 45% of the
-// tapered path tail so the visible path reads as "leads from under the house
-// to the well" without an overlong stalk.
+
+// Per-phase foundations. The artist hand-lit one foundation per phase (bright
+// green day -> dry dusk -> cool night -> blue shadow), grass tufts + a center
+// dirt path gap baked into each base. They're normalized to ONE box size so
+// the house never jumps vertically when the phase changes (only the look of
+// the strip differs); the slight per-phase aspect stretch is baked in here.
+// Mapping mirrors the skies (phase_5 art is reused for game phase 5, like
+// sky_shadow): foundation_<gamePhase>.png, phase_1..5 -> game phases 0..4.
+const FOUND_W = 792, FOUND_H = 120;
+['phase_1', 'phase_2', 'phase_3', 'phase_4', 'phase_5'].forEach((raw, gamePhase) => {
+  const png = load(path.join(RAW, `${raw}.png`));
+  keyBackground(png);
+  const final = resize(cropToContent(png), FOUND_W, FOUND_H);
+  save(final, path.join(ENV, `foundation_${gamePhase}.png`));
+});
+
+// Pit: the newer well+path art. Drop the top 45% of the tapered path tail so
+// the visible path reads as "leads from under the house to the well".
 processSprite('pit_raw.png', 'pit_entrance.png', 460, { dropTopFrac: 0.45 });
 
 // Wall tile: centered square crop, wrap-aware downscale to 128

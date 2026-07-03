@@ -96,11 +96,12 @@ describe('phase lighting settles the house into each sky', () => {
     expect(tint).toMatch(/0: \{ color: '#000000', ext: 0, room: 0 \}/);
   });
 
-  test('roof / foundation / pit carry a same-source tintColor overlay', () => {
-    // tintColor on a same-source Image follows the art alpha exactly; there
-    // must be one guarded overlay per silhouette piece.
+  test('roof + pit carry a same-source tintColor overlay (foundation is per-phase art)', () => {
+    // tintColor on a same-source Image follows the art alpha exactly. The
+    // foundation is now hand-lit per phase (no tint overlay), so only the
+    // single-asset roof and pit are programmatically tinted.
     const overlays = HOUSE_WORLD.match(/styles\.tintFill, \{ tintColor: houseTint\.color/g) || [];
-    expect(overlays.length).toBeGreaterThanOrEqual(3);
+    expect(overlays.length).toBeGreaterThanOrEqual(2);
   });
 
   test('the two body scrims tint wall/frame fully but rooms at ~half', () => {
@@ -159,7 +160,7 @@ describe('foundation seats below the river on real devices', () => {
   const RIVER_BOTTOM_ROW = 1335; // lowest river/bank pixel across all 5 skies
   const HOUSE_BOTTOM_MARGIN = 30;
   const PIT_DOCK_CLEARANCE = 80;
-  const PIT_BLOCK = 137; // pit height 153 + marginTop -16 (PIT_FLOW_HEIGHT)
+  const PIT_BLOCK = 124; // pit height 140 + marginTop -16 (PIT_FLOW_HEIGHT)
   const FOUNDATION_H = 43; // 282 * (120/792)
 
   const foundationTopArtRow = (sw: number, sh: number) => {
