@@ -178,8 +178,30 @@ processSprite('pit_raw.png', 'pit_entrance.png', 460, { dropTopFrac: 0.45 });
   for (let y = 0; y < size; y++) {
     png.data.copy(sq.data, (y * size) * 4, ((y0 + y) * png.width + x0) * 4, ((y0 + y) * png.width + x0 + size) * 4);
   }
-  const final = resize(sq, 128, 128, true);
-  save(final, path.join(ENV, 'wall.png'));
+  // Seamless base tile, then PRE-TILE it into a tall strip. RN's
+  // resizeMode="repeat" renders nothing on the New Architecture (Fabric), so
+  // HouseWorld draws this with resizeMode="cover" instead — the strip is much
+  // taller than it is wide, so cover is always width-driven and the plank
+  // scale stays consistent no matter how many rooms the house has.
+  // 256 x 1280 panel: aspect 1:5 is taller than the tallest house body
+  // (~272x1300dp), so cover scaling stays width-driven and the plank size is
+  // consistent whatever the room count. The vertical repeat compresses well.
+  const TILE = 128, COLS = 2, ROWS = 10; // 256 x 1280
+  const base = resize(sq, TILE, TILE, true);
+  const panel = new PNG({ width: TILE * COLS, height: TILE * ROWS });
+  for (let ty = 0; ty < ROWS; ty++) {
+    for (let tx = 0; tx < COLS; tx++) {
+      for (let y = 0; y < TILE; y++) {
+        base.data.copy(
+          panel.data,
+          ((ty * TILE + y) * TILE * COLS + tx * TILE) * 4,
+          (y * TILE) * 4,
+          (y * TILE + TILE) * 4,
+        );
+      }
+    }
+  }
+  save(panel, path.join(ENV, 'wall.png'));
 }
 
 // ─── Foundation grounding assets (procedural, no raw source) ────────────────
