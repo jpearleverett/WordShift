@@ -20,6 +20,7 @@
     "expo": "~56.0.12",
     "expo-application": "~56.0.3",
     "expo-audio": "~56.0.12",
+    "expo-build-properties": "~56.0.21",
     "expo-constants": "~56.0.18",
     "expo-haptics": "~56.0.3",
     "expo-notifications": "~56.0.18",

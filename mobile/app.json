@@ -75,7 +75,15 @@
         }
       ],
       "expo-audio",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enablePngCrunchInReleaseBuilds": false
+          }
+        }
+      ]
     ],
     "extra": {
       "telemetryEndpoint": "",
