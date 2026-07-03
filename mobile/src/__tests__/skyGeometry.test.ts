@@ -160,7 +160,7 @@ describe('foundation seats below the river on real devices', () => {
   const RIVER_BOTTOM_ROW = 1335; // lowest river/bank pixel across all 5 skies
   const HOUSE_BOTTOM_MARGIN = 30;
   const PIT_DOCK_CLEARANCE = 80;
-  const PIT_BLOCK = 124; // pit height 140 + marginTop -16 (PIT_FLOW_HEIGHT)
+  const PIT_BLOCK = 140; // pit height 140 + marginTop 0 (PIT_FLOW_HEIGHT)
   const FOUNDATION_H = 43; // 282 * (120/792)
 
   const foundationTopArtRow = (sw: number, sh: number) => {

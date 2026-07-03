@@ -774,10 +774,12 @@ const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (120 / 792));
 // Rendered box + the tuck under the foundation edge.
 const PIT_RENDER_WIDTH = 130;
 const PIT_RENDER_HEIGHT = Math.round(PIT_RENDER_WIDTH * (496 / 460)); // 140
-const PIT_MARGIN_TOP = -16; // path tail tucks behind the foundation edge
+// The pit's path top meets the foundation base flush (0 = no overlap); the
+// pit renders after the foundation, so a tuck would cover the stone.
+const PIT_MARGIN_TOP = 0;
 // Net flow height the pit adds below the foundation — used by the pan bounds,
 // the contact shadow seat, and the house-vs-art geometry notes below.
-const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 124
+const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 140
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
 // Baseline gap between the pit entrance and the container bottom (before the
@@ -807,8 +809,8 @@ const PIT_DOCK_CLEARANCE = 80;
 //      container bottom, where scale = SKY_BOX_HEIGHT / 1972 — independent of
 //      the container height, header height, or insets.
 // The house column is bottom-anchored too (margins below), so the foundation
-// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 124
-// + foundation 43) = 277dp above the container bottom.
+// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 140
+// + foundation 43) = 293dp above the container bottom.
 const SKY_IMG_WIDTH = 941;
 const SKY_IMG_HEIGHT = 1972;
 // The 940 floor guarantees the seat even on very small / display-size-scaled
