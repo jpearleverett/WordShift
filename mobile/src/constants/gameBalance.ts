@@ -215,11 +215,14 @@ export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 /**
  * Amber premium for skipping a level-gated room's puzzle requirement and
  * unlocking it immediately (vs Reserve, which pays the plain cost and waits for
- * the gate). The premium is what keeps the gates meaningful for a typical
- * earner while giving an amber-rich player a paid shortcut: skip cost =
- * ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)).
+ * the gate). skip cost = ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)). At 1.0 the
+ * gated rooms (build 200-400) skip for 400-800 — enough to push a player who
+ * just barely afforded the room past their balance (so it doubles as amber-pack
+ * demand) while staying coverable by one small/medium pack. Reserve (base cost,
+ * auto-build at the gate) stays the non-paying path, so the premium is a
+ * convenience, never a wall. Tune post-launch on real conversion data.
  */
-export const UNLOCK_SKIP_PREMIUM = 0.5;
+export const UNLOCK_SKIP_PREMIUM = 1.0;
 
 // ============================================================================
 // STREAK
