@@ -1182,12 +1182,20 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     tile fills the wall area behind the rooms — the flat color
                     fill read as a cartoon sticker against the painterly sky. */}
                 <View style={[styles.houseBody, { minHeight: houseHeight - HOUSE_PADDING }]}>
-                  <Image
-                    source={WALL_IMG}
-                    style={styles.wallTexture}
-                    resizeMode="cover"
-                    fadeDuration={0}
-                  />
+                  {/* Clipped backdrop: resizeMode="cover" is width-driven for
+                      the tall plank strip, so its content overflows the body's
+                      height. Fabric does not clip that overflow, which let the
+                      planks bleed BELOW the foundation around the pit. This
+                      wrapper (overflow:hidden) confines the wall to the body
+                      without clipping the room content (rooms are siblings). */}
+                  <View style={styles.wallBackdrop} pointerEvents="none">
+                    <Image
+                      source={WALL_IMG}
+                      style={styles.wallTexture}
+                      resizeMode="cover"
+                      fadeDuration={0}
+                    />
+                  </View>
                   {/* Wall/frame phase scrim (behind the rooms). Compensated so
                       the wall's compound tint (this + the room scrim over it)
                       lands on the full exterior strength, while the rooms above
@@ -1467,19 +1475,31 @@ const styles = StyleSheet.create({
 
   // House body
   houseBody: {
-    // Fallback under the plank texture (also covers any repeat-tiling seam)
-    backgroundColor: '#A0522D',
+    // Muted-timber fallback under the plank texture (matches wall.png's average
+    // so any seam/fallback reads as wood, not the old garish orange)
+    backgroundColor: '#79593E',
     padding: HOUSE_PADDING / 2,
     borderWidth: 5,
     borderColor: '#5D4037',
     borderTopWidth: 0,
     alignItems: 'center',
   },
-  // Timber wall behind the rooms. wall.png is a pre-tiled 256x1280 strip drawn
-  // with resizeMode="cover" (NOT "repeat" — repeat renders nothing on the New
-  // Architecture / Fabric, which left the flat #A0522D fallback showing). The
-  // strip's 1:5 aspect keeps cover width-driven so the plank scale is
-  // consistent whatever the room count.
+  // Clips the wall texture to the house body. Absolute-fills the body; the
+  // wall Image cover-overflows its own frame on Fabric, so this overflow:hidden
+  // wrapper stops the planks spilling below the foundation onto the pit.
+  wallBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+  },
+  // Muted timber wall behind the rooms. wall.png is a pre-tiled 256x1280 strip
+  // drawn with resizeMode="cover" (NOT "repeat" — repeat renders nothing on the
+  // New Architecture / Fabric). The strip's 1:5 aspect keeps cover width-driven
+  // so the plank scale is consistent whatever the room count; the wallBackdrop
+  // wrapper clips the resulting vertical overflow to the body.
   wallTexture: {
     position: 'absolute',
     top: 0,
