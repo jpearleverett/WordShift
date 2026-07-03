@@ -15,6 +15,9 @@
  *     never stack (footer wins when a chain renders one); the generic
  *     "Puzzle Complete" subtitle is trimmed (daily keeps its label); the
  *     social-proof line renders only when provided.
+ *  4. Share button — the daily-bonus hint renders as a flex row (label text,
+ *     amber gem Image as a sibling, "+N" text), never as an inline image
+ *     nested inside Text (which baseline-wrapped onto a second line).
  */
 
 // ---------------------------------------------------------------------------
@@ -144,6 +147,7 @@ jest.mock('../components/monetization/RewardedAdButton', () => ({
 
 import { VictoryModal, VictoryData } from '../components/puzzle/VictoryModal';
 import { getVictoryFeedback, getRitualEchoFooter, getRitualEchoHeader } from '../services/phaseNarrative';
+import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
 
@@ -214,6 +218,18 @@ function flatStyle(style: unknown): Record<string, unknown> {
 function render(props: Record<string, unknown>) {
   rewindHookIndices();
   return (VictoryModal as unknown as (p: unknown) => unknown)(props);
+}
+
+/**
+ * Render, run the collected effects (the harness only queues them), flush the
+ * isDailyShareBonusAvailable() promise, then re-render with the updated state.
+ */
+async function renderWithEffects(props: Record<string, unknown>) {
+  render(props);
+  const pending = [...effectCallbacks];
+  pending.forEach(e => e.fn());
+  await new Promise(resolve => setTimeout(resolve, 0));
+  return render(props);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,5 +431,72 @@ describe('social proof line', () => {
   it('renders nothing when the line is null (weak/absent counts)', () => {
     const tree = render(baseProps({ socialProofLine: null }));
     expect(textOf(tree)).not.toContain('words today');
+  });
+});
+
+// ===========================================================================
+// 4. Share button — bonus layout is a flex row, never an inline image in Text
+// ===========================================================================
+
+describe('share button bonus layout', () => {
+  const bonusLabel = `Share result, earns ${DAILY_SHARE_BONUS_AMBER} amber for the first share today`;
+
+  it('renders label, gem, and +N as siblings in one centered non-wrapping row', async () => {
+    (isDailyShareBonusAvailable as jest.Mock).mockResolvedValueOnce(true);
+    const tree = await renderWithEffects(baseProps());
+
+    const btn = findByA11yLabel(tree, bonusLabel);
+    expect(btn).not.toBeNull();
+
+    // Exactly one horizontal content row, centered on both axes. RN's default
+    // flexWrap ('nowrap') is not overridden, so the gem can never wrap onto a
+    // second line (the playtest bug).
+    const rows = findAll(btn, el =>
+      el.type === 'View' && flatStyle((el.props as Record<string, unknown>).style).flexDirection === 'row');
+    expect(rows).toHaveLength(1);
+    const rowStyle = flatStyle((rows[0].props as Record<string, unknown>).style);
+    expect(rowStyle.alignItems).toBe('center');
+    expect(rowStyle.justifyContent).toBe('center');
+    expect(rowStyle.flexWrap).toBeUndefined();
+
+    // Traversal order pins the reading order: "📤 Share", gem, "+N".
+    const ordered = findAll(rows[0], el => el.type === 'Text' || el.type === 'Image');
+    expect(ordered.map(el => el.type)).toEqual(['Text', 'Image', 'Text']);
+    const [label, gem, amount] = ordered;
+
+    expect(textOf(label)).toContain('Share');
+    expect(textOf(amount)).toBe(`+${DAILY_SHARE_BONUS_AMBER}`);
+
+    // Both text pieces fit one line and share the button font + phase color.
+    for (const t of [label, amount]) {
+      expect((t.props as Record<string, unknown>).numberOfLines).toBe(1);
+    }
+    const labelStyle = flatStyle((label.props as Record<string, unknown>).style);
+    const amountStyle = flatStyle((amount.props as Record<string, unknown>).style);
+    expect(labelStyle.fontWeight).toBe('700');
+    expect(amountStyle.fontWeight).toBe('700');
+    expect(amountStyle.color).toBe(labelStyle.color);
+
+    // The gem is decorative: the button's accessibilityLabel already announces
+    // the bonus, so the Image carries no label and is hidden from readers.
+    const gemProps = gem.props as Record<string, unknown>;
+    expect(gemProps.accessibilityLabel).toBeUndefined();
+    expect(gemProps.importantForAccessibility).toBe('no');
+    expect(gemProps.accessibilityElementsHidden).toBe(true);
+
+    // The old broken structure: an Image nested INSIDE a Text run.
+    for (const t of [label, amount]) {
+      const nested = findAll((t.props as Record<string, unknown>).children, el => el.type === 'Image');
+      expect(nested).toHaveLength(0);
+    }
+  });
+
+  it('renders just the share label when no bonus is available (no gem, no +N)', () => {
+    const tree = render(baseProps());
+    const btn = findByA11yLabel(tree, 'Share result');
+    expect(btn).not.toBeNull();
+    expect(findAll(btn, el => el.type === 'Image')).toHaveLength(0);
+    expect(findAll(btn, el => el.type === 'Text')).toHaveLength(1);
+    expect(textOf(btn)).not.toContain(`+${DAILY_SHARE_BONUS_AMBER}`);
   });
 });
