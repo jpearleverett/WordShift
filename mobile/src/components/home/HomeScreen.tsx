@@ -1969,7 +1969,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </Text>
                     );
                   }
-                  // Gated but affordable: offer to reserve (pay now, auto-builds).
+                  // Gated but affordable: offer to reserve (pay now, auto-builds)
+                  // and — if the premium is affordable — to skip the wait entirely.
                   if (unlockFlow.canReserve) {
                     return (
                       <>
@@ -1986,6 +1987,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             Reserve for <AmberInline /> {unlockFlow.nextUnlock!.cost}
                           </Text>
                         </TouchableOpacity>
+                        {unlockFlow.canSkip && (
+                          <TouchableOpacity
+                            style={[styles.buyButton, styles.buyButtonLarge, styles.skipButton]}
+                            onPress={() => unlockFlow.handleSkip(unlockFlow.nextUnlock!)}
+                            accessibilityLabel={`Skip the wait and unlock ${unlockFlow.nextUnlock!.name} now for ${unlockFlow.skipCost} amber`}
+                            accessibilityRole="button"
+                          >
+                            <Text style={[styles.buyButtonText, styles.skipButtonText]}>
+                              Skip the wait for <AmberInline /> {unlockFlow.skipCost}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </>
                     );
                   }
@@ -3230,6 +3243,17 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '800',
+  },
+  // Secondary "skip the wait" action — outlined amber so it reads as the paid
+  // premium shortcut, one step below the recommended (cheaper) Reserve.
+  skipButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.dark,
+    marginTop: 10,
+  },
+  skipButtonText: {
+    color: CandyColors.yellow.dark,
   },
   allUnlockedText: {
     fontSize: 16,

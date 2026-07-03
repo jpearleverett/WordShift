@@ -8,6 +8,9 @@ import {
   isUnlockAvailable,
   canReserveUnlock,
   reserveNextUnlock,
+  canSkipUnlockGate,
+  skipUnlockGate,
+  getUnlockSkipCost,
 } from '../services/homeWorldData';
 import { getReservedUnlockId } from '../services/amberCurrency';
 import { hapticError, hapticLight, hapticSuccess } from '../services/haptics';
@@ -35,8 +38,13 @@ interface UseUnlockFlowReturn {
   reservedUnlockId: string | null;
   /** Whether the current next unlock can be reserved now (gated + affordable). */
   canReserve: boolean;
+  /** Whether the current next unlock can be skipped now (gated + premium affordable). */
+  canSkip: boolean;
+  /** Premium amber cost to skip the current next unlock's gate (0 when N/A). */
+  skipCost: number;
   handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
   handleReserve: (unlock: Unlockable) => Promise<void>;
+  handleSkip: (unlock: Unlockable) => Promise<void>;
   handleRoomPress: (room: Room) => void;
   setShowShop: (show: boolean) => void;
   setShowRoomUnlock: (room: Room | null) => void;
@@ -69,6 +77,8 @@ export function useUnlockFlow({
   const [allUnlocks, setAllUnlocks] = useState<Unlockable[]>([]);
   const [reservedUnlockId, setReservedUnlockId] = useState<string | null>(null);
   const [canReserve, setCanReserve] = useState(false);
+  const [canSkip, setCanSkip] = useState(false);
+  const [skipCost, setSkipCost] = useState(0);
   const [unlockAvailability, setUnlockAvailability] = useState<{
     available: boolean;
     reason?: string;
@@ -97,15 +107,20 @@ export function useUnlockFlow({
     setReservedUnlockId(reserved);
 
     if (unlock) {
-      const [availability, reservable] = await Promise.all([
+      const [availability, reservable, skippable] = await Promise.all([
         isUnlockAvailable(unlock.id),
         canReserveUnlock(unlock.id),
+        canSkipUnlockGate(unlock.id),
       ]);
       setUnlockAvailability(availability);
       setCanReserve(reservable);
+      setCanSkip(skippable);
+      setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
     } else {
       setUnlockAvailability(null);
       setCanReserve(false);
+      setCanSkip(false);
+      setSkipCost(0);
     }
 
     // Check if there's an empty room waiting for an animal (first-time invite prompt)
@@ -162,6 +177,37 @@ export function useUnlockFlow({
     }
   }, [loadAllData, onAmberChange]);
 
+  // Skip a level-gated unlock's wait: pay the premium and unlock it NOW.
+  // Unlike Reserve, this builds immediately, so it celebrates + shows the
+  // new-character intro just like a normal purchase.
+  const handleSkip = useCallback(async (unlock: Unlockable) => {
+    setPurchaseError(null);
+    const result = await skipUnlockGate(unlock.id);
+    if (result.success) {
+      hapticSuccess();
+      setShowCelebration(true);
+      if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
+      await loadAllData();
+      setShowRoomUnlock(null);
+      setShowInvitePrompt(false);
+      if (unlock.type === 'character') {
+        const animal = ANIMALS.find(a => a.id === unlock.targetId);
+        if (animal) {
+          if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
+          introTimeoutRef.current = setTimeout(() => {
+            introTimeoutRef.current = null;
+            setIntroAnimal(animal as unknown as Animal);
+            setIntroDialogueIndex(0);
+            setShowIntroDialogue(true);
+          }, 300);
+        }
+      }
+    } else {
+      hapticError();
+      setPurchaseError(result.error || 'Unable to skip the wait right now.');
+    }
+  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+
   // Handle unlock purchase
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
     const result = await purchaseUnlock(unlock.id);
@@ -206,8 +252,11 @@ export function useUnlockFlow({
     allUnlocks,
     reservedUnlockId,
     canReserve,
+    canSkip,
+    skipCost,
     handlePurchase,
     handleReserve,
+    handleSkip,
     handleRoomPress,
     setShowShop,
     setShowRoomUnlock,
