@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
+import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud } from '../services/cloudSave';
 import { CandyColors } from '../theme/colors';
@@ -72,7 +73,26 @@ interface SettingsScreenProps {
   onReset?: () => void;
 }
 
-const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
+// Native build identity. `expo-application` reads the installed APK/IPA's real
+// versionName + versionCode from the OS, so it identifies the NATIVE build on
+// the device regardless of any OTA update layered on top (unlike
+// Constants.expoConfig, which reflects whatever JS bundle is running).
+const NATIVE_VERSION = Application.nativeApplicationVersion ?? Constants.expoConfig?.version ?? '1.0.0';
+const NATIVE_BUILD = Application.nativeBuildVersion ?? '?';
+const APP_VERSION = NATIVE_VERSION; // support mailto subject
+
+// Which JS bundle is actually running: the one embedded in the native build,
+// or an over-the-air update. The quickest way to tell if OTA is overriding
+// the build you just installed.
+function getBundleSource(): string {
+  try {
+    if (!Updates.isEnabled) return 'dev';
+    return Updates.isEmbeddedLaunch ? 'embedded' : `update · ${Updates.channel ?? '?'}`;
+  } catch {
+    return 'dev';
+  }
+}
+const BUNDLE_SOURCE = getBundleSource();
 
 /**
  * Reset All Progress — the full local wipe, exported for regression testing.
@@ -580,7 +600,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onReset
           <View style={styles.divider} />
           <View style={styles.aboutRow}>
             <Text style={styles.aboutLabel}>WordShift</Text>
-            <Text style={styles.aboutValue}>{`v${APP_VERSION}`}</Text>
+            <Text style={styles.aboutValue}>{`v${NATIVE_VERSION} (${NATIVE_BUILD})`}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.aboutRow}>
+            <Text style={styles.aboutLabel}>Build</Text>
+            <Text style={styles.aboutValue}>{BUNDLE_SOURCE}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.aboutRow}>
