@@ -760,6 +760,11 @@ const ROOM_HEIGHT = ROOM_WIDTH * 0.493865; // Maintains ~2:1 aspect ratio of roo
 const ROOM_GAP = 6;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
+// The house BODY is a touch narrower than the foundation/roof so the timber
+// side walls are thin and sit WITHIN the stone base instead of overhanging it
+// (the base reads as slightly wider than the walls, like a real house). The
+// foundation stays HOUSE_WIDTH and the roof still overhangs both.
+const HOUSE_BODY_WIDTH = ROOM_WIDTH + HOUSE_PADDING;
 
 // House structure art. roof/foundation/pit_entrance/wall are AI-generated
 // pixel art (sources in assets/raw/, processed by
@@ -1495,11 +1500,11 @@ const styles = StyleSheet.create({
     // Muted-timber fallback under the plank texture (matches wall.png's average
     // so any seam/fallback reads as wood, not the old garish orange)
     backgroundColor: '#79593E',
-    // Explicit width == foundation width so the wall reaches the same edge and a
-    // symmetric wood margin frames the centered rooms. The old flat 5px border
-    // is gone (it read as a cheap outline); soft edge-shadow overlays give the
-    // sides depth instead.
-    width: HOUSE_WIDTH,
+    // Narrower than the foundation (HOUSE_BODY_WIDTH) so the thin timber walls
+    // sit within the stone base instead of overhanging it. The old flat 5px
+    // border is gone (it read as a cheap outline); soft edge-shadow overlays
+    // give the sides depth instead.
+    width: HOUSE_BODY_WIDTH,
     padding: HOUSE_PADDING / 2,
     alignItems: 'center',
   },
