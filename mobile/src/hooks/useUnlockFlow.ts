@@ -11,6 +11,9 @@ import {
   canSkipUnlockGate,
   skipUnlockGate,
   getUnlockSkipCost,
+  canSpeedUpReservedUnlock,
+  skipReservedUnlock,
+  getReservedSkipCost,
 } from '../services/homeWorldData';
 import { getReservedUnlockId } from '../services/amberCurrency';
 import { hapticError, hapticLight, hapticSuccess } from '../services/haptics';
@@ -42,9 +45,14 @@ interface UseUnlockFlowReturn {
   canSkip: boolean;
   /** Premium amber cost to skip the current next unlock's gate (0 when N/A). */
   skipCost: number;
+  /** Whether the RESERVED unlock can be sped up now (reserved + premium affordable). */
+  canSpeedUpReserved: boolean;
+  /** Remaining premium amber to speed up the reserved unlock (0 when N/A). */
+  reservedSkipCost: number;
   handlePurchase: (unlock: Unlockable, options?: { suppressIntro?: boolean }) => Promise<void>;
   handleReserve: (unlock: Unlockable) => Promise<void>;
   handleSkip: (unlock: Unlockable) => Promise<void>;
+  handleSpeedUpReserved: (unlock: Unlockable) => Promise<void>;
   handleRoomPress: (room: Room) => void;
   setShowShop: (show: boolean) => void;
   setShowRoomUnlock: (room: Room | null) => void;
@@ -79,6 +87,8 @@ export function useUnlockFlow({
   const [canReserve, setCanReserve] = useState(false);
   const [canSkip, setCanSkip] = useState(false);
   const [skipCost, setSkipCost] = useState(0);
+  const [canSpeedUpReserved, setCanSpeedUpReserved] = useState(false);
+  const [reservedSkipCost, setReservedSkipCost] = useState(0);
   const [unlockAvailability, setUnlockAvailability] = useState<{
     available: boolean;
     reason?: string;
@@ -107,20 +117,25 @@ export function useUnlockFlow({
     setReservedUnlockId(reserved);
 
     if (unlock) {
-      const [availability, reservable, skippable] = await Promise.all([
+      const [availability, reservable, skippable, speedable] = await Promise.all([
         isUnlockAvailable(unlock.id),
         canReserveUnlock(unlock.id),
         canSkipUnlockGate(unlock.id),
+        canSpeedUpReservedUnlock(unlock.id),
       ]);
       setUnlockAvailability(availability);
       setCanReserve(reservable);
       setCanSkip(skippable);
       setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
+      setCanSpeedUpReserved(speedable);
+      setReservedSkipCost(speedable ? getReservedSkipCost(unlock) : 0);
     } else {
       setUnlockAvailability(null);
       setCanReserve(false);
       setCanSkip(false);
       setSkipCost(0);
+      setCanSpeedUpReserved(false);
+      setReservedSkipCost(0);
     }
 
     // Check if there's an empty room waiting for an animal (first-time invite prompt)
@@ -208,6 +223,35 @@ export function useUnlockFlow({
     }
   }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
 
+  // Speed up an already-reserved unlock: pay the remaining premium, unlock now.
+  const handleSpeedUpReserved = useCallback(async (unlock: Unlockable) => {
+    setPurchaseError(null);
+    const result = await skipReservedUnlock(unlock.id);
+    if (result.success) {
+      hapticSuccess();
+      setShowCelebration(true);
+      if (typeof result.newBalance === 'number') onAmberChange?.(result.newBalance);
+      await loadAllData();
+      setShowRoomUnlock(null);
+      setShowInvitePrompt(false);
+      if (unlock.type === 'character') {
+        const animal = ANIMALS.find(a => a.id === unlock.targetId);
+        if (animal) {
+          if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
+          introTimeoutRef.current = setTimeout(() => {
+            introTimeoutRef.current = null;
+            setIntroAnimal(animal as unknown as Animal);
+            setIntroDialogueIndex(0);
+            setShowIntroDialogue(true);
+          }, 300);
+        }
+      }
+    } else {
+      hapticError();
+      setPurchaseError(result.error || 'Unable to speed this up right now.');
+    }
+  }, [loadAllData, onAmberChange, setShowCelebration, setIntroAnimal, setIntroDialogueIndex, setShowIntroDialogue]);
+
   // Handle unlock purchase
   const handlePurchase = useCallback(async (unlock: Unlockable, options?: { suppressIntro?: boolean }) => {
     const result = await purchaseUnlock(unlock.id);
@@ -254,9 +298,12 @@ export function useUnlockFlow({
     canReserve,
     canSkip,
     skipCost,
+    canSpeedUpReserved,
+    reservedSkipCost,
     handlePurchase,
     handleReserve,
     handleSkip,
+    handleSpeedUpReserved,
     handleRoomPress,
     setShowShop,
     setShowRoomUnlock,

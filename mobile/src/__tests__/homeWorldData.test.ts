@@ -17,6 +17,9 @@ import {
   skipUnlockGate,
   getUnlockSkipCost,
   getSkipGateText,
+  canSpeedUpReservedUnlock,
+  skipReservedUnlock,
+  getReservedSkipCost,
 } from '../services/homeWorldData';
 import { clearProgress, loadProgress, devAddAmber, getReservedUnlockId } from '../services/amberCurrency';
 import { PHASE_THRESHOLDS, UNLOCK_SKIP_PREMIUM } from '../constants/gameBalance';
@@ -458,5 +461,77 @@ describe('skip the wait (pay premium, unlock now)', () => {
 
   test('getSkipGateText names the premium cost', () => {
     expect(getSkipGateText(300)).toBe('Skip the wait now for 300 amber');
+  });
+});
+
+describe('speed up a reserved room (pay only the remaining premium)', () => {
+  async function reserveJungle() {
+    await devAddAmber(100000);
+    for (const u of UNLOCK_PROGRESSION) {
+      if (u.id === 'unlock_jungle') break;
+      await purchaseUnlock(u.id);
+    }
+    await reserveNextUnlock('unlock_jungle');
+  }
+
+  test('reserved skip cost is only the premium delta (skip cost minus build cost)', () => {
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    expect(getReservedSkipCost(jungle)).toBe(getUnlockSkipCost(jungle) - jungle.cost);
+  });
+
+  test('canSpeedUpReservedUnlock: true once reserved + premium affordable + gate not met', async () => {
+    await reserveJungle();
+    expect(await canSpeedUpReservedUnlock('unlock_jungle')).toBe(true);
+  });
+
+  test('canSpeedUpReservedUnlock: false when nothing is reserved', async () => {
+    await devAddAmber(100000);
+    for (const u of UNLOCK_PROGRESSION) {
+      if (u.id === 'unlock_jungle') break;
+      await purchaseUnlock(u.id);
+    }
+    expect(await canSpeedUpReservedUnlock('unlock_jungle')).toBe(false);
+  });
+
+  test('canSpeedUpReservedUnlock: false once the gate is met (it auto-claims free)', async () => {
+    await reserveJungle();
+    const p = await loadProgress();
+    p.puzzlesSolved = 28;
+    expect(await canSpeedUpReservedUnlock('unlock_jungle')).toBe(false);
+  });
+
+  test('skipReservedUnlock: charges only the premium delta, unlocks now, clears the reservation', async () => {
+    await reserveJungle();
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    const before = (await loadProgress()).amber;
+    const res = await skipReservedUnlock('unlock_jungle');
+    expect(res.success).toBe(true);
+    expect(res.unlock?.id).toBe('unlock_jungle');
+    const p = await loadProgress();
+    expect(p.unlockedRooms).toContain('jungle_room');
+    expect(p.reservedUnlockId).toBeNull();
+    expect(before - p.amber).toBe(getReservedSkipCost(jungle)); // premium only
+  });
+
+  test('reserve + speed up costs the same total as a direct skip', async () => {
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    // Path A: reserve then speed up.
+    await reserveJungle();
+    const afterReserve = (await loadProgress()).amber;
+    await skipReservedUnlock('unlock_jungle');
+    const afterSpeedUp = (await loadProgress()).amber;
+    const reservePathSpend = (afterReserve + jungle.cost) - afterSpeedUp; // base + premium
+    expect(reservePathSpend).toBe(getUnlockSkipCost(jungle));
+  });
+
+  test('skipReservedUnlock: refuses when the unlock is not reserved', async () => {
+    await devAddAmber(100000);
+    for (const u of UNLOCK_PROGRESSION) {
+      if (u.id === 'unlock_jungle') break;
+      await purchaseUnlock(u.id);
+    }
+    const res = await skipReservedUnlock('unlock_jungle');
+    expect(res.success).toBe(false);
+    expect((await loadProgress()).unlockedRooms).not.toContain('jungle_room');
   });
 });

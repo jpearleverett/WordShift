@@ -1519,12 +1519,17 @@ const styles = StyleSheet.create({
   // New Architecture / Fabric). The strip's 1:5 aspect keeps cover width-driven
   // so the plank scale is consistent whatever the room count; the wallBackdrop
   // wrapper clips the resulting vertical overflow to the body.
+  //
+  // EXPLICIT width/height '100%' (not right:0/bottom:0): on Fabric an <Image>
+  // sized only by insets falls back to its INTRINSIC size (256px) anchored
+  // top-left, which left the right ~26px of the body showing the flat fallback
+  // color instead of planks. Percentages stretch it to fill the backdrop.
   wallTexture: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   // Phase scrim over the wall, behind the rooms. Fills the body exactly (the
   // old flat border it used to reach past is gone).
@@ -1545,22 +1550,23 @@ const styles = StyleSheet.create({
   },
   // Soft shadowed side edges (wall_edge_shadow.png is a dark->transparent
   // horizontal gradient). Left uses it as-is (dark on the outer/left); right
-  // mirrors it (scaleX:-1) so the dark sits on the outer/right. Stretched over
-  // the full body height — the gradient has no vertical detail, so no distortion.
+  // mirrors it (scaleX:-1) so the dark sits on the outer/right. Explicit
+  // height:'100%' (not bottom:0) for the same Fabric intrinsic-size reason as
+  // wallTexture — an inset-only Image would collapse to its 16px source height.
   edgeShadowLeft: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     left: 0,
     width: 24,
+    height: '100%',
     pointerEvents: 'none',
   },
   edgeShadowRight: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     right: 0,
     width: 24,
+    height: '100%',
     transform: [{ scaleX: -1 }],
     pointerEvents: 'none',
   },
