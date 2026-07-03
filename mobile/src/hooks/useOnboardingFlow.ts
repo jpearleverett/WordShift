@@ -127,8 +127,9 @@ export function useOnboardingFlow(
   const [onboardingLineIndex, setOnboardingLineIndex] = useState(0);
   const [onboardingReady, setOnboardingReady] = useState(false);
   const [pitOfferDone, setPitOfferDone] = useState(false);
-  // Guards the one-shot auto-return-home after the tutorial pit offering.
-  const pitAutoReturnedRef = useRef(false);
+  // One-shot guard for the tutorial pit offer-complete beat (the pit's
+  // stall-rescue path can invoke completion a second time).
+  const pitOfferCompletedRef = useRef(false);
 
   const isOnboarding = onboardingStep !== 'complete';
 
@@ -249,7 +250,7 @@ export function useOnboardingFlow(
           callbacks.setShowConfetti(false);
           callbacks.resetVictory();
           setPitOfferDone(false);
-          pitAutoReturnedRef.current = false;
+          pitOfferCompletedRef.current = false;
           addTimeout(async () => {
             if (!mountedRef.current) return;
             await advanceOnboarding('pit_intro');
@@ -323,7 +324,8 @@ export function useOnboardingFlow(
     // During/after the tutorial puzzle: complete onboarding entirely and land
     // the player on a clean home screen — never a guided board in limbo.
     // Cancel any pending step-transition timers first so a queued advance
-    // (e.g. the pit auto-return) can't resurrect onboarding after the skip.
+    // (e.g. the going_to_pit → pit_intro transition) can't resurrect
+    // onboarding after the skip.
     pendingTimeouts.current.forEach(clearTimeout);
     pendingTimeouts.current = [];
 
@@ -351,22 +353,17 @@ export function useOnboardingFlow(
   // handlePitOnboardingOfferComplete
   // ------------------------------------------------------------------
   const handlePitOnboardingOfferComplete = useCallback(() => {
-    if (pitAutoReturnedRef.current) return;
-    pitAutoReturnedRef.current = true;
+    if (pitOfferCompletedRef.current) return;
+    pitOfferCompletedRef.current = true;
     setPitOfferDone(true);
+    // Start the completion beat at its first line.
+    setOnboardingLineIndex(0);
     callbacks.refreshStats();
-    // Auto-return home a beat after the words are offered, so the tutorial
-    // continues at home on its own — the player shouldn't have to find a
-    // "Continue" tap at the pit (which read as a soft-lock).
-    addTimeout(async () => {
-      if (!mountedRef.current) return;
-      await advanceOnboarding('returning_home');
-      if (!mountedRef.current) return;
-      callbacks.transitionTo('home', async () => {
-        await advanceOnboarding('unlock_explained');
-      });
-    }, ONBOARDING_TRANSITION_DELAY_MS + 1200);
-  }, [callbacks, advanceOnboarding, addTimeout]);
+    // No auto-return: the FoxGuide switches to the completion beat with a
+    // continue button and waits, so the player reads the line at their own
+    // pace. handleOnboardingContinue's 'pit_offering' case routes home when
+    // they tap "Let's go home!".
+  }, [callbacks]);
 
   // ------------------------------------------------------------------
   // Fox text helpers

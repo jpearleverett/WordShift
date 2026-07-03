@@ -140,6 +140,16 @@ describe('victory flow', () => {
     expect(APP_TSX).not.toMatch(/pointerEvents="box-none"/);
   });
 
+  test('VictoryModal stays hidden through the onboarding pit handoff (puzzle_complete AND going_to_pit)', () => {
+    // After the tutorial board is solved, gameState stays WON while the
+    // FoxGuide completion beat runs AND through the ~300ms going_to_pit
+    // transition window; without the second exclusion the modal flashed
+    // back in before the transition overlay covered it.
+    expect(APP_TSX).toMatch(
+      /onboardingStep === 'puzzle_complete' \|\| onboardingFlow\.onboardingStep === 'going_to_pit'/
+    );
+  });
+
   test('all three victory exits (next / home / pit) run the interstitial gate', () => {
     const calls = APP_TSX.match(/maybeShowVictoryInterstitial\(\);/g) || [];
     expect(calls.length).toBeGreaterThanOrEqual(3);

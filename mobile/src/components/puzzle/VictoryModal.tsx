@@ -819,15 +819,27 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                   backgroundColor: btn.share.bg,
                   borderColor: btn.share.edge,
                 }]}>
-                  <Text style={[styles.btnFlatUniform, { color: btn.share.text }]}>
-                    {'\uD83D\uDCE4'} Share{shareBonusAvailable ? ` +${DAILY_SHARE_BONUS_AMBER}` : ''}
+                  {/* Flex row (not an inline image in Text) \u2014 inline images
+                      baseline-align unreliably and wrap onto their own line
+                      when tight. The row centers the gem properly. */}
+                  <View style={styles.shareBtnRow}>
+                    <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
+                      {'\uD83D\uDCE4'} Share
+                    </Text>
                     {shareBonusAvailable && (
                       <>
-                        {' '}
-                        <Image source={AMBER_ICON} style={styles.shareBonusIcon} accessibilityLabel="amber" />
+                        <Image
+                          source={AMBER_ICON}
+                          style={styles.shareBonusIcon}
+                          importantForAccessibility="no"
+                          accessibilityElementsHidden
+                        />
+                        <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
+                          {`+${DAILY_SHARE_BONUS_AMBER}`}
+                        </Text>
                       </>
                     )}
-                  </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -1220,9 +1232,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  // Share button content row — keeps "📤 Share" + gem + "+N" on one centered
+  // line (the row never wraps; the gem is a sibling, not an inline image).
+  shareBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
   shareBonusIcon: {
-    width: 12,
-    height: 12,
+    width: 14,
+    height: 14,
   },
 
   // Collect Now pill (inside amber stats box)

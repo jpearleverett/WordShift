@@ -296,3 +296,31 @@ cloud([[14, 23, 9, 6], [28, 18, 12, 9], [44, 22, 11, 7], [55, 25, 6, 4]], 'cloud
   for (const [x, y] of [[33, 22 + oy], [62, 18 + oy], [50, 14 + oy], [41, 10 + oy], [68, 26 + oy]]) put(g, x, y, GLOW1);
   save(g, 5, 'pit_entrance.png');
 }
+
+// === wall (24x24 grid, x2 = 48x48) ===========================================
+// Seamless timber-plank tile for the house body (HouseWorld renders it with
+// resizeMode="repeat" behind the rooms). Same warm sienna family as the flat
+// #A0522D fill it replaces and the #5D4037 frame, in the roof/foundation's
+// top-lit 1px-outline language, so the walls read as built timber instead of
+// a flat color block. Fully deterministic and appended after the other
+// sections (consumes no rng), so regenerating leaves every other output
+// byte-identical.
+{
+  const g = G(24, 24);
+  const A = '#A0522D', B = '#96491F';            // alternating plank tones
+  const HI = '#B96B3F', LO = '#82401F', SEAM = '#5D4037';
+  for (let course = 0; course < 4; course++) {
+    const y0 = course * 6;
+    box(g, 0, y0, 23, y0 + 5, course % 2 ? B : A);
+    box(g, 0, y0, 23, y0, HI);                   // lit plank top
+    box(g, 0, y0 + 4, 23, y0 + 4, LO);           // shaded base
+    box(g, 0, y0 + 5, 23, y0 + 5, SEAM);         // seam between courses
+    // one staggered butt joint per course (fixed columns tile seamlessly)
+    const jx = course % 2 ? 5 : 17;
+    box(g, jx, y0 + 1, jx, y0 + 4, SEAM);
+    put(g, jx + 1, y0 + 1, HI);                  // light catch on the joint edge
+  }
+  // sparse knots/grain ticks (fixed positions, deterministic)
+  for (const [x, y] of [[9, 2], [20, 8], [3, 15], [14, 20], [7, 21], [21, 14]]) put(g, x, y, LO);
+  save(g, 2, 'wall.png');
+}

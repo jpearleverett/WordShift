@@ -2076,10 +2076,13 @@ function MainApp() {
               text={onboardingActions.getOnboardingFoxText()}
               buttonText={onboardingActions.getOnboardingButtonText()}
               onContinue={
-                // pit_offering has no manual Continue: before offering the player
-                // taps the words; after offering it auto-returns home. pit_intro
-                // keeps its Continue to advance into the offering step.
-                onboardingFlow.onboardingStep === 'pit_offering'
+                // Before offering, pit_offering has NO continue button: the
+                // player must tap the words themselves. Once pitOfferDone, the
+                // completion beat shows its continue button and waits for the
+                // player to tap "Let's go home!" (getOnboardingButtonText's
+                // pit_offering label) — no auto-return. pit_intro keeps its
+                // Continue to advance into the offering step.
+                onboardingFlow.onboardingStep === 'pit_offering' && !onboardingFlow.pitOfferDone
                   ? undefined
                   : onboardingActions.handleOnboardingContinue
               }
@@ -2545,11 +2548,15 @@ function MainApp() {
           onClose={() => puzzleActions.setShowRules(false)}
         />
 
-        {/* Victory Modal — shown during onboarding puzzle_tutorial (hidden during puzzle_complete when FoxGuide takes over).
+        {/* Victory Modal — shown during onboarding puzzle_tutorial. Hidden while
+            the FoxGuide completion beat runs (puzzle_complete) AND through the
+            going_to_pit transition window: gameState is still WON during the
+            ~300ms before the pit transition overlay covers the screen, so
+            without the second exclusion the modal flashed back in.
             Tap-to-skip lives INSIDE the modal (onSkip): the old childless
             box-none Pressable here never received touches — dead code. */}
         <VictoryModal
-          visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && onboardingFlow.onboardingStep === 'puzzle_complete')}
+          visible={puzzle.gameState === GameState.WON && !(onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'puzzle_complete' || onboardingFlow.onboardingStep === 'going_to_pit'))}
           earnedStars={puzzle.earnedStars}
           difficulty={isPlayingDaily ? 'HARD' : puzzle.difficulty}
           phase={persistence.currentPhase}

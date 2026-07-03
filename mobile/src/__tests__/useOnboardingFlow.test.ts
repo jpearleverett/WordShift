@@ -1,6 +1,7 @@
 /**
- * Tests for the onboarding state machine's resume-resilience contract and the
- * skip clean-exit contract.
+ * Tests for the onboarding state machine's resume-resilience contract, the
+ * skip clean-exit contract, and the pit offer-complete tap-to-continue
+ * contract.
  *
  * `normalizeResumeStep` is the guard that prevents a brand-new player from
  * being stranded if the app is killed mid-onboarding: transient steps (which
@@ -272,18 +273,29 @@ describe('handleSkipOnboarding (clean exit, no guided-board limbo)', () => {
     jest.useFakeTimers();
     try {
       const cbs = makeCallbacks();
-      const [, actions] = await mountAtStep('pit_offering', cbs);
+      // puzzle_complete is transient (a mount normalizes it away), so reach it
+      // in-session the way App.tsx does after the tutorial victory.
+      const [, mounted] = await mountAtStep('puzzle_tutorial', cbs);
+      await mounted.advanceOnboarding('puzzle_complete');
+      await flushAsync();
 
-      // Player offered every word — the auto-return-home timer is now queued.
-      actions.handlePitOnboardingOfferComplete();
+      // Tap through the completion beat; the final tap queues the
+      // going_to_pit → pit_intro transition timer.
+      const lines = ONBOARDING_FOX_LINES.puzzle_tutorial_complete;
+      for (let i = 0; i < lines.length; i++) {
+        const [, actions] = renderOnboardingHook(cbs);
+        await actions.handleOnboardingContinue();
+        await flushAsync();
+      }
+      expect(await getOnboardingStep()).toBe('going_to_pit');
 
       const [, freshActions] = renderOnboardingHook(cbs);
       await freshActions.handleSkipOnboarding();
       await flushAsync();
       expect(await getOnboardingStep()).toBe('complete');
 
-      // If the queued auto-return survived the skip it would advance the
-      // step to returning_home/unlock_explained — it must not.
+      // If the queued transition survived the skip it would advance the
+      // step to pit_intro — it must not.
       jest.runAllTimers();
       await flushAsync();
       expect(await getOnboardingStep()).toBe('complete');
@@ -315,5 +327,81 @@ describe('handleSkipOnboarding (clean exit, no guided-board limbo)', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handlePitOnboardingOfferComplete — tap-to-continue contract (no auto-return)
+// ---------------------------------------------------------------------------
+// The old behavior auto-returned home ~1.5s after the last word was offered,
+// which yanked the completion line away before the player could read it. The
+// fixed behavior: offer-complete flips pitOfferDone (FoxGuide switches to the
+// completion beat, which now shows a continue button) and WAITS — the player
+// taps "Let's go home!" to route home via handleOnboardingContinue.
+
+describe('handlePitOnboardingOfferComplete (tap-to-continue, no auto-return)', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    resetHookState();
+    await (AsyncStorage.clear as jest.Mock)();
+    await resetOnboarding();
+  });
+
+  test('offer-complete flips pitOfferDone, resets the line index, and schedules NO return-home timer', async () => {
+    jest.useFakeTimers();
+    try {
+      const cbs = makeCallbacks();
+      const [, actions] = await mountAtStep('pit_offering', cbs);
+
+      // Seed a stale line index (state slot 1 = onboardingLineIndex in hook
+      // declaration order) to prove the completion beat starts at line 0.
+      stateStore.set(1, 1);
+
+      actions.handlePitOnboardingOfferComplete();
+
+      const [state] = renderOnboardingHook(cbs);
+      expect(state.pitOfferDone).toBe(true);
+      expect(state.onboardingLineIndex).toBe(0);
+      expect(state.onboardingStep).toBe('pit_offering');
+      expect(cbs.refreshStats).toHaveBeenCalled();
+
+      // No auto-return: nothing is queued, and even draining every timer
+      // must leave the player at the pit until they tap continue.
+      expect(jest.getTimerCount()).toBe(0);
+      jest.runAllTimers();
+      await flushAsync();
+      expect(await getOnboardingStep()).toBe('pit_offering');
+      expect(cbs.transitionTo).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('one-shot guard: the stall-rescue path cannot double-invoke completion', async () => {
+    const cbs = makeCallbacks();
+    const [, actions] = await mountAtStep('pit_offering', cbs);
+
+    actions.handlePitOnboardingOfferComplete();
+    actions.handlePitOnboardingOfferComplete();
+
+    expect(cbs.refreshStats).toHaveBeenCalledTimes(1);
+  });
+
+  test('tapping continue after the completion beat routes home (existing pit_offering case)', async () => {
+    const cbs = makeCallbacks();
+    const [, actions] = await mountAtStep('pit_offering', cbs);
+    actions.handlePitOnboardingOfferComplete();
+
+    // Tap through the completion beat; the final tap ("Let's go home!")
+    // transitions home and lands on unlock_explained.
+    const lines = ONBOARDING_FOX_LINES.pit_offering_complete;
+    for (let i = 0; i < lines.length; i++) {
+      const [, fresh] = renderOnboardingHook(cbs);
+      await fresh.handleOnboardingContinue();
+      await flushAsync();
+    }
+
+    expect(cbs.transitionTo).toHaveBeenCalledWith('home', expect.any(Function));
+    expect(await getOnboardingStep()).toBe('unlock_explained');
   });
 });
