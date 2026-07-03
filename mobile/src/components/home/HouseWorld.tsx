@@ -46,6 +46,7 @@ const FOUNDATION_IMGS = [
   require('../../../assets/environment/foundation_4.png'),
 ];
 const WALL_IMG = require('../../../assets/environment/wall.png');
+const EDGE_SHADOW_IMG = require('../../../assets/environment/wall_edge_shadow.png');
 const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
 const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
@@ -1207,7 +1208,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       style={[styles.bodyScrim, { backgroundColor: houseTint.color, opacity: wallTintOpacity }]}
                     />
                   )}
-                  <View style={styles.topTrim} />
 
                   {/* Render rooms from top to bottom (highest row number first) */}
                   {sortedRooms.map((room, index) => {
@@ -1266,6 +1266,23 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       style={[styles.bodyRoomScrim, { backgroundColor: houseTint.color, opacity: houseTint.room }]}
                     />
                   )}
+
+                  {/* Soft shadowed side edges (replaces the flat brown outline).
+                      The wall reaches the true body edge; these gradients darken
+                      the outer strip so the house corners read as receding into
+                      shadow, matching the painterly art instead of a hard line. */}
+                  <Image
+                    source={EDGE_SHADOW_IMG}
+                    style={styles.edgeShadowLeft}
+                    resizeMode="stretch"
+                    fadeDuration={0}
+                  />
+                  <Image
+                    source={EDGE_SHADOW_IMG}
+                    style={styles.edgeShadowRight}
+                    resizeMode="stretch"
+                    fadeDuration={0}
+                  />
                 </View>
 
                 {/* Foundation — hand-lit per-phase stone + baked grass (no
@@ -1478,10 +1495,12 @@ const styles = StyleSheet.create({
     // Muted-timber fallback under the plank texture (matches wall.png's average
     // so any seam/fallback reads as wood, not the old garish orange)
     backgroundColor: '#79593E',
+    // Explicit width == foundation width so the wall reaches the same edge and a
+    // symmetric wood margin frames the centered rooms. The old flat 5px border
+    // is gone (it read as a cheap outline); soft edge-shadow overlays give the
+    // sides depth instead.
+    width: HOUSE_WIDTH,
     padding: HOUSE_PADDING / 2,
-    borderWidth: 5,
-    borderColor: '#5D4037',
-    borderTopWidth: 0,
     alignItems: 'center',
   },
   // Clips the wall texture to the house body. Absolute-fills the body; the
@@ -1507,24 +1526,43 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  // Phase scrim over the wall+trim, behind the rooms. Inset past the 5px
-  // frame border (like the room scrim) so the stone frame tints to the same
-  // exterior strength as the wall instead of reading lighter at night.
+  // Phase scrim over the wall, behind the rooms. Fills the body exactly (the
+  // old flat border it used to reach past is gone).
   bodyScrim: {
     position: 'absolute',
     top: 0,
-    left: -5,
-    right: -5,
-    bottom: -5,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  // Phase scrim over the rooms + frame border. Inset past the 5px border so
-  // the stone trim tints with the wall instead of standing out lighter.
+  // Phase scrim over the rooms. Fills the body exactly.
   bodyRoomScrim: {
     position: 'absolute',
     top: 0,
-    left: -5,
-    right: -5,
-    bottom: -5,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  // Soft shadowed side edges (wall_edge_shadow.png is a dark->transparent
+  // horizontal gradient). Left uses it as-is (dark on the outer/left); right
+  // mirrors it (scaleX:-1) so the dark sits on the outer/right. Stretched over
+  // the full body height — the gradient has no vertical detail, so no distortion.
+  edgeShadowLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 24,
+    pointerEvents: 'none',
+  },
+  edgeShadowRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: 24,
+    transform: [{ scaleX: -1 }],
+    pointerEvents: 'none',
   },
   // Contact shadow under the foundation. Wrap is bottom-positioned inline (the
   // pit entrance adds its flow height below the foundation when it renders);
@@ -1541,16 +1579,6 @@ const styles = StyleSheet.create({
   contactShadowImg: {
     width: HOUSE_WIDTH + 40,
     height: 54,
-  },
-  topTrim: {
-    position: 'absolute',
-    top: 0,
-    left: -5,
-    right: -5,
-    height: 8,
-    backgroundColor: '#8B4513',
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
   },
   roomRow: {
     marginBottom: ROOM_GAP,
