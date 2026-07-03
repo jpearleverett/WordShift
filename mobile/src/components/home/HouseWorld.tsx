@@ -39,7 +39,6 @@ const FOUNDATION_IMG = require('../../../assets/environment/foundation.png');
 const WALL_IMG = require('../../../assets/environment/wall.png');
 const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
 const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
-const GRASS_FRINGE_IMG = require('../../../assets/environment/grass_fringe.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -758,7 +757,9 @@ const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 // keep these aspect constants in sync with the processed asset dims).
 const ROOF_WIDTH = HOUSE_WIDTH + 30; // Rendered roof width (slight overhang)
 const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (283 / 792)); // roof.png 792x283
-const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (118 / 792)); // foundation.png 792x118
+// foundation.png is 792x120 — stone courses with grass tufts + a center dirt
+// path gap baked into the base (the house plants itself into the meadow).
+const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (120 / 792));
 // pit_entrance.png is 460x540 (stone well + a stone path leading up to it).
 // Rendered box + the tuck under the foundation edge.
 const PIT_RENDER_WIDTH = 130;
@@ -1259,31 +1260,6 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   )}
                 </View>
 
-                {/* Grass fringe: tufts rooted at the base rising over the stone
-                    bottom, so the foundation is planted in the meadow instead
-                    of ending on a hard line. Base + a same-source tinted copy
-                    (keeps the blades, shades them into the phase). Positioned
-                    at the foundation base; the pit path (drawn next) passes in
-                    front at the center. */}
-                <View
-                  pointerEvents="none"
-                  style={[
-                    styles.grassFringeWrap,
-                    { bottom: (onPitPress ? PIT_FLOW_HEIGHT : 0) - 4 },
-                  ]}
-                >
-                  <View style={styles.grassFringeInner}>
-                    <Image source={GRASS_FRINGE_IMG} style={styles.grassFringeImg} resizeMode="stretch" />
-                    {houseTint.ext > 0 && (
-                      <Image
-                        source={GRASS_FRINGE_IMG}
-                        style={[styles.grassFringeImg, styles.tintFill, { tintColor: houseTint.color, opacity: houseTint.ext }]}
-                        resizeMode="stretch"
-                      />
-                    )}
-                  </View>
-                </View>
-
                 {/* The Offering Pit's mouth in the front yard, a stone path
                     connecting it to the house */}
                 {onPitPress && (
@@ -1532,24 +1508,6 @@ const styles = StyleSheet.create({
   contactShadowImg: {
     width: HOUSE_WIDTH + 40,
     height: 54,
-  },
-  // Grass fringe rooted at the foundation base. Wrap spans full width and
-  // centers a fixed-width inner band; both grass images (base + tinted copy)
-  // fill the inner band so the tint aligns to the base exactly.
-  grassFringeWrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 24,
-    alignItems: 'center',
-  },
-  grassFringeInner: {
-    width: HOUSE_WIDTH + 24,
-    height: 24,
-  },
-  grassFringeImg: {
-    width: '100%',
-    height: '100%',
   },
   topTrim: {
     position: 'absolute',

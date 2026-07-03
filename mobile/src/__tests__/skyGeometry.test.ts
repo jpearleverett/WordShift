@@ -109,10 +109,12 @@ describe('phase lighting settles the house into each sky', () => {
     expect(HOUSE_WORLD).toMatch(/styles\.bodyRoomScrim, \{ backgroundColor: houseTint\.color, opacity: houseTint\.room \}/);
   });
 
-  test('the house is grounded with a grass fringe + soft contact shadow', () => {
-    expect(fs.existsSync(path.join(ENV_DIR, 'grass_fringe.png'))).toBe(true);
+  test('the house is grounded (grass baked into the foundation + soft contact shadow)', () => {
+    // The grass tufts live in the foundation art now (not a separate fringe),
+    // so the old fringe asset/require must be gone; a soft contact band remains.
+    expect(fs.existsSync(path.join(ENV_DIR, 'grass_fringe.png'))).toBe(false);
+    expect(HOUSE_WORLD).not.toMatch(/GRASS_FRINGE_IMG/);
     expect(fs.existsSync(path.join(ENV_DIR, 'house_shadow.png'))).toBe(true);
-    expect(HOUSE_WORLD).toMatch(/GRASS_FRINGE_IMG/);
     expect(HOUSE_WORLD).toMatch(/HOUSE_SHADOW_IMG/);
   });
 });
@@ -158,7 +160,7 @@ describe('foundation seats below the river on real devices', () => {
   const HOUSE_BOTTOM_MARGIN = 30;
   const PIT_DOCK_CLEARANCE = 80;
   const PIT_BLOCK = 137; // pit height 153 + marginTop -16 (PIT_FLOW_HEIGHT)
-  const FOUNDATION_H = 42; // 282 * (118/792)
+  const FOUNDATION_H = 43; // 282 * (120/792)
 
   const foundationTopArtRow = (sw: number, sh: number) => {
     const boxH = Math.max(sh, Math.ceil(sw * (IMG_H / IMG_W)) + 2, 940);

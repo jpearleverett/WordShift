@@ -174,9 +174,10 @@ function processSprite(rawName, outName, targetWidth, opts = {}) {
 }
 
 processSprite('roof_raw.png', 'roof.png', 792);
-// Feather the foundation's bottom courses so the stone dissolves into the
-// meadow instead of ending on a hard rectangular line.
-processSprite('foundation_raw.png', 'foundation.png', 792, { featherBottomFrac: 0.24 });
+// Foundation art has grass tufts + a center dirt path gap baked into its base,
+// so it seats into the meadow on its own — no bottom feather (that would erode
+// the soft grass tips).
+processSprite('foundation_raw.png', 'foundation.png', 792);
 // Pit: the newer art (stone well + long stone path). Drop the top 45% of the
 // tapered path tail so the visible path reads as "leads from under the house
 // to the well" without an overlong stalk.
@@ -210,45 +211,6 @@ processSprite('pit_raw.png', 'pit_entrance.png', 460, { dropTopFrac: 0.45 });
     p.data[i + 3] = Math.round(ay * edge * 255);
   }
   save(p, path.join(ENV, 'house_shadow.png'));
-}
-
-// grass_fringe.png: tufts rooted at the base that rise over the foundation's
-// bottom courses so the house plants into the meadow. Rendered base + a
-// same-source tinted copy in RN so the blades shade into each phase.
-{
-  const W = 420, H = 70;
-  const p = new PNG({ width: W, height: H });
-  let s = 12345; const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
-  const blade = (x0, h, curve, wBase, pal) => {
-    for (let t = 0; t <= h; t++) {
-      const yy = H - 1 - t, frac = t / h;
-      const cx = x0 + curve * frac * frac * 8;
-      const halfw = Math.max(0.5, wBase * (1 - frac * 0.85)) / 2;
-      const col = pal[Math.min(pal.length - 1, Math.floor(frac * pal.length))];
-      for (let dx = -halfw; dx <= halfw; dx++) {
-        const x = Math.round(cx + dx); if (x < 0 || x >= W) continue;
-        const i = (yy * W + x) * 4;
-        p.data[i] = col[0]; p.data[i + 1] = col[1]; p.data[i + 2] = col[2]; p.data[i + 3] = 255;
-      }
-    }
-  };
-  const DARK = [[46, 86, 42], [58, 104, 48], [86, 150, 68]];
-  const MID = [[54, 98, 46], [74, 132, 58], [120, 188, 92]];
-  const LITE = [[70, 120, 54], [104, 170, 74], [150, 214, 110]];
-  const pals = [DARK, MID, LITE];
-  for (let i = 0; i < 170; i++) {
-    blade(rnd() * W, H * (0.35 + rnd() * 0.6), (rnd() - 0.5) * 2, 2 + rnd() * 3, pals[Math.floor(rnd() * pals.length)]);
-  }
-  for (let i = 0; i < 10; i++) {
-    const x = Math.round(rnd() * W), y = Math.round(H * (0.25 + rnd() * 0.4));
-    const col = [[255, 240, 180], [255, 180, 210], [200, 180, 255]][Math.floor(rnd() * 3)];
-    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const xx = x + dx, yy = y + dy; if (xx < 0 || xx >= W || yy < 0 || yy >= H) continue;
-      const ii = (yy * W + xx) * 4;
-      p.data[ii] = col[0]; p.data[ii + 1] = col[1]; p.data[ii + 2] = col[2]; p.data[ii + 3] = 255;
-    }
-  }
-  save(p, path.join(ENV, 'grass_fringe.png'));
 }
 
 // ─── Window masks (phase-appropriate room windows) ──────────────────────────
