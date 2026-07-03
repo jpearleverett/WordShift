@@ -13,9 +13,13 @@ import {
   claimReservedUnlockIfReady,
   getReservedArrivalText,
   getReserveGateText,
+  canSkipUnlockGate,
+  skipUnlockGate,
+  getUnlockSkipCost,
+  getSkipGateText,
 } from '../services/homeWorldData';
 import { clearProgress, loadProgress, devAddAmber, getReservedUnlockId } from '../services/amberCurrency';
-import { PHASE_THRESHOLDS } from '../constants/gameBalance';
+import { PHASE_THRESHOLDS, UNLOCK_SKIP_PREMIUM } from '../constants/gameBalance';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Reset state between tests
@@ -385,5 +389,74 @@ describe('reserve-ahead (pay-now, build-when-gate-opens)', () => {
     p.puzzlesSolved = 28;
     await claimReservedUnlockIfReady();
     expect((await loadProgress()).amber).toBe(afterReserve); // claim is free
+  });
+});
+
+describe('skip the wait (pay premium, unlock now)', () => {
+  async function unlockUpTo(targetUnlockId: string) {
+    await devAddAmber(100000);
+    for (const u of UNLOCK_PROGRESSION) {
+      if (u.id === targetUnlockId) break;
+      await purchaseUnlock(u.id);
+    }
+  }
+
+  test('skip cost is the build cost plus the premium (and higher than reserve)', () => {
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    expect(getUnlockSkipCost(jungle)).toBe(Math.ceil(jungle.cost * (1 + UNLOCK_SKIP_PREMIUM)));
+    expect(getUnlockSkipCost(jungle)).toBeGreaterThan(jungle.cost);
+  });
+
+  test('canSkipUnlockGate: true when gated + premium affordable + prerequisites met', async () => {
+    await unlockUpTo('unlock_jungle');
+    expect(await canSkipUnlockGate('unlock_jungle')).toBe(true);
+  });
+
+  test('canSkipUnlockGate: false when only the base cost (not the premium) is affordable', async () => {
+    await unlockUpTo('unlock_jungle');
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    const p = await loadProgress();
+    p.amber = jungle.cost; // enough to reserve, short of the premium skip
+    expect(await canReserveUnlock('unlock_jungle')).toBe(true);
+    expect(await canSkipUnlockGate('unlock_jungle')).toBe(false);
+  });
+
+  test('canSkipUnlockGate: false once the puzzle gate is already met (just build it)', async () => {
+    await unlockUpTo('unlock_jungle');
+    const p = await loadProgress();
+    p.puzzlesSolved = 28;
+    expect(await canSkipUnlockGate('unlock_jungle')).toBe(false);
+  });
+
+  test('canSkipUnlockGate: false while something is already reserved', async () => {
+    await unlockUpTo('unlock_jungle');
+    await reserveNextUnlock('unlock_jungle');
+    expect(await canSkipUnlockGate('unlock_jungle')).toBe(false);
+  });
+
+  test('skipUnlockGate: builds the room immediately, charges the premium, bypasses the gate', async () => {
+    await unlockUpTo('unlock_jungle');
+    const jungle = UNLOCK_PROGRESSION.find(u => u.id === 'unlock_jungle')!;
+    const before = (await loadProgress()).amber;
+    const res = await skipUnlockGate('unlock_jungle');
+    expect(res.success).toBe(true);
+    expect(res.unlock?.id).toBe('unlock_jungle');
+    const p = await loadProgress();
+    expect(p.unlockedRooms).toContain('jungle_room'); // built now, gate never met
+    expect(p.puzzlesSolved).toBe(0);
+    expect(before - p.amber).toBe(getUnlockSkipCost(jungle)); // premium charged
+  });
+
+  test('skipUnlockGate: refuses (and builds nothing) when the premium is unaffordable', async () => {
+    await unlockUpTo('unlock_jungle');
+    const p = await loadProgress();
+    p.amber = 1;
+    const res = await skipUnlockGate('unlock_jungle');
+    expect(res.success).toBe(false);
+    expect((await loadProgress()).unlockedRooms).not.toContain('jungle_room');
+  });
+
+  test('getSkipGateText names the premium cost', () => {
+    expect(getSkipGateText(300)).toBe('Skip the wait now for 300 amber');
   });
 });

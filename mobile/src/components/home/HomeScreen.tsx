@@ -146,19 +146,21 @@ interface HomeScreenProps {
 // --- Header quest pill: pure decisions (node-testable, see questPill.test.ts) ---
 
 /**
- * Count of ACTIONABLE quests across daily + weekly: quests still in progress
- * (not completed) PLUS completed-but-unclaimed (the claim is still an action).
- * Claimed quests are done and never count. This is the single shared count
- * behind BOTH the header quest pill and the Journal Hub "Quests (N)" row, so
- * the two surfaces can never disagree. (Player report: every reward claimed on
- * both tabs, yet the pill read "5" and the journal "Quests (5)" — the old
- * journal count included all unclaimed quests while the pill excluded
- * completed-but-unclaimed ones; neither matched what was actually left to do.)
+ * Count of CLAIMABLE quests across daily + weekly: quests that are completed but
+ * not yet claimed — i.e. rewards waiting to be turned in. This is the single
+ * shared count behind BOTH the header quest pill and the Journal Hub "Quests (N)"
+ * row, so the two surfaces can never disagree.
+ *
+ * In-progress quests are deliberately NOT counted: a player who claimed every
+ * finished quest saw the pill still read "3" from long-running weeklies they
+ * couldn't finish yet, which read as "3 rewards to turn in" when there was
+ * nothing to claim. The number now tracks exactly what the "!" badge does
+ * (claimable amber), so it's bare 🎯 the moment there's nothing left to collect.
  */
 export const getActionableQuestCount = (state: CombinedQuestState | null): number => {
   if (!state) return 0;
   return [...state.daily.quests, ...state.weekly.quests]
-    .filter(q => !q.claimed).length;
+    .filter(q => q.completed && !q.claimed).length;
 };
 
 /**
@@ -1967,7 +1969,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </Text>
                     );
                   }
-                  // Gated but affordable: offer to reserve (pay now, auto-builds).
+                  // Gated but affordable: offer to reserve (pay now, auto-builds)
+                  // and — if the premium is affordable — to skip the wait entirely.
                   if (unlockFlow.canReserve) {
                     return (
                       <>
@@ -1984,6 +1987,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             Reserve for <AmberInline /> {unlockFlow.nextUnlock!.cost}
                           </Text>
                         </TouchableOpacity>
+                        {unlockFlow.canSkip && (
+                          <TouchableOpacity
+                            style={[styles.buyButton, styles.buyButtonLarge, styles.skipButton]}
+                            onPress={() => unlockFlow.handleSkip(unlockFlow.nextUnlock!)}
+                            accessibilityLabel={`Skip the wait and unlock ${unlockFlow.nextUnlock!.name} now for ${unlockFlow.skipCost} amber`}
+                            accessibilityRole="button"
+                          >
+                            <Text style={[styles.buyButtonText, styles.skipButtonText]}>
+                              Skip the wait for <AmberInline /> {unlockFlow.skipCost}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
                       </>
                     );
                   }
@@ -3228,6 +3243,17 @@ const styles = StyleSheet.create({
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '800',
+  },
+  // Secondary "skip the wait" action — outlined amber so it reads as the paid
+  // premium shortcut, one step below the recommended (cheaper) Reserve.
+  skipButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: CandyColors.yellow.dark,
+    marginTop: 10,
+  },
+  skipButtonText: {
+    color: CandyColors.yellow.dark,
   },
   allUnlockedText: {
     fontSize: 16,

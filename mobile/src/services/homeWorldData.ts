@@ -8,6 +8,7 @@ import { logEvent } from './eventLogger';
 import { loadTendingState } from './tending';
 import { loadChoiceState } from './dialogueChoices';
 import { getPhase5PoolLength } from './dialogue/phase5Pool';
+import { UNLOCK_SKIP_PREMIUM } from '../constants/gameBalance';
 
 // ============================================================================
 // PHASE-AWARE ROOM DESCRIPTIONS
@@ -893,6 +894,93 @@ export async function reserveNextUnlock(unlockId: string): Promise<{
     logEvent({ type: 'unlock_purchased', data: { unlockId: unlock.id, targetId: unlock.targetId, cost: unlock.cost, reserved: true } });
   }
   return { success: result.success, newBalance: result.newBalance, error: result.error };
+}
+
+/**
+ * Amber cost to SKIP a level-gated unlock's puzzle requirement and unlock it
+ * immediately: the build cost plus UNLOCK_SKIP_PREMIUM.
+ */
+export function getUnlockSkipCost(unlock: Unlockable): number {
+  return Math.ceil(unlock.cost * (1 + UNLOCK_SKIP_PREMIUM));
+}
+
+/**
+ * Whether an unlock can be SKIPPED right now: it's the legitimate next unlock
+ * (all previous done), it's blocked ONLY by its puzzle-count gate, nothing is
+ * reserved (skip and reserve are mutually exclusive — a reservation already
+ * paid the plain cost), it isn't already unlocked, and the player can afford the
+ * premium skip cost. Skipping unlocks the room/animal immediately, bypassing the
+ * level wait — the paid shortcut past the gate.
+ */
+export async function canSkipUnlockGate(unlockId: string): Promise<boolean> {
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
+  if (!unlock || unlock.minPuzzles === undefined) return false;
+
+  const progress = await loadProgress();
+  if (progress.reservedUnlockId) return false; // already paid via reserve
+
+  // Must be blocked solely by the puzzle gate.
+  if (progress.puzzlesSolved >= unlock.minPuzzles) return false;
+
+  // Not already unlocked.
+  const alreadyUnlocked = unlock.type === 'character'
+    ? progress.unlockedAnimals.includes(unlock.targetId)
+    : progress.unlockedRooms.includes(unlock.targetId);
+  if (alreadyUnlocked) return false;
+
+  // All previous unlocks must be done (it's genuinely the next thing).
+  const previous = UNLOCK_PROGRESSION.filter(u => u.order < unlock.order);
+  for (const prev of previous) {
+    const done = prev.type === 'character'
+      ? progress.unlockedAnimals.includes(prev.targetId)
+      : progress.unlockedRooms.includes(prev.targetId);
+    if (!done) return false;
+  }
+
+  // Must be able to afford the premium skip cost.
+  return progress.amber >= getUnlockSkipCost(unlock);
+}
+
+/**
+ * Skip a level-gated unlock's puzzle requirement: pays the premium skip cost and
+ * unlocks the room/animal immediately. Returns the unlocked item on success so
+ * the caller can celebrate / show a new-character intro (same as purchaseUnlock).
+ */
+export async function skipUnlockGate(unlockId: string): Promise<{
+  success: boolean;
+  unlock?: Unlockable;
+  newBalance?: number;
+  error?: string;
+}> {
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
+  if (!unlock) return { success: false, error: 'Invalid unlock ID' };
+  if (!(await canSkipUnlockGate(unlockId))) {
+    return { success: false, error: 'Cannot skip this unlock right now' };
+  }
+
+  const skipCost = getUnlockSkipCost(unlock);
+  const success = unlock.type === 'character'
+    ? await unlockAnimal(unlock.targetId, skipCost)
+    : await unlockRoom(unlock.targetId, skipCost);
+  if (!success) return { success: false, error: 'Not enough amber' };
+
+  if (unlock.type === 'character') {
+    await fastForwardLateUnlockDialogue(unlock.targetId);
+  }
+  logEvent({
+    type: 'unlock_purchased',
+    data: { unlockId: unlock.id, targetId: unlock.targetId, cost: skipCost, skippedGate: true },
+  });
+  const progress = await loadProgress();
+  return { success: true, unlock, newBalance: progress.amber };
+}
+
+/**
+ * "Skip the wait" pitch shown under a gated room's requirement when the player
+ * can afford the premium — the paid shortcut past the level gate.
+ */
+export function getSkipGateText(skipCost: number): string {
+  return `Skip the wait now for ${skipCost} amber`;
 }
 
 /**

@@ -209,6 +209,19 @@ export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
 export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 
 // ============================================================================
+// ROOM UNLOCK — "skip the wait"
+// ============================================================================
+
+/**
+ * Amber premium for skipping a level-gated room's puzzle requirement and
+ * unlocking it immediately (vs Reserve, which pays the plain cost and waits for
+ * the gate). The premium is what keeps the gates meaningful for a typical
+ * earner while giving an amber-rich player a paid shortcut: skip cost =
+ * ceil(buildCost * (1 + UNLOCK_SKIP_PREMIUM)).
+ */
+export const UNLOCK_SKIP_PREMIUM = 0.5;
+
+// ============================================================================
 // STREAK
 // ============================================================================
 
