@@ -124,10 +124,22 @@ function resize(png, tw, th, wrap = false) {
   return out;
 }
 
-function processSprite(rawName, outName, targetWidth) {
+// Drop the top `dropTopFrac` of the CONTENT height before the final crop —
+// used for the tall pit art (long tapered path tail we don't need all of).
+function dropTop(png, dropTopFrac) {
+  const cropped = cropToContent(png);
+  const { width: w, height: h, data } = cropped;
+  const y0 = Math.round(h * dropTopFrac);
+  const nh = h - y0;
+  const out = new PNG({ width: w, height: nh });
+  data.copy(out.data, 0, y0 * w * 4, h * w * 4);
+  return out;
+}
+
+function processSprite(rawName, outName, targetWidth, dropTopFrac = 0) {
   const png = load(path.join(RAW, rawName));
   keyBackground(png);
-  const cropped = cropToContent(png);
+  const cropped = dropTopFrac > 0 ? dropTop(png, dropTopFrac) : cropToContent(png);
   const th = Math.round(targetWidth * (cropped.height / cropped.width));
   const final = resize(cropped, targetWidth, th);
   save(final, path.join(ENV, outName));
@@ -137,7 +149,10 @@ function processSprite(rawName, outName, targetWidth) {
 
 processSprite('roof_raw.png', 'roof.png', 792);
 processSprite('foundation_raw.png', 'foundation.png', 792);
-processSprite('pit_raw.png', 'pit_entrance.png', 480);
+// Pit: the newer art (stone well + long stone path). Drop the top 45% of the
+// tapered path tail so the visible path reads as "leads from under the house
+// to the well" without an overlong stalk.
+processSprite('pit_raw.png', 'pit_entrance.png', 460, 0.45);
 
 // Wall tile: centered square crop, wrap-aware downscale to 128
 {

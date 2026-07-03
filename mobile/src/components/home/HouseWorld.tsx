@@ -434,6 +434,35 @@ const PHASE_GROUND_COLORS: Record<number, string> = {
   5: '#182131', // Phase 5 renders sky_shadow too
 };
 
+// Per-phase house lighting. The house art is drawn in daylight; these tints
+// sit it into each sky's ambient light (values tuned against offline
+// composites of the real assets over all five skies). `ext` is the exterior
+// strength (roof / walls / foundation / pit); `room` is deliberately about
+// half of it so the lit interiors keep glowing against the darkened shell,
+// like windows at night. Non-rectangular pieces (roof, pit) are tinted with
+// a same-source overlay Image + tintColor, which follows the art's alpha
+// silhouette exactly.
+const PHASE_HOUSE_TINT: Record<number, { color: string; ext: number; room: number }> = {
+  0: { color: '#000000', ext: 0, room: 0 },      // day: untouched
+  1: { color: '#FFBE6E', ext: 0.06, room: 0.03 }, // afternoon: faint warm gold
+  2: { color: '#D66E46', ext: 0.14, room: 0.07 }, // dusk: warm sunset rose
+  3: { color: '#0E1A36', ext: 0.45, room: 0.22 }, // storm night: deep blue
+  4: { color: '#080818', ext: 0.55, room: 0.27 }, // shadow: near-black indigo
+  5: { color: '#140E28', ext: 0.48, room: 0.24 }, // terrible peace: softer mauve dark
+};
+
+// Contact-shadow appearance by phase: color follows the ground it falls on
+// (green meadow -> sunset earth -> night blues) and the strength softens as
+// the direct sunlight goes away.
+const CONTACT_SHADOW: Record<number, { color: string; mult: number }> = {
+  0: { color: '#0A1408', mult: 1 },
+  1: { color: '#1A1206', mult: 1 },
+  2: { color: '#170B04', mult: 0.85 },
+  3: { color: '#030812', mult: 0.6 },
+  4: { color: '#020409', mult: 0.5 },
+  5: { color: '#020409', mult: 0.5 },
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ARRANGEMENT CONNECTOR - Visual sigil lines connecting rooms
 // ═══════════════════════════════════════════════════════════════════════════
@@ -728,13 +757,14 @@ const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 const ROOF_WIDTH = HOUSE_WIDTH + 30; // Rendered roof width (slight overhang)
 const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (283 / 792)); // roof.png 792x283
 const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (118 / 792)); // foundation.png 792x118
-// pit_entrance.png is 480x421; rendered box + the tuck under the foundation.
-const PIT_RENDER_WIDTH = 116;
-const PIT_RENDER_HEIGHT = Math.round(PIT_RENDER_WIDTH * (421 / 480)); // 102
-const PIT_MARGIN_TOP = -6; // path start tucks under the foundation edge
+// pit_entrance.png is 460x540 (stone well + a stone path leading up to it).
+// Rendered box + the tuck under the foundation edge.
+const PIT_RENDER_WIDTH = 130;
+const PIT_RENDER_HEIGHT = Math.round(PIT_RENDER_WIDTH * (540 / 460)); // 153
+const PIT_MARGIN_TOP = -16; // path tail tucks behind the foundation edge
 // Net flow height the pit adds below the foundation — used by the pan bounds,
 // the contact shadow seat, and the house-vs-art geometry notes below.
-const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 96
+const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 137
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
 // Baseline gap between the pit entrance and the container bottom (before the
@@ -764,19 +794,20 @@ const PIT_DOCK_CLEARANCE = 80;
 //      container bottom, where scale = SKY_BOX_HEIGHT / 1972 — independent of
 //      the container height, header height, or insets.
 // The house column is bottom-anchored too (margins below), so the foundation
-// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 96
-// + foundation 42) = 248dp ≈ image rows 1353-1440 across real devices — on
-// the meadow, just below the river, in every sky variant.
+// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 137
+// + foundation 42) = 289dp above the container bottom.
 const SKY_IMG_WIDTH = 941;
 const SKY_IMG_HEIGHT = 1972;
-// The 790 floor guarantees the seat even on very small / display-size-scaled
-// windows (e.g. 320x640dp): scale >= 790/1972 puts the foundation top at
-// image row <= ~1353, still below every river. Larger boxes only push the
-// house further down the meadow, never back into the water.
+// The 940 floor guarantees the seat even on very small / display-size-scaled
+// windows (e.g. 320x640dp): scale >= 940/1972 keeps the foundation top at
+// image row >= ~1366, below every river (lowest bank ~row 1335). The taller
+// pit (137dp flow) pushes the foundation higher up the art than the old one
+// did, so this floor is what keeps it out of the water — larger boxes only
+// push the house further down the meadow, never back up into the river.
 const SKY_BOX_HEIGHT = Math.max(
   SCREEN_HEIGHT,
   Math.ceil(SCREEN_WIDTH * (SKY_IMG_HEIGHT / SKY_IMG_WIDTH)) + 2,
-  790,
+  940,
 );
 
 
@@ -821,9 +852,16 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
 }) => {
   const tendingIntensity = getTendingIntensity(tendingLevel);
   const ambientMotionEnabled = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
-  // Contact-shadow strength by phase: crisp under the day sun, softer as the
-  // skies darken (a hard shadow under a storm sky reads wrong).
-  const contactShadowMult = [1, 1, 0.85, 0.6, 0.5, 0.5][currentPhase] ?? 1;
+  const houseTint = PHASE_HOUSE_TINT[currentPhase] ?? PHASE_HOUSE_TINT[0];
+  // Wall texture sits UNDER the whole-body room scrim, so its own overlay is
+  // compensated to land the compound wall tint exactly on `ext`.
+  const wallTintOpacity = houseTint.room >= 1
+    ? houseTint.ext
+    : Math.max(0, (houseTint.ext - houseTint.room) / (1 - houseTint.room));
+  // The pit shares the exterior tint, but capped so the well's teal glow
+  // survives the night phases instead of washing to flat black.
+  const pitTintOpacity = Math.min(houseTint.ext, 0.4);
+  const contactShadow = CONTACT_SHADOW[currentPhase] ?? CONTACT_SHADOW[0];
   // Animated values
   const translateY = useRef(new Animated.Value(0)).current;
 
@@ -1095,15 +1133,24 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     { bottom: (onPitPress ? PIT_FLOW_HEIGHT : 0) - 14 },
                   ]}
                 >
-                  <View style={[styles.contactShadowPill, styles.contactShadowOuter, { opacity: 0.1 * contactShadowMult }]} />
-                  <View style={[styles.contactShadowPill, styles.contactShadowMid, { opacity: 0.1 * contactShadowMult }]} />
-                  <View style={[styles.contactShadowPill, styles.contactShadowInner, { opacity: 0.12 * contactShadowMult }]} />
+                  <View style={[styles.contactShadowPill, styles.contactShadowOuter, { backgroundColor: contactShadow.color, opacity: 0.1 * contactShadow.mult }]} />
+                  <View style={[styles.contactShadowPill, styles.contactShadowMid, { backgroundColor: contactShadow.color, opacity: 0.1 * contactShadow.mult }]} />
+                  <View style={[styles.contactShadowPill, styles.contactShadowInner, { backgroundColor: contactShadow.color, opacity: 0.12 * contactShadow.mult }]} />
                 </View>
 
 
                 {/* Roof — pixel art (chimney + attic window baked into the asset) */}
                 <View style={styles.roof}>
                   <Image source={ROOF_IMG} style={styles.roofImage} resizeMode="stretch" />
+                  {/* Phase lighting: a same-source tinted copy follows the roof
+                      silhouette exactly (tintColor respects alpha). */}
+                  {houseTint.ext > 0 && (
+                    <Image
+                      source={ROOF_IMG}
+                      style={[styles.roofImage, styles.tintFill, { tintColor: houseTint.color, opacity: houseTint.ext }]}
+                      resizeMode="stretch"
+                    />
+                  )}
                   {/* Animated smoke puffs rising from the baked-in chimney */}
                   <View style={styles.smokeContainer}>
                     <SmokePuff delay={0} isStatic={!ambientMotionEnabled} />
@@ -1122,6 +1169,17 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                     resizeMode="repeat"
                     fadeDuration={0}
                   />
+                  {/* Wall/frame phase scrim (behind the rooms). Compensated so
+                      the wall's compound tint (this + the room scrim over it)
+                      lands on the full exterior strength, while the rooms above
+                      keep only the lighter room scrim — lit interiors still glow
+                      against the darkened shell. */}
+                  {wallTintOpacity > 0 && (
+                    <View
+                      pointerEvents="none"
+                      style={[styles.bodyScrim, { backgroundColor: houseTint.color, opacity: wallTintOpacity }]}
+                    />
+                  )}
                   <View style={styles.topTrim} />
 
                   {/* Render rooms from top to bottom (highest row number first) */}
@@ -1171,10 +1229,29 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       <Text style={styles.emptyHouseSubtext}>Your house awaits!</Text>
                     </View>
                   )}
+
+                  {/* Room phase scrim (over the rooms + frame). Lighter than the
+                      exterior so the interiors read as lit at night; inset past
+                      the frame border so the stone trim tints too. */}
+                  {houseTint.room > 0 && (
+                    <View
+                      pointerEvents="none"
+                      style={[styles.bodyRoomScrim, { backgroundColor: houseTint.color, opacity: houseTint.room }]}
+                    />
+                  )}
                 </View>
 
                 {/* Foundation — pixel stone courses */}
-                <Image source={FOUNDATION_IMG} style={styles.foundationImage} resizeMode="stretch" />
+                <View style={styles.foundationWrap}>
+                  <Image source={FOUNDATION_IMG} style={styles.foundationImageInner} resizeMode="stretch" />
+                  {houseTint.ext > 0 && (
+                    <Image
+                      source={FOUNDATION_IMG}
+                      style={[styles.foundationImageInner, styles.tintFill, { tintColor: houseTint.color, opacity: houseTint.ext }]}
+                      resizeMode="stretch"
+                    />
+                  )}
+                </View>
 
                 {/* The Offering Pit's mouth in the front yard, a stone path
                     connecting it to the house */}
@@ -1196,6 +1273,13 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       style={styles.pitEntranceImage}
                       resizeMode="contain"
                     />
+                    {houseTint.ext > 0 && (
+                      <Image
+                        source={PIT_ENTRANCE_IMG}
+                        style={[styles.pitEntranceImage, styles.tintFill, { tintColor: houseTint.color, opacity: pitTintOpacity }]}
+                        resizeMode="contain"
+                      />
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
@@ -1304,16 +1388,29 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  foundationImage: {
+  // Absolute-fill for a same-source tinted overlay (phase lighting). Follows
+  // the base image's box; tintColor makes it follow the alpha silhouette.
+  tintFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  foundationWrap: {
     width: HOUSE_WIDTH,
     height: FOUNDATION_RENDER_HEIGHT,
     marginTop: -2,
+  },
+  foundationImageInner: {
+    width: '100%',
+    height: '100%',
   },
   pitEntrance: {
     alignSelf: 'center',
     marginTop: PIT_MARGIN_TOP, // path tucks under the foundation edge
     width: PIT_RENDER_WIDTH,
-    height: PIT_RENDER_HEIGHT, // pit_entrance.png aspect (480x421)
+    height: PIT_RENDER_HEIGHT, // pit_entrance.png aspect
   },
   pitEntranceImage: {
     width: '100%',
@@ -1361,14 +1458,33 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     alignItems: 'center',
   },
-  // Seamless 48x48 timber tile (assets/environment/wall.png, generated by
-  // generatePixelWorld.mjs) repeated across the wall area behind the rooms.
+  // Seamless timber tile (assets/environment/wall.png) repeated across the
+  // wall area behind the rooms.
   wallTexture: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  // Phase scrim over the wall+trim, behind the rooms. Inset past the 5px
+  // frame border (like the room scrim) so the stone frame tints to the same
+  // exterior strength as the wall instead of reading lighter at night.
+  bodyScrim: {
+    position: 'absolute',
+    top: 0,
+    left: -5,
+    right: -5,
+    bottom: -5,
+  },
+  // Phase scrim over the rooms + frame border. Inset past the 5px border so
+  // the stone trim tints with the wall instead of standing out lighter.
+  bodyRoomScrim: {
+    position: 'absolute',
+    top: 0,
+    left: -5,
+    right: -5,
+    bottom: -5,
   },
   // Contact shadow under the foundation. Wrap is bottom-positioned inline
   // (the pit entrance adds 95dp of flow height below the foundation when it
