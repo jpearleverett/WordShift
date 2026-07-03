@@ -57,7 +57,7 @@ describe('HouseWorld sky anchoring', () => {
     // The box height must beat width-driven scaling so the art's full height
     // maps onto the box and its bottom row lands on the container bottom.
     expect(HOUSE_WORLD).toMatch(
-      /const SKY_BOX_HEIGHT = Math\.max\(\s*SCREEN_HEIGHT,\s*Math\.ceil\(SCREEN_WIDTH \* \(SKY_IMG_HEIGHT \/ SKY_IMG_WIDTH\)\) \+ 2,\s*760,?\s*\);/
+      /const SKY_BOX_HEIGHT = Math\.max\(\s*SCREEN_HEIGHT,\s*Math\.ceil\(SCREEN_WIDTH \* \(SKY_IMG_HEIGHT \/ SKY_IMG_WIDTH\)\) \+ 2,\s*940,?\s*\);/
     );
     const skyStyle = HOUSE_WORLD.slice(
       HOUSE_WORLD.indexOf('skyBackground: {'),
@@ -78,6 +78,78 @@ describe('HouseWorld sky anchoring', () => {
   });
 });
 
+describe('phase lighting settles the house into each sky', () => {
+  test('per-phase tint + contact-shadow maps exist for all six phases', () => {
+    const tint = HOUSE_WORLD.slice(
+      HOUSE_WORLD.indexOf('PHASE_HOUSE_TINT'),
+      HOUSE_WORLD.indexOf('CONTACT_SHADOW')
+    );
+    const shadow = HOUSE_WORLD.slice(
+      HOUSE_WORLD.indexOf('const CONTACT_SHADOW'),
+      HOUSE_WORLD.indexOf('};', HOUSE_WORLD.indexOf('const CONTACT_SHADOW'))
+    );
+    for (let p = 0; p <= 5; p++) {
+      expect(tint).toMatch(new RegExp(`\\n  ${p}: \\{`));
+      expect(shadow).toMatch(new RegExp(`\\n  ${p}: \\{`));
+    }
+    // Phase 0 (day) must stay untouched.
+    expect(tint).toMatch(/0: \{ color: '#000000', ext: 0, room: 0 \}/);
+  });
+
+  test('roof + pit carry a same-source tintColor overlay (foundation is per-phase art)', () => {
+    // tintColor on a same-source Image follows the art alpha exactly. The
+    // foundation is now hand-lit per phase (no tint overlay), so only the
+    // single-asset roof and pit are programmatically tinted.
+    const overlays = HOUSE_WORLD.match(/styles\.tintFill, \{ tintColor: houseTint\.color/g) || [];
+    expect(overlays.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('the two body scrims tint wall/frame fully but rooms at ~half', () => {
+    expect(HOUSE_WORLD).toMatch(/const wallTintOpacity =/);
+    expect(HOUSE_WORLD).toMatch(/styles\.bodyScrim, \{ backgroundColor: houseTint\.color, opacity: wallTintOpacity \}/);
+    expect(HOUSE_WORLD).toMatch(/styles\.bodyRoomScrim, \{ backgroundColor: houseTint\.color, opacity: houseTint\.room \}/);
+  });
+
+  test('the house is grounded (grass baked into the foundation + soft contact shadow)', () => {
+    // The grass tufts live in the foundation art now (not a separate fringe),
+    // so the old fringe asset/require must be gone; a soft contact band remains.
+    expect(fs.existsSync(path.join(ENV_DIR, 'grass_fringe.png'))).toBe(false);
+    expect(HOUSE_WORLD).not.toMatch(/GRASS_FRINGE_IMG/);
+    expect(fs.existsSync(path.join(ENV_DIR, 'house_shadow.png'))).toBe(true);
+    expect(HOUSE_WORLD).toMatch(/HOUSE_SHADOW_IMG/);
+  });
+});
+
+describe('phase-appropriate room windows', () => {
+  const ROOM_VIEW = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/RoomView.tsx'),
+    'utf8'
+  );
+  const TREATED = ['cozy_den', 'kitchen', 'study', 'office', 'garden'];
+  const WINDOWS_DIR = path.resolve(__dirname, '../../assets/rooms/windows');
+
+  test.each(TREATED)('%s has a window-sky mask asset', (room) => {
+    expect(fs.existsSync(path.join(WINDOWS_DIR, `${room}.png`))).toBe(true);
+  });
+
+  test('only the clear-window rooms are treated (aquarium/desert excluded)', () => {
+    for (const room of TREATED) {
+      expect(ROOM_VIEW).toMatch(new RegExp(`${room}: require\\(.*windows/${room}\\.png`));
+    }
+    // The aquarium's water and the desert's night sky must NOT be recolored.
+    expect(ROOM_VIEW).not.toMatch(/windows\/aquarium/);
+    expect(ROOM_VIEW).not.toMatch(/windows\/desert/);
+    expect(fs.existsSync(path.join(WINDOWS_DIR, 'aquarium.png'))).toBe(false);
+    expect(fs.existsSync(path.join(WINDOWS_DIR, 'desert.png'))).toBe(false);
+  });
+
+  test('the mask recolors per phase via WINDOW_TINT (day untouched)', () => {
+    expect(ROOM_VIEW).toMatch(/const WINDOW_TINT/);
+    expect(ROOM_VIEW).toMatch(/0: \{ color: '#000000', opacity: 0 \}/);
+    expect(ROOM_VIEW).toMatch(/tintColor: tint\.color, opacity: tint\.opacity/);
+  });
+});
+
 describe('foundation seats below the river on real devices', () => {
   // Replicates HouseWorld's bottom-anchored seat math. If any constant in
   // HouseWorld changes (margins, pit size, foundation height, sky dims),
@@ -88,11 +160,11 @@ describe('foundation seats below the river on real devices', () => {
   const RIVER_BOTTOM_ROW = 1335; // lowest river/bank pixel across all 5 skies
   const HOUSE_BOTTOM_MARGIN = 30;
   const PIT_DOCK_CLEARANCE = 80;
-  const PIT_BLOCK = 95; // pit height 99 + marginTop -4
-  const FOUNDATION_H = 30;
+  const PIT_BLOCK = 140; // pit height 140 + marginTop 0 (PIT_FLOW_HEIGHT)
+  const FOUNDATION_H = 43; // 282 * (120/792)
 
   const foundationTopArtRow = (sw: number, sh: number) => {
-    const boxH = Math.max(sh, Math.ceil(sw * (IMG_H / IMG_W)) + 2, 760);
+    const boxH = Math.max(sh, Math.ceil(sw * (IMG_H / IMG_W)) + 2, 940);
     const scale = boxH / IMG_H;
     const foundationTopDp =
       HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_BLOCK + FOUNDATION_H; // above container bottom
