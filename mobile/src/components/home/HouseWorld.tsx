@@ -38,6 +38,8 @@ const ROOF_IMG = require('../../../assets/environment/roof.png');
 const FOUNDATION_IMG = require('../../../assets/environment/foundation.png');
 const WALL_IMG = require('../../../assets/environment/wall.png');
 const PIT_ENTRANCE_IMG = require('../../../assets/environment/pit_entrance.png');
+const HOUSE_SHADOW_IMG = require('../../../assets/environment/house_shadow.png');
+const GRASS_FRINGE_IMG = require('../../../assets/environment/grass_fringe.png');
 const SHADOW_FIGURE_IMG = require('../../../assets/environment/shadow_figure.png');
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -1121,21 +1123,25 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                 {/* The unnamed entity - invisible until Phase 3, then looming behind the house */}
                 <ShadowFigure phase={currentPhase} />
 
-                {/* Contact shadow: three stacked soft pills under the
-                    foundation seat the house on the meadow (without it the
-                    hard art edge read as a sticker on the background).
-                    Static Views, painted before the house so the foundation
-                    covers the center; dark phases soften it. */}
+                {/* Contact shadow: a soft feathered blob under the foundation
+                    seats the house on the meadow (without it the hard art edge
+                    read as a sticker). Painted before the house so the
+                    foundation/pit cover the opaque core and only the soft halo
+                    shows around the base; tintColor + opacity track the phase
+                    ground (green -> sunset earth -> night blues, softening as
+                    the sun leaves). */}
                 <View
                   pointerEvents="none"
                   style={[
                     styles.contactShadowWrap,
-                    { bottom: (onPitPress ? PIT_FLOW_HEIGHT : 0) - 14 },
+                    { bottom: (onPitPress ? PIT_FLOW_HEIGHT : 0) - 48 },
                   ]}
                 >
-                  <View style={[styles.contactShadowPill, styles.contactShadowOuter, { backgroundColor: contactShadow.color, opacity: 0.1 * contactShadow.mult }]} />
-                  <View style={[styles.contactShadowPill, styles.contactShadowMid, { backgroundColor: contactShadow.color, opacity: 0.1 * contactShadow.mult }]} />
-                  <View style={[styles.contactShadowPill, styles.contactShadowInner, { backgroundColor: contactShadow.color, opacity: 0.12 * contactShadow.mult }]} />
+                  <Image
+                    source={HOUSE_SHADOW_IMG}
+                    style={[styles.contactShadowImg, { tintColor: contactShadow.color, opacity: 0.55 * contactShadow.mult }]}
+                    resizeMode="stretch"
+                  />
                 </View>
 
 
@@ -1251,6 +1257,31 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                       resizeMode="stretch"
                     />
                   )}
+                </View>
+
+                {/* Grass fringe: tufts rooted at the base rising over the stone
+                    bottom, so the foundation is planted in the meadow instead
+                    of ending on a hard line. Base + a same-source tinted copy
+                    (keeps the blades, shades them into the phase). Positioned
+                    at the foundation base; the pit path (drawn next) passes in
+                    front at the center. */}
+                <View
+                  pointerEvents="none"
+                  style={[
+                    styles.grassFringeWrap,
+                    { bottom: (onPitPress ? PIT_FLOW_HEIGHT : 0) - 4 },
+                  ]}
+                >
+                  <View style={styles.grassFringeInner}>
+                    <Image source={GRASS_FRINGE_IMG} style={styles.grassFringeImg} resizeMode="stretch" />
+                    {houseTint.ext > 0 && (
+                      <Image
+                        source={GRASS_FRINGE_IMG}
+                        style={[styles.grassFringeImg, styles.tintFill, { tintColor: houseTint.color, opacity: houseTint.ext }]}
+                        resizeMode="stretch"
+                      />
+                    )}
+                  </View>
                 </View>
 
                 {/* The Offering Pit's mouth in the front yard, a stone path
@@ -1486,37 +1517,39 @@ const styles = StyleSheet.create({
     right: -5,
     bottom: -5,
   },
-  // Contact shadow under the foundation. Wrap is bottom-positioned inline
-  // (the pit entrance adds 95dp of flow height below the foundation when it
-  // renders). Dark grass-green rather than pure black so the low-opacity
-  // lobes blend into the meadow.
+  // Contact shadow under the foundation. Wrap is bottom-positioned inline (the
+  // pit entrance adds its flow height below the foundation when it renders);
+  // the soft blob Image is wider than the house so its feathered halo spills
+  // onto the meadow around the base.
   contactShadowWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 28,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  contactShadowPill: {
+  contactShadowImg: {
+    width: HOUSE_WIDTH + 40,
+    height: 54,
+  },
+  // Grass fringe rooted at the foundation base. Wrap spans full width and
+  // centers a fixed-width inner band; both grass images (base + tinted copy)
+  // fill the inner band so the tint aligns to the base exactly.
+  grassFringeWrap: {
     position: 'absolute',
-    alignSelf: 'center',
-    backgroundColor: '#0A1408',
+    left: 0,
+    right: 0,
+    height: 24,
+    alignItems: 'center',
   },
-  contactShadowOuter: {
-    width: HOUSE_WIDTH + 54,
-    height: 26,
-    borderRadius: 13,
+  grassFringeInner: {
+    width: HOUSE_WIDTH + 24,
+    height: 24,
   },
-  contactShadowMid: {
-    width: HOUSE_WIDTH + 28,
-    height: 20,
-    borderRadius: 10,
-  },
-  contactShadowInner: {
-    width: HOUSE_WIDTH + 4,
-    height: 14,
-    borderRadius: 7,
+  grassFringeImg: {
+    width: '100%',
+    height: '100%',
   },
   topTrim: {
     position: 'absolute',

@@ -108,6 +108,43 @@ describe('phase lighting settles the house into each sky', () => {
     expect(HOUSE_WORLD).toMatch(/styles\.bodyScrim, \{ backgroundColor: houseTint\.color, opacity: wallTintOpacity \}/);
     expect(HOUSE_WORLD).toMatch(/styles\.bodyRoomScrim, \{ backgroundColor: houseTint\.color, opacity: houseTint\.room \}/);
   });
+
+  test('the house is grounded with a grass fringe + soft contact shadow', () => {
+    expect(fs.existsSync(path.join(ENV_DIR, 'grass_fringe.png'))).toBe(true);
+    expect(fs.existsSync(path.join(ENV_DIR, 'house_shadow.png'))).toBe(true);
+    expect(HOUSE_WORLD).toMatch(/GRASS_FRINGE_IMG/);
+    expect(HOUSE_WORLD).toMatch(/HOUSE_SHADOW_IMG/);
+  });
+});
+
+describe('phase-appropriate room windows', () => {
+  const ROOM_VIEW = fs.readFileSync(
+    path.resolve(__dirname, '../components/home/RoomView.tsx'),
+    'utf8'
+  );
+  const TREATED = ['cozy_den', 'kitchen', 'study', 'office', 'garden'];
+  const WINDOWS_DIR = path.resolve(__dirname, '../../assets/rooms/windows');
+
+  test.each(TREATED)('%s has a window-sky mask asset', (room) => {
+    expect(fs.existsSync(path.join(WINDOWS_DIR, `${room}.png`))).toBe(true);
+  });
+
+  test('only the clear-window rooms are treated (aquarium/desert excluded)', () => {
+    for (const room of TREATED) {
+      expect(ROOM_VIEW).toMatch(new RegExp(`${room}: require\\(.*windows/${room}\\.png`));
+    }
+    // The aquarium's water and the desert's night sky must NOT be recolored.
+    expect(ROOM_VIEW).not.toMatch(/windows\/aquarium/);
+    expect(ROOM_VIEW).not.toMatch(/windows\/desert/);
+    expect(fs.existsSync(path.join(WINDOWS_DIR, 'aquarium.png'))).toBe(false);
+    expect(fs.existsSync(path.join(WINDOWS_DIR, 'desert.png'))).toBe(false);
+  });
+
+  test('the mask recolors per phase via WINDOW_TINT (day untouched)', () => {
+    expect(ROOM_VIEW).toMatch(/const WINDOW_TINT/);
+    expect(ROOM_VIEW).toMatch(/0: \{ color: '#000000', opacity: 0 \}/);
+    expect(ROOM_VIEW).toMatch(/tintColor: tint\.color, opacity: tint\.opacity/);
+  });
 });
 
 describe('foundation seats below the river on real devices', () => {

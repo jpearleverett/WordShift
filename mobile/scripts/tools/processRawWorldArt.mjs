@@ -136,23 +136,51 @@ function dropTop(png, dropTopFrac) {
   return out;
 }
 
-function processSprite(rawName, outName, targetWidth, dropTopFrac = 0) {
+// Dissolve the bottom `frac` of an image's alpha to 0 so a hard bottom edge
+// melts into the ground instead of reading as a pasted rectangle. The fade
+// line is perturbed per-column (two summed sines) so the stone meets the
+// grass on an irregular, organic edge rather than a dead-straight cut —
+// deterministic, so regenerating is byte-stable.
+function featherBottom(png, frac) {
+  const { width: w, height: h, data } = png;
+  const band = h * frac;
+  const base = h - band;
+  for (let x = 0; x < w; x++) {
+    // wobble the fade's start row +/- ~25% of the band
+    const wob = (Math.sin(x * 0.11) + Math.sin(x * 0.037 + 1.7)) * 0.5; // [-1,1]
+    const start = base + wob * band * 0.28;
+    const span = h - start;
+    for (let y = 0; y < h; y++) {
+      if (y <= start) continue;
+      const t = Math.max(0, 1 - (y - start) / span); // 1 -> 0 downward
+      const ramp = t * t;
+      const i = (y * w + x) * 4;
+      data[i + 3] = Math.round(data[i + 3] * ramp);
+    }
+  }
+}
+
+function processSprite(rawName, outName, targetWidth, opts = {}) {
+  const { dropTopFrac = 0, featherBottomFrac = 0 } = opts;
   const png = load(path.join(RAW, rawName));
   keyBackground(png);
   const cropped = dropTopFrac > 0 ? dropTop(png, dropTopFrac) : cropToContent(png);
   const th = Math.round(targetWidth * (cropped.height / cropped.width));
   const final = resize(cropped, targetWidth, th);
+  if (featherBottomFrac > 0) featherBottom(final, featherBottomFrac);
   save(final, path.join(ENV, outName));
   console.log(`  ${outName}: content aspect ${(cropped.width / cropped.height).toFixed(3)} (w/h)`);
   return final;
 }
 
 processSprite('roof_raw.png', 'roof.png', 792);
-processSprite('foundation_raw.png', 'foundation.png', 792);
+// Feather the foundation's bottom courses so the stone dissolves into the
+// meadow instead of ending on a hard rectangular line.
+processSprite('foundation_raw.png', 'foundation.png', 792, { featherBottomFrac: 0.24 });
 // Pit: the newer art (stone well + long stone path). Drop the top 45% of the
 // tapered path tail so the visible path reads as "leads from under the house
 // to the well" without an overlong stalk.
-processSprite('pit_raw.png', 'pit_entrance.png', 460, 0.45);
+processSprite('pit_raw.png', 'pit_entrance.png', 460, { dropTopFrac: 0.45 });
 
 // Wall tile: centered square crop, wrap-aware downscale to 128
 {
@@ -165,4 +193,154 @@ processSprite('pit_raw.png', 'pit_entrance.png', 460, 0.45);
   }
   const final = resize(sq, 128, 128, true);
   save(final, path.join(ENV, 'wall.png'));
+}
+
+// ─── Foundation grounding assets (procedural, no raw source) ────────────────
+// house_shadow.png: a soft contact band (white, tinted per-phase in RN),
+// darkest at the top so it hugs the foundation base and fades down the grass.
+{
+  const W = 340, H = 54;
+  const p = new PNG({ width: W, height: H });
+  const smooth = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const ay = Math.pow(Math.max(0, 1 - y / H), 1.7);       // dark at top, fade down
+    const edge = Math.min(smooth(x / 70), smooth((W - x) / 70)); // feather ends
+    const i = (y * W + x) * 4;
+    p.data[i] = 255; p.data[i + 1] = 255; p.data[i + 2] = 255;
+    p.data[i + 3] = Math.round(ay * edge * 255);
+  }
+  save(p, path.join(ENV, 'house_shadow.png'));
+}
+
+// grass_fringe.png: tufts rooted at the base that rise over the foundation's
+// bottom courses so the house plants into the meadow. Rendered base + a
+// same-source tinted copy in RN so the blades shade into each phase.
+{
+  const W = 420, H = 70;
+  const p = new PNG({ width: W, height: H });
+  let s = 12345; const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const blade = (x0, h, curve, wBase, pal) => {
+    for (let t = 0; t <= h; t++) {
+      const yy = H - 1 - t, frac = t / h;
+      const cx = x0 + curve * frac * frac * 8;
+      const halfw = Math.max(0.5, wBase * (1 - frac * 0.85)) / 2;
+      const col = pal[Math.min(pal.length - 1, Math.floor(frac * pal.length))];
+      for (let dx = -halfw; dx <= halfw; dx++) {
+        const x = Math.round(cx + dx); if (x < 0 || x >= W) continue;
+        const i = (yy * W + x) * 4;
+        p.data[i] = col[0]; p.data[i + 1] = col[1]; p.data[i + 2] = col[2]; p.data[i + 3] = 255;
+      }
+    }
+  };
+  const DARK = [[46, 86, 42], [58, 104, 48], [86, 150, 68]];
+  const MID = [[54, 98, 46], [74, 132, 58], [120, 188, 92]];
+  const LITE = [[70, 120, 54], [104, 170, 74], [150, 214, 110]];
+  const pals = [DARK, MID, LITE];
+  for (let i = 0; i < 170; i++) {
+    blade(rnd() * W, H * (0.35 + rnd() * 0.6), (rnd() - 0.5) * 2, 2 + rnd() * 3, pals[Math.floor(rnd() * pals.length)]);
+  }
+  for (let i = 0; i < 10; i++) {
+    const x = Math.round(rnd() * W), y = Math.round(H * (0.25 + rnd() * 0.4));
+    const col = [[255, 240, 180], [255, 180, 210], [200, 180, 255]][Math.floor(rnd() * 3)];
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const xx = x + dx, yy = y + dy; if (xx < 0 || xx >= W || yy < 0 || yy >= H) continue;
+      const ii = (yy * W + xx) * 4;
+      p.data[ii] = col[0]; p.data[ii + 1] = col[1]; p.data[ii + 2] = col[2]; p.data[ii + 3] = 255;
+    }
+  }
+  save(p, path.join(ENV, 'grass_fringe.png'));
+}
+
+// ─── Window masks (phase-appropriate room windows) ──────────────────────────
+// The room interiors are painted with bright day-sky windows. Those read as
+// noon even under a storm/shadow sky. This extracts a per-room mask of the
+// window SKY (white on transparent) so RoomView can recolor just that region
+// to the current phase. Only rooms with a clear sky window are treated — the
+// aquarium's water and the desert's already-night sky are deliberately left
+// alone (verified against a per-room detection montage).
+const ROOMS_DIR = path.resolve(import.meta.dirname, '../../assets/rooms');
+const WINDOWS_DIR = path.join(ROOMS_DIR, 'windows');
+const WINDOW_ROOMS = ['cozy_den', 'kitchen', 'study', 'office', 'garden'];
+
+const isSkyBlue = (r, g, b) => b > 150 && b > r + 20 && g > r + 5 && g > 120;
+const isCloudWhite = (r, g, b) => r > 185 && g > 185 && b > 185 && Math.abs(r - b) < 28;
+
+// All connected blue-sky blobs (bbox + size). Panes split by a thin mullion
+// come back as separate blobs; the caller merges nearby ones into one window.
+function blueBlobs(png) {
+  const { width: w, height: h, data } = png;
+  const blue = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const p = i * 4;
+    if (isSkyBlue(data[p], data[p + 1], data[p + 2])) blue[i] = 1;
+  }
+  const seen = new Uint8Array(w * h);
+  const blobs = [];
+  for (let s = 0; s < w * h; s++) {
+    if (!blue[s] || seen[s]) continue;
+    const stack = [s]; seen[s] = 1;
+    let size = 0, x0 = w, y0 = h, x1 = 0, y1 = 0;
+    while (stack.length) {
+      const c = stack.pop(); const cx = c % w, cy = (c / w) | 0;
+      size++;
+      if (cx < x0) x0 = cx; if (cx > x1) x1 = cx; if (cy < y0) y0 = cy; if (cy > y1) y1 = cy;
+      for (const n of [c + 1, c - 1, c + w, c - w]) {
+        if (n < 0 || n >= w * h) continue;
+        if ((n === c + 1 && cx === w - 1) || (n === c - 1 && cx === 0)) continue;
+        if (blue[n] && !seen[n]) { seen[n] = 1; stack.push(n); }
+      }
+    }
+    blobs.push({ size, x0, y0, x1, y1 });
+  }
+  return blobs;
+}
+
+// Merge the biggest blob with any blob whose bbox sits within `dist` of the
+// growing window region (bridges mullion-split panes; won't reach a far-off
+// monitor/globe). Returns the union bbox.
+function windowRegion(blobs, dist) {
+  if (!blobs.length) return null;
+  let win = blobs.reduce((a, b) => (b.size > a.size ? b : a));
+  let box = { x0: win.x0, y0: win.y0, x1: win.x1, y1: win.y1 };
+  let grew = true;
+  const used = new Set([win]);
+  while (grew) {
+    grew = false;
+    for (const b of blobs) {
+      if (used.has(b) || b.size < 150) continue;
+      const near = b.x0 <= box.x1 + dist && b.x1 >= box.x0 - dist &&
+        b.y0 <= box.y1 + dist && b.y1 >= box.y0 - dist;
+      if (near) {
+        box.x0 = Math.min(box.x0, b.x0); box.y0 = Math.min(box.y0, b.y0);
+        box.x1 = Math.max(box.x1, b.x1); box.y1 = Math.max(box.y1, b.y1);
+        used.add(b); grew = true;
+      }
+    }
+  }
+  return box;
+}
+
+if (!fs.existsSync(WINDOWS_DIR)) fs.mkdirSync(WINDOWS_DIR, { recursive: true });
+for (const room of WINDOW_ROOMS) {
+  const src = load(path.join(ROOMS_DIR, `${room}.png`));
+  const { width: w, height: h, data } = src;
+  const blobs = blueBlobs(src);
+  const box = windowRegion(blobs, Math.round(w * 0.03)); // bridge mullions
+  const pad = Math.round(Math.max(w, h) * 0.008);
+  const bx0 = Math.max(0, box.x0 - pad), by0 = Math.max(0, box.y0 - pad);
+  const bx1 = Math.min(w - 1, box.x1 + pad), by1 = Math.min(h - 1, box.y1 + pad);
+  const mask = new PNG({ width: w, height: h });
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = (y * w + x) * 4;
+    const inBox = x >= bx0 && x <= bx1 && y >= by0 && y <= by1;
+    // inside the window region, keep the sky (blue) and clouds (white); the
+    // wooden mullions between panes stay excluded so they read as frame.
+    const isWin = inBox && (isSkyBlue(data[p], data[p + 1], data[p + 2]) ||
+      isCloudWhite(data[p], data[p + 1], data[p + 2]));
+    mask.data[p] = 255; mask.data[p + 1] = 255; mask.data[p + 2] = 255;
+    mask.data[p + 3] = isWin ? 255 : 0;
+  }
+  const out = resize(mask, 400, Math.round(400 * h / w));
+  save(out, path.join(WINDOWS_DIR, `${room}.png`));
+  console.log(`  windows/${room}: region [${box.x0}-${box.x1}, ${box.y0}-${box.y1}]`);
 }

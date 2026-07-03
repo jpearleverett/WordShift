@@ -27,6 +27,31 @@ const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
   bamboo: require('../../../assets/rooms/bamboo.png'),
 };
 
+// Phase-appropriate windows. The room art paints bright day-sky windows that
+// read as noon under a dusk/night sky. These masks (white on transparent,
+// window sky only — see scripts/tools/processRawWorldArt.mjs) let us recolor
+// just the window to the current phase. Only the rooms with a clear sky window
+// have a mask; the aquarium (water), desert (already night), and windowless
+// rooms are deliberately absent.
+const ROOM_WINDOW_MASKS: Partial<Record<RoomTheme, ImageSourcePropType>> = {
+  cozy_den: require('../../../assets/rooms/windows/cozy_den.png'),
+  kitchen: require('../../../assets/rooms/windows/kitchen.png'),
+  study: require('../../../assets/rooms/windows/study.png'),
+  office: require('../../../assets/rooms/windows/office.png'),
+  garden: require('../../../assets/rooms/windows/garden.png'),
+};
+
+// The color + strength painted over the window sky per phase (roughly each
+// sky's own tone; strength climbs into night). Phase 0 is untouched.
+const WINDOW_TINT: Record<number, { color: string; opacity: number }> = {
+  0: { color: '#000000', opacity: 0 },
+  1: { color: '#FFC98A', opacity: 0.14 }, // afternoon: faint warm
+  2: { color: '#B5623C', opacity: 0.5 },  // dusk: warm rose
+  3: { color: '#16233F', opacity: 0.82 }, // storm night: deep blue
+  4: { color: '#0A0E22', opacity: 0.9 },  // shadow: near-black night
+  5: { color: '#191330', opacity: 0.86 }, // terrible peace: mauve night
+};
+
 // Word echo configuration by phase (ritual words inscribed in rooms)
 const WORD_ECHO_CONFIG: Record<number, { count: number; opacity: number; fontSize: number; color: string }> = {
   2: { count: 3, opacity: 0.08, fontSize: 9, color: '#FFFFFF' },
@@ -175,6 +200,22 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           onError={() => {/* Falls back to themeColors.bg */}}
         />
       )}
+
+      {/* Phase-appropriate window: recolor just the window sky to match the
+          current sky. tintColor paints the mask's window shape; resizeMode
+          cover matches the background so it aligns. Mullions/curtains stay. */}
+      {(() => {
+        const mask = ROOM_WINDOW_MASKS[room.theme];
+        const tint = WINDOW_TINT[currentPhase] ?? WINDOW_TINT[0];
+        if (!mask || tint.opacity <= 0) return null;
+        return (
+          <Image
+            source={mask}
+            style={[styles.backgroundImage, { tintColor: tint.color, opacity: tint.opacity }]}
+            resizeMode="cover"
+          />
+        );
+      })()}
 
       {/* Room frame */}
       <View style={[styles.frame, { borderColor: themeColors.accent }]} />
