@@ -1185,7 +1185,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   <Image
                     source={WALL_IMG}
                     style={styles.wallTexture}
-                    resizeMode="repeat"
+                    resizeMode="cover"
                     fadeDuration={0}
                   />
                   {/* Wall/frame phase scrim (behind the rooms). Compensated so
@@ -1475,8 +1475,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     alignItems: 'center',
   },
-  // Seamless timber tile (assets/environment/wall.png) repeated across the
-  // wall area behind the rooms.
+  // Timber wall behind the rooms. wall.png is a pre-tiled 256x1280 strip drawn
+  // with resizeMode="cover" (NOT "repeat" — repeat renders nothing on the New
+  // Architecture / Fabric, which left the flat #A0522D fallback showing). The
+  // strip's 1:5 aspect keeps cover width-driven so the plank scale is
+  // consistent whatever the room count.
   wallTexture: {
     position: 'absolute',
     top: 0,
