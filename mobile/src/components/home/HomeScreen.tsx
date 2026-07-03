@@ -146,19 +146,21 @@ interface HomeScreenProps {
 // --- Header quest pill: pure decisions (node-testable, see questPill.test.ts) ---
 
 /**
- * Count of ACTIONABLE quests across daily + weekly: quests still in progress
- * (not completed) PLUS completed-but-unclaimed (the claim is still an action).
- * Claimed quests are done and never count. This is the single shared count
- * behind BOTH the header quest pill and the Journal Hub "Quests (N)" row, so
- * the two surfaces can never disagree. (Player report: every reward claimed on
- * both tabs, yet the pill read "5" and the journal "Quests (5)" — the old
- * journal count included all unclaimed quests while the pill excluded
- * completed-but-unclaimed ones; neither matched what was actually left to do.)
+ * Count of CLAIMABLE quests across daily + weekly: quests that are completed but
+ * not yet claimed — i.e. rewards waiting to be turned in. This is the single
+ * shared count behind BOTH the header quest pill and the Journal Hub "Quests (N)"
+ * row, so the two surfaces can never disagree.
+ *
+ * In-progress quests are deliberately NOT counted: a player who claimed every
+ * finished quest saw the pill still read "3" from long-running weeklies they
+ * couldn't finish yet, which read as "3 rewards to turn in" when there was
+ * nothing to claim. The number now tracks exactly what the "!" badge does
+ * (claimable amber), so it's bare 🎯 the moment there's nothing left to collect.
  */
 export const getActionableQuestCount = (state: CombinedQuestState | null): number => {
   if (!state) return 0;
   return [...state.daily.quests, ...state.weekly.quests]
-    .filter(q => !q.claimed).length;
+    .filter(q => q.completed && !q.claimed).length;
 };
 
 /**

@@ -144,23 +144,23 @@ const makeState = (daily: Quest[], weekly: Quest[]): CombinedQuestState => {
   return { daily: tier('2026-07-02', daily), weekly: tier('2026-W27', weekly) };
 };
 
-describe('getActionableQuestCount (the ONE shared count)', () => {
+describe('getActionableQuestCount (claimable = completed & unclaimed)', () => {
   test('returns 0 when quest state has not loaded', () => {
     expect(getActionableQuestCount(null)).toBe(0);
   });
 
-  test('counts in-progress quests across both daily and weekly tiers', () => {
+  test('in-progress quests do NOT count — nothing to turn in yet', () => {
     const state = makeState(
       [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2', progress: 2 })],
       [makeQuest({ id: 'w1', tier: 'weekly' })]
     );
-    expect(getActionableQuestCount(state)).toBe(3);
+    expect(getActionableQuestCount(state)).toBe(0);
   });
 
-  test('counts completed-but-unclaimed quests (claiming is still an action)', () => {
+  test('counts completed-but-unclaimed quests (rewards waiting to claim)', () => {
     const state = makeState(
       [makeQuest({ id: 'd1', completed: true, progress: 3 })],
-      [makeQuest({ id: 'w1', tier: 'weekly' })]
+      [makeQuest({ id: 'w1', tier: 'weekly', completed: true, progress: 3 })]
     );
     expect(getActionableQuestCount(state)).toBe(2);
   });
@@ -176,31 +176,32 @@ describe('getActionableQuestCount (the ONE shared count)', () => {
     expect(getActionableQuestCount(state)).toBe(0);
   });
 
-  test('mixed board: in-progress + unclaimed-complete count, claimed does not', () => {
+  test('mixed board: only completed-unclaimed counts; in-progress and claimed do not', () => {
     const state = makeState(
       [
-        makeQuest({ id: 'd1' }),                                        // in progress
-        makeQuest({ id: 'd2', completed: true, progress: 3 }),          // unclaimed
-        makeQuest({ id: 'd3', completed: true, claimed: true }),        // done
+        makeQuest({ id: 'd1' }),                                        // in progress -> no
+        makeQuest({ id: 'd2', completed: true, progress: 3 }),          // claimable -> yes
+        makeQuest({ id: 'd3', completed: true, claimed: true }),        // done -> no
       ],
       [makeQuest({ id: 'w1', tier: 'weekly', completed: true, claimed: true })]
     );
-    expect(getActionableQuestCount(state)).toBe(2);
+    expect(getActionableQuestCount(state)).toBe(1);
   });
 });
 
 describe('getQuestPillLabel (badge/number semantics)', () => {
-  test('in-progress quests show the count', () => {
+  test('in-progress quests only: bare 🎯 — nothing to turn in yet', () => {
     const state = makeState(
       [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2' })],
       [makeQuest({ id: 'w1', tier: 'weekly' })]
     );
     const count = getActionableQuestCount(state);
-    expect(count).toBe(3);
-    expect(getQuestPillLabel(count)).toBe('🎯 3');
+    expect(count).toBe(0);
+    expect(getQuestPillLabel(count)).toBe('🎯');
+    expect(getQuestPillLabel(count)).not.toMatch(/\d/);
   });
 
-  test('completed-but-unclaimed quests are counted too, and the "!" badge condition holds', () => {
+  test('completed-but-unclaimed quests are counted, and the "!" badge condition holds', () => {
     const state = makeState(
       [makeQuest({ id: 'd1', completed: true, progress: 3 })],
       [makeQuest({ id: 'w1', tier: 'weekly', completed: true, progress: 3 })]
@@ -226,12 +227,12 @@ describe('getQuestPillLabel (badge/number semantics)', () => {
 });
 
 describe('getJournalQuestLabel (Journal Hub row shares the same count)', () => {
-  test('in-progress quests show the count', () => {
+  test('in-progress quests only: no count suffix (nothing to claim)', () => {
     const state = makeState(
       [makeQuest({ id: 'd1' }), makeQuest({ id: 'd2' })],
       [makeQuest({ id: 'w1', tier: 'weekly' })]
     );
-    expect(getJournalQuestLabel(getActionableQuestCount(state), 0)).toBe('🗓 Quests (3)');
+    expect(getJournalQuestLabel(getActionableQuestCount(state), 0)).toBe('🗓 Quests');
   });
 
   test('claimable amber takes precedence over the plain count', () => {

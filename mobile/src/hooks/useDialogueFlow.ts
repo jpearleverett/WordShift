@@ -759,19 +759,23 @@ export function useDialogueFlow({
       }
       await markDialogueRead(selectedAnimal.id, newIndex);
 
-      // Honest hasNewDialogue: at Phase 5 (post-revelation) use the Tending pool /
-      // caught-up pointer; at Phase 2 past the base block use the exhaustion-pool
-      // cursor; otherwise the normal index-vs-total check.
-      let hasNewDialogue: boolean;
+      // Whether genuinely-new (undelivered) lines remain, INDEPENDENT of cooldown:
+      // at Phase 5 (post-revelation) the Tending pool / caught-up pointer; at
+      // Phase 2 past the base block the exhaustion-pool cursor; otherwise the
+      // normal index-vs-total check.
+      let hasUndeliveredLines: boolean;
       if (animalPhase === 5 && newIndex >= totalRegular) {
         const pool = getPhase5Pool(selectedAnimal.type);
-        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && nextCaughtUp < pool.length;
+        hasUndeliveredLines = nextCaughtUp < pool.length;
       } else if (animalPhase === 2 && phase2Pool.length > 0 && newIndex >= total2) {
-        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && phase2PoolHasNew(selectedAnimal.type, nextPhase2Cursor);
+        hasUndeliveredLines = phase2PoolHasNew(selectedAnimal.type, nextPhase2Cursor);
       } else {
         const totalDialogues = getTotalDialogueCount(selectedAnimal.type, animalPhase);
-        hasNewDialogue = !isOnCooldown(selectedAnimal.id) && newIndex < totalDialogues;
+        hasUndeliveredLines = newIndex < totalDialogues;
       }
+      // The "!" badge is lit only when undelivered lines remain AND the animal is
+      // available to talk (not resting on cooldown) — mirrors getAnimalsWithStatus.
+      const hasNewDialogue = !isOnCooldown(selectedAnimal.id) && hasUndeliveredLines;
 
       setAnimals(prev =>
         prev.map(a =>
@@ -788,7 +792,22 @@ export function useDialogueFlow({
         const animalId = selectedAnimal.id;
         const animalName = selectedAnimal.name;
         await closeDialogue(true);
-        setCooldownMessage(sessionEndMessage(animalName, isOnCooldown(animalId)));
+        // closeDialogue may have just started this animal's cooldown (e.g. the
+        // grace period ending on the 2nd post-unlock session, when the session
+        // increment crosses GRACE_PERIOD_SESSIONS). Re-derive the badge with the
+        // SETTLED cooldown state — read the same way the message below is — so
+        // the "!" badge and the session-end message can never disagree: if the
+        // animal is now resting, the badge goes dark until the cooldown clears
+        // (getAnimalsWithStatus re-lights it on the next home load).
+        const restingNow = isOnCooldown(animalId);
+        setAnimals(prev =>
+          prev.map(a =>
+            a.id === animalId
+              ? { ...a, hasNewDialogue: !restingNow && hasUndeliveredLines }
+              : a
+          )
+        );
+        setCooldownMessage(sessionEndMessage(animalName, restingNow));
         return;
       }
     } else {
