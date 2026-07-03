@@ -57,7 +57,7 @@ describe('HouseWorld sky anchoring', () => {
     // The box height must beat width-driven scaling so the art's full height
     // maps onto the box and its bottom row lands on the container bottom.
     expect(HOUSE_WORLD).toMatch(
-      /const SKY_BOX_HEIGHT = Math\.max\(\s*SCREEN_HEIGHT,\s*Math\.ceil\(SCREEN_WIDTH \* \(SKY_IMG_HEIGHT \/ SKY_IMG_WIDTH\)\) \+ 2,\s*760,?\s*\);/
+      /const SKY_BOX_HEIGHT = Math\.max\(\s*SCREEN_HEIGHT,\s*Math\.ceil\(SCREEN_WIDTH \* \(SKY_IMG_HEIGHT \/ SKY_IMG_WIDTH\)\) \+ 2,\s*790,?\s*\);/
     );
     const skyStyle = HOUSE_WORLD.slice(
       HOUSE_WORLD.indexOf('skyBackground: {'),
@@ -88,11 +88,11 @@ describe('foundation seats below the river on real devices', () => {
   const RIVER_BOTTOM_ROW = 1335; // lowest river/bank pixel across all 5 skies
   const HOUSE_BOTTOM_MARGIN = 30;
   const PIT_DOCK_CLEARANCE = 80;
-  const PIT_BLOCK = 95; // pit height 99 + marginTop -4
-  const FOUNDATION_H = 30;
+  const PIT_BLOCK = 96; // pit height 102 + marginTop -6 (PIT_FLOW_HEIGHT)
+  const FOUNDATION_H = 42; // 282 * (118/792)
 
   const foundationTopArtRow = (sw: number, sh: number) => {
-    const boxH = Math.max(sh, Math.ceil(sw * (IMG_H / IMG_W)) + 2, 760);
+    const boxH = Math.max(sh, Math.ceil(sw * (IMG_H / IMG_W)) + 2, 790);
     const scale = boxH / IMG_H;
     const foundationTopDp =
       HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_BLOCK + FOUNDATION_H; // above container bottom

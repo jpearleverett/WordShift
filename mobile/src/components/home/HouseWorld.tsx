@@ -721,11 +721,20 @@ const ROOM_GAP = 6;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
 
-// House structure art (roof.png 1024x420, foundation.png 1024x160,
-// ground.png 1024x300, tree.png 480x640, shadow_figure.png 600x1200)
+// House structure art. roof/foundation/pit_entrance/wall are AI-generated
+// pixel art (sources in assets/raw/, processed by
+// scripts/tools/processRawWorldArt.mjs — re-run it if the raws change, and
+// keep these aspect constants in sync with the processed asset dims).
 const ROOF_WIDTH = HOUSE_WIDTH + 30; // Rendered roof width (slight overhang)
-const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (312 / 792)); // roof.png aspect
-const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (84 / 792)); // foundation.png aspect
+const ROOF_RENDER_HEIGHT = Math.round(ROOF_WIDTH * (283 / 792)); // roof.png 792x283
+const FOUNDATION_RENDER_HEIGHT = Math.round(HOUSE_WIDTH * (118 / 792)); // foundation.png 792x118
+// pit_entrance.png is 480x421; rendered box + the tuck under the foundation.
+const PIT_RENDER_WIDTH = 116;
+const PIT_RENDER_HEIGHT = Math.round(PIT_RENDER_WIDTH * (421 / 480)); // 102
+const PIT_MARGIN_TOP = -6; // path start tucks under the foundation edge
+// Net flow height the pit adds below the foundation — used by the pan bounds,
+// the contact shadow seat, and the house-vs-art geometry notes below.
+const PIT_FLOW_HEIGHT = PIT_RENDER_HEIGHT + PIT_MARGIN_TOP; // 96
 const SHADOW_FIGURE_ASPECT = 600 / 1200; // width / height
 
 // Baseline gap between the pit entrance and the container bottom (before the
@@ -755,19 +764,19 @@ const PIT_DOCK_CLEARANCE = 80;
 //      container bottom, where scale = SKY_BOX_HEIGHT / 1972 — independent of
 //      the container height, header height, or insets.
 // The house column is bottom-anchored too (margins below), so the foundation
-// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + pit 95 + foundation
-// 30) = 235dp ≈ image rows 1360-1470 across real devices — on the meadow,
-// just below the river, in every sky variant.
+// top sits at (HOUSE_BOTTOM_MARGIN + PIT_DOCK_CLEARANCE + PIT_FLOW_HEIGHT 96
+// + foundation 42) = 248dp ≈ image rows 1353-1440 across real devices — on
+// the meadow, just below the river, in every sky variant.
 const SKY_IMG_WIDTH = 941;
 const SKY_IMG_HEIGHT = 1972;
-// The 760 floor guarantees the seat even on very small / display-size-scaled
-// windows (e.g. 320x640dp): scale >= 760/1972 puts the foundation top at
-// image row <= ~1362, still below every river. Larger boxes only push the
+// The 790 floor guarantees the seat even on very small / display-size-scaled
+// windows (e.g. 320x640dp): scale >= 790/1972 puts the foundation top at
+// image row <= ~1353, still below every river. Larger boxes only push the
 // house further down the meadow, never back into the water.
 const SKY_BOX_HEIGHT = Math.max(
   SCREEN_HEIGHT,
   Math.ceil(SCREEN_WIDTH * (SKY_IMG_HEIGHT / SKY_IMG_WIDTH)) + 2,
-  760,
+  790,
 );
 
 
@@ -915,7 +924,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   const panBounds = useMemo(() => {
     // Full height of the house structure including margins and connectors
     const connectorHeight = Math.max(0, numRows - 1) * 10; // ArrangementConnectors between rooms
-    const totalContentHeight = 50 + (ROOF_RENDER_HEIGHT - 6) + houseHeight + FOUNDATION_RENDER_HEIGHT + (onPitPress ? 95 : 0) + (houseBottomMargin + 10) + connectorHeight; // marginTop + roof + body + foundation + pit + marginBottom + connectors
+    const totalContentHeight = 50 + (ROOF_RENDER_HEIGHT - 6) + houseHeight + FOUNDATION_RENDER_HEIGHT + (onPitPress ? PIT_FLOW_HEIGHT : 0) + (houseBottomMargin + 10) + connectorHeight; // marginTop + roof + body + foundation + pit + marginBottom + connectors
     // How much the house overflows above the visible viewport
     const overflow = Math.max(0, totalContentHeight - (containerHeight ?? SCREEN_HEIGHT));
     return {
@@ -1083,7 +1092,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                   pointerEvents="none"
                   style={[
                     styles.contactShadowWrap,
-                    { bottom: (onPitPress ? 95 : 0) - 14 },
+                    { bottom: (onPitPress ? PIT_FLOW_HEIGHT : 0) - 14 },
                   ]}
                 >
                   <View style={[styles.contactShadowPill, styles.contactShadowOuter, { opacity: 0.1 * contactShadowMult }]} />
@@ -1302,9 +1311,9 @@ const styles = StyleSheet.create({
   },
   pitEntrance: {
     alignSelf: 'center',
-    marginTop: -4, // path tucks under the foundation edge
-    width: 132,
-    height: 99, // pit_entrance.png aspect (480x360)
+    marginTop: PIT_MARGIN_TOP, // path tucks under the foundation edge
+    width: PIT_RENDER_WIDTH,
+    height: PIT_RENDER_HEIGHT, // pit_entrance.png aspect (480x421)
   },
   pitEntranceImage: {
     width: '100%',
