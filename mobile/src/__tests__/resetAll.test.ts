@@ -65,6 +65,11 @@ jest.mock('expo-updates', () => ({
   reloadAsync: jest.fn(async () => {}),
 }));
 
+jest.mock('expo-application', () => ({
+  nativeApplicationVersion: '1.0.1',
+  nativeBuildVersion: '24',
+}));
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(async () => {}),
   notificationAsync: jest.fn(async () => {}),
