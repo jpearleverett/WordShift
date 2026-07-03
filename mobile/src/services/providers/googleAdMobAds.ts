@@ -73,11 +73,15 @@ function idsFromExtra(): AdMobConfig {
   }
 }
 
+// LITERAL requires (not eval): Metro only bundles the native module's JS when it
+// can see a static require('literal'). A dynamic/eval require is invisible to
+// Metro, so the SDK never shipped in release builds and ads/consent silently
+// no-op'd on device. The try/catch still degrades to NoOp under Jest / Expo Go.
 function loadAdsModule(): any | null {
   if (Platform.OS === 'web') return null;
   try {
-    const runtimeRequire = eval('require') as NodeRequire;
-    return runtimeRequire('react-native-google-mobile-ads');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('react-native-google-mobile-ads');
   } catch {
     return null;
   }
@@ -86,8 +90,8 @@ function loadAdsModule(): any | null {
 function loadATTModule(): any | null {
   if (Platform.OS === 'web') return null;
   try {
-    const runtimeRequire = eval('require') as NodeRequire;
-    return runtimeRequire('expo-tracking-transparency');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('expo-tracking-transparency');
   } catch {
     return null;
   }

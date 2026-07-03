@@ -56,12 +56,19 @@ function keyFromExtra(): string | undefined {
   }
 }
 
-/** Guarded load of the native SDK. Returns null when it isn't installed. */
+/** Guarded load of the native SDK. Returns null when it isn't installed.
+ *
+ * IMPORTANT: this is a LITERAL `require`, not `eval('require')`. Metro only
+ * bundles modules it can see via static `require('literal')` — a dynamic/eval
+ * require is invisible to it, so the SDK's JS never shipped in release builds
+ * and this returned null even on a real Play build (getProducts → [] → the
+ * store read "not available"). The try/catch still degrades cleanly to NoOp
+ * under Jest / Expo Go, where the native module is absent. */
 function loadPurchases(): any | null {
   if (Platform.OS === 'web') return null;
   try {
-    const runtimeRequire = eval('require') as NodeRequire;
-    const mod = runtimeRequire('react-native-purchases');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('react-native-purchases');
     return mod?.default ?? mod;
   } catch {
     return null;
