@@ -53,6 +53,7 @@ import {
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
+import { NotificationPromptModal } from './src/components/NotificationPromptModal';
 import { PatronModal } from './src/components/monetization/PatronModal';
 import { submitDailyResult, getDailyRank, DailyRank } from './src/services/leaderboard';
 import { recordPuzzleContribution, getAggregateProof, getWordsOfferedText } from './src/services/socialProof';
@@ -287,6 +288,11 @@ function MainApp() {
   // Daily-login claim modal — set to the already-granted reward to present it
   // (null = closed). Purely presentational; amber is credited before this is set.
   const [dailyLoginGrant, setDailyLoginGrant] = useState<DailyLoginGrant | null>(null);
+  // One-time daily-reminder pre-permission prompt (styled in-game modal, not a
+  // bare OS Alert). Content is the phase-aware getNotificationPromptText copy.
+  const [notificationPrompt, setNotificationPrompt] = useState<
+    { title: string; body: string; accept: string; decline: string } | null
+  >(null);
 
   // Speed-variant escalation: consecutive speed wins increment this, shortening
   // each subsequent clock. Reset on time-up exit or whenever a fresh run begins
@@ -1687,35 +1693,33 @@ function MainApp() {
       await markPromptedForNotifications();
 
       const { title, body, accept, decline } = getNotificationPromptText(persistence.currentPhase);
-      Alert.alert(title, body, [
-        {
-          text: decline,
-          style: 'cancel',
-          onPress: () => {
-            logEvent({
-              type: 'notification_permission_result',
-              data: { granted: false, prompted: true },
-            });
-          },
-        },
-        {
-          text: accept,
-          onPress: async () => {
-            const granted = await requestNotificationPermission();
-            logEvent({
-              type: 'notification_permission_result',
-              data: { granted },
-            });
-            if (granted) {
-              scheduleAllNotifications(persistence.currentPhase).catch(() => {});
-            }
-          },
-        },
-      ]);
+      // Present the styled in-game modal instead of a bare OS Alert. The
+      // accept/decline handlers (below) own the permission request + telemetry.
+      setNotificationPrompt({ title, body, accept, decline });
     } finally {
       notificationPromptInFlightRef.current = false;
     }
   }, [onboardingFlow.isOnboarding, persistence.cumulativeStats, persistence.currentPhase]);
+
+  const handleNotificationPromptDecline = useCallback(() => {
+    setNotificationPrompt(null);
+    logEvent({
+      type: 'notification_permission_result',
+      data: { granted: false, prompted: true },
+    });
+  }, []);
+
+  const handleNotificationPromptAccept = useCallback(async () => {
+    setNotificationPrompt(null);
+    const granted = await requestNotificationPermission();
+    logEvent({
+      type: 'notification_permission_result',
+      data: { granted },
+    });
+    if (granted) {
+      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+    }
+  }, [persistence.currentPhase]);
 
   // Fire an interstitial on a normal puzzle→next/home exit. All narrative-beat
   // exemptions live here so ads never interrupt a ceremony, the daily, the pit
@@ -2796,6 +2800,16 @@ function MainApp() {
         grant={dailyLoginGrantVisible ? dailyLoginGrant : null}
         phase={persistence.currentPhase}
         onClose={() => setDailyLoginGrant(null)}
+      />
+      <NotificationPromptModal
+        visible={notificationPrompt !== null}
+        phase={persistence.currentPhase}
+        title={notificationPrompt?.title ?? ''}
+        body={notificationPrompt?.body ?? ''}
+        acceptLabel={notificationPrompt?.accept ?? ''}
+        declineLabel={notificationPrompt?.decline ?? ''}
+        onAccept={handleNotificationPromptAccept}
+        onDecline={handleNotificationPromptDecline}
       />
       <PatronModal
         visible={showPatronModal}
