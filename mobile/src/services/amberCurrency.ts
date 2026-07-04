@@ -33,7 +33,12 @@ const DAILY_CHALLENGE_INTRO_SEEN_KEY = 'wordshift_daily_challenge_intro_seen';
 const FOX_PLAY_NUDGE_SEEN_KEY = 'wordshift_fox_play_nudge_seen';
 const CHALLENGE_INTRO_SEEN_KEY = 'wordshift_challenge_intro_seen';
 const PIT_NUDGE_SEEN_KEY = 'wordshift_pit_nudge_seen';
+// Legacy: the old passive puzzle-8 Fox pit-harvest intro's seen flag. That intro
+// was replaced by the mandatory first-harvest gate, which uses its OWN fresh flag
+// (MANDATORY_HARVEST_SEEN_KEY) so existing players — who already have this legacy
+// flag set — still get the new gate once. Only cleared on Reset All now.
 const PIT_HARVEST_INTRO_SEEN_KEY = 'wordshift_pit_harvest_intro_seen';
+const MANDATORY_HARVEST_SEEN_KEY = 'wordshift_mandatory_harvest_seen';
 const SETUP_SELECTOR_INTRO_SEEN_KEY = 'wordshift_setup_selector_intro_seen';
 const JOURNAL_INTRO_SEEN_KEY = 'wordshift_journal_intro_seen';
 const STARTER_INTRO_SEEN_KEY = 'wordshift_starter_intro_seen';
@@ -997,6 +1002,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(FOX_PLAY_NUDGE_SEEN_KEY);
     await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY);
     await AsyncStorage.removeItem(PIT_HARVEST_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(MANDATORY_HARVEST_SEEN_KEY);
     await AsyncStorage.removeItem(SETUP_SELECTOR_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(JOURNAL_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(STARTER_INTRO_SEEN_KEY);
@@ -1552,17 +1558,23 @@ export async function markSetupSelectorIntroSeen(): Promise<void> {
   }
 }
 
-export async function hasSeenPitHarvestIntro(): Promise<boolean> {
+/**
+ * One-time flag for the mandatory first-harvest gate — the forced pit visit at
+ * the victory where the auto-collect window closes. Uses its OWN key (not the
+ * legacy pit-harvest-intro flag), so players who saw the old passive puzzle-8
+ * Fox card still get this new gate exactly once.
+ */
+export async function hasSeenMandatoryHarvest(): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(PIT_HARVEST_INTRO_SEEN_KEY)) === 'true';
+    return (await AsyncStorage.getItem(MANDATORY_HARVEST_SEEN_KEY)) === 'true';
   } catch {
     return false;
   }
 }
 
-export async function markPitHarvestIntroSeen(): Promise<void> {
+export async function markMandatoryHarvestSeen(): Promise<void> {
   try {
-    await AsyncStorage.setItem(PIT_HARVEST_INTRO_SEEN_KEY, 'true');
+    await AsyncStorage.setItem(MANDATORY_HARVEST_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

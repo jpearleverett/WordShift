@@ -110,6 +110,7 @@ const SYNC_KEYS = [
   'wordshift_journal_intro_seen',
   'wordshift_setup_selector_intro_seen',
   'wordshift_pit_harvest_intro_seen',
+  'wordshift_mandatory_harvest_seen',
   'wordshift_gated_unlock_intro_seen',
   'wordshift_micro_beats_seen',
 ];
