@@ -41,8 +41,8 @@ import {
   spendAmber,
   hasSeenSetupSelectorIntro,
   markSetupSelectorIntroSeen,
-  hasSeenPitHarvestIntro,
-  markPitHarvestIntroSeen,
+  hasSeenMandatoryHarvest,
+  markMandatoryHarvestSeen,
   hasSeenStarterIntro,
   markStarterIntroSeen,
   consumePendingVariantTutorial,
@@ -1246,10 +1246,10 @@ function MainApp() {
         !finalVictory.autoCollected &&
         !!finalVictory.harvestBatchId &&
         completedTotal >= AUTO_COLLECT_PUZZLE_LIMIT + 1 &&
-        !(await hasSeenPitHarvestIntro())
+        !(await hasSeenMandatoryHarvest())
       ) {
         finalVictory = { ...finalVictory, mandatoryHarvest: true };
-        await markPitHarvestIntroSeen();
+        await markMandatoryHarvestSeen();
       }
       // Fox introduces the Keeper's Welcome starter pack once, ~puzzle 12, but
       // only for players who don't already own it. She frames it in-world (a
