@@ -128,6 +128,17 @@ export const AMBER_UNDO_REFILL_COST = 15;
 export const REWARDED_DAILY_CAP = 8;
 
 /**
+ * Daily "watch a short clip → free amber" faucet. A separate, tighter per-day
+ * cap than REWARDED_DAILY_CAP (which also covers hint/speed rescues). Sized so a
+ * full week of watching (~840) only equals one small amber pack — meaningful for
+ * an engaged free player and good ad inventory, but it never undercuts buying
+ * amber or feeds phase progress (amber never does). Patron holders get the grant
+ * for free (no ad — they bought the quiet table).
+ */
+export const DAILY_AMBER_REWARD = 60;
+export const DAILY_AMBER_DAILY_CAP = 2;
+
+/**
  * Interstitial cadence: show at most one interstitial every Nth completed puzzle.
  * Looser early (Phase 0–2) to protect the candy-phase tone contract, tighter later.
  * Patron holders and all narrative-beat exemptions bypass this entirely (see ads.ts).
@@ -200,6 +211,13 @@ export const PATRON_NUDGE_MIN_PUZZLES = 6;
 
 /** Show the Remove-Ads nudge once this many interstitials have been seen. */
 export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
+
+/**
+ * Earliest puzzle count for Fox's one-time "Keeper's Welcome" starter-pack intro.
+ * After the pit-harvest intro (puzzle 8) and before challenge mode (15), once the
+ * player understands amber. Suppressed if the starter pack is already owned.
+ */
+export const STARTER_INTRO_MIN_PUZZLES = 12;
 
 // ============================================================================
 // OFFERING PIT

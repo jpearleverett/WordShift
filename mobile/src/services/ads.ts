@@ -33,7 +33,8 @@ export type RewardedPlacement =
   | 'victory_double'
   | 'hint_recovery'
   | 'quest_bonus'
-  | 'speed_rescue';
+  | 'speed_rescue'
+  | 'daily_amber';
 
 export interface RewardedResult {
   /** True only when the user watched the full ad and earned the reward. */

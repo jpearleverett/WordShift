@@ -33,6 +33,7 @@ export type EventType =
   | 'iap_purchase'
   | 'purchase_cancelled'
   | 'purchase_failed'
+  | 'daily_amber_claimed'
   | 'app_error';
 
 /**

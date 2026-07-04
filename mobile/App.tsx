@@ -43,6 +43,8 @@ import {
   markSetupSelectorIntroSeen,
   hasSeenPitHarvestIntro,
   markPitHarvestIntroSeen,
+  hasSeenStarterIntro,
+  markStarterIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
   isHouseCompleted,
@@ -75,6 +77,7 @@ import {
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
   getFoxPitHarvestIntroLines,
+  getFoxStarterIntroLines,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
   getDragMissMessage,
@@ -104,14 +107,14 @@ import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewarded
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
 import { initHints, addHints } from './src/services/hints';
-import { loadEntitlements } from './src/services/entitlements';
+import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
 import { recordInterstitialSeen, consumePatronNudge, consumeRemoveAdsNudge } from './src/services/monetizationPrompts';
 import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
@@ -138,7 +141,7 @@ import { useScreenInsets } from './src/hooks/useScreenInsets';
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
 
-type PostVictoryIntroKind = 'variant_unlock' | 'home_tools';
+type PostVictoryIntroKind = 'variant_unlock' | 'home_tools' | 'starter_pack';
 interface PostVictoryIntro {
   kind: PostVictoryIntroKind;
   lines: string[];
@@ -741,11 +744,19 @@ function MainApp() {
   }, []);
 
   const dismissPostVictoryIntro = useCallback(async () => {
-    if (postVictoryIntro?.kind === 'home_tools') {
+    const dismissedKind = postVictoryIntro?.kind;
+    if (dismissedKind === 'home_tools') {
       await markPitHarvestIntroSeen();
+    } else if (dismissedKind === 'starter_pack') {
+      await markStarterIntroSeen();
     }
     setPostVictoryIntro(null);
     await advanceQueuedPostVictoryIntro();
+    // After the starter intro closes, open the Store so the "welcome" Fox
+    // described is right there (the Keeper's Welcome hero card).
+    if (dismissedKind === 'starter_pack') {
+      setShowStoreModal(true);
+    }
   }, [postVictoryIntro, advanceQueuedPostVictoryIntro]);
 
   const handleAdvancePostVictoryIntro = useCallback(async () => {
@@ -1232,6 +1243,19 @@ function MainApp() {
         immediateIntros.push({
           kind: 'home_tools',
           lines: getFoxPitHarvestIntroLines(finalVictory.newPhase),
+        });
+      }
+      // Fox introduces the Keeper's Welcome starter pack once, ~puzzle 12, but
+      // only for players who don't already own it. She frames it in-world (a
+      // welcome gift on "the shelf"); dismissing opens the Store.
+      if (
+        completedTotal >= STARTER_INTRO_MIN_PUZZLES &&
+        !hasEntitlementSync(ENTITLEMENTS.STARTER_PACK) &&
+        !(await hasSeenStarterIntro())
+      ) {
+        immediateIntros.push({
+          kind: 'starter_pack',
+          lines: getFoxStarterIntroLines(finalVictory.newPhase),
         });
       }
       queuedPostVictoryIntrosRef.current = immediateIntros;
