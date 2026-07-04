@@ -317,7 +317,9 @@ Puzzle completion queues amber in harvest batches instead of crediting directly.
 
 **Flow**: Puzzle complete → `enqueueHarvestBatch()` → VictoryModal shows "Collect Now" → pit screen → tap floating words to devour → `offerBatch()` credits amber.
 
-**Auto-collect window**: through the first `AUTO_COLLECT_PUZZLE_LIMIT` (8, `gameBalance.ts`) puzzles, amber auto-credits without a pit visit; Fox's `pit_harvest` intro fires when the window closes and manual harvesting begins.
+**Auto-collect window**: through the first `AUTO_COLLECT_PUZZLE_LIMIT` (8, `gameBalance.ts`) puzzles, amber auto-credits without a pit visit (the auto-collect path sets `VictoryData.autoCollected`). The VictoryModal shows an in-world reason via `getAutoCollectCaption(phase)` ("The house carries your words down to the pit for you, for now.") — lore, never a "tutorial" voice — so the automatic reward reads as the house doing the ritual labor for a newcomer.
+
+**Mandatory first-harvest gate**: the one-time victory where the window closes and a real batch first waits in the pit (`completedTotal >= AUTO_COLLECT_PUZZLE_LIMIT + 1`, outside onboarding, no phase-transition ceremony already claiming the pit, `!hasSeenPitHarvestIntro()`) sets `VictoryData.mandatoryHarvest` in `App.handleVictory` and marks the pit-harvest intro seen. The VictoryModal then **forces** the pit before the player can continue: it hides Next Level / Home / Share (same `mustVisitPit` gate the phase-transition ceremony uses) and shows `getMandatoryHarvestText(phase)` + `getMandatoryHarvestCTA(phase)` as the only action — teach the pit by using it, with a lore beat instead of a passive Fox card. (This replaced the old passive `pit_harvest`/`home_tools` post-victory Fox intro that merely explained the change at puzzle 8.)
 
 **Pit Features**: Flying mini candy-tile words, tap-to-devour spiral animation, multi-layered pit glow (4 concentric ovals), ward marks (7 circles showing phase progress), ward ignition ceremony for phase transitions, phase-aware background images.
 
@@ -360,6 +362,8 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 **Reserve-ahead (pay now, build at the gate):** the gates are tuned for a baseline earner, so a fast/skilled player (HARD + achievements + quests) reaches a gated room's amber cost well before its level gate and would otherwise sit on idle amber behind a wall. When the next unlock is blocked *only* by its puzzle gate and the player can afford it, they can **Reserve** it — `reserveNextUnlock` spends the amber up front and stores `reservedUnlockId` (on home progress); `claimReservedUnlockIfReady` (called from `HomeScreen.loadAllData`) commits the room for free the moment `puzzlesSolved` crosses `minPuzzles`, firing a celebration. Only the **immediate next** unlock can be reserved (one at a time, `canReserveUnlock`), so a rich player can stay one step ahead but can't pre-buy the whole house. The shop + room-unlock modals show gate/reserved copy via `getReserveGateText`/`getReservedArrivalText` (homeWorldData) — both include the player's current level ("Unlocks at level 42. You're at 35.") so progress-to-arrival is always visible; exact strings pinned in `homeWorldData.test.ts`. Reservation rides in `wordshift_home_progress` (cloud-synced; cleared by Reset All's `clearProgress`). Covered by `homeWorldData.test.ts`.
 
 **Skip the wait (pay a premium, unlock NOW):** alongside Reserve, a gated room the player can afford at a **premium** offers a **Skip the wait** shortcut — unlock it immediately, bypassing the level gate. `getUnlockSkipCost` = `ceil(cost × (1 + UNLOCK_SKIP_PREMIUM))` (premium = 1.0 in `gameBalance.ts` — skip = 2× build cost); `canSkipUnlockGate` mirrors `canReserveUnlock` but requires the premium be affordable and no reservation pending (skip and reserve are mutually exclusive); `skipUnlockGate` spends the premium via `unlockRoom`/`unlockAnimal` and unlocks right away (celebration + character intro like a normal purchase). The premium keeps the gates meaningful for a baseline earner while giving an amber-rich player a paid shortcut. Surfaced in the room-unlock modal as a secondary outlined-amber button *below* the (cheaper) Reserve button — `useUnlockFlow` exposes `canSkip`/`skipCost`/`handleSkip`; copy via `getSkipGateText`. **Speed up a reserved room:** once a room is *reserved* (Skip is then hidden, since reserve already paid the base cost), a "Speed it up" button lets the player pay only the remaining premium (`getReservedSkipCost` = skip cost − build cost) to unlock it now — `canSpeedUpReservedUnlock`/`skipReservedUnlock` (spends the delta, `claimReservedUnlock`s it, clears the reservation); total paid equals a direct skip. `useUnlockFlow` exposes `canSpeedUpReserved`/`reservedSkipCost`/`handleSpeedUpReserved`. Amber-only (never cash) and never feeds phase progress. Covered by `homeWorldData.test.ts`.
+
+**First-gate lore intro (one-time, Fox-led):** the first time a level-gated room actually *blocks* the player (the next unlock is a `type:'room'` with a `minPuzzles` gate and `puzzlesSolved < minPuzzles` — the Jungle Hammock at level 28 by default), a one-time HomeScreen intro fires (same `introOverrideLines` mechanism as the challenge/daily/journal intros): Fox explains the wait in-world (the house needs *time and words offered*, not just amber) and points at Reserve (set the amber aside now, it rises on its own) and Skip (press it to completion now for a little more). Copy from `getGatedRoomIntroLines(phase, roomName)` (phaseNarrative — never says "level"/"unlock"/"puzzle"; the modal's gate copy carries that). Gated by `hasSeenGatedUnlockIntro()`/`markGatedUnlockIntroSeen()` (`introContext: 'gated_room_intro'`); it fires only while the gate blocks, so a fast player who blew past it gets no needless explanation. Key `wordshift_gated_unlock_intro_seen` is cloud-synced + cleared by Reset All. Covered by `gatedRoomIntro.test.ts`.
 
 ### Animal Characters (10 total, in unlock order)
 
@@ -451,7 +455,9 @@ ALL player-facing text shifts with phase. Key functions:
 - `getAnimalWhisper()`, `getAnimalInterjection()`, `getRitualMicroEvent()`
 - `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`; `getNoValidMovesMessage()`/`getStuckPanelTitle()` exist but are intentionally unused (stuck detection is silent by product decision)
 - `getNotificationPromptText()` — phase-aware copy for the one-time in-app notification pre-permission prompt; `getWinBackMessage(phase, rung)` — lapsed-player win-back ladder copy
+- `getGatedRoomIntroLines(phase, roomName)` — one-time Fox lore intro the first time a level-gated room blocks the player (explains the wait, points at Reserve/Skip)
 - Pit functions: `getPitScreenTitle/Subtitle()`, `getPitButtonLabel()`, `getPitOfferAllLabel()`, etc.
+- Early pit economy: `getAutoCollectCaption()` (lore reason amber auto-banks early), `getMandatoryHarvestText()`/`getMandatoryHarvestCTA()` (the one-time forced first-harvest gate)
 - Ward functions: `getPitWardHint()`, `getPitTransitionReadyText/CeremonyText()`, `getWardMarkColors()`
 
 ## Early Darkness Seeds (Phase 0)
@@ -494,11 +500,10 @@ During onboarding: simplified UI (no difficulty selector, stats, NEW button). Ba
 
 ## Fox Post-Victory Intros
 
-One-time Fox sequences triggered after victories in App.tsx:
+One-time Fox sequences triggered after victories in App.tsx (`PostVictoryIntroKind` = `variant_unlock | starter_pack`; `setup_selector`, `challenge_intro`, `journal_intro`, `daily_challenge_intro` ride their own one-time flows):
 - `variant_unlock`: New variant unlocked
-- `home_tools`: Home screen features
 - `setup_selector`: Puzzle setup selector
-- `pit_harvest`: Pit harvest system (fires at puzzle 8, when the auto-collect window closes)
+- Pit harvest: **no longer a Fox intro** — when the auto-collect window closes, the VictoryModal's one-time **mandatory first-harvest gate** (`VictoryData.mandatoryHarvest`) teaches the pit by forcing a visit (see Offering Pit Economy). The old passive `pit_harvest`/`home_tools` post-victory Fox card was removed.
 - `challenge_intro`: Challenge Mode (after 15 puzzles)
 - `journal_intro`: Journal hub (from HomeScreen after puzzle 6)
 - `daily_challenge_intro`: Daily Challenge on unlock

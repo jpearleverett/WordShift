@@ -37,6 +37,7 @@ const PIT_HARVEST_INTRO_SEEN_KEY = 'wordshift_pit_harvest_intro_seen';
 const SETUP_SELECTOR_INTRO_SEEN_KEY = 'wordshift_setup_selector_intro_seen';
 const JOURNAL_INTRO_SEEN_KEY = 'wordshift_journal_intro_seen';
 const STARTER_INTRO_SEEN_KEY = 'wordshift_starter_intro_seen';
+const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -999,6 +1000,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(SETUP_SELECTOR_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(JOURNAL_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(STARTER_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(GATED_UNLOCK_INTRO_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -1561,6 +1563,27 @@ export async function hasSeenPitHarvestIntro(): Promise<boolean> {
 export async function markPitHarvestIntroSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(PIT_HARVEST_INTRO_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * One-time flag for the lore intro shown the first time a level-gated room
+ * (the Jungle Hammock, by default) blocks the player — explaining the wait and
+ * pointing at Reserve / Skip.
+ */
+export async function hasSeenGatedUnlockIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(GATED_UNLOCK_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markGatedUnlockIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(GATED_UNLOCK_INTRO_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

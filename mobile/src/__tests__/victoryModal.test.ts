@@ -146,7 +146,14 @@ jest.mock('../components/monetization/RewardedAdButton', () => ({
 // ---------------------------------------------------------------------------
 
 import { VictoryModal, VictoryData } from '../components/puzzle/VictoryModal';
-import { getVictoryFeedback, getRitualEchoFooter, getRitualEchoHeader } from '../services/phaseNarrative';
+import {
+  getVictoryFeedback,
+  getRitualEchoFooter,
+  getRitualEchoHeader,
+  getAutoCollectCaption,
+  getMandatoryHarvestText,
+  getMandatoryHarvestCTA,
+} from '../services/phaseNarrative';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
 import { DialoguePhase } from '../types/homeWorld';
@@ -498,5 +505,57 @@ describe('share button bonus layout', () => {
     expect(findAll(btn, el => el.type === 'Image')).toHaveLength(0);
     expect(findAll(btn, el => el.type === 'Text')).toHaveLength(1);
     expect(textOf(btn)).not.toContain(`+${DAILY_SHARE_BONUS_AMBER}`);
+  });
+});
+
+// ===========================================================================
+// 5. Early pit economy — auto-collect lore + one-time mandatory harvest gate
+// ===========================================================================
+
+describe('auto-collect lore caption', () => {
+  it('renders the in-world reason while the pit auto-collects early rewards', () => {
+    const tree = render(baseProps({
+      phase: 0,
+      victoryData: baseVictoryData({ autoCollected: true }),
+    }));
+    expect(textOf(tree)).toContain(getAutoCollectCaption(0 as DialoguePhase));
+  });
+
+  it('is absent once the player harvests manually (autoCollected falsy)', () => {
+    const tree = render(baseProps({
+      phase: 0,
+      victoryData: baseVictoryData({ autoCollected: false }),
+    }));
+    expect(textOf(tree)).not.toContain(getAutoCollectCaption(0 as DialoguePhase));
+  });
+});
+
+describe('mandatory first-harvest gate', () => {
+  it('forces the pit: Next Level / Home / Share hide, only the pit CTA remains', () => {
+    const tree = render(baseProps({
+      phase: 0,
+      victoryData: baseVictoryData({ mandatoryHarvest: true }),
+    }));
+    // The replay + secondary actions are gone — the player cannot continue
+    // until they offer their words at the pit.
+    expect(findByA11yLabel(tree, 'Next level')).toBeNull();
+    expect(findByA11yLabel(tree, 'Return home')).toBeNull();
+    expect(findByA11yLabel(tree, 'Share result')).toBeNull();
+    // The pit is the only way forward, with its mandatory a11y label.
+    expect(findByA11yLabel(tree, 'Visit the pit to continue')).not.toBeNull();
+    // The lore dialogue + CTA copy are shown.
+    const text = textOf(tree);
+    expect(text).toContain(getMandatoryHarvestText(0 as DialoguePhase));
+    expect(text).toContain(getMandatoryHarvestCTA(0 as DialoguePhase));
+  });
+
+  it('a normal victory keeps Next Level and the plain (optional) Collect Now pill', () => {
+    const tree = render(baseProps({
+      phase: 0,
+      victoryData: baseVictoryData({ mandatoryHarvest: false }),
+    }));
+    expect(findByA11yLabel(tree, 'Next level')).not.toBeNull();
+    expect(findByA11yLabel(tree, 'Collect amber in the pit')).not.toBeNull();
+    expect(textOf(tree)).not.toContain(getMandatoryHarvestText(0 as DialoguePhase));
   });
 });

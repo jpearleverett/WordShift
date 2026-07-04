@@ -33,6 +33,8 @@ import {
   markJournalIntroSeen,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
+  hasSeenGatedUnlockIntro,
+  markGatedUnlockIntroSeen,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
@@ -49,6 +51,7 @@ import {
   getJournalIntroLines,
   getJournalSpotlightSteps,
   getDailyChallengeIntroLines,
+  getGatedRoomIntroLines,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -239,7 +242,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro'>('animal_intro');
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -616,6 +619,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     journalSpotlightActive,
   ]);
 
+  // First-gate lore intro (one-time, Fox-led): the first time a level-gated
+  // room blocks the player (the Jungle Hammock, by default), Fox explains the
+  // wait in-world and points at Reserve / Skip. Fires only while the gate is
+  // actually blocking (below the room's minPuzzles), so a fast player who blew
+  // past the gate never gets a needless explanation.
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (unlockFlow.showRoomUnlock || unlockFlow.showInvitePrompt) return;
+    const nu = unlockFlow.nextUnlock;
+    if (!nu || nu.type !== 'room' || nu.minPuzzles === undefined) return;
+    if ((progress.puzzlesSolved || 0) >= nu.minPuzzles) return; // gate already open — no wall
+
+    let cancelled = false;
+    (async () => {
+      const seen = await hasSeenGatedUnlockIntro();
+      if (seen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getGatedRoomIntroLines(progress.currentPhase, nu.name));
+      setIntroContext('gated_room_intro');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    unlockFlow.nextUnlock,
+    unlockFlow.showRoomUnlock,
+    unlockFlow.showInvitePrompt,
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
   // Ambient home line — atmospheric text when no dialogue is active
   // Fades in, holds for 5s, then fades out to avoid persistent visual clutter.
   useEffect(() => {
@@ -776,6 +819,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markPitNudgeSeen();
       } else if (introContext === 'daily_challenge_intro') {
         await markDailyChallengeIntroSeen();
+      } else if (introContext === 'gated_room_intro') {
+        await markGatedUnlockIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -797,6 +842,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markPitNudgeSeen();
       } else if (introContext === 'daily_challenge_intro') {
         await markDailyChallengeIntroSeen();
+      } else if (introContext === 'gated_room_intro') {
+        await markGatedUnlockIntroSeen();
       } else {
         await markIntroSeen(introAnimal.id);
       }

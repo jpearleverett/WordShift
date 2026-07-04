@@ -76,7 +76,6 @@ import {
   getRitualMicroEvent,
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
-  getFoxPitHarvestIntroLines,
   getFoxStarterIntroLines,
   getNotificationPromptText,
   getSpeedTimeUpMessage,
@@ -141,7 +140,7 @@ import { useScreenInsets } from './src/hooks/useScreenInsets';
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
 
-type PostVictoryIntroKind = 'variant_unlock' | 'home_tools' | 'starter_pack';
+type PostVictoryIntroKind = 'variant_unlock' | 'starter_pack';
 interface PostVictoryIntro {
   kind: PostVictoryIntroKind;
   lines: string[];
@@ -745,9 +744,7 @@ function MainApp() {
 
   const dismissPostVictoryIntro = useCallback(async () => {
     const dismissedKind = postVictoryIntro?.kind;
-    if (dismissedKind === 'home_tools') {
-      await markPitHarvestIntroSeen();
-    } else if (dismissedKind === 'starter_pack') {
+    if (dismissedKind === 'starter_pack') {
       await markStarterIntroSeen();
     }
     setPostVictoryIntro(null);
@@ -1237,13 +1234,22 @@ function MainApp() {
           });
         }
       }
-      // Fox explains manual harvesting exactly when the auto-collect window
-      // closes (the NEXT puzzle's amber will queue in the pit).
-      if (completedTotal === AUTO_COLLECT_PUZZLE_LIMIT && !(await hasSeenPitHarvestIntro())) {
-        immediateIntros.push({
-          kind: 'home_tools',
-          lines: getFoxPitHarvestIntroLines(finalVictory.newPhase),
-        });
+      // First harvest gate: the one-time victory where the auto-collect window
+      // closes and a real batch now waits in the pit. Instead of Fox merely
+      // explaining, the Victory modal forces the player to offer their words at
+      // the pit before continuing (teach the pit by using it, with a lore beat).
+      // Skipped during onboarding and when a phase-transition ceremony already
+      // claims the pit; one-time via the pit-harvest-intro seen flag.
+      if (
+        (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete') &&
+        !finalVictory.phaseTransitionPending &&
+        !finalVictory.autoCollected &&
+        !!finalVictory.harvestBatchId &&
+        completedTotal >= AUTO_COLLECT_PUZZLE_LIMIT + 1 &&
+        !(await hasSeenPitHarvestIntro())
+      ) {
+        finalVictory = { ...finalVictory, mandatoryHarvest: true };
+        await markPitHarvestIntroSeen();
       }
       // Fox introduces the Keeper's Welcome starter pack once, ~puzzle 12, but
       // only for players who don't already own it. She frames it in-world (a
