@@ -22,6 +22,9 @@ import {
   getVictoryPitHint,
   getPitMandatoryText,
   getPitMandatoryCTA,
+  getAutoCollectCaption,
+  getMandatoryHarvestText,
+  getMandatoryHarvestCTA,
   getNextStreakMilestoneText,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
@@ -64,6 +67,8 @@ export interface VictoryData {
   harvestedWords?: string[];
   pendingHarvest?: { pendingAmber: number; pendingWords: number; pendingBatches: number };
   autoCollected?: boolean;
+  /** One-time mandatory first-harvest gate: hides Next Level, forces a pit visit */
+  mandatoryHarvest?: boolean;
 }
 
 interface VictoryModalProps {
@@ -191,6 +196,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   const btn = getButtonTheme(phase);
   const totalPuzzlesCompleted = cumulativeStats?.totalPuzzlesCompleted ?? 0;
   const isEarlyGameVictory = totalPuzzlesCompleted > 0 && totalPuzzlesCompleted <= 5;
+  // Both the phase-transition ceremony and the one-time first-harvest gate force
+  // a pit visit: the pit CTA becomes the only action (Next Level/Home/Share hide).
+  const mandatoryHarvest = !!victoryData?.mandatoryHarvest;
+  const mustVisitPit = !!phaseTransitionPending || mandatoryHarvest;
 
   // Ritual echo chain + de-duplicated feedback register: the performance
   // feedback line and the ritual-echo footer occupy the same emotional slot,
@@ -683,6 +692,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         </Text>
                       </View>
                     </View>
+                    {/* Auto-collect lore: while the house gathers the player's
+                        early rewards for them, say WHY the amber arrives on its
+                        own (in-world, never a "tutorial" voice). */}
+                    {victoryData.autoCollected && (
+                      <Text style={[styles.autoCollectCaption, { color: phaseTheme.modalSecondaryTextColor }]}>
+                        {getAutoCollectCaption(phase as DialoguePhase)}
+                      </Text>
+                    )}
                     {/* Optional "double the reward". Ad-free players (Patron /
                         Remove-Ads) get it granted instantly with no ad — their
                         perk. Everyone else opts in by watching (the button
@@ -716,16 +733,20 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                     {/* Collect Now — compact pill inside amber stats box */}
                     {!isOnboarding && !victoryData.autoCollected && (
                       <>
-                      {phaseTransitionPending && (
+                      {phaseTransitionPending ? (
                         <Text style={[styles.pitMandatoryText, { color: btn.harvestPill.text }]}>
                           {getPitMandatoryText(phase as DialoguePhase)}
                         </Text>
-                      )}
+                      ) : mandatoryHarvest ? (
+                        <Text style={[styles.mandatoryHarvestText, { color: btn.harvestPill.text }]}>
+                          {getMandatoryHarvestText(phase as DialoguePhase)}
+                        </Text>
+                      ) : null}
                       <TouchableOpacity
                         onPress={onGoToPit}
                         activeOpacity={0.7}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        accessibilityLabel={phaseTransitionPending ? 'Visit the pit to continue' : 'Collect amber in the pit'}
+                        accessibilityLabel={mustVisitPit ? 'Visit the pit to continue' : 'Collect amber in the pit'}
                         accessibilityRole="button"
                         style={[styles.collectNowPill, {
                           backgroundColor: btn.harvestPill.bg,
@@ -735,6 +756,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
                           {phaseTransitionPending
                             ? getPitMandatoryCTA(phase as DialoguePhase)
+                            : mandatoryHarvest
+                            ? getMandatoryHarvestCTA(phase as DialoguePhase)
                             : `${'\uD83C\uDF3E'} Collect Now  \u203A`}
                         </Text>
                       </TouchableOpacity>
@@ -774,8 +797,9 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
-            ) : phaseTransitionPending ? (
-            // Phase transition pending: pit CTA is the only action
+            ) : mustVisitPit ? (
+            // Pit visit required (phase transition or first-harvest gate): the
+            // pit CTA above is the only action — Next Level/Home/Share are hidden.
             null
             ) : (
             <>
@@ -1218,6 +1242,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 2,
     paddingHorizontal: 16,
+  },
+
+  // One-time first-harvest gate dialogue — a touch larger than pitMandatoryText
+  // because it's a first-time teaching beat that reads as Fox/house speaking.
+  mandatoryHarvestText: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+  },
+
+  // Lore caption under the amber total while the pit auto-collects early rewards
+  autoCollectCaption: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    lineHeight: 15,
+    marginTop: 8,
+    paddingHorizontal: 8,
   },
 
   // Flat secondary buttons (Share, Home)

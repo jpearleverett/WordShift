@@ -1060,28 +1060,6 @@ export function getFoxSetupSelectorIntroLines(phase: number): string[] {
   ];
 }
 
-export function getFoxPitHarvestIntroLines(phase: number): string[] {
-  if (phase >= 4) {
-    return [
-      'The house gathered your first few offerings on its own while you learned.',
-      'From here on, it will leave those words waiting below. Use the pit button in the header to call the amber back yourself.',
-      'I sometimes wonder where the words go after the pit takes them. Somewhere deep, I think.',
-    ];
-  }
-  if (phase >= 3) {
-    return [
-      'The house has been collecting your first rewards for you while you get comfortable.',
-      'From here on, words will wait in the pit until you offer them yourself. Use the pit button in the header whenever you want that amber back.',
-      'I sometimes wonder where the words go after the pit takes them. Somewhere deep, I think.',
-    ];
-  }
-  return [
-    'The house has been sweeping up your first few rewards for you while you learned.',
-    'From now on, words will wait in the pit until you offer them yourself. The pit button in the header will take you there.',
-    'I sometimes wonder where the words go after the pit takes them. Somewhere deep, I think.',
-  ];
-}
-
 /**
  * Fox's one-time "Keeper's Welcome" starter-pack intro. Warm, in-world framing:
  * Fox never mentions money (narrative rule 1 — the animals don't know they're in
@@ -2355,6 +2333,41 @@ export function getPitMandatoryText(phase: DialoguePhase): string {
 export function getPitMandatoryCTA(phase: DialoguePhase): string {
   if (phase >= 3) return 'The pit demands your presence';
   return 'Visit the Pit';
+}
+
+/**
+ * Lore caption shown in the Victory modal while the pit auto-collects the
+ * player's early rewards (the first AUTO_COLLECT_PUZZLE_LIMIT puzzles). It
+ * explains, in-world, WHY the amber arrives on its own: the house carries the
+ * words down to the pit on the player's behalf while they are still new. The
+ * "for now" quietly foreshadows that the help ends (it does, at the mandatory
+ * first harvest). Auto-collect only ever runs in Phase 0, but kept phase-aware
+ * for consistency.
+ */
+export function getAutoCollectCaption(phase: DialoguePhase): string {
+  if (phase >= 3) return 'The house carries your words down to the pit for you... for now.';
+  if (phase >= 2) return 'The house still carries your words to the pit for you, for now.';
+  return 'The house carries your words down to the pit for you, for now.';
+}
+
+/**
+ * Lore dialogue shown in the Victory modal the first time the auto-collect
+ * window closes and the player must offer their words at the pit themselves.
+ * A one-time teach-by-doing beat: the Victory modal hides the "Next Level" CTA
+ * (see VictoryData.mandatoryHarvest) so the player learns the pit by using it,
+ * with an in-world line rather than a bare tutorial card. Fires just past
+ * AUTO_COLLECT_PUZZLE_LIMIT, squarely Phase 0, but kept phase-aware.
+ */
+export function getMandatoryHarvestText(phase: DialoguePhase): string {
+  if (phase >= 3) return 'The house will carry nothing more for you. Your words wait in the pit. Offer them yourself before you go on.';
+  if (phase >= 2) return 'The house has stopped gathering for you, friend. Your words are waiting in the pit now. Offer them yourself before we play on.';
+  return 'That is the last the house will carry for you, friend. Your words are waiting in the pit now. Go and offer them yourself before we play on.';
+}
+
+/** CTA button label for the one-time mandatory first-harvest gate. */
+export function getMandatoryHarvestCTA(phase: DialoguePhase): string {
+  if (phase >= 3) return 'Offer your words to the pit';
+  return 'Offer your words at the Pit';
 }
 
 // ============================================================================

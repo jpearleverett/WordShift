@@ -72,6 +72,12 @@ export interface VictoryData {
   harvestBatchId?: string;
   /** True when the victory reward was banked immediately */
   autoCollected?: boolean;
+  /**
+   * True on the one-time victory where the auto-collect window closes and the
+   * player must offer their words at the pit before continuing (set in App, not
+   * here). Drives the mandatory first-harvest gate in the Victory modal.
+   */
+  mandatoryHarvest?: boolean;
   /** True when this puzzle created a new pending phase transition in the pit */
   phaseTransitionPending: boolean;
   /** True when pending harvest batches hit the 200 cap and oldest were trimmed */

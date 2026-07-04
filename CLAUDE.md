@@ -317,7 +317,9 @@ Puzzle completion queues amber in harvest batches instead of crediting directly.
 
 **Flow**: Puzzle complete → `enqueueHarvestBatch()` → VictoryModal shows "Collect Now" → pit screen → tap floating words to devour → `offerBatch()` credits amber.
 
-**Auto-collect window**: through the first `AUTO_COLLECT_PUZZLE_LIMIT` (8, `gameBalance.ts`) puzzles, amber auto-credits without a pit visit; Fox's `pit_harvest` intro fires when the window closes and manual harvesting begins.
+**Auto-collect window**: through the first `AUTO_COLLECT_PUZZLE_LIMIT` (8, `gameBalance.ts`) puzzles, amber auto-credits without a pit visit (the auto-collect path sets `VictoryData.autoCollected`). The VictoryModal shows an in-world reason via `getAutoCollectCaption(phase)` ("The house carries your words down to the pit for you, for now.") — lore, never a "tutorial" voice — so the automatic reward reads as the house doing the ritual labor for a newcomer.
+
+**Mandatory first-harvest gate**: the one-time victory where the window closes and a real batch first waits in the pit (`completedTotal >= AUTO_COLLECT_PUZZLE_LIMIT + 1`, outside onboarding, no phase-transition ceremony already claiming the pit, `!hasSeenPitHarvestIntro()`) sets `VictoryData.mandatoryHarvest` in `App.handleVictory` and marks the pit-harvest intro seen. The VictoryModal then **forces** the pit before the player can continue: it hides Next Level / Home / Share (same `mustVisitPit` gate the phase-transition ceremony uses) and shows `getMandatoryHarvestText(phase)` + `getMandatoryHarvestCTA(phase)` as the only action — teach the pit by using it, with a lore beat instead of a passive Fox card. (This replaced the old passive `pit_harvest`/`home_tools` post-victory Fox intro that merely explained the change at puzzle 8.)
 
 **Pit Features**: Flying mini candy-tile words, tap-to-devour spiral animation, multi-layered pit glow (4 concentric ovals), ward marks (7 circles showing phase progress), ward ignition ceremony for phase transitions, phase-aware background images.
 
@@ -452,6 +454,7 @@ ALL player-facing text shifts with phase. Key functions:
 - `getInvalidWordMessage()`, `getLockedLetterMessage()`, `getHintFallback()`; `getNoValidMovesMessage()`/`getStuckPanelTitle()` exist but are intentionally unused (stuck detection is silent by product decision)
 - `getNotificationPromptText()` — phase-aware copy for the one-time in-app notification pre-permission prompt; `getWinBackMessage(phase, rung)` — lapsed-player win-back ladder copy
 - Pit functions: `getPitScreenTitle/Subtitle()`, `getPitButtonLabel()`, `getPitOfferAllLabel()`, etc.
+- Early pit economy: `getAutoCollectCaption()` (lore reason amber auto-banks early), `getMandatoryHarvestText()`/`getMandatoryHarvestCTA()` (the one-time forced first-harvest gate)
 - Ward functions: `getPitWardHint()`, `getPitTransitionReadyText/CeremonyText()`, `getWardMarkColors()`
 
 ## Early Darkness Seeds (Phase 0)
@@ -494,11 +497,10 @@ During onboarding: simplified UI (no difficulty selector, stats, NEW button). Ba
 
 ## Fox Post-Victory Intros
 
-One-time Fox sequences triggered after victories in App.tsx:
+One-time Fox sequences triggered after victories in App.tsx (`PostVictoryIntroKind` = `variant_unlock | starter_pack`; `setup_selector`, `challenge_intro`, `journal_intro`, `daily_challenge_intro` ride their own one-time flows):
 - `variant_unlock`: New variant unlocked
-- `home_tools`: Home screen features
 - `setup_selector`: Puzzle setup selector
-- `pit_harvest`: Pit harvest system (fires at puzzle 8, when the auto-collect window closes)
+- Pit harvest: **no longer a Fox intro** — when the auto-collect window closes, the VictoryModal's one-time **mandatory first-harvest gate** (`VictoryData.mandatoryHarvest`) teaches the pit by forcing a visit (see Offering Pit Economy). The old passive `pit_harvest`/`home_tools` post-victory Fox card was removed.
 - `challenge_intro`: Challenge Mode (after 15 puzzles)
 - `journal_intro`: Journal hub (from HomeScreen after puzzle 6)
 - `daily_challenge_intro`: Daily Challenge on unlock
