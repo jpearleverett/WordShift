@@ -80,7 +80,7 @@ mobile/
 ├── App.tsx                      # Bootstrap gate (cloud auto-restore → migrations → cosmetics/hints/entitlements; IAP/ads init fire-and-forget; error handler) wrapping MainApp (~2800 lines): screen routing, onboarding, post-victory intros, deep-link + notification-tap routing (incl. cold-start), Android back handling
 ├── assets/                      # Image assets (characters/, rooms/, house/, environment/)
 ├── src/
-│   ├── types.ts                 # TypeScript interfaces (RowData, Letter, GameState, etc.)
+│   ├── types.ts                 # TypeScript types (RowData/Letter interfaces, GameState enum, etc.)
 │   ├── types/homeWorld.ts       # Home screen types, config constants, DialoguePhase = 0|1|2|3|4|5
 │   ├── constants/               # Centralized constants (index.ts re-exports; import from '../constants')
 │   │   ├── wordLists.ts         # Word lists by length (3-7 letters), COMMON_WORDS, fallback pools, CURATED_EARLY_PUZZLES
@@ -120,6 +120,7 @@ mobile/
 │   │   ├── AchievementToast.tsx # Slide-in achievement notification
 │   │   ├── DailyChallengeCard.tsx # Compact daily challenge button (header)
 │   │   ├── DailyLoginModal.tsx  # Daily app-open reward claim modal (7-day cycle, phase-aware)
+│   │   ├── social/DailyLeaderboardCard.tsx # Compact phase-aware daily leaderboard standing card in VictoryModal (pure/presentational, spoiler-safe: rank/percentile only)
 │   │   ├── puzzle/              # Extracted puzzle UI components
 │   │   │   ├── ActionButton.tsx, AnimatedLogo.tsx, LevelDisplay.tsx, Toast.tsx
 │   │   │   ├── VictoryModal.tsx # Victory screen (stars, stats, amber breakdown)
@@ -128,6 +129,8 @@ mobile/
 │   │   │   └── AnimalWhisper.tsx # Ghost-like post-puzzle whisper
 │   │   ├── OfferingPitScreen.tsx # Offering Pit: tap-to-devour words, ward marks, phase transitions, Phase-5 Tending Shrine modal
 │   │   ├── shop/ShopScreen.tsx  # Cosmetic Shop: buy/equip amber tile themes (expression-only)
+│   │   ├── monetization/        # StoreModal.tsx (amber/hint/starter/bundle packs + daily amber faucet), PatronModal.tsx, RewardedAdButton.tsx (opt-in rewarded ad, Patron-suppressed)
+│   │   ├── NotificationPromptModal.tsx # Styled phase-aware in-game daily-reminder pre-permission prompt (replaces the stock OS Alert)
 │   │   ├── share/ShareCard.tsx  # Phase-aware, spoiler-free shareable result card (forwardRef for PNG capture)
 │   │   ├── share/ShareResultModal.tsx # Victory share preview → shares image (or text fallback)
 │   │   ├── WhisperGalleryScreen.tsx # Collectible whisper/dialogue archive
@@ -172,6 +175,9 @@ mobile/
 │       ├── ads.ts               # Monetization: AdProvider seam + ad policy (live AdMob adapter in providers/googleAdMobAds.ts)
 │       ├── providers/           # Live monetization adapters: revenueCatBilling.ts (IAP), googleAdMobAds.ts (ads)
 │       ├── cosmetics.ts         # Cosmetic ownership/equip + amber shop (tile themes + confetti palettes; getEquippedSync, initCosmetics; pushes tile theme to colors.ts)
+│       ├── hints.ts             # Consumable hint balance (seed once, earn via rewarded ad, buy packs; sync mirror for render/handleHint; key wordshift_hints)
+│       ├── dailyAmberReward.ts  # Daily watch-ad-for-amber faucet count tracker (local-day bucketed, cap DAILY_AMBER_DAILY_CAP; grants elsewhere; key wordshift_daily_amber)
+│       ├── monetizationPrompts.ts # One-time frequency-capped Patron / Remove-Ads soft nudges (device-local UX pacing, suppressed for owners; key wordshift_monet_prompts)
 │       ├── wordHarvest.ts       # Offering Pit harvest batches (over-cap = merge oldest, never drop amber)
 │       ├── slotEstimation.ts    # Drag-and-drop slot position estimation (`estimateSlotIndex`) + `findClosestValidSlot` (App routes drag drops through it with a ±1-slot bound for near-miss forgiveness; ties break toward the finger, never teleports across the row)
 │       ├── puzzleSaveState.ts   # Mid-puzzle autosave/restore
@@ -180,6 +186,10 @@ mobile/
 │       ├── dataMigration.ts     # Schema versioning + migrations (v3)
 │       ├── configValidation.ts  # Configuration data validation
 │       ├── telemetry.ts         # Remote event uploader → Supabase events table when supabaseUrl is set (configured)
+│       ├── supabaseClient.ts    # Dependency-free Supabase REST client (fetch, no native SDK); RPC-only helpers (sbRpc), backend identity, getSentryDsn; no-op until credentials in app.json → extra
+│       ├── leaderboard.ts       # Async Daily Challenge leaderboard (anonymous install id; SECURITY DEFINER RPCs only; degrades to null when unconfigured)
+│       ├── socialProof.ts       # Aggregate anonymous daily social proof (words offered + active seekers today; RPC-only, no feeds/identities)
+│       ├── crashReporter.ts     # Dependency-free Sentry crash forwarding over HTTP (registers errorReporting forwarder; no-op until sentryDsn set)
 │       ├── dateUtils.ts          # Local-day date helpers (streak/daily bucketing — NEVER UTC/toISOString)
 │       ├── settings.ts, haptics.ts, audio.ts, eventLogger.ts
 │       ├── deviceTier.ts, performanceMonitor.ts, errorReporting.ts
@@ -642,7 +652,7 @@ Edit `calculateStars()` in `starRating.ts`
 4. Add to `UNLOCK_PROGRESSION`
 
 ### Adjusting amber rewards
-Edit `AMBER_REWARDS` in `types/homeWorld.ts`
+Edit `AMBER_REWARDS` in `constants/gameBalance.ts` (all tuning values live there; `types/homeWorld.ts` only re-exports it)
 
 ### Adjusting dialogue phases
 Edit `PHASE_THRESHOLDS` in `constants/gameBalance.ts`. `MIN_PUZZLES_FOR_PHASE` sets minimum real puzzles per phase.
