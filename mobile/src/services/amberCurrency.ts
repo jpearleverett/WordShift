@@ -36,6 +36,7 @@ const PIT_NUDGE_SEEN_KEY = 'wordshift_pit_nudge_seen';
 const PIT_HARVEST_INTRO_SEEN_KEY = 'wordshift_pit_harvest_intro_seen';
 const SETUP_SELECTOR_INTRO_SEEN_KEY = 'wordshift_setup_selector_intro_seen';
 const JOURNAL_INTRO_SEEN_KEY = 'wordshift_journal_intro_seen';
+const STARTER_INTRO_SEEN_KEY = 'wordshift_starter_intro_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -997,6 +998,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(PIT_HARVEST_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(SETUP_SELECTOR_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(JOURNAL_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(STARTER_INTRO_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -1474,6 +1476,26 @@ export async function hasSeenChallengeIntro(): Promise<boolean> {
 export async function markChallengeIntroSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(CHALLENGE_INTRO_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Track whether Fox's one-time "Keeper's Welcome" starter-pack intro has shown.
+ */
+export async function hasSeenStarterIntro(): Promise<boolean> {
+  try {
+    const value = await AsyncStorage.getItem(STARTER_INTRO_SEEN_KEY);
+    return value === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markStarterIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STARTER_INTRO_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

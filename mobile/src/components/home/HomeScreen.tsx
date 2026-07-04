@@ -1649,9 +1649,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     ) : null}
                   </View>
                   {unlockFlow.reservedUnlockId === unlockFlow.nextUnlock.id ? (
-                    <View style={[styles.buyButton, styles.buyButtonDisabled]}>
-                      <Text style={styles.buyButtonText}>Reserved ✓</Text>
-                    </View>
+                    unlockFlow.canSpeedUpReserved ? (
+                      <TouchableOpacity
+                        style={[styles.buyButton, styles.skipButton]}
+                        onPress={() => unlockFlow.handleSpeedUpReserved(unlockFlow.nextUnlock!)}
+                        accessibilityLabel={`Speed up ${unlockFlow.nextUnlock.name} and unlock now for ${unlockFlow.reservedSkipCost} amber`}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.buyButtonText, styles.skipButtonText]}>Speed up</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={[styles.buyButton, styles.buyButtonDisabled]}>
+                        <Text style={styles.buyButtonText}>Reserved ✓</Text>
+                      </View>
+                    )
                   ) : unlockFlow.canReserve ? (
                     <TouchableOpacity
                       style={styles.buyButton}
@@ -1961,12 +1972,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     && unlockFlow.unlockAvailability.reason && !unlockFlow.unlockAvailability.reason.startsWith('Already');
                   const cantAfford = progress.amber < unlockFlow.nextUnlock.cost;
                   const isDisabled = cantAfford || !!isGated;
-                  // Reserved: paid, awaiting its level gate.
+                  // Reserved: paid, awaiting its level gate — offer to speed it
+                  // up (pay the remaining premium, unlock now) if affordable.
                   if (isReserved) {
                     return (
-                      <Text style={[styles.shopSubtitle, { color: dt.nameColor, marginTop: 8, fontWeight: '700' }]}>
-                        {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
-                      </Text>
+                      <>
+                        <Text style={[styles.shopSubtitle, { color: dt.nameColor, marginTop: 8, fontWeight: '700' }]}>
+                          {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
+                        </Text>
+                        {unlockFlow.canSpeedUpReserved && (
+                          <TouchableOpacity
+                            style={[styles.buyButton, styles.buyButtonLarge, styles.skipButton]}
+                            onPress={() => unlockFlow.handleSpeedUpReserved(unlockFlow.nextUnlock!)}
+                            accessibilityLabel={`Speed up ${unlockFlow.nextUnlock!.name} and unlock now for ${unlockFlow.reservedSkipCost} amber`}
+                            accessibilityRole="button"
+                          >
+                            <Text style={[styles.buyButtonText, styles.skipButtonText]}>
+                              Speed it up for <AmberInline /> {unlockFlow.reservedSkipCost}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </>
                     );
                   }
                   // Gated but affordable: offer to reserve (pay now, auto-builds)

@@ -1082,6 +1082,28 @@ export function getFoxPitHarvestIntroLines(phase: number): string[] {
   ];
 }
 
+/**
+ * Fox's one-time "Keeper's Welcome" starter-pack intro. Warm, in-world framing:
+ * Fox never mentions money (narrative rule 1 — the animals don't know they're in
+ * a game); she describes a welcome gift set aside on "the shelf", and dismissing
+ * the intro opens the Store where the actual price is shown. Fires early (~puzzle
+ * 12), so this is mostly the bright-days voice, with a quieter later variant.
+ */
+export function getFoxStarterIntroLines(phase: number): string[] {
+  if (phase >= 2) {
+    return [
+      "You've stayed longer than most, friend. The house remembers who remains.",
+      'There is a welcome kept for keepers like you. A measure of amber, and a few hints for the road ahead.',
+      "It waits on the shelf whenever you'd like it. Small comforts, freely offered.",
+    ];
+  }
+  return [
+    "You've settled in so nicely, friend. The house notices who stays.",
+    "There's a little welcome we set aside for new keepers. A pouch of amber and a few hints, to keep the early days cozy.",
+    "It's waiting on the shelf whenever you'd like to take it. No hurry at all.",
+  ];
+}
+
 // ============================================================================
 // HOUSE COMPLETION — All rooms built, all animals unlocked
 // ============================================================================

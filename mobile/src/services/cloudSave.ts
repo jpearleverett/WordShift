@@ -90,6 +90,7 @@ const SYNC_KEYS = [
   'wordshift_weekly_quests',
   'wordshift_daily_quests',
   'wordshift_daily_login',
+  'wordshift_daily_amber',
   // Narrative state
   'wordshift_dialogue_sessions',
   'wordshift_dialogue_choices',

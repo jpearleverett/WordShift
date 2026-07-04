@@ -25,6 +25,7 @@ import {
 import {
   hasEntitlementSync,
   hasMadeAmberPurchaseSync,
+  isPatronSync,
   ENTITLEMENTS,
 } from '../../services/entitlements';
 import { awardBonusAmber } from '../../services/amberCurrency';
@@ -32,6 +33,14 @@ import { addHints } from '../../services/hints';
 import { getSettingsSync } from '../../services/settings';
 import { hapticLight, hapticMedium } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
+import { RewardedAdButton } from './RewardedAdButton';
+import { isAdsReady } from '../../services/ads';
+import {
+  getDailyAmberStatus,
+  recordDailyAmberClaim,
+  DailyAmberStatus,
+} from '../../services/dailyAmberReward';
+import { DAILY_AMBER_REWARD } from '../../constants/gameBalance';
 
 interface StoreModalProps {
   visible: boolean;
@@ -126,6 +135,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     !hasMadeAmberPurchaseSync(),
   );
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [amberFaucet, setAmberFaucet] = useState<DailyAmberStatus | null>(null);
 
   const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
@@ -136,6 +146,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
       setOwnsStarter(hasEntitlementSync(ENTITLEMENTS.STARTER_PACK));
       setFirstAmberDouble(!hasMadeAmberPurchaseSync());
       setSuccessMsg(null);
+      getDailyAmberStatus().then(setAmberFaucet).catch(() => {});
       logEvent({ type: 'store_opened', data: { surface: 'store_modal' } });
     }
   }, [visible]);
@@ -188,6 +199,19 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     (info: ConsumableProductInfo) => prices[info.productId] ?? info.fallbackPrice,
     [prices],
   );
+
+  // Grant the daily free-amber reward (called after a completed rewarded view, or
+  // directly for Patron holders who don't watch ads). recordDailyAmberClaim caps
+  // it per local day; awardBonusAmber credits the reward-only amber.
+  const handleClaimDailyAmber = useCallback(async () => {
+    hapticMedium();
+    const status = await recordDailyAmberClaim();
+    const balance = await awardBonusAmber(DAILY_AMBER_REWARD, 'rewarded_daily_amber');
+    onAmberChange?.(balance);
+    setAmberFaucet(status);
+    setSuccessMsg(`+${DAILY_AMBER_REWARD} amber added.`);
+    logEvent({ type: 'daily_amber_claimed', data: { amount: DAILY_AMBER_REWARD, remaining: status.remaining } });
+  }, [onAmberChange]);
 
   const handleBuyConsumable = useCallback(
     async (info: ConsumableProductInfo) => {
@@ -409,6 +433,35 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   )}
                 </View>
               </View>
+            )}
+
+            {/* Daily free-amber faucet: watch a short clip (or free for Patron).
+                Only shown when there's actually something to offer — a real ad
+                backend for free players, or always for Patron holders. */}
+            {amberFaucet && (isPatronSync() || isAdsReady()) && (
+              <>
+                <Text style={[styles.sectionLabel, { color: t.body }]}>FREE AMBER</Text>
+                <View style={[styles.row, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+                  <View style={styles.rowInfo}>
+                    <Text style={[styles.rowTitle, { color: t.title }]}>Daily Amber</Text>
+                    <Text style={[styles.rowDesc, { color: t.body }]}>
+                      {amberFaucet.available
+                        ? `Watch a short clip for +${DAILY_AMBER_REWARD} amber. ${amberFaucet.remaining} left today.`
+                        : 'Collected for today. Come back tomorrow!'}
+                    </Text>
+                  </View>
+                  {amberFaucet.available && (isPatronSync()
+                    ? renderPricePill('Claim', handleClaimDailyAmber, `Claim ${DAILY_AMBER_REWARD} free amber`)
+                    : (
+                      <RewardedAdButton
+                        placement="daily_amber"
+                        onReward={handleClaimDailyAmber}
+                        label={`Watch · +${DAILY_AMBER_REWARD}`}
+                        phase={phase}
+                      />
+                    ))}
+                </View>
+              </>
             )}
 
             <Text style={[styles.sectionLabel, { color: t.body }]}>AMBER</Text>

@@ -61,6 +61,7 @@ import { clearAdPacing, privacyOptionsRequired, showPrivacyOptions } from '../se
 import { clearHints } from '../services/hints';
 import { clearMonetPrompts } from '../services/monetizationPrompts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
+import { clearDailyAmberReward } from '../services/dailyAmberReward';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -143,6 +144,7 @@ export async function performFullReset(): Promise<string[]> {
     ['hints', clearHints],
     ['monetPrompts', clearMonetPrompts],
     ['dailyLogin', clearDailyLoginReward],
+    ['dailyAmber', clearDailyAmberReward],
     ['syncStatus', clearSyncStatus],
   ];
 

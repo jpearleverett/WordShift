@@ -760,6 +760,11 @@ const ROOM_HEIGHT = ROOM_WIDTH * 0.493865; // Maintains ~2:1 aspect ratio of roo
 const ROOM_GAP = 6;
 const HOUSE_PADDING = 16;
 const HOUSE_WIDTH = ROOM_WIDTH + (HOUSE_PADDING * 2);
+// The house BODY is a touch narrower than the foundation/roof so the timber
+// side walls are thin and sit WITHIN the stone base instead of overhanging it
+// (the base reads as slightly wider than the walls, like a real house). The
+// foundation stays HOUSE_WIDTH and the roof still overhangs both.
+const HOUSE_BODY_WIDTH = ROOM_WIDTH + HOUSE_PADDING;
 
 // House structure art. roof/foundation/pit_entrance/wall are AI-generated
 // pixel art (sources in assets/raw/, processed by
@@ -1495,11 +1500,11 @@ const styles = StyleSheet.create({
     // Muted-timber fallback under the plank texture (matches wall.png's average
     // so any seam/fallback reads as wood, not the old garish orange)
     backgroundColor: '#79593E',
-    // Explicit width == foundation width so the wall reaches the same edge and a
-    // symmetric wood margin frames the centered rooms. The old flat 5px border
-    // is gone (it read as a cheap outline); soft edge-shadow overlays give the
-    // sides depth instead.
-    width: HOUSE_WIDTH,
+    // Narrower than the foundation (HOUSE_BODY_WIDTH) so the thin timber walls
+    // sit within the stone base instead of overhanging it. The old flat 5px
+    // border is gone (it read as a cheap outline); soft edge-shadow overlays
+    // give the sides depth instead.
+    width: HOUSE_BODY_WIDTH,
     padding: HOUSE_PADDING / 2,
     alignItems: 'center',
   },
@@ -1519,12 +1524,17 @@ const styles = StyleSheet.create({
   // New Architecture / Fabric). The strip's 1:5 aspect keeps cover width-driven
   // so the plank scale is consistent whatever the room count; the wallBackdrop
   // wrapper clips the resulting vertical overflow to the body.
+  //
+  // EXPLICIT width/height '100%' (not right:0/bottom:0): on Fabric an <Image>
+  // sized only by insets falls back to its INTRINSIC size (256px) anchored
+  // top-left, which left the right ~26px of the body showing the flat fallback
+  // color instead of planks. Percentages stretch it to fill the backdrop.
   wallTexture: {
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   // Phase scrim over the wall, behind the rooms. Fills the body exactly (the
   // old flat border it used to reach past is gone).
@@ -1545,22 +1555,23 @@ const styles = StyleSheet.create({
   },
   // Soft shadowed side edges (wall_edge_shadow.png is a dark->transparent
   // horizontal gradient). Left uses it as-is (dark on the outer/left); right
-  // mirrors it (scaleX:-1) so the dark sits on the outer/right. Stretched over
-  // the full body height — the gradient has no vertical detail, so no distortion.
+  // mirrors it (scaleX:-1) so the dark sits on the outer/right. Explicit
+  // height:'100%' (not bottom:0) for the same Fabric intrinsic-size reason as
+  // wallTexture — an inset-only Image would collapse to its 16px source height.
   edgeShadowLeft: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     left: 0,
     width: 24,
+    height: '100%',
     pointerEvents: 'none',
   },
   edgeShadowRight: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     right: 0,
     width: 24,
+    height: '100%',
     transform: [{ scaleX: -1 }],
     pointerEvents: 'none',
   },

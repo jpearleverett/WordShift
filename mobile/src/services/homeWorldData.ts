@@ -1,5 +1,5 @@
 import { Animal, Room, Unlockable, AnimalType, RoomTheme, DialoguePhase, getAnimalPhase } from '../types/homeWorld';
-import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead, reserveUnlock, getReservedUnlockId, claimReservedUnlock } from './amberCurrency';
+import { loadProgress, unlockAnimal, unlockRoom, canAfford, markDialogueRead, reserveUnlock, getReservedUnlockId, claimReservedUnlock, spendAmber } from './amberCurrency';
 import { getPhaseStartIndex, phase2PoolHasNew, resolveDialogueIndex } from './dialogue/animalDialogueBase';
 import { getPhase2PoolCursors } from './dialogue/animalDialogueNarrative';
 import { getTotalDialogueCount } from './animalDialogue';
@@ -981,6 +981,63 @@ export async function skipUnlockGate(unlockId: string): Promise<{
  */
 export function getSkipGateText(skipCost: number): string {
   return `Skip the wait now for ${skipCost} amber`;
+}
+
+/**
+ * Amber to speed up an ALREADY-RESERVED unlock: only the premium delta (the base
+ * cost was already paid at reserve time), so the total paid equals a direct skip.
+ */
+export function getReservedSkipCost(unlock: Unlockable): number {
+  return getUnlockSkipCost(unlock) - unlock.cost;
+}
+
+/**
+ * Whether a reserved unlock can be sped up now: it is the reservation, its gate
+ * hasn't opened yet (once it has, it auto-claims for free — no reason to pay),
+ * and the player can afford the remaining premium.
+ */
+export async function canSpeedUpReservedUnlock(unlockId: string): Promise<boolean> {
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
+  if (!unlock) return false;
+  const progress = await loadProgress();
+  if (progress.reservedUnlockId !== unlockId) return false;
+  if (unlock.minPuzzles !== undefined && progress.puzzlesSolved >= unlock.minPuzzles) return false;
+  return progress.amber >= getReservedSkipCost(unlock);
+}
+
+/**
+ * Speed up a reserved unlock: pay the remaining premium and unlock it NOW,
+ * clearing the reservation (the base cost was already spent when it was
+ * reserved, so this never double-charges). Returns the unlocked item on success
+ * so the caller can celebrate / show a new-character intro.
+ */
+export async function skipReservedUnlock(unlockId: string): Promise<{
+  success: boolean;
+  unlock?: Unlockable;
+  newBalance?: number;
+  error?: string;
+}> {
+  const unlock = UNLOCK_PROGRESSION.find(u => u.id === unlockId);
+  if (!unlock) return { success: false, error: 'Invalid unlock ID' };
+  const progress = await loadProgress();
+  if (progress.reservedUnlockId !== unlockId) {
+    return { success: false, error: 'This unlock is not reserved' };
+  }
+  const premium = getReservedSkipCost(unlock);
+  const spend = await spendAmber(premium, `skip_reserved_${unlock.targetId}`);
+  if (!spend.success) return { success: false, error: 'Not enough amber' };
+  // Base cost was already spent at reserve time — claim marks it unlocked and
+  // clears the reservation (no further spend).
+  await claimReservedUnlock(unlock.targetId, unlock.type);
+  if (unlock.type === 'character') {
+    await fastForwardLateUnlockDialogue(unlock.targetId);
+  }
+  logEvent({
+    type: 'unlock_purchased',
+    data: { unlockId: unlock.id, targetId: unlock.targetId, cost: premium, skippedReservedGate: true },
+  });
+  const after = await loadProgress();
+  return { success: true, unlock, newBalance: after.amber };
 }
 
 /**
