@@ -2287,6 +2287,30 @@ export function getFoxPitNudgeLines(targetPhase: DialoguePhase): string[] {
 }
 
 /**
+ * Fox's one-time lore intro the first time a level-gated room (the Jungle
+ * Hammock, by default) blocks the player. Explains, in-world, WHY the house
+ * can't simply be bought forward here, and points at the two amber options:
+ * Reserve (set the amber aside now, it rises on its own when the gate opens)
+ * and Skip (press it to completion now, for a little more amber). Fires around
+ * the first gate (~level 28), so mostly the bright-days voice, with a quieter
+ * later variant. `roomName` is the gated room's display name ("Jungle Hammock").
+ */
+export function getGatedRoomIntroLines(phase: number, roomName: string): string[] {
+  if (phase >= 2) {
+    return [
+      `The house has grown quickly with you, friend. But the ${roomName} is not ready to rise yet.`,
+      'Some rooms ask more than amber. They ask for time, and for words... more of them offered to the pit before the ground will hold the walls.',
+      'If you have the amber, you need not wait. Set it aside now and the room will rise on its own when the time comes, or press it to completion now for a little more.',
+    ];
+  }
+  return [
+    `The house has grown so quickly with you, friend. But the ${roomName} isn't ready to be built yet.`,
+    'Some rooms need more than amber. They need a little time, and a few more words offered before the ground will hold them.',
+    "If you'd rather not wait, and you have the amber to spare: set it aside now and the room will build itself when the time comes, or press it to completion now for a little more.",
+  ];
+}
+
+/**
  * Fox's one-time intro lines when Challenge Mode becomes available (after 15 puzzles).
  */
 export function getChallengeIntroLines(phase: DialoguePhase): string[] {
