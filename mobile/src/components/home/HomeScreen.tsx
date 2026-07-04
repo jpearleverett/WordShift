@@ -621,12 +621,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // First-gate lore intro (one-time, Fox-led): the first time a level-gated
   // room blocks the player (the Jungle Hammock, by default), Fox explains the
-  // wait in-world and points at Reserve / Skip. Fires only while the gate is
-  // actually blocking (below the room's minPuzzles), so a fast player who blew
-  // past the gate never gets a needless explanation.
+  // wait in-world and points at Reserve / Skip. Fires while the gate is actually
+  // blocking (below the room's minPuzzles), so a fast player who blew past the
+  // gate gets no needless explanation.
+  //
+  // It fires whether the player is idling on home OR has already opened the
+  // room's unlock modal (the intro dialogue renders on top of it, so dismissing
+  // reveals the Reserve/Skip buttons underneath). This is deliberate: the
+  // blocking window can be brief — a player who unlocks the prior animal, then
+  // immediately taps the gated room and reserves/skips it, would otherwise never
+  // get a clean render with the modal closed, and the intro would be skipped.
   useEffect(() => {
     if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
-    if (unlockFlow.showRoomUnlock || unlockFlow.showInvitePrompt) return;
     const nu = unlockFlow.nextUnlock;
     if (!nu || nu.type !== 'room' || nu.minPuzzles === undefined) return;
     if ((progress.puzzlesSolved || 0) >= nu.minPuzzles) return; // gate already open — no wall
@@ -650,7 +656,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [
     unlockFlow.nextUnlock,
     unlockFlow.showRoomUnlock,
-    unlockFlow.showInvitePrompt,
     progress?.puzzlesSolved,
     progress?.currentPhase,
     isOnboarding,
