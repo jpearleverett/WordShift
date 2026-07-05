@@ -47,7 +47,7 @@ jest.mock('../src/services/amberCurrency', () => ({
 // push a word past the cap (covers formed words the DFS cannot see).
 // ============================================================================
 
-const WORD_USAGE_CAP = 4;
+const WORD_USAGE_CAP = Number(process.env.BANK_WORD_CAP ?? 4);
 const bankWordUsage = new Map<string, number>();
 
 function collectPuzzleWords(puzzle: { words: string[]; solution?: { sourceWord: string; targetWord: string; explanation?: string }[]; reverseSolution?: { sourceWord: string; targetWord: string; explanation?: string }[] }): string[] {
