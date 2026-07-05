@@ -283,23 +283,24 @@ describe('resolveDialogueIndex (locked-animal forward references)', () => {
     expect(resolveDialogueIndex('fox', 0, 4, ALL)).toBe(0);
   });
 
-  test('skips a line that names a locked animal', () => {
+  test('skips a line that requires a locked animal', () => {
+    // Content-agnostic: find the first fox base line gated behind another animal.
     const foxLines = getDialoguesForAnimal('fox', 4);
-    const blocked = foxLines.findIndex((d: { id: string }) => d.id === 'fx_0_5'); // mentions Archimedes
+    const blocked = foxLines.findIndex((d: { requiresAnimals?: string[] }) => (d.requiresAnimals ?? []).length > 0);
     expect(blocked).toBeGreaterThan(-1);
-    const onlyFox = new Set(['fox']);
+    const onlyFox = new Set(['fox']); // every animal the gated line needs is locked
     const resolved = resolveDialogueIndex('fox', blocked, 4, onlyFox);
     expect(resolved).toBeGreaterThan(blocked);
-    // The resolved line must not require any locked animal
+    // The resolved line must not require any locked animal (fox never gates on itself).
     const line = foxLines[resolved];
     for (const req of line.requiresAnimals ?? []) {
       expect(onlyFox.has(req)).toBe(true);
     }
   });
 
-  test('does not skip when the referenced animal is unlocked', () => {
+  test('does not skip when the required animal is unlocked', () => {
     const foxLines = getDialoguesForAnimal('fox', 4);
-    const blocked = foxLines.findIndex((d: { id: string }) => d.id === 'fx_0_5');
+    const blocked = foxLines.findIndex((d: { requiresAnimals?: string[] }) => (d.requiresAnimals ?? []).length > 0);
     expect(resolveDialogueIndex('fox', blocked, 4, ALL)).toBe(blocked);
   });
 
