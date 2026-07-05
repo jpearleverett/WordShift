@@ -48,13 +48,14 @@ describe('Configuration Validation', () => {
       expectValid(result);
     });
 
-    test('phase-2 exhaustion pool has exactly 5 extra lines for each of the 10 animals', () => {
-      // The pool lives OUTSIDE the indexed base arrays (base counts stay
-      // 12/14/11/15/15) so existing lastDialogueRead indices are never shifted.
+    test('phase-2 exhaustion pool has exactly 10 extra lines for each of the 10 animals', () => {
+      // The pool lives OUTSIDE the indexed base arrays so growing it never
+      // shifts lastDialogueRead indices (resizing the BASE blocks requires a
+      // dataMigration — see v4, which remapped indices for the 2x expansion).
       const { PHASE2_EXTRA_DIALOGUES } = require('../services/dialogue/animalDialogueBase');
       expect(Object.keys(PHASE2_EXTRA_DIALOGUES)).toHaveLength(10);
       for (const lines of Object.values(PHASE2_EXTRA_DIALOGUES) as string[][]) {
-        expect(lines).toHaveLength(5);
+        expect(lines).toHaveLength(10);
       }
     });
   });

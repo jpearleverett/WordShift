@@ -48,17 +48,17 @@ beforeEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('phase-2 exhaustion pool', () => {
-  it('serves 5 unique lines per animal, in order, then cycles', () => {
+  it('serves 10 unique lines per animal, in order, then cycles', () => {
     for (const animal of ALL_ANIMALS) {
       const pool = PHASE2_EXTRA_DIALOGUES[animal];
-      expect(pool).toHaveLength(5);
+      expect(pool).toHaveLength(10);
       expect(new Set(pool).size).toBe(pool.length);
       for (let c = 0; c < pool.length; c++) {
         expect(getPhase2PoolLine(animal, c)).toBe(pool[c]);
       }
       // Cycling after the pool is exhausted
-      expect(getPhase2PoolLine(animal, 5)).toBe(pool[0]);
-      expect(getPhase2PoolLine(animal, 8)).toBe(pool[3]);
+      expect(getPhase2PoolLine(animal, pool.length)).toBe(pool[0]);
+      expect(getPhase2PoolLine(animal, pool.length + 3)).toBe(pool[3]);
     }
   });
 
@@ -84,15 +84,16 @@ describe('phase-2 exhaustion pool', () => {
 
   it('the cursor walk yields fresh lines each advance — no verbatim dead-end loop', async () => {
     // Simulates the hook's exhausted-block loop: show pool[cursor], advance.
+    // Walk the full pool plus two so the wrap-around is exercised.
+    const pool = PHASE2_EXTRA_DIALOGUES.rabbit;
     const seen: string[] = [];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < pool.length + 2; i++) {
       const cursors = await getPhase2PoolCursors();
       const line = getPhase2PoolLine('rabbit', cursors['rabbit'] ?? 0);
       expect(line).not.toBeNull();
       seen.push(line!);
       await advancePhase2PoolCursor('rabbit');
     }
-    const pool = PHASE2_EXTRA_DIALOGUES.rabbit;
     expect(seen).toEqual([...pool, pool[0], pool[1]]);
     for (let i = 1; i < seen.length; i++) {
       expect(seen[i]).not.toBe(seen[i - 1]);

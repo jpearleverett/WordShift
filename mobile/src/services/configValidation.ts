@@ -43,21 +43,23 @@ const ALL_ANIMAL_TYPES: AnimalType[] = [
   'red_panda',
 ];
 
-// Expected dialogue counts per phase (from CLAUDE.md):
-// Phase 0: 12, Phase 1: 14, Phase 2: 11 (incl. question-web hook), Phase 3: 15, Phase 4: 15 = 67 total
+// Expected dialogue counts per phase (from CLAUDE.md), doubled in the
+// dialogue-expansion pass (dataMigration v4 remaps saved lastDialogueRead
+// indices whenever these blocks are resized):
+// Phase 0: 24, Phase 1: 28, Phase 2: 22 (incl. question-web hook), Phase 3: 30, Phase 4: 30 = 134 total
 const EXPECTED_DIALOGUE_COUNTS_BY_PHASE: Record<number, number> = {
-  0: 12,
-  1: 14,
-  2: 11,
-  3: 15,
-  4: 15,
+  0: 24,
+  1: 28,
+  2: 22,
+  3: 30,
+  4: 30,
 };
-const EXPECTED_TOTAL_DIALOGUES_PER_ANIMAL = 67;
-const EXPECTED_POST_REVELATION_PER_ANIMAL = 10;
+const EXPECTED_TOTAL_DIALOGUES_PER_ANIMAL = 134;
+const EXPECTED_POST_REVELATION_PER_ANIMAL = 20;
 // Phase-2 exhaustion pool: extra lines served once the indexed Phase-2 base
 // block is exhausted. Deliberately OUTSIDE the base arrays (inserting there
 // would shift phase-start indices and corrupt saved lastDialogueRead values).
-const EXPECTED_PHASE2_EXTRA_PER_ANIMAL = 5;
+const EXPECTED_PHASE2_EXTRA_PER_ANIMAL = 10;
 
 // ---------------------------------------------------------------------------
 // 1. Dialogue integrity
