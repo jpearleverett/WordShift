@@ -59,6 +59,37 @@ function recordUsage(words: string[]): void {
   for (const w of words) bankWordUsage.set(w, (bankWordUsage.get(w) ?? 0) + 1);
 }
 
+// ============================================================================
+// Crash-safe checkpointing (mirrors the reverse generators)
+// The generator process can die under long high-attempt runs; saving after
+// every accepted puzzle makes any death resumable by simply re-running.
+// ============================================================================
+
+const CHECKPOINT_PATH = require('path').join(__dirname, '..', 'src', 'data', '.bank_generateDoubleShiftHardBank_progress.json');
+
+interface BankCheckpoint {
+  phaseCounts: Record<string, number>;
+  puzzles: unknown[];
+}
+
+function loadCheckpoint(): BankCheckpoint {
+  try {
+    const fsMod = require('fs');
+    if (fsMod.existsSync(CHECKPOINT_PATH)) {
+      const data = JSON.parse(fsMod.readFileSync(CHECKPOINT_PATH, 'utf-8'));
+      if (data && Array.isArray(data.puzzles)) return data;
+    }
+  } catch { /* corrupted checkpoint: start fresh */ }
+  return { phaseCounts: {}, puzzles: [] };
+}
+
+function saveCheckpoint(cp: BankCheckpoint): void {
+  const fsMod = require('fs');
+  const tmp = CHECKPOINT_PATH + '.tmp';
+  fsMod.writeFileSync(tmp, JSON.stringify(cp), 'utf-8');
+  fsMod.renameSync(tmp, CHECKPOINT_PATH); // atomic on Linux
+}
+
 jest.mock('../src/services/wordHistory', () => ({
   getWordHistoryWithRecency: jest.fn(async () => new Map(bankWordUsage)),
   calculateFreshnessPenalty: jest.fn((word: string, usage: Map<string, number>) => {
@@ -142,15 +173,22 @@ function serializePuzzle(p: PreGeneratedPuzzle): string {
 
 describe('Puzzle Bank Generator — HARD Double Shift', () => {
   it('generates 500 HARD double-shift puzzles (6 rows)', async () => {
-    const allPuzzles: PreGeneratedPuzzle[] = [];
+    // Resume from checkpoint: reload accepted puzzles, chain dedup, per-phase
+    // counts, and the bank-wide word usage so the cap stays accurate.
+    const checkpoint = loadCheckpoint();
+    const allPuzzles: PreGeneratedPuzzle[] = checkpoint.puzzles as PreGeneratedPuzzle[];
     const seenChains = new Set<string>();
+    for (const p of allPuzzles) {
+      seenChains.add(p.words.join('-'));
+      recordUsage(collectPuzzleWords(p as { words: string[]; solution?: { sourceWord: string; targetWord: string; explanation?: string }[] }));
+    }
     let totalAttempts = 0;
     let totalFailures = 0;
 
     for (const [phaseStr, target] of Object.entries(PHASE_TARGETS)) {
       const phase = parseInt(phaseStr);
       mockPhase = phase;
-      let phaseCount = 0;
+      let phaseCount = checkpoint.phaseCounts[phaseStr] ?? 0;
       let phaseAttempts = 0;
       // Higher attempts budget for 6-row chains which are harder to find
       const maxAttemptsPerPhase = target * 12;
@@ -195,6 +233,8 @@ describe('Puzzle Bank Generator — HARD Double Shift', () => {
 
           allPuzzles.push(preGenPuzzle);
           recordUsage(puzzleWords);
+          checkpoint.phaseCounts[phaseStr] = phaseCount + 1;
+          saveCheckpoint(checkpoint);
           phaseCount++;
 
           if (phaseCount % 10 === 0) {
