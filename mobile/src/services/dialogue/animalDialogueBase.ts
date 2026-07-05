@@ -879,8 +879,8 @@ export function getTotalDialogueCount(
 
 // ============================================================================
 // PHASE 2 EXHAUSTION POOL
-// Phase 2 spans the longest stretch of the game (~80 puzzles) with only 11
-// base lines per animal — chatty players exhaust the block and would re-read
+// Phase 2 spans the longest stretch of the game (~80 puzzles); even with 22
+// base lines per animal, chatty players exhaust the block and would re-read
 // the last line verbatim for dozens of puzzles. These extra lines are served
 // (in order, then cycling) once an animal's Phase-2 base block is exhausted
 // while the player is still in Phase 2.

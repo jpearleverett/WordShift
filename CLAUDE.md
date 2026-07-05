@@ -183,7 +183,7 @@ mobile/
 │       ├── puzzleSaveState.ts   # Mid-puzzle autosave/restore
 │       ├── roomUpgrades.ts      # Room upgrade amber sink (Phase 2+)
 │       ├── onboarding.ts        # Onboarding state machine + persistence
-│       ├── dataMigration.ts     # Schema versioning + migrations (v3)
+│       ├── dataMigration.ts     # Schema versioning + migrations (v4: remaps lastDialogueRead for the doubled dialogue corpus)
 │       ├── configValidation.ts  # Configuration data validation
 │       ├── telemetry.ts         # Remote event uploader → Supabase events table when supabaseUrl is set (configured)
 │       ├── supabaseClient.ts    # Dependency-free Supabase REST client (fetch, no native SDK); RPC-only helpers (sbRpc), backend identity, getSentryDsn; no-op until credentials in app.json → extra
@@ -386,9 +386,9 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 
 ### Dialogue System
 
-**670 base dialogues** (67 per animal) + **100 post-revelation** (10 per animal) + **50 Phase-2 exhaustion-pool lines** (`PHASE2_EXTRA_DIALOGUES`, 5 per animal):
-- Phase 0: 12, Phase 1: 14, Phase 2: 11 (incl. question-web hook), Phases 3-4: 15 each, Phase 5: 10 each
-- Counts are enforced by `configValidation.ts` (`EXPECTED_DIALOGUE_COUNTS_BY_PHASE`, `EXPECTED_PHASE2_EXTRA_PER_ANIMAL`=5) — update it when adding lines
+**1,340 base dialogues** (134 per animal, doubled in the dialogue-expansion pass; every line scored against a McKee-based dialogue rubric) + **200 post-revelation** (20 per animal) + **100 Phase-2 exhaustion-pool lines** (`PHASE2_EXTRA_DIALOGUES`, 10 per animal):
+- Phase 0: 24, Phase 1: 28, Phase 2: 22 (incl. question-web hook), Phases 3-4: 30 each, Phase 5: 20 each. Each phase block is written as session-sized mini-chapters (3 lines/visit at Phases 0-1, 5 at Phases 2-3, 6 at Phase 4) with end-of-session hooks and continuing story threads. **Doubling shifted every phase-start index — dataMigration v4 (`remapDialogueIndexV4`) remaps saved `lastDialogueRead` values to the same (phase, offset) position; never resize a phase block without a companion migration.**
+- Counts are enforced by `configValidation.ts` (`EXPECTED_DIALOGUE_COUNTS_BY_PHASE`, `EXPECTED_PHASE2_EXTRA_PER_ANIMAL`=10) — update it when adding lines
 
 **Session mechanics**: Max dialogues per session phase-aware (3-6). Cooldown: 2-5 puzzles between sessions. Grace period for newly unlocked animals. **Badge honesty (finite phases):** the stored dialogue index used to cap at the last line (`total-1`), so a fully-read animal's `!` badge would re-light after every cooldown while the session showed only "Close" — reading as *stuck* (lagging animals like the sloth hit this first, since their block is small relative to the global phase). `closeDialogue` now performs a **terminal read**: closing while on the last available line advances the stored index PAST it (to `total`) so the badge goes honest-dark until genuinely new lines exist (phase advance / newly unlocked animal). The cycling pools (Phase 2 exhaustion, Phase 5 post-revelation) are excluded (they always have more). `getAnimalsWithStatus` also resolves the stored index past locked-animal-gated lines, matching `useDialogueFlow.recomputeHasNewDialogue`.
 
@@ -475,14 +475,14 @@ One-time events at specific puzzle counts (`MICRO_BEATS` in `phaseNarrative.ts`,
 
 **House Completion**: All 10 rooms + animals → ceremony modal + cinematic event.
 **Final Puzzle**: After house completion + Phase 4, next puzzle triggers `FINAL_PUZZLE_EVENT`.
-**Post-Revelation (Phase 5)**: Next puzzle after final triggers `POST_REVELATION_EVENT` + `markPostRevelation()`, which **pins `currentPhase = 5`** (`updatePhase` respects the pin — `calculatePhase` caps at 4 and must never win; legacy post-revelation saves self-heal to 5 on load). Special victory text, 10 new dialogues per animal.
+**Post-Revelation (Phase 5)**: Next puzzle after final triggers `POST_REVELATION_EVENT` + `markPostRevelation()`, which **pins `currentPhase = 5`** (`updatePhase` respects the pin — `calculatePhase` caps at 4 and must never win; legacy post-revelation saves self-heal to 5 on load). Special victory text, 20 new dialogues per animal.
 
 ### The Tending Shrine (Phase 5 endgame loop)
 
 The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is **resolved** by the Tending Shrine — a serene, soft-infinite, **cosmetic-only** amber sink (`src/services/tending.ts`).
 
 - **Loop:** at global phase 5 (post-revelation), a ✴ button in the Offering Pit header opens the Tending modal. The player spends amber to "deepen the pattern," advancing a **Tending Level** on an escalating cost curve (`getTendingCost`, `TENDING_*` in `gameBalance.ts`, capped 5,000) with a once-per-local-day discount (`getNextTendingInfo`, via `dateUtils`). The service does **not** spend — the pit calls `spendAmber(cost, 'tending')` then `applyTend(cost)` (mirrors `sacrifice`/`roomUpgrades`). Milestones (5/10/25/50/100) fire a serene ceremony.
-- **Honest, refreshing dialogue:** the Phase-5 branch of `useDialogueFlow` (and the home badge in `getAnimalsWithStatus`) now build a shared pool via `dialogue/phase5Pool.ts` (10 base post-rev lines + Phase-3 choice callback + unlocked Tending milestone lines). New lines deliver in order; once caught up, re-reads come in a **deterministic shuffled** order that **reshuffles each cycle** (`selectPhase5Dialogue` — no verbatim loop, no single repeating sequence). A per-animal `caughtUp` pointer (persisted in tending state) makes `hasNewDialogue` **honest**: lit only while undelivered lines remain, re-lit when a Tending milestone unlocks one. The Phase-5 session also never dead-ends at the last regular line (`hasMore` override in `useDialogueFlow`). ~50 milestone lines live in `dialogue/animalDialogueTending.ts` (5/animal), recorded to the Whisper Gallery.
+- **Honest, refreshing dialogue:** the Phase-5 branch of `useDialogueFlow` (and the home badge in `getAnimalsWithStatus`) now build a shared pool via `dialogue/phase5Pool.ts` (20 base post-rev lines + Phase-3 choice callback + unlocked Tending milestone lines). New lines deliver in order; once caught up, re-reads come in a **deterministic shuffled** order that **reshuffles each cycle** (`selectPhase5Dialogue` — no verbatim loop, no single repeating sequence). A per-animal `caughtUp` pointer (persisted in tending state) makes `hasNewDialogue` **honest**: lit only while undelivered lines remain, re-lit when a Tending milestone unlocks one. The Phase-5 session also never dead-ends at the last regular line (`hasMore` override in `useDialogueFlow`). ~50 milestone lines live in `dialogue/animalDialogueTending.ts` (5/animal), recorded to the Whisper Gallery.
 - **Cadence:** a Phase-5-gated `tend_amber` quest type (deliberately net-negative — a sink disguised as a quest) + an extended `MILESTONE_BONUSES` tail past 350.
 - **Hygiene:** `wordshift_tending` is in `cloudSave.SYNC_KEYS`; `clearTendingState` is in Settings → Reset All; covered by `tending.test.ts`.
 - **Visual deepening:** the world scales with Tending Level via `getTendingIntensity(level)` (sqrt curve, saturates ~level 50). The home Arrangement sigils (`ArrangementConnector` in HouseWorld) brighten/thicken/glow and the Offering Pit raises more rim embers + a warmer inner/core glow as the player tends (reduced-motion/device-tier gated, no new art). `HomeScreen` loads `tendingLevel` and threads it → `HouseWorld`; the pit reads its own `tendingLevel` state.
