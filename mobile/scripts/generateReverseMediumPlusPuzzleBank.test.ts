@@ -35,36 +35,52 @@ jest.mock('../src/services/amberCurrency', () => ({
   getFullProgress: jest.fn(async () => ({ puzzlesSolved: 999 })),
 }));
 
+// ============================================================================
+// Bank-wide word saturation (diversity fix)
+// The old mock reproduced the app's ROLLING recency window (last ~100 puzzles,
+// 15-puzzle hard cooldown), which lets the DFS return to the same hub words
+// dozens of times across a 500-puzzle bank. This model instead counts, for the
+// WHOLE bank, how many accepted puzzles each word (start or formed) appears in:
+//   - a word at the cap is treated as hard-cooldown (excluded from starts and
+//     chain candidates inside the generator), and
+//   - freshness penalties scale with usage so the search prefers unused words.
+// The accept loop additionally hard-rejects any candidate puzzle that would
+// push a word past the cap (covers formed words the DFS cannot see).
+// ============================================================================
+
+const WORD_USAGE_CAP = 4;
+const bankWordUsage = new Map<string, number>();
+
+function collectPuzzleWords(puzzle: { words: string[]; solution?: { sourceWord: string; targetWord: string; explanation?: string }[]; reverseSolution?: { sourceWord: string; targetWord: string; explanation?: string }[] }): string[] {
+  const seen = new Set<string>();
+  for (const w of puzzle.words) seen.add(w.toUpperCase());
+  for (const step of [...(puzzle.solution ?? []), ...(puzzle.reverseSolution ?? [])]) {
+    if (step.sourceWord) seen.add(String(step.sourceWord).toUpperCase());
+    if (step.targetWord) seen.add(String(step.targetWord).toUpperCase());
+    const m = /form ([A-Z]+)/.exec(step.explanation ?? '');
+    if (m) seen.add(m[1]);
+  }
+  return [...seen];
+}
+
+function exceedsUsageCap(words: string[]): boolean {
+  return words.some(w => (bankWordUsage.get(w) ?? 0) >= WORD_USAGE_CAP);
+}
+
+function recordUsage(words: string[]): void {
+  for (const w of words) bankWordUsage.set(w, (bankWordUsage.get(w) ?? 0) + 1);
+}
+
 jest.mock('../src/services/wordHistory', () => ({
-  getWordHistoryWithRecency: jest.fn(async () => {
-    const recencyMap = new Map<string, number>();
-    for (let puzzlesAgo = 0; puzzlesAgo < generatedHistory.length; puzzlesAgo++) {
-      for (const word of generatedHistory[puzzlesAgo]) {
-        if (!recencyMap.has(word)) {
-          recencyMap.set(word, puzzlesAgo);
-        }
-      }
-    }
-    return recencyMap;
+  getWordHistoryWithRecency: jest.fn(async () => new Map(bankWordUsage)),
+  calculateFreshnessPenalty: jest.fn((word: string, usage: Map<string, number>) => {
+    const uses = usage.get(word) ?? 0;
+    if (uses === 0) return -5; // small bonus for never-used words
+    if (uses >= WORD_USAGE_CAP) return 100;
+    return Math.round((uses / WORD_USAGE_CAP) * 85);
   }),
-  calculateFreshnessPenalty: jest.fn((word: string, recencyMap: Map<string, number>) => {
-    const puzzlesAgo = recencyMap.get(word);
-    if (puzzlesAgo === undefined) return -5;
-    if (puzzlesAgo < 15) return 100;
-    if (puzzlesAgo < 40) {
-      const progress = (puzzlesAgo - 15) / 25;
-      return Math.round(50 - (progress * 40));
-    }
-    return 0;
-  }),
-  isInHardCooldown: jest.fn((word: string, recencyMap: Map<string, number>) => {
-    const puzzlesAgo = recencyMap.get(word);
-    return puzzlesAgo !== undefined && puzzlesAgo < 15;
-  }),
-  recordPuzzleWords: jest.fn(async (words: string[]) => {
-    generatedHistory.unshift(words.map((w: string) => w.toUpperCase()));
-    if (generatedHistory.length > 100) generatedHistory.length = 100;
-  }),
+  isInHardCooldown: jest.fn((word: string, usage: Map<string, number>) => (usage.get(word) ?? 0) >= WORD_USAGE_CAP),
+  recordPuzzleWords: jest.fn(async () => {}), // usage recorded on ACCEPT in the loop below
 }));
 
 // ============================================================================
@@ -90,7 +106,7 @@ const TOTAL_TARGET = Object.values(PHASE_TARGETS).reduce((a, b) => a + b, 0); //
 
 // MEDIUM_PLUS reverse generates faster than HARD (4 rows vs 5), so we can
 // do larger batches per process invocation.
-const BATCH_SIZE = 30;
+const BATCH_SIZE = 500; // one-shot: savePuzzles() persists after every puzzle, so crash-resume is intact
 
 const TEMP_DIR = path.join(__dirname, '..', 'src', 'data');
 
@@ -196,11 +212,7 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
   mockPhase = phase;
 
   // Seed word history from recent existing puzzles for diversity.
-  generatedHistory.length = 0;
-  const recentExisting = existing.slice(-15);
-  for (const p of recentExisting) {
-    generatedHistory.push(p.words.map(w => w.toUpperCase()));
-  }
+  // Bank-wide word usage is seeded once from all phases in the main loop.
 
   // Track existing chain keys to avoid duplicates
   const seenChains = new Set<string>();
@@ -221,7 +233,7 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
   const newPuzzles: PreGeneratedPuzzle[] = [];
   let attempts = 0;
   let failures = 0;
-  const maxAttempts = batchTarget * 8;
+  const maxAttempts = batchTarget * 12;
 
   process.stdout.write(`\nPhase ${phase}: generating batch of ${batchTarget} MEDIUM_PLUS reverse (${existing.length}/${target} existing)...\n`);
 
@@ -237,6 +249,10 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
 
       if (seenChains.has(chainKey)) continue;
       seenChains.add(chainKey);
+
+          // Bank-wide diversity: reject any puzzle that would push a word past the cap
+          const puzzleWords = collectPuzzleWords(puzzle);
+          if (exceedsUsageCap(puzzleWords)) continue;
 
       const id = puzzleId(puzzle.words);
       const dreadTier = computeDreadTier(puzzle.words);
@@ -262,6 +278,7 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
       };
 
       newPuzzles.push(newPuzzle);
+          recordUsage(puzzleWords);
       accumulated.push(newPuzzle);
 
       // Save immediately after each puzzle so progress survives crashes
@@ -288,7 +305,16 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
 // ============================================================================
 
 describe('Reverse MEDIUM_PLUS Puzzle Bank Generator', () => {
-  for (const [phaseStr, target] of Object.entries(PHASE_TARGETS)) {
+  // Seed bank-wide word usage from every phase's existing progress so resumes
+    // keep the cap accurate across the whole bank, not just the current phase.
+    bankWordUsage.clear();
+    for (const phaseStr of Object.keys(PHASE_TARGETS)) {
+      for (const p of loadExistingPuzzles(parseInt(phaseStr))) {
+        recordUsage(collectPuzzleWords(p));
+      }
+    }
+
+    for (const [phaseStr, target] of Object.entries(PHASE_TARGETS)) {
     const phase = parseInt(phaseStr);
 
     it(`generates phase ${phase} reverse MEDIUM_PLUS puzzles`, async () => {
