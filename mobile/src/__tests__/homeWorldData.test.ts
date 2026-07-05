@@ -244,6 +244,36 @@ describe('late-unlock dialogue fast-forward', () => {
   });
 });
 
+describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
+  const { getTotalDialogueCount } = require('../services/dialogue/animalDialogueBase');
+
+  // Middle-tier animal (offset 0) → animalPhase == global phase, so the math is
+  // simple. Unlock it and pin its stored read index directly.
+  async function setup(index: number) {
+    const p = await loadProgress();
+    p.currentPhase = 0;
+    p.unlockedAnimals = ['fox', 'pangolin'];
+    p.lastDialogueRead = { ...(p.lastDialogueRead ?? {}), pangolin: index };
+    const animals = await getAnimalsWithStatus();
+    return animals.find(a => a.id === 'pangolin')!;
+  }
+
+  test('badge is lit while an unread line remains (index below total)', async () => {
+    const total = getTotalDialogueCount('pangolin', 0);
+    const pangolin = await setup(total - 1); // sitting on the last line
+    expect(pangolin.hasNewDialogue).toBe(true);
+  });
+
+  test('badge goes dark once the index advances past the last line (index == total)', async () => {
+    // This is the terminal state the last-line close now writes — without it the
+    // index caps at total-1 and the badge would re-light forever (the "stuck"
+    // sloth). Pinning it keeps the boundary honest.
+    const total = getTotalDialogueCount('pangolin', 0);
+    const pangolin = await setup(total);
+    expect(pangolin.hasNewDialogue).toBe(false);
+  });
+});
+
 describe('resolveDialogueIndex (locked-animal forward references)', () => {
   const { resolveDialogueIndex, getDialoguesForAnimal } =
     require('../services/dialogue/animalDialogueBase');
@@ -253,23 +283,24 @@ describe('resolveDialogueIndex (locked-animal forward references)', () => {
     expect(resolveDialogueIndex('fox', 0, 4, ALL)).toBe(0);
   });
 
-  test('skips a line that names a locked animal', () => {
+  test('skips a line that requires a locked animal', () => {
+    // Content-agnostic: find the first fox base line gated behind another animal.
     const foxLines = getDialoguesForAnimal('fox', 4);
-    const blocked = foxLines.findIndex((d: { id: string }) => d.id === 'fx_0_5'); // mentions Archimedes
+    const blocked = foxLines.findIndex((d: { requiresAnimals?: string[] }) => (d.requiresAnimals ?? []).length > 0);
     expect(blocked).toBeGreaterThan(-1);
-    const onlyFox = new Set(['fox']);
+    const onlyFox = new Set(['fox']); // every animal the gated line needs is locked
     const resolved = resolveDialogueIndex('fox', blocked, 4, onlyFox);
     expect(resolved).toBeGreaterThan(blocked);
-    // The resolved line must not require any locked animal
+    // The resolved line must not require any locked animal (fox never gates on itself).
     const line = foxLines[resolved];
     for (const req of line.requiresAnimals ?? []) {
       expect(onlyFox.has(req)).toBe(true);
     }
   });
 
-  test('does not skip when the referenced animal is unlocked', () => {
+  test('does not skip when the required animal is unlocked', () => {
     const foxLines = getDialoguesForAnimal('fox', 4);
-    const blocked = foxLines.findIndex((d: { id: string }) => d.id === 'fx_0_5');
+    const blocked = foxLines.findIndex((d: { requiresAnimals?: string[] }) => (d.requiresAnimals ?? []).length > 0);
     expect(resolveDialogueIndex('fox', blocked, 4, ALL)).toBe(blocked);
   });
 
