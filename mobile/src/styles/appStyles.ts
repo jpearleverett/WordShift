@@ -134,7 +134,9 @@ export const appStyles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    // Top-align so a wrapped left group (Challenge + Double Shift on a narrow
+    // screen) sits under itself while the difficulty button stays at the top.
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingVertical: 8,
     zIndex: 100,
@@ -147,6 +149,9 @@ export const appStyles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 16,
     overflow: 'hidden',
+    // Never let the setup button clip off the right edge — the left badges
+    // shrink/wrap instead.
+    flexShrink: 0,
   },
   difficultyButtonHighlighted: {
     borderWidth: 2,
@@ -375,6 +380,12 @@ export const appStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    // Fill the space up to the difficulty button and wrap the badges (e.g.
+    // Challenge + Double Shift) onto a second line instead of overflowing.
+    flex: 1,
+    minWidth: 0,
+    flexWrap: 'wrap',
+    marginRight: 8,
   },
   challengeBadge: {
     backgroundColor: CandyColors.red.main,
@@ -383,7 +394,11 @@ export const appStyles = StyleSheet.create({
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
+    // On a tight width the inline "refill undo" button wraps below the label
+    // instead of forcing the pill wider than the row.
+    flexWrap: 'wrap',
   },
   challengeBadgeText: {
     fontSize: 10,

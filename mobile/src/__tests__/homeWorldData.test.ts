@@ -244,6 +244,36 @@ describe('late-unlock dialogue fast-forward', () => {
   });
 });
 
+describe('getAnimalsWithStatus new-dialogue badge honesty', () => {
+  const { getTotalDialogueCount } = require('../services/dialogue/animalDialogueBase');
+
+  // Middle-tier animal (offset 0) → animalPhase == global phase, so the math is
+  // simple. Unlock it and pin its stored read index directly.
+  async function setup(index: number) {
+    const p = await loadProgress();
+    p.currentPhase = 0;
+    p.unlockedAnimals = ['fox', 'pangolin'];
+    p.lastDialogueRead = { ...(p.lastDialogueRead ?? {}), pangolin: index };
+    const animals = await getAnimalsWithStatus();
+    return animals.find(a => a.id === 'pangolin')!;
+  }
+
+  test('badge is lit while an unread line remains (index below total)', async () => {
+    const total = getTotalDialogueCount('pangolin', 0);
+    const pangolin = await setup(total - 1); // sitting on the last line
+    expect(pangolin.hasNewDialogue).toBe(true);
+  });
+
+  test('badge goes dark once the index advances past the last line (index == total)', async () => {
+    // This is the terminal state the last-line close now writes — without it the
+    // index caps at total-1 and the badge would re-light forever (the "stuck"
+    // sloth). Pinning it keeps the boundary honest.
+    const total = getTotalDialogueCount('pangolin', 0);
+    const pangolin = await setup(total);
+    expect(pangolin.hasNewDialogue).toBe(false);
+  });
+});
+
 describe('resolveDialogueIndex (locked-animal forward references)', () => {
   const { resolveDialogueIndex, getDialoguesForAnimal } =
     require('../services/dialogue/animalDialogueBase');

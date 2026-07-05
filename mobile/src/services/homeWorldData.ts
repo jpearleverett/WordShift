@@ -1181,8 +1181,12 @@ export async function getAnimalsWithStatus(): Promise<Animal[]> {
           hasNewDialogue = phase2PoolHasNew(animal.type, phase2Cursors[animal.type] ?? 0);
         }
       } else {
+        // Resolve the stored index past any lines gated on still-locked animals
+        // (mirrors useDialogueFlow.recomputeHasNewDialogue) so the badge is never
+        // lit for an animal whose only remaining lines are all blocked.
         const totalDialogues = getTotalDialogueCount(animal.type, animalPhase);
-        hasNewDialogue = dialogueIndex < totalDialogues;
+        const resolvedIndex = resolveDialogueIndex(animal.type, dialogueIndex, animalPhase, unlockedTypes);
+        hasNewDialogue = resolvedIndex < totalDialogues;
       }
     }
 

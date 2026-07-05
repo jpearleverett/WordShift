@@ -650,13 +650,47 @@ export function useDialogueFlow({
   const closeDialogue = useCallback(async (startCooldown: boolean) => {
     hapticLight();
     const closingAnimal = selectedAnimal;
+
+    // Terminal read: if the player is closing while on the LAST available line
+    // for this animal at a finite phase (nothing more to advance to), advance
+    // the stored index PAST it so the "!" badge goes honest-dark. Without this
+    // the index caps at the last line forever (index < total stays true), so an
+    // exhausted animal — lagging animals like the sloth hit this first — keeps
+    // re-lighting its badge after every cooldown while showing only "Close",
+    // which reads as being stuck. The cycling pools (Phase 2 exhaustion / Phase 5
+    // post-revelation) genuinely always have more, so they're excluded.
+    let terminalIndex: number | null = null;
+    if (closingAnimal && progress && preDialoguePages.length === 0) {
+      const animalPhase = getAnimalPhase(progress.currentPhase, closingAnimal.type);
+      const isCyclingPool =
+        animalPhase === 5 ||
+        (animalPhase === 2 && getPhase2ExtraDialogues(closingAnimal.type).length > 0);
+      if (!isCyclingPool) {
+        // animalPhase is 0-4 here (5 is a cycling pool, excluded above).
+        const unlocked = getUnlockedTypes();
+        const cur = resolveDialogueIndex(closingAnimal.type, closingAnimal.currentDialogueIndex, animalPhase, unlocked);
+        const next = resolveDialogueIndex(closingAnimal.type, cur + 1, animalPhase, unlocked);
+        const total = getTotalDialogueCount(closingAnimal.type, animalPhase);
+        if (next >= total && closingAnimal.currentDialogueIndex < total) {
+          terminalIndex = total;
+          await markDialogueRead(closingAnimal.id, total);
+        }
+      }
+    }
+
     if (closingAnimal && startCooldown) {
       await endSession(closingAnimal.id);
-      // Update hasNewDialogue for the animal that was talking
+    }
+    // Refresh the animal's badge on cooldown-close OR when a terminal read just
+    // advanced its index — either way hasNewDialogue may have changed.
+    if (closingAnimal && (startCooldown || terminalIndex !== null)) {
+      const committed = terminalIndex !== null
+        ? { ...closingAnimal, currentDialogueIndex: terminalIndex }
+        : closingAnimal;
       setAnimals(prev =>
         prev.map(a =>
           a.id === closingAnimal.id
-            ? { ...a, hasNewDialogue: recomputeHasNewDialogue(a) }
+            ? { ...a, currentDialogueIndex: committed.currentDialogueIndex, hasNewDialogue: recomputeHasNewDialogue(committed) }
             : a
         )
       );
@@ -665,7 +699,7 @@ export function useDialogueFlow({
     setSelectedAnimal(null);
     setSessionInfo(null);
     setPreDialoguePages([]);
-  }, [selectedAnimal, recomputeHasNewDialogue, setAnimals]);
+  }, [selectedAnimal, progress, preDialoguePages, recomputeHasNewDialogue, setAnimals]);
 
   const handleCloseDialogue = useCallback(async () => {
     await closeDialogue(false);

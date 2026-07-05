@@ -1412,6 +1412,60 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       return;
     }
 
+    // Challenge + double shift: a completed step is TWO committed deltas (both
+    // drops). Revert the WHOLE step atomically for ONE undo charge — otherwise
+    // the limited undo half-reverts on the first press (only the second drop),
+    // stranding the first drop as an un-undoable move and burning a charge on a
+    // partial undo. Standard mode keeps its granular per-drop undo below. The
+    // last two deltas belong to the same step iff they share activeRowIndexBefore
+    // (mid-step undos are handled by the pick2/drop2 branch above).
+    if (
+      gameMode === 'challenge' &&
+      isDoubleShift &&
+      (doubleShiftPhase === 'pick1' || doubleShiftPhase === 'drop1') &&
+      history.length >= 2 &&
+      history[history.length - 1].activeRowIndexBefore === history[history.length - 2].activeRowIndexBefore
+    ) {
+      const dropSecond = history[history.length - 1];
+      const dropFirst = history[history.length - 2];
+      const reverseDelta = (rowsArr: RowData[], d: MoveDelta): RowData[] => {
+        const nr = [...rowsArr];
+        const tRow = nr[d.targetRowIndex];
+        const sRow = nr[d.sourceRowIndex];
+        const tLetters = tRow.words.filter(l => l.id !== d.movedLetterId);
+        const restored: Letter = { id: d.movedLetterId, char: d.movedLetterChar, isLocked: false };
+        const sLetters = [...sRow.words];
+        sLetters.splice(d.sourceLetterIndex, 0, restored);
+        nr[d.targetRowIndex] = { ...tRow, words: tLetters };
+        nr[d.sourceRowIndex] = { ...sRow, words: sLetters };
+        return nr;
+      };
+      // Undo in reverse commit order: the second drop, then the first.
+      setRows(prevRows => reverseDelta(reverseDelta(prevRows, dropSecond), dropFirst));
+      setActiveRowIndex(dropFirst.activeRowIndexBefore);
+      if (dropFirst.moveDirectionBefore) setMoveDirection(dropFirst.moveDirectionBefore);
+      setHistory(prev => prev.slice(0, -2));
+      setGameState(GameState.PLAYING);
+      setSelectedLetter(null);
+      setError(null);
+      setIsStuck(false);
+      setHintHighlight(null);
+      setLastArrival(null);
+      setDoubleShiftPhase('pick1');
+      // One moveOutcome was recorded for the whole step (at drop2) — pop it and
+      // re-merge its hint/mistake flags, mirroring the single-delta path.
+      if (moveOutcomesRef.current.length > 0) {
+        const undone = moveOutcomesRef.current[moveOutcomesRef.current.length - 1];
+        if (undone === 'hint' || undone === 'both') pendingHintRef.current = true;
+        if (undone === 'mistake' || undone === 'both') pendingMistakeRef.current = true;
+        moveOutcomesRef.current = moveOutcomesRef.current.slice(0, -1);
+        setMoveOutcomes(moveOutcomesRef.current);
+      }
+      setMessage("Let's try again!");
+      setUndosRemaining(prev => prev - 1);
+      return;
+    }
+
     // Standard undo: always undo 1 delta at a time.
     // For double shift completed steps, the second undo press will reverse the other drop.
     const delta = history[history.length - 1];

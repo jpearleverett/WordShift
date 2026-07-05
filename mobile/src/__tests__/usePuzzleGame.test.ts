@@ -573,6 +573,48 @@ describe('usePuzzleGame', () => {
       expect(state.undosRemaining).toBe(2);
       expect(state.gameMode).toBe('challenge');
     });
+
+    test('challenge + double shift: undoing a completed step reverts BOTH drops for ONE charge', async () => {
+      async function playMove(char: string, slot: number) {
+        let [state, actions] = callHook();
+        const letter = state.rows[state.activeRowIndex].words.find(
+          l => l.char === char && !l.isLocked
+        )!;
+        actions.handleLetterPress(letter, state.activeRowIndex);
+        [, actions] = callHook();
+        return actions.handleSlotPress(slot);
+      }
+
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setGameMode('challenge');
+      [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+
+      let [state] = callHook();
+      const undosBefore = state.undosRemaining;
+
+      // Complete one two-letter step (drop1 then drop2).
+      await playMove('A', 0);
+      await playMove('B', 1);
+      [state] = callHook();
+      expect(state.doubleShiftPhase).toBe('pick1');
+      expect(state.history).toHaveLength(2);      // a completed step = 2 deltas
+      expect(state.moveOutcomes).toEqual(['clean']);
+      expect(state.undosRemaining).toBe(undosBefore);
+
+      // One undo reverts the WHOLE step: both drops gone, board fully restored,
+      // exactly one charge spent — not a half-revert that strands the first drop.
+      [, actions] = callHook();
+      actions.handleUndo();
+      [state] = callHook();
+      expect(state.history).toHaveLength(0);
+      expect(state.doubleShiftPhase).toBe('pick1');
+      expect(state.undosRemaining).toBe(undosBefore - 1);
+      expect(state.moveOutcomes).toEqual([]);
+      expect(state.rows[0].words.map(l => l.char).join('')).toBe('ABCDE');
+      expect(state.rows[1].words.map(l => l.char).join('')).toBe('FGHIJ');
+    });
   });
 
   describe('setCurrentPhase', () => {
