@@ -6,16 +6,16 @@ import { AnimalType } from '../../types/homeWorld';
 
 const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = {
   reverse: {
-    light: 'That puzzle had a return path. You carry letters all the way down, then walk them back to the first word.',
-    dark: 'The arrangement asked for a full circuit: down to the last row, then back to the first without breaking the chain.',
+    light: 'There was a return path folded into it. You carry your letters all the way down to the last word, and then you walk them back up to the first, the whole road twice.',
+    dark: 'The arrangement wanted a full circuit this time, down to the last word and then back up to the first, with the chain unbroken the whole way home.',
   },
   speed: {
-    light: 'Speed shifts are short and urgent. Fewer rows, faster choices, no overthinking.',
-    dark: 'When the pattern rushes you, it is testing devotion under pressure.',
+    light: 'The quick kind is short and urgent. Fewer words to cross, faster choices, and no time left over for second thoughts, which is rather the point of it.',
+    dark: 'When the pattern hurries you like that, it is weighing devotion under pressure. Fewer words, less time, and no room to hesitate, so that only the certain hand finishes.',
   },
   double_shift: {
-    light: 'Double shifts move two letters at once. Pick two from a word, place each into the next. More to juggle, more to explore.',
-    dark: 'Two offerings per step. The arrangement demands a heavier hand... two letters wrenched free and placed in a single breath.',
+    light: 'The doubled kind asks for two letters at once. You lift a pair from one word and settle each of them into the next, which is more to hold at once and more to discover.',
+    dark: 'The arrangement asks a heavier hand of you now. Two letters lifted free and set down in a single breath, two offerings carried together at every step.',
   },
 };
 
@@ -23,53 +23,53 @@ function getVariantDialogueLead(animalType: AnimalType, phase: number): string {
   if (phase >= 3) {
     switch (animalType) {
       case 'fox':
-        return 'The fire showed me what happened in your last puzzle.';
+        return 'Friend, the fire sat straight up and showed me what you just did with the words you brought, every flicker of it, and I have been holding my breath waiting to tell you.';
       case 'owl':
-        return 'I checked the text after your last arrangement.';
+        return 'I consulted the book after your latest arrangement, and it had, of course, already made a note of the change.';
       case 'pangolin':
-        return 'I felt the recipe change while you solved.';
+        return 'I felt the recipe change under my paws while you worked, the way a stock changes the moment a new bone goes in.';
       case 'axolotl':
-        return 'The water rippled when you finished.';
+        return 'The water rippled when you finished, all the way to the glass, and something far down turned over slowly to watch you do it.';
       case 'fennec_fox':
-        return 'I heard the shape of that puzzle from across the house.';
+        return 'I heard the shape of it from clear across the house, and it was not a shape my ears had ever been given before.';
       case 'capybara':
-        return 'I logged the sequence while it was still warm.';
+        return 'I logged the sequence while it was still warm. It required a new folder, which does not happen often anymore.';
       case 'sloth':
-        return 'I watched it... slowly... all the way through.';
+        return 'I watched the whole of it from my branch, slowly and all the way through, and it moved the way arriving things move.';
       case 'wombat':
-        return 'I felt that structure in the foundations.';
+        return 'I felt that structure come down through the foundations, and it set its weight differently than any load I have carried before.';
       case 'rabbit':
-        return 'I could feel my heartbeat matching your puzzle steps.';
+        return 'The whole garden leaned while you worked, and my heart kept time with every word you moved. I have learned to trust what my heart notices.';
       case 'red_panda':
-        return 'The pattern from your puzzle reached the highest room immediately.';
+        return 'The pattern of what you offered reached the highest room before you had finished making it. The attic always knows first.';
       default:
-        return 'I felt that variant in the structure of the house.';
+        return 'I felt that new shape settle into the bones of the house.';
     }
   }
 
   switch (animalType) {
     case 'fox':
-      return 'That was a different kind of puzzle run.';
+      return 'Friend, that was a whole new kind of dance you just did with your words, and I watched every step of it from right here by the fire!';
     case 'owl':
-      return 'Interesting variation in your latest sequence.';
+      return 'A noteworthy variation in your latest sequence, and I say that as someone who keeps meticulous records of your sequences.';
     case 'pangolin':
-      return 'That puzzle had a different recipe to it.';
+      return 'The words you brought followed a different recipe this time, and I could taste the difference from my kitchen.';
     case 'axolotl':
-      return 'Blub! That one felt different in the water.';
+      return 'Oh, the water felt that one differently, it rippled a brand new way and every single fish turned at once to look!';
     case 'fennec_fox':
-      return 'I could hear that mode from your first move.';
+      return 'I could hear the difference from your very first move. It made a sound I had not catalogued yet, and I catalogue everything.';
     case 'capybara':
-      return 'That variant changed the pacing a lot.';
+      return 'That changed the pacing considerably. I have adjusted the paperwork, which is my way of saying I noticed.';
     case 'sloth':
-      return 'That one... moved... differently...';
+      return 'That one moved differently, and I have watched enough of your words go by to know a new gait when it ambles past my branch.';
     case 'wombat':
-      return 'That mode changed the whole structure of the run.';
+      return 'That one was built on a different plan altogether. I could feel it in the way the weight came down.';
     case 'rabbit':
-      return 'That variant made my paws sweat just watching.';
+      return 'That new way of yours made my paws damp just from watching, and I mean that as a compliment, mostly.';
     case 'red_panda':
-      return 'That variation altered the rhythm of the pattern.';
+      return 'The rhythm changed just now. Even the bamboo noticed.';
     default:
-      return 'That variant plays by a different rhythm.';
+      return 'The words you brought moved to a different rhythm this time.';
   }
 }
 
@@ -97,12 +97,12 @@ export function getVariantTutorialIntroLines(
   if (!script) return null;
 
   const introLead = phase >= 3
-    ? 'Something new settled into the house after that puzzle.'
-    : 'You unlocked a new kind of puzzle just now.';
+    ? 'Something new settled into the house after the words you offered just now.'
+    : 'A new way of moving your words just opened itself up for you.';
   const body = phase >= 3 ? script.dark : script.light;
   const cta = phase >= 3
-    ? 'You can choose it from the setup button before you play. More arrangements reveal themselves with time.'
-    : 'You can choose it from the setup button before you play. More puzzle styles will appear as we keep going.';
+    ? 'You can choose it from the setup button before you begin. More arrangements will reveal themselves in their own time.'
+    : 'You can choose it from the setup button before you begin. More ways will show themselves as we keep going.';
 
   return [introLead, body, cta];
 }
