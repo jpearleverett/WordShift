@@ -1321,6 +1321,14 @@ export function isReverseSolvable(
 
   if (!minDict || !baseDict || !maxDict) return false;
 
+  // Work budget: the removal x insertion combinations multiply per step, and
+  // every complete combination runs a solver capped at ~100k iterations. On
+  // pathological chains that product allocates faster than the GC can reclaim
+  // (observed: heap-limit abort inside a single call), so the whole search is
+  // capped at a fixed number of leaf solver calls. Exhaustion = "not solvable",
+  // which merely skips that candidate chain during generation.
+  let leafBudget = 400;
+
   // Recursively try all valid insertion positions for each forward step.
   // Returns true if any combination leads to a reverse-solvable board.
   function tryForwardStep(
@@ -1328,8 +1336,10 @@ export function isReverseSolvable(
     rowLetters: string[][],
     lockedSets: Set<number>[]
   ): boolean {
+    if (leafBudget <= 0) return false;
     if (stepIdx >= solution.length) {
       // All forward steps done — check reverse solvability
+      leafBudget--;
       const postForwardRows = rowLetters.map(r => r.join(''));
       return canSolveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength, lockedSets);
     }
@@ -1691,6 +1701,12 @@ export function solveReverse(
 
   if (!minDict || !baseDict || !maxDict) return null;
 
+  // Work budget — same rationale as isReverseSolvable: cap the number of leaf
+  // solver calls so one pathological chain can never allocation-storm the heap.
+  // Exhaustion returns null; callers already treat a missing reverse solution
+  // as "no hint path" (and the bank generators skip such puzzles).
+  let leafBudget = 800;
+
   // Recursively try all valid removal + insertion position combinations for each
   // forward step. When a reverse-solvable combination is found, capture and return
   // the reverse steps. Also tracks which positions were chosen so we can update the
@@ -1702,8 +1718,10 @@ export function solveReverse(
     lockedSets: Set<number>[],
     forwardPositions: Array<{ removePos: number; insertPos: number }>
   ): PuzzleSolutionStep[] | null {
+    if (leafBudget <= 0) return null;
     if (stepIdx >= solution.length) {
       // All forward steps done — solve reverse and capture steps
+      leafBudget--;
       const postForwardRows = rowLetters.map(r => r.join(''));
       const reverseResult = solveReverseIterative(postForwardRows, minDict, baseDict, maxDict, wordLength, lockedSets);
       if (reverseResult !== null) {

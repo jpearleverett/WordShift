@@ -264,6 +264,10 @@ async function generateBatch(phase: number, target: number, existing: PreGenerat
       const reverseSolutionSteps = puzzle.reverseSolution
         ?? (puzzle.solution ? solveReverse(puzzle.words, puzzle.solution) : null);
 
+      // Budgeted solveReverse can (rarely) give up on a pathological chain;
+      // a reverse-bank puzzle without a reverse hint path is not worth keeping.
+      if (!reverseSolutionSteps) continue;
+
       const newPuzzle: PreGeneratedPuzzle = {
         id,
         words: puzzle.words,
