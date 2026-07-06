@@ -684,15 +684,22 @@ export function useDialogueFlow({
     // Refresh the animal's badge on cooldown-close OR when a terminal read just
     // advanced its index — either way hasNewDialogue may have changed.
     if (closingAnimal && (startCooldown || terminalIndex !== null)) {
-      const committed = terminalIndex !== null
-        ? { ...closingAnimal, currentDialogueIndex: terminalIndex }
-        : closingAnimal;
+      // Derive the committed index from the CURRENT state value inside the
+      // functional update — never from this callback's closure. The forced
+      // close that ends a session runs in the same tick as handleNextDialogue's
+      // index advance, so the closure's copy of the animal is one line behind;
+      // writing it back rolled the in-memory index backwards, and a newly
+      // unlocked animal's grace period (no cooldown, no storage reload) then
+      // re-served the already-read line at the start of the next session.
       setAnimals(prev =>
-        prev.map(a =>
-          a.id === closingAnimal.id
-            ? { ...a, currentDialogueIndex: committed.currentDialogueIndex, hasNewDialogue: recomputeHasNewDialogue(committed) }
-            : a
-        )
+        prev.map(a => {
+          if (a.id !== closingAnimal.id) return a;
+          const idx = terminalIndex !== null
+            ? Math.max(terminalIndex, a.currentDialogueIndex)
+            : a.currentDialogueIndex;
+          const committed = { ...a, currentDialogueIndex: idx };
+          return { ...committed, hasNewDialogue: recomputeHasNewDialogue(committed) };
+        })
       );
     }
     setShowDialogue(false);

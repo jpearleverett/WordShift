@@ -43,6 +43,7 @@ const SETUP_SELECTOR_INTRO_SEEN_KEY = 'wordshift_setup_selector_intro_seen';
 const JOURNAL_INTRO_SEEN_KEY = 'wordshift_journal_intro_seen';
 const STARTER_INTRO_SEEN_KEY = 'wordshift_starter_intro_seen';
 const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
+const HARVEST_HOME_INTRO_SEEN_KEY = 'wordshift_harvest_home_intro_seen';
 
 // In-memory cache
 let progressCache: HomeWorldProgress | null = null;
@@ -1007,6 +1008,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(JOURNAL_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(STARTER_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(GATED_UNLOCK_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(HARVEST_HOME_INTRO_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
       await AsyncStorage.removeItem(`wordshift_guaranteed_crossref_phase_${i}`);
     }
@@ -1559,10 +1561,18 @@ export async function markSetupSelectorIntroSeen(): Promise<void> {
 }
 
 /**
- * One-time flag for the mandatory first-harvest gate — the forced pit visit at
- * the victory where the auto-collect window closes. Uses its OWN key (not the
- * legacy pit-harvest-intro flag), so players who saw the old passive puzzle-8
- * Fox card still get this new gate exactly once.
+ * "Learned the pit" flag for the mandatory first-harvest gate — the forced pit
+ * visit once the auto-collect window closes. Uses its OWN key (not the legacy
+ * pit-harvest-intro flag), so players who saw the old passive puzzle-8 Fox
+ * card still get this gate.
+ *
+ * Semantics (hardened): the flag means the player has actually LEARNED manual
+ * harvesting — it is set only when they complete their first manual offer at
+ * the pit (OfferingPitScreen), never at gate-decision time. The victory-modal
+ * gate therefore re-fires on every eligible victory (any mode, including the
+ * Daily Challenge) until a real harvest happens, so no interruption — hardware
+ * back, app kill, deep link, notification tap — can silently consume the
+ * teaching beat.
  */
 export async function hasSeenMandatoryHarvest(): Promise<boolean> {
   try {
@@ -1575,6 +1585,29 @@ export async function hasSeenMandatoryHarvest(): Promise<boolean> {
 export async function markMandatoryHarvestSeen(): Promise<void> {
   try {
     await AsyncStorage.setItem(MANDATORY_HARVEST_SEEN_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * One-time flag for the home-screen safety net that accompanies the mandatory
+ * first-harvest gate: if the player somehow reaches home past the auto-collect
+ * window with batches waiting and the pit still unlearned, Fox explains the
+ * pit once from home. Separate from the learned flag above — dismissing the
+ * explanation does not count as harvesting; only a real offer does.
+ */
+export async function hasSeenHarvestHomeIntro(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(HARVEST_HOME_INTRO_SEEN_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markHarvestHomeIntroSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(HARVEST_HOME_INTRO_SEEN_KEY, 'true');
   } catch {
     // Non-critical
   }

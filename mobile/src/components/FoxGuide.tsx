@@ -12,6 +12,11 @@ import {
 } from 'react-native';
 import { CandyColors, getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
+import {
+  getSkipConfirmText,
+  getSkipConfirmStayLabel,
+  getSkipConfirmLeaveLabel,
+} from '../services/phaseNarrative';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -82,6 +87,10 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const textFadeAnim = useRef(new Animated.Value(1)).current;
   const [isTalking, setIsTalking] = useState(false);
+  // Two-step skip: the first Skip tap swaps the card to a confirmation (the
+  // safe "keep going" gets the prominent pill; the skip is the quiet button),
+  // so one stray touch can never silently abandon the guided intro.
+  const [confirmingSkip, setConfirmingSkip] = useState(false);
   const reducedMotion = getSettingsSync().reducedMotion;
   const hasInteractiveControls = Boolean(onContinue || (showSkip && onSkip));
   // The card renders nothing without text (see the early returns below), so the
@@ -180,11 +189,18 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
     }).start();
   }, [text]);
 
+  // A step advance or hide must never strand the skip confirmation — the
+  // confirm applies to the moment it was asked in, not to a new line.
+  useEffect(() => {
+    setConfirmingSkip(false);
+  }, [text, visible]);
+
   if (!visible) return null;
   // Never render an empty shell: with no text Fox has nothing to say, and a
   // bare card (or a lone Skip button in an empty box) reads as a broken overlay.
   if (!text || text.trim().length === 0) return null;
 
+  const displayText = confirmingSkip ? getSkipConfirmText() : text;
   const isTop = position === 'top';
   const isMiddle = position === 'middle';
   const resolvedPositionStyle = anchorStyle || (isTop ? { top: Math.max(80, SCREEN_HEIGHT * 0.12) } : isMiddle ? { top: Math.max(180, SCREEN_HEIGHT * 0.25) } : { bottom: Math.max(30, SCREEN_HEIGHT * 0.04) });
@@ -211,7 +227,7 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       // Let puzzle/home interactions pass through when Fox is informational only.
       pointerEvents={hasInteractiveControls ? 'box-none' : 'none'}
       accessibilityRole={isCompact ? 'alert' : undefined}
-      accessibilityLabel={isCompact ? `Ember says: ${text}` : undefined}
+      accessibilityLabel={isCompact ? `Ember says: ${displayText}` : undefined}
     >
       <View
         style={[
@@ -252,38 +268,67 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
               <Animated.Text
                 style={[isCompact ? styles.compactText : styles.dialogueText, { color: dt.textColor, opacity: textFadeAnim }]}
               >
-                {text}
+                {displayText}
               </Animated.Text>
             </View>
 
             {/* Footer: quiet Skip + solid purple pill. The footer keeps a
                 stable min height even when no pill renders (move-required
                 steps advance via the board), so the card never jumps when a
-                continue action appears/disappears. */}
+                continue action appears/disappears. While confirming a skip,
+                the roles flip: staying is the prominent pill, skipping the
+                quiet button — a stray tap resolves to the safe choice. */}
             <View style={isCompact ? styles.compactFooter : styles.dialogueFooter}>
-              {showSkip && onSkip && (
-                <TouchableOpacity
-                  style={styles.skipBtn}
-                  onPress={onSkip}
-                  accessibilityLabel="Skip intro"
-                  accessibilityRole="button"
-                >
-                  <Text style={[isCompact ? styles.compactSkipText : styles.dialogueSkipText, { color: dt.subtitleColor }]}>Skip</Text>
-                </TouchableOpacity>
-              )}
-              {onContinue && (
-                <TouchableOpacity
-                  style={[
-                    isCompact ? styles.compactContinueBtn : styles.dialogueContinueBtn,
-                    { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
-                  ]}
-                  onPress={onContinue}
-                  accessibilityLabel={buttonText}
-                  accessibilityRole="button"
-                >
-                  <View style={isCompact ? styles.compactBtnShine : styles.dialogueBtnShine} />
-                  <Text style={isCompact ? styles.compactContinueBtnText : styles.dialogueContinueBtnText}>{buttonText}</Text>
-                </TouchableOpacity>
+              {confirmingSkip ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.skipBtn}
+                    onPress={onSkip}
+                    accessibilityLabel="Yes, skip the whole intro"
+                    accessibilityRole="button"
+                  >
+                    <Text style={[isCompact ? styles.compactSkipText : styles.dialogueSkipText, { color: dt.subtitleColor }]}>{getSkipConfirmLeaveLabel()}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      isCompact ? styles.compactContinueBtn : styles.dialogueContinueBtn,
+                      { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
+                    ]}
+                    onPress={() => setConfirmingSkip(false)}
+                    accessibilityLabel="Keep going with the intro"
+                    accessibilityRole="button"
+                  >
+                    <View style={isCompact ? styles.compactBtnShine : styles.dialogueBtnShine} />
+                    <Text style={isCompact ? styles.compactContinueBtnText : styles.dialogueContinueBtnText}>{getSkipConfirmStayLabel()}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {showSkip && onSkip && (
+                    <TouchableOpacity
+                      style={styles.skipBtn}
+                      onPress={() => setConfirmingSkip(true)}
+                      accessibilityLabel="Skip intro"
+                      accessibilityRole="button"
+                    >
+                      <Text style={[isCompact ? styles.compactSkipText : styles.dialogueSkipText, { color: dt.subtitleColor }]}>Skip</Text>
+                    </TouchableOpacity>
+                  )}
+                  {onContinue && (
+                    <TouchableOpacity
+                      style={[
+                        isCompact ? styles.compactContinueBtn : styles.dialogueContinueBtn,
+                        { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
+                      ]}
+                      onPress={onContinue}
+                      accessibilityLabel={buttonText}
+                      accessibilityRole="button"
+                    >
+                      <View style={isCompact ? styles.compactBtnShine : styles.dialogueBtnShine} />
+                      <Text style={isCompact ? styles.compactContinueBtnText : styles.dialogueContinueBtnText}>{buttonText}</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
               )}
             </View>
           </View>

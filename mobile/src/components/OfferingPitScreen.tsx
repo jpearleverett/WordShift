@@ -43,7 +43,7 @@ import {
   getTendingMilestoneCeremonyText,
   getTendingLevelLabel,
 } from '../services/phaseNarrative';
-import { confirmPhaseTransition, spendAmber, awardBonusAmber } from '../services/amberCurrency';
+import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen } from '../services/amberCurrency';
 import {
   loadTendingState,
   getNextTendingInfo,
@@ -1623,6 +1623,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       const result = await offerBatch(batchId);
       if (!result) return;
       logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
+      // A completed manual offer is the moment the player has LEARNED the pit —
+      // this is what retires the first-harvest victory gate (the onboarding
+      // pit beat doesn't count; the gate re-teaches the auto-collect handoff).
+      if (!isOnboarding) {
+        markMandatoryHarvestSeen().catch(() => {});
+      }
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) {
         // Settle on the real credited balance. The per-word optimistic bumps
@@ -1652,7 +1658,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
       }
     } catch { /* batch may already be offered */ }
-  }, [phase, onAmberChange, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
+  }, [phase, onAmberChange, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding]);
 
   // ---- Handle word devoured ----
   const handleWordDevoured = useCallback((fw: FlyingWord) => {
@@ -1807,6 +1813,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     // Offer all batches atomically first
     const result = await offerAllBatches();
     logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
+    // Manual offer completed — the pit is learned (see tryFinalizeBatch).
+    if (!isOnboarding) {
+      markMandatoryHarvestSeen().catch(() => {});
+    }
     let finalBalance = baseBalance;
     if (result.amberAwarded > 0) {
       finalBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
@@ -1932,7 +1942,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
+  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding]);
 
   // ---- Onboarding: advance when the PLAYER has offered every word ----
   // The pit_offering step is completed by the player's own taps (each word
@@ -2383,6 +2393,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 <RewardedAdButton
                   placement="quest_bonus"
                   phase={phase}
+                  surface="dark"
                   label={`Offer your attention  ·  +${REWARDED_TEND_BONUS} amber`}
                   onReward={async () => {
                     const newBalance = await awardBonusAmber(REWARDED_TEND_BONUS, 'rewarded_tend');

@@ -27,6 +27,14 @@ interface UseUnlockFlowParams {
   setIntroAnimal: (animal: Animal | null) => void;
   setIntroDialogueIndex: (index: number) => void;
   setShowIntroDialogue: (show: boolean) => void;
+  /**
+   * Reset any intro-override state (override lines + context) before a
+   * character intro opens. A HomeScreen one-time intro (e.g. the gated-room
+   * Reserve explainer) can win the race into the shared intro-dialogue state
+   * during this hook's 300ms intro delay; without the reset, the new animal's
+   * portrait would deliver the OTHER intro's script.
+   */
+  resetIntroOverrides?: () => void;
 }
 
 interface UseUnlockFlowReturn {
@@ -77,6 +85,7 @@ export function useUnlockFlow({
   setIntroAnimal,
   setIntroDialogueIndex,
   setShowIntroDialogue,
+  resetIntroOverrides,
 }: UseUnlockFlowParams): UseUnlockFlowReturn {
   const [showShop, setShowShop] = useState(false);
   const [showRoomUnlock, setShowRoomUnlock] = useState<Room | null>(null);
@@ -274,6 +283,10 @@ export function useUnlockFlow({
           if (introTimeoutRef.current) clearTimeout(introTimeoutRef.current);
           introTimeoutRef.current = setTimeout(() => {
             introTimeoutRef.current = null;
+            // Clean slate: a HomeScreen one-time intro may have claimed the
+            // shared intro state during this delay — the new character's
+            // intro must never render with another intro's override script.
+            resetIntroOverrides?.();
             setIntroAnimal(animal as unknown as Animal);
             setIntroDialogueIndex(0);
             setShowIntroDialogue(true);

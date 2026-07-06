@@ -112,6 +112,7 @@ const SYNC_KEYS = [
   'wordshift_pit_harvest_intro_seen',
   'wordshift_mandatory_harvest_seen',
   'wordshift_gated_unlock_intro_seen',
+  'wordshift_harvest_home_intro_seen',
   'wordshift_micro_beats_seen',
 ];
 

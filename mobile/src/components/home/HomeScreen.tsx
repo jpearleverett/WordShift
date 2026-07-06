@@ -35,8 +35,12 @@ import {
   markDailyChallengeIntroSeen,
   hasSeenGatedUnlockIntro,
   markGatedUnlockIntroSeen,
+  hasSeenMandatoryHarvest,
+  hasSeenHarvestHomeIntro,
+  markHarvestHomeIntroSeen,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
+import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
 
@@ -52,6 +56,8 @@ import {
   getJournalSpotlightSteps,
   getDailyChallengeIntroLines,
   getGatedRoomIntroLines,
+  getHarvestHomeIntroLines,
+  getHarvestNudgeLine,
 } from '../../services/phaseNarrative';
 import {
   ROOMS,
@@ -242,7 +248,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [introAnimal, setIntroAnimal] = useState<Animal | null>(null);
   const [introDialogueIndex, setIntroDialogueIndex] = useState(0);
   const [introOverrideLines, setIntroOverrideLines] = useState<string[] | null>(null);
-  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro'>('animal_intro');
+  const [introContext, setIntroContext] = useState<'animal_intro' | 'challenge_intro' | 'pit_nudge' | 'daily_challenge_intro' | 'gated_room_intro' | 'harvest_gate_intro' | 'harvest_heavy_nudge'>('animal_intro');
+  // Once-per-session guard for the gentle "your pit is getting heavy" nudge.
+  const heavyHarvestNudgeShownRef = useRef(false);
   // Journal spotlight intro state
   const [journalSpotlightActive, setJournalSpotlightActive] = useState(false);
   const [journalSpotlightIndex, setJournalSpotlightIndex] = useState(0);
@@ -313,6 +321,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setIntroAnimal,
     setIntroDialogueIndex,
     setShowIntroDialogue,
+    // A newly unlocked character's intro must open on a clean slate — if a
+    // one-time HomeScreen intro (Reserve explainer etc.) raced into the shared
+    // intro state during the unlock delay, its override script would otherwise
+    // play under the new animal's portrait.
+    resetIntroOverrides: () => {
+      setIntroOverrideLines(null);
+      setIntroContext('animal_intro');
+    },
   });
 
   // Load all data from storage
@@ -636,6 +652,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const nu = unlockFlow.nextUnlock;
     if (!nu || nu.type !== 'room' || nu.minPuzzles === undefined) return;
     if ((progress.puzzlesSolved || 0) >= nu.minPuzzles) return; // gate already open — no wall
+    // Fire only once the player can actually AFFORD to reserve the gated room —
+    // Reserve/Skip advice is noise before it's actionable, and firing at the
+    // moment the gate first appears collided with the just-unlocked animal's
+    // own intro (the previous animal in the progression unlocks seconds before
+    // the gated room becomes next).
+    if ((progress.amber ?? 0) < nu.cost) return;
 
     let cancelled = false;
     (async () => {
@@ -658,6 +680,86 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     unlockFlow.showRoomUnlock,
     progress?.puzzlesSolved,
     progress?.currentPhase,
+    progress?.amber,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // First-harvest home safety net (one-time): the victory-modal gate is the
+  // primary teacher, but if the player reaches home past the auto-collect
+  // window with batches waiting and the pit still unlearned (gate interrupted
+  // by a kill / back press / link), Fox explains the pit once from here. The
+  // learned flag itself is only set by a real manual offer at the pit, so the
+  // victory gate keeps re-arming either way.
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if ((progress.puzzlesSolved || 0) <= AUTO_COLLECT_PUZZLE_LIMIT) return;
+    if (!pendingHarvest || pendingHarvest.pendingBatches <= 0) return;
+
+    let cancelled = false;
+    (async () => {
+      const learned = await hasSeenMandatoryHarvest();
+      if (learned || cancelled) return;
+      const introSeen = await hasSeenHarvestHomeIntro();
+      if (introSeen || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getHarvestHomeIntroLines(progress.currentPhase));
+      setIntroContext('harvest_gate_intro');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    pendingHarvest,
+    isOnboarding,
+    showIntroDialogue,
+    introOverrideLines,
+    animals,
+  ]);
+
+  // Gentle heavy-pit nudge (once per app session): when a big pile of amber
+  // sits unoffered, Fox mentions it once. The pit-entrance glow remains the
+  // ambient signal; this is a soft reminder, never a gate. Suppressed while a
+  // phase transition is pending (the pit_nudge intro owns that moment) and
+  // until the pit has been learned (the safety net above owns teaching).
+  useEffect(() => {
+    if (!progress || isOnboarding || showIntroDialogue || introOverrideLines) return;
+    if (heavyHarvestNudgeShownRef.current) return;
+    if (pitPhaseReady) return;
+    if ((progress.puzzlesSolved || 0) <= AUTO_COLLECT_PUZZLE_LIMIT) return;
+    if (!pendingHarvest || pendingHarvest.pendingAmber < HARVEST_NUDGE_MIN_AMBER) return;
+
+    let cancelled = false;
+    (async () => {
+      const learned = await hasSeenMandatoryHarvest();
+      if (!learned || cancelled) return;
+
+      const fox = animals.find(a => a.id === 'fox') || ANIMALS.find(a => a.id === 'fox') || null;
+      if (!fox) return;
+
+      heavyHarvestNudgeShownRef.current = true;
+      setIntroAnimal(fox);
+      setIntroDialogueIndex(0);
+      setIntroOverrideLines(getHarvestNudgeLine(progress.currentPhase, pendingHarvest.pendingAmber));
+      setIntroContext('harvest_heavy_nudge');
+      setShowIntroDialogue(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [
+    progress?.puzzlesSolved,
+    progress?.currentPhase,
+    pendingHarvest,
+    pitPhaseReady,
     isOnboarding,
     showIntroDialogue,
     introOverrideLines,
@@ -826,6 +928,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markDailyChallengeIntroSeen();
       } else if (introContext === 'gated_room_intro') {
         await markGatedUnlockIntroSeen();
+      } else if (introContext === 'harvest_gate_intro') {
+        await markHarvestHomeIntroSeen();
+      } else if (introContext === 'harvest_heavy_nudge') {
+        // Session-scoped (heavyHarvestNudgeShownRef) — nothing to persist.
       } else {
         await markIntroSeen(introAnimal.id);
       }
@@ -849,6 +955,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         await markDailyChallengeIntroSeen();
       } else if (introContext === 'gated_room_intro') {
         await markGatedUnlockIntroSeen();
+      } else if (introContext === 'harvest_gate_intro') {
+        await markHarvestHomeIntroSeen();
+      } else if (introContext === 'harvest_heavy_nudge') {
+        // Session-scoped (heavyHarvestNudgeShownRef) — nothing to persist.
       } else {
         await markIntroSeen(introAnimal.id);
       }

@@ -42,7 +42,6 @@ import {
   hasSeenSetupSelectorIntro,
   markSetupSelectorIntroSeen,
   hasSeenMandatoryHarvest,
-  markMandatoryHarvestSeen,
   hasSeenStarterIntro,
   markStarterIntroSeen,
   consumePendingVariantTutorial,
@@ -271,6 +270,9 @@ function MainApp() {
   const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
   // Quiet, spoiler-safe aggregate social-proof line for the victory modal
   const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
+  // Last-known global words-offered count for today; reused when a victory's
+  // own fetch fails so the social-proof line doesn't blink out mid-session.
+  const socialProofCacheRef = useRef<{ date: string; count: number } | null>(null);
   // Optional rewarded "double the reward" — one claim per victory
   const [victoryDoubleClaimed, setVictoryDoubleClaimed] = useState(false);
 
@@ -489,28 +491,8 @@ function MainApp() {
     };
   }, []);
 
-  // Android hardware back button: sub-screens navigate home; home exits the app.
-  // Swallowed during onboarding so back can't break the guided flow.
-  useEffect(() => {
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (onboardingFlow.isOnboarding) {
-        return true;
-      }
-      if (currentScreen !== 'home') {
-        // Mirror the in-UI home button: reset transient puzzle UI state
-        // (mid-puzzle progress itself is preserved by autosave).
-        transitionTo('home', () => {
-          if (currentScreen === 'puzzle') {
-            puzzleActions.setGameState(GameState.IDLE);
-            puzzleActions.setShowConfetti(false);
-          }
-        });
-        return true;
-      }
-      return false;
-    });
-    return () => subscription.remove();
-  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions]);
+  // (The Android hardware-back handler lives below handleGoToPit — its deps
+  // array references that callback, which must be initialized first.)
 
   // Resume the correct screen if onboarding was interrupted (initial mount only).
   // The onboarding hook has already normalized transient steps to stable ones,
@@ -954,6 +936,12 @@ function MainApp() {
     if (onboardingFlow.onboardingStep && onboardingFlow.onboardingStep !== 'complete') {
       return;
     }
+    // Never let a link navigate over the first-harvest gate — the forced pit
+    // beat must complete first (the link is rare and re-tappable; the teaching
+    // beat is one-time).
+    if (puzzle.gameState === GameState.WON && victoryFlow.victoryData?.mandatoryHarvest) {
+      return;
+    }
 
     if (url.startsWith('wordshift://challenge/daily')) {
       // The optional ?date= param is ignored — the daily is always today's.
@@ -986,6 +974,8 @@ function MainApp() {
     persistence.currentPhase,
     handleStartDaily,
     handleStartSharedChallenge,
+    puzzle.gameState,
+    victoryFlow.victoryData,
   ]);
 
   // The handler lives in a ref so the Linking subscription is created exactly
@@ -1023,6 +1013,10 @@ function MainApp() {
   const routeNotificationTargetRef = useRef<(target: unknown) => void>(() => {});
   routeNotificationTargetRef.current = (target: unknown) => {
     if (onboardingFlow.onboardingStep && onboardingFlow.onboardingStep !== 'complete') {
+      return;
+    }
+    // Never route over the first-harvest gate (same rule as deep links).
+    if (puzzle.gameState === GameState.WON && victoryFlow.victoryData?.mandatoryHarvest) {
       return;
     }
     if (target === 'daily') {
@@ -1122,14 +1116,27 @@ function MainApp() {
 
       // Aggregate social proof: contribute this puzzle's words to the global
       // daily count (spoiler-safe, anonymous). No-op until the backend is on.
-      recordPuzzleContribution(result.completedWords?.length ?? 0);
+      // The bump RPC returns the post-increment total, so prefer it over a
+      // separate read (which used to race the fire-and-forget bump and made
+      // the line appear only "some of the time"). A same-local-day cached
+      // count covers transient network failures so the line doesn't flicker
+      // out between victories.
       setSocialProofLine(null);
       setVictoryDoubleClaimed(false);
       (async () => {
         try {
-          const proof = await getAggregateProof();
-          if (proof && proof.wordsOfferedToday > 0) {
-            setSocialProofLine(getWordsOfferedText(proof.wordsOfferedToday, persistence.currentPhase));
+          const today = getLocalDateString();
+          let count = await recordPuzzleContribution(result.completedWords?.length ?? 0);
+          if (count == null) {
+            const proof = await getAggregateProof();
+            count = proof?.wordsOfferedToday ?? null;
+          }
+          if (count == null && socialProofCacheRef.current?.date === today) {
+            count = socialProofCacheRef.current.count;
+          }
+          if (count != null && count > 0) {
+            socialProofCacheRef.current = { date: today, count };
+            setSocialProofLine(getWordsOfferedText(count, persistence.currentPhase));
           }
         } catch {
           // Social proof is decorative — never block the victory flow.
@@ -1234,12 +1241,16 @@ function MainApp() {
           });
         }
       }
-      // First harvest gate: the one-time victory where the auto-collect window
-      // closes and a real batch now waits in the pit. Instead of Fox merely
-      // explaining, the Victory modal forces the player to offer their words at
-      // the pit before continuing (teach the pit by using it, with a lore beat).
+      // First harvest gate: fires when the auto-collect window has closed, a
+      // real batch waits in the pit, and the player has not yet LEARNED manual
+      // harvesting. The Victory modal forces the pit visit (teach the pit by
+      // using it, with a lore beat). The learned flag is set ONLY when the
+      // player completes a manual offer at the pit (OfferingPitScreen) — never
+      // here — so the gate re-fires on every eligible victory (standard, daily,
+      // variant) until a real harvest happens. No interruption (back press,
+      // app kill, deep link, notification tap) can consume the beat unseen.
       // Skipped during onboarding and when a phase-transition ceremony already
-      // claims the pit; one-time via the pit-harvest-intro seen flag.
+      // claims the pit (that ceremony forces the same pit visit anyway).
       if (
         (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete') &&
         !finalVictory.phaseTransitionPending &&
@@ -1249,7 +1260,6 @@ function MainApp() {
         !(await hasSeenMandatoryHarvest())
       ) {
         finalVictory = { ...finalVictory, mandatoryHarvest: true };
-        await markMandatoryHarvestSeen();
       }
       // Fox introduces the Keeper's Welcome starter pack once, ~puzzle 12, but
       // only for players who don't already own it. She frames it in-world (a
@@ -1764,6 +1774,7 @@ function MainApp() {
     const exempt =
       inOnboarding ||
       isPlayingDaily ||
+      vd.mandatoryHarvest ||                           // first-harvest teaching beat: never interrupt with an ad
       vd.phaseTransitionPending ||                     // pit ignition ceremony incoming
       persistence.pendingPhaseTransition != null ||    // ward ceremony waiting in the pit
       phaseTransitionEvent != null ||                  // final / post-revelation cinematic queued
@@ -1863,6 +1874,40 @@ function MainApp() {
       transitionTo('pit');
     });
   }, [puzzleActions, transitionTo, startVictoryExitFlow, maybeShowVictoryInterstitial]);
+
+  // Android hardware back button: sub-screens navigate home; home exits the app.
+  // Swallowed during onboarding so back can't break the guided flow.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (onboardingFlow.isOnboarding) {
+        return true;
+      }
+      // A pit-mandatory victory (first-harvest gate or pending ward ceremony)
+      // must not be escapable via hardware back — back does what the only
+      // visible CTA does and routes to the pit instead of stranding the beat.
+      if (
+        currentScreen === 'puzzle' &&
+        puzzle.gameState === GameState.WON &&
+        (victoryFlow.victoryData?.mandatoryHarvest || persistence.pendingPhaseTransition != null)
+      ) {
+        handleGoToPit();
+        return true;
+      }
+      if (currentScreen !== 'home') {
+        // Mirror the in-UI home button: reset transient puzzle UI state
+        // (mid-puzzle progress itself is preserved by autosave).
+        transitionTo('home', () => {
+          if (currentScreen === 'puzzle') {
+            puzzleActions.setGameState(GameState.IDLE);
+            puzzleActions.setShowConfetti(false);
+          }
+        });
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [currentScreen, transitionTo, onboardingFlow.isOnboarding, puzzleActions, puzzle.gameState, victoryFlow.victoryData, persistence.pendingPhaseTransition, handleGoToPit]);
 
   // Optional rewarded "double the reward": credits a bonus equal to this
   // puzzle's amber (a true 2x), reward-only — never phase progress. One claim
@@ -2418,6 +2463,7 @@ function MainApp() {
                   <RewardedAdButton
                     placement={SPEED_RESCUE_PLACEMENT}
                     phase={persistence.currentPhase}
+                    surface="dark"
                     label={getSpeedRescueLabel(persistence.currentPhase, SPEED_RESCUE_EXTRA_SEC)}
                     onReward={handleSpeedRescue}
                     style={styles.speedRescueButton}
