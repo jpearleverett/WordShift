@@ -1,5 +1,15 @@
 
 import { WORDS_3, WORDS_4, WORDS_5, WORDS_6, WORDS_7, COMMON_WORDS } from '../constants';
+
+// Offline bank generation runs the search loops synchronously (no UI to keep
+// responsive) and sets GENERATOR_NO_YIELD=1: the periodic setTimeout yields
+// exist for the app's event loop, but under jest each yield allocates a
+// timer+promise pair that the environment retains, and a 25s search window
+// creates enough of them to exhaust the heap. In the app this is always false
+// and the yields behave exactly as before.
+const SKIP_EVENT_LOOP_YIELDS =
+  typeof process !== 'undefined' && !!process.env && process.env.GENERATOR_NO_YIELD === '1';
+
 import { PuzzleConfig, PuzzleSolutionStep, Difficulty } from '../types';
 import {
   getWordHistoryWithRecency,
@@ -994,7 +1004,7 @@ async function generateReverseChain(
   while (Date.now() - startTime < timeoutMs) {
     // Yield periodically
     if (Date.now() - lastYield > YIELD_INTERVAL) {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      if (!SKIP_EVENT_LOOP_YIELDS) await new Promise(resolve => setTimeout(resolve, 0));
       lastYield = Date.now();
     }
 
@@ -1327,7 +1337,7 @@ export function isReverseSolvable(
   // (observed: heap-limit abort inside a single call), so the whole search is
   // capped at a fixed number of leaf solver calls. Exhaustion = "not solvable",
   // which merely skips that candidate chain during generation.
-  let leafBudget = 400;
+  let leafBudget = 20000;
 
   // Recursively try all valid insertion positions for each forward step.
   // Returns true if any combination leads to a reverse-solvable board.
@@ -1705,7 +1715,7 @@ export function solveReverse(
   // solver calls so one pathological chain can never allocation-storm the heap.
   // Exhaustion returns null; callers already treat a missing reverse solution
   // as "no hint path" (and the bank generators skip such puzzles).
-  let leafBudget = 800;
+  let leafBudget = 40000;
 
   // Recursively try all valid removal + insertion position combinations for each
   // forward step. When a reverse-solvable combination is found, capture and return
@@ -2171,7 +2181,7 @@ async function findPath(
   }
 
   if (now - state.lastYieldTime > 15) {
-    await new Promise(resolve => setTimeout(resolve, 0));
+    if (!SKIP_EVENT_LOOP_YIELDS) await new Promise(resolve => setTimeout(resolve, 0));
     state.lastYieldTime = Date.now();
   }
 
@@ -2534,7 +2544,7 @@ async function findDoubleShiftPath(
   state.iterations++;
   if (state.iterations % 500 === 0) {
     if (Date.now() - state.lastYieldTime > 15) {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      if (!SKIP_EVENT_LOOP_YIELDS) await new Promise(resolve => setTimeout(resolve, 0));
       state.lastYieldTime = Date.now();
     }
   }

@@ -19,8 +19,8 @@ const generatedHistory: string[][] = [];
 let mockPhase = 0;
 
 jest.mock('../src/services/amberCurrency', () => ({
-  getCurrentPhase: jest.fn(async () => mockPhase),
-  getFullProgress: jest.fn(async () => ({ puzzlesSolved: 999 })),
+  getCurrentPhase: async () => mockPhase,
+  getFullProgress: async () => ({ puzzlesSolved: 999 }),
 }));
 
 // ============================================================================
@@ -91,15 +91,15 @@ function saveCheckpoint(cp: BankCheckpoint): void {
 }
 
 jest.mock('../src/services/wordHistory', () => ({
-  getWordHistoryWithRecency: jest.fn(async () => new Map(bankWordUsage)),
-  calculateFreshnessPenalty: jest.fn((word: string, usage: Map<string, number>) => {
+  getWordHistoryWithRecency: async () => new Map(bankWordUsage),
+  calculateFreshnessPenalty: (word: string, usage: Map<string, number>) => {
     const uses = usage.get(word) ?? 0;
     if (uses === 0) return -5; // small bonus for never-used words
     if (uses >= WORD_USAGE_CAP) return 100;
     return Math.round((uses / WORD_USAGE_CAP) * 85);
-  }),
-  isInHardCooldown: jest.fn((word: string, usage: Map<string, number>) => (usage.get(word) ?? 0) >= WORD_USAGE_CAP),
-  recordPuzzleWords: jest.fn(async () => {}), // usage recorded on ACCEPT in the loop below
+  },
+  isInHardCooldown: (word: string, usage: Map<string, number>) => (usage.get(word) ?? 0) >= WORD_USAGE_CAP,
+  recordPuzzleWords: async () => {}, // usage recorded on ACCEPT in the loop below
 }));
 
 // ============================================================================
