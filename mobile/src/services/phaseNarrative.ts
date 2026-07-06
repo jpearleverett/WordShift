@@ -2181,7 +2181,10 @@ const PIT_WARD_HINTS: Record<number, string> = {
 };
 
 export function getPitWardHint(currentPhase: DialoguePhase, fraction: number): string | null {
-  if (fraction < 0.3) return null; // Too early
+  // Threshold kept low: the later phases are several times longer than the
+  // first, and a 0.3 gate left the pit mute for dozens of puzzles after each
+  // transition.
+  if (fraction < 0.15) return null; // Too early
   const nextPhase = Math.min(4, currentPhase + 1);
   return PIT_WARD_HINTS[nextPhase] ?? null;
 }

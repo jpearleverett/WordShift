@@ -10,7 +10,9 @@ const VARIANT_TUTORIAL_LINES: Record<string, { light: string; dark: string }> = 
     dark: 'The arrangement wanted a full circuit this time, down to the last word and then back up to the first, with the chain unbroken the whole way home.',
   },
   speed: {
-    light: 'The quick kind is short and urgent. Fewer words to cross, faster choices, and no time left over for second thoughts, which is rather the point of it.',
+    // Animal-agnostic by design (this body is appended to EVERY animal's lead
+    // in getVariantTutorialDialogue) — keep it warm but personality-neutral.
+    light: 'The quick kind is short and urgent. Fewer words to cross, faster choices, and no time left over for second thoughts. That rush is the whole idea.',
     dark: 'When the pattern hurries you like that, it is weighing devotion under pressure. Fewer words, less time, and no room to hesitate, so that only the certain hand finishes.',
   },
   double_shift: {
@@ -96,9 +98,12 @@ export function getVariantTutorialIntroLines(
   const script = VARIANT_TUTORIAL_LINES[variant];
   if (!script) return null;
 
+  // This lead is spoken by Ember on the post-victory Fox card, so at bright
+  // phases it carries her voice (first person, delighted); dark phases keep
+  // the hushed register.
   const introLead = phase >= 3
     ? 'Something new settled into the house after the words you offered just now.'
-    : 'A new way of moving your words just opened itself up for you.';
+    : 'Oh! Something new just clicked open, I felt it from here! There is a whole new way to move your words now.';
   const body = phase >= 3 ? script.dark : script.light;
   const cta = phase >= 3
     ? 'You can choose it from the setup button before you begin. More arrangements will reveal themselves in their own time.'

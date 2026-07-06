@@ -99,13 +99,13 @@ export async function resetOnboarding(): Promise<void> {
 export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // Step 1: Empty home — guide to invite Fox
   home_empty: [
-    "Hey! Down here by the den.\nTap the invite and let me in.",
+    "Oh! Hello up there! I'm down here, by the little den.\nTap the invite and I'll come say hello properly!",
   ],
 
   // Step 2: Fox just invited — intro dialogue
   fox_invited: [
-    "You opened the door for me. Thank you.\nI'm Ember.",
-    "Words shift. Patterns form. The house grows with every puzzle.",
+    "You let me in! Oh, I hoped you would. I have been practicing my hello all morning.\nI'm Ember!",
+    "Here is the wonderful part: every puzzle you solve makes this house a little more real. I don't entirely know how that works, only that it does, and that it is my favorite thing.",
     "Come on, one quick puzzle together, then we build.",
   ],
 
@@ -114,10 +114,10 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "See these rows? We'll move one letter from here into the row below.",
   ],
   puzzle_tutorial_pick: [
-    "Start with the glowing letter.",
+    "See that glowing letter? Give it a tap!",
   ],
   puzzle_tutorial_drop: [
-    "Good. Now drop it into the glowing slot below.",
+    "Beautiful! Now tuck it into the glowing spot below.",
   ],
   puzzle_tutorial_valid_move: [
     "There it is, that little click when a word falls into place.\nMade a wrong move? Tap undo, no harm done. Stuck? Tap hint.\nKeep going, all the way down.",
@@ -127,19 +127,19 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   ],
   puzzle_tutorial_complete: [
     "Perfect. Feel how the house settled just a little? That's what your words do.",
-    "Those words you just formed? They're worth something.\nFollow me. I'll show you where they go.",
+    "And the words you just made? Oh, they don't simply vanish, they're worth something!\nCome with me, I want to show you my favorite spot.",
   ],
 
   // Step 5.5: Transition to pit — Fox introduces word harvesting
   going_to_pit: [
-    "Those words you just formed? They're worth something.\nFollow me. I'll show you where they go.",
+    "And the words you just made? Oh, they don't simply vanish, they're worth something!\nCome with me, I want to show you my favorite spot.",
   ],
 
   // Step 6: On pit screen — Fox explains the Offering Pit (kept short: the player
   // already had their first-win reward moment, so this is trimmed to two beats).
   pit_intro: [
-    "Here we are. The pit... where your words drift after every puzzle, waiting.",
-    "Offer them and they turn to amber: the warm gold that builds the house.\nGo on... the pit is hungry. Feed it.",
+    "Here we are! This is the pit. I know it looks a little dramatic, but I promise it's friendly.\nEvery word you solve drifts down here afterwards.",
+    "Offer your words and they turn to amber, the warm gold that builds our house.\nGo on, it loves being fed. Most things here do, funnily enough.",
   ],
 
   // Step 6.5: On the pit screen, before the player has offered — a standing
@@ -153,7 +153,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
 
   // Step 7: After the player has offered every word on the pit screen
   pit_offering_complete: [
-    "See? Amber, from the words you formed.\nThe pit takes the words and gives back what the house needs.\n...It always does.",
+    "See?! Real amber, from words you made up in your own head!\nThe pit takes what we offer and gives back what the house needs. It has never once missed a trade.",
   ],
 
   // Step 8: Back on home screen — explain unlocks and keep playing (kept to
@@ -162,7 +162,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // house — the in-world path is the only way back to the pit, so the player
   // must hear where it lives before onboarding lets go of their hand.
   unlock_explained: [
-    "Now you know the cycle.\nSolve puzzles, offer words, earn amber.",
+    "And that's the whole happy loop of it!\nSolve puzzles, offer your words, and the amber comes home with us.",
     "Amber builds rooms, and rooms let us invite more friends in.",
     "When you have words to offer, the pit waits just below the house.\nScroll down and give it a tap.",
     "Come back each day, and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
