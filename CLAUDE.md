@@ -20,7 +20,7 @@ npm run generate:assets  # Regenerate icons/splash/notification icon/SFX (pure N
 - **Run tests for changed files only**: `cd mobile && npm test -- --no-coverage --changedSince=main`
 - Do NOT use `npx jest` directly — it does not find the local install and triggers a full remote download + deprecated dependency warnings every time. Always use `npm test` which routes through the locally installed jest.
 - `npm install` IS allowed in this environment. Fresh containers may start without `node_modules`; run `cd mobile && npm install` (or `npm ci`) once at the start of a session before running tests/typecheck/lint. Prefer `npm ci` when `package-lock.json` is present and unchanged.
-- The full suite has ~1,680 tests across 70 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
+- The full suite has ~1,780 tests across 75 suites, expected green (counts drift as features land — don't treat the number as load-bearing). **Prefer running only the relevant test file(s)** rather than the full suite unless explicitly asked to run everything.
 
 ## Tech Stack
 
@@ -89,7 +89,7 @@ mobile/
 │   │   ├── tileLayout.ts        # Shared arc-layout geometry (single source of truth for Row/LetterTile/slotEstimation)
 │   │   └── timing.ts            # Animation/interaction timing constants
 │   ├── dictionary.ts            # 11,504-word dictionary (3-7 letters, profanity-filtered)
-│   ├── data/                    # Pre-generated puzzle banks (12 banks, ~480 puzzles each after profanity purge; lazy-loaded)
+│   ├── data/                    # Pre-generated puzzle banks (12 banks, ~5,100 puzzles total, diversity-capped; lazy-loaded)
 │   │   ├── puzzleBankTypes.ts   # PreGeneratedPuzzle interface
 │   │   ├── puzzleBankEasy.ts .. puzzleBankHard.ts           # Standard banks
 │   │   ├── puzzleBankReverseEasy.ts .. puzzleBankReverseHard.ts  # Reverse banks
@@ -196,7 +196,7 @@ mobile/
 │       ├── homeScenePan.ts, shareResults.ts (emoji-grid text share + challenge links + Play Store CTA; daily shares are spoiler-free)
 │       ├── shareImage.ts        # Pluggable result-image capture (react-native-view-shot + expo-sharing are real deps — PNG ShareCard ships in dev-client/EAS builds; text fallback in Expo Go)
 │       └── animalDialogue.ts    # Re-export shim → dialogue/ submodules
-├── src/__tests__/               # ~1,680 tests, 70 suites
+├── src/__tests__/               # ~1,780 tests, 75 suites
 ├── scripts/                     # Puzzle bank generator scripts (12 generators)
 ├── scripts/tools/               # Pure-Node asset generators + profanity purge + image downscaler + sanitizePng.mjs (see below)
 ├── eas.json                     # EAS build profiles; `appVersionSource: "local"` → app.json is the single version source. autoIncrement is OFF (it re-bumped to the same code on local source and collided on Play) — **bump `android.versionCode` manually for each release**. `submit.production.android` is wired (serviceAccountKeyPath `./secrets/play-service-account.json`, internal track); the service-account JSON must have Release permission and the FIRST upload of a new app must be done manually in Play Console. Production no longer disables Sentry source-map upload (the `@sentry/react-native` plugin in app.json carries `organization`/`project`; the `SENTRY_AUTH_TOKEN` EAS env secret provides auth; dev/preview still set `SENTRY_DISABLE_AUTO_UPLOAD`). `docs/LAUNCH_CHECKLIST.md` tracks the remaining human release tasks.
@@ -237,7 +237,7 @@ Player-selected from the setup menu. Persisted as preferred variant.
 - **Speed Shift** (unlock: 35 puzzles): Timed run with difficulty-aware base timers (EASY 65s → HARD 48s). **Escalation ladder**: each consecutive speed win increments App-level `speedRound`, trimming the next clock by `SPEED_ESCALATION_STEP_SEC` (5s, floored at `SPEED_ESCALATION_MIN_SEC` = 30s) so a streak keeps tightening instead of letting skilled players idle. A "🔥 Round N" indicator appears under the timer once `speedRound > 0`. The ladder resets on any fresh run (Play, variant/difficulty/challenge switch, Home) and on the Time's-Up overlay exits (Try Again / Home) — **not** on time-up itself, since a rescue may continue the run; only **Next Level** continues it. The clock **pauses while the app is backgrounded** (AppState listener in `useSpeedTimer`) and resumes from the saved remaining seconds after a relaunch (`speedTimeRemainingSec` in autosave; legacy `speedTimerExpireAt` still restores as a fallback). Time-up sets `GameState.GAME_OVER` (warning haptic + sound) and shows a **"Time's Up" overlay** in App.tsx with the phase-aware `getSpeedTimeUpMessage(phase)`, a **once-per-board rewarded rescue** (`RewardedAdButton`, placement `speed_rescue`, +30s — `resumeSpeedAfterRescue` flips GAME_OVER→PLAYING and the timer effect restarts the clock; `speedRound` deliberately survives), and two CTAs: **Try Again** (new puzzle) and **Home**. `GAME_OVER` is set *only* on speed time-up.
 ### Pre-Generated Puzzle Banks
 
-12 banks of ~480 puzzles each (~5,800 total) — generated at 500 each, then filtered by `scripts/tools/purgeProfanity.mjs`. Banks are **lazy-loaded** on first use via `require()` thunks in `puzzleBank.ts` (keeps ~5.7MB of data out of cold start). Standard, reverse, and double-shift variants at all 4 difficulties. Phase-aware selection scores by dread tier proximity. Word freshness cross-references with `wordHistory.ts`, plus a per-bank hub-word frequency penalty (the generator over-uses ~50 'hub' words like MATER/CATER — high-frequency words cost score so the vocabulary long tail surfaces). Top-10 random pick for variety. Recycling when exhausted. Graceful fallback to on-device generation.
+12 banks, ~5,100 puzzles total, regenerated in the word-diversity pass with a **bank-wide word saturation cap**: the generator scripts reject any puzzle whose words (starting chain, formed, or reverse-leg transient — `collectPuzzleWords`) would appear in more than `BANK_WORD_CAP` puzzles of that bank. Easy banks generate to ~500 at cap 3; harder banks plateau (later-phase generation steers toward the fixed 615-word dread vocabulary, which saturates at any cap) and were **topped up from the pre-cap banks** by a greedy diversity-capped merge (accepts old puzzles maximizing unique-word gain under the same per-word cap). Final sizes/effective caps: EASY 500/3, MEDIUM 500/4, MEDIUM_PLUS 476/7, HARD 440/10, ReverseEasy 467/6, ReverseMedium 379/10, ReverseMediumPlus 228/12, ReverseHard 191/16, DoubleShiftEasy 500/3, DoubleShiftMedium 469/5, DoubleShiftMediumPlus 487/8, DoubleShiftHard 461/10 — pinned by `src/__tests__/bankDiversity.test.ts` (per-bank cap + unique-word floor + puzzle floor + no duplicate chains; recalibrate its BANKS table after any regeneration). Before the pass, hub words hit 154 uses in one bank and 23 words appeared 100+ times across banks (now zero ≥100). Banks are **lazy-loaded** on first use via `require()` thunks in `puzzleBank.ts` (keeps the bank data out of cold start). Standard, reverse, and double-shift variants at all 4 difficulties. Phase-aware selection scores by dread tier proximity. Word freshness cross-references with `wordHistory.ts`, plus a per-bank hub-word frequency penalty. Top-10 random pick for variety. Recycling when exhausted (matters most for the small ReverseMediumPlus/ReverseHard banks). Graceful fallback to on-device generation.
 
 ### Curated Early Puzzles
 5 hand-picked puzzles (`CURATED_EARLY_PUZZLES` in `constants/wordLists.ts`, each with pre-computed solution steps): index 0 is the onboarding tutorial board, the next 4 cover the first post-onboarding session. Served while `puzzlesSolved < CURATED_PUZZLE_COUNT` (5).
@@ -673,9 +673,10 @@ Edit `DIALOGUE_SESSION_CONFIG` in `types/homeWorld.ts`:
 3. Call from relevant component (auto-checks `settings.soundEnabled`)
 
 ### Regenerating puzzle banks
-1. `npm run generate:puzzles` (long-running jest generators in `scripts/`)
+1. `npm run generate:puzzles` (long-running jest generators in `scripts/`). Each generator enforces the bank-wide word saturation cap (`BANK_WORD_CAP` env, see Pre-Generated Puzzle Banks) and **checkpoints per puzzle** to gitignored `src/data/.bank_*_progress.json` / `.reverseBank*_phase*.json` files, so crashed/killed runs resume where they left off. Run jest with `--forceExit` (generators hold open handles after completion) and `NODE_OPTIONS=--max-old-space-size=4096`. Hot-loop mocks in these scripts MUST be plain functions, never `jest.fn()` — jest.fn records every call's arguments and a multi-hour DFS run OOMs the heap. `scripts/jest.config.js` runs ts-jest transpile-only (`isolatedModules`) for the same reason.
 2. **Always** run `node scripts/tools/purgeProfanity.mjs` afterwards — the generator does not filter offensive words; the purge script removes them from both dictionaries and drops affected bank puzzles
 3. The blocklist lives in `scripts/tools/purgeProfanity.mjs` (`BLOCKED_WORDS`)
+4. Recalibrate `src/__tests__/bankDiversity.test.ts` (per-bank cap = measured max, floors ~15% under measured) — it will fail loudly if a regeneration regresses variety
 
 ## Narrative Acceleration
 
