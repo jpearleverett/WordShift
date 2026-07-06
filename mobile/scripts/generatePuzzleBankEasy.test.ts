@@ -19,40 +19,87 @@ const generatedHistory: string[][] = [];
 let mockPhase = 0;
 
 jest.mock('../src/services/amberCurrency', () => ({
-  getCurrentPhase: jest.fn(async () => mockPhase),
-  getFullProgress: jest.fn(async () => ({ puzzlesSolved: 999 })),
+  getCurrentPhase: async () => mockPhase,
+  getFullProgress: async () => ({ puzzlesSolved: 999 }),
 }));
 
+// ============================================================================
+// Bank-wide word saturation (diversity fix)
+// The old mock reproduced the app's ROLLING recency window (last ~100 puzzles,
+// 15-puzzle hard cooldown), which lets the DFS return to the same hub words
+// dozens of times across a 500-puzzle bank. This model instead counts, for the
+// WHOLE bank, how many accepted puzzles each word (start or formed) appears in:
+//   - a word at the cap is treated as hard-cooldown (excluded from starts and
+//     chain candidates inside the generator), and
+//   - freshness penalties scale with usage so the search prefers unused words.
+// The accept loop additionally hard-rejects any candidate puzzle that would
+// push a word past the cap (covers formed words the DFS cannot see).
+// ============================================================================
+
+const WORD_USAGE_CAP = Number(process.env.BANK_WORD_CAP ?? 3);
+const bankWordUsage = new Map<string, number>();
+
+function collectPuzzleWords(puzzle: { words: string[]; solution?: { sourceWord: string; targetWord: string; explanation?: string }[]; reverseSolution?: { sourceWord: string; targetWord: string; explanation?: string }[] }): string[] {
+  const seen = new Set<string>();
+  for (const w of puzzle.words) seen.add(w.toUpperCase());
+  for (const step of [...(puzzle.solution ?? []), ...(puzzle.reverseSolution ?? [])]) {
+    if (step.sourceWord) seen.add(String(step.sourceWord).toUpperCase());
+    if (step.targetWord) seen.add(String(step.targetWord).toUpperCase());
+    const m = /form ([A-Z]+)/.exec(step.explanation ?? '');
+    if (m) seen.add(m[1]);
+  }
+  return [...seen];
+}
+
+function exceedsUsageCap(words: string[]): boolean {
+  return words.some(w => (bankWordUsage.get(w) ?? 0) >= WORD_USAGE_CAP);
+}
+
+function recordUsage(words: string[]): void {
+  for (const w of words) bankWordUsage.set(w, (bankWordUsage.get(w) ?? 0) + 1);
+}
+
+// ============================================================================
+// Crash-safe checkpointing (mirrors the reverse generators)
+// The generator process can die under long high-attempt runs; saving after
+// every accepted puzzle makes any death resumable by simply re-running.
+// ============================================================================
+
+const CHECKPOINT_PATH = require('path').join(__dirname, '..', 'src', 'data', '.bank_generatePuzzleBankEasy_progress.json');
+
+interface BankCheckpoint {
+  phaseCounts: Record<string, number>;
+  puzzles: unknown[];
+}
+
+function loadCheckpoint(): BankCheckpoint {
+  try {
+    const fsMod = require('fs');
+    if (fsMod.existsSync(CHECKPOINT_PATH)) {
+      const data = JSON.parse(fsMod.readFileSync(CHECKPOINT_PATH, 'utf-8'));
+      if (data && Array.isArray(data.puzzles)) return data;
+    }
+  } catch { /* corrupted checkpoint: start fresh */ }
+  return { phaseCounts: {}, puzzles: [] };
+}
+
+function saveCheckpoint(cp: BankCheckpoint): void {
+  const fsMod = require('fs');
+  const tmp = CHECKPOINT_PATH + '.tmp';
+  fsMod.writeFileSync(tmp, JSON.stringify(cp), 'utf-8');
+  fsMod.renameSync(tmp, CHECKPOINT_PATH); // atomic on Linux
+}
+
 jest.mock('../src/services/wordHistory', () => ({
-  getWordHistoryWithRecency: jest.fn(async () => {
-    const recencyMap = new Map<string, number>();
-    for (let puzzlesAgo = 0; puzzlesAgo < generatedHistory.length; puzzlesAgo++) {
-      for (const word of generatedHistory[puzzlesAgo]) {
-        if (!recencyMap.has(word)) {
-          recencyMap.set(word, puzzlesAgo);
-        }
-      }
-    }
-    return recencyMap;
-  }),
-  calculateFreshnessPenalty: jest.fn((word: string, recencyMap: Map<string, number>) => {
-    const puzzlesAgo = recencyMap.get(word);
-    if (puzzlesAgo === undefined) return -5;
-    if (puzzlesAgo < 15) return 100;
-    if (puzzlesAgo < 40) {
-      const progress = (puzzlesAgo - 15) / 25;
-      return Math.round(50 - (progress * 40));
-    }
-    return 0;
-  }),
-  isInHardCooldown: jest.fn((word: string, recencyMap: Map<string, number>) => {
-    const puzzlesAgo = recencyMap.get(word);
-    return puzzlesAgo !== undefined && puzzlesAgo < 15;
-  }),
-  recordPuzzleWords: jest.fn(async (words: string[]) => {
-    generatedHistory.unshift(words.map((w: string) => w.toUpperCase()));
-    if (generatedHistory.length > 100) generatedHistory.length = 100;
-  }),
+  getWordHistoryWithRecency: async () => new Map(bankWordUsage),
+  calculateFreshnessPenalty: (word: string, usage: Map<string, number>) => {
+    const uses = usage.get(word) ?? 0;
+    if (uses === 0) return -5; // small bonus for never-used words
+    if (uses >= WORD_USAGE_CAP) return 100;
+    return Math.round((uses / WORD_USAGE_CAP) * 85);
+  },
+  isInHardCooldown: (word: string, usage: Map<string, number>) => (usage.get(word) ?? 0) >= WORD_USAGE_CAP,
+  recordPuzzleWords: async () => {}, // usage recorded on ACCEPT in the loop below
 }));
 
 // ============================================================================
@@ -123,17 +170,24 @@ function serializePuzzle(p: PreGeneratedPuzzle): string {
 
 describe('Puzzle Bank Generator — EASY Standard', () => {
   it('generates 500 EASY standard puzzles', async () => {
-    const allPuzzles: PreGeneratedPuzzle[] = [];
+    // Resume from checkpoint: reload accepted puzzles, chain dedup, per-phase
+    // counts, and the bank-wide word usage so the cap stays accurate.
+    const checkpoint = loadCheckpoint();
+    const allPuzzles: PreGeneratedPuzzle[] = checkpoint.puzzles as PreGeneratedPuzzle[];
     const seenChains = new Set<string>();
+    for (const p of allPuzzles) {
+      seenChains.add(p.words.join('-'));
+      recordUsage(collectPuzzleWords(p as { words: string[]; solution?: { sourceWord: string; targetWord: string; explanation?: string }[] }));
+    }
     let totalAttempts = 0;
     let totalFailures = 0;
 
     for (const [phaseStr, target] of Object.entries(PHASE_TARGETS)) {
       const phase = parseInt(phaseStr);
       mockPhase = phase;
-      let phaseCount = 0;
+      let phaseCount = checkpoint.phaseCounts[phaseStr] ?? 0;
       let phaseAttempts = 0;
-      const maxAttemptsPerPhase = target * 3;
+      const maxAttemptsPerPhase = target * 10;
 
       process.stdout.write(`\nPhase ${phase}: generating ${target} puzzles...\n`);
 
@@ -149,6 +203,10 @@ describe('Puzzle Bank Generator — EASY Standard', () => {
             continue;
           }
           seenChains.add(chainKey);
+
+          // Bank-wide diversity: reject any puzzle that would push a word past the cap
+          const puzzleWords = collectPuzzleWords(puzzle);
+          if (exceedsUsageCap(puzzleWords)) continue;
 
           const id = puzzleId(puzzle.words);
           const dreadTier = computeDreadTier(puzzle.words);
@@ -169,6 +227,9 @@ describe('Puzzle Bank Generator — EASY Standard', () => {
           };
 
           allPuzzles.push(preGenPuzzle);
+          recordUsage(puzzleWords);
+          checkpoint.phaseCounts[phaseStr] = phaseCount + 1;
+          saveCheckpoint(checkpoint);
           phaseCount++;
 
           if (phaseCount % 10 === 0) {

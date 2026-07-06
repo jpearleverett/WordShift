@@ -37,3 +37,4 @@ src/data/.reverseBank*_phase*.json.tmp
 
 # EAS / store credentials — never commit
 secrets/
+src/data/.bank_*_progress.json*

@@ -11,7 +11,37 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SCHEMA_VERSION_KEY = 'wordshift_schema_version';
 
 /** Current schema version — increment when adding new migrations */
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
+
+// ---------------------------------------------------------------------------
+// v4: dialogue-corpus doubling (67 -> 134 base lines per animal).
+// lastDialogueRead indices are positions into each animal's phase-ordered line
+// list; doubling the per-phase counts moves every phase boundary, so each
+// stored index must be remapped to the same (phase, offset) position in the
+// new layout. Kept here (not in amberCurrency) so the mapping constants live
+// and die with the migration.
+// ---------------------------------------------------------------------------
+const V4_OLD_PHASE_STARTS = [0, 12, 26, 37, 52]; // per-phase start indices before doubling
+const V4_OLD_TOTAL = 67;
+const V4_NEW_PHASE_STARTS = [0, 24, 52, 74, 104]; // after doubling (24/28/22/30/30)
+const V4_NEW_TOTAL = 134;
+
+/** Remap one pre-v4 dialogue index to the doubled layout. Exported for tests. */
+export function remapDialogueIndexV4(oldIndex: number): number {
+  if (typeof oldIndex !== 'number' || !isFinite(oldIndex) || oldIndex <= 0) return 0;
+  // Beyond the old total: Phase-5 cycling positions — preserve the distance
+  // past the end so post-revelation pool progress keeps its meaning.
+  if (oldIndex > V4_OLD_TOTAL) return V4_NEW_TOTAL + (oldIndex - V4_OLD_TOTAL);
+  // Within (or exactly at the end of) the old corpus: same phase, same offset.
+  // An old terminal read (67 = phase-4 offset 15) lands at the first NEW
+  // phase-4 line (119), so finished players resume with fresh content.
+  for (let phase = 4; phase >= 0; phase--) {
+    if (oldIndex >= V4_OLD_PHASE_STARTS[phase]) {
+      return V4_NEW_PHASE_STARTS[phase] + (oldIndex - V4_OLD_PHASE_STARTS[phase]);
+    }
+  }
+  return oldIndex;
+}
 
 interface Migration {
   version: number;
@@ -127,6 +157,33 @@ const MIGRATIONS: Migration[] = [
         }
       } catch (error) {
         console.warn('Migration v3: Failed to migrate home progress:', error);
+      }
+    },
+  },
+  {
+    version: 4,
+    description: 'Remap lastDialogueRead indices for the doubled dialogue corpus (67 -> 134 lines per animal)',
+    migrate: async () => {
+      const progressKey = 'wordshift_home_progress';
+      try {
+        const stored = await AsyncStorage.getItem(progressKey);
+        if (stored) {
+          const progress = JSON.parse(stored);
+          // Idempotency marker: the remap is NOT safe to apply twice (a
+          // remapped index re-remaps to garbage), so guard with a flag the
+          // way v2/v3 guard with undefined-checks.
+          if (progress.lastDialogueRead && !progress.dialogueIndicesV4) {
+            const remapped: Record<string, number> = {};
+            for (const [animalId, idx] of Object.entries(progress.lastDialogueRead)) {
+              remapped[animalId] = remapDialogueIndexV4(Number(idx));
+            }
+            progress.lastDialogueRead = remapped;
+          }
+          progress.dialogueIndicesV4 = true;
+          await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
+        }
+      } catch (error) {
+        console.warn('Migration v4: Failed to migrate dialogue indices:', error);
       }
     },
   },

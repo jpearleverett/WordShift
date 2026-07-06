@@ -9,6 +9,14 @@ module.exports = {
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
+      // Transpile-only: the generator scripts run for minutes to hours, and
+      // ts-jest's type-checking mode retains the TypeScript checker program
+      // (millions of AST/Symbol nodes across the module graph, including the
+      // multi-MB bank data files) for the process lifetime — observed as
+      // heap-limit OOM aborts mid-generation. `npm run typecheck` covers the
+      // type safety of everything these scripts import.
+      isolatedModules: true,
+      diagnostics: false,
       tsconfig: {
         module: 'commonjs',
         esModuleInterop: true,
