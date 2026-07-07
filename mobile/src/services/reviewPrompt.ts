@@ -100,9 +100,13 @@ function getStoreReview(): { requestReview?: () => Promise<void>; isAvailableAsy
 }
 
 /**
- * Fire the native store-review prompt if the policy allows. Marks it prompted
- * (once, ever) BEFORE the native call so a failure can't re-prompt. Returns
- * whether a prompt was attempted. Safe no-op when the native module is absent.
+ * Fire the native store-review prompt if the policy allows. The one-time
+ * "prompted" flag is committed ONLY after a native prompt actually fires, so a
+ * player whose OS review sheet is unavailable (or who is running a build where
+ * the module isn't present) keeps their single lifetime ask for a later Phase
+ * 0-1 perfect win. Otherwise we would silently spend the one ask on a no-op and
+ * never reach the player at all. Returns whether a prompt actually fired. Safe
+ * no-op when the native module is absent.
  */
 export async function maybePromptReview(
   ctx: Omit<ReviewPromptContext, 'alreadyPrompted'>
@@ -110,16 +114,22 @@ export async function maybePromptReview(
   const state = await load();
   if (!shouldPromptReview({ ...ctx, alreadyPrompted: state.prompted })) return false;
 
-  // Commit the one-time flag first — the prompt is a courtesy, not a retry loop.
-  await save({ prompted: true });
-
   const sr = getStoreReview();
-  if (!sr?.requestReview) return true; // policy passed; native just isn't present
+  // Native module absent (Expo Go / not installed): do NOT burn the one-time
+  // flag — stay eligible for a real prompt on a later delight peak or after an
+  // update that ships the module.
+  if (!sr?.requestReview) return false;
   try {
-    if (sr.isAvailableAsync && !(await sr.isAvailableAsync())) return true;
+    // OS review sheet not currently available (rate-limited, simulator, etc.):
+    // also keep the flag so a genuine prompt can still land later.
+    if (sr.isAvailableAsync && !(await sr.isAvailableAsync())) return false;
     await sr.requestReview();
   } catch {
-    // Best-effort — never surface a review error to the player.
+    // Best-effort — a failed attempt never consumes the one-time flag.
+    return false;
   }
+
+  // A real prompt fired — commit the one-time flag so we never ask again.
+  await save({ prompted: true });
   return true;
 }
