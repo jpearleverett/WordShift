@@ -29,6 +29,7 @@ import {
   BTN_SHADOW_DP,
 } from '../theme/pixelSkin.generated';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 
 // FoxGuide is always a Phase-0 tutorial moment → bright cottage skin.
 const FOX_SKIN = getPixelSkin(0);
@@ -63,7 +64,7 @@ const foxBevelStyles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: BTN_SHADOW_DP,
   },
-  label: { fontSize: 15, fontWeight: '800', letterSpacing: 0.4 },
+  label: { fontFamily: PIXEL_FONT_BOLD, fontSize: 15, fontWeight: '800', letterSpacing: 0.4 },
 });
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -311,12 +312,14 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
                 <Text style={isCompact ? styles.compactSpriteEmoji : styles.dialogueSpriteEmoji}>🦊</Text>
               )}
             </Animated.View>
+            {/* Name as a portrait nameplate below the sprite (reclaims the
+                wasted header space; the bubble now starts at the top). */}
+            <Text numberOfLines={1} style={[isCompact ? styles.compactName : styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
+            <View style={[isCompact ? styles.compactNameSep : styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
           </View>
 
           {/* Text column */}
           <View style={isCompact ? styles.compactTextCol : styles.dialogueTextCol}>
-            <Text style={[isCompact ? styles.compactName : styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
-            <View style={[isCompact ? styles.compactNameSep : styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
 
             {/* Speech tray. The full dialogue card nests a parchment card-frame
                 bubble (matches the home dialogue); the compact card is itself a
@@ -460,18 +463,22 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     paddingHorizontal: 12,
   },
+  // Portrait nameplate below the sprite, centered in the alcove.
   dialogueName: {
-    fontSize: 22,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 3,
   },
   dialogueNameSep: {
     height: 2,
-    width: 32,
+    width: 26,
     borderRadius: 1,
     opacity: 0.5,
-    marginBottom: 12,
+    alignSelf: 'center',
   },
   // Cottage parchment tray (NineSliceFrame card); clear the 12dp wood band.
   dialogueBubble: {
@@ -482,9 +489,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialogueText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 15,
-    lineHeight: 23,
-    letterSpacing: 0.1,
+    lineHeight: 25,
+    letterSpacing: 0.2,
   },
   dialogueFooter: {
     flexDirection: 'row',
@@ -496,6 +504,7 @@ const styles = StyleSheet.create({
     minHeight: BTN_MD_DP + BTN_SHADOW_DP,
   },
   dialogueSkipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -532,17 +541,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   compactName: {
-    fontSize: 16,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 13,
     fontWeight: '900',
-    letterSpacing: 0.5,
-    marginBottom: 3,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 2,
   },
   compactNameSep: {
     height: 2,
-    width: 24,
+    width: 20,
     borderRadius: 1,
     opacity: 0.5,
-    marginBottom: 8,
+    alignSelf: 'center',
   },
   // Text sits directly on the card-frame parchment (no nested bubble), so only
   // light inner spacing is needed above the footer.
@@ -553,9 +565,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   compactText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
-    lineHeight: 21,
-    letterSpacing: 0.1,
+    lineHeight: 22,
+    letterSpacing: 0.2,
   },
   compactFooter: {
     flexDirection: 'row',
@@ -567,6 +580,7 @@ const styles = StyleSheet.create({
     minHeight: BTN_MD_DP + BTN_SHADOW_DP,
   },
   compactSkipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 17,

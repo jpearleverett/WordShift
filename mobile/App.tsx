@@ -116,6 +116,7 @@ import { initIAP, setBillingProvider } from './src/services/iap';
 import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
+import { loadPixelFonts } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
@@ -3109,7 +3110,9 @@ function App() {
         // Store first-purchase badge) — a cheap local read that must NOT ride on
         // the fire-and-forget initIAP, or a cold cache briefly misreports
         // Patron/ad-free status and the Store's 2x-first-purchase badge.
-        await Promise.all([initCosmetics(), initHints(), loadEntitlements()]);
+        // loadPixelFonts registers the cottage dialogue/chrome font before the
+        // first frame (never throws — falls back to system font on failure).
+        await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
       } finally {
