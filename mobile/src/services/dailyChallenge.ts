@@ -193,6 +193,46 @@ export function getDailyRamp(dateStr?: string): {
   }
 }
 
+// Deterministic daily host order — the animal "preparing today's offering".
+// Same for every player on a given date (seeded by the date string). App only
+// surfaces the host line if the player has actually met the animal, else Fox.
+const DAILY_HOST_ORDER = [
+  'fox', 'pangolin', 'owl', 'axolotl', 'capybara',
+  'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda',
+] as const;
+
+// Canonical animal display names (kept local so dailyChallenge doesn't depend on
+// homeWorldData). Must stay in sync with the ANIMALS name fields.
+const DAILY_HOST_NAMES: Record<string, string> = {
+  fox: 'Ember', pangolin: 'Panko', owl: 'Archimedes', axolotl: 'Axel',
+  capybara: 'Chill', fennec_fox: 'Fennick', sloth: 'Sloane', wombat: 'Warren',
+  rabbit: 'Thyme', red_panda: 'Bamboo',
+};
+
+/**
+ * The animal type hosting today's daily challenge (deterministic by date). Gives
+ * the daily a narrative host instead of being the one ritual with no animal
+ * attached (assessment §7).
+ */
+export function getDailyHost(dateStr?: string): (typeof DAILY_HOST_ORDER)[number] {
+  const rng = seededRandom(`wordshift-daily-host-${dateStr ?? getTodayString()}`);
+  return DAILY_HOST_ORDER[Math.floor(rng() * DAILY_HOST_ORDER.length)];
+}
+
+/**
+ * The display NAME of today's daily host, chosen deterministically from the
+ * animals the player has actually MET (`unlockedTypes`) — the narrative rule is
+ * that no animal is named before the player meets them. Falls back to Fox
+ * (Ember), who is always known after onboarding.
+ */
+export function getDailyHostName(unlockedTypes: string[], dateStr?: string): string {
+  const known = DAILY_HOST_ORDER.filter(t => unlockedTypes.includes(t));
+  const pool = known.length > 0 ? known : (['fox'] as const);
+  const rng = seededRandom(`wordshift-daily-host-${dateStr ?? getTodayString()}`);
+  const host = pool[Math.floor(rng() * pool.length)];
+  return DAILY_HOST_NAMES[host] ?? 'Ember';
+}
+
 /**
  * Load daily challenge progress
  */

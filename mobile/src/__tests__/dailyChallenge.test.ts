@@ -15,6 +15,8 @@ import {
   loadDailyProgress,
   grantFirstDailyMercy,
   DAILY_CHALLENGE_UNLOCK_PUZZLES,
+  getDailyHost,
+  getDailyHostName,
 } from '../services/dailyChallenge';
 import { getHintBalance, clearHints } from '../services/hints';
 import { FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
@@ -99,6 +101,24 @@ describe('dailyChallenge', () => {
 
   test('unlock threshold is 8 puzzles (aligned with the auto-collect window)', () => {
     expect(DAILY_CHALLENGE_UNLOCK_PUZZLES).toBe(8);
+  });
+
+  describe('daily host', () => {
+    test('is deterministic by date', () => {
+      expect(getDailyHost('2026-02-15')).toBe(getDailyHost('2026-02-15'));
+    });
+
+    test('host name only ever names an animal the player has met', () => {
+      // Only Fox met → always Ember, even though the deterministic pick may be someone else.
+      expect(getDailyHostName(['fox'], '2026-02-15')).toBe('Ember');
+      // No animals met → falls back to Ember (Fox is always known post-onboarding).
+      expect(getDailyHostName([], '2026-02-15')).toBe('Ember');
+    });
+
+    test('host name is chosen from the unlocked set', () => {
+      const name = getDailyHostName(['fox', 'pangolin', 'owl'], '2026-02-15');
+      expect(['Ember', 'Panko', 'Archimedes']).toContain(name);
+    });
   });
 
   test('daily challenge unlocks after enough puzzle progress', () => {

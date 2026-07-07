@@ -147,6 +147,8 @@ interface HomeScreenProps {
   onPlayPuzzle: (difficulty?: Difficulty) => void;
   /** Start the Daily Challenge (seeded HARD puzzle). */
   onStartDaily?: (difficulty: Difficulty) => void;
+  /** Re-check today's leaderboard standing (tapping the completed daily card). */
+  onRecheckDailyStanding?: () => void;
   onAmberChange?: (newBalance: number) => void;
   onOpenSettings?: () => void;
   onOpenStats?: () => void;
@@ -368,6 +370,7 @@ const BevelRowButton: React.FC<{
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
+  onRecheckDailyStanding,
   onAmberChange,
   onOpenSettings,
   onOpenStats,
@@ -1370,6 +1373,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
                 <DailyChallengeCard
                   onStartDaily={onStartDaily}
+                  onRecheckStanding={onRecheckDailyStanding}
                   phase={progress.currentPhase}
                   refreshSignal={progress.puzzlesSolved}
                 />

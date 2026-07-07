@@ -16,6 +16,9 @@ interface DailyChallengeCardProps {
   phase?: number;
   /** Changing this value re-runs the daily status load (e.g. after returning home from a daily completion). */
   refreshSignal?: number | string;
+  /** Tapping the COMPLETED card re-checks today's leaderboard standing (the
+   *  standing was previously shown exactly once, on completion). */
+  onRecheckStanding?: () => void;
 }
 
 /**
@@ -28,6 +31,7 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   onStartDaily,
   phase = 0,
   refreshSignal,
+  onRecheckStanding,
 }) => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [difficulty, setDifficulty] = useState<Difficulty>('HARD');
@@ -125,6 +129,9 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
   const handlePress = () => {
     if (!isCompleted) {
       onStartDaily(difficulty);
+    } else {
+      // Already played today — re-check the leaderboard standing.
+      onRecheckStanding?.();
     }
   };
 
@@ -148,10 +155,10 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
         style={[styles.button, { backgroundColor: btnBg }]}
         onPress={handlePress}
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        activeOpacity={isCompleted ? 1 : 0.7}
+        activeOpacity={isCompleted && !onRecheckStanding ? 1 : 0.7}
         accessibilityLabel={
           isCompleted
-            ? `Daily challenge completed. ${stars} stars. ${streak > 1 ? `${streak} day streak.` : ''}`
+            ? `Daily challenge completed. ${stars} stars. ${streak > 1 ? `${streak} day streak. ` : ''}${onRecheckStanding ? 'Tap to check your standing.' : ''}`
             : 'Start daily challenge'
         }
         accessibilityRole="button"

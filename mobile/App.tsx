@@ -53,12 +53,13 @@ import {
   markPostRevelation,
   recordPhase4Dwell,
   consumeVariantNudge,
+  getFullProgress,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
 import { NotificationPromptModal } from './src/components/NotificationPromptModal';
 import { PatronModal } from './src/components/monetization/PatronModal';
-import { submitDailyResult, getDailyRank, DailyRank } from './src/services/leaderboard';
+import { submitDailyResult, getDailyRank, getBeatPercentText, DailyRank } from './src/services/leaderboard';
 import { recordPuzzleContribution, getAggregateProof, getWordsOfferedText } from './src/services/socialProof';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
@@ -90,10 +91,12 @@ import {
   getPaceTrendMessage,
   getSpeedRecordMessage,
   getVariantNudgeMessage,
+  getDailyHostLine,
 } from './src/services/phaseNarrative';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
+import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
-import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy } from './src/services/dailyChallenge';
+import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName } from './src/services/dailyChallenge';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
@@ -913,6 +916,13 @@ function MainApp() {
           if (mercyHints !== null) {
             puzzleActions.refreshHintBalance();
             puzzleActions.setMessage(getFirstDailyMercyMessage(persistence.currentPhase, mercyHints));
+          } else {
+            // Narrative host: name the animal who "prepared" today's offering —
+            // only ever one the player has met (assessment §7). Skipped on the
+            // first daily so the mercy message isn't clobbered.
+            const prog = await getFullProgress();
+            const hostName = getDailyHostName(prog?.unlockedAnimals ?? []);
+            puzzleActions.setMessage(getDailyHostLine(hostName, persistence.currentPhase));
           }
         } catch {
           // Non-critical — the daily plays fine without the mercy grant.
@@ -926,6 +936,29 @@ function MainApp() {
       }
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
+
+  // Re-check today's daily leaderboard standing (tapping the completed daily
+  // card). The standing used to be shown exactly once, on completion; this gives
+  // it a re-check surface (assessment §7). Degrades gracefully when the backend
+  // is off or standings haven't aggregated yet.
+  const handleRecheckDailyStanding = useCallback(() => {
+    hapticLight();
+    (async () => {
+      try {
+        const rank = await getDailyRank(getLocalDateString());
+        if (rank) {
+          Alert.alert(
+            'Today’s Standing',
+            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.`
+          );
+        } else {
+          Alert.alert('Today’s Standing', 'The standings are still gathering. Check back a little later.');
+        }
+      } catch {
+        // Non-critical — leaderboard is decorative.
+      }
+    })();
+  }, [persistence.currentPhase]);
 
   // Start a puzzle from a friend-shared challenge link. The hook validates the
   // decoded words (dictionary membership, uniform length) and returns false
@@ -1396,6 +1429,20 @@ function MainApp() {
       puzzleActions.setShowConfetti(true);
       victoryActions.setProcessingVictory(false);
       puzzlesSinceHomeVisit.current += 1;
+
+      // Store-review prompt — ONLY on a Phase 0-1 delight peak (a perfect win),
+      // HARD-suppressed from Phase 2 on so the reveal's betrayal can't harvest
+      // one-star reviews (assessment §9). Policy-gated + once-ever; deferred so
+      // it lands after the victory choreography settles.
+      addVictoryTimeout(() => {
+        maybePromptReview({
+          phase: persistence.currentPhase,
+          stars: victory.earnedStars,
+          puzzlesSolved: completedTotal,
+          isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
+          isDaily: isPlayingDaily,
+        }).catch(() => {});
+      }, 1800);
 
       // Play choreographed victory sequence (the modal gates tap-to-skip to
       // its own entrance window via onSkip)
@@ -2278,6 +2325,7 @@ function MainApp() {
             <HomeScreen
               onPlayPuzzle={handlePlayPuzzle}
               onStartDaily={handleStartDaily}
+              onRecheckDailyStanding={handleRecheckDailyStanding}
               onAmberChange={persistenceActions.setAmberBalance}
               onOpenSettings={() => transitionTo('settings')}
               onOpenStats={() => transitionTo('stats')}

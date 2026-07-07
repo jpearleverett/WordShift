@@ -1731,6 +1731,17 @@ export function getEchoPuzzleMessage(phase: DialoguePhase): string {
  * complicity lever). Phase 2+ only; {word} is the strongest dread word offered.
  * The point is quiet accusation: you didn't have to give us this.
  */
+/**
+ * Daily-challenge narrative host line ("Panko prepared today's offering") — the
+ * daily was the only ritual with no animal attached (assessment §7). Phase-aware.
+ * {host} is the animal's display name, resolved by the caller.
+ */
+export function getDailyHostLine(hostName: string, phase: DialoguePhase): string {
+  if (phase >= 4) return `${hostName} laid out today's offering. It is ready for you.`;
+  if (phase >= 2) return `${hostName} prepared today's arrangement. They were waiting for you.`;
+  return `${hostName} prepared today's puzzle just for you!`;
+}
+
 export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
   const w = word.toUpperCase();
   if (phase >= 5) return `${w}. It is part of the weave now. Woven by your hand.`;
