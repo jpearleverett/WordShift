@@ -19,6 +19,16 @@ import {
 } from './wordHistory';
 import { getCurrentPhase } from './amberCurrency';
 import { DialoguePhase } from '../types/homeWorld';
+import { isReverseChainSolvable } from './puzzleSolvability';
+
+// Shipped-rules solvability check (COMMON_WORDS is the same dictionary the
+// board validates against). Used as the FINAL acceptance gate for reverse
+// chains so the generator can never again emit a chain that is unwinnable
+// under the real move rules (the divergence that shipped 36 dead reverse
+// boards): the internal isReverseSolvable follows the stored solution's
+// forward letters, while this explores the full move space exactly as the
+// player can.
+const isValidWordForRules = (w: string): boolean => COMMON_WORDS.has(w.toUpperCase());
 
 // Organize sets for dynamic access
 const WORD_SETS: Record<number, Set<string>> = {
@@ -1098,7 +1108,11 @@ async function generateReverseChain(
     const words = chain.map(n => n.word);
     checksCount++;
 
-    if (isReverseSolvable(words, solution)) {
+    if (
+      isReverseSolvable(words, solution) &&
+      // Final gate under the SHIPPED rules — no more unwinnable reverse boards.
+      isReverseChainSolvable(words, isValidWordForRules) === 'solvable'
+    ) {
       const score = scorePuzzleChain(chain, recencyMap, true);
       if (score > bestScore) {
         bestChain = chain;
