@@ -187,9 +187,9 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    paddingTop: 26,
-    paddingHorizontal: 22,
-    paddingBottom: 14,
+    paddingTop: 28,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     alignItems: 'center',
   },
   glow: {

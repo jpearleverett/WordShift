@@ -89,7 +89,7 @@ export const WordLedger: React.FC<WordLedgerProps> = ({ phase, onClose }) => {
         >
           <Text style={[styles.backChipText, { color: t.title }]}>← Back</Text>
         </TouchableOpacity>
-        <PanelCard phase={phase} kind="panel" style={styles.titlePlaque}>
+        <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
           <Text style={[styles.title, { color: t.title }]}>
             {getTitle()}
           </Text>

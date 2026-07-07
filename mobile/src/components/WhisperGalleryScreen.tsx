@@ -84,7 +84,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
         >
           <Text style={[styles.backChipText, { color: t.title }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <PanelCard phase={phase} kind="panel" style={styles.titlePlaque}>
+        <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
           <Text style={[styles.title, { color: t.title }]}>{title}</Text>
           <Text style={[styles.subtitle, { color: t.muted }]}>{subtitle}</Text>
         </PanelCard>

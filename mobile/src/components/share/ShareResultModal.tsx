@@ -156,7 +156,7 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
             <>
               <ShareCard ref={cardRef} result={result} />
 
-              <PanelCard phase={phase} kind="panel" style={styles.actionPanel}>
+              <PanelCard phase={phase} kind="card" style={styles.actionPanel}>
                 {bonusAvailable && (
                   <Text style={[styles.bonusHint, { color: t.amberText }]}>
                     +{DAILY_SHARE_BONUS_AMBER} amber for your first share today
