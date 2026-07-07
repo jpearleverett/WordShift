@@ -692,40 +692,62 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
           {/* Animal body */}
           {CHARACTER_SPRITES[animal.type] && !spriteLoadFailed ? (
             (() => {
-              const spriteSource =
-                currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
-                  ? CHARACTER_SPRITES[animal.type]!.robed!
-                  : walkActive && walkFrames
-                    ? walkFrames[walkFrame % walkFrames.length]
-                    : CHARACTER_SPRITES[animal.type]!.idle;
+              const sprites = CHARACTER_SPRITES[animal.type]!;
+              const staticSource =
+                currentPhase >= 4 && sprites.robed ? sprites.robed : sprites.idle;
               const dreadTint = getSpriteDreadTint(currentPhase);
-              // Base sprite renders with its explicit size (the known-good path).
-              const baseSprite = (
-                <Image
-                  source={spriteSource}
-                  style={styles.spriteImage}
-                  resizeMode="contain"
-                  onError={() => setSpriteLoadFailed(true)}
-                />
+              // Walk frames stay MOUNTED (opacity-switched) whenever they
+              // could play — swapping one Image's `source` mid-gait forces an
+              // async decode per frame the first time through the cycle,
+              // which reads as flicker. Mounting decodes everything up front.
+              // Skipped when the walk can never run (robed phases, reduced
+              // motion, low-tier devices) so those paths pay no decode cost.
+              const mountWalkStack = Boolean(
+                walkFrames &&
+                walkFrames.length > 0 &&
+                currentPhase < 4 &&
+                !getSettingsSync().reducedMotion &&
+                !shouldSimplifyAnimations()
               );
-              // Phases 0 and 4+ have no dread wash — render the bare sprite,
-              // exactly as before the dread-ramp refactor.
-              if (!dreadTint) return baseSprite;
-              // Phases 1-3: layer a tinted copy on top (tintColor honours the
-              // sprite's alpha, so only the animal shape cools, not the box).
-              return (
-                <View style={styles.spriteImage}>
-                  {baseSprite}
+              // Phases 1-3 layer a tinted copy on top of each layer (tintColor
+              // honours the sprite's alpha, so only the animal shape cools).
+              const renderTint = (source: ImageSourcePropType) =>
+                dreadTint ? (
                   <Image
-                    source={spriteSource}
+                    source={source}
                     style={[
-                      StyleSheet.absoluteFill,
+                      styles.spriteLayer,
                       { tintColor: dreadTint.color, opacity: dreadTint.opacity },
                     ]}
                     resizeMode="contain"
                     importantForAccessibility="no"
                     accessibilityElementsHidden
                   />
+                ) : null;
+              return (
+                <View style={styles.spriteImage}>
+                  {/* Idle/robed base — hidden (not unmounted) while walking */}
+                  <View style={[styles.spriteLayer, { opacity: walkActive ? 0 : 1 }]}>
+                    <Image
+                      source={staticSource}
+                      style={styles.spriteFill}
+                      resizeMode="contain"
+                      onError={() => setSpriteLoadFailed(true)}
+                    />
+                    {renderTint(staticSource)}
+                  </View>
+                  {mountWalkStack && walkFrames!.map((frameSource, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.spriteLayer,
+                        { opacity: walkActive && idx === walkFrame % walkFrames!.length ? 1 : 0 },
+                      ]}
+                    >
+                      <Image source={frameSource} style={styles.spriteFill} resizeMode="contain" />
+                      {renderTint(frameSource)}
+                    </View>
+                  ))}
                 </View>
               );
             })()
@@ -841,6 +863,19 @@ const styles = StyleSheet.create({
   spriteImage: {
     width: 90,
     height: 90,
+  },
+  // Stacked sprite layers: absolute + EXPLICIT '100%' size (never inset-only —
+  // on Fabric an Image sized only by insets collapses to its intrinsic size).
+  spriteLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+  spriteFill: {
+    width: '100%',
+    height: '100%',
   },
   notificationBadge: {
     position: 'absolute',
