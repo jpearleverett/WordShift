@@ -1388,6 +1388,27 @@ export async function isPostRevelation(): Promise<boolean> {
 }
 
 /**
+ * Record one Phase-4 "dwell" puzzle (a victory at Phase 4 with the house
+ * complete and the finale not yet fired) and return the new count. The finale
+ * gate reads this so the cult-reveal era is genuinely played instead of
+ * flashing past in one puzzle. Idempotent-safe: callers should only invoke it
+ * on the exact victory path that would otherwise trigger the finale.
+ */
+export async function recordPhase4Dwell(): Promise<number> {
+  const progress = await loadProgress();
+  progress.phase4Dwell = (progress.phase4Dwell ?? 0) + 1;
+  progressCache = progress;
+  await saveProgress();
+  return progress.phase4Dwell;
+}
+
+/** Current Phase-4 dwell count (see recordPhase4Dwell). */
+export async function getPhase4DwellCount(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.phase4Dwell ?? 0;
+}
+
+/**
  * Mark tutorial seeds as planted (for Phase 4 callbacks)
  */
 export async function markTutorialSeedsPlanted(): Promise<void> {

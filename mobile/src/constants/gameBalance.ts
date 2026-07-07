@@ -227,6 +227,18 @@ export const STARTER_INTRO_MIN_PUZZLES = 12;
 export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 
 /**
+ * Finale dwell: the cult-reveal finale used to fire on the FIRST Phase-4
+ * victory with a complete house, so the entire robed/storm/sacrifice era
+ * (300 written dialogue lines) flashed past in ~2 puzzles. The finale now
+ * unlocks only after the player has completed this many Phase-4 puzzles with
+ * the house complete — long enough, against the 5-puzzle Phase-4 dialogue
+ * cooldown, for multiple sessions per animal and the sacrifice mechanic to
+ * actually be played. Never revealed as a counter (narrative rule 7); the
+ * house "is not yet ready to receive it."
+ */
+export const FINALE_DWELL_PUZZLES = 8;
+
+/**
  * Pending (unoffered) pit amber at or above which the home screen gives a
  * gentle once-per-session Fox nudge to go harvest. High enough that a player
  * banking a puzzle or two never sees it; the pit-entrance glow remains the

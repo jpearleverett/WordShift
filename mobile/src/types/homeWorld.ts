@@ -250,6 +250,10 @@ export interface HomeWorldProgress {
   finalPuzzleCompleted?: boolean;
   // Whether post-revelation (Phase 5) content has been reached
   postRevelation?: boolean;
+  // Count of puzzles completed at Phase 4 with the house already complete —
+  // gates the finale (dwell so the cult-reveal era is actually played, not
+  // flashed past in one puzzle). See FINALE_DWELL_PUZZLES.
+  phase4Dwell?: number;
   // Tutorial seeds - tracks specific tutorial lines for Phase 4 callbacks
   tutorialSeedsPlanted?: boolean;
   // Coordinated dialogue events that have been consumed (by theme name)

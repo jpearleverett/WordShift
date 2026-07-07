@@ -33,6 +33,8 @@ import {
   setSurpriseRng,
   markPostRevelation,
   isPostRevelation,
+  recordPhase4Dwell,
+  getPhase4DwellCount,
   getFullProgress,
   invalidateProgressCache,
 } from '../services/amberCurrency';
@@ -706,6 +708,14 @@ describe('challenge intro tracking', () => {
 // ============================================================================
 
 describe('post-revelation phase pinning (Phase 5)', () => {
+  test('recordPhase4Dwell counts up and getPhase4DwellCount reads it (finale gate)', async () => {
+    expect(await getPhase4DwellCount()).toBe(0);
+    expect(await recordPhase4Dwell()).toBe(1);
+    expect(await recordPhase4Dwell()).toBe(2);
+    expect(await recordPhase4Dwell()).toBe(3);
+    expect(await getPhase4DwellCount()).toBe(3);
+  });
+
   test('markPostRevelation sets currentPhase to 5 and clears any pending transition', async () => {
     await devAddPuzzles(235); // Reach phase 4
     await markPostRevelation();

@@ -51,6 +51,7 @@ import {
   markFinalPuzzleCompleted,
   isPostRevelation,
   markPostRevelation,
+  recordPhase4Dwell,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
@@ -112,7 +113,7 @@ import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
@@ -1338,14 +1339,23 @@ function MainApp() {
           if (houseComplete) {
             const finalDone = await isFinalPuzzleCompleted();
             if (!finalDone) {
-              await markFinalPuzzleCompleted();
-              orchestrationActions.setCompletionCoda({
-                title: 'THE HOUSE STANDS COMPLETE',
-                text: persistence.currentPhase >= 3
-                  ? 'You finished what was being built. There is no pretending now.'
-                  : 'You completed the house and reached the final path.',
-              });
-              addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+              // Dwell gate: the finale used to fire on the FIRST Phase-4
+              // victory, so the whole cult-reveal era flashed past in one
+              // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first so
+              // the robed sprites, sacrifice mechanic, and 300 Phase-4
+              // dialogue lines are actually played. Never shown as a counter
+              // (narrative rule 7) — the house "is not yet ready."
+              const dwell = await recordPhase4Dwell();
+              if (dwell >= FINALE_DWELL_PUZZLES) {
+                await markFinalPuzzleCompleted();
+                orchestrationActions.setCompletionCoda({
+                  title: 'THE HOUSE STANDS COMPLETE',
+                  text: persistence.currentPhase >= 3
+                    ? 'You finished what was being built. There is no pretending now.'
+                    : 'You completed the house and reached the final path.',
+                });
+                addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+              }
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
