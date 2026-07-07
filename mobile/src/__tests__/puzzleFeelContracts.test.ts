@@ -134,6 +134,22 @@ describe('Row hint-glow + arrival prop contract', () => {
   });
 });
 
+// --- Row drop effects are visual-only (App owns the haptic) ------------------
+// Regression pin for the doubled-buzz fix: App.tsx fires the weighted valid/
+// invalid drop haptic; Row.tsx renders only the shake/bounce. Re-adding a
+// haptic in Row would double every tap's buzz. Guard-by-source (Row can't
+// render in Node), matching the isStuck source-guard idiom.
+describe('Row drop effects are visual-only', () => {
+  const rowSrc = require('fs').readFileSync(
+    require('path').join(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+  test('Row.tsx does not import or call hapticMedium / hapticError', () => {
+    expect(rowSrc).not.toMatch(/hapticMedium/);
+    expect(rowSrc).not.toMatch(/hapticError/);
+  });
+});
+
 // ─── ShareCard honest performance grid ──────────────────────────────────────
 // The shared PNG/preview must show the SAME grid as the shared text
 // (generateShareText): one square per move in play order when moveOutcomes is
