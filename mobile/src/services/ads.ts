@@ -207,7 +207,7 @@ async function savePacing(): Promise<void> {
 // Pure policy helpers (exported for testing)
 // ---------------------------------------------------------------------------
 
-/** Interstitial cadence by phase (looser early to protect the candy-phase tone). */
+/** Interstitial cadence by phase; the gap only widens toward the reveal (early = light touch, Phase 3 doubled, Phase 4+ silenced in shouldShowInterstitial). */
 export function interstitialFrequency(phase: DialoguePhase): number {
   return (phase as number) <= 2 ? INTERSTITIAL_FREQUENCY_EARLY : INTERSTITIAL_FREQUENCY_LATE;
 }

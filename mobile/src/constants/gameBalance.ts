@@ -139,12 +139,17 @@ export const DAILY_AMBER_REWARD = 60;
 export const DAILY_AMBER_DAILY_CAP = 2;
 
 /**
- * Interstitial cadence: show at most one interstitial every Nth completed puzzle.
- * Looser early (Phase 0–2) to protect the candy-phase tone contract, tighter later.
- * Patron holders and all narrative-beat exemptions bypass this entirely (see ads.ts).
+ * Interstitial cadence: at most one interstitial every Nth completed puzzle, and
+ * the gap only ever WIDENS as the story darkens. EARLY applies in the bright
+ * candy phases (0–2); at the dusk turn (Phase 3) shouldShowInterstitial doubles
+ * the gap (→ every 10), and from the reveal on (Phase 4+) interstitials are
+ * silenced entirely. Kept a genuinely light touch even early, so ads never
+ * trample the first-impression / review window (the candy hours are the game's
+ * single differentiator and where store reviews are won). Patron holders and
+ * every narrative-beat exemption bypass this entirely (see ads.ts).
  */
-export const INTERSTITIAL_FREQUENCY_EARLY = 3; // Phase 0–2
-export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3+
+export const INTERSTITIAL_FREQUENCY_EARLY = 6; // Phase 0–2 (candy hours: light touch)
+export const INTERSTITIAL_FREQUENCY_LATE = 5; // Phase 3 base (×2 → every 10); Phase 4+ suppressed
 
 // ============================================================================
 // HINT ECONOMY
