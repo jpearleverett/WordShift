@@ -1,13 +1,15 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Animated,
+  Easing,
   Modal,
 } from 'react-native';
-import { CandyColors, getPhaseTheme } from '../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { PanelCard } from './ui/PanelCard';
+import { CandyButton } from './ui/CandyButton';
 import { getSettingsSync } from '../services/settings';
 
 interface NotificationPromptModalProps {
@@ -39,26 +41,35 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
   onAccept,
   onDecline,
 }) => {
-  const phaseTheme = getPhaseTheme(phase);
+  const t = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
 
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.85)).current;
+  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const closingRef = useRef(false);
 
   useEffect(() => {
     if (!visible) return;
+    closingRef.current = false;
     if (reducedMotion) {
+      backdropOpacity.setValue(1);
       cardScale.setValue(1);
       cardOpacity.setValue(1);
       return;
     }
-    cardScale.setValue(0.85);
+    backdropOpacity.setValue(0);
+    cardScale.setValue(0.92);
     cardOpacity.setValue(0);
     const anim = Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
       Animated.spring(cardScale, {
         toValue: 1,
-        friction: 6,
-        tension: 120,
+        ...SURFACE.modalIn,
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {
@@ -69,68 +80,94 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, cardScale, cardOpacity]);
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+
+  const animateOut = useCallback((done: () => void) => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (reducedMotion) {
+      done();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => done());
+  }, [reducedMotion, backdropOpacity, cardOpacity]);
+
+  const handleAccept = useCallback(() => animateOut(onAccept), [animateOut, onAccept]);
+  const handleDecline = useCallback(() => animateOut(onDecline), [animateOut, onDecline]);
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={onDecline}
+      onRequestClose={handleDecline}
     >
-      <View style={[styles.overlay, { backgroundColor: phaseTheme.modalOverlayColor }]}>
+      <View style={styles.overlayRoot}>
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
+        />
         <Animated.View
           style={[
-            styles.card,
+            styles.cardWrap,
             {
-              backgroundColor: phaseTheme.modalBgColor,
               transform: [{ scale: cardScale }],
               opacity: cardOpacity,
             },
           ]}
         >
-          <View style={[styles.glow, { backgroundColor: phaseTheme.victoryGlowColor }]} />
+          <PanelCard phase={phase} kind="panel" style={styles.card}>
+            <View style={[styles.glow, { backgroundColor: t.glow }]} />
 
-          <View style={[styles.iconBadge, { backgroundColor: phaseTheme.modalStatBgColor }]}>
-            <Text
-              style={styles.iconGlyph}
-              accessibilityLabel="Reminder bell"
-            >
-              🔔
+            <View style={[styles.iconBadge, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+              <Text
+                style={styles.iconGlyph}
+                accessibilityLabel="Reminder bell"
+              >
+                🔔
+              </Text>
+            </View>
+
+            <Text style={[styles.title, { color: t.title }]}>
+              {title}
             </Text>
-          </View>
 
-          <Text style={[styles.title, { color: phaseTheme.modalTextColor }]}>
-            {title}
-          </Text>
-
-          <Text style={[styles.body, { color: phaseTheme.modalSecondaryTextColor }]}>
-            {body}
-          </Text>
-
-          <TouchableOpacity
-            style={[styles.acceptButton, { backgroundColor: phaseTheme.modalTextColor }]}
-            onPress={onAccept}
-            accessibilityRole="button"
-            accessibilityLabel={acceptLabel}
-            activeOpacity={0.85}
-          >
-            <Text style={[styles.acceptText, { color: phaseTheme.modalBgColor }]}>
-              {acceptLabel}
+            <Text style={[styles.body, { color: t.body }]}>
+              {body}
             </Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.declineButton}
-            onPress={onDecline}
-            accessibilityRole="button"
-            accessibilityLabel={declineLabel}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.declineText, { color: phaseTheme.modalSecondaryTextColor }]}>
-              {declineLabel}
-            </Text>
-          </TouchableOpacity>
+            <CandyButton
+              label={acceptLabel}
+              onPress={handleAccept}
+              phase={phase}
+              variant="primary"
+              size="lg"
+              style={styles.acceptButton}
+              accessibilityLabel={acceptLabel}
+            />
+
+            <CandyButton
+              label={declineLabel}
+              onPress={handleDecline}
+              phase={phase}
+              variant="quiet"
+              style={styles.declineButton}
+              accessibilityLabel={declineLabel}
+            />
+          </PanelCard>
         </Animated.View>
       </View>
     </Modal>
@@ -138,28 +175,22 @@ export const NotificationPromptModal: React.FC<NotificationPromptModalProps> = (
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  overlayRoot: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
   },
-  card: {
+  cardWrap: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: 28,
+  },
+  card: {
+    width: '100%',
     paddingTop: 26,
     paddingHorizontal: 22,
-    paddingBottom: 18,
+    paddingBottom: 14,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 20,
-    overflow: 'hidden',
   },
   glow: {
     position: 'absolute',
@@ -174,6 +205,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
@@ -183,7 +215,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: 0.3,
     textAlign: 'center',
   },
@@ -196,26 +228,10 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   acceptButton: {
-    width: '100%',
-    borderRadius: 16,
-    paddingVertical: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  acceptText: {
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    alignSelf: 'stretch',
   },
   declineButton: {
-    width: '100%',
-    paddingVertical: 13,
+    alignSelf: 'stretch',
     marginTop: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  declineText: {
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

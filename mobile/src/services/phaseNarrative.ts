@@ -2181,7 +2181,10 @@ const PIT_WARD_HINTS: Record<number, string> = {
 };
 
 export function getPitWardHint(currentPhase: DialoguePhase, fraction: number): string | null {
-  if (fraction < 0.3) return null; // Too early
+  // Threshold kept low: the later phases are several times longer than the
+  // first, and a 0.3 gate left the pit mute for dozens of puzzles after each
+  // transition.
+  if (fraction < 0.15) return null; // Too early
   const nextPhase = Math.min(4, currentPhase + 1);
   return PIT_WARD_HINTS[nextPhase] ?? null;
 }
@@ -2392,6 +2395,59 @@ export function getMandatoryHarvestText(phase: DialoguePhase): string {
 export function getMandatoryHarvestCTA(phase: DialoguePhase): string {
   if (phase >= 3) return 'Offer your words to the pit';
   return 'Offer your words at the Pit';
+}
+
+/**
+ * Onboarding skip confirmation (FoxGuide): shown after the first Skip tap so a
+ * stray touch can't silently abandon the guided intro. The SAFE action gets
+ * the prominent pill; the skip is the quiet text button.
+ */
+export function getSkipConfirmText(): string {
+  return 'Skip the rest of the welcome? There are only a few little steps left, and I so wanted to show you the pit...';
+}
+
+export function getSkipConfirmStayLabel(): string {
+  return 'Keep going';
+}
+
+export function getSkipConfirmLeaveLabel(): string {
+  return 'Skip it all';
+}
+
+/**
+ * Home-screen safety net for the first-harvest gate: if the player somehow
+ * lands on home past the auto-collect window with batches waiting and the pit
+ * still unlearned (the victory gate was interrupted by a kill, a back press,
+ * a link), Fox explains the pit once from home. Fired via the HomeScreen
+ * intro-override dialogue; the pit entrance below the house glows the whole
+ * time, so the words have a visible anchor.
+ */
+export function getHarvestHomeIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 3) {
+    return [
+      'The house no longer carries your words down. They wait in the pit, and they are heavy.',
+      'Follow the path below the house. Offer them yourself. Then we continue.',
+    ];
+  }
+  return [
+    'Oh! Friend, before you settle in... the house has stopped carrying your amber down for you.',
+    'Everything you earn waits in the pit now, down past the bottom of the house. See the little glow below us?',
+    'Go tap the words floating there and the pit will trade them for your amber. I promise it is the fun kind of chore.',
+  ];
+}
+
+/**
+ * Gentle once-per-session nudge when a big pile of amber sits unoffered in the
+ * pit. One line, warm, never a command — the pit glow does the pointing.
+ */
+export function getHarvestNudgeLine(phase: DialoguePhase, pendingAmber: number): string[] {
+  if (phase >= 4) {
+    return [`${pendingAmber} amber waits below. The pit is patient. You need not be.`];
+  }
+  if (phase >= 2) {
+    return [`Your words are pooling in the pit, friend... ${pendingAmber} amber worth. It hums when it waits this long.`];
+  }
+  return [`Not to fuss, but there is quite a pile waiting in the pit! ${pendingAmber} amber, just sitting there. Shall we go collect it soon?`];
 }
 
 // ============================================================================

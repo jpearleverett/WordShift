@@ -14,7 +14,21 @@ jest.mock('../services/eventLogger', () => ({
   getEvents: jest.fn(async () => []),
 }));
 
-import { hasSeenMandatoryHarvest, markMandatoryHarvestSeen } from '../services/amberCurrency';
+import {
+  hasSeenMandatoryHarvest,
+  markMandatoryHarvestSeen,
+  hasSeenHarvestHomeIntro,
+  markHarvestHomeIntroSeen,
+  clearProgress,
+} from '../services/amberCurrency';
+import {
+  getHarvestHomeIntroLines,
+  getHarvestNudgeLine,
+  getSkipConfirmText,
+  getSkipConfirmStayLabel,
+  getSkipConfirmLeaveLabel,
+} from '../services/phaseNarrative';
+import { DialoguePhase } from '../types/homeWorld';
 
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
@@ -38,5 +52,55 @@ describe('mandatory first-harvest gate seen flag', () => {
     await markMandatoryHarvestSeen();
     expect(await AsyncStorage.getItem('wordshift_mandatory_harvest_seen')).toBe('true');
     expect(await AsyncStorage.getItem('wordshift_pit_harvest_intro_seen')).toBeNull();
+  });
+});
+
+describe('harvest home-intro safety-net flag', () => {
+  test('round-trips independently of the learned flag', async () => {
+    expect(await hasSeenHarvestHomeIntro()).toBe(false);
+    await markHarvestHomeIntroSeen();
+    expect(await hasSeenHarvestHomeIntro()).toBe(true);
+    // Dismissing the home explanation does NOT count as learning the pit —
+    // only a real manual offer sets the learned flag.
+    expect(await hasSeenMandatoryHarvest()).toBe(false);
+  });
+
+  test('Reset All clears both harvest-gate flags', async () => {
+    await markMandatoryHarvestSeen();
+    await markHarvestHomeIntroSeen();
+    await clearProgress();
+    expect(await hasSeenMandatoryHarvest()).toBe(false);
+    expect(await hasSeenHarvestHomeIntro()).toBe(false);
+  });
+});
+
+describe('harvest gate narrative copy', () => {
+  const phases: DialoguePhase[] = [0, 1, 2, 3, 4, 5];
+
+  test('home intro lines exist for every phase, without em dashes', () => {
+    for (const phase of phases) {
+      const lines = getHarvestHomeIntroLines(phase);
+      expect(lines.length).toBeGreaterThan(0);
+      for (const line of lines) {
+        expect(line.length).toBeGreaterThan(10);
+        expect(line).not.toMatch(/[—–]/);
+      }
+    }
+  });
+
+  test('heavy-pit nudge line includes the pending amber and has no em dashes', () => {
+    for (const phase of phases) {
+      const lines = getHarvestNudgeLine(phase, 240);
+      expect(lines.length).toBe(1);
+      expect(lines[0]).toContain('240');
+      expect(lines[0]).not.toMatch(/[—–]/);
+    }
+  });
+
+  test('skip confirmation copy is present and em-dash free', () => {
+    for (const s of [getSkipConfirmText(), getSkipConfirmStayLabel(), getSkipConfirmLeaveLabel()]) {
+      expect(s.length).toBeGreaterThan(3);
+      expect(s).not.toMatch(/[—–]/);
+    }
   });
 });

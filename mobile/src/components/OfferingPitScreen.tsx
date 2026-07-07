@@ -43,7 +43,7 @@ import {
   getTendingMilestoneCeremonyText,
   getTendingLevelLabel,
 } from '../services/phaseNarrative';
-import { confirmPhaseTransition, spendAmber, awardBonusAmber } from '../services/amberCurrency';
+import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen } from '../services/amberCurrency';
 import {
   loadTendingState,
   getNextTendingInfo,
@@ -862,15 +862,21 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const ceremonyTextOpacity = useRef(new Animated.Value(0)).current;
   const ceremonyOverlayOpacity = useRef(new Animated.Value(0)).current;
 
-  // Ward mark positions: distributed along upper arc of the pit oval
+  // Ward mark positions: distributed along the upper arc of the pit opening.
+  // The dots trace the opening's OWN ellipse plus a small uniform offset, so
+  // they hug the rim's actual curvature on every device. (The old
+  // radiusX*1.18 / radiusY*1.8 pair traced a much taller ellipse whose crown
+  // floated well above the rim while the ends sat near it — the marks read as
+  // misaligned with the pit's curve.)
   const wardPositions = useMemo(() => {
     const positions: { x: number; y: number }[] = [];
+    const RIM_OFFSET = 10;
     for (let i = 0; i < PIT_WARD_COUNT; i++) {
       const t = PIT_WARD_COUNT > 1 ? i / (PIT_WARD_COUNT - 1) : 0.5;
       const angle = -Math.PI * 0.85 + t * Math.PI * 0.7;
       positions.push({
-        x: PIT_CENTER.x + PIT_OVAL.radiusX * 1.18 * Math.cos(angle),
-        y: PIT_CENTER.y + PIT_OVAL.radiusY * 1.8 * Math.sin(angle),
+        x: PIT_CENTER.x + (PIT_OVAL.radiusX + RIM_OFFSET) * Math.cos(angle),
+        y: PIT_CENTER.y + (PIT_OVAL.radiusY + RIM_OFFSET) * Math.sin(angle),
       });
     }
     return positions;
@@ -880,6 +886,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   const litCount = pendingPhaseTransition != null
     ? PIT_WARD_COUNT
     : Math.floor(phaseProgressFraction * PIT_WARD_COUNT);
+  // The NEXT ward "charges" continuously (partial-opacity lit color) so the
+  // player always sees motion toward the next transition — the later phases
+  // are 3-5x longer than the first, and whole-dot steps alone left them
+  // looking stalled for dozens of puzzles.
+  const wardChargeFraction = pendingPhaseTransition != null
+    ? 0
+    : Math.max(0, Math.min(1, phaseProgressFraction * PIT_WARD_COUNT - litCount));
 
   // Ward pulse loop for pending state
   useEffect(() => {
@@ -939,7 +952,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     if (pendingPhaseTransition != null && ceremonyStatus === 'idle') {
       return getPitTransitionReadyText(pendingPhaseTransition);
     }
-    if (phase < 4 && phaseProgressFraction >= 0.3 && pendingPhaseTransition == null) {
+    if (phase < 4 && phaseProgressFraction >= 0.15 && pendingPhaseTransition == null) {
       return getPitWardHint(phase, phaseProgressFraction);
     }
     return null;
@@ -1623,6 +1636,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       const result = await offerBatch(batchId);
       if (!result) return;
       logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
+      // A completed manual offer is the moment the player has LEARNED the pit —
+      // this is what retires the first-harvest victory gate (the onboarding
+      // pit beat doesn't count; the gate re-teaches the auto-collect handoff).
+      if (!isOnboarding) {
+        markMandatoryHarvestSeen().catch(() => {});
+      }
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
       if (mountedRef.current) {
         // Settle on the real credited balance. The per-word optimistic bumps
@@ -1652,7 +1671,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
       }
     } catch { /* batch may already be offered */ }
-  }, [phase, onAmberChange, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
+  }, [phase, onAmberChange, spawnAmberRise, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding]);
 
   // ---- Handle word devoured ----
   const handleWordDevoured = useCallback((fw: FlyingWord) => {
@@ -1807,6 +1826,10 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     // Offer all batches atomically first
     const result = await offerAllBatches();
     logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
+    // Manual offer completed — the pit is learned (see tryFinalizeBatch).
+    if (!isOnboarding) {
+      markMandatoryHarvestSeen().catch(() => {});
+    }
     let finalBalance = baseBalance;
     if (result.amberAwarded > 0) {
       finalBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
@@ -1932,7 +1955,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         }
       }
     }, cascadeDuration);
-  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony]);
+  }, [isOffering, harvestState, phase, amberBalance, reducedMotion, onAmberChange, getCurrentPos, spawnTrail, spawnAmberRise, spawnImpactBurst, spawnShockwave, flashPitSurge, showResultToast, pendingPhaseTransition, ceremonyStatus, startCeremony, isOnboarding]);
 
   // ---- Onboarding: advance when the PLAYER has offered every word ----
   // The pit_offering step is completed by the player's own taps (each word
@@ -2131,19 +2154,23 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {shockwaveRings.map(ring => <ShockwaveRingView key={ring.id} ring={ring} />)}
 
       {/* Ward marks — phase progression indicators around the pit rim */}
-      {phase < 4 && (litCount > 0 || pendingPhaseTransition != null) && (
+      {phase < 4 && (litCount > 0 || wardChargeFraction > 0.02 || pendingPhaseTransition != null) && (
         <>
           {wardPositions.map((pos, idx) => {
             const isLit = idx < litCount;
             const isPending = pendingPhaseTransition != null && ceremonyStatus === 'idle';
             const isIgnited = ceremonyStatus === 'igniting' && idx <= ceremonyIgniteStep;
+            // The next unlit ward brightens continuously with sub-dot progress.
+            const isCharging = !isPending && !isIgnited && !isLit && idx === litCount && wardChargeFraction > 0.02;
             const flashAnim = wardFlashAnims[idx];
 
             const baseColor = isIgnited
               ? wardColors.pendingPulse
               : isLit
                 ? (isPending ? wardColors.pendingPulse : wardColors.lit)
-                : wardColors.unlit;
+                : isCharging
+                  ? wardColors.lit
+                  : wardColors.unlit;
 
             const flashScale = flashAnim.interpolate({
               inputRange: [0, 1],
@@ -2162,7 +2189,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                   height: 12,
                   borderRadius: 6,
                   backgroundColor: baseColor,
-                  opacity: isPending ? wardPulseOpacity : (isLit ? 0.9 : 1),
+                  opacity: isPending
+                    ? wardPulseOpacity
+                    : isLit
+                      ? 0.9
+                      : isCharging
+                        ? 0.2 + 0.6 * wardChargeFraction
+                        : 1,
                   transform: [
                     { scale: isPending ? wardPulseScale : (isIgnited ? flashScale : 1) },
                   ],
@@ -2383,6 +2416,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
                 <RewardedAdButton
                   placement="quest_bonus"
                   phase={phase}
+                  surface="dark"
                   label={`Offer your attention  ·  +${REWARDED_TEND_BONUS} amber`}
                   onReward={async () => {
                     const newBalance = await awardBonusAmber(REWARDED_TEND_BONUS, 'rewarded_tend');

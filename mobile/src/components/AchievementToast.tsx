@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { CandyColors, getPhaseTheme } from '../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { Achievement } from '../services/achievements';
 import { AmberInline } from './AmberInline';
+import { getSettingsSync } from '../services/settings';
 
 interface AchievementToastProps {
   achievement: Achievement | null;
@@ -12,7 +13,9 @@ interface AchievementToastProps {
 
 /**
  * Animated toast that slides in from the top when an achievement is unlocked.
- * Auto-dismisses after 3 seconds.
+ * Auto-dismisses after 3 seconds. Framed layered material (PanelCard anatomy
+ * inline, since the banner itself is the animated element), phase-aware via
+ * getSurfaceTheme. Reduced motion pins the end states (no slide/fade).
  */
 export const AchievementToast: React.FC<AchievementToastProps> = ({
   achievement,
@@ -24,24 +27,41 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
 
   useEffect(() => {
     if (achievement) {
-      // Slide in
-      Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          friction: 8,
-          tension: 60,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      const reducedMotion = getSettingsSync().reducedMotion;
+      let entrance: Animated.CompositeAnimation | null = null;
+      let exit: Animated.CompositeAnimation | null = null;
+
+      if (reducedMotion) {
+        // Pin end states: visible immediately, no slide.
+        slideAnim.setValue(0);
+        opacityAnim.setValue(1);
+      } else {
+        // Slide in
+        entrance = Animated.parallel([
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            friction: 8,
+            tension: 60,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]);
+        entrance.start();
+      }
 
       // Auto-dismiss
       const timeout = setTimeout(() => {
-        Animated.parallel([
+        if (reducedMotion) {
+          slideAnim.setValue(-120);
+          opacityAnim.setValue(0);
+          onDismiss();
+          return;
+        }
+        exit = Animated.parallel([
           Animated.timing(slideAnim, {
             toValue: -120,
             duration: 300,
@@ -52,14 +72,21 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
             duration: 300,
             useNativeDriver: true,
           }),
-        ]).start(() => onDismiss());
+        ]);
+        exit.start(() => onDismiss());
       }, 3000);
 
-      return () => clearTimeout(timeout);
+      return () => {
+        clearTimeout(timeout);
+        entrance?.stop();
+        exit?.stop();
+      };
     }
   }, [achievement]);
 
   if (!achievement) return null;
+
+  const t = getSurfaceTheme(phase);
 
   return (
     <Animated.View
@@ -74,22 +101,18 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
       accessibilityLiveRegion="polite"
       accessibilityLabel={`Achievement unlocked: ${achievement.title}. ${achievement.description}.${achievement.rewardAmber > 0 ? ` Earned ${achievement.rewardAmber} amber.` : ''}`}
     >
-      <View style={[
-        styles.inner,
-        phase >= 3 && phase < 4 && { backgroundColor: '#2E2345', borderColor: '#6A4A8A' },
-        phase >= 4 && { backgroundColor: '#1A1225', borderColor: '#5A2A3A' },
-      ]}>
-        <Text style={styles.icon}>{achievement.icon}</Text>
+      <View style={[styles.inner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
+        <View pointerEvents="none" style={styles.highlightBand} />
+        <View pointerEvents="none" style={styles.shadeBand} />
+        <View style={[styles.iconBadge, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+          <Text style={styles.icon}>{achievement.icon}</Text>
+        </View>
         <View style={styles.textContainer}>
-          <Text style={[
-            styles.label,
-            phase >= 3 && phase < 4 && { color: '#A888C8' },
-            phase >= 4 && { color: '#A078C8' },
-          ]}>Achievement Unlocked!</Text>
-          <Text style={styles.title}>{achievement.title}</Text>
+          <Text style={[styles.label, { color: t.muted }]}>Achievement Unlocked!</Text>
+          <Text style={[styles.title, { color: t.title }]}>{achievement.title}</Text>
         </View>
         {achievement.rewardAmber > 0 && (
-          <Text style={styles.reward}>
+          <Text style={[styles.reward, { color: t.amberText }]}>
             +{achievement.rewardAmber} <AmberInline size={14} />
           </Text>
         )}
@@ -109,41 +132,65 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: CandyColors.purple.dark,
-    borderRadius: 16,
-    padding: 14,
-    shadowColor: '#000',
+    borderRadius: SURFACE.cardRadius,
+    borderWidth: 1.5,
+    padding: 12,
+    overflow: 'hidden',
+    shadowColor: 'rgba(10, 6, 24, 1)',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 12,
-    borderWidth: 2,
-    borderColor: CandyColors.yellow.main,
+  },
+  highlightBand: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '34%',
+    borderTopLeftRadius: SURFACE.cardRadius,
+    borderTopRightRadius: SURFACE.cardRadius,
+    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
+  },
+  shadeBand: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '22%',
+    borderBottomLeftRadius: SURFACE.cardRadius,
+    borderBottomRightRadius: SURFACE.cardRadius,
+    backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
+  },
+  iconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   icon: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: 24,
   },
   textContainer: {
     flex: 1,
   },
   label: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
-    color: CandyColors.yellow.main,
-    letterSpacing: 1.5,
+    letterSpacing: SURFACE.sectionLetterSpacing,
     textTransform: 'uppercase',
   },
   title: {
     fontSize: 16,
     fontWeight: '900',
-    color: CandyColors.white,
     marginTop: 2,
   },
   reward: {
     fontSize: 15,
     fontWeight: '900',
-    color: CandyColors.yellow.main,
     marginLeft: 8,
   },
 });

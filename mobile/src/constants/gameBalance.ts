@@ -226,6 +226,14 @@ export const STARTER_INTRO_MIN_PUZZLES = 12;
 /** Pit amber auto-collects through this many puzzles before manual harvest begins. */
 export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 
+/**
+ * Pending (unoffered) pit amber at or above which the home screen gives a
+ * gentle once-per-session Fox nudge to go harvest. High enough that a player
+ * banking a puzzle or two never sees it; the pit-entrance glow remains the
+ * primary ambient signal.
+ */
+export const HARVEST_NUDGE_MIN_AMBER = 150;
+
 // ============================================================================
 // ROOM UNLOCK — "skip the wait"
 // ============================================================================

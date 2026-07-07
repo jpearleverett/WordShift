@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,17 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from 'react-native';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud } from '../services/cloudSave';
-import { CandyColors } from '../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { PanelCard } from './ui/PanelCard';
+import { CandyButton } from './ui/CandyButton';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
 import { GameSettings, getSettings, updateSetting, resetSettings } from '../services/settings';
@@ -63,7 +67,11 @@ import { clearMonetPrompts } from '../services/monetizationPrompts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
 import { clearDailyAmberReward } from '../services/dailyAmberReward';
 
+const AMBER_ICON = require('../../assets/ui/amber.png');
+
 interface SettingsScreenProps {
+  /** Current narrative phase (0-5) — drives the phase-aware surface theme. */
+  phase: number;
   onClose: () => void;
   /**
    * Called after Reset All when an in-place reload is unavailable
@@ -173,7 +181,7 @@ export async function performFullReset(): Promise<string[]> {
   return failures;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onReset }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, onReset }) => {
   const screenInsets = useScreenInsets();
   const [settings, setSettings] = useState<GameSettings | null>(null);
   const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
@@ -189,6 +197,56 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onReset
   // UMP privacy-options entry point (required to stay visible for EEA users
   // under the Google EU User Consent Policy; hidden everywhere else).
   const [privacyOptionsAvailable, setPrivacyOptionsAvailable] = useState(false);
+
+  // Restore-modal choreography (presentation only — showRestore remains the
+  // source of truth): backdrop fade + panel spring in, fast timing out.
+  // `restoreVisible` keeps the Modal mounted while the exit animation plays.
+  const [restoreVisible, setRestoreVisible] = useState(false);
+  const restoreBackdrop = useRef(new Animated.Value(0)).current;
+  const restoreScale = useRef(new Animated.Value(0.92)).current;
+  const reducedMotion = settings?.reducedMotion ?? false;
+
+  useEffect(() => {
+    if (showRestore) {
+      setRestoreVisible(true);
+      if (reducedMotion) {
+        restoreBackdrop.setValue(1);
+        restoreScale.setValue(1);
+        return;
+      }
+      const enter = Animated.parallel([
+        Animated.timing(restoreBackdrop, { toValue: 1, duration: 180, useNativeDriver: true }),
+        Animated.spring(restoreScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
+      ]);
+      enter.start();
+      return () => enter.stop();
+    }
+    if (!restoreVisible) return;
+    if (reducedMotion) {
+      restoreBackdrop.setValue(0);
+      restoreScale.setValue(0.92);
+      setRestoreVisible(false);
+      return;
+    }
+    const exit = Animated.parallel([
+      Animated.timing(restoreBackdrop, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(restoreScale, {
+        toValue: 0.92,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]);
+    exit.start(({ finished }) => {
+      if (finished) setRestoreVisible(false);
+    });
+    return () => exit.stop();
+  }, [showRestore, restoreVisible, reducedMotion, restoreBackdrop, restoreScale]);
 
   // Restore previously-purchased IAP entitlements (Patron / ad-free). Store
   // policy requires an accessible restore path outside the purchase modal, so
@@ -372,160 +430,163 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onReset
 
   if (!settings) return null;
 
+  const t = getSurfaceTheme(phase);
+  // Framed light lift for the back chip — the kit's own highlight band alpha
+  // over the deep screen base, framed with the panel border tint.
+  const chipBg = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
+  const switchTrack = { false: t.sectionBorder, true: t.primaryBg };
+  const rowTint = { backgroundColor: t.rowBg };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: t.screenBg }]}>
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.cardBorder }]}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Back to home"
         >
-          <Text style={styles.backButtonText}>{'<'} Back</Text>
+          <Text style={[styles.backChipText, { color: t.primaryText }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
-        <View style={styles.backButton} />
+        <Text style={[styles.title, { color: t.primaryText }]}>Settings</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Sound & Haptics */}
-        <Text style={styles.sectionTitle}>FEEDBACK</Text>
-        <View style={styles.section}>
+        <PanelCard phase={phase} kind="panel" style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: t.muted }]}>FEEDBACK</Text>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Sound Effects</Text>
-              <Text style={styles.settingDescription}>Play sounds on moves and victories</Text>
+              <Text style={[styles.settingLabel, { color: t.title }]}>Sound Effects</Text>
+              <Text style={[styles.settingDescription, { color: t.muted }]}>Play sounds on moves and victories</Text>
             </View>
             <Switch
               value={settings.soundEnabled}
               onValueChange={(v) => handleToggle('soundEnabled', v)}
-              trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
-              thumbColor={settings.soundEnabled ? CandyColors.purple.main : CandyColors.gray[100]}
+              trackColor={switchTrack}
+              thumbColor={settings.soundEnabled ? t.primaryText : t.secondaryText}
               accessibilityRole="switch"
               accessibilityLabel="Sound effects"
               accessibilityState={{ checked: settings.soundEnabled }}
             />
           </View>
 
-          <View style={styles.divider} />
-
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, rowTint]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Haptic Feedback</Text>
-              <Text style={styles.settingDescription}>Vibration on taps and interactions</Text>
+              <Text style={[styles.settingLabel, { color: t.title }]}>Haptic Feedback</Text>
+              <Text style={[styles.settingDescription, { color: t.muted }]}>Vibration on taps and interactions</Text>
             </View>
             <Switch
               value={settings.hapticsEnabled}
               onValueChange={(v) => handleToggle('hapticsEnabled', v)}
-              trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
-              thumbColor={settings.hapticsEnabled ? CandyColors.purple.main : CandyColors.gray[100]}
+              trackColor={switchTrack}
+              thumbColor={settings.hapticsEnabled ? t.primaryText : t.secondaryText}
               accessibilityRole="switch"
               accessibilityLabel="Haptic feedback"
               accessibilityState={{ checked: settings.hapticsEnabled }}
             />
           </View>
-        </View>
+        </PanelCard>
 
         {/* Accessibility */}
-        <Text style={styles.sectionTitle}>ACCESSIBILITY</Text>
-        <View style={styles.section}>
+        <PanelCard phase={phase} kind="panel" style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: t.muted }]}>ACCESSIBILITY</Text>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Reduced Motion</Text>
-              <Text style={styles.settingDescription}>Minimize animations for accessibility</Text>
+              <Text style={[styles.settingLabel, { color: t.title }]}>Reduced Motion</Text>
+              <Text style={[styles.settingDescription, { color: t.muted }]}>Minimize animations for accessibility</Text>
             </View>
             <Switch
               value={settings.reducedMotion}
               onValueChange={(v) => handleToggle('reducedMotion', v)}
-              trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
-              thumbColor={settings.reducedMotion ? CandyColors.purple.main : CandyColors.gray[100]}
+              trackColor={switchTrack}
+              thumbColor={settings.reducedMotion ? t.primaryText : t.secondaryText}
               accessibilityRole="switch"
               accessibilityLabel="Reduced motion"
               accessibilityState={{ checked: settings.reducedMotion }}
             />
           </View>
-        </View>
+        </PanelCard>
 
         {/* Notifications */}
-        <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
-        <View style={styles.section}>
+        <PanelCard phase={phase} kind="panel" style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: t.muted }]}>NOTIFICATIONS</Text>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Daily Reminders</Text>
-              <Text style={styles.settingDescription}>Daily puzzle reminder</Text>
+              <Text style={[styles.settingLabel, { color: t.title }]}>Daily Reminders</Text>
+              <Text style={[styles.settingDescription, { color: t.muted }]}>Daily puzzle reminder</Text>
             </View>
             <Switch
               value={dailyRemindersOn}
               onValueChange={handleDailyReminderToggle}
-              trackColor={{ false: CandyColors.gray[300], true: CandyColors.purple.light }}
-              thumbColor={dailyRemindersOn ? CandyColors.purple.main : CandyColors.gray[100]}
+              trackColor={switchTrack}
+              thumbColor={dailyRemindersOn ? t.primaryText : t.secondaryText}
               accessibilityRole="switch"
               accessibilityState={{ checked: dailyRemindersOn }}
             />
           </View>
-        </View>
+        </PanelCard>
 
         {/* Streak Protection */}
-        <Text style={styles.sectionTitle}>STREAK PROTECTION</Text>
-        <View style={styles.section}>
+        <PanelCard phase={phase} kind="panel" style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: t.muted }]}>STREAK PROTECTION</Text>
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Streak Freezes</Text>
-              <Text style={styles.settingDescription}>
+              <Text style={[styles.settingLabel, { color: t.title }]}>Streak Freezes</Text>
+              <Text style={[styles.settingDescription, { color: t.muted }]}>
                 {freezeCount > 0
                   ? `${freezeCount} ready. Each protects your streak for one missed day.`
                   : 'Protects your streak the next time you miss a day.'}
               </Text>
             </View>
-            <TouchableOpacity
-              style={[
-                styles.freezeButton,
-                amberBalance < STREAK_FREEZE_AMBER_COST && styles.freezeButtonDisabled,
-              ]}
+            {/* Stays fully enabled even when unaffordable — tapping explains
+                the shortfall via the Alert (deliberate), so no dimmed-but-
+                pressable fake-disabled state for screen readers. */}
+            <CandyButton
+              label={`Buy · ${STREAK_FREEZE_AMBER_COST}`}
               onPress={handleBuyStreakFreeze}
-              accessibilityRole="button"
+              phase={phase}
+              variant="amber"
+              icon={AMBER_ICON}
               accessibilityLabel={`Buy a streak freeze for ${STREAK_FREEZE_AMBER_COST} amber`}
-            >
-              <Text style={styles.freezeButtonText}>{`Buy · ${STREAK_FREEZE_AMBER_COST}`}</Text>
-            </TouchableOpacity>
+            />
           </View>
-        </View>
+        </PanelCard>
 
         {/* Backup & Restore (only when a cloud backend is configured) */}
         {cloudEnabled && (
-          <>
-            <Text style={styles.sectionTitle}>BACKUP &amp; RESTORE</Text>
-            <View style={styles.section}>
-              <TouchableOpacity style={styles.aboutRow} onPress={handleShowRecoveryCode} accessibilityRole="button" accessibilityLabel="Show recovery code">
-                <Text style={styles.linkText}>{recoveryCode ? 'Your recovery code' : 'Show recovery code'}</Text>
-              </TouchableOpacity>
-              {recoveryCode && (
-                <View style={styles.recoveryCodeBox}>
-                  <Text style={styles.recoveryCodeText} accessibilityLabel={`Recovery code ${recoveryCode}`}>{recoveryCode}</Text>
-                  <Text style={styles.recoveryCodeHint}>Write this down. Enter it on a new device to restore your progress.</Text>
-                </View>
-              )}
-              <TouchableOpacity style={styles.aboutRow} onPress={() => { hapticLight(); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
-                <Text style={styles.linkText}>Restore from another device</Text>
-              </TouchableOpacity>
-            </View>
-          </>
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: t.muted }]}>BACKUP &amp; RESTORE</Text>
+            <TouchableOpacity style={styles.aboutRow} onPress={handleShowRecoveryCode} accessibilityRole="button" accessibilityLabel="Show recovery code">
+              <Text style={[styles.linkText, { color: t.secondaryText }]}>{recoveryCode ? 'Your recovery code' : 'Show recovery code'}</Text>
+            </TouchableOpacity>
+            {recoveryCode && (
+              <View style={[styles.recoveryCodeBox, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
+                <Text style={[styles.recoveryCodeText, { color: t.title }]} accessibilityLabel={`Recovery code ${recoveryCode}`}>{recoveryCode}</Text>
+                <Text style={[styles.recoveryCodeHint, { color: t.muted }]}>Write this down. Enter it on a new device to restore your progress.</Text>
+              </View>
+            )}
+            <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
+              <Text style={[styles.linkText, { color: t.secondaryText }]}>Restore from another device</Text>
+            </TouchableOpacity>
+          </PanelCard>
         )}
 
         {/* Data */}
-        <Text style={styles.sectionTitle}>DATA</Text>
-        <View style={styles.section}>
+        <PanelCard phase={phase} kind="panel" style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: t.muted }]}>DATA</Text>
           <TouchableOpacity style={styles.dangerRow} onPress={handleResetData}>
-            <Text style={styles.dangerText}>Reset All Progress</Text>
-            <Text style={styles.dangerDescription}>
+            <Text style={[styles.dangerText, { color: t.dangerText }]}>Reset All Progress</Text>
+            <Text style={[styles.dangerDescription, { color: t.muted }]}>
               Clears statistics, achievements, and daily challenge history
             </Text>
           </TouchableOpacity>
-        </View>
+        </PanelCard>
 
         {/* Purchases — restore IAP entitlements (store-policy requirement) */}
-        <Text style={styles.sectionTitle}>PURCHASES</Text>
-        <View style={styles.section}>
+        <PanelCard phase={phase} kind="panel" style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: t.muted }]}>PURCHASES</Text>
           <TouchableOpacity
             style={styles.aboutRow}
             onPress={handleRestorePurchases}
@@ -533,117 +594,133 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onReset
             accessibilityRole="button"
             accessibilityLabel="Restore Purchases"
           >
-            <Text style={styles.linkText}>Restore Purchases</Text>
+            <Text style={[styles.linkText, { color: t.secondaryText }]}>Restore Purchases</Text>
             {purchaseRestoreBusy
-              ? <ActivityIndicator color={CandyColors.purple.main} />
-              : <Text style={styles.linkChevron}>{'>'}</Text>}
+              ? <ActivityIndicator color={t.secondaryText} />
+              : <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>}
           </TouchableOpacity>
-        </View>
+        </PanelCard>
 
         {/* About */}
-        <Text style={styles.sectionTitle}>ABOUT</Text>
-        <View style={styles.section}>
+        <PanelCard phase={phase} kind="panel" style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: t.muted }]}>ABOUT</Text>
           <TouchableOpacity
             style={styles.aboutRow}
             onPress={() => openLink(EXTERNAL_LINKS.privacyPolicy)}
             accessibilityRole="link"
             accessibilityLabel="Privacy Policy"
           >
-            <Text style={styles.linkText}>Privacy Policy</Text>
-            <Text style={styles.linkChevron}>{'>'}</Text>
+            <Text style={[styles.linkText, { color: t.secondaryText }]}>Privacy Policy</Text>
+            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
           </TouchableOpacity>
-          <View style={styles.divider} />
           <TouchableOpacity
-            style={styles.aboutRow}
+            style={[styles.aboutRow, rowTint]}
             onPress={() => openLink(EXTERNAL_LINKS.termsOfService)}
             accessibilityRole="link"
             accessibilityLabel="Terms of Service"
           >
-            <Text style={styles.linkText}>Terms of Service</Text>
-            <Text style={styles.linkChevron}>{'>'}</Text>
+            <Text style={[styles.linkText, { color: t.secondaryText }]}>Terms of Service</Text>
+            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
           </TouchableOpacity>
-          <View style={styles.divider} />
           <TouchableOpacity
             style={styles.aboutRow}
             onPress={() => openLink(EXTERNAL_LINKS.dataDeletion)}
             accessibilityRole="link"
             accessibilityLabel="Data Deletion"
           >
-            <Text style={styles.linkText}>Data Deletion</Text>
-            <Text style={styles.linkChevron}>{'>'}</Text>
+            <Text style={[styles.linkText, { color: t.secondaryText }]}>Data Deletion</Text>
+            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
           </TouchableOpacity>
           {privacyOptionsAvailable && (
-            <>
-              <View style={styles.divider} />
-              <TouchableOpacity
-                style={styles.aboutRow}
-                onPress={() => {
-                  hapticLight();
-                  showPrivacyOptions();
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Privacy Options"
-              >
-                <Text style={styles.linkText}>Privacy Options</Text>
-                <Text style={styles.linkChevron}>{'>'}</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              style={styles.aboutRow}
+              onPress={() => {
+                hapticLight();
+                showPrivacyOptions();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Privacy Options"
+            >
+              <Text style={[styles.linkText, { color: t.secondaryText }]}>Privacy Options</Text>
+              <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+            </TouchableOpacity>
           )}
-          <View style={styles.divider} />
           <TouchableOpacity
-            style={styles.aboutRow}
+            style={[styles.aboutRow, rowTint]}
             onPress={() => openLink(getSupportMailto(APP_VERSION))}
             accessibilityRole="button"
             accessibilityLabel="Contact Support"
           >
-            <Text style={styles.linkText}>Contact Support</Text>
-            <Text style={styles.linkChevron}>{'>'}</Text>
+            <Text style={[styles.linkText, { color: t.secondaryText }]}>Contact Support</Text>
+            <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
           </TouchableOpacity>
-          <View style={styles.divider} />
           <View style={styles.aboutRow}>
-            <Text style={styles.aboutLabel}>WordShift</Text>
-            <Text style={styles.aboutValue}>{`v${NATIVE_VERSION} (${NATIVE_BUILD})`}</Text>
+            <Text style={[styles.aboutLabel, { color: t.body }]}>WordShift</Text>
+            <Text style={[styles.aboutValue, { color: t.muted }]}>{`v${NATIVE_VERSION} (${NATIVE_BUILD})`}</Text>
           </View>
-          <View style={styles.divider} />
+          <View style={[styles.aboutRow, rowTint]}>
+            <Text style={[styles.aboutLabel, { color: t.body }]}>Build</Text>
+            <Text style={[styles.aboutValue, { color: t.muted }]}>{BUNDLE_SOURCE}</Text>
+          </View>
           <View style={styles.aboutRow}>
-            <Text style={styles.aboutLabel}>Build</Text>
-            <Text style={styles.aboutValue}>{BUNDLE_SOURCE}</Text>
+            <Text style={[styles.aboutLabel, { color: t.body }]}>Made with</Text>
+            <Text style={[styles.aboutValue, { color: t.muted }]}>love and existential dread</Text>
           </View>
-          <View style={styles.divider} />
-          <View style={styles.aboutRow}>
-            <Text style={styles.aboutLabel}>Made with</Text>
-            <Text style={styles.aboutValue}>love and existential dread</Text>
-          </View>
-        </View>
+        </PanelCard>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
-      <Modal visible={showRestore} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setShowRestore(false)}>
-        <View style={styles.restoreOverlay}>
-          <View style={styles.restoreCard}>
-            <Text style={styles.restoreTitle}>Restore progress</Text>
-            <Text style={styles.restoreHint}>Enter the recovery code from your other device. This replaces the data currently on this device.</Text>
-            <TextInput
-              style={styles.restoreInput}
-              value={restoreInput}
-              onChangeText={setRestoreInput}
-              placeholder="WS-XXXX-XXXX"
-              placeholderTextColor={CandyColors.gray[400]}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              editable={!restoreBusy}
-              accessibilityLabel="Recovery code"
-            />
-            <View style={styles.restoreButtons}>
-              <TouchableOpacity style={styles.restoreCancel} onPress={() => { setShowRestore(false); setRestoreInput(''); }} disabled={restoreBusy} accessibilityRole="button" accessibilityLabel="Cancel">
-                <Text style={styles.restoreCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.restoreConfirm} onPress={handleRestoreFromCode} disabled={restoreBusy || !restoreInput.trim()} accessibilityRole="button" accessibilityLabel="Restore">
-                {restoreBusy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.restoreConfirmText}>Restore</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
+      <Modal visible={restoreVisible} transparent animationType="none" statusBarTranslucent onRequestClose={() => setShowRestore(false)}>
+        <View style={styles.restoreRoot}>
+          <Animated.View
+            style={[styles.restoreBackdrop, { backgroundColor: t.overlay, opacity: restoreBackdrop }]}
+          />
+          <Animated.View style={{ opacity: restoreBackdrop, transform: [{ scale: restoreScale }] }}>
+            <PanelCard phase={phase} kind="panel" style={styles.restoreCard}>
+              <Text style={[styles.restoreTitle, { color: t.title }]}>Restore progress</Text>
+              <Text style={[styles.restoreHint, { color: t.body }]}>Enter the recovery code from your other device. This replaces the data currently on this device.</Text>
+              <TextInput
+                style={[styles.restoreInput, { borderColor: t.sectionBorder, backgroundColor: t.sectionBg, color: t.title }]}
+                value={restoreInput}
+                onChangeText={setRestoreInput}
+                placeholder="WS-XXXX-XXXX"
+                placeholderTextColor={t.muted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!restoreBusy}
+                accessibilityLabel="Recovery code"
+              />
+              <View style={styles.restoreButtons}>
+                <CandyButton
+                  label="Cancel"
+                  onPress={() => { setShowRestore(false); setRestoreInput(''); }}
+                  phase={phase}
+                  variant="quiet"
+                  disabled={restoreBusy}
+                  accessibilityLabel="Cancel"
+                  style={styles.restoreCancel}
+                />
+                {/* Primary confirm keeps the CandyButton bevel anatomy inline so
+                    the busy spinner can live on the face (label-only component). */}
+                <TouchableOpacity
+                  style={[styles.restoreConfirm, (restoreBusy || !restoreInput.trim()) && styles.restoreConfirmDisabled]}
+                  onPress={handleRestoreFromCode}
+                  disabled={restoreBusy || !restoreInput.trim()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Restore"
+                >
+                  <View style={[styles.confirmEdge, { backgroundColor: t.primaryEdge }]} />
+                  <View style={[styles.confirmFace, { backgroundColor: t.primaryBg }]}>
+                    <View style={styles.confirmHighlight} />
+                    {restoreBusy
+                      ? <ActivityIndicator color={t.primaryText} />
+                      : <Text style={[styles.restoreConfirmText, { color: t.primaryText }]}>Restore</Text>}
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </PanelCard>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -653,7 +730,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose, onReset
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CandyColors.gray[100],
+    // backgroundColor applied inline (phase-aware screenBg)
   },
   header: {
     flexDirection: 'row',
@@ -661,47 +738,55 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     // paddingTop applied inline via useScreenInsets (safe-area aware)
-    paddingBottom: 16,
-    backgroundColor: CandyColors.purple.main,
+    paddingBottom: 14,
   },
-  backButton: {
-    width: 80,
+  backChip: {
+    width: 88,
+    minHeight: 44,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backButtonText: {
-    color: CandyColors.white,
-    fontSize: 16,
+  backChipText: {
+    fontSize: 15,
     fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  headerSpacer: {
+    width: 88,
   },
   title: {
-    color: CandyColors.white,
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '900',
+    letterSpacing: 0.5,
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 24,
+    paddingTop: 12,
   },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: CandyColors.gray[400],
-    letterSpacing: 1.5,
-    marginBottom: 8,
-    marginLeft: 4,
+    letterSpacing: SURFACE.sectionLetterSpacing,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 8,
   },
   section: {
-    backgroundColor: CandyColors.white,
-    borderRadius: 16,
-    marginBottom: 24,
-    overflow: 'hidden',
+    marginBottom: 20,
+    paddingBottom: 4,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginHorizontal: 8,
+    marginBottom: 6,
   },
   settingInfo: {
     flex: 1,
@@ -710,162 +795,159 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 16,
     fontWeight: '700',
-    color: CandyColors.gray[700],
   },
   settingDescription: {
     fontSize: 12,
-    color: CandyColors.gray[400],
     marginTop: 2,
   },
-  divider: {
-    height: 1,
-    backgroundColor: CandyColors.gray[100],
-    marginLeft: 16,
-  },
-  freezeButton: {
-    backgroundColor: CandyColors.purple.main,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    minHeight: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  freezeButtonDisabled: {
-    backgroundColor: CandyColors.gray[300],
-  },
-  freezeButtonText: {
-    color: CandyColors.white,
-    fontSize: 14,
-    fontWeight: '800',
+  freezeDim: {
+    opacity: 0.55,
   },
   dangerRow: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginHorizontal: 8,
+    marginBottom: 6,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   dangerText: {
     fontSize: 16,
     fontWeight: '700',
-    color: CandyColors.red.main,
   },
   dangerDescription: {
     fontSize: 12,
-    color: CandyColors.gray[400],
     marginTop: 2,
   },
   aboutRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginHorizontal: 8,
+    marginBottom: 6,
+    minHeight: 44,
   },
   aboutLabel: {
     fontSize: 15,
     fontWeight: '600',
-    color: CandyColors.gray[600],
   },
   aboutValue: {
     fontSize: 14,
-    color: CandyColors.gray[400],
   },
   linkText: {
     fontSize: 15,
     fontWeight: '600',
-    color: CandyColors.purple.main,
   },
   linkChevron: {
     fontSize: 14,
     fontWeight: '700',
-    color: CandyColors.gray[400],
   },
   bottomSpacer: {
     height: 60,
   },
   recoveryCodeBox: {
+    marginHorizontal: 8,
+    marginBottom: 6,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: CandyColors.gray[100],
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: CandyColors.gray[200],
+    borderRadius: 12,
+    borderWidth: 1,
   },
   recoveryCodeText: {
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 2,
-    color: CandyColors.purple.dark,
     textAlign: 'center',
   },
   recoveryCodeHint: {
     fontSize: 12,
-    color: CandyColors.gray[500],
     textAlign: 'center',
     marginTop: 6,
   },
-  restoreOverlay: {
+  restoreRoot: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
+  restoreBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   restoreCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
     padding: 22,
   },
   restoreTitle: {
-    fontSize: 19,
+    fontSize: 22,
     fontWeight: '900',
-    color: CandyColors.gray[800],
+    letterSpacing: 0.3,
     marginBottom: 8,
   },
   restoreHint: {
     fontSize: 13.5,
-    color: CandyColors.gray[600],
     marginBottom: 16,
     lineHeight: 19,
   },
   restoreInput: {
     borderWidth: 1.5,
-    borderColor: CandyColors.gray[300],
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 1.5,
-    color: CandyColors.gray[800],
     textAlign: 'center',
     marginBottom: 18,
   },
   restoreButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   restoreCancel: {
     flex: 1,
-    paddingVertical: 13,
-    alignItems: 'center',
     marginRight: 8,
-    borderRadius: 12,
-    backgroundColor: CandyColors.gray[200],
-  },
-  restoreCancelText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: CandyColors.gray[700],
   },
   restoreConfirm: {
     flex: 1,
-    paddingVertical: 13,
-    alignItems: 'center',
     marginLeft: 8,
-    borderRadius: 12,
-    backgroundColor: CandyColors.purple.main,
+    paddingBottom: SURFACE.bevelDepth,
+  },
+  restoreConfirmDisabled: {
+    opacity: 0.45,
+  },
+  confirmEdge: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: SURFACE.bevelDepth,
+    bottom: 0,
+    borderRadius: SURFACE.buttonRadius,
+  },
+  confirmFace: {
+    borderRadius: SURFACE.buttonRadius,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  confirmHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '46%',
+    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
   },
   restoreConfirmText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#FFFFFF',
+    letterSpacing: 0.4,
   },
 });

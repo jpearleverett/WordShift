@@ -22,6 +22,14 @@ interface RewardedAdButtonProps {
   /** Narrative phase, for tasteful phase-aware tinting. */
   phase: number;
   /**
+   * Which background the button sits on. 'auto' (default) infers from phase
+   * (dark at phase 3+), which is right when the host surface follows the phase
+   * theme (victory modal, store). Hosts that are dark at EVERY phase (the
+   * speed-rescue overlay, the pit's tending modal) must pass 'dark' so the
+   * label keeps its light-gold ink instead of dark-on-dark.
+   */
+  surface?: 'auto' | 'light' | 'dark';
+  /**
    * Render even when no ad backend is available, in a disabled state, instead of
    * hiding entirely. Default false → the affordance simply isn't there when there
    * is nothing to offer (the honest, non-nagging default).
@@ -51,6 +59,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
   onReward,
   label,
   phase,
+  surface = 'auto',
   showWhenUnavailable = false,
   style,
 }) => {
@@ -107,7 +116,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
   if (unavailable && !showWhenUnavailable) return null;
 
   const disabled = unavailable || busy;
-  const isDark = phase >= 3;
+  const isDark = surface === 'auto' ? phase >= 3 : surface === 'dark';
 
   return (
     <TouchableOpacity
@@ -119,7 +128,7 @@ export const RewardedAdButton: React.FC<RewardedAdButtonProps> = ({
       accessibilityLabel={label}
     >
       {busy ? (
-        <ActivityIndicator size="small" color="#FFD479" />
+        <ActivityIndicator size="small" color={isDark ? '#FFD479' : '#755A00'} />
       ) : (
         <Text style={[styles.label, isDark ? styles.labelDark : styles.labelLight]}>
           {'▷ '}
@@ -140,8 +149,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   buttonLight: {
-    backgroundColor: 'rgba(255, 201, 77, 0.16)',
-    borderColor: 'rgba(255, 201, 77, 0.45)',
+    backgroundColor: 'rgba(255, 201, 77, 0.22)',
+    borderColor: 'rgba(184, 134, 11, 0.5)',
   },
   buttonDark: {
     backgroundColor: 'rgba(150, 90, 60, 0.18)',
@@ -149,7 +158,9 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.4 },
   label: { fontSize: 13.5, fontWeight: '800' },
-  labelLight: { color: '#FFD479' },
+  // Dark amber ink on the light gold pill (matches freeDoubleTextLight in the
+  // victory modal); the old #FFD479 was near-invisible on cream surfaces.
+  labelLight: { color: '#755A00' },
   labelDark: { color: '#E0B080' },
 });
 

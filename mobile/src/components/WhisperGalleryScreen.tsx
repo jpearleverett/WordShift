@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { CandyColors } from '../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { PanelCard } from './ui/PanelCard';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import {
   getGroupedEntries,
@@ -26,6 +27,8 @@ import { AnimalType, DialoguePhase } from '../types/homeWorld';
 import { CHARACTER_SPRITES } from './home/AnimalSprite';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const FLAME_ICON = require('../../assets/ui/flame.png');
 
 interface WhisperGalleryScreenProps {
   phase: number;
@@ -60,34 +63,31 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
   const title = getGalleryTitle(phase);
   const subtitle = getGallerySubtitle(phase, totalCollected);
 
-  const isDark = phase >= 3;
-  const bgColor = isDark ? '#0A0A14' : '#1A1030';
-  const textColor = isDark ? 'rgba(180, 100, 130, 0.9)' : 'rgba(220, 200, 240, 0.9)';
-  const headerColor = isDark ? '#8B3050' : CandyColors.purple.main;
-  const entryBg = isDark ? 'rgba(60, 20, 40, 0.3)' : 'rgba(100, 70, 150, 0.15)';
-  const entryBorder = isDark ? 'rgba(100, 30, 50, 0.3)' : 'rgba(130, 100, 180, 0.2)';
+  const t = getSurfaceTheme(phase);
 
   const animalTypes = Object.keys(grouped);
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
+    <View style={[styles.container, { backgroundColor: t.screenBg }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* Header — safe-area top inset applied inline */}
+      {/* Soft vignette glow behind the content */}
+      <View pointerEvents="none" style={[styles.vignetteGlow, { backgroundColor: t.glow }]} />
+
+      {/* Header, safe-area top inset applied inline */}
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backChip, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}
           onPress={onClose}
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text style={styles.backButtonText}>{'<'} Back</Text>
+          <Text style={[styles.backChipText, { color: t.title }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={[styles.title, { color: headerColor }]}>{title}</Text>
-          <Text style={[styles.subtitle, { color: textColor }]}>{subtitle}</Text>
-        </View>
-        <View style={styles.backButton} />
+        <PanelCard phase={phase} kind="panel" style={styles.titlePlaque}>
+          <Text style={[styles.title, { color: t.title }]}>{title}</Text>
+          <Text style={[styles.subtitle, { color: t.muted }]}>{subtitle}</Text>
+        </PanelCard>
       </View>
 
       <ScrollView
@@ -97,15 +97,18 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
       >
         {loading && (
           <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color={textColor} />
+            <ActivityIndicator size="large" color={t.primaryText} />
           </View>
         )}
 
         {!loading && animalTypes.length === 0 && (
           <View style={styles.emptyState}>
-            <Text style={[styles.emptyText, { color: textColor }]}>
-              {getWhisperGalleryEmptyText(phase as DialoguePhase)}
-            </Text>
+            <PanelCard phase={phase} kind="card" style={styles.emptyCard}>
+              <Image source={FLAME_ICON} style={styles.emptyIcon} resizeMode="contain" />
+              <Text style={[styles.emptyText, { color: t.body }]}>
+                {getWhisperGalleryEmptyText(phase as DialoguePhase)}
+              </Text>
+            </PanelCard>
           </View>
         )}
 
@@ -120,41 +123,55 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
           return (
             <View key={animalType} style={styles.animalSection}>
               <TouchableOpacity
-                style={[styles.animalHeader, { borderColor: entryBorder }]}
                 onPress={() => setExpandedAnimal(isExpanded ? null : animalType)}
                 accessibilityLabel={`${animalName}: ${entries.length} entries`}
                 accessibilityRole="button"
+                activeOpacity={0.85}
               >
-                <View style={[styles.animalPortrait, { borderColor: entryBorder }]}>
-                  {animalSprite ? (
-                    <Image
-                      source={animalSprite}
-                      style={styles.animalPortraitImage}
-                      resizeMode="contain"
-                      accessibilityLabel={animalName}
-                    />
-                  ) : (
-                    <Text style={styles.animalEmoji}>{animalEmoji}</Text>
-                  )}
-                </View>
-                <Text style={[styles.animalName, { color: headerColor }]}>
-                  {animalName}
-                </Text>
-                <Text style={[styles.entryCount, { color: textColor }]}>
-                  {entries.length}
-                </Text>
-                <Text style={[styles.expandArrow, { color: textColor }]}>
-                  {isExpanded ? '\u25B2' : '\u25BC'}
-                </Text>
+                <PanelCard phase={phase} kind="card" style={styles.animalHeader}>
+                  <View style={[
+                    styles.animalPortrait,
+                    { borderColor: t.secondaryBorder, backgroundColor: t.secondaryBg },
+                  ]}>
+                    {animalSprite ? (
+                      <Image
+                        source={animalSprite}
+                        style={styles.animalPortraitImage}
+                        resizeMode="contain"
+                        accessibilityLabel={animalName}
+                      />
+                    ) : (
+                      <Text style={styles.animalEmoji}>{animalEmoji}</Text>
+                    )}
+                  </View>
+                  <Text style={[styles.animalName, { color: t.title }]}>
+                    {animalName}
+                  </Text>
+                  <View style={[
+                    styles.countPill,
+                    { backgroundColor: t.secondaryBg, borderColor: t.secondaryBorder },
+                  ]}>
+                    <Text style={[styles.entryCount, { color: t.secondaryText }]}>
+                      {entries.length}
+                    </Text>
+                  </View>
+                  <View style={styles.chevronBox}>
+                    <View style={[
+                      styles.chevron,
+                      { borderColor: t.muted },
+                      isExpanded ? styles.chevronUp : styles.chevronDown,
+                    ]} />
+                  </View>
+                </PanelCard>
               </TouchableOpacity>
 
               {isExpanded && entries.map((entry, i) => (
                 <View
                   key={entry.id || i}
-                  style={[styles.entryCard, { backgroundColor: entryBg, borderColor: entryBorder }]}
+                  style={[styles.entryCard, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}
                 >
                   <Text
-                    style={[styles.entryType, { color: textColor }]}
+                    style={[styles.entryType, { color: t.muted }]}
                     accessibilityLabel={getPhaseEraName(entry.phase)}
                   >
                     {entry.type === 'whisper' ? '💭' :
@@ -163,7 +180,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
                      entry.type === 'trigger_reaction' ? '⚡' : '📜'}
                     {' '}{getPhaseEraName(entry.phase)}
                   </Text>
-                  <Text style={[styles.entryText, { color: textColor }]}>
+                  <Text style={[styles.entryText, { color: t.body }]}>
                     &ldquo;{entry.text}&rdquo;
                   </Text>
                 </View>
@@ -180,34 +197,52 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // Large tinted radial-ish glow anchored behind the header. Gives the flat
+  // screen background a soft vignette depth without any animation cost.
+  vignetteGlow: {
+    position: 'absolute',
+    top: -SCREEN_WIDTH * 0.55,
+    left: -SCREEN_WIDTH * 0.3,
+    width: SCREEN_WIDTH * 1.6,
+    height: SCREEN_WIDTH * 1.1,
+    borderRadius: SCREEN_WIDTH * 0.8,
+    opacity: 0.22,
+  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 16,
     // paddingTop applied inline via useScreenInsets (safe-area aware)
     paddingBottom: 12,
   },
-  backButton: {
-    width: 70,
+  backChip: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
+    marginBottom: 12,
   },
-  backButtonText: {
-    color: CandyColors.white,
-    fontSize: 14,
-    fontWeight: '700',
+  backChipText: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
-  headerCenter: {
-    flex: 1,
+  titlePlaque: {
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 4,
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
@@ -218,13 +253,25 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 48,
+    paddingHorizontal: 8,
+  },
+  emptyCard: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+  },
+  emptyIcon: {
+    width: 52,
+    height: 52,
+    marginBottom: 14,
   },
   emptyText: {
     fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
     lineHeight: 22,
-    paddingHorizontal: 20,
   },
   animalSection: {
     marginBottom: 12,
@@ -234,17 +281,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
     gap: 10,
   },
   animalPortrait: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -259,26 +302,54 @@ const styles = StyleSheet.create({
   animalName: {
     fontSize: 16,
     fontWeight: '800',
+    letterSpacing: 0.3,
     flex: 1,
+  },
+  countPill: {
+    minWidth: 34,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    alignItems: 'center',
   },
   entryCount: {
     fontSize: 14,
     fontWeight: '700',
   },
-  expandArrow: {
-    fontSize: 10,
+  // Rotated-View chevron replaces the old text-triangle disclosure glyph.
+  chevronBox: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chevron: {
+    width: 10,
+    height: 10,
+    borderRightWidth: 2.5,
+    borderBottomWidth: 2.5,
+  },
+  chevronDown: {
+    transform: [{ rotate: '45deg' }],
+    marginTop: -3,
+  },
+  chevronUp: {
+    transform: [{ rotate: '-135deg' }],
+    marginTop: 3,
   },
   entryCard: {
-    marginTop: 6,
-    marginLeft: 16,
+    marginTop: 8,
+    marginLeft: 18,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: SURFACE.cardRadius,
+    borderWidth: 1.5,
   },
   entryType: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.8,
     marginBottom: 4,
   },
   entryText: {
