@@ -233,7 +233,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     const defaultEquipped = equipped[category] === undefined;
     return (
       <View key={category}>
-        <Text style={[styles.sectionLabel, { color: t.primaryText }]}>{sectionLabel}</Text>
+        <Text style={[styles.sectionLabel, { color: t.headerMuted }]}>{sectionLabel}</Text>
 
         {/* Default (free) option */}
         <PanelCard phase={phase} kind="card" style={styles.card}>
@@ -281,16 +281,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
       <View style={[styles.header, { paddingTop: screenInsets.top + 12 }]}>
         <TouchableOpacity
-          style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.cardBorder }]}
+          style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.headerChipBorder }]}
           onPress={onClose}
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text style={[styles.backChipText, { color: t.primaryText }]}>{'<'} Back</Text>
+          <Text style={[styles.backChipText, { color: t.headerTitle }]}>{'<'} Back</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.title, { color: t.primaryText }]}>{getShopTitle(phase)}</Text>
-          <Text style={[styles.subtitle, { color: t.primaryText }]} numberOfLines={2}>
+          <Text style={[styles.title, { color: t.headerTitle }]}>{getShopTitle(phase)}</Text>
+          <Text style={[styles.subtitle, { color: t.headerMuted }]} numberOfLines={2}>
             {getShopSubtitle(phase)}
           </Text>
         </View>
@@ -306,7 +306,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       >
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color={t.primaryText} />
+            <ActivityIndicator size="large" color={t.headerTitle} />
           </View>
         ) : (
           <>
@@ -322,7 +322,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   kind="card"
                   style={{ ...styles.patronBanner, borderColor: t.amberTintBorder }}
                 >
-                  <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.amberTint }]} />
+                  <View pointerEvents="none" style={[styles.tintInset, { backgroundColor: t.amberTint }]} />
                   <Text style={[styles.patronBannerTitle, { color: t.amberText }]}>{'✦'} Become a Patron</Text>
                   <Text style={[styles.patronBannerSub, { color: t.body }]}>Support WordShift. A small amber bonus + an exclusive gold tile set</Text>
                 </PanelCard>
@@ -357,7 +357,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   kind="card"
                   style={{ ...styles.storeBridge, borderColor: t.amberTintBorder }}
                 >
-                  <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.amberTint }]} />
+                  <View pointerEvents="none" style={[styles.tintInset, { backgroundColor: t.amberTint }]} />
                   <View style={styles.storeBridgeBody}>
                     <Text style={[styles.storeBridgeTitle, { color: t.amberText }]}>{getShopStoreBridgeText(phase).title}</Text>
                     <Text style={[styles.storeBridgeSub, { color: t.body }]}>
@@ -369,7 +369,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               </TouchableOpacity>
             )}
 
-            <Text style={[styles.footnote, { color: t.primaryText }]}>
+            <Text style={[styles.footnote, { color: t.headerMuted }]}>
               Cosmetics are for expression only. They never change the puzzle, the
               story, or your progress.
             </Text>
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
   title: { fontSize: 22, fontWeight: '900', letterSpacing: 0.5 },
   subtitle: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 2,
@@ -427,11 +427,13 @@ const styles = StyleSheet.create({
   },
   amberPillText: { fontSize: 15, fontWeight: '900' },
   patronBanner: {
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     marginBottom: 18,
   },
-  patronBannerTitle: { fontSize: 16, fontWeight: '900', marginBottom: 3 },
+  patronBannerTitle: { fontSize: 16, fontWeight: '900', marginBottom: 4 },
+  // Washes only the parchment, never the painted wood frame.
+  tintInset: { position: 'absolute', top: 12, left: 12, right: 12, bottom: 12 },
   patronBannerSub: { fontSize: 12.5, fontWeight: '600' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
@@ -447,8 +449,9 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    marginBottom: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    marginBottom: 14,
   },
   cardBody: { flex: 1, paddingHorizontal: 12 },
   cardName: { fontSize: 16, fontWeight: '800' },
@@ -493,8 +496,8 @@ const styles = StyleSheet.create({
   storeBridge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 18,
     marginTop: 8,
     marginBottom: 4,
   },

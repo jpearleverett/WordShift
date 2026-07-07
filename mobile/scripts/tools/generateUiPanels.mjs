@@ -111,6 +111,10 @@ const PALETTES = {
     outline: '#3B2416',
     wood: { rim: '#F0BE84', light: '#E3AC6E', base: '#C98A4B', mid: '#A96B33', dark: '#7E4A20', seam: '#5A3418' },
     parch: { hi: '#FBF0D9', base: '#F3E2BF', dim: '#EBD8B2', shadow: '#D9BE8F', vig1: '#DFC69B', vig2: '#E9D4AD', vig3: '#EFDCB7' },
+    // Painted inlay trim — the per-skin second hue (cottage sage → dusty rose
+    // → slate → ember → mauve). Structural jewelry only, never an action color
+    // (amber keeps that job).
+    accent: { main: '#6E9A4B', lo: '#527A36' },
     btn: {
       primary: { face: '#E8A33D', hi: '#FFD9A0', hi2: '#F4BE6C', lo: '#B06F1E', lo2: '#8A5414' },
       secondary: { face: '#C98A4B', hi: '#E9B87E', hi2: '#DBA163', lo: '#96602A', lo2: '#754A1E' },
@@ -188,17 +192,20 @@ Object.assign(PALETTES.dusk, {
   outline: '#33201E',
   wood: { rim: '#DCA878', light: '#C99668', base: '#A87447', mid: '#8A5A31', dark: '#66401F', seam: '#48301C' },
   parch: { hi: '#F2E2C2', base: '#E6D0A9', dim: '#DCC49B', shadow: '#C3A67D', vig1: '#C3A67D', vig2: '#D2B78C', vig3: '#DCC49B' },
+  accent: { main: '#A9535C', lo: '#873E46' },
 });
 Object.assign(PALETTES.storm, {
   outline: '#221723',
   wood: { rim: '#A87858', light: '#97684A', base: '#7A5238', mid: '#613E2B', dark: '#46291D', seam: '#301B14' },
   parch: { hi: '#DEC49E', base: '#CDB289', dim: '#C2A67D', shadow: '#A3875F', vig1: '#A3875F', vig2: '#B49770', vig3: '#C2A67D' },
+  accent: { main: '#5F6E96', lo: '#485577' },
 });
 Object.assign(PALETTES.storm.btn.primary, { face: '#D97F2E', hi: '#F2A65A', hi2: '#E4913F', lo: '#96521B', lo2: '#733D12' });
 Object.assign(PALETTES.dark, {
   outline: '#0F0A10',
   wood: { rim: '#7E574A', light: '#6B463A', base: '#52332C', mid: '#3E2522', dark: '#2B1817', seam: '#1D0F0F' },
   parch: { hi: '#3E323A', base: '#352A31', dim: '#2E2429', shadow: '#241B20', vig1: '#241B20', vig2: '#2A2026', vig3: '#30262C' },
+  accent: { main: '#9E3B2A', lo: '#77281C' },
 });
 Object.assign(PALETTES.dark.btn.primary, { face: '#A83A28', hi: '#D65B33', hi2: '#C04A2C', lo: '#6E2014', lo2: '#54160D' });
 Object.assign(PALETTES.dark.btn.quiet, { face: '#3E323A', hi: '#4C3E48', hi2: '#453840', lo: '#2A2026', lo2: '#221820' });
@@ -206,6 +213,7 @@ Object.assign(PALETTES.serene, {
   outline: '#151019',
   wood: { rim: '#715866', light: '#5E4653', base: '#4A3742', mid: '#392A34', dark: '#291D26', seam: '#1C1219' },
   parch: { hi: '#3C3242', base: '#332A38', dim: '#2C2431', shadow: '#221B28', vig1: '#221B28', vig2: '#28202E', vig3: '#2E2533' },
+  accent: { main: '#8A6E96', lo: '#6B5277' },
 });
 Object.assign(PALETTES.serene.btn.primary, { face: '#A97F45', hi: '#C99E63', hi2: '#B98E52', lo: '#6E4E26', lo2: '#573C1C' });
 Object.assign(PALETTES.serene.btn.quiet, { face: '#3C3242', hi: '#4A3F52', hi2: '#433849', lo: '#28202E', lo2: '#201926' });
@@ -270,15 +278,21 @@ function drawFrameMaster(w, h, pal, kind) {
   const woodRows = kind === 'panel' ? 3 : 1;
   const g = new Grid(w, h);
   const { depth, inside } = ringDepth(w, h, (x, y) => insideSteppedRect(x, y, w, h, runs));
-  const P = pal.parch, W = pal.wood;
-  // Ring layout: 0 outline | 1 rim | 2..2+woodRows-1 wood | seam | transition | vig steps | fill
-  // Ring budget must exactly fill the edge-strip thickness so corner tiles and
-  // edge strips agree at their boundary: panel = outline+rim+3wood+seam+trans+vig
-  // = 8 rings = PANEL_THICK; card = outline+rim+wood+seam = 4 rings (+1 fill
-  // breathing row inside CARD_THICK).
+  const P = pal.parch, W = pal.wood, A = pal.accent;
+  // Ring layout v2 (the "more texture, more color" pass):
+  //   0 outline | 1 rim | wood rows | seam | ACCENT INLAY (panel) |
+  //   parchment transition | graded vignette | fill
+  // Ring budget must exactly fill the edge-strip thickness so corner tiles
+  // and edge strips agree at their boundary:
+  //   panel = 1+1+3+1+1+1+2 = 10 rings = PANEL_THICK
+  //   card  = 1+1+1+1+1+1   =  6 rings = CARD_THICK
+  // Content only needs to clear the WOOD (outline..transition); the vignette
+  // rings are parchment tones every ink stays >=4.5:1 on, so text may overlap
+  // them freely.
   const seamRing = 2 + woodRows;
-  const transRing = seamRing + 1;
-  const vigRings = kind === 'panel' ? 1 : 0;
+  const accentRing = kind === 'panel' ? seamRing + 1 : -1;
+  const transRing = kind === 'panel' ? accentRing + 1 : seamRing + 1;
+  const vigRings = kind === 'panel' ? 2 : 1;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x;
     if (!inside[i]) continue;
@@ -298,25 +312,43 @@ function drawFrameMaster(w, h, pal, kind) {
       continue;
     }
     if (d === seamRing) { g.set(x, y, W.seam); continue; }
-    if (kind === 'panel') {
-      if (d === transRing) {
-        g.set(x, y, side === 'top' || side === 'left' ? P.shadow : P.hi);
-        continue;
+    if (d === accentRing) {
+      // Painted inlay: lit on the top/left run, shaded bottom/right — reads
+      // as a carved groove filled with the skin's second hue.
+      g.set(x, y, side === 'top' || side === 'left' ? A.main : A.lo);
+      continue;
+    }
+    if (d === transRing) {
+      g.set(x, y, side === 'top' || side === 'left' ? P.shadow : P.hi);
+      continue;
+    }
+    if (d <= transRing + vigRings) {
+      // Graded vignette: the paper darkens softly toward the frame on the lit
+      // sides, giving the flat center a lit-parchment depth.
+      const k = d - transRing; // 1..vigRings
+      if (side === 'top' || side === 'left') {
+        g.set(x, y, k === 1 ? P.vig1 : P.vig2);
+      } else {
+        g.set(x, y, kind === 'card' ? P.dim : P.base);
       }
-      if (d <= transRing + vigRings) {
-        g.set(x, y, side === 'top' || side === 'left' ? P.vig2 : P.base);
-        continue;
-      }
+      continue;
     }
     g.set(x, y, kind === 'card' ? P.dim : P.base);
   }
-  // Corner decor (fixed corner tiles only, panel only): nail heads + grain.
   if (kind === 'panel') {
+    // Corner decor (fixed corner tiles only): nail heads, wood knots, grain.
     const nailAt = 4;
     const corners = [[nailAt, nailAt], [w - nailAt - 2, nailAt], [nailAt, h - nailAt - 2], [w - nailAt - 2, h - nailAt - 2]];
     for (const [cx, cy] of corners) {
       g.set(cx, cy, W.seam); g.set(cx + 1, cy, W.seam); g.set(cx, cy + 1, W.seam); g.set(cx + 1, cy + 1, W.seam);
       g.set(cx, cy, W.rim); // glint
+    }
+    // Small wood knots beside the nails (one per corner, mirrored).
+    const knots = [[8, 3], [w - 10, 3], [8, h - 5], [w - 10, h - 5]];
+    for (const [kx, ky] of knots) {
+      if (g.get(kx, ky)) g.set(kx, ky, W.dark);
+      if (g.get(kx + 1, ky)) g.set(kx + 1, ky, W.mid);
+      if (g.get(kx, ky + 1)) g.set(kx, ky + 1, W.mid);
     }
     const dashes = [
       [7, 2, 3], [2, 8, 1], [w - 10, 2, 3], [w - 3, 8, 1],
@@ -327,6 +359,14 @@ function drawFrameMaster(w, h, pal, kind) {
         const cur = g.get(dx + k, dy);
         if (cur) g.set(dx + k, dy, W.mid);
       }
+    }
+  } else {
+    // Card corner stitch: a 2-px accent tick in each corner's wood — the
+    // quiet version of the panel's inlay ring, so list rows carry a hint of
+    // the skin's second hue without a full loud trim.
+    const stitches = [[3, 3], [w - 4, 3], [3, h - 4], [w - 4, h - 4]];
+    for (const [sx, sy] of stitches) {
+      if (g.get(sx, sy)) g.set(sx, sy, A.main);
     }
   }
   return g;
@@ -354,6 +394,10 @@ function drawButtonMaster(w, h, pal, colors, pressed) {
       else if (fromBottom <= 3) c = colors.lo;
       else if (x === 1 || (depth[i] === 1 && nearestSide(x, y, w, h) === 'left')) c = colors.hi2;
       else if (x === w - 2 || (depth[i] === 1 && nearestSide(x, y, w, h) === 'right')) c = colors.lo;
+      // Candy glint: a 2-px sparkle in the top-left cap (fixed caps only —
+      // never in the stretched middle column band).
+      else if ((x === 3 && fromTop === 3) || (x === 4 && fromTop === 3)) c = colors.hi;
+      else if (x === 3 && fromTop === 4) c = colors.hi2;
     } else {
       // pressed: light falls into the socket — dark lip at top, shallow base
       if (fromTop === 1) c = colors.lo;
@@ -384,6 +428,7 @@ function drawPlaqueMaster(w, h, pal) {
     const fromTop = y, fromBottom = h - 1 - y;
     let c = pal.plaque.face;
     if (fromTop === 1) c = pal.plaque.rim;
+    else if (fromBottom === 2) c = pal.accent.lo; // painted carve line above the base shadow
     else if (fromBottom === 1) c = pal.plaque.lo;
     g.set(x, y, c);
   }
@@ -399,11 +444,13 @@ function drawPlaqueMaster(w, h, pal) {
 // ---------------------------------------------------------------------------
 // Slice + emit
 // ---------------------------------------------------------------------------
-// Panel: 7 art-px visual frame (outline+rim+3 wood+seam+transition) + vignette.
-// Card: 4 art-px slim tray (outline+rim+1 wood+seam) — fits 52dp list rows
-// (two 18dp corner caps + content) and clears the common 12dp paddings.
-const PANEL_MASTER = 40, PANEL_CAP = 12, PANEL_THICK = 8;
-const CARD_MASTER = 24, CARD_CAP = 6, CARD_THICK = 5;
+// Panel: 8 art-px visual frame (outline+rim+3 wood+seam+ACCENT+transition)
+// + 2 graded vignette rings. Card: 5 art-px slim tray (outline+rim+wood+seam+
+// transition) + 1 vignette ring — still fits 52dp list rows (two 21dp corner
+// caps + content). Vignette rings are text-safe parchment, so the required
+// content clearance stays the wood band, not the full strip.
+const PANEL_MASTER = 40, PANEL_CAP = 12, PANEL_THICK = 10;
+const CARD_MASTER = 24, CARD_CAP = 7, CARD_THICK = 6;
 const BTN_H_MD = 14, BTN_H_LG = 19, BTN_W = 24, BTN_CAP = 8;
 const PLAQUE_H = 14, PLAQUE_W = 32, PLAQUE_CAP = 10;
 
@@ -554,7 +601,7 @@ if (PREVIEW_DIR) {
   lines.push('export interface FrameSkin { tl: ImageSourcePropType; tr: ImageSourcePropType; bl: ImageSourcePropType; br: ImageSourcePropType; top: ImageSourcePropType; bottom: ImageSourcePropType; left: ImageSourcePropType; right: ImageSourcePropType; }');
   lines.push('export interface ThreeSlice { l: ImageSourcePropType; m: ImageSourcePropType; r: ImageSourcePropType; }');
   lines.push('export interface ButtonSkin { up: ThreeSlice; down: ThreeSlice; }');
-  lines.push('export interface PixelSkin { panel: FrameSkin; card: FrameSkin; buttons: { primary: { md: ButtonSkin; lg: ButtonSkin }; secondary: { md: ButtonSkin; lg: ButtonSkin }; quiet: { md: ButtonSkin; lg: ButtonSkin } }; plaque: ThreeSlice; fill: string; fillCard: string; ink: { primary: string; secondary: string; quiet: string; plaque: string }; }');
+  lines.push('export interface PixelSkin { panel: FrameSkin; card: FrameSkin; buttons: { primary: { md: ButtonSkin; lg: ButtonSkin }; secondary: { md: ButtonSkin; lg: ButtonSkin }; quiet: { md: ButtonSkin; lg: ButtonSkin } }; plaque: ThreeSlice; fill: string; fillCard: string; /** Painted-inlay second hue per skin (structural accent, never an action color). */ accent: string; accentLo: string; ink: { primary: string; secondary: string; quiet: string; plaque: string }; }');
   lines.push('');
   // dp constants: 1 art-px = 3dp
   lines.push('/** dp sizes (1 art-px = 3 dp; PNGs are baked at 9 real px per art-px). */');
@@ -586,6 +633,8 @@ if (PREVIEW_DIR) {
     plaque: ${three('plaque')},
     fill: '${PALETTES[skin].parch.base}',
     fillCard: '${PALETTES[skin].parch.dim}',
+    accent: '${PALETTES[skin].accent.main}',
+    accentLo: '${PALETTES[skin].accent.lo}',
     ink: { primary: '${BTN_INKS[skin].primary}', secondary: '${BTN_INKS[skin].secondary}', quiet: '${BTN_INKS[skin].quiet}', plaque: '${PALETTES[skin].plaque.text}' },
   },`);
   }
