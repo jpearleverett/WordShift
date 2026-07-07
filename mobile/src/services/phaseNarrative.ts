@@ -255,6 +255,59 @@ export function getShareCardTagline(phase: number): string {
 }
 
 // ============================================================================
+// DAILY LADDER — spoiler-safe "your daily history" copy for the leaderboard
+// card. Rank / percentile / participation only; never words, the solution, or a
+// phase label. Works offline (falls back to a bare participation count when the
+// backend gave no rank), and the tone shifts with the descent. No em dashes.
+// ============================================================================
+
+export function getDailyLadderLine(
+  summary: {
+    bestRankThisWeek: number | null;
+    bestPercentileThisWeek: number | null;
+    participationCount: number;
+  } | null | undefined,
+  phase: number,
+): string | null {
+  if (!summary || typeof summary !== 'object') return null;
+
+  if (summary.bestRankThisWeek != null) {
+    const r = summary.bestRankThisWeek;
+    if (phase >= 4) return `Best among the gathered this week: #${r}`;
+    if (phase >= 2) return `Your best standing this week: #${r}`;
+    return `Best this week: #${r}`;
+  }
+  if (summary.bestPercentileThisWeek != null) {
+    const p = summary.bestPercentileThisWeek;
+    if (phase >= 4) return `This week you stood ahead of ${p}% at your best`;
+    if (phase >= 2) return `This week's best: ahead of ${p}% of seekers`;
+    return `Best this week: ahead of ${p}% of seekers`;
+  }
+  // Offline / never ranked: celebrate the habit itself (spoiler-safe, no rank).
+  if (summary.participationCount >= 2) {
+    const n = summary.participationCount;
+    if (phase >= 4) return `${n} offerings kept in the pattern`;
+    if (phase >= 2) return `${n} dailies answered`;
+    return `${n} dailies completed`;
+  }
+  return null;
+}
+
+/**
+ * Short, phase-aware, color-independent placement-trend tag for the ladder card
+ * (rendered as text + an a11y label, never color alone). Null for no trend.
+ */
+export function getDailyLadderTrendLabel(
+  trend: 'up' | 'down' | 'flat' | null | undefined,
+  phase: number,
+): string | null {
+  if (trend === 'up') return phase >= 2 ? 'Ascending' : 'Rising';
+  if (trend === 'down') return phase >= 2 ? 'Receding' : 'Slipping';
+  if (trend === 'flat') return 'Holding';
+  return null;
+}
+
+// ============================================================================
 // COMBO MOVE MESSAGES — Escalating feedback for consecutive clean moves within a
 // single puzzle. `streak` is the count of successful moves so far this board (2+).
 // Each tier ramps the energy so a clean run *feels* like it's building, which is

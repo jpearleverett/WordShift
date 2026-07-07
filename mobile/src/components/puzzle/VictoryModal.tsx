@@ -37,7 +37,7 @@ import { getSettingsSync } from '../../services/settings';
 import { DailyLeaderboardCard } from '../social/DailyLeaderboardCard';
 import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
-import { getRewardedDoubleLabel, getRewardedDoubleConfirm } from '../../services/phaseNarrative';
+import { getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel } from '../../services/phaseNarrative';
 import { isAdFreeSync } from '../../services/entitlements';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
@@ -87,6 +87,10 @@ interface VictoryModalProps {
   isPlayingDaily: boolean;
   /** Daily leaderboard standing for this result (null = none / backend off) */
   dailyRank?: DailyRank | null;
+  /** Persistent daily-ladder history line (best this week / participation). */
+  dailyHistoryLine?: string | null;
+  /** Placement trend vs the previous ranked day. */
+  dailyTrend?: 'up' | 'down' | 'flat' | null;
   /** Quiet, spoiler-safe aggregate social-proof line (null = none / backend off) */
   socialProofLine?: string | null;
   /** App-level gate for the optional rewarded "double the reward" affordance */
@@ -174,6 +178,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   phaseTransitionPending,
   isPlayingDaily,
   dailyRank,
+  dailyHistoryLine,
+  dailyTrend,
   socialProofLine,
   rewardedDoubleEnabled,
   rewardedDoubleClaimed,
@@ -382,12 +388,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               </Text>
             )}
 
-            {isPlayingDaily && dailyRank && (
+            {isPlayingDaily && (dailyRank || dailyHistoryLine) && (
               <DailyLeaderboardCard
-                rank={dailyRank.rank}
-                total={dailyRank.total}
-                percentile={dailyRank.percentile}
-                beatText={getBeatPercentText(dailyRank.percentile, phase)}
+                rank={dailyRank?.rank ?? null}
+                total={dailyRank?.total ?? null}
+                percentile={dailyRank?.percentile ?? null}
+                beatText={dailyRank ? getBeatPercentText(dailyRank.percentile, phase) : null}
+                historyLine={dailyHistoryLine}
+                trendLabel={getDailyLadderTrendLabel(dailyTrend, phase)}
                 phase={phase}
               />
             )}

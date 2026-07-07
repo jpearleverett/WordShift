@@ -3,6 +3,8 @@ import {
   getVictoryFeedback,
   getMoveMessage,
   getShareCardTagline,
+  getDailyLadderLine,
+  getDailyLadderTrendLabel,
   getHintMessage,
   getHintFallback,
   getLoadingMessage,
@@ -145,6 +147,44 @@ describe('getShareCardTagline', () => {
     // The dark phases drop the "cozy" framing entirely.
     expect(getShareCardTagline(4).toLowerCase()).not.toContain('cozy');
     expect(getShareCardTagline(5).toLowerCase()).not.toContain('cozy');
+  });
+});
+
+describe('getDailyLadderLine', () => {
+  test('prefers this week best rank, tone shifts with phase', () => {
+    const s = { bestRankThisWeek: 3, bestPercentileThisWeek: 90, participationCount: 5 };
+    expect(getDailyLadderLine(s, 0)).toBe('Best this week: #3');
+    expect(getDailyLadderLine(s, 2)).toContain('#3');
+    expect(getDailyLadderLine(s, 4)).toContain('#3');
+    // Tone actually differs across the descent.
+    expect(getDailyLadderLine(s, 0)).not.toBe(getDailyLadderLine(s, 4));
+  });
+
+  test('falls back to percentile, then participation, then null', () => {
+    expect(getDailyLadderLine({ bestRankThisWeek: null, bestPercentileThisWeek: 82, participationCount: 4 }, 0))
+      .toContain('82%');
+    expect(getDailyLadderLine({ bestRankThisWeek: null, bestPercentileThisWeek: null, participationCount: 3 }, 0))
+      .toContain('3');
+    // First daily (participation 1, no rank) → nothing worth showing.
+    expect(getDailyLadderLine({ bestRankThisWeek: null, bestPercentileThisWeek: null, participationCount: 1 }, 0))
+      .toBeNull();
+  });
+
+  test('is safe for null / non-object input (getter-sweep safety)', () => {
+    expect(getDailyLadderLine(null, 0)).toBeNull();
+    expect(getDailyLadderLine(undefined, 3)).toBeNull();
+  });
+});
+
+describe('getDailyLadderTrendLabel', () => {
+  test('maps up/down/flat per phase, null otherwise', () => {
+    expect(getDailyLadderTrendLabel('up', 0)).toBe('Rising');
+    expect(getDailyLadderTrendLabel('up', 2)).toBe('Ascending');
+    expect(getDailyLadderTrendLabel('down', 0)).toBe('Slipping');
+    expect(getDailyLadderTrendLabel('down', 2)).toBe('Receding');
+    expect(getDailyLadderTrendLabel('flat', 4)).toBe('Holding');
+    expect(getDailyLadderTrendLabel(null, 0)).toBeNull();
+    expect(getDailyLadderTrendLabel(undefined, 0)).toBeNull();
   });
 });
 

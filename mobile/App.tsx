@@ -94,11 +94,14 @@ import {
   getVariantNudgeMessage,
   getDailyHostLine,
   getNewCycleOpeningLine,
+  getDailyLadderLine,
+  getDailyLadderTrendLabel,
 } from './src/services/phaseNarrative';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
-import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName } from './src/services/dailyChallenge';
+import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
+import { recordDailyLadderResult, getDailyLadderSummary } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
@@ -281,6 +284,10 @@ function MainApp() {
   const puzzleStartTimeRef = useRef<number>(0);
   // Daily Challenge leaderboard standing for the current victory (null = none/off)
   const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
+  // Persistent daily-ladder "best this week / your history" line + trend for the
+  // Victory modal. Works offline (independent of the live dailyRank fetch).
+  const [dailyLadderLine, setDailyLadderLine] = useState<string | null>(null);
+  const [dailyLadderTrend, setDailyLadderTrend] = useState<'up' | 'down' | 'flat' | null>(null);
   // Quiet, spoiler-safe aggregate social-proof line for the victory modal
   const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
   // Last-known global words-offered count for today; reused when a victory's
@@ -876,6 +883,8 @@ function MainApp() {
     resetSpeedRun();
     setVictoryDoubleClaimed(false);
     setDailyRank(null);
+    setDailyLadderLine(null);
+    setDailyLadderTrend(null);
     setSocialProofLine(null);
     setShareResultData(null);
     setShareChallengeText(null);
@@ -1263,21 +1272,44 @@ function MainApp() {
         // Submit to the daily leaderboard and fetch standing for the modal.
         // Fire-and-forget; both no-op (null) until the backend is configured.
         setDailyRank(null);
+        setDailyLadderLine(null);
+        setDailyLadderTrend(null);
         (async () => {
+          const date = getLocalDateString();
+          const elapsedMs = puzzleStartTimeRef.current > 0
+            ? Date.now() - puzzleStartTimeRef.current
+            : 0;
+          let rank: DailyRank | null = null;
           try {
-            const elapsedMs = puzzleStartTimeRef.current > 0
-              ? Date.now() - puzzleStartTimeRef.current
-              : 0;
             await submitDailyResult({
-              date: getLocalDateString(),
+              date,
               timeMs: elapsedMs,
               stars: victory.earnedStars,
               hintsUsed: result.hintsUsed,
             });
-            const rank = await getDailyRank(getLocalDateString());
+            rank = await getDailyRank(date);
             if (rank) setDailyRank(rank);
           } catch {
             // Leaderboard is non-critical — never block the victory flow.
+          }
+          // Persist the local ladder entry regardless of backend availability,
+          // then surface the returning-player "best this week / your history"
+          // line. This is the offline hook: rank/percentile are null offline and
+          // the line falls back to participation copy from local history.
+          try {
+            await recordDailyLadderResult({
+              date,
+              rank: rank?.rank ?? null,
+              percentile: rank?.percentile ?? null,
+              timeMs: elapsedMs,
+              stars: victory.earnedStars,
+              difficulty: getDailyDifficulty(date),
+            });
+            const summary = await getDailyLadderSummary();
+            setDailyLadderLine(getDailyLadderLine(summary, persistence.currentPhase));
+            setDailyLadderTrend(summary.trend);
+          } catch {
+            // Ladder is decorative — never block the victory flow.
           }
         })();
         try {
@@ -2800,6 +2832,8 @@ function MainApp() {
           phaseTransitionPending={persistence.pendingPhaseTransition != null}
           isPlayingDaily={isPlayingDaily}
           dailyRank={dailyRank}
+          dailyHistoryLine={dailyLadderLine}
+          dailyTrend={dailyLadderTrend}
           socialProofLine={socialProofLine}
           rewardedDoubleEnabled={(persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) > AUTO_COLLECT_PUZZLE_LIMIT}
           rewardedDoubleClaimed={victoryDoubleClaimed}
