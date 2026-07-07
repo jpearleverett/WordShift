@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
+import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
@@ -218,6 +220,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   }, [onClose]);
 
   const t = getSurfaceTheme(phase);
+  const skin = getPixelSkin(phase);
 
   const benefits: { key: string; render: React.ReactNode }[] = [
     {
@@ -261,16 +264,19 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           style={[
             styles.card,
             {
-              backgroundColor: t.cardBg,
-              borderColor: t.cardBorder,
               opacity: cardOpacity,
               transform: [{ scale: cardScale }],
             },
           ]}
         >
+          {/* Cottage pixel panel frame (wood 9-slice + solid parchment fill). */}
+          <NineSliceFrame
+            skin={skin.panel}
+            cornerDp={PANEL_CORNER_DP}
+            edgeDp={PANEL_EDGE_DP}
+            fillColor={skin.fill}
+          />
           <View style={[styles.glow, { backgroundColor: t.glow }]} />
-          {/* Layered material bands (PanelCard anatomy, inline for the animated card). */}
-          <View pointerEvents="none" style={styles.cardHighlight} />
 
           <Text style={[styles.eyebrow, { color: t.muted }]}>WORDSHIFT</Text>
           <Text style={[styles.title, { color: t.title }]}>Become a Patron</Text>
@@ -279,14 +285,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           </Text>
 
           {isPatron ? (
-            <PanelCard
-              phase={phase}
-              style={{
-                ...styles.patronActiveBox,
-                backgroundColor: t.amberTint,
-                borderColor: t.amberTintBorder,
-              }}
-            >
+            <PanelCard phase={phase} style={styles.patronActiveBox}>
               <Text style={[styles.patronActiveTitle, { color: t.amberText }]}>
                 You are a Patron ✦
               </Text>
@@ -399,8 +398,6 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
-    borderRadius: SURFACE.panelRadius,
-    borderWidth: 1.5,
     padding: 24,
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
@@ -418,17 +415,6 @@ const styles = StyleSheet.create({
     height: 160,
     opacity: 0.25,
     borderRadius: 100,
-  },
-  // Top highlight — the panel reads as lit material.
-  cardHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '34%',
-    borderTopLeftRadius: SURFACE.panelRadius,
-    borderTopRightRadius: SURFACE.panelRadius,
-    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
   },
   eyebrow: {
     fontSize: 11,

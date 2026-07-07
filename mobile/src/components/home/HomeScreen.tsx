@@ -23,6 +23,18 @@ import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors, getDialogueTheme, getOverlayBannerTheme, getPhaseTheme } from '../../theme/colors';
 import { SURFACE, getPressSpring, getSurfaceTheme } from '../../theme/surfaces';
+import {
+  getPixelSkin,
+  PANEL_CORNER_DP,
+  PANEL_EDGE_DP,
+  CARD_CORNER_DP,
+  CARD_EDGE_DP,
+  BTN_CAP_DP,
+  BTN_MD_DP,
+  BTN_SHADOW_DP,
+} from '../../theme/pixelSkin.generated';
+import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
+import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import {
@@ -260,7 +272,7 @@ const SpringIn: React.FC<{
 };
 
 /**
- * Framed hub-row (Journal / Utility menus): layered tinted material with an
+ * Framed hub-row (Journal / Utility menus): cottage pixel card frame with an
  * optional ui-sprite icon — replaces the old uniform ghost rows.
  */
 const HubRow: React.FC<{
@@ -273,15 +285,21 @@ const HubRow: React.FC<{
   hostDark?: boolean;
 }> = ({ phase, label, onPress, accessibilityLabel, icon, hostDark = false }) => {
   const t = getSurfaceTheme(hostDark && phase < 3 ? 3 : phase);
+  const skin = getPixelSkin(phase, hostDark);
   return (
     <TouchableOpacity
-      style={[styles.hubRow, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}
+      style={styles.hubRow}
       onPress={onPress}
       activeOpacity={0.8}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
     >
-      <View pointerEvents="none" style={styles.hubRowHighlight} />
+      <NineSliceFrame
+        skin={skin.card}
+        cornerDp={CARD_CORNER_DP}
+        edgeDp={CARD_EDGE_DP}
+        fillColor={skin.fillCard}
+      />
       {icon ? <Image source={icon} style={styles.hubRowIcon} resizeMode="contain" /> : null}
       <Text style={[styles.hubRowText, { color: t.body }]}>{label}</Text>
     </TouchableOpacity>
@@ -289,11 +307,13 @@ const HubRow: React.FC<{
 };
 
 /**
- * Chunky two-layer bevel button that accepts arbitrary children (needed where
+ * Cottage pixel bevel button that accepts arbitrary children (needed where
  * the label embeds <AmberInline /> inside the Text run — CandyButton itself
- * only takes a string label). Mirrors CandyButton's anatomy exactly: darker
- * bottom edge, face travels down SURFACE.pressTravel while pressed, springs
- * back with phase weight. Secondary variant is the flat tinted frame.
+ * only takes a string label). Mirrors CandyButton's anatomy exactly: 3-slice
+ * pixel strip with a baked cast shadow, pressed-state sprite swap, and the
+ * label travels down SURFACE.pressTravel while pressed, springing back with
+ * phase weight. amber/primary map onto the amber pixel bevel; secondary is
+ * the wood-trimmed parchment bevel.
  */
 const BevelRowButton: React.FC<{
   phase: number;
@@ -306,14 +326,18 @@ const BevelRowButton: React.FC<{
   /** Host panel is dt.modalBg, which darkens at phase 2 (see dtHostDark). */
   hostDark?: boolean;
 }> = ({ phase, variant, onPress, disabled = false, accessibilityLabel, style, children, hostDark = false }) => {
-  const t = getSurfaceTheme(hostDark && phase < 3 ? 3 : phase);
+  const skin = getPixelSkin(phase, hostDark);
   const reducedMotion = getSettingsSync().reducedMotion;
   const travel = useRef(new Animated.Value(0)).current;
+  const [pressed, setPressed] = useState(false);
+  const buttonSkin = skin.buttons[variant === 'secondary' ? 'secondary' : 'primary'].md;
   const handlePressIn = useCallback(() => {
+    setPressed(true);
     if (reducedMotion) return;
     Animated.timing(travel, { toValue: 1, duration: 70, useNativeDriver: true }).start();
   }, [travel, reducedMotion]);
   const handlePressOut = useCallback(() => {
+    setPressed(false);
     if (reducedMotion) return;
     Animated.spring(travel, { toValue: 0, ...getPressSpring(phase), useNativeDriver: true }).start();
   }, [travel, phase, reducedMotion]);
@@ -321,37 +345,6 @@ const BevelRowButton: React.FC<{
     inputRange: [0, 1],
     outputRange: [0, SURFACE.pressTravel],
   });
-  if (variant === 'secondary') {
-    return (
-      <Pressable
-        onPress={disabled ? undefined : onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={disabled}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ disabled }}
-        style={[disabled && styles.bevelDisabled, style]}
-      >
-        <Animated.View
-          style={[
-            styles.bevelFace,
-            styles.bevelSecondaryFace,
-            {
-              backgroundColor: t.secondaryBg,
-              borderColor: t.secondaryBorder,
-              transform: [{ translateY }],
-            },
-          ]}
-        >
-          {children}
-        </Animated.View>
-      </Pressable>
-    );
-  }
-  const face = variant === 'primary'
-    ? { bg: t.primaryBg, edge: t.primaryEdge }
-    : { bg: t.pillBg, edge: t.pillEdge };
   return (
     <Pressable
       onPress={disabled ? undefined : onPress}
@@ -361,13 +354,10 @@ const BevelRowButton: React.FC<{
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
-      style={[styles.bevelWrapper, disabled && styles.bevelDisabled, style]}
+      style={[styles.bevelStrip, disabled && styles.bevelDisabled, style]}
     >
-      <View style={[styles.bevelEdge, { backgroundColor: face.edge }]} />
-      <Animated.View
-        style={[styles.bevelFace, { backgroundColor: face.bg, transform: [{ translateY }] }]}
-      >
-        <View pointerEvents="none" style={styles.bevelHighlight} />
+      <ThreeSliceStrip skin={pressed ? buttonSkin.down : buttonSkin.up} capDp={BTN_CAP_DP} />
+      <Animated.View style={[styles.bevelContent, { transform: [{ translateY }] }]}>
         {children}
       </Animated.View>
     </Pressable>
@@ -1308,6 +1298,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // the panel).
   const dtHostDark = progress.currentPhase >= 2;
   const panelSt = getSurfaceTheme(progress.currentPhase === 2 ? 3 : progress.currentPhase);
+  // Cottage pixel skin for the home modal chrome (same hostDark mapping).
+  const pixelSkin = getPixelSkin(progress.currentPhase, dtHostDark);
   const phaseTheme = getPhaseTheme(progress.currentPhase);
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
     Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
@@ -1739,17 +1731,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <SpringIn
             claimTouches
-            style={[
-              styles.compactHubModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
+            style={styles.compactHubModal}
           >
-            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Journal</Text>
-            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
+            />
+            <PixelPlaque
+              phase={progress.currentPhase}
+              hostDark={dtHostDark}
+              label="Journal"
+              style={styles.modalPlaque}
+            />
+            <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
               Keep the house&apos;s records in one place.
             </Text>
             {onOpenLedger && (
@@ -1811,17 +1808,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <SpringIn
             claimTouches
-            style={[
-              styles.compactHubModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
+            style={styles.compactHubModal}
           >
-            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Menu</Text>
-            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
+            />
+            <PixelPlaque
+              phase={progress.currentPhase}
+              hostDark={dtHostDark}
+              label="Menu"
+              style={styles.modalPlaque}
+            />
+            <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
               Everything else can stay tucked away until you need it.
             </Text>
             {onOpenStats && (
@@ -1926,21 +1928,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <SpringIn
             claimTouches
-            style={[
-              styles.shopModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
+            style={styles.shopModal}
           >
-            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Unlock Progress</Text>
-            <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
+            />
+            <Text style={[styles.shopTitle, { color: panelSt.title }]}>Unlock Progress</Text>
+            <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
               Your Amber: <AmberInline /> {progress.amber}
             </Text>
             {upgradeFeedback && (
-              <Text style={[styles.shopFeedbackText, { color: dt.nameColor }]}>
+              <Text style={[styles.shopFeedbackText, { color: panelSt.title }]}>
                 {upgradeFeedback}
               </Text>
             )}
@@ -1951,8 +1953,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.nextUnlockLabel, { color: panelSt.muted }]}>Next Unlock:</Text>
                 <PanelCard phase={progress.currentPhase} hostDark={dtHostDark} kind="card" style={styles.unlockItem}>
                   <View style={styles.unlockInfo}>
-                    <Text style={[styles.unlockName, { color: dt.textColor }]}>{unlockFlow.nextUnlock.name}</Text>
-                    <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                    <Text style={[styles.unlockName, { color: panelSt.body }]}>{unlockFlow.nextUnlock.name}</Text>
+                    <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
                       {unlockFlow.nextUnlock.type === 'room'
                         ? getRoomDescription(unlockFlow.nextUnlock.targetId, progress.currentPhase)
                         : unlockFlow.nextUnlock.description}
@@ -2035,7 +2037,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.upgradeSection}>
                 <Text style={[styles.nextUnlockLabel, { color: panelSt.muted }]}>Room Upgrades</Text>
                 {availableRoomUpgrades.length === 0 ? (
-                  <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                  <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
                     Every unlocked room already has its decorative upgrade.
                   </Text>
                 ) : (
@@ -2048,8 +2050,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       style={StyleSheet.flatten([styles.unlockItem, styles.upgradeItem])}
                     >
                       <View style={styles.unlockInfo}>
-                        <Text style={[styles.unlockName, { color: dt.textColor }]}>{room.name}: {upgrade.name}</Text>
-                        <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                        <Text style={[styles.unlockName, { color: panelSt.body }]}>{room.name}: {upgrade.name}</Text>
+                        <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
                           {getUpgradeDescription(room.id, progress.currentPhase)}
                         </Text>
                         <Text style={[styles.unlockCost, { color: panelSt.amberText }]}><AmberInline /> {upgrade.cost} amber</Text>
@@ -2084,8 +2086,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     style={StyleSheet.flatten([styles.unlockItem, styles.upgradeItem])}
                   >
                     <View style={styles.unlockInfo}>
-                      <Text style={[styles.unlockName, { color: dt.textColor }]}>{room.name}: {deepening.name}</Text>
-                      <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                      <Text style={[styles.unlockName, { color: panelSt.body }]}>{room.name}: {deepening.name}</Text>
+                      <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
                         {deepening.description}
                       </Text>
                       <Text style={[styles.unlockCost, { color: panelSt.amberText }]}><AmberInline /> {deepening.cost} amber</Text>
@@ -2137,19 +2139,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             accessibilityRole="button"
           />
           <SpringIn
-            style={[
-              styles.shopModal,
-              styles.questModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
+            style={[styles.shopModal, styles.questModal]}
           >
-            <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Quests</Text>
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
+            />
+            <PixelPlaque
+              phase={progress.currentPhase}
+              hostDark={dtHostDark}
+              label="Quests"
+              style={styles.modalPlaque}
+            />
             {questFeedback && (
-              <Text style={[styles.shopFeedbackText, { color: dt.nameColor }]}>
+              <Text style={[styles.shopFeedbackText, { color: panelSt.title }]}>
                 {questFeedback}
               </Text>
             )}
@@ -2164,8 +2170,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Daily quests tab"
                 accessibilityRole="tab"
               >
-                <Text style={[styles.questTabText, { color: questTab === 'daily' ? dt.nameColor : dt.subtitleColor }]}>Daily</Text>
-                <Text style={[styles.questTabTimer, { color: dt.subtitleColor }]}>
+                <Text style={[styles.questTabText, { color: questTab === 'daily' ? panelSt.title : panelSt.muted }]}>Daily</Text>
+                <Text style={[styles.questTabTimer, { color: panelSt.muted }]}>
                   {getTimeUntilDailyReset().hours}h {getTimeUntilDailyReset().minutes}m
                 </Text>
               </TouchableOpacity>
@@ -2178,8 +2184,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityLabel="Weekly quests tab"
                 accessibilityRole="tab"
               >
-                <Text style={[styles.questTabText, { color: questTab === 'weekly' ? dt.nameColor : dt.subtitleColor }]}>Weekly</Text>
-                <Text style={[styles.questTabTimer, { color: dt.subtitleColor }]}>
+                <Text style={[styles.questTabText, { color: questTab === 'weekly' ? panelSt.title : panelSt.muted }]}>Weekly</Text>
+                <Text style={[styles.questTabTimer, { color: panelSt.muted }]}>
                   {getTimeUntilReset().days}d {getTimeUntilReset().hours}h
                 </Text>
               </TouchableOpacity>
@@ -2204,8 +2210,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     style={StyleSheet.flatten([styles.unlockItem, styles.questItem])}
                   >
                     <View style={styles.unlockInfo}>
-                      <Text style={[styles.unlockName, { color: dt.textColor }]}>{quest.title}</Text>
-                      <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                      <Text style={[styles.unlockName, { color: panelSt.body }]}>{quest.title}</Text>
+                      <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
                         {getQuestDescription(quest, progress.currentPhase)}
                       </Text>
                       <Text style={[styles.questProgressText, { color: panelSt.amberText }]}>
@@ -2278,23 +2284,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         >
           <SpringIn
             claimTouches
-            style={[
-              styles.shopModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
+            style={styles.shopModal}
           >
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
+            />
             {unlockFlow.showRoomUnlock && (
               <>
                 <View style={[styles.lockBadge, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
                   <Text style={styles.lockBadgeEmoji}>🔒</Text>
                 </View>
-                <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Locked Room</Text>
-                <Text style={[styles.lockedRoomName, { color: dt.textColor }]}>{unlockFlow.showRoomUnlock.name}</Text>
-                <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
+                <PixelPlaque
+                  phase={progress.currentPhase}
+                  hostDark={dtHostDark}
+                  label="Locked Room"
+                  style={styles.modalPlaque}
+                />
+                <Text style={[styles.lockedRoomName, { color: panelSt.body }]}>{unlockFlow.showRoomUnlock.name}</Text>
+                <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
                   Play more puzzles to earn amber and unlock this room!
                 </Text>
                 <Text style={[styles.amberBalance, { color: panelSt.amberText }]}>Your Amber: <AmberInline /> {progress.amber}</Text>
@@ -2316,7 +2327,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   if (isReserved) {
                     return (
                       <>
-                        <Text style={[styles.shopSubtitle, { color: dt.nameColor, marginTop: 8, fontWeight: '700' }]}>
+                        <Text style={[styles.shopSubtitle, { color: panelSt.title, marginTop: 8, fontWeight: '700' }]}>
                           {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                         </Text>
                         {unlockFlow.canSpeedUpReserved && (
@@ -2328,7 +2339,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             onPress={() => unlockFlow.handleSpeedUpReserved(unlockFlow.nextUnlock!)}
                             accessibilityLabel={`Speed up ${unlockFlow.nextUnlock!.name} and unlock now for ${unlockFlow.reservedSkipCost} amber`}
                           >
-                            <Text style={[styles.bevelBtnText, { color: panelSt.pillText }]}>
+                            <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.primary }]}>
                               Speed it up for <AmberInline /> {unlockFlow.reservedSkipCost}
                             </Text>
                           </BevelRowButton>
@@ -2341,7 +2352,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   if (unlockFlow.canReserve) {
                     return (
                       <>
-                        <Text style={[styles.shopSubtitle, { color: dt.subtitleColor, marginTop: 8, fontStyle: 'italic' }]}>
+                        <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 8, fontStyle: 'italic' }]}>
                           {getReserveGateText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}. Reserve it now and it builds itself the moment you get there.
                         </Text>
                         <BevelRowButton
@@ -2352,7 +2363,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
                           accessibilityLabel={`Reserve room for ${unlockFlow.nextUnlock!.cost} amber; builds at level ${unlockFlow.nextUnlock!.minPuzzles}, you're at ${progress.puzzlesSolved}`}
                         >
-                          <Text style={[styles.bevelBtnText, { color: panelSt.secondaryText }]}>
+                          <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.secondary }]}>
                             Reserve for <AmberInline /> {unlockFlow.nextUnlock!.cost}
                           </Text>
                         </BevelRowButton>
@@ -2365,7 +2376,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             onPress={() => unlockFlow.handleSkip(unlockFlow.nextUnlock!)}
                             accessibilityLabel={`Skip the wait and unlock ${unlockFlow.nextUnlock!.name} now for ${unlockFlow.skipCost} amber`}
                           >
-                            <Text style={[styles.bevelBtnText, { color: panelSt.pillText }]}>
+                            <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.primary }]}>
                               Skip the wait for <AmberInline /> {unlockFlow.skipCost}
                             </Text>
                           </BevelRowButton>
@@ -2376,7 +2387,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   return (
                     <>
                       {isGated && (
-                        <Text style={[styles.shopSubtitle, { color: dt.subtitleColor, marginTop: 8, fontStyle: 'italic' }]}>
+                        <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 8, fontStyle: 'italic' }]}>
                           {unlockFlow.unlockAvailability!.reason}
                         </Text>
                       )}
@@ -2389,7 +2400,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         disabled={isDisabled}
                         accessibilityLabel={`Unlock room for ${unlockFlow.nextUnlock!.cost} amber`}
                       >
-                        <Text style={[styles.bevelBtnText, { color: panelSt.primaryText }]}>
+                        <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.primary }]}>
                           Unlock for <AmberInline /> {unlockFlow.nextUnlock!.cost}
                         </Text>
                       </BevelRowButton>
@@ -2423,15 +2434,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
             claimTouches
-            style={[
-              styles.inviteModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
+            style={styles.inviteModal}
           >
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+            />
             {unlockFlow.nextUnlock && unlockFlow.nextUnlock.type === 'character' && (() => {
               const animalData = ANIMALS.find(a => a.id === unlockFlow.nextUnlock!.targetId);
               const animalEmoji = animalData ? ANIMAL_EMOJIS[animalData.type] : '🐾';
@@ -2455,13 +2465,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       )}
                     </View>
                   </View>
-                  <Text style={[styles.inviteTitle, { color: dt.nameColor }]}>
-                    {isFirstAnimal ? 'A Visitor Approaches!' : 'A New Friend!'}
-                  </Text>
-                  <Text style={[styles.inviteText, { color: dt.textColor }]}>
+                  <PixelPlaque
+                    phase={progress.currentPhase}
+                    hostDark={dtHostDark}
+                    label={isFirstAnimal ? 'A Visitor Approaches!' : 'A New Friend!'}
+                    style={styles.modalPlaque}
+                  />
+                  <Text style={[styles.inviteText, { color: panelSt.body }]}>
                     {unlockFlow.nextUnlock!.description}
                   </Text>
-                  <Text style={[styles.inviteText, { color: dt.textColor }]}>
+                  <Text style={[styles.inviteText, { color: panelSt.body }]}>
                     {isFirstAnimal
                       ? 'Would you like to invite them into your cozy den?'
                       : `Would you like to welcome ${unlockFlow.nextUnlock!.name.split(' ')[0]} to your growing home?`
@@ -2628,29 +2641,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
           <SpringIn
             claimTouches
-            style={[
-              styles.sacrificeModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
+            style={styles.sacrificeModal}
           >
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+            />
             <Text style={styles.sacrificeEmoji}>🕯️</Text>
-            <Text style={[styles.sacrificeTitle, { color: dt.nameColor }]}>
+            <Text style={[styles.sacrificeTitle, { color: panelSt.title }]}>
               {getSacrificePrompt(progress.currentPhase).title}
             </Text>
-            <Text style={[styles.sacrificeSubtitle, { color: dt.subtitleColor }]}>
+            <Text style={[styles.sacrificeSubtitle, { color: panelSt.muted }]}>
               {getSacrificePrompt(progress.currentPhase).subtitle}
             </Text>
-            <Text style={[styles.sacrificeBalance, { color: dt.textColor }]}>
+            <Text style={[styles.sacrificeBalance, { color: panelSt.body }]}>
               Your Amber: <AmberInline /> {progress.amber}
             </Text>
 
             {sacrificeMessage ? (
-              <View style={[styles.sacrificeResponseBox, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
-                <Text style={[styles.sacrificeResponseText, { color: dt.textColor }]}>
+              <View style={[styles.sacrificeResponseBox, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
+                <Text style={[styles.sacrificeResponseText, { color: panelSt.body }]}>
                   {sacrificeMessage}
                 </Text>
                 <CandyButton
@@ -2684,13 +2696,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     accessibilityLabel={`Offer ${amount} amber`}
                     accessibilityRole="button"
                   >
-                    <Text style={[styles.sacrificeAmountText, { color: dt.textColor }]}>
+                    <Text style={[styles.sacrificeAmountText, { color: panelSt.body }]}>
                       <AmberInline /> {amount}
                     </Text>
                   </TouchableOpacity>
                 ))}
                 {getSacrificeAmounts(progress.amber).length === 0 && (
-                  <Text style={[styles.sacrificeNoAmber, { color: dt.subtitleColor }]}>
+                  <Text style={[styles.sacrificeNoAmber, { color: panelSt.muted }]}>
                     You don&apos;t have enough amber to offer.
                   </Text>
                 )}
@@ -2724,14 +2736,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             claimTouches
             style={[
               styles.houseCompletionModal,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
               progress.currentPhase >= 3 && styles.houseCompletionModalDark,
             ]}
           >
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+            />
             <View pointerEvents="none" style={[styles.houseCompletionGlow, { backgroundColor: panelSt.glow }]} />
             {(() => {
               const lines = getHouseCompletionText();
@@ -2742,18 +2755,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </Text>
                   <Text style={[
                     styles.houseCompletionTitle,
-                    { color: dt.nameColor },
+                    { color: panelSt.title },
                   ]}>
                     {progress.currentPhase >= 4 ? 'The Temple' : 'The House is Complete'}
                   </Text>
                   <Text style={[
                     styles.houseCompletionText,
-                    { color: dt.textColor },
+                    { color: panelSt.body },
                   ]}>
                     {lines[houseCompletionTextIndex]}
                   </Text>
                   <View style={styles.introDialogueFooter}>
-                    <Text style={[styles.introDialogueProgress, { color: dt.progressColor }]}>
+                    <Text style={[styles.introDialogueProgress, { color: panelSt.muted }]}>
                       {houseCompletionTextIndex + 1}/{lines.length}
                     </Text>
                     <CandyButton
@@ -3431,30 +3444,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  // Shop modal
+  // Shop modal — chrome comes from the NineSliceFrame pixel panel; the style
+  // keeps layout only (padding clears PANEL_EDGE_DP = 24).
   shopModal: {
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
     padding: 24,
     paddingBottom: 40,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 12,
   },
   compactHubModal: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 32,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 12,
+  },
+  // Wooden nameplate title overlapping the panel's top frame edge.
+  modalPlaque: {
+    marginTop: -8,
+    marginBottom: 10,
   },
   shopTitle: {
     fontSize: 24,
@@ -3474,26 +3477,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
-  // Framed layered hub rows (Journal / Utility menus)
+  // Pixel-card hub rows (Journal / Utility menus) — the NineSliceFrame is the
+  // chrome; padding clears the card frame edge (CARD_EDGE_DP = 15).
   hubRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: SURFACE.cardRadius,
-    borderWidth: 1.5,
-    paddingHorizontal: 16,
-    minHeight: 52,
+    paddingHorizontal: 18,
+    paddingVertical: 15,
+    minHeight: 56,
     marginBottom: 10,
-    overflow: 'hidden',
-  },
-  hubRowHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '45%',
-    borderTopLeftRadius: SURFACE.cardRadius,
-    borderTopRightRadius: SURFACE.cardRadius,
-    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
   },
   hubRowIcon: {
     width: 20,
@@ -3550,44 +3542,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.4,
   },
-  // Two-layer bevel button anatomy (mirrors CandyButton; needed for labels
+  // Pixel bevel button anatomy (mirrors CandyButton; needed for labels
   // that embed <AmberInline /> inside the Text run)
-  bevelWrapper: {
-    paddingBottom: SURFACE.bevelDepth,
+  bevelStrip: {
+    height: BTN_MD_DP + BTN_SHADOW_DP,
+    minWidth: BTN_CAP_DP * 2 + 24,
   },
   bevelDisabled: {
     opacity: 0.45,
   },
-  bevelEdge: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    top: SURFACE.bevelDepth,
-    borderRadius: SURFACE.buttonRadius,
-  },
-  bevelFace: {
-    borderRadius: SURFACE.buttonRadius,
-    minHeight: 46,
-    paddingHorizontal: 22,
-    paddingVertical: 11,
+  bevelContent: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  bevelSecondaryFace: {
-    borderWidth: 1.5,
-  },
-  bevelHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '46%',
-    borderTopLeftRadius: SURFACE.buttonRadius,
-    borderTopRightRadius: SURFACE.buttonRadius,
-    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
+    paddingHorizontal: 16,
+    // The baked shadow row sits below the button body — keep the label
+    // centered in the body, not the full strip.
+    paddingBottom: BTN_SHADOW_DP,
   },
   bevelBtnText: {
     fontSize: 15,
@@ -3747,17 +3719,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Invite modal styles
+  // Invite modal styles — chrome comes from the NineSliceFrame pixel panel
   inviteModal: {
-    borderRadius: 30,
     padding: 30,
     marginHorizontal: 20,
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 12,
-    borderWidth: 1,
     maxWidth: 380,
     width: '90%',
   },
@@ -3789,12 +3755,6 @@ const styles = StyleSheet.create({
   inviteSpriteImage: {
     width: 116,
     height: 116,
-  },
-  inviteTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 16,
   },
   inviteText: {
     fontSize: 16,
@@ -3915,19 +3875,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 6,
   },
 
-  // Sacrifice modal
+  // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel
   sacrificeModal: {
-    borderRadius: 30,
     padding: 30,
     marginHorizontal: 20,
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 12,
     maxWidth: 380,
     width: '90%',
-    borderWidth: 1,
   },
   sacrificeEmoji: {
     fontSize: 50,
@@ -3997,19 +3951,13 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
 
-  // House completion ceremony styles
+  // House completion ceremony styles — chrome from the NineSliceFrame panel
   houseCompletionModal: {
-    borderRadius: 30,
     padding: 30,
     marginHorizontal: 20,
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 12,
     maxWidth: 380,
     width: '90%',
-    borderWidth: 1,
   },
   houseCompletionModalDark: {
     // Kept for backward compat but colors now come from dt
