@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { CandyColors } from '../../theme/colors';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface LevelDisplayProps {
   level: number;
@@ -28,6 +29,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 9,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.7)',
@@ -43,6 +45,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18,
     fontWeight: '900',
     color: CandyColors.white,

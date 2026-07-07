@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { useScreenInsets } from '../hooks/useScreenInsets';
@@ -223,6 +224,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backChipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.4,
@@ -233,12 +235,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   title: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.5,
     textAlign: 'center',
   },
   subtitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,
@@ -268,6 +272,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   emptyText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
@@ -297,9 +302,11 @@ const styles = StyleSheet.create({
     height: 34,
   },
   animalEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 22,
   },
   animalName: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -314,6 +321,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   entryCount: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -347,12 +355,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   entryType: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   entryText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
     lineHeight: 20,
     fontStyle: 'italic',

@@ -12,6 +12,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
@@ -197,10 +198,10 @@ const SleepingZs: React.FC = () => {
 
 const sleepStyles = StyleSheet.create({
   container: { position: 'absolute', top: -10, right: -5 },
-  z: { position: 'absolute', fontWeight: 'bold', color: CandyColors.purple.main },
-  z1: { fontSize: 10, right: 0 },
-  z2: { fontSize: 12, right: 8, top: -5 },
-  z3: { fontSize: 14, right: 16, top: -12 },
+  z: { fontFamily: PIXEL_FONT_BOLD, position: 'absolute', fontWeight: 'bold', color: CandyColors.purple.main },
+  z1: { fontFamily: PIXEL_FONT_BOLD, fontSize: 10, right: 0 },
+  z2: { fontFamily: PIXEL_FONT_BOLD, fontSize: 12, right: 8, top: -5 },
+  z3: { fontFamily: PIXEL_FONT_BOLD, fontSize: 14, right: 16, top: -12 },
 });
 
 interface AnimalSpriteProps {
@@ -858,6 +859,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   emoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 38,
   },
   spriteImage: {
@@ -896,6 +898,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   notificationText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '900',
@@ -911,6 +914,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   nameText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 10,
     fontWeight: '700',
@@ -921,6 +925,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   cooldownIndicator: {
+    fontFamily: PIXEL_FONT,
     fontSize: 8,
     marginLeft: 2,
   },
@@ -941,6 +946,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(60, 30, 80, 0.7)',
   },
   cooldownCountText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.gray[300],
     fontSize: 8,
     fontWeight: '600',
@@ -956,6 +962,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emotionEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 18,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },

@@ -10,6 +10,7 @@ import {
   COMPACT_TILE_W,
   COMPACT_TILE_MARGIN_H,
 } from '../constants/tileLayout';
+import { PIXEL_FONT_BOLD } from '../theme/fonts';
 
 interface LetterTileProps {
   letter: Letter;
@@ -964,6 +965,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   letterText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 26,
     fontWeight: '900',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',

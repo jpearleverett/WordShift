@@ -6,6 +6,7 @@ import { shareResultImage, isImageShareAvailable } from '../../services/shareIma
 import { getChallengeFriendLabel } from '../../services/phaseNarrative';
 import { hapticLight } from '../../services/haptics';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { PanelCard } from '../ui/PanelCard';
 import { CandyButton } from '../ui/CandyButton';
 import { getSettingsSync } from '../../services/settings';
@@ -235,11 +236,13 @@ const styles = StyleSheet.create({
   bonusHint: {
     fontSize: 13,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
     marginBottom: 4,
   },
   captureHint: {
     fontSize: 12,
     fontWeight: '600',
+    fontFamily: PIXEL_FONT_BOLD,
     textAlign: 'center',
   },
   buttons: {

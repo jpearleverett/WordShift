@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getShareCardTagline } from '../../services/phaseNarrative';
 import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
 
@@ -266,22 +267,24 @@ const styles = StyleSheet.create({
   wordmark: {
     fontSize: 26,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 1,
   },
   wordmarkWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
   wordmarkGhost: { position: 'absolute', left: 0, right: 0, top: 0, textAlign: 'center' },
-  tagline: { fontSize: 11.5, fontWeight: '600', fontStyle: 'italic', marginTop: 16, letterSpacing: 0.3, textAlign: 'center' },
+  tagline: { fontSize: 11.5, fontWeight: '600', fontStyle: 'italic', marginTop: 16, letterSpacing: 0.3, textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
   daily: {
     fontSize: 12,
     fontWeight: '700',
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 2,
     letterSpacing: 0.5,
   },
   starsRow: { flexDirection: 'row', marginTop: 14, gap: 6 },
-  star: { fontSize: 30, fontWeight: '900' },
+  star: { fontSize: 30, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   diffRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 7 },
   diffDot: { width: 10, height: 10, borderRadius: 5 },
-  diffText: { fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+  diffText: { fontSize: 14, fontWeight: '800', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -291,9 +294,9 @@ const styles = StyleSheet.create({
     maxWidth: CARD_WIDTH - 56,
   },
   square: { width: 22, height: 22, borderRadius: 5 },
-  badge: { fontSize: 13, fontWeight: '800', marginTop: 14 },
-  chain: { fontSize: 13, fontWeight: '700', marginTop: 14, textAlign: 'center', letterSpacing: 0.5 },
-  incantation: { fontSize: 12.5, fontWeight: '600', fontStyle: 'italic', marginTop: 6, textAlign: 'center' },
+  badge: { fontSize: 13, fontWeight: '800', marginTop: 14, fontFamily: PIXEL_FONT_BOLD },
+  chain: { fontSize: 13, fontWeight: '700', marginTop: 14, textAlign: 'center', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
+  incantation: { fontSize: 12.5, fontWeight: '600', fontStyle: 'italic', marginTop: 6, textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
   footer: {
     marginTop: 18,
     paddingTop: 12,
@@ -301,7 +304,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  footerText: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.3 },
+  footerText: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.3, fontFamily: PIXEL_FONT_BOLD },
 });
 
 export { CARD_WIDTH };

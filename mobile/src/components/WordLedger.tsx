@@ -8,6 +8,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import { PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { useScreenInsets } from '../hooks/useScreenInsets';
@@ -186,6 +187,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backChipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.4,
@@ -196,6 +198,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   title: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -203,6 +206,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   subtitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
@@ -219,6 +223,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   countText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -250,11 +255,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(200, 50, 60, 0.55)',
   },
   wordText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   wordTextDread: {
+    fontFamily: PIXEL_FONT_BOLD,
     // Bright enough to clear 4.5:1 on the phase-2 mid-tone screenBg through
     // the translucent crimson chip (deeper phases only get darker under it).
     color: '#FF9C9C',
@@ -277,6 +284,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   emptyText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',

@@ -9,6 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { PIXEL_FONT_BOLD } from '../theme/fonts';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { AmberInline } from './AmberInline';
@@ -278,11 +279,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.5,
   },
   resetLine: {
     fontSize: 13,
     fontWeight: '600',
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 4,
     fontStyle: 'italic',
   },
@@ -310,11 +313,13 @@ const styles = StyleSheet.create({
   dayLabel: {
     fontSize: 9,
     fontWeight: '700',
+    fontFamily: PIXEL_FONT_BOLD,
     marginBottom: 3,
   },
   checkMark: {
     fontSize: 16,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
   },
   dayAmount: {
     flexDirection: 'row',
@@ -328,10 +333,12 @@ const styles = StyleSheet.create({
   dayAmountText: {
     fontSize: 12,
     fontWeight: '700',
+    fontFamily: PIXEL_FONT_BOLD,
   },
   dayAmountClaimed: {
     fontSize: 14,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
   },
   claimedBanner: {
     marginTop: 18,
@@ -340,10 +347,12 @@ const styles = StyleSheet.create({
   claimedText: {
     fontSize: 18,
     fontWeight: '700',
+    fontFamily: PIXEL_FONT_BOLD,
   },
   jackpotText: {
     fontSize: 15,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 4,
     letterSpacing: 1,
     textTransform: 'uppercase',

@@ -22,6 +22,7 @@ import {
   ARC_LETTER_MARGIN_H,
   ARC_SLOT_MARGIN_H,
 } from '../constants/tileLayout';
+import { PIXEL_FONT_BOLD } from '../theme/fonts';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
@@ -1016,6 +1017,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
   },
   badgeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 11,
     fontWeight: '900',
@@ -1044,6 +1046,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   checkText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '900',
@@ -1158,6 +1161,7 @@ const styles = StyleSheet.create({
     right: 4,
   },
   slotGuideText: {
+    fontFamily: PIXEL_FONT_BOLD,
     position: 'absolute',
     fontSize: 18,
     lineHeight: 18,
@@ -1174,6 +1178,7 @@ const styles = StyleSheet.create({
     width: 60,
   },
   slotPreviewText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,

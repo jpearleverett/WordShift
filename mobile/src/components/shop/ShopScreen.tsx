@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
@@ -403,13 +404,15 @@ const styles = StyleSheet.create({
   backChipText: {
     fontSize: 15,
     fontWeight: '700',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.3,
   },
   headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
-  title: { fontSize: 22, fontWeight: '900', letterSpacing: 0.5 },
+  title: { fontSize: 22, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   subtitle: {
     fontSize: 12.5,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     textAlign: 'center',
     marginTop: 2,
     paddingHorizontal: 4,
@@ -425,22 +428,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  amberPillText: { fontSize: 15, fontWeight: '900' },
+  amberPillText: { fontSize: 15, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   patronBanner: {
     paddingVertical: 18,
     paddingHorizontal: 18,
     marginBottom: 18,
   },
-  patronBannerTitle: { fontSize: 16, fontWeight: '900', marginBottom: 4 },
+  patronBannerTitle: { fontSize: 16, fontWeight: '900', marginBottom: 4, fontFamily: PIXEL_FONT_BOLD },
   // Washes only the parchment, never the painted wood frame.
   tintInset: { position: 'absolute', top: 12, left: 12, right: 12, bottom: 12 },
-  patronBannerSub: { fontSize: 12.5, fontWeight: '600' },
+  patronBannerSub: { fontSize: 12.5, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
   loading: { paddingTop: 80, alignItems: 'center' },
   sectionLabel: {
     fontSize: 12.5,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
     marginTop: 8,
     marginBottom: 12,
@@ -454,8 +458,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   cardBody: { flex: 1, paddingHorizontal: 12 },
-  cardName: { fontSize: 16, fontWeight: '800' },
-  cardDesc: { fontSize: 12.5, fontWeight: '500', marginTop: 3, lineHeight: 17 },
+  cardName: { fontSize: 16, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  cardDesc: { fontSize: 12.5, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: PIXEL_FONT },
   previewRow: { flexDirection: 'row', width: 96, flexWrap: 'wrap', gap: 4 },
   previewTile: {
     width: 22,
@@ -465,7 +469,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewTileText: { color: CandyColors.white, fontSize: 12, fontWeight: '900' },
+  previewTileText: { color: CandyColors.white, fontSize: 12, fontWeight: '900', fontFamily: PIXEL_FONT_BOLD },
   previewConfetti: {
     width: 96,
     height: 52,
@@ -491,8 +495,8 @@ const styles = StyleSheet.create({
     // Settled, lifted tint: the framed "this one is worn" state.
     backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
   },
-  equippedChipText: { fontSize: 13, fontWeight: '800' },
-  lockedChipText: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  equippedChipText: { fontSize: 13, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
+  lockedChipText: { fontSize: 12, fontWeight: '700', textAlign: 'center', fontFamily: PIXEL_FONT_BOLD },
   storeBridge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,12 +506,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   storeBridgeBody: { flex: 1 },
-  storeBridgeTitle: { fontSize: 14.5, fontWeight: '800', marginBottom: 2 },
-  storeBridgeSub: { fontSize: 12, fontWeight: '600' },
-  storeBridgeChevron: { fontSize: 18, fontWeight: '900', marginLeft: 10 },
+  storeBridgeTitle: { fontSize: 14.5, fontWeight: '800', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeSub: { fontSize: 12, fontWeight: '600', fontFamily: PIXEL_FONT_BOLD },
+  storeBridgeChevron: { fontSize: 18, fontWeight: '900', marginLeft: 10, fontFamily: PIXEL_FONT_BOLD },
   footnote: {
     fontSize: 11.5,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 16,

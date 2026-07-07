@@ -33,6 +33,7 @@ import {
   BTN_MD_DP,
   BTN_SHADOW_DP,
 } from '../../theme/pixelSkin.generated';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
@@ -1658,18 +1659,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       {ANIMAL_INFO[dialogueFlow.selectedAnimal.type]?.emoji || '🐾'}
                     </Text>
                   )}
+                  {/* Name as a portrait nameplate BELOW the sprite (reclaims the
+                      wasted header space; the bubble now starts at the top). */}
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.dialogueAnimalName, { color: dt.nameColor }]}
+                  >
+                    {dialogueFlow.selectedAnimal.name}
+                  </Text>
+                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
                 </View>
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  {/* Name in the cottage parchment ink (phase-aware via the skin),
-                      so the nameplate belongs to the wood-and-parchment card. */}
-                  <Text style={[styles.dialogueAnimalName, { color: panelSt.body }]}>
-                    {dialogueFlow.selectedAnimal.name}
-                  </Text>
-                  {/* Decorative separator under name */}
-                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
-
                   <View style={styles.dialogueBubble}>
                     <NineSliceFrame
                       skin={pixelSkin.card}
@@ -2625,16 +2627,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
                     </Text>
                   )}
+                  {/* Name as a portrait nameplate BELOW the sprite (reclaims the
+                      wasted header space; the bubble now starts at the top). */}
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.dialogueAnimalName, { color: dt.nameColor }]}
+                  >
+                    {introAnimal.name}
+                  </Text>
+                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
                 </View>
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <Text style={[styles.dialogueAnimalName, { color: panelSt.body }]}>
-                    {introAnimal.name}
-                  </Text>
-                  {/* Decorative separator under name */}
-                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
-
                   <View style={styles.dialogueBubble}>
                     <NineSliceFrame
                       skin={pixelSkin.card}
@@ -2911,29 +2916,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
 
             <View style={styles.journalSpotlightDialogueRow}>
-              <View
-                style={[
-                  styles.journalSpotlightSpriteCol,
-                  { backgroundColor: dt.spriteBg, borderColor: dt.bubbleBorder },
-                ]}
-              >
-                {CHARACTER_SPRITES.fox ? (
-                  <Image
-                    source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
-                    style={styles.journalSpotlightSpriteImage}
-                    resizeMode="cover"
-                    accessibilityLabel="Fox portrait"
-                  />
-                ) : (
-                  <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
-                )}
-              </View>
-
-              <View style={styles.journalSpotlightDialogueCol}>
-                <Text style={[styles.journalSpotlightSpeaker, { color: dt.nameColor }]}>
+              {/* Portrait + name below it (reclaims the wasted header space;
+                  the bubble now starts at the top of the text column). */}
+              <View style={styles.journalSpotlightSpriteWrap}>
+                <View
+                  style={[
+                    styles.journalSpotlightSpriteCol,
+                    { backgroundColor: dt.spriteBg, borderColor: dt.bubbleBorder },
+                  ]}
+                >
+                  {CHARACTER_SPRITES.fox ? (
+                    <Image
+                      source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
+                      style={styles.journalSpotlightSpriteImage}
+                      resizeMode="cover"
+                      accessibilityLabel="Fox portrait"
+                    />
+                  ) : (
+                    <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
+                  )}
+                </View>
+                <Text numberOfLines={1} style={[styles.journalSpotlightSpeaker, { color: dt.nameColor }]}>
                   {ANIMAL_INFO.fox?.name || 'Ember'}
                 </Text>
                 <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
+              </View>
+
+              <View style={styles.journalSpotlightDialogueCol}>
 
                 <View style={styles.journalSpotlightBubble}>
                   <NineSliceFrame
@@ -3032,14 +3041,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   loadingEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 34,
   },
   loadingText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 18,
     fontWeight: '700',
   },
   loadingSubtext: {
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
     color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
@@ -3093,9 +3105,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   amberEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 20,
   },
   amberCount: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 16,
     fontWeight: '800',
@@ -3117,9 +3131,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,60,60,0.4)',
   },
   streakBadgeEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
   },
   streakBadgeCount: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
     color: '#FF8C00',
@@ -3148,6 +3164,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   questPillText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 13,
     fontWeight: '800',
@@ -3165,11 +3182,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerBadgeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 10,
     fontWeight: '800',
   },
   headerIconText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
   },
   headerIconImage: {
@@ -3240,6 +3259,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
   playButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 17,
     fontWeight: '900',
@@ -3263,6 +3283,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
   },
   wordsOfferedHomeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.6)',
@@ -3296,12 +3317,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   unlockProgressLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12.5,
     fontWeight: '800',
     letterSpacing: 0.5,
     flex: 1,
   },
   unlockProgressText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -3375,26 +3398,32 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -2 }, { scale: 1.02 }],
   },
   dialogueSpriteEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
   },
   dialogueTextCol: {
     flex: 1,
-    paddingTop: 20,
+    // Name moved below the sprite — the bubble now starts near the top.
+    paddingTop: 6,
     paddingBottom: 34,
     paddingHorizontal: 18,
   },
+  // Portrait nameplate: sits under the sprite, centered in the alcove.
   dialogueAnimalName: {
-    fontSize: 22,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 3,
   },
   dialogueNameSeparator: {
     height: 2,
-    width: 32,
+    width: 28,
     borderRadius: 1,
     opacity: 0.5,
-    marginBottom: 12,
+    alignSelf: 'center',
   },
   // Cottage parchment tray (NineSliceFrame card background); clear its 12dp
   // wood band. No borderRadius/borderWidth — the pixel frame owns the edge.
@@ -3408,9 +3437,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialogueText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 15,
-    lineHeight: 23,
-    letterSpacing: 0.1,
+    lineHeight: 25,
+    letterSpacing: 0.2,
   },
   // The cottage bevel sits flush-right in the footer at its own strip height.
   dialogueContinueBevel: {
@@ -3422,6 +3452,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   continueButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -3442,6 +3473,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   shopTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -3449,11 +3481,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   shopSubtitle: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
   },
   shopFeedbackText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
@@ -3475,6 +3509,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   hubRowText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.2,
@@ -3486,6 +3521,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   nextUnlockLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -3520,6 +3556,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   reservedChipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.4,
@@ -3544,6 +3581,7 @@ const styles = StyleSheet.create({
     paddingBottom: BTN_SHADOW_DP,
   },
   bevelBtnText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.4,
@@ -3570,10 +3608,12 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   questTabText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '700' as const,
   },
   questTabTimer: {
+    fontFamily: PIXEL_FONT,
     fontSize: 10,
     marginTop: 2,
   },
@@ -3605,19 +3645,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   unlockName: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '800',
   },
   unlockDescription: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     marginTop: 2,
   },
   unlockCost: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
     marginTop: 6,
   },
   questProgressText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     marginTop: 6,
@@ -3630,21 +3674,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   questSectionTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   questSectionTimer: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '600',
   },
   unlockBlockedText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,
     fontStyle: 'italic',
   },
   allUnlockedText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     textAlign: 'center',
     fontWeight: '700',
@@ -3662,15 +3710,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   lockBadgeEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 24,
   },
   lockedRoomName: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
   },
   amberBalance: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
@@ -3695,6 +3746,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cooldownToastText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '700',
@@ -3732,6 +3784,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   inviteEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 80,
   },
   inviteSpriteImage: {
@@ -3739,6 +3792,7 @@ const styles = StyleSheet.create({
     height: 116,
   },
   inviteText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
@@ -3750,6 +3804,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   inviteCost: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '700',
     marginTop: 12,
@@ -3760,6 +3815,7 @@ const styles = StyleSheet.create({
 
   // Intro dialogue progress text (inline in footer)
   introProgressInline: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
     marginRight: 12,
@@ -3771,6 +3827,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   introDialogueProgress: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -3790,6 +3847,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dialogueChoiceBtnText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
@@ -3827,6 +3885,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   actionRowButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.9)',
@@ -3841,6 +3900,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   ambientLineText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: '#FBF0D9',
     fontSize: 15,
     fontWeight: '600',
@@ -3862,16 +3922,19 @@ const styles = StyleSheet.create({
     width: '90%',
   },
   sacrificeEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 50,
     marginBottom: 12,
   },
   sacrificeTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 20,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 8,
   },
   sacrificeSubtitle: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
@@ -3879,6 +3942,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   sacrificeBalance: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 16,
@@ -3902,10 +3966,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sacrificeAmountText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
   },
   sacrificeNoAmber: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13,
     textAlign: 'center',
     fontStyle: 'italic',
@@ -3919,6 +3985,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sacrificeResponseText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
@@ -3949,10 +4016,12 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   houseCompletionEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 60,
     marginBottom: 16,
   },
   houseCompletionTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     textAlign: 'center',
@@ -3960,6 +4029,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   houseCompletionText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
@@ -4000,6 +4070,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   journalSpotlightPointerText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
@@ -4041,28 +4112,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   journalSpotlightHeroBadgeText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 28,
   },
   journalSpotlightHeroText: {
     flex: 1,
   },
   journalSpotlightEyebrow: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
     marginBottom: 4,
   },
   journalSpotlightTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
   journalSpotlightSubtitle: {
+    fontFamily: PIXEL_FONT,
     marginTop: 4,
     fontSize: 13,
     lineHeight: 18,
   },
   journalSpotlightCounter: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     alignSelf: 'flex-start',
@@ -4090,15 +4166,18 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   journalSpotlightCardIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 18,
     marginBottom: 8,
   },
   journalSpotlightCardTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 17,
   },
   journalSpotlightCardIndex: {
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
     fontSize: 11,
     fontWeight: '600',
@@ -4109,8 +4188,14 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     gap: 12,
   },
+  // Portrait + nameplate stacked; the framed box no longer stretches to the
+  // row (it is wrapped), so it carries an explicit height.
+  journalSpotlightSpriteWrap: {
+    alignItems: 'center',
+  },
   journalSpotlightSpriteCol: {
     width: 92,
+    height: 140,
     borderRadius: 20,
     overflow: 'hidden',
     justifyContent: 'center',
@@ -4125,11 +4210,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 6,
   },
+  // Portrait nameplate below the framed portrait, centered in the alcove.
   journalSpotlightSpeaker: {
-    fontSize: 21,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 15,
     fontWeight: '900',
-    letterSpacing: 0.4,
-    marginBottom: 4,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 3,
+    maxWidth: 100,
   },
   journalSpotlightBubble: {
     // Cottage parchment tray; clear the 12dp wood band, ≥44dp for the caps.

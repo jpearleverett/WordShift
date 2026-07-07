@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { CandyColors } from '../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
@@ -468,6 +469,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   backChipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -476,6 +478,7 @@ const styles = StyleSheet.create({
     width: 80,
   },
   title: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -497,11 +500,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   tabText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
   },
   tabTextActive: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '800',
   },
   content: {
@@ -539,10 +544,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   heroValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 30,
     fontWeight: '900',
   },
   heroLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1,
@@ -557,6 +564,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -597,6 +605,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   starBarCount: {
+    fontFamily: PIXEL_FONT_BOLD,
     width: 36,
     textAlign: 'right',
     fontSize: 13,
@@ -608,6 +617,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   starSummaryText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     textAlign: 'center',
   },
@@ -621,14 +631,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   masteryLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '600',
   },
   masteryValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '800',
   },
   masteryPace: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     fontStyle: 'italic',
@@ -652,15 +665,18 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   difficultyLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
     width: 70,
   },
   difficultyCount: {
+    fontFamily: PIXEL_FONT,
     flex: 1,
     fontSize: 13,
   },
   difficultyAvg: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -674,14 +690,17 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   journeyLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '600',
   },
   journeyValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
   },
   personalBestLegend: {
+    fontFamily: PIXEL_FONT,
     fontSize: 10,
     textAlign: 'center',
     paddingTop: 8,
@@ -699,10 +718,12 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   achievementIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 28,
     width: 40,
   },
   achievementIconLocked: {
+    fontFamily: PIXEL_FONT,
     fontSize: 20,
   },
   achievementInfo: {
@@ -711,10 +732,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   achievementTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '700',
   },
   achievementDesc: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     marginTop: 2,
   },
@@ -727,10 +750,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   achievementRewardText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '800',
   },
   achievementCheck: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18,
     color: CandyColors.green.main,
     fontWeight: '900',

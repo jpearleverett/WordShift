@@ -7,6 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
 import { getSettingsSync } from '../services/settings';
@@ -224,6 +225,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   calendarIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 18,
   },
   completedContent: {
@@ -231,12 +233,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkIcon: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '900',
     color: CandyColors.green.main,
     marginTop: -1,
   },
   miniStars: {
+    fontFamily: PIXEL_FONT,
     fontSize: 7,
     color: CandyColors.yellow.main,
     marginTop: -2,
@@ -255,6 +259,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   streakBadgeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 9,
     fontWeight: '900',
     color: CandyColors.white,

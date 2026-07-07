@@ -12,6 +12,7 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import {
   CandyColors,
   getOverlayBannerTheme,
@@ -385,6 +386,7 @@ const tileStyles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.65)',
   },
   letter: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: '#FFFFFF',
     fontSize: MINI_FONT,
     fontWeight: '900',
@@ -2693,6 +2695,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   amberCount: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
@@ -2704,6 +2707,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   pendingBadgeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     color: '#FFBF00',
@@ -2722,7 +2726,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerIconText: { fontSize: 16 },
+  headerIconText: {
+    fontFamily: PIXEL_FONT, fontSize: 16 },
   utilityOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -2738,6 +2743,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.18)',
   },
   utilityTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
     color: CandyColors.white,
@@ -2754,6 +2760,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   utilityButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 15,
     fontWeight: '800',
@@ -2769,6 +2776,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(180, 150, 220, 0.3)',
   },
   tendingTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
     color: CandyColors.white,
@@ -2776,6 +2784,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   tendingDepth: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
     color: 'rgba(206, 184, 232, 0.95)',
@@ -2784,6 +2793,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   tendingSubtitle: {
+    fontFamily: PIXEL_FONT,
     fontSize: 15,
     fontWeight: '500',
     color: 'rgba(225, 215, 240, 0.85)',
@@ -2799,17 +2809,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   tendingCostText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     color: '#FFD479',
   },
   tendingCostStrike: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '700',
     color: 'rgba(225, 215, 240, 0.5)',
     textDecorationLine: 'line-through',
   },
   tendingBonusHint: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12.5,
     fontWeight: '600',
     color: 'rgba(180, 210, 170, 0.9)',
@@ -2830,12 +2843,14 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   tendingButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 17,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
   tendingInsufficient: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12.5,
     fontWeight: '600',
     color: 'rgba(225, 215, 240, 0.6)',
@@ -2853,6 +2868,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   emptyText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: '#FBF0D9',
     fontSize: 17, fontWeight: '700',
     textAlign: 'center', lineHeight: 26,
@@ -2868,6 +2884,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   overflowText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12, fontWeight: '700', fontStyle: 'italic',
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
@@ -2883,6 +2900,7 @@ const styles = StyleSheet.create({
     maxWidth: SCREEN_WIDTH * 0.8,
   },
   resultToastText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: '#FFFFFF',
     fontSize: 14, fontWeight: '700', textAlign: 'center',
   },
@@ -2908,10 +2926,12 @@ const styles = StyleSheet.create({
   },
   summaryItem: { flex: 1, alignItems: 'center' },
   summaryValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18, fontWeight: '900',
     letterSpacing: 0.3,
   },
   summaryLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 10.5, fontWeight: '700', marginTop: 2, textAlign: 'center',
     letterSpacing: 0.4,
   },
@@ -2932,6 +2952,7 @@ const styles = StyleSheet.create({
     paddingBottom: BTN_SHADOW_DP,
   },
   harvestAllText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16, fontWeight: '900', letterSpacing: 1, textAlign: 'center',
   },
   // ---- Ward mark & ceremony ----
@@ -2944,6 +2965,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   wardHintText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -2961,6 +2983,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ceremonyText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 20,
     fontWeight: '800',
     textAlign: 'center',

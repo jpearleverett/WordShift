@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface DailyLeaderboardCardProps {
   /** 1-based standing (1 = best). Omit/undefined while loading or no data. */
@@ -154,25 +155,30 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   icon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
     marginRight: 6,
   },
   title: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   rank: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 28,
     fontWeight: '900',
     marginTop: 2,
   },
   rankTotal: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '600',
   },
   beatText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,
@@ -187,11 +193,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   historyText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
   trendText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 10.5,
     fontWeight: '800',
     marginLeft: 8,

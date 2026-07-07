@@ -77,6 +77,15 @@
       "expo-audio",
       "expo-sharing",
       [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/PixelifySans-Regular.ttf",
+            "./assets/fonts/PixelifySans-Bold.ttf"
+          ]
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
