@@ -18,7 +18,9 @@ import { getAchievementsWithStatus, Achievement, getTotalCount } from '../servic
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getStreakInfo } from '../services/amberCurrency';
 import { Difficulty } from '../types';
-import { getJourneyAtmosphereText } from '../services/phaseNarrative';
+import { getJourneyAtmosphereText, getPaceTrendMessage } from '../services/phaseNarrative';
+import { getBestSpeedRound, getSolveTrend } from '../services/masteryRecords';
+import { DialoguePhase } from '../types/homeWorld';
 
 const STAR_FILLED = require('../../assets/ui/star_filled.png');
 const STAR_EMPTY = require('../../assets/ui/star_empty.png');
@@ -48,12 +50,24 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
   const [dailyStatus, setDailyStatus] = useState<{ totalCompleted: number; bestStreak: number } | null>(null);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'achievements'>('overview');
+  const [bestSpeedRound, setBestSpeedRound] = useState(0);
+  const [paceImproving, setPaceImproving] = useState(false);
 
   useEffect(() => {
     getCumulativeStats().then(setStats);
     getAchievementsWithStatus().then(setAchievements);
     getDailyStatus().then(s => setDailyStatus({ totalCompleted: s.totalCompleted, bestStreak: s.bestStreak }));
     getStreakInfo().then(info => setCurrentStreak(info.currentStreak));
+    getBestSpeedRound().then(setBestSpeedRound);
+    // Pace trend: improving if the player is quicker at ANY difficulty they've
+    // played enough of. Private scanning-speed signal — no leaderboard.
+    (async () => {
+      const diffs: Difficulty[] = ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'];
+      for (const d of diffs) {
+        const trend = await getSolveTrend(d);
+        if (trend?.improving) { setPaceImproving(true); return; }
+      }
+    })();
   }, []);
 
   if (!stats) return null;
@@ -183,6 +197,26 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 )}
               </View>
             </PanelCard>
+
+            {/* Mastery — private skill records (best speed run, scanning pace).
+                Only shown once there's something to show, so it never clutters a
+                new player's overview. */}
+            {(bestSpeedRound > 0 || paceImproving) && (
+              <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+                <PixelPlaque phase={effectivePhase} label={'MASTERY'} style={styles.sectionPlaque} />
+                {bestSpeedRound > 0 && (
+                  <View style={styles.masteryRow}>
+                    <Text style={[styles.masteryLabel, { color: t.body }]}>Best speed run</Text>
+                    <Text style={[styles.masteryValue, { color: t.title }]}>Round {bestSpeedRound + 1}</Text>
+                  </View>
+                )}
+                {paceImproving && (
+                  <Text style={[styles.masteryPace, { color: t.amberText }]}>
+                    {getPaceTrendMessage(effectivePhase as DialoguePhase)}
+                  </Text>
+                )}
+              </PanelCard>
+            )}
 
             {/* Difficulty breakdown */}
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
@@ -576,6 +610,32 @@ const styles = StyleSheet.create({
   starSummaryText: {
     fontSize: 12,
     textAlign: 'center',
+  },
+
+  // Mastery card
+  masteryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  masteryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  masteryValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  masteryPace: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    paddingTop: 2,
   },
 
   // Difficulty rows

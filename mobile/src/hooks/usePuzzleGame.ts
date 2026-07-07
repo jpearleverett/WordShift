@@ -269,6 +269,8 @@ export interface PuzzleGameActions {
     moveOutcomes?: MoveOutcome[];
     /** Undos used across the whole puzzle, present on the completing move (for the flawless tier). */
     undosUsed?: number;
+    /** Solve duration (ms) for a freshly-started board; absent for restored/retried boards. */
+    solveTimeMs?: number;
   } | null>;
   handleUndo: () => void;
   grantExtraUndo: () => void;
@@ -336,6 +338,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // 0 invalids, 0 undos). A ref (not state) because nothing renders from it;
   // it's read once at completion. Reset with the other counters on a new board.
   const undosUsedRef = useRef(0);
+  // Solve-time telemetry for the private "getting faster" trend (mastery chase).
+  // boardStartRef stamps when a FRESH board begins; boardTimedRef guards against
+  // recording restored/retried boards (whose true elapsed we don't know), which
+  // would otherwise poison the trend with sub-second or wildly inflated times.
+  const boardStartRef = useRef(0);
+  const boardTimedRef = useRef(false);
   // Consumable hint economy: spendable balance + a signal raised when the player
   // taps HINT with none left (App offers a rewarded clip / the store).
   const [hintBalance, setHintBalance] = useState(() => getHintBalanceSync());
@@ -499,6 +507,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setHintsUsed(0);
       setEarnedStars(0);
       undosUsedRef.current = 0;
+      // A genuinely fresh board — start the solve-time clock for the trend.
+      boardStartRef.current = Date.now();
+      boardTimedRef.current = true;
     }
 
     // Reset undos for challenge mode (scaled by difficulty)
@@ -1321,6 +1332,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setLastCompletedWords(completedWords);
       setLastIncantationName(getIncantationName(completedWords, currentPhase));
       setIsProcessing(false);
+      // Honest solve time only for a board timed from a fresh start (not a
+      // restore/retry). undefined tells App to skip feeding the pace trend.
+      const solveTimeMs = boardTimedRef.current
+        ? Date.now() - boardStartRef.current
+        : undefined;
+      boardTimedRef.current = false;
       return {
         completed: true,
         hintsUsed,
@@ -1329,6 +1346,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         gameMode,
         completedWords,
         variant: currentVariant,
+        solveTimeMs,
         // Full per-move record including the completing move (ref mirror is
         // already current; state would be a render behind at this point).
         moveOutcomes: moveOutcomesRef.current,
@@ -1719,6 +1737,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMoveOutcomes([]);
     pendingHintRef.current = false;
     pendingMistakeRef.current = false;
+    // A restored board has no honest solve-time origin — don't feed the trend.
+    boardTimedRef.current = false;
   }, []);
 
   // Re-apply the same puzzle from its starting words (each row preserves its

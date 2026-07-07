@@ -85,7 +85,10 @@ import {
   getDailyLockedMessage,
   getBadChallengeLinkMessage,
   getUnplayableChallengeMessage,
+  getPaceTrendMessage,
+  getSpeedRecordMessage,
 } from './src/services/phaseNarrative';
+import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy } from './src/services/dailyChallenge';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
@@ -303,6 +306,9 @@ function MainApp() {
   // each subsequent clock. Reset on time-up exit or whenever a fresh run begins
   // (a rewarded rescue deliberately does NOT reset it — the run continues).
   const [speedRound, setSpeedRound] = useState(0);
+  // The private "words come to you faster now" pace beat fires at most once per
+  // app session so it lands as a rare moment, not a nag.
+  const fasterBeatShownRef = useRef(false);
   // One rewarded rescue per board: set when a rescue is claimed, reset on every
   // fresh-board path so the next attempt gets its own rescue.
   const [speedRescueUsed, setSpeedRescueUsed] = useState(false);
@@ -1092,9 +1098,40 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
-      // Speed streak: a completed speed puzzle ratchets up the next clock.
+      // Speed streak: a completed speed puzzle ratchets up the next clock, and
+      // the peak streak is remembered as a best-round record (the in-run counter
+      // evaporates on every reset). Surface a new record as an in-world beat.
       if (hasVariantModifier(puzzle.currentVariant, 'speed')) {
-        setSpeedRound(prev => prev + 1);
+        const newRound = speedRound + 1;
+        setSpeedRound(newRound);
+        recordSpeedRound(newRound).then(res => {
+          if (res.isNewRecord && res.best >= 3) {
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getSpeedRecordMessage(persistence.currentPhase, res.best));
+            }, 1000);
+          }
+        }).catch(() => {});
+      }
+      // Private pace trend: record standard, non-daily solve durations and, at
+      // most once per session, surface the "getting faster" beat when the recent
+      // median is meaningfully quicker than before. Skipped for restored boards
+      // (result.solveTimeMs is undefined) and timed/speed boards.
+      if (
+        result.solveTimeMs != null &&
+        result.variant === 'standard' &&
+        !isPlayingDaily
+      ) {
+        const solveDifficulty = puzzle.difficulty;
+        recordSolveTime(solveDifficulty, result.solveTimeMs).then(async () => {
+          if (fasterBeatShownRef.current) return;
+          const trend = await getSolveTrend(solveDifficulty);
+          if (trend?.improving) {
+            fasterBeatShownRef.current = true;
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getPaceTrendMessage(persistence.currentPhase));
+            }, 1300);
+          }
+        }).catch(() => {});
       }
       // Clear mid-puzzle save on completion
       clearPuzzleState().catch(() => {});

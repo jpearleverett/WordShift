@@ -85,6 +85,7 @@ const SYNC_KEYS = [
   'wordshift_word_history',
   'wordshift_word_harvest',
   'wordshift_in_progress_puzzle',
+  'wordshift_mastery', // private solve-time trend + best speed round (skill records)
   // Daily challenge & quests
   'wordshift_daily_challenge',
   'wordshift_weekly_quests',

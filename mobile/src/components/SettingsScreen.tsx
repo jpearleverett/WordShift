@@ -67,6 +67,7 @@ import { clearHints } from '../services/hints';
 import { clearMonetPrompts } from '../services/monetizationPrompts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
 import { clearDailyAmberReward } from '../services/dailyAmberReward';
+import { clearMasteryRecords } from '../services/masteryRecords';
 
 const AMBER_ICON = require('../../assets/ui/amber.png');
 
@@ -154,6 +155,7 @@ export async function performFullReset(): Promise<string[]> {
     ['monetPrompts', clearMonetPrompts],
     ['dailyLogin', clearDailyLoginReward],
     ['dailyAmber', clearDailyAmberReward],
+    ['masteryRecords', clearMasteryRecords],
     ['syncStatus', clearSyncStatus],
   ];
 

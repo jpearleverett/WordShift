@@ -144,6 +144,35 @@ export function getFlawlessHonorific(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// PACE TREND — private "the words come to you faster now" beat. Phase-aware:
+// warm encouragement early, quietly unsettling reverence late (the ease itself
+// becomes the horror — the ritual has taught your hands). Never a leaderboard.
+// ============================================================================
+
+const PACE_TREND_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'The words come to you faster now!',
+  1: 'You find them quicker than you used to.',
+  2: 'The patterns surface faster now. You barely have to look.',
+  3: 'The words arrive before you reach for them.',
+  4: 'You no longer search. The arrangement offers, and you accept.',
+  5: 'The words come without asking. Your hands already know the way.',
+};
+
+export function getPaceTrendMessage(phase: DialoguePhase): string {
+  return PACE_TREND_MESSAGES[phase] ?? PACE_TREND_MESSAGES[0];
+}
+
+// ============================================================================
+// SPEED RECORD — a new best Speed-Shift escalation streak. Phase-aware.
+// ============================================================================
+
+export function getSpeedRecordMessage(phase: DialoguePhase, round: number): string {
+  if (phase >= 4) return `A new depth reached. Round ${round}.`;
+  if (phase >= 2) return `Further than before... Round ${round}.`;
+  return `New record! You reached Round ${round}.`;
+}
+
+// ============================================================================
 // MOVE SUCCESS MESSAGES — Shown after each valid move
 // ============================================================================
 
