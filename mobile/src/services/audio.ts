@@ -27,6 +27,10 @@ const SOUND_SOURCES: Record<string, any> = {
   dialogue: require('../../assets/sounds/dialogue.wav'),
   phase_change: require('../../assets/sounds/phase_change.wav'),
   daily_ready: require('../../assets/sounds/daily_ready.wav'),
+  // Dark variants (Phase 3+): hollow, minor, cold — the descent reaches the ears.
+  valid_move_dark: require('../../assets/sounds/valid_move_dark.wav'),
+  victory_dark: require('../../assets/sounds/victory_dark.wav'),
+  perfect_dark: require('../../assets/sounds/perfect_dark.wav'),
 };
 
 // Hot-path sounds preloaded at init for latency-free first playback
@@ -37,9 +41,20 @@ const PRELOAD_SOUND_NAMES = [
   'invalid_move',
   'victory',
   'amber_earn',
+  'valid_move_dark', // hot path once the descent deepens (Phase 3+)
 ];
 
 const SOUND_VOLUME = 0.8;
+
+// Current narrative phase, mirrored here so the low-level sound helpers can pick
+// the Phase 3+ dark variants without every call site threading a phase. App
+// keeps this in sync via setAudioPhase() when the phase changes.
+let audioPhase = 0;
+/** Phase at/above which move + victory chimes switch to their dark variants. */
+const DARK_SFX_PHASE = 3;
+export function setAudioPhase(phase: number): void {
+  audioPhase = phase;
+}
 
 let audioInitialized = false;
 
@@ -160,9 +175,9 @@ export async function soundLetterSelect(): Promise<void> {
   await playSound('letter_select');
 }
 
-/** Valid move completed (letter dropped successfully) */
+/** Valid move completed (letter dropped successfully). Dark chime at Phase 3+. */
 export async function soundValidMove(): Promise<void> {
-  await playSound('valid_move');
+  await playSound(audioPhase >= DARK_SFX_PHASE ? 'valid_move_dark' : 'valid_move');
 }
 
 /** Invalid move attempted */
@@ -170,14 +185,14 @@ export async function soundInvalidMove(): Promise<void> {
   await playSound('invalid_move');
 }
 
-/** Puzzle completed successfully */
+/** Puzzle completed successfully. Hollow, minor victory at Phase 3+. */
 export async function soundVictory(): Promise<void> {
-  await playSound('victory');
+  await playSound(audioPhase >= DARK_SFX_PHASE ? 'victory_dark' : 'victory');
 }
 
-/** 3-star perfect completion */
+/** 3-star perfect completion. Dissonant-tuned at Phase 3+. */
 export async function soundPerfect(): Promise<void> {
-  await playSound('perfect');
+  await playSound(audioPhase >= DARK_SFX_PHASE ? 'perfect_dark' : 'perfect');
 }
 
 /** Undo action */

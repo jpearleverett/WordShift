@@ -6,9 +6,9 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getEchoPuzzleMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
-import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords, isPostRevelation } from '../services/amberCurrency';
+import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
   getVariantOverrides,
   getVariantInstruction,
@@ -661,28 +661,28 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // Phase 5 echo puzzles: every 5th puzzle seeds a word from ritual history.
-      // Falls through to normal bank/generation if echo seeding fails.
+      // Echo puzzles: every 5th puzzle from Phase 3 onward re-seeds a word from
+      // the player's OWN ritual history — the descent handing their past words
+      // back. This is the moment it was made for (the reveal), so it now runs
+      // pre-finale, not just at Phase 5 (post-revelation). Falls through to the
+      // normal bank/generation path if echo seeding fails.
       setIsEchoPuzzle(false);
-      if (currentPhase === 5 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
+      if (currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
         try {
-          const postRev = await isPostRevelation();
-          if (postRev) {
-            const ritualWords = await getRitualWords();
-            // Pick words matching the target word length for this difficulty
-            const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
-            const candidates = ritualWords.filter(w => w.length === targetLen);
-            if (candidates.length > 0) {
-              const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
-              const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
-              if (echoPuzzle) {
-                if (isStale()) return;
-                initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
-                await recordPuzzleWords(echoPuzzle.words);
-                setIsEchoPuzzle(true);
-                setMessage('The words are returning. They remember you.');
-                return;
-              }
+          const ritualWords = await getRitualWords();
+          // Pick words matching the target word length for this difficulty
+          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
+          const candidates = ritualWords.filter(w => w.length === targetLen);
+          if (candidates.length > 0) {
+            const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
+            const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
+            if (echoPuzzle) {
+              if (isStale()) return;
+              initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
+              await recordPuzzleWords(echoPuzzle.words);
+              setIsEchoPuzzle(true);
+              setMessage(getEchoPuzzleMessage(currentPhase));
+              return;
             }
           }
         } catch {

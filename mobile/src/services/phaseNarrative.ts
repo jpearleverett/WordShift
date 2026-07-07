@@ -1504,8 +1504,8 @@ export function getAnimalInterjection(
 // ============================================================================
 
 export interface NarrativeMicroBeat {
-  /** Type of micro-beat effect */
-  type: 'glitch_title' | 'ambient_whisper' | 'color_shift';
+  /** Type of micro-beat effect. `silent_victory` also suppresses the fanfare. */
+  type: 'glitch_title' | 'ambient_whisper' | 'color_shift' | 'silent_victory';
   /** Text to display (if applicable) */
   text?: string;
   /** Replacement title that briefly flashes then corrects (glitch_title only) */
@@ -1640,6 +1640,14 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The animals have stopped pretending the puzzles are just puzzles. They watch you the way you\'d watch a door beginning to open.',
     durationMs: 4500,
   },
+  160: {
+    // Scripted anticlimax: the fanfare simply does not play. The rendered text
+    // is stark; App suppresses the victory chime on this one board so the
+    // silence is felt, not described. The most complicit moment is a quiet one.
+    type: 'silent_victory',
+    text: '...\n\nNo music this time. Only the quiet after.',
+    durationMs: 4000,
+  },
   170: {
     type: 'ambient_whisper',
     text: 'You could stop now. You know that. You won\'t. They know that too.',
@@ -1695,6 +1703,26 @@ export async function checkNarrativeMicroBeat(
 
   await markMicroBeatSeen(puzzlesSolved);
   return beat;
+}
+
+/**
+ * Whether the victory at this exact completed-puzzle count is a scripted
+ * silent-victory anticlimax (the fanfare is suppressed). Pure lookup — the count
+ * is monotonic, so this is true for exactly one board. App reads it before
+ * playing the victory chime.
+ */
+export function isSilentVictoryBeat(completedTotal: number): boolean {
+  return MICRO_BEATS[completedTotal]?.type === 'silent_victory';
+}
+
+/**
+ * Message shown when an echo puzzle (seeded from the player's own ritual words)
+ * begins. Phase-aware — unsettling during the reveal (Phase 3-4), serene after.
+ */
+export function getEchoPuzzleMessage(phase: DialoguePhase): string {
+  if (phase >= 5) return 'The words are returning. They remember you.';
+  if (phase >= 4) return 'You have offered this word before. It has come back for you.';
+  return 'These letters feel familiar. Have you arranged them before?';
 }
 
 /**

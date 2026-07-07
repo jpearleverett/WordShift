@@ -68,13 +68,14 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
-import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
+import { initAudio, setAudioPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getPhaseIndicator,
   getLoadingMessage,
   getRitualMicroEvent,
+  isSilentVictoryBeat,
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
   getFoxStarterIntroLines,
@@ -482,6 +483,12 @@ function MainApp() {
   // ========================================================================
   // Initialization
   // ========================================================================
+
+  // Keep the audio service's phase mirror in sync so move/victory chimes switch
+  // to their dark variants once the descent deepens (Phase 3+).
+  useEffect(() => {
+    setAudioPhase(persistence.currentPhase);
+  }, [persistence.currentPhase]);
 
   // App-level initialization (non-onboarding)
   useEffect(() => {
@@ -1374,10 +1381,15 @@ function MainApp() {
       puzzleActions.setEarnedStars(victory.earnedStars);
       victoryActions.setVictoryData(finalVictory);
 
-      if (victory.earnedStars === 3) {
-        soundPerfect();
-      } else {
-        soundVictory();
+      // Scripted anticlimax: on the one silent-victory board the fanfare simply
+      // does not play (the micro-beat renders the stark line instead). The most
+      // complicit moment in the descent is a quiet one.
+      if (!isSilentVictoryBeat(completedTotal)) {
+        if (victory.earnedStars === 3) {
+          soundPerfect();
+        } else {
+          soundVictory();
+        }
       }
 
       puzzleActions.setGameState(GameState.WON);
@@ -2763,7 +2775,7 @@ function MainApp() {
         {orchestration.showMicroBeat && orchestration.microBeat && (
           <View style={[
             styles.victoryGlitchOverlay,
-            orchestration.microBeat.type === 'ambient_whisper' && styles.microBeatWhisperOverlay,
+            (orchestration.microBeat.type === 'ambient_whisper' || orchestration.microBeat.type === 'silent_victory') && styles.microBeatWhisperOverlay,
           ]} pointerEvents="none">
             <Text style={[
               orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,
