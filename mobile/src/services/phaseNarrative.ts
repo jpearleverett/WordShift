@@ -125,6 +125,25 @@ export function getVictoryFeedback(stars: number, phase: DialoguePhase): string 
 }
 
 // ============================================================================
+// FLAWLESS OFFERING — the perfect-play tier ABOVE 3 stars (0 hints/invalids/undos)
+// Phase-aware honorific badge copy. Cheerful praise early, reverent awe late —
+// never breaks the fourth wall, never says "no undos/hints" (that's mechanics).
+// ============================================================================
+
+const FLAWLESS_HONORIFICS: Record<DialoguePhase, string> = {
+  0: 'FLAWLESS!',
+  1: 'Flawless.',
+  2: 'A Clean Offering',
+  3: 'Unwavering.',
+  4: 'A Perfect Offering',
+  5: 'The Thread Ran True',
+};
+
+export function getFlawlessHonorific(phase: DialoguePhase): string {
+  return FLAWLESS_HONORIFICS[phase] ?? FLAWLESS_HONORIFICS[0];
+}
+
+// ============================================================================
 // MOVE SUCCESS MESSAGES — Shown after each valid move
 // ============================================================================
 

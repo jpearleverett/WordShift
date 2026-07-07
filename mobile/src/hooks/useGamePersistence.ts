@@ -3,6 +3,7 @@ import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   calculateStars,
+  isFlawless,
   recordPuzzleCompletion,
   getCumulativeStats,
   CumulativeStats,
@@ -28,6 +29,10 @@ import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, Harvest
 
 export interface VictoryData {
   earnedStars: number;
+  /** Perfect play: 0 hints, 0 invalid attempts, 0 undos (the tier above 3 stars). */
+  flawless?: boolean;
+  /** Running lifetime count of flawless offerings (for the victory badge copy). */
+  flawlessCount?: number;
   /** Total amber value computed for this puzzle (queued, not yet spendable) */
   amberEarned: number;
   amberBalance: number;
@@ -102,7 +107,8 @@ export interface PersistenceActions {
     gameMode?: GameMode,
     completedWords?: string[],
     variant?: PuzzleVariant,
-    isDaily?: boolean
+    isDaily?: boolean,
+    undosUsed?: number
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -159,9 +165,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     gameMode: GameMode = 'standard',
     completedWords: string[] = [],
     variant: PuzzleVariant = 'standard',
-    isDaily: boolean = false
+    isDaily: boolean = false,
+    undosUsed: number = 0
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
+    const flawless = isFlawless(hintsUsed, invalidAttempts, undosUsed);
 
     // Guard against concurrent recordVictory calls
     if (recordInProgress.current) {
@@ -196,7 +204,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     recordInProgress.current = true;
     try {
       // Record star stats first so we can get the three-star rate
-      await recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts);
+      await recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts, undosUsed);
       const stats = await getCumulativeStats();
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
@@ -336,6 +344,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       return {
         earnedStars: stars,
+        flawless,
+        flawlessCount: stats.flawlessCount ?? 0,
         amberEarned: totalQueuedAmber,
         amberBalance: amberResult.newBalance,
         phaseChanged: amberResult.phaseChanged,

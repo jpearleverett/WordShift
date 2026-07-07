@@ -267,6 +267,8 @@ export interface PuzzleGameActions {
     reverseMidpoint?: boolean;
     /** Full per-move outcome record, present on the completing move (for the share grid). */
     moveOutcomes?: MoveOutcome[];
+    /** Undos used across the whole puzzle, present on the completing move (for the flawless tier). */
+    undosUsed?: number;
   } | null>;
   handleUndo: () => void;
   grantExtraUndo: () => void;
@@ -330,6 +332,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [showConfetti, setShowConfetti] = useState(false);
   const [invalidAttempts, setInvalidAttempts] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
+  // Undos taken this board — tracked for the "flawless offering" tier (0 hints,
+  // 0 invalids, 0 undos). A ref (not state) because nothing renders from it;
+  // it's read once at completion. Reset with the other counters on a new board.
+  const undosUsedRef = useRef(0);
   // Consumable hint economy: spendable balance + a signal raised when the player
   // taps HINT with none left (App offers a rewarded clip / the store).
   const [hintBalance, setHintBalance] = useState(() => getHintBalanceSync());
@@ -492,6 +498,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setInvalidAttempts(0);
       setHintsUsed(0);
       setEarnedStars(0);
+      undosUsedRef.current = 0;
     }
 
     // Reset undos for challenge mode (scaled by difficulty)
@@ -1098,6 +1105,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     completed: boolean;
     hintsUsed: number;
     invalidAttempts: number;
+    undosUsed?: number;
     gameMode: GameMode;
     completedWords: string[];
     formedWord?: string;
@@ -1317,6 +1325,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         completed: true,
         hintsUsed,
         invalidAttempts,
+        undosUsed: undosUsedRef.current,
         gameMode,
         completedWords,
         variant: currentVariant,
@@ -1430,8 +1439,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameState !== GameState.PLAYING) return;
     if (history.length === 0) return;
 
-    // Taking back a move breaks the clean-move streak.
+    // Taking back a move breaks the clean-move streak AND the flawless run.
     cleanMoveStreakRef.current = 0;
+    undosUsedRef.current += 1;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 

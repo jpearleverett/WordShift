@@ -33,6 +33,13 @@ export interface CumulativeStats {
   totalHintsUsed: number;
   /** Number of puzzles completed without using any hints */
   noHintPuzzleCount: number;
+  /**
+   * "Flawless offerings" — puzzles solved with 0 hints, 0 invalid attempts,
+   * AND 0 undos: the perfect-play tier ABOVE 3 stars (3 stars tolerates one
+   * invalid, so a novice preview-scanner 3-stars everything; flawless is the
+   * expert chase the star economy otherwise can't express). Lifetime tally.
+   */
+  flawlessCount?: number;
   // Per-difficulty breakdowns
   byDifficulty: {
     [K in Difficulty]: {
@@ -78,6 +85,15 @@ export function calculateStars(hintsUsed: number, invalidAttempts: number): numb
 }
 
 /**
+ * The "flawless offering" tier — strictly above 3 stars: perfect play with no
+ * assistance and no take-backs. undosUsed defaults to 0 so older call sites
+ * that don't yet pass it degrade to the hints+invalids definition.
+ */
+export function isFlawless(hintsUsed: number, invalidAttempts: number, undosUsed: number = 0): boolean {
+  return hintsUsed === 0 && invalidAttempts === 0 && undosUsed === 0;
+}
+
+/**
  * Get default empty stats
  */
 function getDefaultStats(): CumulativeStats {
@@ -90,6 +106,7 @@ function getDefaultStats(): CumulativeStats {
     totalInvalidAttempts: 0,
     totalHintsUsed: 0,
     noHintPuzzleCount: 0,
+    flawlessCount: 0,
     byDifficulty: {
       EASY: { completed: 0, stars: 0 },
       MEDIUM: { completed: 0, stars: 0 },
@@ -146,7 +163,8 @@ export function invalidateStatsCache(): void {
 export async function recordPuzzleCompletion(
   difficulty: Difficulty,
   hintsUsed: number,
-  invalidAttempts: number
+  invalidAttempts: number,
+  undosUsed: number = 0
 ): Promise<PuzzleAttemptStats> {
   try {
     if (!statsCache) {
@@ -162,6 +180,9 @@ export async function recordPuzzleCompletion(
     statsCache!.totalHintsUsed += hintsUsed;
     if (hintsUsed === 0) {
       statsCache!.noHintPuzzleCount = (statsCache!.noHintPuzzleCount || 0) + 1;
+    }
+    if (isFlawless(hintsUsed, invalidAttempts, undosUsed)) {
+      statsCache!.flawlessCount = (statsCache!.flawlessCount || 0) + 1;
     }
 
     // Update star count breakdown

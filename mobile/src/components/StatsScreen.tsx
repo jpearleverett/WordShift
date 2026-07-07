@@ -173,6 +173,14 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
                 <Text style={[styles.starSummaryText, { color: t.muted }]}>
                   Avg: {avgStars.toFixed(1)} stars | Perfect rate: {perfectRate.toFixed(0)}%
                 </Text>
+                {(stats.flawlessCount ?? 0) > 0 && (
+                  <Text
+                    style={[styles.starSummaryText, { color: t.amberText, marginTop: 4, fontWeight: '800' }]}
+                    accessibilityLabel={`${stats.flawlessCount} flawless offerings`}
+                  >
+                    Flawless offerings: {stats.flawlessCount}
+                  </Text>
+                )}
               </View>
             </PanelCard>
 

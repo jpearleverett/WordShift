@@ -1,4 +1,8 @@
-import { calculateStars } from '../services/starRating';
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('./helpers/mockAsyncStorage').createMockAsyncStorage()
+);
+
+import { calculateStars, isFlawless, recordPuzzleCompletion, getCumulativeStats, clearStats } from '../services/starRating';
 
 describe('calculateStars', () => {
   // 3 stars: 0 hints, 0-1 invalid attempts (tightened for better tension)
@@ -55,5 +59,46 @@ describe('calculateStars', () => {
 
   test('1 hint with 5+ mistakes returns 1 star (both conditions)', () => {
     expect(calculateStars(1, 5)).toBe(1);
+  });
+});
+
+describe('isFlawless', () => {
+  test('true only for 0 hints, 0 invalids, 0 undos', () => {
+    expect(isFlawless(0, 0, 0)).toBe(true);
+  });
+
+  test('defaults undosUsed to 0 (legacy call sites)', () => {
+    expect(isFlawless(0, 0)).toBe(true);
+  });
+
+  test('a single invalid attempt (still 3 stars) is NOT flawless', () => {
+    expect(calculateStars(0, 1)).toBe(3); // 3 stars tolerates one invalid...
+    expect(isFlawless(0, 1)).toBe(false); // ...but flawless does not
+  });
+
+  test('any hint breaks flawless', () => {
+    expect(isFlawless(1, 0, 0)).toBe(false);
+  });
+
+  test('any undo breaks flawless even with a clean board otherwise', () => {
+    expect(isFlawless(0, 0, 1)).toBe(false);
+  });
+});
+
+describe('recordPuzzleCompletion flawless tally', () => {
+  beforeEach(async () => {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    AsyncStorage.clear();
+    await clearStats();
+  });
+
+  test('increments flawlessCount only on a perfect solve', async () => {
+    await recordPuzzleCompletion('MEDIUM', 0, 0, 0); // flawless
+    await recordPuzzleCompletion('MEDIUM', 0, 1, 0); // 3 stars, not flawless
+    await recordPuzzleCompletion('MEDIUM', 0, 0, 2); // undos used, not flawless
+    await recordPuzzleCompletion('HARD', 0, 0, 0);   // flawless
+    const stats = await getCumulativeStats();
+    expect(stats.flawlessCount).toBe(2);
+    expect(stats.totalPuzzlesCompleted).toBe(4);
   });
 });
