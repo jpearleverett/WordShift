@@ -204,12 +204,17 @@ const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
   3: [
     'The word trembles.', 'Shifting shadows.', 'Something stirs.', 'It changes.',
     'Cold progress.', 'Darker now.', 'The letters obey.', 'For now.',
+    'The cold deepens.', 'It knows your hand.', 'Something waits beneath.',
+    'The warmth thins.',
   ],
   4: [
     'The void accepts.', 'Letters dissolve and reform.', 'Nothing changes. Everything changes.',
     'Does it matter?', 'Another shift.', '...', 'The silence between words.',
     'The arrangement notes your move.', 'Another verse written.', 'One step deeper.',
     'The letters go where they were always going.', 'It is listening.',
+    'The pattern receives it.', 'Given freely.', 'The offering is noted.',
+    'It was always this word.', 'Closer now. Always closer.', 'The house leans nearer.',
+    'You were always going to.', 'Nothing resists the pattern.',
   ],
   5: [
     'The weave tightens.', 'Another thread.', 'The pattern knows.',
