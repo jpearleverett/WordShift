@@ -453,6 +453,15 @@ export const appStyles = StyleSheet.create({
   speedTimerTextUrgent: {
     color: '#FFE0E0',
   },
+  speedTimerCritical: {
+    backgroundColor: 'rgba(230, 20, 40, 0.95)',
+  },
+  speedTimerTextCritical: {
+    color: CandyColors.white,
+    textShadowColor: 'rgba(255, 60, 60, 0.9)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
   speedRoundText: {
     fontSize: 12,
     fontWeight: '800',

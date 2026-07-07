@@ -132,7 +132,7 @@ import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, ma
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
-import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC } from './src/constants/timing';
+import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC, SPEED_ESCALATION_MIN_SEC, SPEED_TICK_CRITICAL_SEC, speedTickKind } from './src/constants/timing';
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
@@ -338,6 +338,12 @@ function MainApp() {
 
   // Restored speed timer value (consumed once by the speed timer effect)
   const restoredSpeedTimeRef = useRef<number | null>(null);
+  // Final-countdown tension. The displayed value is a whole-second integer that
+  // changes once per second, so a per-second tick + a native-driver "pop" turns
+  // the game's deadest moment into its tensest. speedPulseScale runs on the UI
+  // thread, independent of React re-renders.
+  const speedPulseScale = useRef(new Animated.Value(1)).current;
+  const prevSpeedRemainingRef = useRef<number | null>(null);
 
   // One-time post-tutorial setup reveal
   const [showSetupSelectorIntro, setShowSetupSelectorIntro] = useState(false);
@@ -415,6 +421,32 @@ function MainApp() {
 
   const [speedTimer, speedTimerActions] = useSpeedTimer(onSpeedTimeUp);
   const { startSpeedTimer, stopSpeedTimer } = speedTimerActions;
+
+  // Final-countdown tick. Fires once per second inside the danger zone (5,4,3,2,1
+  // only, never on the start, never on a rescue that raises the clock, never at
+  // 0) with a native-driver pop; escalates to a heavier haptic + bigger pop at
+  // the critical threshold. Sound/haptics self-gate on their own settings; the
+  // visual pop is suppressed under reduced motion.
+  useEffect(() => {
+    const r = speedTimer.speedTimeRemaining;
+    const prev = prevSpeedRemainingRef.current;
+    prevSpeedRemainingRef.current = r;
+    const kind = speedTickKind(prev, r);
+    if (kind === 'none') {
+      speedPulseScale.setValue(1);
+      return;
+    }
+    const critical = kind === 'critical';
+    soundTap();
+    if (critical) { hapticMedium(); } else { hapticSelection(); }
+    if (!getSettingsSync().reducedMotion) {
+      speedPulseScale.setValue(1);
+      Animated.sequence([
+        Animated.timing(speedPulseScale, { toValue: critical ? 1.28 : 1.16, duration: 90, useNativeDriver: true }),
+        Animated.spring(speedPulseScale, { toValue: 1, friction: 4, tension: 140, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [speedTimer.speedTimeRemaining, speedPulseScale]);
 
   // Start/stop speed timer based on game state
   useEffect(() => {
@@ -2597,13 +2629,17 @@ function MainApp() {
           <View style={[
             styles.speedTimerContainer,
             speedTimer.speedTimeRemaining <= 10 && styles.speedTimerUrgent,
+            speedTimer.speedTimeRemaining <= SPEED_TICK_CRITICAL_SEC && styles.speedTimerCritical,
           ]}>
-            <Text style={[
-              styles.speedTimerText,
-              speedTimer.speedTimeRemaining <= 10 && styles.speedTimerTextUrgent,
-            ]}>
-              {'\u23F1'} {speedTimer.speedTimeRemaining}s
-            </Text>
+            <Animated.View style={{ transform: [{ scale: speedPulseScale }] }}>
+              <Text style={[
+                styles.speedTimerText,
+                speedTimer.speedTimeRemaining <= 10 && styles.speedTimerTextUrgent,
+                speedTimer.speedTimeRemaining <= SPEED_TICK_CRITICAL_SEC && styles.speedTimerTextCritical,
+              ]}>
+                {'\u23F1'} {speedTimer.speedTimeRemaining}s
+              </Text>
+            </Animated.View>
             {speedRound > 0 && (
               <Text
                 style={styles.speedRoundText}
