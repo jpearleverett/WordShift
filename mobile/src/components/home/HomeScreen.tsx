@@ -1662,7 +1662,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <Text style={[styles.dialogueAnimalName, { color: dt.nameColor }]}>
+                  {/* Name in the cottage parchment ink (phase-aware via the skin),
+                      so the nameplate belongs to the wood-and-parchment card. */}
+                  <Text style={[styles.dialogueAnimalName, { color: panelSt.body }]}>
                     {dialogueFlow.selectedAnimal.name}
                   </Text>
                   {/* Decorative separator under name */}
@@ -2627,7 +2629,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <Text style={[styles.dialogueAnimalName, { color: dt.nameColor }]}>
+                  <Text style={[styles.dialogueAnimalName, { color: panelSt.body }]}>
                     {introAnimal.name}
                   </Text>
                   {/* Decorative separator under name */}
@@ -3431,7 +3433,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
     marginBottom: 14,
-    minHeight: 44,
+    // Stable-ish height so paging short and 2-3 line lines doesn't resize the
+    // sheet and slide the nameplate up and down mid-conversation.
+    minHeight: 66,
     justifyContent: 'center',
   },
   dialogueText: {

@@ -307,7 +307,10 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
 
           {/* Text column */}
           <View style={isCompact ? styles.compactTextCol : styles.dialogueTextCol}>
-            <Text style={[isCompact ? styles.compactName : styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
+            {/* Name in the cottage parchment ink (not the old candy-purple),
+                so the nameplate reads as part of the wood-and-parchment card
+                rather than a foreign sans-serif label floating above it. */}
+            <Text style={[isCompact ? styles.compactName : styles.dialogueName, { color: FOX_SURFACE.body }]}>Ember</Text>
             <View style={[isCompact ? styles.compactNameSep : styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
 
             <View style={isCompact ? styles.compactBubble : styles.dialogueBubble}>
@@ -449,7 +452,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
     marginBottom: 14,
-    minHeight: 44,
+    // Stable-ish height so short and 2-3 line lines don't resize the card (and
+    // slide the nameplate) as Fox pages through a session.
+    minHeight: 66,
     justifyContent: 'center',
   },
   dialogueText: {
@@ -520,7 +525,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginBottom: 8,
-    minHeight: 44,
+    minHeight: 60,
     justifyContent: 'center',
   },
   compactText: {

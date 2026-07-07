@@ -23,6 +23,7 @@ import {
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline } from './AmberInline';
 import { DialoguePhase } from '../types/homeWorld';
+import { AUTO_COLLECT_PUZZLE_LIMIT } from '../constants/gameBalance';
 import {
   getPitOfferAllLabel,
   getPitEmptyMessage,
@@ -665,7 +666,9 @@ export function getPitOnboardingOfferAction(
  * carrying; this beat explains what to DO at the pit, in Fox's voice. It
  * shows only while the manual harvest is genuinely teachable: outside
  * onboarding (the onboarding FoxGuide owns the pit there), with no phase
- * ceremony claiming the pit, with words actually waiting to point at, and
+ * ceremony claiming the pit, with words actually waiting to point at, only
+ * once the auto-collect window has closed (before that the house is still
+ * carrying words down, so "now harvest them yourself" would be a lie), and
  * only until a real offer marks the harvest learned (repeat-until-learned,
  * matching the victory gate's semantics).
  */
@@ -674,8 +677,13 @@ export function shouldShowHarvestPitIntro(
   pendingPhaseTransition: DialoguePhase | null,
   pendingBatchCount: number | null,
   hasLearned: boolean,
+  pastAutoCollectWindow: boolean,
 ): boolean {
   if (isOnboarding) return false;
+  // Still inside the auto-collect window (e.g. onboarding words left un-offered
+  // after a skip, with no real puzzles solved yet): the house is still carrying
+  // words to the pit, so the manual-harvest teaching must not fire.
+  if (!pastAutoCollectWindow) return false;
   if (pendingPhaseTransition != null) return false;
   if (pendingBatchCount == null || pendingBatchCount <= 0) return false;
   return !hasLearned;
@@ -771,6 +779,9 @@ interface OfferingPitScreenProps {
   isOnboarding?: boolean;
   /** Current onboarding step (gates the manual tap-to-offer flow) */
   onboardingStep?: string;
+  /** Total real puzzles completed — gates the manual-harvest Fox intro to
+   *  after the auto-collect window (never fires during the early carried era). */
+  completedPuzzles?: number;
   /** Called once the player has tap-devoured every pending word during onboarding */
   onOnboardingOfferComplete?: () => void;
 }
@@ -787,6 +798,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   onPhaseTransitionConfirmed,
   isOnboarding,
   onboardingStep,
+  completedPuzzles,
   onOnboardingOfferComplete,
 }) => {
   const screenInsets = useScreenInsets();
@@ -1211,7 +1223,8 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       try {
         const learned = await hasSeenMandatoryHarvest();
         if (!mountedRef.current) return;
-        if (shouldShowHarvestPitIntro(isOnboarding, pendingPhaseTransition, pendingCount, learned)) {
+        const pastAutoCollect = (completedPuzzles ?? 0) > AUTO_COLLECT_PUZZLE_LIMIT;
+        if (shouldShowHarvestPitIntro(isOnboarding, pendingPhaseTransition, pendingCount, learned, pastAutoCollect)) {
           setHarvestIntroIndex(0);
           setHarvestIntroLines(getMandatoryHarvestPitIntroLines(phase));
         }
@@ -1219,7 +1232,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         // Never block the pit on a storage read.
       }
     })();
-  }, [harvestState, isOnboarding, pendingPhaseTransition, phase]);
+  }, [harvestState, isOnboarding, pendingPhaseTransition, phase, completedPuzzles]);
 
   // ---- Build flying words ----
   useEffect(() => {
@@ -1238,10 +1251,16 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         const word = batch.words[i];
         const id = `${batch.id}_${i}`;
         const wordPixelWidth = word.length * (MINI_TILE_W + MINI_TILE_GAP);
+        // During onboarding the FoxGuide "tap each glowing word" card occupies the
+        // top (or bottom) of the screen. Confine the few tutorial words to a central
+        // band clear of it (and above the pit) so none can spawn or drift under the
+        // card, where it would be hidden, untappable, and could soft-lock the step.
+        const zoneTop = isOnboarding ? SCREEN_HEIGHT * 0.30 : FLOAT_ZONE.top;
+        const zoneBottom = isOnboarding ? SCREEN_HEIGHT * 0.52 : FLOAT_ZONE.bottom;
         const zoneWidth = FLOAT_ZONE.right - FLOAT_ZONE.left - wordPixelWidth;
-        const zoneHeight = FLOAT_ZONE.bottom - FLOAT_ZONE.top;
+        const zoneHeight = zoneBottom - zoneTop;
         const baseX = FLOAT_ZONE.left + Math.random() * Math.max(zoneWidth, 20);
-        const baseY = FLOAT_ZONE.top + Math.random() * zoneHeight;
+        const baseY = zoneTop + Math.random() * zoneHeight;
 
         allWords.push({
           id,

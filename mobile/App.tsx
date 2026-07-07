@@ -2360,6 +2360,7 @@ function MainApp() {
             }}
             isOnboarding={onboardingFlow.isOnboarding}
             onboardingStep={onboardingFlow.onboardingStep}
+            completedPuzzles={persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0}
             onOnboardingOfferComplete={onboardingActions.handlePitOnboardingOfferComplete}
           />
           {/* Fox Guide overlay — shown during onboarding on pit screen. During
