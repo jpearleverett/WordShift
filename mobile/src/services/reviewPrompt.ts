@@ -91,8 +91,8 @@ export function shouldPromptReview(ctx: ReviewPromptContext): boolean {
 /** Load native expo-store-review via a guarded literal require (NoOp otherwise). */
 function getStoreReview(): { requestReview?: () => Promise<void>; isAvailableAsync?: () => Promise<boolean> } | null {
   try {
-    // Literal require so Metro can see and bundle it when the dep is present.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // Literal require so Metro can see and bundle it when the dep is present
+    // (same guarded-require pattern as the monetization adapters).
     return require('expo-store-review');
   } catch {
     return null;
