@@ -77,15 +77,24 @@ describe('dailyChallenge', () => {
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  test('getDailyDifficulty always returns HARD', () => {
-    const diff = getDailyDifficulty();
-    expect(diff).toBe('HARD');
+  test('daily difficulty ramps across the week (gentle Mon -> brutal Sun)', () => {
+    // 2026-02-09 is a Monday; step through the week (local-component dates).
+    // Mon accessible, Sun the peak — the habit-anchor ramp.
+    expect(getDailyDifficulty('2026-02-09')).toBe('MEDIUM');       // Mon
+    expect(getDailyDifficulty('2026-02-10')).toBe('MEDIUM_PLUS');  // Tue
+    expect(getDailyDifficulty('2026-02-11')).toBe('MEDIUM_PLUS');  // Wed
+    expect(getDailyDifficulty('2026-02-12')).toBe('HARD');         // Thu
+    expect(getDailyDifficulty('2026-02-13')).toBe('HARD');         // Fri
+    expect(getDailyDifficulty('2026-02-14')).toBe('HARD');         // Sat
+    expect(getDailyDifficulty('2026-02-15')).toBe('HARD');         // Sun
   });
 
-  test('getDailyDifficulty returns HARD regardless of date', () => {
-    expect(getDailyDifficulty('2026-02-09')).toBe('HARD');
-    expect(getDailyDifficulty('2026-02-10')).toBe('HARD');
-    expect(getDailyDifficulty('2026-02-11')).toBe('HARD');
+  test('daily ramp is deterministic by date (same puzzle shape for everyone)', () => {
+    const { getDailyRamp } = require('../services/dailyChallenge');
+    // Sunday is the peak: 6-letter / 5-row HARD.
+    expect(getDailyRamp('2026-02-15')).toEqual({ difficulty: 'HARD', wordLength: 6, targetRows: 5 });
+    // Monday is accessible: 4-letter / 4-row MEDIUM.
+    expect(getDailyRamp('2026-02-09')).toEqual({ difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 });
   });
 
   test('unlock threshold is 8 puzzles (aligned with the auto-collect window)', () => {
@@ -199,15 +208,29 @@ describe('dailyChallenge streak freeze mercy', () => {
     expect(result.streakFreezes).toBe(0);
   });
 
-  test('without a freeze, a missed day resets the streak to 1', async () => {
+  test('without a freeze, a short streak below the first milestone resets to 1', async () => {
     const p = await loadDailyProgress();
-    p.currentStreak = 5;
+    p.currentStreak = 2; // below the 3-day first milestone → nothing to protect
     p.streakFreezes = 0;
     p.lastFreezeGrantDate = getLocalDateStringDaysAgo(1);
     p.lastCompletedDate = getLocalDateStringDaysAgo(2);
     const result = await recordDailyCompletion(3, 0, 0);
     expect(result.streakSavedByFreeze).toBe(false);
     expect(result.currentStreak).toBe(1);
+    expect(result.streakDecayedTo).toBeUndefined();
+  });
+
+  test('without a freeze, a long streak decays to its last milestone checkpoint (not to 1)', async () => {
+    const p = await loadDailyProgress();
+    p.currentStreak = 25; // past the 21-day milestone
+    p.streakFreezes = 0;
+    p.lastFreezeGrantDate = getLocalDateStringDaysAgo(1);
+    p.lastCompletedDate = getLocalDateStringDaysAgo(2);
+    const result = await recordDailyCompletion(3, 0, 0);
+    expect(result.streakSavedByFreeze).toBe(false);
+    // Falls back to the 21-day checkpoint rather than being wiped to 1.
+    expect(result.currentStreak).toBe(21);
+    expect(result.streakDecayedTo).toBe(21);
   });
 
   test('a free freeze is granted after the interval has elapsed', async () => {

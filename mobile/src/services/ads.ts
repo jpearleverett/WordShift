@@ -226,7 +226,14 @@ export function shouldShowInterstitial(params: {
 }): boolean {
   const { puzzlesSolved, lastInterstitialPuzzle, phase, isAdFree, exempt } = params;
   if (isAdFree || exempt) return false;
-  const freq = interstitialFrequency(phase);
+  // Tonal protection for the descent (assessment: an interstitial is not just
+  // a churn risk, it is damage to the product's single differentiator — a
+  // bright candy ad firing after a Phase-3 "WHY DOES IT MATTER?" victory
+  // shatters the dread). Phase 4+ (the black-sky reveal and the whole serene
+  // endgame) suppresses interstitials entirely; Phase 3 doubles the gap so
+  // they become rare, not gone.
+  if ((phase as number) >= 4) return false;
+  const freq = interstitialFrequency(phase) * ((phase as number) >= 3 ? 2 : 1);
   return puzzlesSolved - lastInterstitialPuzzle >= freq;
 }
 

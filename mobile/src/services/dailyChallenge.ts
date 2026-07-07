@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { generateLocalPuzzle } from './localGenerator';
-import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal } from './dateUtils';
+import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
 import { addHints } from './hints';
 
 const STORAGE_KEY = 'wordshift_daily_challenge';
@@ -39,6 +39,13 @@ export interface DailyChallengeProgress {
    * streak was saved.
    */
   streakSavedByFreeze?: boolean;
+  /**
+   * Transient (not persisted meaningfully): the milestone-day the streak
+   * decayed back to on this completion, when a lapse fell back to a checkpoint
+   * instead of resetting to 1 (see the decay-to-milestone logic). Undefined on
+   * a normal continuation. Lets the UI say "your streak held at N".
+   */
+  streakDecayedTo?: number;
   /** True once the one-time first-daily hint mercy has been granted. */
   firstDailyMercyGranted: boolean;
 }
@@ -155,11 +162,35 @@ function seededRandom(seed: string): () => number {
 }
 
 /**
- * Daily challenge difficulty is always HARD (6-letter words, 5 rows).
- * Kept as a function for backward compatibility with status/display code.
+ * Daily difficulty ramps across the week (the Wordle/NYT-crossword pattern):
+ * gentle Monday, brutal Sunday. The old always-6-letter/5-row HARD daily was
+ * strictly harder than anything selectable in normal play and read as a wall
+ * to the casual majority every day — the exact inverse of a habit anchor.
+ * The ramp is DETERMINISTIC by date (day-of-week), so every player still gets
+ * the same puzzle on a given day and the leaderboard stays fair. Rewards still
+ * always count as HARD (recordVictory isDaily=true) so the anchor stays
+ * generous regardless of the day's board size.
  */
-export function getDailyDifficulty(_dateStr?: string): Difficulty {
-  return 'HARD';
+export function getDailyDifficulty(dateStr?: string): Difficulty {
+  return getDailyRamp(dateStr).difficulty;
+}
+
+/** Board shape for a given day: difficulty + word length + row count. */
+export function getDailyRamp(dateStr?: string): {
+  difficulty: Difficulty;
+  wordLength: number;
+  targetRows: number;
+} {
+  const day = parseLocalDate(dateStr ?? getTodayString()).getDay(); // 0=Sun..6=Sat
+  switch (day) {
+    case 1: return { difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 };      // Mon — accessible
+    case 2: return { difficulty: 'MEDIUM_PLUS', wordLength: 5, targetRows: 4 }; // Tue
+    case 3: return { difficulty: 'MEDIUM_PLUS', wordLength: 5, targetRows: 5 }; // Wed
+    case 4: return { difficulty: 'HARD', wordLength: 5, targetRows: 5 };        // Thu
+    case 5: return { difficulty: 'HARD', wordLength: 5, targetRows: 5 };        // Fri
+    case 6: return { difficulty: 'HARD', wordLength: 6, targetRows: 5 };        // Sat
+    default: return { difficulty: 'HARD', wordLength: 6, targetRows: 5 };       // Sun — the peak
+  }
 }
 
 /**
@@ -229,7 +260,8 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
   }
 
   const generationPromise = (async () => {
-    const difficulty = getDailyDifficulty(today);
+    const ramp = getDailyRamp(today);
+    const difficulty = ramp.difficulty;
     const rng = seededRandom(`wordshift-daily-${today}`);
 
     // Temporarily override Math.random for deterministic generation
@@ -237,17 +269,17 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
     Math.random = rng;
 
     try {
-      // Daily challenge always uses 6-letter words with 5 rows
+      // Board shape ramps across the week (see getDailyRamp).
       const puzzle = await generateLocalPuzzle(difficulty, {
-        wordLength: 6,
-        targetRows: 5,
+        wordLength: ramp.wordLength,
+        targetRows: ramp.targetRows,
       });
       const result: DailyPuzzleData = {
         words: puzzle.words,
         hint: puzzle.hint,
         difficulty,
         date: today,
-        wordLength: puzzle.wordLength ?? 6,
+        wordLength: puzzle.wordLength ?? ramp.wordLength,
       };
       dailyPuzzleCache = result;
       return result;
@@ -344,7 +376,24 @@ export async function recordDailyCompletion(
     progress.currentStreak += 1;
     progress.streakSavedByFreeze = true;
   } else if (progress.lastCompletedDate !== today) {
-    progress.currentStreak = 1;
+    // Decay-to-milestone instead of reset-to-zero (softened loss aversion —
+    // the 5.6M-dead-Wordle-streaks lesson). A lapsed streak falls back to the
+    // last milestone CHECKPOINT it had passed rather than to 1, so weeks of
+    // habit aren't wiped by one missed day; the setback is losing the climb
+    // toward the next milestone. Below the first milestone (3 days) there is
+    // nothing to protect, so it still resets to 1.
+    const priorStreak = progress.currentStreak;
+    const checkpoint = DAILY_STREAK_MILESTONES
+      .map(m => m.days)
+      .filter(d => d < priorStreak)
+      .pop() ?? 0;
+    progress.currentStreak = Math.max(1, checkpoint);
+    progress.streakDecayedTo = checkpoint > 0 ? checkpoint : undefined;
+  } else {
+    progress.streakDecayedTo = undefined;
+  }
+  if (progress.lastCompletedDate && (isWithinDailyGracePeriod(progress.lastCompletedDate) || progress.streakSavedByFreeze)) {
+    progress.streakDecayedTo = undefined;
   }
 
   progress.bestStreak = Math.max(progress.bestStreak, progress.currentStreak);

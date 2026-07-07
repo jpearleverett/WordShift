@@ -303,7 +303,13 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
     if (hasStreakRisk) {
       await scheduleStreakRisk(mod, currentPhase, streak);
     }
-    await scheduleWinBackLadder(mod, currentPhase, hasStreakRisk ? 2 : 1);
+    // A finished-story player gets the special tail copy on the +14/+30 rungs.
+    let finishedStory = false;
+    try {
+      const { isPostRevelation } = require('./amberCurrency');
+      finishedStory = await isPostRevelation();
+    } catch {}
+    await scheduleWinBackLadder(mod, currentPhase, hasStreakRisk ? 2 : 1, finishedStory);
 
     // Weekly-quest-expiry nudge: the evening before the weekly reset, but only
     // when the player has quests in flight (progress made, or completed-but-
@@ -368,7 +374,7 @@ const DAILY_REMINDER_LOOKAHEAD_DAYS = 7;
  * Days-from-reschedule offsets for the escalating win-back ladder. Rung 1
  * shifts to +2 for streak holders (the streak-risk ping leads the ladder).
  */
-const WIN_BACK_RUNG_OFFSETS: [number, number, number] = [1, 3, 7];
+const WIN_BACK_RUNG_OFFSETS: [number, number, number, number, number] = [1, 3, 7, 14, 30];
 
 async function scheduleDailyReminder(
   mod: any,
@@ -429,12 +435,17 @@ async function scheduleDailyReminder(
 async function scheduleWinBackLadder(
   mod: any,
   phase: number,
-  firstRungDays: number
+  firstRungDays: number,
+  finished = false
 ): Promise<void> {
-  const rungs: { rung: 1 | 2 | 3; daysFromNow: number }[] = [
+  // Extended past the old +7 cliff to +14 and +30 so a lapsed player is never
+  // permanently abandoned; a finished-story player gets special tail copy.
+  const rungs: { rung: 1 | 2 | 3 | 4 | 5; daysFromNow: number }[] = [
     { rung: 1, daysFromNow: firstRungDays },
     { rung: 2, daysFromNow: WIN_BACK_RUNG_OFFSETS[1] },
     { rung: 3, daysFromNow: WIN_BACK_RUNG_OFFSETS[2] },
+    { rung: 4, daysFromNow: WIN_BACK_RUNG_OFFSETS[3] },
+    { rung: 5, daysFromNow: WIN_BACK_RUNG_OFFSETS[4] },
   ];
   for (const { rung, daysFromNow } of rungs) {
     try {
@@ -445,7 +456,7 @@ async function scheduleWinBackLadder(
       await mod.scheduleNotificationAsync({
         content: {
           title: 'WordShift',
-          body: getWinBackMessage(phase, rung),
+          body: getWinBackMessage(phase, rung, finished),
           sound: true,
           data: { target: 'home' },
         },

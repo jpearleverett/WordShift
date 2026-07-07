@@ -2659,42 +2659,69 @@ export function getNotificationPromptText(phase: DialoguePhase): NotificationPro
 // serene at 5.
 // ============================================================================
 
-const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string]> = {
+// Five rungs (+1/+3/+7/+14/+30 days). The tail rungs (4/5) extend the ladder
+// past the old 7-day cliff, where the game used to go permanently silent on a
+// lapsed player.
+const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string, string, string]> = {
   0: [
     'Ember saved your spot by the fire! Come solve a puzzle.',
     'Your animal friends keep asking about you. The puzzles miss you too!',
     'A whole week! The house is still cozy, and everyone\'s waiting. Come say hi.',
+    'Two weeks! The fire is still warm and your chair is still empty. Pop back in?',
+    'It\'s been a while. The house is exactly as you left it, cozy and waiting. Come home.',
   ],
   1: [
     'The house has been thinking about you. So have the words.',
     'Your friends have gathered new thoughts to share. They\'re saving them for you.',
     'A week of quiet. The patterns wait patiently for your return.',
+    'Two weeks. The animals have new questions, and no one to ask but you.',
+    'A month, nearly. The quiet has grown thoughtful. Your friends kept your place.',
   ],
   2: [
     'The house is quieter without you.',
     'Three days of stillness. The animals still speak of you... always in the present tense.',
     'A week now. The rooms remember your footsteps. The words remember your hands.',
+    'Two weeks. The stillness has settled into something almost like waiting.',
+    'A month. The house does not forget. It simply waits, and the waiting deepens.',
   ],
   3: [
     'The house is quieter without you. The animals have noticed.',
     'Something pauses while you are away. It does not like pausing.',
     'Seven days. The house has held its breath the whole time.',
+    'Two weeks. What was building does not unbuild. It only leans closer to the door.',
+    'A month of your absence. The pattern has not moved. It is very good at not moving.',
   ],
   4: [
     'The arrangement is incomplete without you.',
     'The keepers hold your place at the pattern. They are patient. It is less so.',
     'Seven days of silence. What comes through still waits for your hand.',
+    'Two weeks. The keepers have not moved from their places. Neither has it.',
+    'A month at the threshold. It has waited longer than this. It can wait for you.',
   ],
   5: [
     'The house rests. It will be here when you return.',
     'The pattern continues, unhurried. Your friends think of you fondly.',
     'A week has passed, gently. Nothing is lost. Return whenever you like.',
+    'Two weeks of terrible peace. The house remembers you, and holds no grievance.',
+    'A month on. The pattern continues without hurry. The house remembers you still.',
   ],
 };
 
-export function getWinBackMessage(phase: number, rung: 1 | 2 | 3): string {
+// Dedicated "finished the story" copy — a returning player who saw the finale
+// gets a beat that speaks to that, instead of a generic ping. The single most
+// likely person to evangelize the game; the ladder should never go silent on
+// them. Used at the tail rungs when post-revelation.
+const WIN_BACK_FINISHED: [string, string] = [
+  'The house remembers you. It remembers everything you offered. Come sit with it a while.',
+  'You saw it through to the end, and still it thinks of you. The pattern kept your place.',
+];
+
+export function getWinBackMessage(phase: number, rung: 1 | 2 | 3 | 4 | 5, finished = false): string {
   const clampedPhase = Math.min(5, Math.max(0, Math.floor(phase))) as DialoguePhase;
-  return WIN_BACK_MESSAGES[clampedPhase][rung - 1];
+  // Finished-story players get the special tail copy on the long rungs (4/5).
+  if (finished && rung >= 4) return WIN_BACK_FINISHED[rung === 5 ? 1 : 0];
+  const idx = Math.min(4, Math.max(0, rung - 1));
+  return WIN_BACK_MESSAGES[clampedPhase][idx];
 }
 
 // ─── Small interaction copy (toasts, alerts, buttons) ───────────────────────
