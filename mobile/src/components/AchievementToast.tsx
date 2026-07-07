@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../theme/pixelSkin.generated';
+import { NineSliceFrame } from './ui/NineSlice';
 import { Achievement } from '../services/achievements';
 import { AmberInline } from './AmberInline';
 import { getSettingsSync } from '../services/settings';
@@ -13,9 +15,10 @@ interface AchievementToastProps {
 
 /**
  * Animated toast that slides in from the top when an achievement is unlocked.
- * Auto-dismisses after 3 seconds. Framed layered material (PanelCard anatomy
- * inline, since the banner itself is the animated element), phase-aware via
- * getSurfaceTheme. Reduced motion pins the end states (no slide/fade).
+ * Auto-dismisses after 3 seconds. Cottage pixel card frame (9-slice wood +
+ * parchment fill, inline since the banner itself is the animated element),
+ * phase-aware via getSurfaceTheme/getPixelSkin. Reduced motion pins the end
+ * states (no slide/fade).
  */
 export const AchievementToast: React.FC<AchievementToastProps> = ({
   achievement,
@@ -87,6 +90,7 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
   if (!achievement) return null;
 
   const t = getSurfaceTheme(phase);
+  const skin = getPixelSkin(phase);
 
   return (
     <Animated.View
@@ -101,9 +105,14 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
       accessibilityLiveRegion="polite"
       accessibilityLabel={`Achievement unlocked: ${achievement.title}. ${achievement.description}.${achievement.rewardAmber > 0 ? ` Earned ${achievement.rewardAmber} amber.` : ''}`}
     >
-      <View style={[styles.inner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
-        <View pointerEvents="none" style={styles.highlightBand} />
-        <View pointerEvents="none" style={styles.shadeBand} />
+      <View style={styles.inner}>
+        {/* Cottage pixel card frame (wood 9-slice + solid parchment fill). */}
+        <NineSliceFrame
+          skin={skin.card}
+          cornerDp={CARD_CORNER_DP}
+          edgeDp={CARD_EDGE_DP}
+          fillColor={skin.fillCard}
+        />
         <View style={[styles.iconBadge, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
           <Text style={styles.icon}>{achievement.icon}</Text>
         </View>
@@ -132,8 +141,6 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: SURFACE.cardRadius,
-    borderWidth: 1.5,
     padding: 12,
     overflow: 'hidden',
     shadowColor: 'rgba(10, 6, 24, 1)',
@@ -141,26 +148,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 12,
-  },
-  highlightBand: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '34%',
-    borderTopLeftRadius: SURFACE.cardRadius,
-    borderTopRightRadius: SURFACE.cardRadius,
-    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
-  },
-  shadeBand: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '22%',
-    borderBottomLeftRadius: SURFACE.cardRadius,
-    borderBottomRightRadius: SURFACE.cardRadius,
-    backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
   },
   iconBadge: {
     width: 44,

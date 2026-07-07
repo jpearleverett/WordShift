@@ -10,6 +10,7 @@ import {
 import { CandyColors } from '../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
+import { PixelPlaque } from './ui/PixelPlaque';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline } from './AmberInline';
 import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
@@ -164,7 +165,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
             {/* Star breakdown */}
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
-              <Text style={[styles.sectionTitle, { color: t.muted }]}>STAR BREAKDOWN</Text>
+              <PixelPlaque phase={effectivePhase} label={'STAR BREAKDOWN'} style={styles.sectionPlaque} />
               <StarBar label="3 Stars" stars={3} count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} trackColor={t.rowBorder} countColor={t.body} />
               <StarBar label="2 Stars" stars={2} count={stats.twoStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.orange.main} trackColor={t.rowBorder} countColor={t.body} />
               <StarBar label="1 Star" stars={1} count={stats.oneStarCount} total={stats.totalPuzzlesCompleted} color={t.muted} trackColor={t.rowBorder} countColor={t.body} />
@@ -177,7 +178,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
             {/* Difficulty breakdown */}
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
-              <Text style={[styles.sectionTitle, { color: t.muted }]}>BY DIFFICULTY</Text>
+              <PixelPlaque phase={effectivePhase} label={'BY DIFFICULTY'} style={styles.sectionPlaque} />
               <DifficultyRow
                 difficulty="EASY"
                 completed={stats.byDifficulty.EASY.completed}
@@ -211,7 +212,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
             {/* Personal bests */}
             {stats.personalBests && Object.keys(stats.personalBests).length > 0 && (
               <PanelCard phase={effectivePhase} style={styles.sectionCard}>
-                <Text style={[styles.sectionTitle, { color: t.muted }]}>PERSONAL BESTS</Text>
+                <PixelPlaque phase={effectivePhase} label={'PERSONAL BESTS'} style={styles.sectionPlaque} />
                 {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[])
                   .map(diff => ({ diff, pb: stats.personalBests?.[diff] }))
                   .filter((entry): entry is { diff: Difficulty; pb: PersonalBest } => !!entry.pb)
@@ -236,7 +237,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
             {/* Journey progress */}
             <PanelCard phase={effectivePhase} style={styles.sectionCard}>
-              <Text style={[styles.sectionTitle, { color: t.muted }]}>YOUR JOURNEY</Text>
+              <PixelPlaque phase={effectivePhase} label={'YOUR JOURNEY'} style={styles.sectionPlaque} />
               <View style={styles.journeyRow}>
                 <Text style={[styles.journeyLabel, { color: t.body }]}>Atmosphere</Text>
                 <Text style={[styles.journeyValue, { color: t.title }]}>{getJourneyAtmosphereText(effectivePhase)}</Text>
@@ -278,7 +279,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
               return (
                 <PanelCard key={category} phase={effectivePhase} style={styles.sectionCard}>
-                  <Text style={[styles.sectionTitle, { color: t.muted }]}>{categoryName}</Text>
+                  <PixelPlaque phase={effectivePhase} label={'{categoryName}'} style={styles.sectionPlaque} />
                   {categoryAchievements.map((achievement, i) => (
                     <View
                       key={achievement.id}
@@ -470,6 +471,8 @@ const styles = StyleSheet.create({
   // Hero stats
   heroCard: {
     marginBottom: 18,
+    paddingVertical: 24,
+    paddingHorizontal: 22,
   },
   heroGlow: {
     position: 'absolute',
@@ -507,6 +510,9 @@ const styles = StyleSheet.create({
   // Sections
   sectionCard: {
     marginBottom: 18,
+  },
+  sectionPlaque: {
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 12,

@@ -21,6 +21,7 @@ import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud } from '../services/cloudSave';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
+import { PixelPlaque } from './ui/PixelPlaque';
 import { CandyButton } from './ui/CandyButton';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { EXTERNAL_LINKS, getSupportMailto } from '../constants/links';
@@ -455,7 +456,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Sound & Haptics */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.muted }]}>FEEDBACK</Text>
+          <PixelPlaque phase={phase} label={'FEEDBACK'} style={styles.sectionPlaque} />
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={[styles.settingLabel, { color: t.title }]}>Sound Effects</Text>
@@ -491,7 +492,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         {/* Accessibility */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.muted }]}>ACCESSIBILITY</Text>
+          <PixelPlaque phase={phase} label={'ACCESSIBILITY'} style={styles.sectionPlaque} />
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={[styles.settingLabel, { color: t.title }]}>Reduced Motion</Text>
@@ -511,7 +512,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         {/* Notifications */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.muted }]}>NOTIFICATIONS</Text>
+          <PixelPlaque phase={phase} label={'NOTIFICATIONS'} style={styles.sectionPlaque} />
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={[styles.settingLabel, { color: t.title }]}>Daily Reminders</Text>
@@ -530,7 +531,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         {/* Streak Protection */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.muted }]}>STREAK PROTECTION</Text>
+          <PixelPlaque phase={phase} label={'STREAK PROTECTION'} style={styles.sectionPlaque} />
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={[styles.settingLabel, { color: t.title }]}>Streak Freezes</Text>
@@ -557,7 +558,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         {/* Backup & Restore (only when a cloud backend is configured) */}
         {cloudEnabled && (
           <PanelCard phase={phase} kind="panel" style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: t.muted }]}>BACKUP &amp; RESTORE</Text>
+            <PixelPlaque phase={phase} label={'BACKUP & RESTORE'} style={styles.sectionPlaque} />
             <TouchableOpacity style={styles.aboutRow} onPress={handleShowRecoveryCode} accessibilityRole="button" accessibilityLabel="Show recovery code">
               <Text style={[styles.linkText, { color: t.secondaryText }]}>{recoveryCode ? 'Your recovery code' : 'Show recovery code'}</Text>
             </TouchableOpacity>
@@ -575,7 +576,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         {/* Data */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.muted }]}>DATA</Text>
+          <PixelPlaque phase={phase} label={'DATA'} style={styles.sectionPlaque} />
           <TouchableOpacity style={styles.dangerRow} onPress={handleResetData}>
             <Text style={[styles.dangerText, { color: t.dangerText }]}>Reset All Progress</Text>
             <Text style={[styles.dangerDescription, { color: t.muted }]}>
@@ -586,7 +587,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         {/* Purchases — restore IAP entitlements (store-policy requirement) */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.muted }]}>PURCHASES</Text>
+          <PixelPlaque phase={phase} label={'PURCHASES'} style={styles.sectionPlaque} />
           <TouchableOpacity
             style={styles.aboutRow}
             onPress={handleRestorePurchases}
@@ -603,7 +604,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
         {/* About */}
         <PanelCard phase={phase} kind="panel" style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: t.muted }]}>ABOUT</Text>
+          <PixelPlaque phase={phase} label={'ABOUT'} style={styles.sectionPlaque} />
           <TouchableOpacity
             style={styles.aboutRow}
             onPress={() => openLink(EXTERNAL_LINKS.privacyPolicy)}
@@ -766,6 +767,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
   },
+  sectionPlaque: {
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '800',
@@ -776,7 +780,9 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 20,
-    paddingBottom: 4,
+    paddingTop: 18,
+    paddingHorizontal: 20,
+    paddingBottom: 18,
   },
   settingRow: {
     flexDirection: 'row',

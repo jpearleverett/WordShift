@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
+import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
@@ -305,6 +307,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
   }, [onClose]);
 
   const t = getSurfaceTheme(phase);
+  const skin = getPixelSkin(phase);
   const working = flow === 'working';
 
   /** Price pinned right in a chunky amber CandyButton — the store's single accent. */
@@ -365,13 +368,17 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         <Animated.View
           style={[
             styles.card,
-            { backgroundColor: t.cardBg, borderColor: t.cardBorder, opacity: cardOpacity, transform: [{ scale: cardScale }] },
+            { opacity: cardOpacity, transform: [{ scale: cardScale }] },
           ]}
         >
+          {/* Cottage pixel panel frame (wood 9-slice + solid parchment fill). */}
+          <NineSliceFrame
+            skin={skin.panel}
+            cornerDp={PANEL_CORNER_DP}
+            edgeDp={PANEL_EDGE_DP}
+            fillColor={skin.fill}
+          />
           <View style={[styles.glow, { backgroundColor: t.glow }]} />
-          {/* Layered material bands (PanelCard anatomy, inline for the animated card). */}
-          <View pointerEvents="none" style={styles.cardHighlight} />
-          <View pointerEvents="none" style={styles.cardShade} />
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: t.title }]}>Store</Text>
@@ -388,10 +395,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {!ownsStarter && (
-              <PanelCard
-                phase={phase}
-                style={{ ...styles.heroCard, borderColor: t.amberTintBorder }}
-              >
+              <PanelCard phase={phase} style={styles.heroCard}>
                 <View style={styles.heroRibbonRow}>
                   <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
                     BEST VALUE · ONE TIME
@@ -535,9 +539,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     maxHeight: '86%',
-    borderRadius: SURFACE.panelRadius,
-    borderWidth: 1.5,
-    padding: 20,
+    padding: 24,
     shadowColor: CandyColors.purple.dark,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.4,
@@ -554,27 +556,6 @@ const styles = StyleSheet.create({
     height: 160,
     opacity: 0.25,
     borderRadius: 100,
-  },
-  // Top highlight / bottom shade — the panel reads as lit material.
-  cardHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '34%',
-    borderTopLeftRadius: SURFACE.panelRadius,
-    borderTopRightRadius: SURFACE.panelRadius,
-    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
-  },
-  cardShade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '22%',
-    borderBottomLeftRadius: SURFACE.panelRadius,
-    borderBottomRightRadius: SURFACE.panelRadius,
-    backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
   },
   headerRow: {
     flexDirection: 'row',

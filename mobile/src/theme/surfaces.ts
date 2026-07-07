@@ -33,8 +33,6 @@ export const SURFACE = {
   pressTravel: 3,
   /** Top highlight band alpha (the "glossy" light from above). */
   highlightAlpha: 0.10,
-  /** Bottom shade band alpha (the panel's own weight). */
-  shadeAlpha: 0.08,
   /** Uppercase section-label letterSpacing (replaces the web gray-caption look). */
   sectionLetterSpacing: 1.2,
   /** Stagger interval for content cascade inside freshly opened panels. */
@@ -106,42 +104,72 @@ export interface SurfaceTheme {
   dangerText: string;
 }
 
+/**
+ * Cottage material tokens per skin group (matches the generated pixel skin in
+ * pixelSkin.generated.ts — see scripts/tools/generateUiPanels.mjs). Every
+ * fill is the skin's parchment, every ink a warm brown (or cream once the
+ * paper turns to ash at phase 4+); all named pairs hold >= 4.5:1 on their
+ * intended fill. The amber accent is the one hue that survives every phase.
+ */
+const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<SurfaceTheme, 'overlay' | 'glow'>> = {
+  bright: {
+    screenBg: '#5C4130', cardBg: '#F3E2BF', cardBorder: '#5A3418',
+    title: '#3B2416', body: '#4A3222', muted: '#6B4A2F',
+    sectionBg: '#EBD8B2', sectionBorder: '#D9BE8F', rowBg: '#EBD8B2', rowBorder: '#D9BE8F',
+    amberText: '#7A4E00', amberTint: 'rgba(202, 138, 4, 0.12)', amberTintBorder: 'rgba(176, 111, 30, 0.45)',
+    primaryBg: '#E8A33D', primaryEdge: '#8A5414', primaryText: '#3B2416',
+    pillBg: '#E8A33D', pillEdge: '#8A5414', pillText: '#3B2416',
+    secondaryBg: 'rgba(201, 138, 75, 0.16)', secondaryBorder: '#A96B33', secondaryText: '#4A3222',
+    dangerText: '#A6402E',
+  },
+  dusk: {
+    screenBg: '#4A3524', cardBg: '#E6D0A9', cardBorder: '#48301C',
+    title: '#33201E', body: '#43301F', muted: '#64492E',
+    sectionBg: '#DCC49B', sectionBorder: '#C3A67D', rowBg: '#DCC49B', rowBorder: '#C3A67D',
+    amberText: '#6F4700', amberTint: 'rgba(190, 128, 8, 0.12)', amberTintBorder: 'rgba(160, 100, 26, 0.45)',
+    primaryBg: '#DC8026', primaryEdge: '#7E4A10', primaryText: '#33201E',
+    pillBg: '#DC8026', pillEdge: '#7E4A10', pillText: '#33201E',
+    secondaryBg: 'rgba(168, 116, 71, 0.16)', secondaryBorder: '#8A5A31', secondaryText: '#43301F',
+    dangerText: '#96382A',
+  },
+  storm: {
+    screenBg: '#33241E', cardBg: '#CDB289', cardBorder: '#301B14',
+    title: '#2A1A10', body: '#2F1F14', muted: '#4A3626',
+    sectionBg: '#C2A67D', sectionBorder: '#A3875F', rowBg: '#C2A67D', rowBorder: '#A3875F',
+    amberText: '#5E3B00', amberTint: 'rgba(150, 98, 20, 0.14)', amberTintBorder: 'rgba(130, 82, 24, 0.5)',
+    primaryBg: '#D97F2E', primaryEdge: '#733D12', primaryText: '#2A1A10',
+    pillBg: '#D97F2E', pillEdge: '#733D12', pillText: '#2A1A10',
+    secondaryBg: 'rgba(122, 82, 56, 0.18)', secondaryBorder: '#613E2B', secondaryText: '#2F1F14',
+    dangerText: '#8A2F22',
+  },
+  dark: {
+    screenBg: '#171013', cardBg: '#352A31', cardBorder: '#0F0A10',
+    title: '#E8D5B7', body: '#E8D5B7', muted: '#BBA68E',
+    sectionBg: '#2E2429', sectionBorder: '#241B20', rowBg: '#2E2429', rowBorder: '#241B20',
+    amberText: '#E9B468', amberTint: 'rgba(233, 180, 104, 0.10)', amberTintBorder: 'rgba(233, 180, 104, 0.35)',
+    primaryBg: '#A83A28', primaryEdge: '#54160D', primaryText: '#F5E3CB',
+    pillBg: '#A83A28', pillEdge: '#54160D', pillText: '#F5E3CB',
+    secondaryBg: 'rgba(107, 70, 58, 0.22)', secondaryBorder: '#52332C', secondaryText: '#E8D5B7',
+    dangerText: '#E08A8A',
+  },
+  serene: {
+    screenBg: '#241B26', cardBg: '#332A38', cardBorder: '#151019',
+    title: '#D9C8D4', body: '#D9C8D4', muted: '#A793A6',
+    sectionBg: '#2C2431', sectionBorder: '#221B28', rowBg: '#2C2431', rowBorder: '#221B28',
+    amberText: '#C99E63', amberTint: 'rgba(201, 158, 99, 0.10)', amberTintBorder: 'rgba(201, 158, 99, 0.35)',
+    primaryBg: '#A97F45', primaryEdge: '#573C1C', primaryText: '#1F1512',
+    pillBg: '#A97F45', pillEdge: '#573C1C', pillText: '#1F1512',
+    secondaryBg: 'rgba(94, 70, 83, 0.22)', secondaryBorder: '#4A3742', secondaryText: '#D9C8D4',
+    dangerText: '#D98A8A',
+  },
+};
+
 export function getSurfaceTheme(phase: number): SurfaceTheme {
   const pt = getPhaseTheme(phase);
-  const dark = phase >= 3;
-  const body = dark
-    ? pt.modalSecondaryTextColor
-    : phase >= 2 ? '#493C66' : phase >= 1 ? '#554B70' : '#475569';
-  const muted = dark
-    ? 'rgba(196, 181, 224, 0.75)'
-    : phase >= 2 ? '#5E5178' : '#5D5476';
+  const group = phase >= 5 ? 'serene' : phase >= 4 ? 'dark' : phase >= 3 ? 'storm' : phase >= 2 ? 'dusk' : 'bright';
   return {
     overlay: pt.modalOverlayColor,
-    screenBg: dark
-      ? (phase >= 5 ? '#1D1833' : phase >= 4 ? '#131322' : '#232741')
-      : phase >= 2 ? '#3B3560' : phase >= 1 ? '#4A4E8E' : '#4F46A8',
-    cardBg: pt.modalBgColor,
-    cardBorder: dark ? 'rgba(147, 51, 234, 0.22)' : 'rgba(255, 255, 255, 0.4)',
     glow: pt.victoryGlowColor,
-    title: pt.modalTextColor,
-    body,
-    muted,
-    sectionBg: pt.modalStatBgColor,
-    sectionBorder: pt.modalDividerColor,
-    rowBg: pt.modalStatBgColor,
-    rowBorder: pt.modalDividerColor,
-    amberText: dark ? '#E9B468' : '#7A4E00',
-    amberTint: dark ? 'rgba(255, 201, 77, 0.10)' : 'rgba(202, 138, 4, 0.10)',
-    amberTintBorder: dark ? 'rgba(255, 201, 77, 0.30)' : 'rgba(202, 138, 4, 0.35)',
-    primaryBg: dark ? (phase >= 5 ? '#6B5B95' : '#7A2A48') : '#7E57C2',
-    primaryEdge: dark ? (phase >= 5 ? '#4A3F6B' : '#521C30') : '#5B3E94',
-    primaryText: '#FFF7FA',
-    pillBg: dark ? '#C98A4A' : '#F6BA3F',
-    pillEdge: dark ? '#8F5F2E' : '#C8901E',
-    pillText: dark ? '#241302' : '#3F2B04',
-    secondaryBg: dark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(94, 82, 175, 0.10)',
-    secondaryBorder: dark ? 'rgba(196, 181, 224, 0.35)' : 'rgba(94, 82, 175, 0.45)',
-    secondaryText: dark ? '#D8CCEE' : '#4A3E8C',
-    dangerText: dark ? '#E08A8A' : '#B03A3A',
+    ...COTTAGE[group],
   };
 }
