@@ -2837,73 +2837,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="none"
       >
         <View style={[styles.journalSpotlightBackdrop, { backgroundColor: dt.overlayBg }]}>
-          <View
-            style={[
-              styles.journalSpotlightPointer,
-              {
-                // Legacy offsets: Android +26 over the status bar, iOS 60 (44 base + 16)
-                top: screenInsets.top + (Platform.OS === 'android' ? 26 : 16),
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: phaseTheme.victoryGlowColor,
-              },
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={[styles.journalSpotlightPointerText, { color: dt.nameColor }]}>
-              {currentJournalSpotlightStep.pointerText}
-            </Text>
-            <View
-              style={[
-                styles.journalSpotlightPointerTail,
-                {
-                  borderTopColor: dt.modalBg,
-                  borderRightColor: dt.modalBg,
-                  shadowColor: phaseTheme.victoryGlowColor,
-                },
-              ]}
+          <View style={[styles.journalSpotlightPanel, { shadowColor: dt.modalShadowColor }]}>
+            {/* Cottage wood-and-parchment sheet (matches the Fox dialogue below
+                and every other home sheet); replaces the old flat white panel. */}
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
             />
-          </View>
-
-          <View
-            style={[
-              styles.journalSpotlightPanel,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
-          >
-            <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
 
             <View style={styles.journalSpotlightHeroRow}>
-              <View
-                style={[
-                  styles.journalSpotlightHeroBadge,
-                  {
-                    backgroundColor: phaseTheme.modalStatBgColor,
-                    borderColor: dt.bubbleBorder,
-                    shadowColor: phaseTheme.victoryGlowColor,
-                  },
-                ]}
-              >
+              <View style={styles.journalSpotlightHeroBadge}>
+                <NineSliceFrame
+                  skin={pixelSkin.card}
+                  cornerDp={CARD_CORNER_DP}
+                  edgeDp={CARD_EDGE_DP}
+                  fillColor={pixelSkin.fillCard}
+                />
                 <Text style={styles.journalSpotlightHeroBadgeText}>{currentJournalSpotlightStep.icon}</Text>
               </View>
 
               <View style={styles.journalSpotlightHeroText}>
-                <Text style={[styles.journalSpotlightEyebrow, { color: dt.progressColor }]}>
+                <Text style={[styles.journalSpotlightEyebrow, { color: panelSt.muted }]}>
                   {currentJournalSpotlightStep.eyebrow}
                 </Text>
-                <Text style={[styles.journalSpotlightTitle, { color: dt.nameColor }]}>
+                <Text style={[styles.journalSpotlightTitle, { color: panelSt.title }]}>
                   {currentJournalSpotlightStep.title}
                 </Text>
-                <Text style={[styles.journalSpotlightSubtitle, { color: dt.subtitleColor }]}>
+                <Text style={[styles.journalSpotlightSubtitle, { color: panelSt.muted }]}>
                   {currentJournalSpotlightStep.preview}
                 </Text>
               </View>
 
-              <Text style={[styles.journalSpotlightCounter, { color: dt.progressColor }]}>
+              <Text style={[styles.journalSpotlightCounter, { color: panelSt.muted }]}>
                 {journalSpotlightIndex + 1}/{journalSpotlightStepMeta.length}
               </Text>
             </View>
@@ -2916,24 +2884,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     key={step.id}
                     style={[
                       styles.journalSpotlightCard,
-                      {
-                        backgroundColor: isActive ? phaseTheme.modalStatBgColor : dt.bubbleBg,
-                        borderColor: isActive ? dt.accentLine : dt.bubbleBorder,
-                        shadowColor: isActive ? phaseTheme.victoryGlowColor : 'transparent',
-                      },
                       isActive && styles.journalSpotlightCardActive,
                     ]}
                   >
+                    <NineSliceFrame
+                      skin={pixelSkin.card}
+                      cornerDp={CARD_CORNER_DP}
+                      edgeDp={CARD_EDGE_DP}
+                      fillColor={pixelSkin.fillCard}
+                    />
                     <Text style={styles.journalSpotlightCardIcon}>{step.icon}</Text>
                     <Text
                       style={[
                         styles.journalSpotlightCardTitle,
-                        { color: isActive ? dt.nameColor : dt.textColor },
+                        { color: isActive ? panelSt.title : panelSt.body },
                       ]}
                     >
                       {step.title}
                     </Text>
-                    <Text style={[styles.journalSpotlightCardIndex, { color: dt.progressColor }]}>
+                    <Text style={[styles.journalSpotlightCardIndex, { color: panelSt.muted }]}>
                       {step.cardLabel}
                     </Text>
                   </View>
@@ -4050,33 +4019,26 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   journalSpotlightPanel: {
-    borderRadius: 28,
-    borderWidth: 1,
+    // Cottage pixel frame (NineSliceFrame) owns the edge — no CSS radius/border.
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.24,
     shadowRadius: 18,
     elevation: 12,
-    overflow: 'hidden',
   },
   journalSpotlightHeroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingTop: 18,
+    // Clear the 24dp panel wood band (the panel itself carries no padding).
+    paddingHorizontal: 24,
+    paddingTop: 24,
     paddingBottom: 14,
     gap: 12,
   },
   journalSpotlightHeroBadge: {
     width: 58,
     height: 58,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 5,
   },
   journalSpotlightHeroBadgeText: {
     fontSize: 28,
@@ -4110,16 +4072,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    paddingHorizontal: 18,
+    paddingHorizontal: 24,
     paddingBottom: 12,
   },
   journalSpotlightCard: {
     width: '48%',
     minHeight: 84,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
+    // Cottage card frame owns the edge; clear its 12dp wood band comfortably.
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   journalSpotlightCardActive: {
     transform: [{ translateY: -1 }],
@@ -4144,7 +4105,7 @@ const styles = StyleSheet.create({
   },
   journalSpotlightDialogueRow: {
     flexDirection: 'row',
-    paddingHorizontal: 18,
+    paddingHorizontal: 24,
     paddingBottom: 22,
     gap: 12,
   },

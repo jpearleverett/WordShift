@@ -29,16 +29,23 @@ export const NineSliceFrame: React.FC<{
   openBottom?: boolean;
 }> = ({ skin, cornerDp, edgeDp, fillColor, openBottom = false }) => {
   const C = cornerDp, E = edgeDp;
+  // Tuck the fill a hair UNDER the opaque edge slices (the edges draw on top of
+  // it). Without this, the fill's inset boundary meets the edge exactly, and any
+  // sub-pixel rounding or a transparent inner margin in an edge PNG leaks the
+  // container background through as a thin light seam (most visible on the right
+  // edge of parchment trays). The overlap stays well inside the straight edges,
+  // never reaching the transparent outer corner notches, so rounded corners hold.
+  const O = 1;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* center fill (under the frame pieces) */}
+      {/* center fill (under the frame pieces; overlapped under the edges) */}
       <View
         style={{
           position: 'absolute',
-          top: E,
-          left: E,
-          right: E,
-          bottom: openBottom ? 0 : E,
+          top: E - O,
+          left: E - O,
+          right: E - O,
+          bottom: openBottom ? 0 : E - O,
           backgroundColor: fillColor,
         }}
       />
@@ -79,7 +86,9 @@ export const ThreeSliceStrip: React.FC<{
   capDp: number;
 }> = ({ skin, capDp }) => (
   <View style={StyleSheet.absoluteFill} pointerEvents="none">
-    <View style={{ position: 'absolute', top: 0, bottom: 0, left: capDp, right: capDp }}>
+    {/* Middle tucks 1dp under each opaque cap (drawn on top) so no background
+        seam can show where the stretched middle meets a cap. */}
+    <View style={{ position: 'absolute', top: 0, bottom: 0, left: capDp - 1, right: capDp - 1 }}>
       <Image source={skin.m} style={styles.stretch} resizeMode="stretch" fadeDuration={0} />
     </View>
     <Image source={skin.l} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: capDp, height: '100%' }} resizeMode="stretch" fadeDuration={0} />
