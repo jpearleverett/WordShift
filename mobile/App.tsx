@@ -52,6 +52,7 @@ import {
   isPostRevelation,
   markPostRevelation,
   recordPhase4Dwell,
+  consumeVariantNudge,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
@@ -87,6 +88,7 @@ import {
   getUnplayableChallengeMessage,
   getPaceTrendMessage,
   getSpeedRecordMessage,
+  getVariantNudgeMessage,
 } from './src/services/phaseNarrative';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
@@ -129,6 +131,7 @@ import { offerBatch } from './src/services/wordHarvest';
 import {
   hasVariantModifier,
   getNewlyUnlockedVariants,
+  getUnlockedVariants,
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
@@ -1131,6 +1134,24 @@ function MainApp() {
             addVictoryTimeout(() => {
               puzzleActions.setMessage(getPaceTrendMessage(persistence.currentPhase));
             }, 1300);
+          }
+        }).catch(() => {});
+      }
+      // Variant-offer nudge (revives the dead shouldOfferVariant path): once per
+      // local day, after a STANDARD board, gently suggest a variant the player has
+      // unlocked but never tried. Skipped during onboarding.
+      if (
+        (result.variant ?? 'standard') === 'standard' &&
+        !isPlayingDaily &&
+        (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete')
+      ) {
+        const unlockedVariants = getUnlockedVariants(puzzlesSolvedForVariantUnlocks, persistence.currentPhase);
+        consumeVariantNudge(unlockedVariants, 'standard').then(nudgeVariant => {
+          if (nudgeVariant) {
+            const title = VARIANT_CONFIGS[nudgeVariant as PuzzleVariant]?.title || 'a new style';
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getVariantNudgeMessage(persistence.currentPhase, title));
+            }, 2000);
           }
         }).catch(() => {});
       }

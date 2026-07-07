@@ -1345,6 +1345,44 @@ export async function getVariantWinStats(): Promise<{ variantWins: Record<string
 }
 
 /**
+ * Pure picker: the first unlocked non-standard variant the player has NEVER won
+ * (a never-tried unlocked mode), or null. Kept pure for testing.
+ */
+export function pickNudgeVariant(
+  unlockedVariants: string[],
+  variantWins: Record<string, number>
+): string | null {
+  for (const v of unlockedVariants) {
+    if (v === 'standard') continue;
+    if ((variantWins[v] || 0) === 0) return v;
+  }
+  return null;
+}
+
+/**
+ * The variant-offer nudge (revives the long-dead shouldOfferVariant path): once
+ * per local day, after a STANDARD board, suggest a variant the player has
+ * unlocked but never won. Marks the nudge date so it fires at most once/day.
+ * Returns the variant key to suggest, or null.
+ */
+export async function consumeVariantNudge(
+  unlockedVariants: string[],
+  justPlayedVariant: string
+): Promise<string | null> {
+  // Don't nudge mid-variant-play — only when the player is on the default path.
+  if (justPlayedVariant && justPlayedVariant !== 'standard') return null;
+  const progress = await loadProgress();
+  const today = getLocalDateString();
+  if (progress.lastVariantNudgeDate === today) return null;
+  const candidate = pickNudgeVariant(unlockedVariants, progress.variantWins || {});
+  if (!candidate) return null;
+  progress.lastVariantNudgeDate = today;
+  progressCache = progress;
+  await saveProgress();
+  return candidate;
+}
+
+/**
  * Get total accumulated ritual energy
  */
 export async function getTotalRitualEnergy(): Promise<number> {

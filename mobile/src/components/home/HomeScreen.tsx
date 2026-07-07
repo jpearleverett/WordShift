@@ -130,6 +130,7 @@ import {
   CombinedQuestState,
 } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
+import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
 import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
@@ -531,6 +532,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       unlockedAnimalCount,
       dailyUnlocked: false,
       challengeUnlocked: (progressData.puzzlesSolved ?? 0) >= 15,
+      unlockedVariants: getUnlockedVariants(progressData.puzzlesSolved ?? 0, progressData.currentPhase ?? 0),
     });
     setWeeklyQuestState(questState);
 
@@ -1125,6 +1127,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         unlockedAnimalCount: animals.filter(a => a.isUnlocked).length,
         dailyUnlocked: false,
         challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
+        unlockedVariants: getUnlockedVariants(progress.puzzlesSolved ?? 0, progress.currentPhase ?? 0),
       });
       setWeeklyQuestState(refreshed);
     }

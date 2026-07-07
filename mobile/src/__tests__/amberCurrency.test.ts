@@ -18,6 +18,8 @@ import {
   applyVariantAmberBonus,
   recordVariantWin,
   getVariantWinStats,
+  pickNudgeVariant,
+  consumeVariantNudge,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
   hasSeenFoxPlayNudge,
@@ -316,6 +318,33 @@ describe('recordVariantWin / getVariantWinStats', () => {
     const stats = await getVariantWinStats();
     expect(stats.blindWins).toBe(0);
     expect(Object.keys(stats.variantWins)).toHaveLength(0);
+  });
+});
+
+describe('variant-offer nudge', () => {
+  test('pickNudgeVariant returns the first unlocked, never-won variant', () => {
+    expect(pickNudgeVariant(['standard', 'reverse', 'speed'], { reverse: 3 })).toBe('speed');
+    expect(pickNudgeVariant(['standard', 'reverse'], { reverse: 1 })).toBeNull();
+    expect(pickNudgeVariant(['standard'], {})).toBeNull(); // nothing unlocked
+  });
+
+  test('consumeVariantNudge suggests a never-tried variant, once per day', async () => {
+    const first = await consumeVariantNudge(['standard', 'reverse', 'speed'], 'standard');
+    expect(first).toBe('reverse');
+    // Same day: no second nudge.
+    const second = await consumeVariantNudge(['standard', 'reverse', 'speed'], 'standard');
+    expect(second).toBeNull();
+  });
+
+  test('consumeVariantNudge does not fire after a variant board', async () => {
+    const nudge = await consumeVariantNudge(['standard', 'reverse'], 'reverse');
+    expect(nudge).toBeNull();
+  });
+
+  test('consumeVariantNudge skips a variant the player has already won', async () => {
+    await recordVariantWin('reverse', false);
+    const nudge = await consumeVariantNudge(['standard', 'reverse'], 'standard');
+    expect(nudge).toBeNull(); // reverse already won, nothing else unlocked+untried
   });
 });
 

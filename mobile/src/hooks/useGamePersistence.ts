@@ -348,6 +348,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           isChallenge: gameMode === 'challenge',
           amberEarned: totalQueuedAmber,
           currentStreak: amberResult.currentStreak,
+          variant,
         }, effectivePhase);
         questsCompleted = completedQuests.map(q => q.title);
       } catch (_) {

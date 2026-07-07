@@ -173,6 +173,18 @@ export function getSpeedRecordMessage(phase: DialoguePhase, round: number): stri
 }
 
 // ============================================================================
+// VARIANT NUDGE — Fox (early) / the arrangement (late) gently suggests trying a
+// variant the player unlocked but never played. Phase-aware; never nags (once
+// per day, only for a never-tried mode). {variant} = the variant's title.
+// ============================================================================
+
+export function getVariantNudgeMessage(phase: DialoguePhase, variantTitle: string): string {
+  if (phase >= 4) return `The pattern wonders what ${variantTitle} would offer...`;
+  if (phase >= 2) return `Have you tried ${variantTitle}? The words move differently there.`;
+  return `Fox wonders what happens if you try ${variantTitle}!`;
+}
+
+// ============================================================================
 // MOVE SUCCESS MESSAGES — Shown after each valid move
 // ============================================================================
 
