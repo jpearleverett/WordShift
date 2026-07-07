@@ -462,10 +462,13 @@ describe('usePuzzleGame', () => {
     test('increments hintsUsed when solution step matches', () => {
       resetHookState();
       let [, actions] = callHook();
+      // The step must be a genuinely legal move (the stale-step guard rejects
+      // hints the rules cannot execute): A from ABCD (remainder BCD) into
+      // EFGH at slot 0 (AEFGH) — both in the mocked dictionary.
       const solution = [
-        { stepIndex: 0, sourceWord: 'LIME', targetWord: 'TIME', letterToMove: 'L', explanation: 'test' },
+        { stepIndex: 0, sourceWord: 'ABCD', targetWord: 'EFGH', letterToMove: 'A', explanation: 'test', removalPosition: 0, insertionPosition: 0 },
       ];
-      actions.initGame(['LIME', 'TIME'], undefined, solution);
+      actions.initGame(['ABCD', 'EFGH'], undefined, solution);
 
       let [state] = callHook();
       expect(state.hintsUsed).toBe(0);
@@ -1376,6 +1379,60 @@ describe('usePuzzleGame', () => {
       expect(HOOK_SRC).toMatch(/setIsStuck\(/); // internal computation kept
       expect(HOOK_SRC).not.toMatch(/getNoValidMovesMessage/);
       expect(HOOK_SRC).not.toMatch(/getStuckPanelTitle/);
+    });
+  });
+
+  describe('handleHint stale-step guard', () => {
+    test('never consumes a hint whose stored step is illegal on the current board', () => {
+      const { consumeHintSync } = require('../services/hints');
+      (consumeHintSync as jest.Mock).mockClear();
+
+      // Stored solution claims: move 'I' from LIME into TIME. Removing 'I'
+      // leaves 'LME' — NOT in the mocked dictionary — so the shipped rules
+      // reject the stored step (the post-generation purge scenario).
+      // A legal live move exists instead: 'L' (remainder IME) into TIME at
+      // position 4 forming TIMEL... none valid in the mock, so the live
+      // search also fails and the hook must fall back WITHOUT charging.
+      const staleSolution = [
+        { stepIndex: 0, sourceWord: 'LIME', targetWord: 'TIME', letterToMove: 'I', explanation: 'stale', removalPosition: 1, insertionPosition: 0 },
+      ];
+      let [, actions] = callHook();
+      actions.initGame(['LIME', 'TIME', 'TIED'], 'hint', staleSolution);
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      const [state] = callHook();
+      // No consumable spent, no star penalty, fallback message shown.
+      expect(consumeHintSync).not.toHaveBeenCalled();
+      expect(state.hintsUsed).toBe(0);
+      expect(state.message).toBe('Try undoing!');
+    });
+
+    test('a stale stored step falls through to a legal live move (charged once)', () => {
+      const { consumeHintSync } = require('../services/hints');
+      (consumeHintSync as jest.Mock).mockClear();
+
+      // Board ABCD → EFGH: the mocked dictionary contains BCD (remainder of
+      // removing A) and AEFGH (A inserted at position 0 of EFGH), so the live
+      // search finds A→slot0. The stored step claims the illegal move 'B'
+      // (remainder ACD is not a word) — the guard must discard it and charge
+      // for the LIVE hint instead.
+      const staleSolution = [
+        { stepIndex: 0, sourceWord: 'ABCD', targetWord: 'EFGH', letterToMove: 'B', explanation: 'stale', removalPosition: 1, insertionPosition: 2 },
+      ];
+      let [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL'], 'hint', staleSolution);
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      const [state] = callHook();
+      expect(consumeHintSync).toHaveBeenCalledTimes(1);
+      expect(state.hintsUsed).toBe(1);
+      // The delivered highlight points at the LIVE move's letter (A), not the
+      // stale step's letter (B).
+      expect(state.hintHighlight?.letterIndex).toBe(0);
     });
   });
 });

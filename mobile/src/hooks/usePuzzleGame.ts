@@ -896,6 +896,59 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       );
     }
 
+    // Solvability guard: a stored solution step can be STALE — e.g. a
+    // dictionary purge removed a word the step relies on as a transient
+    // remainder after the bank was generated. Never consume a paid hint for
+    // a step the current rules reject: validate the stored move against the
+    // live board + dictionary first, and on failure fall through to the
+    // off-solution search below (which only charges when it finds a move
+    // that is genuinely legal right now).
+    if (relevantStep) {
+      const guardLetter = relevantStep.lettersToMove
+        ? (doubleShiftMidStep ? relevantStep.lettersToMove[1] : null)
+        : relevantStep.letterToMove;
+      if (guardLetter != null) {
+        // Single-shift legality (also covers the double-shift mid-step, whose
+        // remaining half is exactly one pick+drop): the letter must exist
+        // unlocked, its removal must leave a valid word, and some insertion
+        // into the current target must form a valid word.
+        const srcLetters = rows[activeRowIndex].words;
+        const preferred = relevantStep.removalPosition;
+        const li =
+          preferred !== undefined &&
+          srcLetters[preferred] &&
+          srcLetters[preferred].char === guardLetter &&
+          !srcLetters[preferred].isLocked
+            ? preferred
+            : srcLetters.findIndex(l => !l.isLocked && l.char === guardLetter);
+        let stepLegal = false;
+        if (li >= 0) {
+          const remainder = srcLetters
+            .filter((_, idx) => idx !== li)
+            .map(l => l.char)
+            .join('');
+          if (validWordsCache.current.has(remainder)) {
+            const targetChars = rows[hintTargetRowIndex].words.map(l => l.char);
+            for (let j = 0; j <= targetChars.length; j++) {
+              const cand =
+                targetChars.slice(0, j).join('') + guardLetter + targetChars.slice(j).join('');
+              if (validWordsCache.current.has(cand)) {
+                stepLegal = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!stepLegal) relevantStep = undefined;
+      } else if (relevantStep.lettersToMove) {
+        // Full double-shift step: require that SOME completable two-letter
+        // move exists before charging (the stored pair may have gone stale).
+        if (!hasAnyValidDoubleShiftMove(rows, activeRowIndex, checkValidation)) {
+          relevantStep = undefined;
+        }
+      }
+    }
+
     // Build the board glow for a delivered hint: pinpoint the letter tile to
     // pick (preferring the solution's exact removal position — critical with
     // duplicate letters) and, when determinable, the drop slot. Reuses the
@@ -1036,7 +1089,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getHintFallback(currentPhase));
       }
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
