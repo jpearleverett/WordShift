@@ -236,23 +236,10 @@ function drawLogoMark(cv, cx, cy, s) {
 const ASSETS = path.resolve(import.meta.dirname, '../../assets');
 const S = 2; // supersample factor
 
-// 1) App icon: 1024x1024, opaque candy gradient background
-{
-  const W = 1024;
-  const cv = makeCanvas(W * S, W * S);
-  fillBackgroundGradient(cv, '#7C8BF0', '#4E58B8');
-  radialLight(cv, (W * S) / 2, (W * S) * 0.32, (W * S) * 0.75, 0.10);
-  drawLogoMark(cv, (W * S) / 2, (W * S) / 2, W * S * 0.62);
-  writePNG(path.join(ASSETS, 'icon.png'), W, W, downsampleToBuffer(cv, W, W));
-}
-
-// 2) Android adaptive icon foreground: 1024x1024, transparent, mark within safe zone
-{
-  const W = 1024;
-  const cv = makeCanvas(W * S, W * S); // starts fully transparent
-  drawLogoMark(cv, (W * S) / 2, (W * S) / 2, W * S * 0.46);
-  writePNG(path.join(ASSETS, 'adaptive-icon.png'), W, W, downsampleToBuffer(cv, W, W));
-}
+// 1) & 2) App icon (icon.png) + Android adaptive foreground (adaptive-icon.png)
+//    are NO LONGER generated here — they come from the hand-authored fox art
+//    via scripts/tools/processAppIcon.mjs (reads assets/raw/app_icon_source.png).
+//    Run that instead; this generator only draws the splash mark below.
 
 // 3) Splash logo: 1024x1024 transparent mark (app.json uses resizeMode contain
 //    over the splash backgroundColor)
