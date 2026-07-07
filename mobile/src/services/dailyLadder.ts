@@ -187,6 +187,18 @@ export async function getDailyLadderSummary(): Promise<DailyLadderSummary> {
   };
 }
 
+/**
+ * Whether a placement trend should be surfaced. The trend is only coherent
+ * beside a placement line (a week-scoped rank/percentile), never beside the
+ * offline participation fallback ("N dailies completed") — otherwise a lapsed
+ * player whose only ranked days are >1 week old would see "N dailies completed
+ * RISING", a placement tag attached to a non-placement line. Mirrors exactly
+ * when getDailyLadderLine returns a rank/percentile line rather than the count.
+ */
+export function shouldShowTrend(summary: DailyLadderSummary): boolean {
+  return summary.bestRankThisWeek != null || summary.bestPercentileThisWeek != null;
+}
+
 /** Full local history (newest last), for a future history screen. */
 export async function getDailyLadderHistory(): Promise<DailyLadderEntry[]> {
   return [...(await load()).entries];

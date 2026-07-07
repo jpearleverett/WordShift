@@ -101,7 +101,7 @@ import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services
 import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
 import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName, getDailyDifficulty } from './src/services/dailyChallenge';
-import { recordDailyLadderResult, getDailyLadderSummary } from './src/services/dailyLadder';
+import { recordDailyLadderResult, getDailyLadderSummary, shouldShowTrend } from './src/services/dailyLadder';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
@@ -1339,7 +1339,9 @@ function MainApp() {
             });
             const summary = await getDailyLadderSummary();
             setDailyLadderLine(getDailyLadderLine(summary, persistence.currentPhase));
-            setDailyLadderTrend(summary.trend);
+            // Only attach a placement trend beside a placement line (a week-scoped
+            // rank/percentile), never beside the offline participation fallback.
+            setDailyLadderTrend(shouldShowTrend(summary) ? summary.trend : null);
           } catch {
             // Ladder is decorative — never block the victory flow.
           }

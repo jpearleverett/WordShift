@@ -8,7 +8,9 @@ import {
   getDailyLadderHistory,
   clearDailyLadder,
   _clearDailyLadderCache,
+  shouldShowTrend,
   DailyLadderEntry,
+  DailyLadderSummary,
 } from '../services/dailyLadder';
 import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
 
@@ -100,6 +102,34 @@ describe('getDailyLadderSummary', () => {
     await recordDailyLadderResult(entry({ date: getLocalDateString(), rank: 3, percentile: 90 }));
     // Compares the two RANKED days (70 -> 90) = up, ignoring the null day.
     expect((await getDailyLadderSummary()).trend).toBe('up');
+  });
+});
+
+describe('shouldShowTrend (placement trend only rides a placement line)', () => {
+  test('false when the week window has no ranked days (the offline-lapsed case)', async () => {
+    // All ranked days are >1 week old; today is played OFFLINE (no rank).
+    await recordDailyLadderResult(entry({ date: getLocalDateStringDaysAgo(15), rank: 8, percentile: 50 }));
+    await recordDailyLadderResult(entry({ date: getLocalDateStringDaysAgo(10), rank: 4, percentile: 90 }));
+    await recordDailyLadderResult(entry({ date: getLocalDateString(), rank: null, percentile: null }));
+    const s = await getDailyLadderSummary();
+    // The global trend still computes ('up' over the two old ranked days)...
+    expect(s.trend).toBe('up');
+    // ...but there is no week-scoped placement, so the card shows the
+    // participation fallback and the trend must NOT ride it.
+    expect(s.bestRankThisWeek).toBeNull();
+    expect(s.bestPercentileThisWeek).toBeNull();
+    expect(s.participationCount).toBe(3);
+    expect(shouldShowTrend(s)).toBe(false);
+  });
+
+  test('true when a week-scoped placement exists', () => {
+    const base: DailyLadderSummary = {
+      participationCount: 3, bestRankThisWeek: null, bestPercentileThisWeek: null,
+      bestRankEver: 2, bestPercentileEver: 95, trend: 'up', latest: null,
+    };
+    expect(shouldShowTrend(base)).toBe(false);
+    expect(shouldShowTrend({ ...base, bestRankThisWeek: 4 })).toBe(true);
+    expect(shouldShowTrend({ ...base, bestPercentileThisWeek: 80 })).toBe(true);
   });
 });
 
