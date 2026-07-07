@@ -279,7 +279,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
               return (
                 <PanelCard key={category} phase={effectivePhase} style={styles.sectionCard}>
-                  <PixelPlaque phase={effectivePhase} label={'{categoryName}'} style={styles.sectionPlaque} />
+                  <PixelPlaque phase={effectivePhase} label={categoryName} style={styles.sectionPlaque} />
                   {categoryAchievements.map((achievement, i) => (
                     <View
                       key={achievement.id}
