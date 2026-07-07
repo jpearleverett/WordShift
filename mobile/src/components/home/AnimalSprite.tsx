@@ -13,6 +13,11 @@ import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
+import { shouldSimplifyAnimations } from '../../services/deviceTier';
+
+/** Milliseconds per walk-cycle frame (matches the source video's cadence:
+ * a 30-frame gait at 24fps sampled every 3rd frame). */
+const WALK_FRAME_MS = 125;
 
 // Character sprite assets - add more as they become available
 // Exported so dialogue modals can use talk sprites
@@ -20,11 +25,30 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
   idle: ImageSourcePropType;
   talk?: ImageSourcePropType;
   robed?: ImageSourcePropType;
+  /**
+   * Optional walk cycle, played while the animal wanders its room (frames
+   * face RIGHT like idle.png; the container's scaleX flip handles leftward
+   * walks). Frames were extracted from source video (assets/raw/*_walk_
+   * source.mp4) at WALK_FRAME_MS spacing — one full gait cycle.
+   */
+  walk?: ImageSourcePropType[];
 }>> = {
   fox: {
     idle: require('../../../assets/characters/fox/idle.png'),
     talk: require('../../../assets/characters/fox/talk.png'),
     robed: require('../../../assets/characters/fox/robed.png'),
+    walk: [
+      require('../../../assets/characters/fox/walk_0.png'),
+      require('../../../assets/characters/fox/walk_1.png'),
+      require('../../../assets/characters/fox/walk_2.png'),
+      require('../../../assets/characters/fox/walk_3.png'),
+      require('../../../assets/characters/fox/walk_4.png'),
+      require('../../../assets/characters/fox/walk_5.png'),
+      require('../../../assets/characters/fox/walk_6.png'),
+      require('../../../assets/characters/fox/walk_7.png'),
+      require('../../../assets/characters/fox/walk_8.png'),
+      require('../../../assets/characters/fox/walk_9.png'),
+    ],
   },
   pangolin: {
     idle: require('../../../assets/characters/pangolin/idle.png'),
@@ -282,6 +306,34 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
   const [isMoving, setIsMoving] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
   const [spriteLoadFailed, setSpriteLoadFailed] = useState(false);
+  const [walkFrame, setWalkFrame] = useState(0);
+
+  // Real walk-cycle frames play while the animal wanders (currently the fox).
+  // Robed figures (Phase 4+) don't stroll — they keep the gliding reverence —
+  // and reduced motion / low-tier devices keep the static sprite.
+  const walkFrames = CHARACTER_SPRITES[animal.type]?.walk;
+  const walkActive = Boolean(
+    isMoving &&
+    walkFrames &&
+    walkFrames.length > 0 &&
+    currentPhase < 4 &&
+    !spriteLoadFailed &&
+    !getSettingsSync().reducedMotion &&
+    !shouldSimplifyAnimations()
+  );
+
+  // Cycle gait frames while walking; reset to the first frame on stop so the
+  // next stroll always starts at the cycle's beginning.
+  useEffect(() => {
+    if (!walkActive) {
+      setWalkFrame(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setWalkFrame(prev => (prev + 1) % (walkFrames?.length ?? 1));
+    }, WALK_FRAME_MS);
+    return () => clearInterval(interval);
+  }, [walkActive, walkFrames?.length]);
 
   // Breathing animation (subtle scale pulse)
   useEffect(() => {
@@ -502,9 +554,11 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     };
   }, [animal.type]);
 
-  // Bounce animation while moving
+  // Bounce animation while moving. Suppressed when real walk frames play —
+  // the gait already carries the vertical bob, and stacking the glide-bounce
+  // on top reads as skipping.
   useEffect(() => {
-    if (getSettingsSync().reducedMotion) {
+    if (getSettingsSync().reducedMotion || walkActive) {
       bounceY.setValue(0);
       return;
     }
@@ -536,7 +590,7 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
     return () => {
       bounceAnimation?.stop();
     };
-  }, [isMoving, animal.type]);
+  }, [isMoving, animal.type, walkActive]);
 
   // Notification pulse for new dialogue
   useEffect(() => {
@@ -641,7 +695,9 @@ export const AnimalSprite: React.FC<AnimalSpriteProps> = ({
               const spriteSource =
                 currentPhase >= 4 && CHARACTER_SPRITES[animal.type]?.robed
                   ? CHARACTER_SPRITES[animal.type]!.robed!
-                  : CHARACTER_SPRITES[animal.type]!.idle;
+                  : walkActive && walkFrames
+                    ? walkFrames[walkFrame % walkFrames.length]
+                    : CHARACTER_SPRITES[animal.type]!.idle;
               const dreadTint = getSpriteDreadTint(currentPhase);
               // Base sprite renders with its explicit size (the known-good path).
               const baseSprite = (
