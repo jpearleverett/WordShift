@@ -22,6 +22,8 @@ import {
   getPixelSkin,
   CARD_CORNER_DP,
   CARD_EDGE_DP,
+  PANEL_CORNER_DP,
+  PANEL_EDGE_DP,
   BTN_CAP_DP,
   BTN_MD_DP,
   BTN_SHADOW_DP,
@@ -278,19 +280,25 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
       <View
         style={[
           isCompact ? styles.compactCard : styles.dialogueCard,
-          {
-            backgroundColor: dt.modalBg,
-            borderColor: dt.modalBorder,
-            shadowColor: dt.modalShadowColor,
-          },
+          { shadowColor: dt.modalShadowColor },
         ]}
       >
-        {/* Decorative accent line at top (same as HomeScreen dialogue modal) */}
-        <View style={[styles.accentLine, { backgroundColor: dt.accentLine }]} />
+        {/* Cottage wood-and-parchment sheet — matches the HomeScreen animal
+            dialogue (replaces the flat webby white card + accent line). The
+            full dialogue card uses the panel frame; the compact move-prompt card
+            uses the lighter card frame so it stays small over the board. */}
+        <NineSliceFrame
+          skin={isCompact ? FOX_SKIN.card : FOX_SKIN.panel}
+          cornerDp={isCompact ? CARD_CORNER_DP : PANEL_CORNER_DP}
+          edgeDp={isCompact ? CARD_EDGE_DP : PANEL_EDGE_DP}
+          fillColor={isCompact ? FOX_SKIN.fillCard : FOX_SKIN.fill}
+        />
 
         <View style={styles.cardRow}>
-          {/* Sprite panel — full card height, lavender, sprite zoomed to fill */}
-          <View style={[isCompact ? styles.compactSpriteCol : styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
+          {/* Sprite alcove — transparent (sits on parchment) with a slim accent
+              rail on its inner edge, exactly like the home dialogue portrait. */}
+          <View style={isCompact ? styles.compactSpriteCol : styles.dialogueSpriteCol}>
+            <View style={[styles.spriteRail, { backgroundColor: FOX_SKIN.accent }]} />
             <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
               {foxSprite ? (
                 <Image
@@ -310,13 +318,19 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
             <Text style={[isCompact ? styles.compactName : styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
             <View style={[isCompact ? styles.compactNameSep : styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
 
+            {/* Speech tray. The full dialogue card nests a parchment card-frame
+                bubble (matches the home dialogue); the compact card is itself a
+                card frame, so its text sits directly on the parchment to avoid a
+                cramped box-in-a-box. */}
             <View style={isCompact ? styles.compactBubble : styles.dialogueBubble}>
-              <NineSliceFrame
-                skin={FOX_SKIN.card}
-                cornerDp={CARD_CORNER_DP}
-                edgeDp={CARD_EDGE_DP}
-                fillColor={FOX_SKIN.fillCard}
-              />
+              {!isCompact && (
+                <NineSliceFrame
+                  skin={FOX_SKIN.card}
+                  cornerDp={CARD_CORNER_DP}
+                  edgeDp={CARD_EDGE_DP}
+                  fillColor={FOX_SKIN.fillCard}
+                />
+              )}
               <Animated.Text
                 style={[isCompact ? styles.compactText : styles.dialogueText, { color: FOX_SURFACE.body, opacity: textFadeAnim }]}
               >
@@ -397,18 +411,33 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
+  // Slim accent rail on the sprite alcove's inner edge (carries the skin's
+  // second hue between portrait and text — matches the home dialogue).
+  spriteRail: {
+    position: 'absolute',
+    right: 0,
+    top: 8,
+    bottom: 8,
+    width: 2,
+    borderRadius: 1,
+    opacity: 0.6,
+    zIndex: 2,
+  },
 
-  // ---- Dialogue variant (exact HomeScreen dialogue card values) ----
+  // ---- Dialogue variant (cottage wood-and-parchment sheet) ----
+  // The pixel frame owns the edge — no borderRadius/borderWidth. Content clears
+  // the panel wood band via the card padding below.
   dialogueCard: {
-    borderRadius: 22,
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
+    paddingTop: PANEL_EDGE_DP - 8,
+    paddingLeft: PANEL_EDGE_DP - 12,
+    paddingRight: PANEL_EDGE_DP - 14,
+    paddingBottom: PANEL_EDGE_DP - 12,
   },
-  // Sprite column - 30% width, zoomed in to fill (HomeScreen dialogueSpriteCol)
+  // Sprite column - 30% width, zoomed in to fill (transparent — parchment shows)
   dialogueSpriteCol: {
     width: '30%',
     justifyContent: 'center',
@@ -427,9 +456,9 @@ const styles = StyleSheet.create({
   // padding stays symmetric with the top instead.
   dialogueTextCol: {
     flex: 1,
-    paddingTop: 20,
-    paddingBottom: 18,
-    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 6,
+    paddingHorizontal: 12,
   },
   dialogueName: {
     fontSize: 22,
@@ -472,18 +501,18 @@ const styles = StyleSheet.create({
   },
 
   // ---- Compact variant: the same anatomy shrunk down (move-required steps,
-  // must not cover the board) ----
+  // must not cover the board). Uses the lighter CARD frame so it stays small;
+  // content clears the 12dp card wood band via the padding below. ----
   compactCard: {
-    borderRadius: 18,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
+    paddingVertical: CARD_EDGE_DP - 6,
+    paddingHorizontal: CARD_EDGE_DP - 6,
   },
   compactSpriteCol: {
-    width: 78,
+    width: 72,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -498,9 +527,9 @@ const styles = StyleSheet.create({
   },
   compactTextCol: {
     flex: 1,
-    paddingTop: 12,
-    paddingBottom: 12,
-    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 2,
+    paddingHorizontal: 8,
   },
   compactName: {
     fontSize: 16,
@@ -515,12 +544,12 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginBottom: 8,
   },
-  // Cottage parchment tray, compact; still clears the 12dp wood band.
+  // Text sits directly on the card-frame parchment (no nested bubble), so only
+  // light inner spacing is needed above the footer.
   compactBubble: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
     marginBottom: 8,
-    minHeight: 44,
     justifyContent: 'center',
   },
   compactText: {

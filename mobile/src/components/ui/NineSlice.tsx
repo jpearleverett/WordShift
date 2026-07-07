@@ -29,16 +29,25 @@ export const NineSliceFrame: React.FC<{
   openBottom?: boolean;
 }> = ({ skin, cornerDp, edgeDp, fillColor, openBottom = false }) => {
   const C = cornerDp, E = edgeDp;
+  // The solid center is drawn FIRST (behind the edge strips) and deliberately
+  // UNDERLAPS them by ~1dp on every side. At fractional screen densities the
+  // center View's inner edge (at E dp) and a stretched edge Image's inner edge
+  // round to different physical pixels, leaving a hairline where the layer
+  // behind bleeds through (the "thin white/black lines"). Extending the fill
+  // under the opaque wood strips closes that gap with no visible bleed — the
+  // strips draw on top and hide the extra dp.
+  const OVERLAP = 1;
+  const inner = Math.max(0, E - OVERLAP);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* center fill (under the frame pieces) */}
+      {/* center fill (underlaps the frame pieces to kill subpixel seams) */}
       <View
         style={{
           position: 'absolute',
-          top: E,
-          left: E,
-          right: E,
-          bottom: openBottom ? 0 : E,
+          top: inner,
+          left: inner,
+          right: inner,
+          bottom: openBottom ? 0 : inner,
           backgroundColor: fillColor,
         }}
       />

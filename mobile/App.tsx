@@ -2304,7 +2304,10 @@ function MainApp() {
           {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering') && (
             <FoxGuide
               visible={onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering'}
-              variant="dialogue"
+              // Compact + top-anchored so Ember never covers the pit or the
+              // floating words the player must tap during the offering step
+              // (the pit + float zone live in the lower two-thirds of the screen).
+              variant="compact"
               text={onboardingActions.getOnboardingFoxText()}
               buttonText={onboardingActions.getOnboardingButtonText()}
               onContinue={
@@ -2320,7 +2323,7 @@ function MainApp() {
               }
               showSkip={true}
               onSkip={onboardingActions.handleSkipOnboarding}
-              position="bottom"
+              position="top"
             />
           )}
         </View>
