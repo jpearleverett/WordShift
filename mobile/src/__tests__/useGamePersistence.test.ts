@@ -118,6 +118,8 @@ jest.mock('../services/starRating', () => ({
   recordPuzzleCompletion: (...args: any[]) => mockRecordPuzzleCompletion(args[0], args[1], args[2]),
   getCumulativeStats: () => mockGetCumulativeStats(),
   getThreeStarRate: (...args: any[]) => mockGetThreeStarRate(args[0]),
+  isFlawless: (hints: number, invalids: number, undos: number = 0) =>
+    hints === 0 && invalids === 0 && undos === 0,
 }));
 
 // --- Mock amberCurrency ---
@@ -144,11 +146,14 @@ const mockGetCurrentPhase = jest.fn(async () => 0);
 const mockRecordVariantEncounter = jest.fn(async (_variant?: any) => {});
 const mockApplyVariantAmberBonus = jest.fn(async (_variant?: any, _base?: any, _mult?: any, _credit?: any) => ({
   bonus: 0,
+  freshBonus: 0,
+  isFresh: false,
   newBalance: 115,
   appliedMultiplier: 1.0,
   repeatCount: 1,
   repeatDecay: 1.0,
 }));
+const mockRecordVariantWin = jest.fn(async (_variant?: any, _blind?: any) => {});
 
 const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
   totalWordsFormed: 0,
@@ -166,6 +171,7 @@ jest.mock('../services/amberCurrency', () => ({
   recordRitualWords: (...args: any[]) => mockRecordRitualWords(args[0], args[1], args[2]),
   recordVariantEncounter: (...args: any[]) => mockRecordVariantEncounter(args[0]),
   applyVariantAmberBonus: (...args: any[]) => mockApplyVariantAmberBonus(args[0], args[1], args[2], args[3]),
+  recordVariantWin: (...args: any[]) => mockRecordVariantWin(args[0], args[1]),
 }));
 
 // --- Mock dialogueSession ---
@@ -252,6 +258,8 @@ describe('useGamePersistence', () => {
     mockGetThreeStarRate.mockReturnValue(100);
     mockApplyVariantAmberBonus.mockResolvedValue({
       bonus: 0,
+      freshBonus: 0,
+      isFresh: false,
       newBalance: 115,
       appliedMultiplier: 1.0,
       repeatCount: 1,
@@ -456,6 +464,8 @@ describe('useGamePersistence', () => {
     test('applies variant bonus via anti-farm calculator', async () => {
       mockApplyVariantAmberBonus.mockResolvedValueOnce({
         bonus: 4,
+        freshBonus: 0,
+        isFresh: false,
         newBalance: 119,
         appliedMultiplier: 1.2,
         repeatCount: 2,

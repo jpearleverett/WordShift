@@ -6,9 +6,9 @@ import { selectPreGeneratedPuzzle } from '../services/puzzleBank';
 import { getWordHistoryWithRecency, recordPuzzleWords } from '../services/wordHistory';
 import { COMMON_WORDS, CURATED_EARLY_PUZZLES, CURATED_PUZZLE_COUNT, CuratedPuzzle, getRandomFallback } from '../constants';
 import { CHALLENGE_MODE_CONFIG, DialoguePhase } from '../types/homeWorld';
-import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage } from '../services/phaseNarrative';
+import { getMoveMessage, getComboMoveMessage, getHintMessage, getHintFallback, getOutOfHintsMessage, getLoadingMessage, getStartMessage, getInvalidWordMessage, getLockedLetterMessage, getEchoPuzzleMessage } from '../services/phaseNarrative';
 import { getHintBalanceSync, hasHintSync, consumeHintSync } from '../services/hints';
-import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords, isPostRevelation } from '../services/amberCurrency';
+import { getPreferredPuzzleVariant, setPreferredPuzzleVariant, getFullProgress, getRitualWords } from '../services/amberCurrency';
 import {
   getVariantOverrides,
   getVariantInstruction,
@@ -194,6 +194,8 @@ export interface PuzzleGameState {
   hintsUsed: number;
   earnedStars: number;
   gameMode: GameMode;
+  /** Blind Offering modifier active (ghost previews hidden). */
+  blindMode: boolean;
   undosRemaining: number;
   currentPhase: DialoguePhase;
   /** The word chain from the last completed puzzle (for ritual echo display) */
@@ -247,7 +249,8 @@ export interface PuzzleGameActions {
   startNewGame: (
     selectedDifficulty?: Difficulty,
     mode?: GameMode,
-    variant?: PuzzleVariant
+    variant?: PuzzleVariant,
+    blind?: boolean
   ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   /**
@@ -267,6 +270,12 @@ export interface PuzzleGameActions {
     reverseMidpoint?: boolean;
     /** Full per-move outcome record, present on the completing move (for the share grid). */
     moveOutcomes?: MoveOutcome[];
+    /** Undos used across the whole puzzle, present on the completing move (for the flawless tier). */
+    undosUsed?: number;
+    /** Solve duration (ms) for a freshly-started board; absent for restored/retried boards. */
+    solveTimeMs?: number;
+    /** Whether this board was played with the Blind Offering modifier on. */
+    blind?: boolean;
   } | null>;
   handleUndo: () => void;
   grantExtraUndo: () => void;
@@ -330,6 +339,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const [showConfetti, setShowConfetti] = useState(false);
   const [invalidAttempts, setInvalidAttempts] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
+  // Undos taken this board — tracked for the "flawless offering" tier (0 hints,
+  // 0 invalids, 0 undos). A ref (not state) because nothing renders from it;
+  // it's read once at completion. Reset with the other counters on a new board.
+  const undosUsedRef = useRef(0);
+  // Solve-time telemetry for the private "getting faster" trend (mastery chase).
+  // boardStartRef stamps when a FRESH board begins; boardTimedRef guards against
+  // recording restored/retried boards (whose true elapsed we don't know), which
+  // would otherwise poison the trend with sub-second or wildly inflated times.
+  const boardStartRef = useRef(0);
+  const boardTimedRef = useRef(false);
   // Consumable hint economy: spendable balance + a signal raised when the player
   // taps HINT with none left (App offers a rewarded clip / the store).
   const [hintBalance, setHintBalance] = useState(() => getHintBalanceSync());
@@ -340,6 +359,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const cleanMoveStreakRef = useRef(0);
   const [earnedStars, setEarnedStars] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('standard');
+  // Blind Offering modifier (opt-in, Wordle-Hard-Mode shape): when on, the ghost
+  // word previews are hidden, so the player commits from their own word knowledge
+  // and learns only from the rejection shake. Sticky across Next Level like
+  // gameMode; forced OFF on daily/shared-challenge boards. Composes with any
+  // variant/difficulty. No amber bonus by design — the reward is the mastery.
+  const [blindMode, setBlindMode] = useState(false);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -492,6 +517,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setInvalidAttempts(0);
       setHintsUsed(0);
       setEarnedStars(0);
+      undosUsedRef.current = 0;
+      // A genuinely fresh board — start the solve-time clock for the trend.
+      boardStartRef.current = Date.now();
+      boardTimedRef.current = true;
     }
 
     // Reset undos for challenge mode (scaled by difficulty)
@@ -584,8 +613,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const startNewGame = useCallback(async (
     selectedDifficulty: Difficulty = difficulty,
     mode?: GameMode,
-    variantOverride?: PuzzleVariant
+    variantOverride?: PuzzleVariant,
+    blindOverride?: boolean
   ) => {
+    if (blindOverride !== undefined) {
+      setBlindMode(blindOverride);
+    }
     // Claim this generation. Any initGame commit below is skipped if a newer
     // startNewGame call has since superseded this one (see generationIdRef).
     const genId = ++generationIdRef.current;
@@ -628,28 +661,28 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         return;
       }
 
-      // Phase 5 echo puzzles: every 5th puzzle seeds a word from ritual history.
-      // Falls through to normal bank/generation if echo seeding fails.
+      // Echo puzzles: every 5th puzzle from Phase 3 onward re-seeds a word from
+      // the player's OWN ritual history — the descent handing their past words
+      // back. This is the moment it was made for (the reveal), so it now runs
+      // pre-finale, not just at Phase 5 (post-revelation). Falls through to the
+      // normal bank/generation path if echo seeding fails.
       setIsEchoPuzzle(false);
-      if (currentPhase === 5 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
+      if (currentPhase >= 3 && puzzlesSolved > 0 && puzzlesSolved % 5 === 0 && variant === 'standard') {
         try {
-          const postRev = await isPostRevelation();
-          if (postRev) {
-            const ritualWords = await getRitualWords();
-            // Pick words matching the target word length for this difficulty
-            const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
-            const candidates = ritualWords.filter(w => w.length === targetLen);
-            if (candidates.length > 0) {
-              const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
-              const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
-              if (echoPuzzle) {
-                if (isStale()) return;
-                initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
-                await recordPuzzleWords(echoPuzzle.words);
-                setIsEchoPuzzle(true);
-                setMessage('The words are returning. They remember you.');
-                return;
-              }
+          const ritualWords = await getRitualWords();
+          // Pick words matching the target word length for this difficulty
+          const targetLen = selectedDifficulty === 'EASY' || selectedDifficulty === 'MEDIUM' ? 4 : 5;
+          const candidates = ritualWords.filter(w => w.length === targetLen);
+          if (candidates.length > 0) {
+            const echoWord = candidates[Math.floor(Math.random() * candidates.length)];
+            const echoPuzzle = await generateLocalPuzzle(selectedDifficulty, { startWord: echoWord });
+            if (echoPuzzle) {
+              if (isStale()) return;
+              initGame(echoPuzzle.words, echoPuzzle.hint, echoPuzzle.solution, echoPuzzle.wordLength, 'standard');
+              await recordPuzzleWords(echoPuzzle.words);
+              setIsEchoPuzzle(true);
+              setMessage(getEchoPuzzleMessage(currentPhase));
+              return;
             }
           }
         } catch {
@@ -742,6 +775,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     wordLength: number
   ) => {
     setGameMode('standard');
+    setBlindMode(false); // the daily is a shared board — never blind
     applyBoard(words, puzzleHint, undefined, wordLength, {
       resetPerformance: true,
       variant: 'standard',
@@ -774,6 +808,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // can't clobber the shared board after it starts.
     generationIdRef.current++;
     setGameMode('standard');
+    setBlindMode(false); // a friend's shared board — never blind
     setIsEchoPuzzle(false);
     applyBoard(normalized, undefined, undefined, wordLength, {
       resetPerformance: true,
@@ -894,6 +929,59 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         s.sourceWord === currentSourceWord &&
         s.targetWord === currentTargetWord
       );
+    }
+
+    // Solvability guard: a stored solution step can be STALE — e.g. a
+    // dictionary purge removed a word the step relies on as a transient
+    // remainder after the bank was generated. Never consume a paid hint for
+    // a step the current rules reject: validate the stored move against the
+    // live board + dictionary first, and on failure fall through to the
+    // off-solution search below (which only charges when it finds a move
+    // that is genuinely legal right now).
+    if (relevantStep) {
+      const guardLetter = relevantStep.lettersToMove
+        ? (doubleShiftMidStep ? relevantStep.lettersToMove[1] : null)
+        : relevantStep.letterToMove;
+      if (guardLetter != null) {
+        // Single-shift legality (also covers the double-shift mid-step, whose
+        // remaining half is exactly one pick+drop): the letter must exist
+        // unlocked, its removal must leave a valid word, and some insertion
+        // into the current target must form a valid word.
+        const srcLetters = rows[activeRowIndex].words;
+        const preferred = relevantStep.removalPosition;
+        const li =
+          preferred !== undefined &&
+          srcLetters[preferred] &&
+          srcLetters[preferred].char === guardLetter &&
+          !srcLetters[preferred].isLocked
+            ? preferred
+            : srcLetters.findIndex(l => !l.isLocked && l.char === guardLetter);
+        let stepLegal = false;
+        if (li >= 0) {
+          const remainder = srcLetters
+            .filter((_, idx) => idx !== li)
+            .map(l => l.char)
+            .join('');
+          if (validWordsCache.current.has(remainder)) {
+            const targetChars = rows[hintTargetRowIndex].words.map(l => l.char);
+            for (let j = 0; j <= targetChars.length; j++) {
+              const cand =
+                targetChars.slice(0, j).join('') + guardLetter + targetChars.slice(j).join('');
+              if (validWordsCache.current.has(cand)) {
+                stepLegal = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!stepLegal) relevantStep = undefined;
+      } else if (relevantStep.lettersToMove) {
+        // Full double-shift step: require that SOME completable two-letter
+        // move exists before charging (the stored pair may have gone stale).
+        if (!hasAnyValidDoubleShiftMove(rows, activeRowIndex, checkValidation)) {
+          relevantStep = undefined;
+        }
+      }
     }
 
     // Build the board glow for a delivered hint: pinpoint the letter tile to
@@ -1036,7 +1124,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         setMessage(getHintFallback(currentPhase));
       }
     }
-  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode]);
+  }, [gameState, isProcessing, rows, activeRowIndex, solution, reverseSolution, currentPhase, moveDirection, currentVariant, doubleShiftPhase, gameMode, checkValidation]);
 
   const handleSlotPress = useCallback(async (
     targetIndex: number,
@@ -1045,6 +1133,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     completed: boolean;
     hintsUsed: number;
     invalidAttempts: number;
+    undosUsed?: number;
     gameMode: GameMode;
     completedWords: string[];
     formedWord?: string;
@@ -1260,13 +1349,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       setLastCompletedWords(completedWords);
       setLastIncantationName(getIncantationName(completedWords, currentPhase));
       setIsProcessing(false);
+      // Honest solve time only for a board timed from a fresh start (not a
+      // restore/retry). undefined tells App to skip feeding the pace trend.
+      const solveTimeMs = boardTimedRef.current
+        ? Date.now() - boardStartRef.current
+        : undefined;
+      boardTimedRef.current = false;
       return {
         completed: true,
         hintsUsed,
         invalidAttempts,
+        undosUsed: undosUsedRef.current,
         gameMode,
         completedWords,
         variant: currentVariant,
+        solveTimeMs,
+        blind: blindMode,
         // Full per-move record including the completing move (ref mirror is
         // already current; state would be a render behind at this point).
         moveOutcomes: moveOutcomesRef.current,
@@ -1377,8 +1475,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     if (gameState !== GameState.PLAYING) return;
     if (history.length === 0) return;
 
-    // Taking back a move breaks the clean-move streak.
+    // Taking back a move breaks the clean-move streak AND the flawless run.
     cleanMoveStreakRef.current = 0;
+    undosUsedRef.current += 1;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -1539,6 +1638,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Shows what word would form at each slot position — valid words in green, invalid in red.
   const slotPreviews = useMemo(() => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return undefined;
+    // Blind Offering: no ghost previews — and, because drag snapping keys off
+    // these validity flags, suppressing them also removes the "tile jumps to a
+    // valid slot" tell, keeping the modifier honestly blind.
+    if (blindMode) return undefined;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -1607,7 +1710,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
     }
     return previews;
-  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase]);
+  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode]);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
@@ -1628,6 +1731,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSolution(saved.solution);
     setReverseSolution(saved.reverseSolution);
     setGameMode(saved.gameMode);
+    setBlindMode(saved.blindMode ?? false);
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
@@ -1656,6 +1760,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setMoveOutcomes([]);
     pendingHintRef.current = false;
     pendingMistakeRef.current = false;
+    // A restored board has no honest solve-time origin — don't feed the trend.
+    boardTimedRef.current = false;
   }, []);
 
   // Re-apply the same puzzle from its starting words (each row preserves its
@@ -1742,6 +1848,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     hintsUsed,
     earnedStars,
     gameMode,
+    blindMode,
     undosRemaining,
     currentPhase,
     lastCompletedWords,

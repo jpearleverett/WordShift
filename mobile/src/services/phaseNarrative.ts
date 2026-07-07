@@ -125,6 +125,66 @@ export function getVictoryFeedback(stars: number, phase: DialoguePhase): string 
 }
 
 // ============================================================================
+// FLAWLESS OFFERING — the perfect-play tier ABOVE 3 stars (0 hints/invalids/undos)
+// Phase-aware honorific badge copy. Cheerful praise early, reverent awe late —
+// never breaks the fourth wall, never says "no undos/hints" (that's mechanics).
+// ============================================================================
+
+const FLAWLESS_HONORIFICS: Record<DialoguePhase, string> = {
+  0: 'FLAWLESS!',
+  1: 'Flawless.',
+  2: 'A Clean Offering',
+  3: 'Unwavering.',
+  4: 'A Perfect Offering',
+  5: 'The Thread Ran True',
+};
+
+export function getFlawlessHonorific(phase: DialoguePhase): string {
+  return FLAWLESS_HONORIFICS[phase] ?? FLAWLESS_HONORIFICS[0];
+}
+
+// ============================================================================
+// PACE TREND — private "the words come to you faster now" beat. Phase-aware:
+// warm encouragement early, quietly unsettling reverence late (the ease itself
+// becomes the horror — the ritual has taught your hands). Never a leaderboard.
+// ============================================================================
+
+const PACE_TREND_MESSAGES: Record<DialoguePhase, string> = {
+  0: 'The words come to you faster now!',
+  1: 'You find them quicker than you used to.',
+  2: 'The patterns surface faster now. You barely have to look.',
+  3: 'The words arrive before you reach for them.',
+  4: 'You no longer search. The arrangement offers, and you accept.',
+  5: 'The words come without asking. Your hands already know the way.',
+};
+
+export function getPaceTrendMessage(phase: DialoguePhase): string {
+  return PACE_TREND_MESSAGES[phase] ?? PACE_TREND_MESSAGES[0];
+}
+
+// ============================================================================
+// SPEED RECORD — a new best Speed-Shift escalation streak. Phase-aware.
+// ============================================================================
+
+export function getSpeedRecordMessage(phase: DialoguePhase, round: number): string {
+  if (phase >= 4) return `A new depth reached. Round ${round}.`;
+  if (phase >= 2) return `Further than before... Round ${round}.`;
+  return `New record! You reached Round ${round}.`;
+}
+
+// ============================================================================
+// VARIANT NUDGE — Fox (early) / the arrangement (late) gently suggests trying a
+// variant the player unlocked but never played. Phase-aware; never nags (once
+// per day, only for a never-tried mode). {variant} = the variant's title.
+// ============================================================================
+
+export function getVariantNudgeMessage(phase: DialoguePhase, variantTitle: string): string {
+  if (phase >= 4) return `The pattern wonders what ${variantTitle} would offer...`;
+  if (phase >= 2) return `Have you tried ${variantTitle}? The words move differently there.`;
+  return `Fox wonders what happens if you try ${variantTitle}!`;
+}
+
+// ============================================================================
 // MOVE SUCCESS MESSAGES — Shown after each valid move
 // ============================================================================
 
@@ -1444,8 +1504,8 @@ export function getAnimalInterjection(
 // ============================================================================
 
 export interface NarrativeMicroBeat {
-  /** Type of micro-beat effect */
-  type: 'glitch_title' | 'ambient_whisper' | 'color_shift';
+  /** Type of micro-beat effect. `silent_victory` also suppresses the fanfare. */
+  type: 'glitch_title' | 'ambient_whisper' | 'color_shift' | 'silent_victory';
   /** Text to display (if applicable) */
   text?: string;
   /** Replacement title that briefly flashes then corrects (glitch_title only) */
@@ -1580,6 +1640,14 @@ const MICRO_BEATS: Record<number, NarrativeMicroBeat> = {
     text: 'The animals have stopped pretending the puzzles are just puzzles. They watch you the way you\'d watch a door beginning to open.',
     durationMs: 4500,
   },
+  160: {
+    // Scripted anticlimax: the fanfare simply does not play. The rendered text
+    // is stark; App suppresses the victory chime on this one board so the
+    // silence is felt, not described. The most complicit moment is a quiet one.
+    type: 'silent_victory',
+    text: '...\n\nNo music this time. Only the quiet after.',
+    durationMs: 4000,
+  },
   170: {
     type: 'ambient_whisper',
     text: 'You could stop now. You know that. You won\'t. They know that too.',
@@ -1635,6 +1703,81 @@ export async function checkNarrativeMicroBeat(
 
   await markMicroBeatSeen(puzzlesSolved);
   return beat;
+}
+
+/**
+ * Whether the victory at this exact completed-puzzle count is a scripted
+ * silent-victory anticlimax (the fanfare is suppressed). Pure lookup — the count
+ * is monotonic, so this is true for exactly one board. App reads it before
+ * playing the victory chime.
+ */
+export function isSilentVictoryBeat(completedTotal: number): boolean {
+  return MICRO_BEATS[completedTotal]?.type === 'silent_victory';
+}
+
+/**
+ * Message shown when an echo puzzle (seeded from the player's own ritual words)
+ * begins. Phase-aware — unsettling during the reveal (Phase 3-4), serene after.
+ */
+export function getEchoPuzzleMessage(phase: DialoguePhase): string {
+  if (phase >= 5) return 'The words are returning. They remember you.';
+  if (phase >= 4) return 'You have offered this word before. It has come back for you.';
+  return 'These letters feel familiar. Have you arranged them before?';
+}
+
+/**
+ * "Remembered by name" — when the player feeds the pit a dread word, the
+ * arrangement notes the specific offering (assessment §6, the cheapest real
+ * complicity lever). Phase 2+ only; {word} is the strongest dread word offered.
+ * The point is quiet accusation: you didn't have to give us this.
+ */
+/**
+ * Daily-challenge narrative host line ("Panko prepared today's offering") — the
+ * daily was the only ritual with no animal attached (assessment §7). Phase-aware.
+ * {host} is the animal's display name, resolved by the caller.
+ */
+export function getDailyHostLine(hostName: string, phase: DialoguePhase): string {
+  if (phase >= 4) return `${hostName} laid out today's offering. It is ready for you.`;
+  if (phase >= 2) return `${hostName} prepared today's arrangement. They were waiting for you.`;
+  return `${hostName} prepared today's puzzle just for you!`;
+}
+
+// ============================================================================
+// NEW CYCLE (NG+) — "The pattern continues" made literal. A second descent with
+// the collection kept and the animals subtly remembering.
+// ============================================================================
+
+/** Title of the New Cycle offer shown at the Phase-5 endgame surface. */
+export function getNewCycleTitle(): string {
+  return 'The Pattern Continues';
+}
+
+/** Body copy explaining the New Cycle (never breaks the fourth wall). */
+export function getNewCycleDescription(): string {
+  return 'It could all begin again. The bright days, the warmth, the slow turning. The house would stay as you built it, but the descent would come faster this time. Some part of them would remember.';
+}
+
+/** CTA label to begin a New Cycle. */
+export function getNewCycleCTA(): string {
+  return 'Begin Again';
+}
+
+/**
+ * The opening beat when a New Cycle begins — the bright days return, but wrongly.
+ * Escalates with the cycle number: the pretense wears thinner each time.
+ */
+export function getNewCycleOpeningLine(cycle: number): string {
+  if (cycle >= 3) return 'Bright morning. Again. You have all stopped pretending this is the first time.';
+  if (cycle >= 2) return 'The sun comes up over the house once more. The animals smile. They remember your face from before, though none of them will say so.';
+  return 'Morning breaks bright and warm, as if none of it had happened. The animals greet you like an old friend. Somewhere beneath the warmth, something already knows how this ends.';
+}
+
+export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
+  const w = word.toUpperCase();
+  if (phase >= 5) return `${w}. It is part of the weave now. Woven by your hand.`;
+  if (phase >= 4) return `You gave us ${w}. You didn't have to.`;
+  if (phase >= 3) return `${w} slips into the dark. The pit remembers it.`;
+  return `Something in ${w} sinks deeper than the rest.`;
 }
 
 /**
@@ -2659,42 +2802,69 @@ export function getNotificationPromptText(phase: DialoguePhase): NotificationPro
 // serene at 5.
 // ============================================================================
 
-const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string]> = {
+// Five rungs (+1/+3/+7/+14/+30 days). The tail rungs (4/5) extend the ladder
+// past the old 7-day cliff, where the game used to go permanently silent on a
+// lapsed player.
+const WIN_BACK_MESSAGES: Record<DialoguePhase, [string, string, string, string, string]> = {
   0: [
     'Ember saved your spot by the fire! Come solve a puzzle.',
     'Your animal friends keep asking about you. The puzzles miss you too!',
     'A whole week! The house is still cozy, and everyone\'s waiting. Come say hi.',
+    'Two weeks! The fire is still warm and your chair is still empty. Pop back in?',
+    'It\'s been a while. The house is exactly as you left it, cozy and waiting. Come home.',
   ],
   1: [
     'The house has been thinking about you. So have the words.',
     'Your friends have gathered new thoughts to share. They\'re saving them for you.',
     'A week of quiet. The patterns wait patiently for your return.',
+    'Two weeks. The animals have new questions, and no one to ask but you.',
+    'A month, nearly. The quiet has grown thoughtful. Your friends kept your place.',
   ],
   2: [
     'The house is quieter without you.',
     'Three days of stillness. The animals still speak of you... always in the present tense.',
     'A week now. The rooms remember your footsteps. The words remember your hands.',
+    'Two weeks. The stillness has settled into something almost like waiting.',
+    'A month. The house does not forget. It simply waits, and the waiting deepens.',
   ],
   3: [
     'The house is quieter without you. The animals have noticed.',
     'Something pauses while you are away. It does not like pausing.',
     'Seven days. The house has held its breath the whole time.',
+    'Two weeks. What was building does not unbuild. It only leans closer to the door.',
+    'A month of your absence. The pattern has not moved. It is very good at not moving.',
   ],
   4: [
     'The arrangement is incomplete without you.',
     'The keepers hold your place at the pattern. They are patient. It is less so.',
     'Seven days of silence. What comes through still waits for your hand.',
+    'Two weeks. The keepers have not moved from their places. Neither has it.',
+    'A month at the threshold. It has waited longer than this. It can wait for you.',
   ],
   5: [
     'The house rests. It will be here when you return.',
     'The pattern continues, unhurried. Your friends think of you fondly.',
     'A week has passed, gently. Nothing is lost. Return whenever you like.',
+    'Two weeks of terrible peace. The house remembers you, and holds no grievance.',
+    'A month on. The pattern continues without hurry. The house remembers you still.',
   ],
 };
 
-export function getWinBackMessage(phase: number, rung: 1 | 2 | 3): string {
+// Dedicated "finished the story" copy — a returning player who saw the finale
+// gets a beat that speaks to that, instead of a generic ping. The single most
+// likely person to evangelize the game; the ladder should never go silent on
+// them. Used at the tail rungs when post-revelation.
+const WIN_BACK_FINISHED: [string, string] = [
+  'The house remembers you. It remembers everything you offered. Come sit with it a while.',
+  'You saw it through to the end, and still it thinks of you. The pattern kept your place.',
+];
+
+export function getWinBackMessage(phase: number, rung: 1 | 2 | 3 | 4 | 5, finished = false): string {
   const clampedPhase = Math.min(5, Math.max(0, Math.floor(phase))) as DialoguePhase;
-  return WIN_BACK_MESSAGES[clampedPhase][rung - 1];
+  // Finished-story players get the special tail copy on the long rungs (4/5).
+  if (finished && rung >= 4) return WIN_BACK_FINISHED[rung === 5 ? 1 : 0];
+  const idx = Math.min(4, Math.max(0, rung - 1));
+  return WIN_BACK_MESSAGES[clampedPhase][idx];
 }
 
 // ─── Small interaction copy (toasts, alerts, buttons) ───────────────────────

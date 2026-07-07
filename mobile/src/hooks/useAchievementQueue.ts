@@ -5,7 +5,7 @@ import {
   AchievementCheckState,
   getShareCount,
 } from '../services/achievements';
-import { getFullProgress } from '../services/amberCurrency';
+import { getFullProgress, getVariantWinStats } from '../services/amberCurrency';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { VictoryData } from './useGamePersistence';
 import { hapticHeavy } from '../services/haptics';
@@ -37,6 +37,7 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
       const progress = await getFullProgress();
       const shareCount = await getShareCount();
       const dailyStatus = await getDailyStatus();
+      const variantStats = await getVariantWinStats();
       const state: AchievementCheckState = {
         stats: victory.cumulativeStats || {
           totalPuzzlesCompleted: 0,
@@ -64,6 +65,8 @@ export function useAchievementQueue(): [AchievementQueueState, AchievementQueueA
         dailyChallengesCompleted: dailyStatus.totalCompleted,
         shareCount,
         challengeCompletions: progress.challengeCompletions || 0,
+        variantWins: variantStats.variantWins,
+        blindWins: variantStats.blindWins,
       };
 
       const newAchievements = await checkAchievements(state);

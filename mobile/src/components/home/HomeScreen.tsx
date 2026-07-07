@@ -130,6 +130,7 @@ import {
   CombinedQuestState,
 } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
+import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
 import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
@@ -146,6 +147,8 @@ interface HomeScreenProps {
   onPlayPuzzle: (difficulty?: Difficulty) => void;
   /** Start the Daily Challenge (seeded HARD puzzle). */
   onStartDaily?: (difficulty: Difficulty) => void;
+  /** Re-check today's leaderboard standing (tapping the completed daily card). */
+  onRecheckDailyStanding?: () => void;
   onAmberChange?: (newBalance: number) => void;
   onOpenSettings?: () => void;
   onOpenStats?: () => void;
@@ -367,6 +370,7 @@ const BevelRowButton: React.FC<{
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
+  onRecheckDailyStanding,
   onAmberChange,
   onOpenSettings,
   onOpenStats,
@@ -531,6 +535,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       unlockedAnimalCount,
       dailyUnlocked: false,
       challengeUnlocked: (progressData.puzzlesSolved ?? 0) >= 15,
+      unlockedVariants: getUnlockedVariants(progressData.puzzlesSolved ?? 0, progressData.currentPhase ?? 0),
     });
     setWeeklyQuestState(questState);
 
@@ -1125,6 +1130,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         unlockedAnimalCount: animals.filter(a => a.isUnlocked).length,
         dailyUnlocked: false,
         challengeUnlocked: (progress.puzzlesSolved ?? 0) >= 15,
+        unlockedVariants: getUnlockedVariants(progress.puzzlesSolved ?? 0, progress.currentPhase ?? 0),
       });
       setWeeklyQuestState(refreshed);
     }
@@ -1367,6 +1373,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase) && (
                 <DailyChallengeCard
                   onStartDaily={onStartDaily}
+                  onRecheckStanding={onRecheckDailyStanding}
                   phase={progress.currentPhase}
                   refreshSignal={progress.puzzlesSolved}
                 />
@@ -1503,17 +1510,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
 
-          {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
+          {/* Ambient home line — atmospheric whisper when idle (auto-dismiss
+              with fade). Deliberately BOXLESS (player feedback: a framed sign
+              here stacked awkwardly under the Next Unlock signage): cream ink
+              with a soft warm shadow reads over every phase's sky art. */}
           {ambientLine && !isOnboarding && (
-            <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
-              {/* Small wooden sign — cottage card frame over the world. */}
-              <NineSliceFrame
-                skin={getPixelSkin(progress.currentPhase).card}
-                cornerDp={CARD_CORNER_DP}
-                edgeDp={CARD_EDGE_DP}
-                fillColor={getPixelSkin(progress.currentPhase).fillCard}
-              />
-              <Text style={[styles.ambientLineText, { color: st.body }]}>
+            <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]} pointerEvents="none">
+              <Text style={styles.ambientLineText}>
                 {ambientLine}
               </Text>
             </Animated.View>
@@ -1604,8 +1607,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={[
               styles.dialogueModal,
               {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
                 shadowColor: dt.modalShadowColor,
                 transform: [
                   {
@@ -1620,13 +1621,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             ]}
             onStartShouldSetResponder={() => true}
           >
-            {/* Decorative accent line at top of modal */}
-            <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
+            {/* Cottage wood-and-parchment sheet (openBottom: flush to the
+                screen edge). Replaces the flat webby card + accent line. */}
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
+            />
 
             {dialogueFlow.selectedAnimal && (
               <View style={styles.dialogueRow}>
-                {/* Sprite column - 30% width, zoomed in to fill */}
-                <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
+                {/* Sprite column — the zoomed portrait sits on the parchment
+                    (transparent bg); a slim accent rail marks the alcove. */}
+                <View style={styles.dialogueSpriteCol}>
+                  <View style={[styles.dialogueSpriteRail, { backgroundColor: pixelSkin.accent }]} />
                   {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
                     <Image
                       source={
@@ -2568,8 +2578,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={[
               styles.dialogueModal,
               {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
                 shadowColor: dt.modalShadowColor,
                 transform: [
                   {
@@ -2584,13 +2592,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             ]}
             onStartShouldSetResponder={() => true}
           >
-            {/* Decorative accent line at top of modal */}
-            <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
+            />
 
             {introAnimal && (
               <View style={styles.dialogueRow}>
-                {/* Sprite column - 30% width, zoomed in to fill */}
-                <View style={[styles.dialogueSpriteCol, { backgroundColor: dt.spriteBg }]}>
+                {/* Sprite column — zoomed portrait on the parchment. */}
+                <View style={styles.dialogueSpriteCol}>
+                  <View style={[styles.dialogueSpriteRail, { backgroundColor: pixelSkin.accent }]} />
                   {CHARACTER_SPRITES[introAnimal.type] ? (
                     <Image
                       source={
@@ -3342,17 +3356,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Dialogue modal - side-by-side: 30% sprite, 70% text
+  // Dialogue modal — cottage wood-and-parchment sheet (NineSliceFrame panel
+  // background, openBottom). No borderRadius/border/backgroundColor: the
+  // pixel frame owns the edge. Content is inset to clear the 24dp wood band.
   dialogueModal: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderBottomWidth: 0,
+    paddingTop: PANEL_EDGE_DP - 6,
+    paddingLeft: PANEL_EDGE_DP - 8,
+    paddingRight: PANEL_EDGE_DP - 12,
   },
   dialogueAccentLine: {
     height: 3,
@@ -3366,6 +3380,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  // Slim accent rail on the sprite alcove's inner edge (replaces the old flat
+  // accent line — carries the skin's second hue between portrait and text).
+  dialogueSpriteRail: {
+    position: 'absolute',
+    right: 0,
+    top: 8,
+    bottom: 8,
+    width: 2,
+    borderRadius: 1,
+    opacity: 0.6,
   },
   dialogueSpriteImage: {
     width: SCREEN_WIDTH * 0.36,
@@ -3834,27 +3859,25 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
   },
 
-  // Ambient home line — cottage card frame; clear the 12dp wood band.
+  // Ambient home line — boxless atmospheric whisper (no frame by design).
   ambientLineContainer: {
     alignSelf: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 6,
     marginBottom: 4,
-    minWidth: 120,
     zIndex: 10,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
   },
   ambientLineText: {
+    color: '#FBF0D9',
     fontSize: 15,
     fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
     letterSpacing: 0.5,
     lineHeight: 22,
+    textShadowColor: 'rgba(20, 10, 6, 0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 
   // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel

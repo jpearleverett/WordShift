@@ -85,6 +85,7 @@ const SYNC_KEYS = [
   'wordshift_word_history',
   'wordshift_word_harvest',
   'wordshift_in_progress_puzzle',
+  'wordshift_mastery', // private solve-time trend + best speed round (skill records)
   // Daily challenge & quests
   'wordshift_daily_challenge',
   'wordshift_weekly_quests',
@@ -98,6 +99,7 @@ const SYNC_KEYS = [
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
   'wordshift_tending',
+  'wordshift_offering_requests', // per-animal offering request / fulfillment state
   // Settings, onboarding & one-time intro flags
   'wordshift_settings',
   'wordshift_notification_prefs',

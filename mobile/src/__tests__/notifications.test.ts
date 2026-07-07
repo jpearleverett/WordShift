@@ -449,7 +449,7 @@ describe('notifications', () => {
       return d.getDate();
     }
 
-    it('schedules a 7-day daily reminder ladder + the +1/+3/+7 win-back ladder when there is no streak', async () => {
+    it('schedules a 7-day daily reminder ladder + the +1/+3/+7/+14/+30 win-back ladder when there is no streak', async () => {
       const svc = loadWithStatus('granted');
       await svc.scheduleAllNotifications(0);
 
@@ -464,14 +464,17 @@ describe('notifications', () => {
       // Win-back rungs are the 18:00 pings. No streak ⇒ no 19:00 streak-risk.
       const winBack = triggers.filter((t) => t.hour === 18);
       const streakRisk = triggers.filter((t) => t.hour === 19);
-      expect(winBack.length).toBe(3);
+      expect(winBack.length).toBe(5);
       expect(streakRisk.length).toBe(0);
 
-      // Rungs are scheduled in order: +1, +3, +7 days.
+      // Rungs are scheduled in order: +1, +3, +7, +14, +30 days (the tail rungs
+      // extend past the old 7-day silence cliff).
       expect(winBack.map((t) => t.date.getDate())).toEqual([
         expectedDayOfMonth(1),
         expectedDayOfMonth(3),
         expectedDayOfMonth(7),
+        expectedDayOfMonth(14),
+        expectedDayOfMonth(30),
       ]);
     });
 
@@ -485,6 +488,8 @@ describe('notifications', () => {
         getWinBackMessage(4, 1),
         getWinBackMessage(4, 2),
         getWinBackMessage(4, 3),
+        getWinBackMessage(4, 4),
+        getWinBackMessage(4, 5),
       ]);
       // Rung 1 at Phase 4 is the reverent register.
       expect(winBack[0].body).toContain('arrangement is incomplete');
@@ -526,9 +531,9 @@ describe('notifications', () => {
       const questTrigger = new Date(nextMonday.getTime() - 6 * 60 * 60 * 1000);
       const questEligible = questTrigger.getTime() > now.getTime();
 
-      // 18:00 pings = 3 win-back rungs + the quest-expiry ping (when eligible).
+      // 18:00 pings = 5 win-back rungs + the quest-expiry ping (when eligible).
       const evening = scheduledTriggers().filter((t) => t.hour === 18);
-      expect(evening.length).toBe(questEligible ? 4 : 3);
+      expect(evening.length).toBe(questEligible ? 6 : 5);
       evening.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
 
       jest.dontMock('../services/weeklyQuests');
@@ -583,13 +588,15 @@ describe('notifications', () => {
       expect(streakRisk[0].body).toContain('5');
       expect(streakRisk[0].data).toEqual({ target: 'daily' });
       // Win-back rung 1 deferred to +2 days (the streak ping leads the ladder);
-      // rungs 2 and 3 hold at +3 and +7.
+      // rungs 2-5 hold at +3/+7/+14/+30.
       const winBack = triggers.filter((t) => t.hour === 18);
-      expect(winBack.length).toBe(3);
+      expect(winBack.length).toBe(5);
       expect(winBack.map((t) => t.date.getDate())).toEqual([
         expectedDayOfMonth(2),
         expectedDayOfMonth(3),
         expectedDayOfMonth(7),
+        expectedDayOfMonth(14),
+        expectedDayOfMonth(30),
       ]);
 
       jest.dontMock('../services/amberCurrency');
@@ -616,11 +623,13 @@ describe('notifications', () => {
       // Win-back rung 1 falls back to next-day (no streak-risk leading the
       // ladder) — never today, so a player who played today hears nothing.
       const winBack = triggers.filter((t) => t.hour === 18);
-      expect(winBack.length).toBe(3);
+      expect(winBack.length).toBe(5);
       expect(winBack.map((t) => t.date.getDate())).toEqual([
         expectedDayOfMonth(1),
         expectedDayOfMonth(3),
         expectedDayOfMonth(7),
+        expectedDayOfMonth(14),
+        expectedDayOfMonth(30),
       ]);
 
       jest.dontMock('../services/amberCurrency');

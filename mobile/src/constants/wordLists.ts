@@ -51,40 +51,48 @@ export const FALLBACK_PUZZLES_MEDIUM: string[][] = [
   ["IRON", "TIME", "OVER", "INTO"],
 ];
 
+// Replaced in the solvability pass (see FALLBACK_PUZZLES_HARD note): the old
+// pool repeated THERE/LATER/TIMES and its first entry was unwinnable. These
+// are word-disjoint verified chains from the MEDIUM_PLUS bank.
 export const FALLBACK_PUZZLES_MEDIUM_PLUS: string[][] = [
-  ["SCRAP", "THERE", "LATER", "TIMES"],
-  ["SHELL", "THERE", "LATER", "TIMES"],
-  ["STEAL", "THERE", "LATER", "TIMES"],
-  ["BEADS", "THERE", "LATER", "TIMES"],
-  ["IDEAS", "THERE", "LATER", "TIMES"],
-  ["VOTES", "THERE", "LATER", "TIMES"],
-  ["LOOKS", "THERE", "LATER", "TIMES"],
-  ["CELLS", "THERE", "LATER", "TIMES"],
-  ["BRUSH", "TIMES", "THERE", "LATER"],
-  ["SOLAR", "WORDS", "THERE", "LATER"],
-  ["BLUSH", "WORDS", "THERE", "LATER"],
-  ["TASKS", "LATER", "TIMES", "THERE"],
-  ["WITCH", "RIGHT", "TIMES", "THERE"],
-  ["PEARL", "SUPER", "THERE", "LATER"],
-  ["WRIST", "THERE", "LATER", "TIMES"],
+  ["GIVEN", "CHATS", "CURED", "CRAVE"],
+  ["AWOKE", "HUNTS", "SAVED", "JUDGE"],
+  ["SKILL", "SPIED", "MEALS", "EATER"],
+  ["FINED", "HAVEN", "SAILS", "BEATS"],
+  ["UNITY", "FLING", "ARMED", "OVERS"],
+  ["PSALM", "REIGN", "RACED", "AVERT"],
+  ["RELAY", "HIRED", "SELLS", "CRIES"],
+  ["GRAIN", "DIVER", "CURES", "FEATS"],
+  ["COAST", "SWING", "LIGHT", "FAVOR"],
+  ["BLANK", "BINDS", "CATER", "SHINE"],
+  ["ROVER", "CAVED", "CURVE", "CARED"],
+  ["CAGES", "HARMS", "NAPPY", "DEMOS"],
+  ["BURLY", "PACED", "EVILS", "INANE"],
+  ["TWAIN", "GRINS", "PEACH", "HOPED"],
+  ["TIRES", "BEADS", "PLANT", "FACES"],
 ];
 
+// Replaced in the solvability pass: the old pool was 15 near-identical
+// THERE/LATER/TIMES chains and its first entry was mathematically unwinnable
+// under the shipped rules. These 15 are word-disjoint chains sampled from the
+// verified HARD bank — every one exhaustively solved by
+// services/puzzleSolvability.ts (pinned in bankSolvability.test.ts).
 export const FALLBACK_PUZZLES_HARD: string[][] = [
-  ["SCRAP", "THERE", "LATER", "TIMES", "THEIR"],
-  ["SHELL", "THERE", "LATER", "TIMES", "THEIR"],
-  ["CELLS", "THERE", "LATER", "TIMES", "THEIR"],
-  ["STEAL", "THERE", "LATER", "TIMES", "THEIR"],
-  ["WRIST", "THERE", "LATER", "TIMES", "THEIR"],
-  ["BEADS", "THERE", "LATER", "TIMES", "THEIR"],
-  ["BRUSH", "TIMES", "THERE", "LATER", "MAKES"],
-  ["IDEAS", "THERE", "LATER", "TIMES", "THEIR"],
-  ["PEARL", "SUPER", "THERE", "LATER", "TIMES"],
-  ["SOLAR", "WORDS", "THERE", "LATER", "TIMES"],
-  ["BLUSH", "WORDS", "THERE", "LATER", "TIMES"],
-  ["TASKS", "LATER", "TIMES", "THERE", "ASKED"],
-  ["VOTES", "THERE", "LATER", "TIMES", "THEIR"],
-  ["WITCH", "RIGHT", "TIMES", "THERE", "LATER"],
-  ["LOOKS", "THERE", "LATER", "TIMES", "THEIR"],
+  ["SHARP", "CURED", "BEARS", "DIVES", "SOLES"],
+  ["CAMEL", "REPAY", "STIRS", "CHEFS", "UNION"],
+  ["MOUTH", "PONDS", "CRIES", "SPIED", "BRAVE"],
+  ["TRICK", "MOVES", "CHAPS", "SAVED", "FINER"],
+  ["BLOWN", "BROWS", "CATER", "BAKES", "SPARE"],
+  ["TWIGS", "MATER", "GATED", "CROWS", "PACES"],
+  ["KNITS", "DOORS", "REIGN", "RIDES", "LOSES"],
+  ["TWAIN", "MANIC", "RAMPS", "TOLLS", "MEALS"],
+  ["SCREW", "LACKS", "QUITS", "OWING", "TYING"],
+  ["ALLEY", "WAVES", "LIGHT", "BINDS", "MOUSE"],
+  ["NEEDY", "FLING", "RIGHT", "TICKS", "PARKS"],
+  ["HARDY", "STORM", "FARED", "FIEND", "WIDOW"],
+  ["GHOST", "RACED", "CURVE", "STARE", "BAKER"],
+  ["FUNKY", "CRUST", "LOCKS", "CARED", "CURSE"],
+  ["GOERS", "FAMED", "SACKS", "TRUCK", "DOVES"],
 ];
 
 /** Get a random fallback puzzle for the given difficulty */

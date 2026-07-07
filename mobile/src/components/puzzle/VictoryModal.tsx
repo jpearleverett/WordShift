@@ -26,6 +26,7 @@ import {
   getMandatoryHarvestText,
   getMandatoryHarvestCTA,
   getNextStreakMilestoneText,
+  getFlawlessHonorific,
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
@@ -62,6 +63,7 @@ export interface VictoryData {
   totalWordsFormed?: number;
   ritualEnergy?: number;
   variantBonus?: number;
+  freshVariantBonus?: number;
   variantRepeatDecay?: number;
   questsCompleted?: string[];
   harvestedWords?: string[];
@@ -69,6 +71,10 @@ export interface VictoryData {
   autoCollected?: boolean;
   /** One-time mandatory first-harvest gate: hides Next Level, forces a pit visit */
   mandatoryHarvest?: boolean;
+  /** Perfect play: 0 hints, 0 invalid attempts, 0 undos — the tier above 3 stars */
+  flawless?: boolean;
+  /** Lifetime count of flawless offerings (for the honorific milestone copy) */
+  flawlessCount?: number;
 }
 
 interface VictoryModalProps {
@@ -348,6 +354,24 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             }]}>
               {getVictoryTitle(earnedStars, phase)}
             </Text>
+            {/* Flawless offering — the perfect-play tier above 3 stars. A small
+                phase-aware honorific ribbon; only shows on a truly clean solve. */}
+            {victoryData?.flawless && (
+              <View
+                style={[styles.flawlessBadge, {
+                  borderColor: phaseTheme.victoryTitleColor,
+                  backgroundColor: phaseTheme.victoryGlowColor,
+                }]}
+                accessible
+                accessibilityLabel={getFlawlessHonorific(phase)}
+              >
+                <Text style={[styles.flawlessBadgeText, {
+                  color: phaseTheme.victoryTitleColor,
+                }]}>
+                  {getFlawlessHonorific(phase)}
+                </Text>
+              </View>
+            )}
             {/* Subtitle only where it disambiguates — the stars + title already
                 say "puzzle complete", so the generic label was trimmed. */}
             {isPlayingDaily && (
@@ -644,6 +668,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                               {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS]?.title || 'Variant'}
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.variant }]}>+{variantBonusAmber}</Text>
+                          </View>
+                        )}
+                        {(victoryData.freshVariantBonus ?? 0) > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'✨'} Fresh variant
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: accent.variant }]}>+{victoryData.freshVariantBonus}</Text>
                           </View>
                         )}
                         {streakBonusAmber > 0 && (
@@ -1021,6 +1053,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: CandyColors.gray[500],
     marginBottom: 4,
+  },
+  flawlessBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    marginBottom: 8,
+  },
+  flawlessBadgeText: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textAlign: 'center',
   },
   socialProofLine: {
     fontSize: 12.5,

@@ -79,6 +79,8 @@ describe('Victory Flow Integration', () => {
       dailyChallengesCompleted: 0,
       shareCount: 0,
       challengeCompletions: 0,
+      variantWins: {},
+      blindWins: 0,
     };
     const newAchievements = await checkAchievements(achievementState);
     const ids = newAchievements.map(a => a.id);

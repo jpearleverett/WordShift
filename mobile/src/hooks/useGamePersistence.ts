@@ -3,6 +3,7 @@ import { Difficulty, GameMode } from '../types';
 import { DialoguePhase } from '../types/homeWorld';
 import {
   calculateStars,
+  isFlawless,
   recordPuzzleCompletion,
   getCumulativeStats,
   CumulativeStats,
@@ -15,6 +16,7 @@ import {
   recordRitualWords,
   recordVariantEncounter,
   applyVariantAmberBonus,
+  recordVariantWin,
   getPhaseProgressFraction,
   getPendingPhaseTransition,
   isPostRevelation,
@@ -23,11 +25,16 @@ import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSessi
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
 import { updateQuestProgress } from '../services/weeklyQuests';
+import { recordOfferingFulfillment } from '../services/offeringRequests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
 import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, HarvestSummary } from '../services/wordHarvest';
 
 export interface VictoryData {
   earnedStars: number;
+  /** Perfect play: 0 hints, 0 invalid attempts, 0 undos (the tier above 3 stars). */
+  flawless?: boolean;
+  /** Running lifetime count of flawless offerings (for the victory badge copy). */
+  flawlessCount?: number;
   /** Total amber value computed for this puzzle (queued, not yet spendable) */
   amberEarned: number;
   amberBalance: number;
@@ -50,11 +57,13 @@ export interface VictoryData {
   firstCompletionBonus: number;
   /** Bonus amber from puzzle variant mode */
   variantBonus: number;
+  /** One-time-per-day fresh-variant rotation bonus (0 if already claimed today) */
+  freshVariantBonus?: number;
   /** Puzzle variant used */
   variant: PuzzleVariant;
-  /** Effective multiplier after anti-farm decay */
+  /** Effective variant multiplier (full configured value; decay removed) */
   variantAppliedMultiplier?: number;
-  /** Repeat decay factor (1.0 = no decay) */
+  /** @deprecated always 1.0 — repeat decay removed in favor of the fresh bonus */
   variantRepeatDecay?: number;
   /** Bonus amber from streak milestone (one-time at 3/7/14/30 days) */
   streakMilestoneBonus: number;
@@ -102,7 +111,9 @@ export interface PersistenceActions {
     gameMode?: GameMode,
     completedWords?: string[],
     variant?: PuzzleVariant,
-    isDaily?: boolean
+    isDaily?: boolean,
+    undosUsed?: number,
+    blind?: boolean
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -159,9 +170,12 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     gameMode: GameMode = 'standard',
     completedWords: string[] = [],
     variant: PuzzleVariant = 'standard',
-    isDaily: boolean = false
+    isDaily: boolean = false,
+    undosUsed: number = 0,
+    blind: boolean = false
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
+    const flawless = isFlawless(hintsUsed, invalidAttempts, undosUsed);
 
     // Guard against concurrent recordVictory calls
     if (recordInProgress.current) {
@@ -196,7 +210,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     recordInProgress.current = true;
     try {
       // Record star stats first so we can get the three-star rate
-      await recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts);
+      await recordPuzzleCompletion(difficulty, hintsUsed, invalidAttempts, undosUsed);
       const stats = await getCumulativeStats();
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
@@ -209,12 +223,13 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const postRev = await isPostRevelation();
       const effectivePhase: DialoguePhase = postRev ? 5 as DialoguePhase : amberResult.newPhase;
 
-      // Apply variant bonus with anti-farm decay and persistence.
-      // creditToBalance=false: variant bonus also queued, not credited.
+      // Apply variant bonus (full multiplier, no decay) + the once-per-day
+      // fresh-variant bonus. creditToBalance=false: both are queued, not credited.
       const variantMultiplier = getVariantAmberMultiplier(variant);
       let variantBonus = 0;
       let variantAppliedMultiplier = 1.0;
-      let variantRepeatDecay = 1.0;
+      const variantRepeatDecay = 1.0;
+      let freshVariantBonus = 0;
       if (variant !== 'standard' && variantMultiplier > 1.0) {
         const variantResult = await applyVariantAmberBonus(
           variant,
@@ -223,10 +238,16 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           false
         );
         variantBonus = variantResult.bonus;
+        freshVariantBonus = variantResult.freshBonus;
         variantAppliedMultiplier = variantResult.appliedMultiplier;
-        variantRepeatDecay = variantResult.repeatDecay;
         amberResult.newBalance = variantResult.newBalance;
-        amberResult.amount += variantBonus;
+        amberResult.amount += variantBonus + freshVariantBonus;
+      }
+
+      // Track the variant/blind win for achievements + the variant-offer nudge.
+      // Runs for blind standard boards too (blind composes with any variant).
+      if (variant !== 'standard' || blind) {
+        await recordVariantWin(variant, blind);
       }
 
       // Compute total queued amber (puzzle + milestones + first-completion + streak milestone + variant)
@@ -278,6 +299,9 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         const triggerWords = extractTriggerWords(completedWords);
         const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
+        // Fulfill any animal's outstanding offering request whose theme these
+        // words match — the animal reacts by name on the next visit.
+        recordOfferingFulfillment(completedWords).catch(() => {});
       }
 
       // Queue a one-time variant tutorial for animal dialogue.
@@ -328,6 +352,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
           isChallenge: gameMode === 'challenge',
           amberEarned: totalQueuedAmber,
           currentStreak: amberResult.currentStreak,
+          variant,
         }, effectivePhase);
         questsCompleted = completedQuests.map(q => q.title);
       } catch (_) {
@@ -336,6 +361,8 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
 
       return {
         earnedStars: stars,
+        flawless,
+        flawlessCount: stats.flawlessCount ?? 0,
         amberEarned: totalQueuedAmber,
         amberBalance: amberResult.newBalance,
         phaseChanged: amberResult.phaseChanged,
@@ -352,6 +379,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         ritualEnergy,
         firstCompletionBonus: amberResult.firstCompletionBonus,
         variantBonus,
+        freshVariantBonus,
         variant,
         variantAppliedMultiplier,
         variantRepeatDecay,

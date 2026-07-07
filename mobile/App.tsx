@@ -51,12 +51,16 @@ import {
   markFinalPuzzleCompleted,
   isPostRevelation,
   markPostRevelation,
+  recordPhase4Dwell,
+  consumeVariantNudge,
+  getFullProgress,
+  consumeCycleOpening,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
 import { NotificationPromptModal } from './src/components/NotificationPromptModal';
 import { PatronModal } from './src/components/monetization/PatronModal';
-import { submitDailyResult, getDailyRank, DailyRank } from './src/services/leaderboard';
+import { submitDailyResult, getDailyRank, getBeatPercentText, DailyRank } from './src/services/leaderboard';
 import { recordPuzzleContribution, getAggregateProof, getWordsOfferedText } from './src/services/socialProof';
 import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
@@ -66,13 +70,14 @@ import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
 import { getSettingsSync } from './src/services/settings';
-import { initAudio, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
+import { initAudio, setAudioPhase, soundVictory, soundPerfect, soundValidMove, soundInvalidMove, soundUndo, soundHint, soundTap } from './src/services/audio';
 import { hapticLight, hapticMedium, hapticHeavy, hapticSuccess, hapticWarning, hapticError, hapticSelection } from './src/services/haptics';
 import { getVariantTutorialIntroLines } from './src/services/animalDialogue';
 import {
   getPhaseIndicator,
   getLoadingMessage,
   getRitualMicroEvent,
+  isSilentVictoryBeat,
   getHarvestOverflowMessage,
   getFoxSetupSelectorIntroLines,
   getFoxStarterIntroLines,
@@ -84,9 +89,16 @@ import {
   getDailyLockedMessage,
   getBadChallengeLinkMessage,
   getUnplayableChallengeMessage,
+  getPaceTrendMessage,
+  getSpeedRecordMessage,
+  getVariantNudgeMessage,
+  getDailyHostLine,
+  getNewCycleOpeningLine,
 } from './src/services/phaseNarrative';
+import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
+import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
-import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy } from './src/services/dailyChallenge';
+import { generateDailyPuzzle, prewarmDailyPuzzle, isDailyChallengeUnlocked, recordDailyCompletion, getDailyStatus, checkDailyStreakMilestone, grantFirstDailyMercy, getDailyHostName } from './src/services/dailyChallenge';
 import { startFrameMonitoring, stopFrameMonitoring } from './src/services/performanceMonitor';
 import { AnimalWhisper } from './src/components/puzzle/AnimalWhisper';
 import { WordLedger } from './src/components/WordLedger';
@@ -112,7 +124,7 @@ import { REWARDED_HINT_GRANT } from './src/constants/gameBalance';
 import { createRevenueCatBillingProvider } from './src/services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
-import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES } from './src/constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES } from './src/constants/gameBalance';
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
@@ -125,6 +137,7 @@ import { offerBatch } from './src/services/wordHarvest';
 import {
   hasVariantModifier,
   getNewlyUnlockedVariants,
+  getUnlockedVariants,
   getVariantTimeLimit,
   getVariantTimeLimitForDifficulty,
   getVariantSelectorOptions,
@@ -302,6 +315,9 @@ function MainApp() {
   // each subsequent clock. Reset on time-up exit or whenever a fresh run begins
   // (a rewarded rescue deliberately does NOT reset it — the run continues).
   const [speedRound, setSpeedRound] = useState(0);
+  // The private "words come to you faster now" pace beat fires at most once per
+  // app session so it lands as a rare moment, not a nag.
+  const fasterBeatShownRef = useRef(false);
   // One rewarded rescue per board: set when a rescue is claimed, reset on every
   // fresh-board path so the next attempt gets its own rescue.
   const [speedRescueUsed, setSpeedRescueUsed] = useState(false);
@@ -459,6 +475,7 @@ function MainApp() {
     solution: puzzle.solution,
     reverseSolution: puzzle.reverseSolution,
     gameMode: puzzle.gameMode,
+    blindMode: puzzle.blindMode,
     currentVariant: puzzle.currentVariant,
     selectedVariant: puzzle.selectedVariant,
     moveDirection: puzzle.moveDirection,
@@ -471,6 +488,23 @@ function MainApp() {
   // ========================================================================
   // Initialization
   // ========================================================================
+
+  // Keep the audio service's phase mirror in sync so move/victory chimes switch
+  // to their dark variants once the descent deepens (Phase 3+).
+  useEffect(() => {
+    setAudioPhase(persistence.currentPhase);
+  }, [persistence.currentPhase]);
+
+  // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
+  // landing after it begins, the bright days announce themselves (wrongly).
+  useEffect(() => {
+    if (onboardingFlow.isOnboarding) return;
+    consumeCycleOpening().then(cycle => {
+      if (cycle != null) {
+        Alert.alert('', getNewCycleOpeningLine(cycle));
+      }
+    }).catch(() => {});
+  }, [onboardingFlow.isOnboarding]);
 
   // App-level initialization (non-onboarding)
   useEffect(() => {
@@ -895,6 +929,13 @@ function MainApp() {
           if (mercyHints !== null) {
             puzzleActions.refreshHintBalance();
             puzzleActions.setMessage(getFirstDailyMercyMessage(persistence.currentPhase, mercyHints));
+          } else {
+            // Narrative host: name the animal who "prepared" today's offering —
+            // only ever one the player has met (assessment §7). Skipped on the
+            // first daily so the mercy message isn't clobbered.
+            const prog = await getFullProgress();
+            const hostName = getDailyHostName(prog?.unlockedAnimals ?? []);
+            puzzleActions.setMessage(getDailyHostLine(hostName, persistence.currentPhase));
           }
         } catch {
           // Non-critical — the daily plays fine without the mercy grant.
@@ -908,6 +949,29 @@ function MainApp() {
       }
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
+
+  // Re-check today's daily leaderboard standing (tapping the completed daily
+  // card). The standing used to be shown exactly once, on completion; this gives
+  // it a re-check surface (assessment §7). Degrades gracefully when the backend
+  // is off or standings haven't aggregated yet.
+  const handleRecheckDailyStanding = useCallback(() => {
+    hapticLight();
+    (async () => {
+      try {
+        const rank = await getDailyRank(getLocalDateString());
+        if (rank) {
+          Alert.alert(
+            'Today’s Standing',
+            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.`
+          );
+        } else {
+          Alert.alert('Today’s Standing', 'The standings are still gathering. Check back a little later.');
+        }
+      } catch {
+        // Non-critical — leaderboard is decorative.
+      }
+    })();
+  }, [persistence.currentPhase]);
 
   // Start a puzzle from a friend-shared challenge link. The hook validates the
   // decoded words (dictionary membership, uniform length) and returns false
@@ -1091,9 +1155,58 @@ function MainApp() {
 
     if (result?.completed) {
       isDragDropRef.current = false;
-      // Speed streak: a completed speed puzzle ratchets up the next clock.
+      // Speed streak: a completed speed puzzle ratchets up the next clock, and
+      // the peak streak is remembered as a best-round record (the in-run counter
+      // evaporates on every reset). Surface a new record as an in-world beat.
       if (hasVariantModifier(puzzle.currentVariant, 'speed')) {
-        setSpeedRound(prev => prev + 1);
+        const newRound = speedRound + 1;
+        setSpeedRound(newRound);
+        recordSpeedRound(newRound).then(res => {
+          if (res.isNewRecord && res.best >= 3) {
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getSpeedRecordMessage(persistence.currentPhase, res.best));
+            }, 1000);
+          }
+        }).catch(() => {});
+      }
+      // Private pace trend: record standard, non-daily solve durations and, at
+      // most once per session, surface the "getting faster" beat when the recent
+      // median is meaningfully quicker than before. Skipped for restored boards
+      // (result.solveTimeMs is undefined) and timed/speed boards.
+      if (
+        result.solveTimeMs != null &&
+        result.variant === 'standard' &&
+        !isPlayingDaily
+      ) {
+        const solveDifficulty = puzzle.difficulty;
+        recordSolveTime(solveDifficulty, result.solveTimeMs).then(async () => {
+          if (fasterBeatShownRef.current) return;
+          const trend = await getSolveTrend(solveDifficulty);
+          if (trend?.improving) {
+            fasterBeatShownRef.current = true;
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getPaceTrendMessage(persistence.currentPhase));
+            }, 1300);
+          }
+        }).catch(() => {});
+      }
+      // Variant-offer nudge (revives the dead shouldOfferVariant path): once per
+      // local day, after a STANDARD board, gently suggest a variant the player has
+      // unlocked but never tried. Skipped during onboarding.
+      if (
+        (result.variant ?? 'standard') === 'standard' &&
+        !isPlayingDaily &&
+        (onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete')
+      ) {
+        const unlockedVariants = getUnlockedVariants(puzzlesSolvedForVariantUnlocks, persistence.currentPhase);
+        consumeVariantNudge(unlockedVariants, 'standard').then(nudgeVariant => {
+          if (nudgeVariant) {
+            const title = VARIANT_CONFIGS[nudgeVariant as PuzzleVariant]?.title || 'a new style';
+            addVictoryTimeout(() => {
+              puzzleActions.setMessage(getVariantNudgeMessage(persistence.currentPhase, title));
+            }, 2000);
+          }
+        }).catch(() => {});
       }
       // Clear mid-puzzle save on completion
       clearPuzzleState().catch(() => {});
@@ -1111,7 +1224,9 @@ function MainApp() {
         result.gameMode,
         result.completedWords,
         result.variant || 'standard',
-        isPlayingDaily
+        isPlayingDaily,
+        result.undosUsed ?? 0,
+        result.blind ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -1312,16 +1427,35 @@ function MainApp() {
       puzzleActions.setEarnedStars(victory.earnedStars);
       victoryActions.setVictoryData(finalVictory);
 
-      if (victory.earnedStars === 3) {
-        soundPerfect();
-      } else {
-        soundVictory();
+      // Scripted anticlimax: on the one silent-victory board the fanfare simply
+      // does not play (the micro-beat renders the stark line instead). The most
+      // complicit moment in the descent is a quiet one.
+      if (!isSilentVictoryBeat(completedTotal)) {
+        if (victory.earnedStars === 3) {
+          soundPerfect();
+        } else {
+          soundVictory();
+        }
       }
 
       puzzleActions.setGameState(GameState.WON);
       puzzleActions.setShowConfetti(true);
       victoryActions.setProcessingVictory(false);
       puzzlesSinceHomeVisit.current += 1;
+
+      // Store-review prompt — ONLY on a Phase 0-1 delight peak (a perfect win),
+      // HARD-suppressed from Phase 2 on so the reveal's betrayal can't harvest
+      // one-star reviews (assessment §9). Policy-gated + once-ever; deferred so
+      // it lands after the victory choreography settles.
+      addVictoryTimeout(() => {
+        maybePromptReview({
+          phase: persistence.currentPhase,
+          stars: victory.earnedStars,
+          puzzlesSolved: completedTotal,
+          isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
+          isDaily: isPlayingDaily,
+        }).catch(() => {});
+      }, 1800);
 
       // Play choreographed victory sequence (the modal gates tap-to-skip to
       // its own entrance window via onSkip)
@@ -1338,14 +1472,23 @@ function MainApp() {
           if (houseComplete) {
             const finalDone = await isFinalPuzzleCompleted();
             if (!finalDone) {
-              await markFinalPuzzleCompleted();
-              orchestrationActions.setCompletionCoda({
-                title: 'THE HOUSE STANDS COMPLETE',
-                text: persistence.currentPhase >= 3
-                  ? 'You finished what was being built. There is no pretending now.'
-                  : 'You completed the house and reached the final path.',
-              });
-              addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+              // Dwell gate: the finale used to fire on the FIRST Phase-4
+              // victory, so the whole cult-reveal era flashed past in one
+              // puzzle. Require FINALE_DWELL_PUZZLES Phase-4 puzzles first so
+              // the robed sprites, sacrifice mechanic, and 300 Phase-4
+              // dialogue lines are actually played. Never shown as a counter
+              // (narrative rule 7) — the house "is not yet ready."
+              const dwell = await recordPhase4Dwell();
+              if (dwell >= FINALE_DWELL_PUZZLES) {
+                await markFinalPuzzleCompleted();
+                orchestrationActions.setCompletionCoda({
+                  title: 'THE HOUSE STANDS COMPLETE',
+                  text: persistence.currentPhase >= 3
+                    ? 'You finished what was being built. There is no pretending now.'
+                    : 'You completed the house and reached the final path.',
+                });
+                addVictoryTimeout(() => setPhaseTransitionEvent(FINAL_PUZZLE_EVENT), 1500);
+              }
             } else {
               const postRev = await isPostRevelation();
               if (!postRev) {
@@ -2012,8 +2155,18 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions]);
+    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, puzzle.blindMode);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
+
+  // Blind Offering: chosen before the board (a fresh board applies it so the
+  // player can't toggle previews back on mid-solve to peek). Sticky across Next
+  // Level like Challenge; composes with any variant/difficulty/challenge state.
+  const handleToggleBlindMode = useCallback(() => {
+    hapticMedium();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, puzzle.selectedVariant, !puzzle.blindMode);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
 
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The
@@ -2185,6 +2338,7 @@ function MainApp() {
             <HomeScreen
               onPlayPuzzle={handlePlayPuzzle}
               onStartDaily={handleStartDaily}
+              onRecheckDailyStanding={handleRecheckDailyStanding}
               onAmberChange={persistenceActions.setAmberBalance}
               onOpenSettings={() => transitionTo('settings')}
               onOpenStats={() => transitionTo('stats')}
@@ -2392,6 +2546,9 @@ function MainApp() {
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
             showChallengeToggle={puzzlesSolvedForVariantUnlocks >= 15}
+            blindActive={puzzle.blindMode}
+            onToggleBlindMode={handleToggleBlindMode}
+            showBlindToggle={puzzlesSolvedForVariantUnlocks >= 15}
             introMode={showSetupSelectorIntro}
             introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />
@@ -2679,7 +2836,7 @@ function MainApp() {
         {orchestration.showMicroBeat && orchestration.microBeat && (
           <View style={[
             styles.victoryGlitchOverlay,
-            orchestration.microBeat.type === 'ambient_whisper' && styles.microBeatWhisperOverlay,
+            (orchestration.microBeat.type === 'ambient_whisper' || orchestration.microBeat.type === 'silent_victory') && styles.microBeatWhisperOverlay,
           ]} pointerEvents="none">
             <Text style={[
               orchestration.microBeat.type === 'glitch_title' ? styles.victoryGlitchText : styles.microBeatWhisperText,

@@ -67,6 +67,12 @@ fs.mkdirSync(OUT_DIR, { recursive: true });
 
 // C major-ish pentatonic palette keeps everything consonant.
 const N = { C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880.0, C6: 1046.5, E6: 1318.5, G6: 1568.0, C4: 261.63, G4: 392.0, A4: 440.0, E4: 329.63 };
+// Dark palette: low minor tones + a tritone for the Phase 3+ variants. Cold,
+// hollow, dissonant — the descent reaching the player's ears.
+const D = {
+  C3: 130.81, Eb3: 155.56, G3: 196.0, Ab3: 207.65, Bb3: 233.08,
+  C4: 261.63, Eb4: 311.13, F4: 349.23, Gb4: 369.99, Ab4: 415.30, Bb4: 466.16, C5: 523.25,
+};
 
 // tap: tiny soft click-chime for generic UI taps
 {
@@ -173,4 +179,40 @@ const N = { C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880.0, C6: 1046.
   tone(s, N.G5, 0, 0.3, 0.2);
   tone(s, N.C6, 0.18, 0.4, 0.2);
   writeWav(path.join(OUT_DIR, 'daily_ready.wav'), s);
+}
+
+// ============================================================================
+// DARK VARIANTS (Phase 3+) — the descent reaches the ears. The move/victory
+// chimes stop being cheerful: hollow, low, minor, a touch dissonant.
+// ============================================================================
+
+// valid_move_dark: a low minor DESCENT (falls instead of rising), hollow.
+{
+  const s = buf(0.36);
+  tone(s, D.G3, 0, 0.2, 0.26, { partial: 0.5, bend: -0.06 });
+  tone(s, D.Eb3, 0.08, 0.26, 0.24, { partial: 0.5, bend: -0.08 });
+  noise(s, 0, 0.05, 0.04, 0.05);
+  writeWav(path.join(OUT_DIR, 'valid_move_dark.wav'), s);
+}
+// victory_dark: a hollow DESCENDING minor line — the victory that feels wrong.
+{
+  const s = buf(1.0);
+  tone(s, D.C5, 0, 0.35, 0.22, { partial: 0.45, attack: 0.01 });
+  tone(s, D.Ab4, 0.14, 0.4, 0.22, { partial: 0.45 });
+  tone(s, D.Eb4, 0.3, 0.5, 0.22, { partial: 0.5 });
+  tone(s, D.C4, 0.48, 0.6, 0.24, { partial: 0.5, attack: 0.02 });
+  noise(s, 0.05, 0.7, 0.04, 0.03);
+  writeWav(path.join(OUT_DIR, 'victory_dark.wav'), s);
+}
+// perfect_dark: the dark victory line with a dissonant tritone shimmer on top
+// instead of a bright sparkle (the "flawless" reward, wrong-tuned).
+{
+  const s = buf(1.2);
+  tone(s, D.C5, 0, 0.35, 0.2, { partial: 0.45 });
+  tone(s, D.Ab4, 0.14, 0.4, 0.2, { partial: 0.45 });
+  tone(s, D.Eb4, 0.3, 0.5, 0.2, { partial: 0.5 });
+  tone(s, D.C4, 0.46, 0.6, 0.22, { partial: 0.5 });
+  tone(s, D.Gb4, 0.62, 0.55, 0.12, { partial: 0.4 }); // tritone above C4 — unease
+  noise(s, 0.05, 0.9, 0.04, 0.03);
+  writeWav(path.join(OUT_DIR, 'perfect_dark.wav'), s);
 }

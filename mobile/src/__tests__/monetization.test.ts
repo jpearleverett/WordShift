@@ -264,6 +264,21 @@ describe('ads policy', () => {
     expect(shouldShowInterstitial({ ...base, puzzlesSolved: 2, lastInterstitialPuzzle: 0 })).toBe(false);
     expect(shouldShowInterstitial({ ...base, puzzlesSolved: 3, lastInterstitialPuzzle: 0 })).toBe(true);
   });
+
+  it('suppresses interstitials entirely at Phase 4+ (tonal protection of the reveal/endgame)', () => {
+    // Huge gap that would normally fire — still no ad once the sky goes black.
+    expect(shouldShowInterstitial({ puzzlesSolved: 300, lastInterstitialPuzzle: 0, phase: 4 as any, isAdFree: false, exempt: false })).toBe(false);
+    expect(shouldShowInterstitial({ puzzlesSolved: 300, lastInterstitialPuzzle: 0, phase: 5 as any, isAdFree: false, exempt: false })).toBe(false);
+  });
+
+  it('throttles interstitials at Phase 3 (doubled gap, rare not gone)', () => {
+    const base = { isAdFree: false, exempt: false };
+    const lateFreq = interstitialFrequency(3 as any); // LATE cadence
+    // Just under 2x the late gap → not yet.
+    expect(shouldShowInterstitial({ ...base, phase: 3 as any, puzzlesSolved: 2 * lateFreq - 1, lastInterstitialPuzzle: 0 })).toBe(false);
+    // At 2x → allowed.
+    expect(shouldShowInterstitial({ ...base, phase: 3 as any, puzzlesSolved: 2 * lateFreq, lastInterstitialPuzzle: 0 })).toBe(true);
+  });
 });
 
 // ===========================================================================

@@ -43,7 +43,9 @@ import {
   getTendingMilestoneCeremonyText,
   getTendingLevelLabel,
   getMandatoryHarvestPitIntroLines,
+  getDreadOfferingLine,
 } from '../services/phaseNarrative';
+import { getStrongestDreadWord } from '../services/localGenerator';
 import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
 import { FoxGuide } from './FoxGuide';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
@@ -1698,6 +1700,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     const devoured = devouredPerBatch.current.get(batchId);
     if (!devoured || devoured.size < totalWords) return;
     finalizingBatches.current.add(batchId);
+    // Capture the batch's words BEFORE offering (offerBatch removes the batch and
+    // returns only counts) so a fed dread word can be named back to the player.
+    const batchWords = harvestStateRef.current?.pendingBatches.find(b => b.id === batchId)?.words ?? [];
     try {
       const result = await offerBatch(batchId);
       if (!result) return;
@@ -1721,6 +1726,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         spawnAmberRise(result.amberAwarded);
         hapticMedium();
         showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
+        // Remembered by name: if the offered batch carried a dread word, the pit
+        // names it back (Phase 2+) — complicity enacted. Delayed so it lands
+        // after the amber result toast; strongest tier wins.
+        if (phase >= 2) {
+          const dread = getStrongestDreadWord(batchWords);
+          if (dread) {
+            setTimeout(() => {
+              if (mountedRef.current) showResultToast(getDreadOfferingLine(dread.word, phase));
+            }, 1600);
+          }
+        }
         // Refresh harvest state so pending amber/count updates in UI
         // Spread to create new reference — harvestCache is mutated in-place by offerBatch,
         // so getHarvestState returns the same object; React skips re-render without a new ref.
@@ -1884,6 +1900,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const totalAmber = harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
     const totalWordCount = harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
+    // Strongest dread word across everything being offered — named back to the
+    // player (Phase 2+) after the result toast, once for the whole harvest.
+    const allOfferedWords = harvestState.pendingBatches.flatMap(b => b.words);
+    const harvestDread = phase >= 2 ? getStrongestDreadWord(allOfferedWords) : null;
+    const nameDreadOffering = () => {
+      if (harvestDread) {
+        setTimeout(() => {
+          if (mountedRef.current) showResultToast(getDreadOfferingLine(harvestDread.word, phase));
+        }, 1600);
+      }
+    };
 
     // Pre-offer REAL balance — the cascade counts the display up from here to
     // the final credited balance, never beyond it.
@@ -1915,6 +1942,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
+        nameDreadOffering();
         const freshState = await getHarvestState();
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setOverflowCount(0);
@@ -2009,6 +2037,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
+        nameDreadOffering();
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setFlyingWords([]);
         setOverflowCount(0);
@@ -2297,19 +2326,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       )}
 
       {/* Ward hint / ready text — shown above the pit */}
+      {/* Ward hint — boxless atmospheric whisper over the pit (player
+          feedback: no framed sign here). A pending transition keeps its
+          ward-color glow; the idle hint reads cream with a warm shadow. */}
       {wardHintText && ceremonyStatus === 'idle' && (
         <View style={styles.wardHintContainer} pointerEvents="none">
-          <NineSliceFrame
-            skin={pitSkin.card}
-            cornerDp={CARD_CORNER_DP}
-            edgeDp={CARD_EDGE_DP}
-            fillColor={pitSkin.fillCard}
-          />
-          {/* A pending transition glows in the ward color (the 7 marks below
-              echo it); the idle "stirs below" hint reads in the sign's own
-              readable ink. */}
           <Text style={[styles.wardHintText, {
-            color: pendingPhaseTransition != null ? wardColors.pendingPulse : pitSurface.title,
+            color: pendingPhaseTransition != null ? wardColors.pendingPulse : '#FBF0D9',
             fontSize: pendingPhaseTransition != null ? 18 : 15,
           }]}>
             {wardHintText}
@@ -2506,16 +2529,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         </TouchableOpacity>
       </Modal>
 
-      {/* Empty state */}
+      {/* Empty state — boxless atmospheric text (player feedback: a framed
+          sign floating over the pit art read as clutter). */}
       {pendingWordCount === 0 && !resultMessage && (
-        <View style={styles.emptyContainer}>
-          <NineSliceFrame
-            skin={pitSkin.card}
-            cornerDp={CARD_CORNER_DP}
-            edgeDp={CARD_EDGE_DP}
-            fillColor={pitSkin.fillCard}
-          />
-          <Text style={[styles.emptyText, { color: pitSurface.body }]}>
+        <View style={styles.emptyContainer} pointerEvents="none">
+          <Text style={styles.emptyText}>
             {getPitEmptyMessage(phase)}
           </Text>
         </View>
@@ -2812,20 +2830,17 @@ const styles = StyleSheet.create({
     top: FLOAT_ZONE.top + 40,
     left: 24, right: 24,
     alignItems: 'center',
-    // Clear the card frame's 12dp wood band with breathing room; no
-    // borderRadius/borderWidth (the pixel frame owns the edge).
-    paddingHorizontal: 26,
-    paddingVertical: 22,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 6,
+    // Boxless: atmospheric text floats over the pit art (no frame by design).
+    paddingHorizontal: 20,
   },
   emptyText: {
-    fontSize: 16, fontWeight: '700',
-    textAlign: 'center', lineHeight: 24,
+    color: '#FBF0D9',
+    fontSize: 17, fontWeight: '700',
+    textAlign: 'center', lineHeight: 26,
     letterSpacing: 0.3,
+    textShadowColor: 'rgba(20, 10, 6, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   overflowContainer: {
     position: 'absolute',
@@ -2906,21 +2921,18 @@ const styles = StyleSheet.create({
     top: PIT_CENTER.y - PIT_OVAL.radiusY * 4.5,
     left: 24, right: 24,
     alignItems: 'center',
-    // Wooden sign frame; clear its 12dp wood band.
-    paddingHorizontal: 22,
-    paddingVertical: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    // Boxless atmospheric whisper (no frame by design).
+    paddingHorizontal: 20,
   },
   wardHintText: {
     fontWeight: '700',
     fontStyle: 'italic',
     textAlign: 'center',
     letterSpacing: 0.5,
-    lineHeight: 20,
+    lineHeight: 22,
+    textShadowColor: 'rgba(20, 10, 6, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   ceremonyOverlay: {
     position: 'absolute',

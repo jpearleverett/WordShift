@@ -16,6 +16,17 @@ import {
   markIntroSeen,
   getStreakInfo,
   applyVariantAmberBonus,
+  recordVariantWin,
+  getVariantWinStats,
+  pickNudgeVariant,
+  consumeVariantNudge,
+  getCycleCount,
+  getCycleAcceleration,
+  canStartNewCycle,
+  startNewCycle,
+  consumeCycleOpening,
+  markHouseCompleted,
+  markFinalPuzzleCompleted,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
   hasSeenFoxPlayNudge,
@@ -33,6 +44,8 @@ import {
   setSurpriseRng,
   markPostRevelation,
   isPostRevelation,
+  recordPhase4Dwell,
+  getPhase4DwellCount,
   getFullProgress,
   invalidateProgressCache,
 } from '../services/amberCurrency';
@@ -243,18 +256,39 @@ describe('applyVariantAmberBonus', () => {
     const result = await applyVariantAmberBonus('speed', 20, 1.34, true);
     expect(result.bonus).toBeGreaterThan(0);
     const balance = await getAmberBalance();
-    expect(balance).toBe(100 + result.bonus);
+    // First win of the day also grants the fresh bonus.
+    expect(balance).toBe(100 + result.bonus + result.freshBonus);
   });
 
-  test('applies decay on repeated same variant farming', async () => {
+  test('no decay on repeated same variant (multiplier bonus is constant)', async () => {
     await devAddAmber(100);
     const first = await applyVariantAmberBonus('speed', 20, 1.34, true);
     const second = await applyVariantAmberBonus('speed', 20, 1.34, true);
     const third = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    // The multiplier portion never decays now — repeated play earns the same bonus.
+    expect(first.bonus).toBe(second.bonus);
+    expect(second.bonus).toBe(third.bonus);
     expect(first.repeatDecay).toBe(1.0);
-    expect(second.repeatDecay).toBe(1.0);
-    expect(third.repeatDecay).toBeLessThan(1.0);
-    expect(third.bonus).toBeLessThan(first.bonus);
+    expect(third.repeatDecay).toBe(1.0);
+  });
+
+  test('grants a once-per-day fresh bonus, only on the first win of the day', async () => {
+    await devAddAmber(100);
+    const first = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    const second = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    expect(first.isFresh).toBe(true);
+    expect(first.freshBonus).toBeGreaterThan(0);
+    // Same variant again same day: no repeat fresh bonus.
+    expect(second.isFresh).toBe(false);
+    expect(second.freshBonus).toBe(0);
+  });
+
+  test('a different variant is independently fresh the same day', async () => {
+    await devAddAmber(100);
+    const speed = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    const reverse = await applyVariantAmberBonus('reverse', 20, 1.2, true);
+    expect(speed.isFresh).toBe(true);
+    expect(reverse.isFresh).toBe(true);
   });
 
   test('deferred crediting (default) does not increase spendable balance', async () => {
@@ -263,6 +297,109 @@ describe('applyVariantAmberBonus', () => {
     expect(result.bonus).toBeGreaterThan(0);
     const balance = await getAmberBalance();
     expect(balance).toBe(100); // Not credited
+  });
+});
+
+describe('recordVariantWin / getVariantWinStats', () => {
+  test('counts per-variant wins and blind wins independently', async () => {
+    await recordVariantWin('reverse', false);
+    await recordVariantWin('reverse', false);
+    await recordVariantWin('speed', false);
+    await recordVariantWin('standard', true); // blind standard board
+    const stats = await getVariantWinStats();
+    expect(stats.variantWins.reverse).toBe(2);
+    expect(stats.variantWins.speed).toBe(1);
+    expect(stats.variantWins.standard).toBeUndefined(); // standard never counted as a variant
+    expect(stats.blindWins).toBe(1);
+  });
+
+  test('a blind reverse win counts BOTH the variant and the blind tally', async () => {
+    await recordVariantWin('reverse', true);
+    const stats = await getVariantWinStats();
+    expect(stats.variantWins.reverse).toBe(1);
+    expect(stats.blindWins).toBe(1);
+  });
+
+  test('a plain standard non-blind win is a no-op', async () => {
+    await recordVariantWin('standard', false);
+    const stats = await getVariantWinStats();
+    expect(stats.blindWins).toBe(0);
+    expect(Object.keys(stats.variantWins)).toHaveLength(0);
+  });
+});
+
+describe('variant-offer nudge', () => {
+  test('pickNudgeVariant returns the first unlocked, never-won variant', () => {
+    expect(pickNudgeVariant(['standard', 'reverse', 'speed'], { reverse: 3 })).toBe('speed');
+    expect(pickNudgeVariant(['standard', 'reverse'], { reverse: 1 })).toBeNull();
+    expect(pickNudgeVariant(['standard'], {})).toBeNull(); // nothing unlocked
+  });
+
+  test('consumeVariantNudge suggests a never-tried variant, once per day', async () => {
+    const first = await consumeVariantNudge(['standard', 'reverse', 'speed'], 'standard');
+    expect(first).toBe('reverse');
+    // Same day: no second nudge.
+    const second = await consumeVariantNudge(['standard', 'reverse', 'speed'], 'standard');
+    expect(second).toBeNull();
+  });
+
+  test('consumeVariantNudge does not fire after a variant board', async () => {
+    const nudge = await consumeVariantNudge(['standard', 'reverse'], 'reverse');
+    expect(nudge).toBeNull();
+  });
+
+  test('consumeVariantNudge skips a variant the player has already won', async () => {
+    await recordVariantWin('reverse', false);
+    const nudge = await consumeVariantNudge(['standard', 'reverse'], 'standard');
+    expect(nudge).toBeNull(); // reverse already won, nothing else unlocked+untried
+  });
+});
+
+describe('New Cycle (NG+)', () => {
+  test('getCycleAcceleration grows with cycles and is capped', () => {
+    expect(getCycleAcceleration(0)).toBe(1);
+    expect(getCycleAcceleration(1)).toBeGreaterThan(1);
+    expect(getCycleAcceleration(2)).toBeGreaterThan(getCycleAcceleration(1));
+    // Capped — a deep cycle can't collapse the arc.
+    expect(getCycleAcceleration(100)).toBeLessThanOrEqual(2.0);
+  });
+
+  test('cannot start a cycle before the true endgame', async () => {
+    expect(await canStartNewCycle()).toBe(false);
+    // Only house complete — still not enough.
+    await markHouseCompleted();
+    expect(await canStartNewCycle()).toBe(false);
+    // startNewCycle is a no-op here.
+    expect(await startNewCycle()).toBe(0);
+    expect(await getCycleCount()).toBe(0);
+  });
+
+  test('startNewCycle re-descends but keeps the collection', async () => {
+    await devAddAmber(500);
+    await markHouseCompleted();
+    await markFinalPuzzleCompleted();
+    await markPostRevelation();
+    expect(await getCurrentPhase()).toBe(5);
+    expect(await canStartNewCycle()).toBe(true);
+
+    const cycle = await startNewCycle();
+    expect(cycle).toBe(1);
+    // Re-descended to the bright days.
+    expect(await getCurrentPhase()).toBe(0);
+    // Collection kept.
+    expect(await getAmberBalance()).toBe(500);
+    // The finale can fire again.
+    expect(await canStartNewCycle()).toBe(false);
+  });
+
+  test('consumeCycleOpening fires once per new cycle', async () => {
+    await markHouseCompleted();
+    await markFinalPuzzleCompleted();
+    await markPostRevelation();
+    await startNewCycle();
+    expect(await consumeCycleOpening()).toBe(1);
+    // Second call in the same cycle: nothing.
+    expect(await consumeCycleOpening()).toBeNull();
   });
 });
 
@@ -706,6 +843,14 @@ describe('challenge intro tracking', () => {
 // ============================================================================
 
 describe('post-revelation phase pinning (Phase 5)', () => {
+  test('recordPhase4Dwell counts up and getPhase4DwellCount reads it (finale gate)', async () => {
+    expect(await getPhase4DwellCount()).toBe(0);
+    expect(await recordPhase4Dwell()).toBe(1);
+    expect(await recordPhase4Dwell()).toBe(2);
+    expect(await recordPhase4Dwell()).toBe(3);
+    expect(await getPhase4DwellCount()).toBe(3);
+  });
+
   test('markPostRevelation sets currentPhase to 5 and clears any pending transition', async () => {
     await devAddPuzzles(235); // Reach phase 4
     await markPostRevelation();

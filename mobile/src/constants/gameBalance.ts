@@ -227,6 +227,27 @@ export const STARTER_INTRO_MIN_PUZZLES = 12;
 export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 
 /**
+ * Finale dwell: the cult-reveal finale used to fire on the FIRST Phase-4
+ * victory with a complete house, so the entire robed/storm/sacrifice era
+ * (300 written dialogue lines) flashed past in ~2 puzzles. The finale now
+ * unlocks only after the player has completed this many Phase-4 puzzles with
+ * the house complete — long enough, against the 5-puzzle Phase-4 dialogue
+ * cooldown, for multiple sessions per animal and the sacrifice mechanic to
+ * actually be played. Never revealed as a counter (narrative rule 7); the
+ * house "is not yet ready to receive it."
+ */
+export const FINALE_DWELL_PUZZLES = 8;
+
+/**
+ * New Cycle (NG+) phase-progress acceleration per completed cycle. Each cycle
+ * makes the descent ~30% faster (dread arrives earlier) while the collection is
+ * kept, capped so even a deep cycle can't collapse the arc to nothing.
+ * Multiplied onto the normal phase acceleration in awardPuzzleAmber.
+ */
+export const NEW_CYCLE_ACCELERATION_PER_CYCLE = 0.3;
+export const NEW_CYCLE_ACCELERATION_MAX = 2.0;
+
+/**
  * Pending (unoffered) pit amber at or above which the home screen gives a
  * gentle once-per-session Fox nudge to go harvest. High enough that a player
  * banking a puzzle or two never sees it; the pit-entrance glow remains the
@@ -341,7 +362,20 @@ export const CHALLENGE_MODE_CONFIG = {
 // VARIANT ECONOMY
 // ============================================================================
 
-/** Consecutive-use decay for variant amber bonuses (anti-farming). */
+/**
+ * Fresh-variant bonus: a flat amber reward the first time each day the player
+ * wins with a non-standard variant they haven't already claimed today. Replaces
+ * the old repeat-use decay (a punishment) with a positive rotation incentive, so
+ * trying every variant reads as REWARDED, not "your bonus is shrinking". Amber
+ * only, never phase progress. One claim per variant per local day (no ping-pong
+ * farming). Sized like a small milestone so rotation feels worth it.
+ */
+export const FRESH_VARIANT_BONUS_AMBER = 15;
+
+/**
+ * @deprecated Repeat-use decay removed in favor of FRESH_VARIANT_BONUS_AMBER.
+ * Kept exported so any stale importer still compiles; no longer applied.
+ */
 export const VARIANT_REPEAT_DECAY = {
   firstTwo: 1.0,
   third: 0.85,
@@ -349,14 +383,14 @@ export const VARIANT_REPEAT_DECAY = {
   fifthPlus: 0.55,
 } as const;
 
-/** Weekly variant usage decay thresholds. */
+/** @deprecated Weekly variant usage decay removed with the repeat-decay system. */
 export const WEEKLY_VARIANT_DECAY_THRESHOLDS = [
   { maxUses: 3, multiplier: 1.0 },
   { maxUses: 6, multiplier: 0.85 },
   { maxUses: 10, multiplier: 0.65 },
 ] as const;
 
-/** Default weekly variant decay multiplier (11+ uses). */
+/** @deprecated Default weekly variant decay multiplier (unused since fresh-bonus). */
 export const WEEKLY_VARIANT_DECAY_DEFAULT = 0.45;
 
 // ============================================================================

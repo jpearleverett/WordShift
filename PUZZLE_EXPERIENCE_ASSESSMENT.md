@@ -4,6 +4,22 @@
 
 ---
 
+## Implementation status (updated)
+
+Every recommendation in the priority list below has now been implemented, with one deliberate, documented exception:
+
+- ✅ **1. Unwinnable boards** — exhaustive solver (`puzzleSolvability.ts`), CI guard (`bankSolvability.test.ts`), 43 unsolvable purged, generator gate, hint-refund guard.
+- ✅ **2. Phase-4 dwell gate** — `FINALE_DWELL_PUZZLES` + `recordPhase4Dwell`; the finale waits for real Phase-4 playtime.
+- ✅ **3. Dread-supply rationing + Phase-4 recycle** — dropped the pre-Phase-3 lead bonus; dread-tiered boards recycle at Phase 4+.
+- ✅ **4. Daily week-ramp + streak decay-to-milestone + rewarded rescue + host** — `getDailyRamp`, decay-to-milestone, `getDailyHost`/`getDailyHostName`.
+- ✅ **5. Animals request offerings** (`offeringRequests.ts`, ask→deliver→react) + **dread words remembered by name** at the pit (`getStrongestDreadWord` + `getDreadOfferingLine`). *Player-curated withholding is deliberately NOT built — `offerBatch` is atomic per batch, so partial withholding would rework the harvest economy and collide with the mandatory-harvest all-devoured invariant; the naming lever delivers the same complicity at far lower risk.*
+- ✅ **6. Flawless tier + solve-time trends + best-speed record + blind mode + variant achievements/quests + fresh-variant bonus + revived variant-offer nudge** (`masteryRecords.ts`, blind modifier, 11 new achievements, `variant_wins` quests).
+- ✅ **7. Dark SFX (Phase 3+) + silent-victory anticlimax + echo puzzles pre-finale.**
+- ✅ **8. Rating-prompt choreography** (`reviewPrompt.ts`, Phase 0-1 only, hard-suppressed Phase 2+) **+ win-back ladder extension** (+1/+3/+7/+14/+30) **+ interstitial throttle** (suppressed Phase 4, halved Phase 3) **+ leaderboard re-check surface.** *(Reverse-bank regeneration-for-size remains a documented offline follow-up — banks are correct/diverse/solvable; regen is a multi-hour offline job.)*
+- ✅ **9. New Cycle (NG+)** — `startNewCycle`, faster re-descent, collection kept.
+
+---
+
 ## The headline verdict
 
 **Opening hour (puzzle 1–35): fun 7/10, retention risk medium.** Close to best-in-class for a small team. The unlock drip lands a new beat every 1–3 sessions and the juice is exceptional.

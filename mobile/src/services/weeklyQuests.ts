@@ -32,7 +32,8 @@ export type QuestType =
   | 'visit_animals'     // Talk to N different animals
   | 'streak_days'       // Maintain a streak for N days
   | 'sacrifice_amber'   // Offer N amber to the arrangement (Phase 4+ only)
-  | 'tend_amber';       // Deepen the pattern by N amber at the Shrine (Phase 5+ only)
+  | 'tend_amber'        // Deepen the pattern by N amber at the Shrine (Phase 5+ only)
+  | 'variant_wins';     // Win N puzzles of a specific named variant (only when unlocked)
 
 export type QuestTier = 'daily' | 'weekly';
 
@@ -52,6 +53,8 @@ export interface Quest {
   rewardAmber: number;
   /** Difficulty filter (only for solve_difficulty quests) */
   difficulty?: Difficulty;
+  /** Variant key (only for variant_wins quests) e.g. 'reverse' | 'double_shift' | 'speed' */
+  variant?: string;
 }
 
 export interface QuestState {
@@ -77,6 +80,8 @@ export interface WeeklyQuestGenerationContext {
   unlockedAnimalCount?: number;
   dailyUnlocked?: boolean;
   challengeUnlocked?: boolean;
+  /** Unlocked non-standard variant keys — variant_wins quests only appear for these. */
+  unlockedVariants?: string[];
 }
 
 // ============================================================================
@@ -91,6 +96,8 @@ export interface QuestTemplate {
   target: number;
   rewardAmber: number;
   difficulty?: Difficulty;
+  /** Variant key (only for variant_wins templates). */
+  variant?: string;
 }
 
 // Daily quest pool — achievable in a dedicated single session.
@@ -115,6 +122,12 @@ export const DAILY_QUEST_POOL: QuestTemplate[] = [
   { type: 'visit_animals', titleTemplate: 'Social Call', descTemplate: 'Talk to {target} different animals', darkDescTemplate: 'Consult {target} keepers', target: 2, rewardAmber: 14 },
   { type: 'earn_amber', titleTemplate: 'Amber Scavenger', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'Gather {target} amber', target: 30, rewardAmber: 8 },
   { type: 'earn_amber', titleTemplate: 'Amber Seeker', descTemplate: 'Earn {target} amber today', darkDescTemplate: 'The coffers need {target} amber', target: 60, rewardAmber: 12 },
+  // Variant quests — only appear once that variant is unlocked (gated in
+  // generateQuestsFromPool). They name the variant so the 32 configs stop being
+  // invisible content and rotation gets a daily reason.
+  { type: 'variant_wins', titleTemplate: 'Backward Steps', descTemplate: 'Win a Reverse Shift puzzle', darkDescTemplate: 'Walk the pattern back once', target: 1, rewardAmber: 12, variant: 'reverse' },
+  { type: 'variant_wins', titleTemplate: 'Doubled', descTemplate: 'Win a Double Shift puzzle', darkDescTemplate: 'Two letters, one breath', target: 1, rewardAmber: 12, variant: 'double_shift' },
+  { type: 'variant_wins', titleTemplate: 'Beat the Clock', descTemplate: 'Win a Speed Shift run', darkDescTemplate: 'Race the closing dark', target: 1, rewardAmber: 12, variant: 'speed' },
   // Tending (Phase 5+ only). Deliberately net-negative — rewards less amber than
   // it asks you to tend, so it pulls amber out of the economy (a sink disguised
   // as a quest) while giving a daily reason to deepen the pattern.
@@ -139,6 +152,10 @@ export const WEEKLY_QUEST_POOL: QuestTemplate[] = [
   { type: 'visit_animals', titleTemplate: 'Social Butterfly', descTemplate: 'Talk to {target} different animals this week', darkDescTemplate: 'Every keeper has something to say', target: 9, rewardAmber: 110 },
   { type: 'streak_days', titleTemplate: 'Consistent', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Do not break the chain for {target} days', target: 5, rewardAmber: 80 },
   { type: 'streak_days', titleTemplate: 'Unbroken', descTemplate: 'Maintain a {target}-day streak', darkDescTemplate: 'Seven days. The ritual deepens.', target: 7, rewardAmber: 120 },
+  // Variant quests (weekly, higher targets/rewards) — gated to unlocked variants.
+  { type: 'variant_wins', titleTemplate: 'The Return', descTemplate: 'Win {target} Reverse Shift puzzles this week', darkDescTemplate: 'Walk the pattern back {target} times', target: 5, rewardAmber: 85, variant: 'reverse' },
+  { type: 'variant_wins', titleTemplate: 'Both Hands', descTemplate: 'Win {target} Double Shift puzzles this week', darkDescTemplate: 'Two letters at a time, {target} times over', target: 5, rewardAmber: 85, variant: 'double_shift' },
+  { type: 'variant_wins', titleTemplate: 'Fleet', descTemplate: 'Win {target} Speed Shift runs this week', darkDescTemplate: 'Outrun the dark {target} times', target: 5, rewardAmber: 85, variant: 'speed' },
   // Sacrifice (Phase 4+ only). Deliberately net-negative like tend_amber — the
   // quest can only appear at Phase 4+ where the reward multiplier is 2.0x, so
   // the base reward must stay below target/2 or the quest becomes an amber
@@ -218,12 +235,16 @@ function generateQuestsFromPool(
 
   const challengeUnlocked = context?.challengeUnlocked ?? (context?.puzzlesSolved ?? 0) >= 15;
   const unlockedAnimalCount = context?.unlockedAnimalCount ?? 10;
+  const unlockedVariants = context?.unlockedVariants ?? [];
 
   // Filter the pool based on player state
   const filtered = pool.filter(t => {
     if (t.type === 'sacrifice_amber' && phase < 4) return false;
     if (t.type === 'tend_amber' && phase < 5) return false;
     if (t.type === 'challenge_mode' && !challengeUnlocked) return false;
+    // A variant quest can only appear once its variant is unlocked (else it names
+    // a mode the player has never seen).
+    if (t.type === 'variant_wins' && (!t.variant || !unlockedVariants.includes(t.variant))) return false;
     if (t.type === 'visit_animals') {
       if (unlockedAnimalCount < 2) return false;
       if (t.target > unlockedAnimalCount) return false;
@@ -276,6 +297,7 @@ function generateQuestsFromPool(
       claimed: false,
       rewardAmber: template.rewardAmber,
       difficulty: template.difficulty,
+      variant: template.variant,
     };
   });
 }
@@ -364,6 +386,8 @@ export async function updateQuestProgress(event: {
   amberSacrificed?: number;
   /** Amber tended at the Shrine this session (for tend_amber quests) */
   amberTended?: number;
+  /** Variant key of the completed puzzle (for variant_wins quests). */
+  variant?: string;
 }, currentPhase: number = 0): Promise<Quest[]> {
   const combined = await loadWeeklyQuests(currentPhase);
   const allNewlyCompleted: Quest[] = [];
@@ -398,6 +422,9 @@ export async function updateQuestProgress(event: {
           break;
         case 'challenge_mode':
           if (event.isChallenge) progressDelta = 1;
+          break;
+        case 'variant_wins':
+          if (event.variant && event.variant === quest.variant) progressDelta = 1;
           break;
         case 'earn_amber':
           progressDelta = event.amberEarned ?? 0;

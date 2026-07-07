@@ -250,6 +250,10 @@ export interface HomeWorldProgress {
   finalPuzzleCompleted?: boolean;
   // Whether post-revelation (Phase 5) content has been reached
   postRevelation?: boolean;
+  // Count of puzzles completed at Phase 4 with the house already complete —
+  // gates the finale (dwell so the cult-reveal era is actually played, not
+  // flashed past in one puzzle). See FINALE_DWELL_PUZZLES.
+  phase4Dwell?: number;
   // Tutorial seeds - tracks specific tutorial lines for Phase 4 callbacks
   tutorialSeedsPlanted?: boolean;
   // Coordinated dialogue events that have been consumed (by theme name)
@@ -270,6 +274,22 @@ export interface HomeWorldProgress {
   variantWeeklyUsage?: Record<string, number>;
   // Week identifier for variant usage tracking reset
   variantWeeklyUsageWeek?: string;
+  // Lifetime wins per non-standard variant key (reverse/double_shift/speed) — feeds
+  // variant achievements + the variant-offer nudge.
+  variantWins?: Record<string, number>;
+  // Lifetime Blind Offering wins (blind composes with any variant, tracked apart).
+  blindWins?: number;
+  // Local date (YYYY-MM-DD) each variant last earned its once-per-day fresh bonus.
+  variantFreshDates?: Record<string, string>;
+  // Local date the player last saw the variant-offer nudge (once-per-day cap).
+  lastVariantNudgeDate?: string;
+  // New Cycle (NG+): how many times the player has begun the descent again. 0 =
+  // first playthrough. Each cycle re-descends faster (dread arrives earlier)
+  // while the collection (rooms, animals, amber, cosmetics) is kept.
+  cycleCount?: number;
+  // The cycleCount whose opening beat has already been shown (so the "bright
+  // days return" line fires exactly once per new cycle).
+  cycleOpeningSeen?: number;
   // Streak freeze: number of streak freezes available
   streakFreezes?: number;
   // Last time a free streak freeze was granted (ISO date)

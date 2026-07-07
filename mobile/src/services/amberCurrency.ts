@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
-import { getWeekId } from './weeklyQuests';
 import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal } from './dateUtils';
 import {
   HomeWorldProgress,
@@ -19,11 +18,13 @@ import {
 } from '../types/homeWorld';
 import {
   MIN_PUZZLES_FOR_PHASE,
-  VARIANT_REPEAT_DECAY as _VARIANT_REPEAT_DECAY,
+  FRESH_VARIANT_BONUS_AMBER,
   PATRON_AMBER_BONUS,
   SURPRISE_BONUS_CHANCE,
   SURPRISE_BONUS_AMOUNTS,
   SURPRISE_BONUS_MIN_PUZZLES,
+  NEW_CYCLE_ACCELERATION_PER_CYCLE,
+  NEW_CYCLE_ACCELERATION_MAX,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -79,9 +80,6 @@ function getDefaultProgress(): HomeWorldProgress {
 }
 
 // MIN_PUZZLES_FOR_PHASE imported from constants/gameBalance.ts (single source of truth).
-
-// Variant reward anti-farm decay — re-exported from constants/gameBalance.ts.
-const VARIANT_REPEAT_DECAY = _VARIANT_REPEAT_DECAY;
 
 /**
  * Get today's date as a LOCAL-day YYYY-MM-DD string.
@@ -495,7 +493,8 @@ export async function awardPuzzleAmber(
   const phaseAcceleration = calculatePhaseAcceleration(
     threeStarRate, currentStreak, difficulty, gameMode
   );
-  const phaseProgressIncrement = phaseAcceleration;
+  // New Cycle: each completed descent makes the next one faster (dread earlier).
+  const phaseProgressIncrement = phaseAcceleration * getCycleAcceleration(progress.cycleCount ?? 0);
   // Initialize phaseProgress from puzzlesSolved for migrated players missing the field
   if (progress.phaseProgress === undefined || progress.phaseProgress === null) {
     progress.phaseProgress = progress.puzzlesSolved - 1; // -1 because we already incremented puzzlesSolved above
@@ -1230,19 +1229,15 @@ export async function getPreferredPuzzleVariant(): Promise<string> {
   return progress.preferredPuzzleVariant || 'standard';
 }
 
-function getVariantRepeatDecay(repeatCount: number): number {
-  if (repeatCount <= 2) return VARIANT_REPEAT_DECAY.firstTwo;
-  if (repeatCount === 3) return VARIANT_REPEAT_DECAY.third;
-  if (repeatCount === 4) return VARIANT_REPEAT_DECAY.fourth;
-  return VARIANT_REPEAT_DECAY.fifthPlus;
-}
-
 /**
- * Apply variant bonus amber with anti-farming decay on repeated use.
- * Returns updated balance and the actual applied multiplier.
+ * Apply the variant amber bonus. The full configured multiplier always applies
+ * (the old anti-farm decay is gone) and, once per local day per variant, a flat
+ * FRESH_VARIANT_BONUS_AMBER is added on top — so rotating between variants reads
+ * as REWARDED rather than "why is my bonus shrinking". Amber only; never phase
+ * progress. `freshBonus`/`isFresh` let the victory modal surface the moment.
  *
- * When `creditToBalance` is false, the bonus is NOT added to spendable amber.
- * The caller is responsible for crediting later.
+ * When `creditToBalance` is false, nothing is added to spendable amber — the
+ * caller credits later (the harvest-batch path).
  */
 export async function applyVariantAmberBonus(
   variant: string,
@@ -1251,22 +1246,25 @@ export async function applyVariantAmberBonus(
   creditToBalance: boolean = false
 ): Promise<{
   bonus: number;
+  freshBonus: number;
+  isFresh: boolean;
   newBalance: number;
   appliedMultiplier: number;
   repeatCount: number;
+  /** @deprecated always 1.0 — repeat decay removed in favor of the fresh bonus. */
   repeatDecay: number;
 }> {
   const progress = await loadProgress();
   if (progress.lastVariantPlayed === undefined) progress.lastVariantPlayed = 'standard';
-  if (progress.sameVariantStreak === undefined) progress.sameVariantStreak = 0;
 
   if (!variant || variant === 'standard' || configuredMultiplier <= 1.0 || baseAmberAward <= 0) {
     progress.lastVariantPlayed = variant || 'standard';
-    progress.sameVariantStreak = 0;
     progressCache = progress;
     await saveProgress();
     return {
       bonus: 0,
+      freshBonus: 0,
+      isFresh: false,
       newBalance: progress.amber,
       appliedMultiplier: 1.0,
       repeatCount: 0,
@@ -1274,32 +1272,22 @@ export async function applyVariantAmberBonus(
     };
   }
 
-  const repeatCount = progress.lastVariantPlayed === variant
-    ? (progress.sameVariantStreak || 0) + 1
-    : 1;
-  const consecutiveDecay = getVariantRepeatDecay(repeatCount);
+  // Full multiplier, no decay.
+  const bonus = Math.max(0, Math.round(baseAmberAward * (configuredMultiplier - 1)));
 
-  // Weekly variant usage tracking
-  const currentWeek = getWeekId();
-  if (!progress.variantWeeklyUsage || progress.variantWeeklyUsageWeek !== currentWeek) {
-    progress.variantWeeklyUsage = {};
-    progress.variantWeeklyUsageWeek = currentWeek;
-  }
-  const weeklyUsage = (progress.variantWeeklyUsage[variant] || 0) + 1;
-  progress.variantWeeklyUsage[variant] = weeklyUsage;
-  const weeklyDecay = getWeeklyVariantDecay(weeklyUsage);
+  // Once-per-day-per-variant fresh bonus.
+  const today = getLocalDateString();
+  if (!progress.variantFreshDates) progress.variantFreshDates = {};
+  const isFresh = progress.variantFreshDates[variant] !== today;
+  const freshBonus = isFresh ? FRESH_VARIANT_BONUS_AMBER : 0;
+  if (isFresh) progress.variantFreshDates[variant] = today;
 
-  // Apply the stricter of consecutive decay vs weekly decay
-  const repeatDecay = Math.min(consecutiveDecay, weeklyDecay);
-  const appliedMultiplier = 1 + ((configuredMultiplier - 1) * repeatDecay);
-  const bonus = Math.max(0, Math.round(baseAmberAward * (appliedMultiplier - 1)));
-
+  const totalBonus = bonus + freshBonus;
   progress.lastVariantPlayed = variant;
-  progress.sameVariantStreak = repeatCount;
   if (creditToBalance) {
-    progress.amber += bonus;
+    progress.amber += totalBonus;
   }
-  progress.totalAmberEarned += bonus;
+  progress.totalAmberEarned += totalBonus;
   progressCache = progress;
   await saveProgress();
 
@@ -1307,18 +1295,94 @@ export async function applyVariantAmberBonus(
     await recordTransaction({
       amount: bonus,
       type: 'earn',
-      source: `variant_${variant}_x${appliedMultiplier.toFixed(2)}`,
+      source: `variant_${variant}_x${configuredMultiplier.toFixed(2)}`,
+      timestamp: Date.now(),
+    });
+  }
+  if (freshBonus > 0) {
+    await recordTransaction({
+      amount: freshBonus,
+      type: 'earn',
+      source: `variant_fresh_${variant}`,
       timestamp: Date.now(),
     });
   }
 
   return {
     bonus,
+    freshBonus,
+    isFresh,
     newBalance: progress.amber,
-    appliedMultiplier,
-    repeatCount,
-    repeatDecay,
+    appliedMultiplier: configuredMultiplier,
+    repeatCount: 0,
+    repeatDecay: 1.0,
   };
+}
+
+/**
+ * Record a completed puzzle's variant/blind flags for the variant achievements
+ * and the variant-offer nudge. Standard non-blind wins are a no-op. Idempotent
+ * per call (one win = one increment).
+ */
+export async function recordVariantWin(variant: string, blind: boolean): Promise<void> {
+  if ((!variant || variant === 'standard') && !blind) return;
+  const progress = await loadProgress();
+  if (variant && variant !== 'standard') {
+    if (!progress.variantWins) progress.variantWins = {};
+    progress.variantWins[variant] = (progress.variantWins[variant] || 0) + 1;
+  }
+  if (blind) {
+    progress.blindWins = (progress.blindWins || 0) + 1;
+  }
+  progressCache = progress;
+  await saveProgress();
+}
+
+/** Read per-variant + blind lifetime win counts (for achievements / nudges). */
+export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number }> {
+  const progress = await loadProgress();
+  return {
+    variantWins: progress.variantWins || {},
+    blindWins: progress.blindWins || 0,
+  };
+}
+
+/**
+ * Pure picker: the first unlocked non-standard variant the player has NEVER won
+ * (a never-tried unlocked mode), or null. Kept pure for testing.
+ */
+export function pickNudgeVariant(
+  unlockedVariants: string[],
+  variantWins: Record<string, number>
+): string | null {
+  for (const v of unlockedVariants) {
+    if (v === 'standard') continue;
+    if ((variantWins[v] || 0) === 0) return v;
+  }
+  return null;
+}
+
+/**
+ * The variant-offer nudge (revives the long-dead shouldOfferVariant path): once
+ * per local day, after a STANDARD board, suggest a variant the player has
+ * unlocked but never won. Marks the nudge date so it fires at most once/day.
+ * Returns the variant key to suggest, or null.
+ */
+export async function consumeVariantNudge(
+  unlockedVariants: string[],
+  justPlayedVariant: string
+): Promise<string | null> {
+  // Don't nudge mid-variant-play — only when the player is on the default path.
+  if (justPlayedVariant && justPlayedVariant !== 'standard') return null;
+  const progress = await loadProgress();
+  const today = getLocalDateString();
+  if (progress.lastVariantNudgeDate === today) return null;
+  const candidate = pickNudgeVariant(unlockedVariants, progress.variantWins || {});
+  if (!candidate) return null;
+  progress.lastVariantNudgeDate = today;
+  progressCache = progress;
+  await saveProgress();
+  return candidate;
 }
 
 /**
@@ -1385,6 +1449,123 @@ export async function markPostRevelation(): Promise<void> {
 export async function isPostRevelation(): Promise<boolean> {
   const progress = await loadProgress();
   return progress.postRevelation === true;
+}
+
+// ============================================================================
+// NEW CYCLE (NG+)
+// ============================================================================
+
+/** How many descents the player has completed (0 = first playthrough). */
+export async function getCycleCount(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.cycleCount ?? 0;
+}
+
+/**
+ * If a New Cycle has begun whose opening beat hasn't been shown yet, mark it
+ * shown and return the cycle number (so App can announce it once). Otherwise
+ * null. Fires exactly once per new cycle.
+ */
+export async function consumeCycleOpening(): Promise<number | null> {
+  const progress = await loadProgress();
+  const cycle = progress.cycleCount ?? 0;
+  if (cycle >= 1 && (progress.cycleOpeningSeen ?? 0) !== cycle) {
+    progress.cycleOpeningSeen = cycle;
+    progressCache = progress;
+    await saveProgress();
+    return cycle;
+  }
+  return null;
+}
+
+/** Phase-progress multiplier from completed cycles (each cycle descends faster). */
+export function getCycleAcceleration(cycleCount: number): number {
+  return Math.min(
+    NEW_CYCLE_ACCELERATION_MAX,
+    1 + Math.max(0, cycleCount) * NEW_CYCLE_ACCELERATION_PER_CYCLE
+  );
+}
+
+/**
+ * Whether the player has reached the true end of the current descent and can
+ * begin a New Cycle: the house is complete, the finale has been played, and
+ * they are post-revelation (Phase 5). "The pattern continues."
+ */
+export async function canStartNewCycle(): Promise<boolean> {
+  const progress = await loadProgress();
+  return (
+    progress.postRevelation === true &&
+    progress.houseCompleted === true &&
+    progress.finalPuzzleCompleted === true
+  );
+}
+
+/**
+ * Begin a New Cycle (NG+). Resets ONLY the narrative-progression state so the
+ * descent replays from the bright days — phase, phase progress, the finale /
+ * post-revelation pins, the dwell counter, and the progress-owned dialogue
+ * bookkeeping (read indices, consumed coordinated events, trigger queue). The
+ * COLLECTION is deliberately kept: amber, totalAmberEarned, unlocked rooms and
+ * animals (the house stays built), streak, puzzlesSolved, and everything owned
+ * by other services (cosmetics, achievements, stats). The cycle counter drives
+ * a faster descent (dread earlier) via getCycleAcceleration.
+ *
+ * Cross-service narrative state (dialogue sessions, narrative delivery, offering
+ * requests, micro-beats) is reset by the CALLER (App) so those services stay in
+ * charge of their own storage — mirroring the partial-reset convention.
+ *
+ * No-op (returns the current count) unless canStartNewCycle() would be true.
+ */
+export async function startNewCycle(): Promise<number> {
+  const progress = await loadProgress();
+  if (
+    progress.postRevelation !== true ||
+    progress.houseCompleted !== true ||
+    progress.finalPuzzleCompleted !== true
+  ) {
+    return progress.cycleCount ?? 0;
+  }
+
+  progress.cycleCount = (progress.cycleCount ?? 0) + 1;
+  // Re-descend from the bright days.
+  progress.currentPhase = 0;
+  progress.phaseProgress = 0;
+  progress.phaseProgressFraction = 0;
+  progress.pendingPhaseTransition = null;
+  progress.phasePuzzleThresholds = [...PHASE_THRESHOLDS];
+  progress.phase4Dwell = 0;
+  // Clear the endgame pins so the finale + post-revelation can fire again.
+  progress.postRevelation = false;
+  progress.finalPuzzleCompleted = false;
+  // Dialogue replays from the top; drop the progress-owned dialogue bookkeeping.
+  progress.lastDialogueRead = {};
+  progress.consumedCoordinatedEvents = [];
+  progress.triggerWordQueue = [];
+
+  progressCache = progress;
+  await saveProgress();
+  return progress.cycleCount;
+}
+
+/**
+ * Record one Phase-4 "dwell" puzzle (a victory at Phase 4 with the house
+ * complete and the finale not yet fired) and return the new count. The finale
+ * gate reads this so the cult-reveal era is genuinely played instead of
+ * flashing past in one puzzle. Idempotent-safe: callers should only invoke it
+ * on the exact victory path that would otherwise trigger the finale.
+ */
+export async function recordPhase4Dwell(): Promise<number> {
+  const progress = await loadProgress();
+  progress.phase4Dwell = (progress.phase4Dwell ?? 0) + 1;
+  progressCache = progress;
+  await saveProgress();
+  return progress.phase4Dwell;
+}
+
+/** Current Phase-4 dwell count (see recordPhase4Dwell). */
+export async function getPhase4DwellCount(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.phase4Dwell ?? 0;
 }
 
 /**
@@ -1687,17 +1868,6 @@ export async function awardBonusAmber(amount: number, source: string): Promise<n
     timestamp: Date.now(),
   });
   return progress.amber;
-}
-
-/**
- * Weekly variant decay — prevents exploitation of variant amber bonuses
- * by tracking per-variant usage per week.
- */
-function getWeeklyVariantDecay(variantUsageThisWeek: number): number {
-  if (variantUsageThisWeek <= 3) return 1.0;
-  if (variantUsageThisWeek <= 6) return 0.85;
-  if (variantUsageThisWeek <= 10) return 0.65;
-  return 0.45;
 }
 
 /**

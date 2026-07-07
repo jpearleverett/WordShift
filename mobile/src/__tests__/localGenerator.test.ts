@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -246,5 +246,28 @@ describe('isReverseSolvable (cumulative locking)', () => {
     expect(isReverseSolvable([], [])).toBe(false);
     expect(isReverseSolvable(['WORD'], [])).toBe(false);
     expect(isReverseSolvable(['A'], [{ stepIndex: 0, sourceWord: 'A', targetWord: 'B', letterToMove: 'A', explanation: '' }])).toBe(false);
+  });
+});
+
+describe('getStrongestDreadWord', () => {
+  test('returns null when no word is a dread word', () => {
+    expect(getStrongestDreadWord(['APPLE', 'CHAIR', 'TABLE'])).toBeNull();
+    expect(getStrongestDreadWord([])).toBeNull();
+  });
+
+  test('finds a dread word (case-insensitive) and reports its tier', () => {
+    const r = getStrongestDreadWord(['apple', 'void', 'chair']);
+    expect(r).not.toBeNull();
+    expect(r!.word).toBe('VOID');
+    expect(r!.tier).toBeGreaterThanOrEqual(1);
+  });
+
+  test('picks the highest-tier dread word when several are present', () => {
+    // DOOM/ABYSS are late-tier; DARK is early. The strongest should win.
+    const r = getStrongestDreadWord(['DARK', 'ABYSS']);
+    expect(r).not.toBeNull();
+    // Whichever is strongest, its tier is >= the early-tier DARK's.
+    const dark = getStrongestDreadWord(['DARK']);
+    expect(r!.tier).toBeGreaterThanOrEqual(dark!.tier);
   });
 });

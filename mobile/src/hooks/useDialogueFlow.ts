@@ -42,6 +42,7 @@ import {
   hasSeenFoxPlayNudge,
   markFoxPlayNudgeSeen,
 } from '../services/amberCurrency';
+import { takeOfferingDialogue } from '../services/offeringRequests';
 import { getSettingsSync } from '../services/settings';
 import {
   getChoiceForAnimal,
@@ -475,6 +476,27 @@ export function useDialogueFlow({
         }
       } catch {
         // Trigger word consumption is non-critical
+      }
+    }
+
+    // 4b. Offering request (Phase 2+) — the animal asks once for a themed word,
+    // and reacts by name when the ledger has since delivered one. A fulfillment
+    // reaction always lands (it's a response to the player); the initial request
+    // line only fills an otherwise-quiet visit so it never crowds the main arc.
+    if (!hasCoordinatedEvent && progress) {
+      try {
+        // Always allow a fulfillment reaction; only allow a fresh request line
+        // (which the service consumes on read) when the visit is otherwise quiet.
+        const offering = await takeOfferingDialogue(
+          animal.type,
+          progress.currentPhase as DialoguePhase,
+          pages.length === 0
+        );
+        if (offering) {
+          pages.push(offering.line);
+        }
+      } catch {
+        // Offering-request dialogue is non-critical
       }
     }
 

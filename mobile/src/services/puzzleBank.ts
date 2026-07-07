@@ -263,9 +263,13 @@ function scorePuzzleForContext(
   else if (tierDiff === 2) score += 5;
   else score -= 10;
 
-  // Slight preference for puzzles that lead the phase by 1
-  // (matching the "visual changes precede dialogue" principle)
-  if (puzzle.dreadTier === idealTier + 1) score += 10;
+  // NOTE: the old "+10 lead bonus" for tier=phase+1 was removed in the
+  // dread-supply pass. It pre-drained the NEXT phase's (scarce) tier-4
+  // puzzles during phase 3, so by the time the black sky arrived the dread
+  // boards were already spent and the climax served bright tier-0 words. The
+  // tier-match weighting above is enough to steer the vocabulary; the finale
+  // now gets its dread supply from the Phase-4 recycle in
+  // selectPreGeneratedPuzzle instead of by leading ahead.
 
   // Word freshness penalty (short-term, from general word history)
   let overlapCount = 0;
@@ -351,6 +355,26 @@ export async function selectPreGeneratedPuzzle(
 
   // Filter out already-played puzzles
   let available = bank.filter(p => !usedSet.has(p.id));
+
+  // Phase 4+ dread recycle: the dread-tiered puzzles are scarce and get
+  // consumed early, so without this the cult reveal and the whole Phase-5
+  // endgame serve bright tier-0 words under a black sky (the FUN->VOID arc
+  // playing backwards). Fold PLAYED high-tier puzzles back into the candidate
+  // pool so dread boards can repeat rather than waiting for full-bank
+  // exhaustion. Unplayed puzzles still win on freshness/novelty scoring, so
+  // fresh dread is preferred while it lasts; only the recycled dread fills in
+  // once it runs out.
+  if ((phase as number) >= 4) {
+    const dreadFloor = Math.max(3, (phase as number) - 1);
+    const playedDread = bank.filter(p => usedSet.has(p.id) && p.dreadTier >= dreadFloor);
+    if (playedDread.length > 0) {
+      // De-dup by id (a puzzle is either unplayed-available or played-dread).
+      const seen = new Set(available.map(p => p.id));
+      for (const p of playedDread) {
+        if (!seen.has(p.id)) available.push(p);
+      }
+    }
+  }
 
   // If all puzzles exhausted, recycle the oldest-played half
   if (available.length === 0) {
