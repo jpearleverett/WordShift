@@ -621,6 +621,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               const milestoneAmber = victoryData.milestoneBonus ?? 0;
               const streakMilestoneAmber = victoryData.streakMilestoneBonus ?? 0;
               const totalAmber = victoryData.amberEarned ?? 0;
+              // The rewarded "double" grants a bonus equal to amberEarned (a true
+              // 2x, credited to the balance in App). Reflect it in the displayed
+              // total + a breakdown line so the number the player sees AFTER the
+              // ad matches the amber they actually received — otherwise it reads
+              // as "I watched an ad and got nothing."
+              const rewardDoubleBonus = rewardedDoubleClaimed ? totalAmber : 0;
+              const displayTotal = totalAmber + rewardDoubleBonus;
 
               return (
                 <>
@@ -636,7 +643,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         <View style={styles.earlyVictoryValueRow}>
                           <Image source={AMBER_ICON} style={styles.amberIconLarge} />
                           <Text style={[styles.earlyVictoryValue, { color: phaseTheme.modalTextColor }]}>
-                            {totalAmber}
+                            {displayTotal}
                           </Text>
                         </View>
                       </>
@@ -721,6 +728,19 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         )}
                       </>
                     )}
+                    {/* Doubled line — appears once the rewarded 2x is claimed, so
+                        the breakdown visibly sums to the new (doubled) total. */}
+                    {rewardDoubleBonus > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>
+                          {'✦'} Doubled
+                        </Text>
+                        <View style={styles.amberValueRow}>
+                          <Image source={AMBER_ICON} style={styles.amberIcon} />
+                          <Text style={[styles.bonusValue, { color: accent.gold, fontWeight: '900' }]}>+{rewardDoubleBonus}</Text>
+                        </View>
+                      </View>
+                    )}
                     <View style={[styles.bonusDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
                     {/* Total — the amber earned is second only to the stars in
                         visual weight, so it renders larger than the line items */}
@@ -729,7 +749,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       <View style={styles.amberValueRow}>
                         <Image source={AMBER_ICON} style={[styles.amberIcon, styles.amberIconTotal]} />
                         <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 19, fontWeight: '900' }]}>
-                          {totalAmber}
+                          {displayTotal}
                         </Text>
                       </View>
                     </View>
