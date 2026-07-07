@@ -59,6 +59,8 @@ const defaultState: AchievementCheckState = {
   dailyChallengesCompleted: 0,
   shareCount: 0,
   challengeCompletions: 0,
+  variantWins: {},
+  blindWins: 0,
 };
 
 describe('achievements', () => {
@@ -97,6 +99,38 @@ describe('achievements', () => {
     const newlyUnlocked = await checkAchievements(state);
     expect(newlyUnlocked.length).toBeGreaterThan(0);
     expect(newlyUnlocked.find(a => a.id === 'first_puzzle')).toBeTruthy();
+  });
+
+  test('variant + flawless + blind achievements unlock from their counters', async () => {
+    const state = {
+      ...defaultState,
+      stats: { ...defaultState.stats, flawlessCount: 1 },
+      variantWins: { reverse: 1, double_shift: 1, speed: 1 },
+      blindWins: 1,
+    };
+    const ids = (await checkAchievements(state)).map(a => a.id);
+    expect(ids).toContain('flawless_first');
+    expect(ids).toContain('reverse_first');
+    expect(ids).toContain('double_first');
+    expect(ids).toContain('speed_first');
+    expect(ids).toContain('variant_explorer'); // one of each
+    expect(ids).toContain('blind_first');
+    // Higher tiers should NOT unlock yet
+    expect(ids).not.toContain('reverse_15');
+    expect(ids).not.toContain('blind_10');
+    expect(ids).not.toContain('flawless_25');
+  });
+
+  test('variant_explorer requires all three variants, not just one', async () => {
+    const state = {
+      ...defaultState,
+      variantWins: { reverse: 20, double_shift: 20 }, // no speed win
+      blindWins: 0,
+    };
+    const ids = (await checkAchievements(state)).map(a => a.id);
+    expect(ids).toContain('reverse_15');
+    expect(ids).toContain('double_15');
+    expect(ids).not.toContain('variant_explorer');
   });
 
   test('achievements are not re-unlocked', async () => {

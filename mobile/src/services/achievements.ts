@@ -46,6 +46,10 @@ export interface AchievementCheckState {
   dailyChallengesCompleted: number;
   shareCount: number;
   challengeCompletions: number;
+  /** Lifetime wins per non-standard variant key (reverse/double_shift/speed). */
+  variantWins: Record<string, number>;
+  /** Lifetime Blind Offering wins. */
+  blindWins: number;
 }
 
 // ===== Achievement Definitions =====
@@ -174,6 +178,111 @@ export const ACHIEVEMENTS: Achievement[] = [
     icon: '🧠',
     category: 'mastery',
     check: (s) => (s.stats.noHintPuzzleCount || 0) >= 10,
+  },
+  // Flawless offerings — the perfect-play tier above 3 stars (0 hints/invalids/undos)
+  {
+    id: 'flawless_first',
+    rewardAmber: 20,
+    title: 'Flawless',
+    description: 'Solve a puzzle with no hints, no mistakes, and no undos',
+    icon: '💠',
+    category: 'mastery',
+    check: (s) => (s.stats.flawlessCount || 0) >= 1,
+  },
+  {
+    id: 'flawless_25',
+    rewardAmber: 60,
+    title: 'Unerring',
+    description: 'Complete 25 flawless offerings',
+    icon: '🏵️',
+    category: 'mastery',
+    check: (s) => (s.stats.flawlessCount || 0) >= 25,
+  },
+  // Variant achievements — the 32 difficulty x variant configs were invisible content
+  {
+    id: 'reverse_first',
+    rewardAmber: 20,
+    title: 'There and Back',
+    description: 'Solve a Reverse Shift puzzle',
+    icon: '🔁',
+    category: 'mastery',
+    check: (s) => (s.variantWins?.reverse || 0) >= 1,
+  },
+  {
+    id: 'reverse_15',
+    rewardAmber: 40,
+    title: 'The Long Way Home',
+    description: 'Solve 15 Reverse Shift puzzles',
+    icon: '↩️',
+    category: 'mastery',
+    check: (s) => (s.variantWins?.reverse || 0) >= 15,
+  },
+  {
+    id: 'double_first',
+    rewardAmber: 20,
+    title: 'Two at Once',
+    description: 'Solve a Double Shift puzzle',
+    icon: '⧉',
+    category: 'mastery',
+    check: (s) => (s.variantWins?.double_shift || 0) >= 1,
+  },
+  {
+    id: 'double_15',
+    rewardAmber: 40,
+    title: 'Both Hands',
+    description: 'Solve 15 Double Shift puzzles',
+    icon: '🖐️',
+    category: 'mastery',
+    check: (s) => (s.variantWins?.double_shift || 0) >= 15,
+  },
+  {
+    id: 'speed_first',
+    rewardAmber: 20,
+    title: 'Against the Clock',
+    description: 'Win a Speed Shift run',
+    icon: '⏱️',
+    category: 'mastery',
+    check: (s) => (s.variantWins?.speed || 0) >= 1,
+  },
+  {
+    id: 'speed_15',
+    rewardAmber: 40,
+    title: 'Quicksilver',
+    description: 'Win 15 Speed Shift runs',
+    icon: '⚡',
+    category: 'mastery',
+    check: (s) => (s.variantWins?.speed || 0) >= 15,
+  },
+  {
+    id: 'variant_explorer',
+    rewardAmber: 50,
+    title: 'Every Path',
+    description: 'Win at least one Reverse, Double, and Speed puzzle',
+    icon: '🧭',
+    category: 'mastery',
+    check: (s) =>
+      (s.variantWins?.reverse || 0) >= 1 &&
+      (s.variantWins?.double_shift || 0) >= 1 &&
+      (s.variantWins?.speed || 0) >= 1,
+  },
+  // Blind Offering — the opt-in previews-hidden modifier
+  {
+    id: 'blind_first',
+    rewardAmber: 30,
+    title: 'Eyes Closed',
+    description: 'Solve a puzzle with the Blind Offering on',
+    icon: '🌑',
+    category: 'mastery',
+    check: (s) => (s.blindWins || 0) >= 1,
+  },
+  {
+    id: 'blind_10',
+    rewardAmber: 60,
+    title: 'Trust the Words',
+    description: 'Solve 10 puzzles with the Blind Offering on',
+    icon: '👁️',
+    category: 'mastery',
+    check: (s) => (s.blindWins || 0) >= 10,
   },
 
   // Streak achievements

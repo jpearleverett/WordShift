@@ -63,6 +63,7 @@ export interface VictoryData {
   totalWordsFormed?: number;
   ritualEnergy?: number;
   variantBonus?: number;
+  freshVariantBonus?: number;
   variantRepeatDecay?: number;
   questsCompleted?: string[];
   harvestedWords?: string[];
@@ -667,6 +668,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                               {VARIANT_CONFIGS[variant as keyof typeof VARIANT_CONFIGS]?.title || 'Variant'}
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.variant }]}>+{variantBonusAmber}</Text>
+                          </View>
+                        )}
+                        {(victoryData.freshVariantBonus ?? 0) > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'✨'} Fresh variant
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: accent.variant }]}>+{victoryData.freshVariantBonus}</Text>
                           </View>
                         )}
                         {streakBonusAmber > 0 && (

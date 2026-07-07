@@ -274,6 +274,15 @@ export interface HomeWorldProgress {
   variantWeeklyUsage?: Record<string, number>;
   // Week identifier for variant usage tracking reset
   variantWeeklyUsageWeek?: string;
+  // Lifetime wins per non-standard variant key (reverse/double_shift/speed) — feeds
+  // variant achievements + the variant-offer nudge.
+  variantWins?: Record<string, number>;
+  // Lifetime Blind Offering wins (blind composes with any variant, tracked apart).
+  blindWins?: number;
+  // Local date (YYYY-MM-DD) each variant last earned its once-per-day fresh bonus.
+  variantFreshDates?: Record<string, string>;
+  // Local date the player last saw the variant-offer nudge (once-per-day cap).
+  lastVariantNudgeDate?: string;
   // Streak freeze: number of streak freezes available
   streakFreezes?: number;
   // Last time a free streak freeze was granted (ISO date)

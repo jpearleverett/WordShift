@@ -16,6 +16,8 @@ import {
   markIntroSeen,
   getStreakInfo,
   applyVariantAmberBonus,
+  recordVariantWin,
+  getVariantWinStats,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
   hasSeenFoxPlayNudge,
@@ -245,18 +247,39 @@ describe('applyVariantAmberBonus', () => {
     const result = await applyVariantAmberBonus('speed', 20, 1.34, true);
     expect(result.bonus).toBeGreaterThan(0);
     const balance = await getAmberBalance();
-    expect(balance).toBe(100 + result.bonus);
+    // First win of the day also grants the fresh bonus.
+    expect(balance).toBe(100 + result.bonus + result.freshBonus);
   });
 
-  test('applies decay on repeated same variant farming', async () => {
+  test('no decay on repeated same variant (multiplier bonus is constant)', async () => {
     await devAddAmber(100);
     const first = await applyVariantAmberBonus('speed', 20, 1.34, true);
     const second = await applyVariantAmberBonus('speed', 20, 1.34, true);
     const third = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    // The multiplier portion never decays now — repeated play earns the same bonus.
+    expect(first.bonus).toBe(second.bonus);
+    expect(second.bonus).toBe(third.bonus);
     expect(first.repeatDecay).toBe(1.0);
-    expect(second.repeatDecay).toBe(1.0);
-    expect(third.repeatDecay).toBeLessThan(1.0);
-    expect(third.bonus).toBeLessThan(first.bonus);
+    expect(third.repeatDecay).toBe(1.0);
+  });
+
+  test('grants a once-per-day fresh bonus, only on the first win of the day', async () => {
+    await devAddAmber(100);
+    const first = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    const second = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    expect(first.isFresh).toBe(true);
+    expect(first.freshBonus).toBeGreaterThan(0);
+    // Same variant again same day: no repeat fresh bonus.
+    expect(second.isFresh).toBe(false);
+    expect(second.freshBonus).toBe(0);
+  });
+
+  test('a different variant is independently fresh the same day', async () => {
+    await devAddAmber(100);
+    const speed = await applyVariantAmberBonus('speed', 20, 1.34, true);
+    const reverse = await applyVariantAmberBonus('reverse', 20, 1.2, true);
+    expect(speed.isFresh).toBe(true);
+    expect(reverse.isFresh).toBe(true);
   });
 
   test('deferred crediting (default) does not increase spendable balance', async () => {
@@ -265,6 +288,34 @@ describe('applyVariantAmberBonus', () => {
     expect(result.bonus).toBeGreaterThan(0);
     const balance = await getAmberBalance();
     expect(balance).toBe(100); // Not credited
+  });
+});
+
+describe('recordVariantWin / getVariantWinStats', () => {
+  test('counts per-variant wins and blind wins independently', async () => {
+    await recordVariantWin('reverse', false);
+    await recordVariantWin('reverse', false);
+    await recordVariantWin('speed', false);
+    await recordVariantWin('standard', true); // blind standard board
+    const stats = await getVariantWinStats();
+    expect(stats.variantWins.reverse).toBe(2);
+    expect(stats.variantWins.speed).toBe(1);
+    expect(stats.variantWins.standard).toBeUndefined(); // standard never counted as a variant
+    expect(stats.blindWins).toBe(1);
+  });
+
+  test('a blind reverse win counts BOTH the variant and the blind tally', async () => {
+    await recordVariantWin('reverse', true);
+    const stats = await getVariantWinStats();
+    expect(stats.variantWins.reverse).toBe(1);
+    expect(stats.blindWins).toBe(1);
+  });
+
+  test('a plain standard non-blind win is a no-op', async () => {
+    await recordVariantWin('standard', false);
+    const stats = await getVariantWinStats();
+    expect(stats.blindWins).toBe(0);
+    expect(Object.keys(stats.variantWins)).toHaveLength(0);
   });
 });
 

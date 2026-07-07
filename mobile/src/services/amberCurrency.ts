@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty, GameMode } from '../types';
 import { clearPlayedPuzzles } from './puzzleBank';
-import { getWeekId } from './weeklyQuests';
 import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal } from './dateUtils';
 import {
   HomeWorldProgress,
@@ -19,7 +18,7 @@ import {
 } from '../types/homeWorld';
 import {
   MIN_PUZZLES_FOR_PHASE,
-  VARIANT_REPEAT_DECAY as _VARIANT_REPEAT_DECAY,
+  FRESH_VARIANT_BONUS_AMBER,
   PATRON_AMBER_BONUS,
   SURPRISE_BONUS_CHANCE,
   SURPRISE_BONUS_AMOUNTS,
@@ -79,9 +78,6 @@ function getDefaultProgress(): HomeWorldProgress {
 }
 
 // MIN_PUZZLES_FOR_PHASE imported from constants/gameBalance.ts (single source of truth).
-
-// Variant reward anti-farm decay — re-exported from constants/gameBalance.ts.
-const VARIANT_REPEAT_DECAY = _VARIANT_REPEAT_DECAY;
 
 /**
  * Get today's date as a LOCAL-day YYYY-MM-DD string.
@@ -1230,19 +1226,15 @@ export async function getPreferredPuzzleVariant(): Promise<string> {
   return progress.preferredPuzzleVariant || 'standard';
 }
 
-function getVariantRepeatDecay(repeatCount: number): number {
-  if (repeatCount <= 2) return VARIANT_REPEAT_DECAY.firstTwo;
-  if (repeatCount === 3) return VARIANT_REPEAT_DECAY.third;
-  if (repeatCount === 4) return VARIANT_REPEAT_DECAY.fourth;
-  return VARIANT_REPEAT_DECAY.fifthPlus;
-}
-
 /**
- * Apply variant bonus amber with anti-farming decay on repeated use.
- * Returns updated balance and the actual applied multiplier.
+ * Apply the variant amber bonus. The full configured multiplier always applies
+ * (the old anti-farm decay is gone) and, once per local day per variant, a flat
+ * FRESH_VARIANT_BONUS_AMBER is added on top — so rotating between variants reads
+ * as REWARDED rather than "why is my bonus shrinking". Amber only; never phase
+ * progress. `freshBonus`/`isFresh` let the victory modal surface the moment.
  *
- * When `creditToBalance` is false, the bonus is NOT added to spendable amber.
- * The caller is responsible for crediting later.
+ * When `creditToBalance` is false, nothing is added to spendable amber — the
+ * caller credits later (the harvest-batch path).
  */
 export async function applyVariantAmberBonus(
   variant: string,
@@ -1251,22 +1243,25 @@ export async function applyVariantAmberBonus(
   creditToBalance: boolean = false
 ): Promise<{
   bonus: number;
+  freshBonus: number;
+  isFresh: boolean;
   newBalance: number;
   appliedMultiplier: number;
   repeatCount: number;
+  /** @deprecated always 1.0 — repeat decay removed in favor of the fresh bonus. */
   repeatDecay: number;
 }> {
   const progress = await loadProgress();
   if (progress.lastVariantPlayed === undefined) progress.lastVariantPlayed = 'standard';
-  if (progress.sameVariantStreak === undefined) progress.sameVariantStreak = 0;
 
   if (!variant || variant === 'standard' || configuredMultiplier <= 1.0 || baseAmberAward <= 0) {
     progress.lastVariantPlayed = variant || 'standard';
-    progress.sameVariantStreak = 0;
     progressCache = progress;
     await saveProgress();
     return {
       bonus: 0,
+      freshBonus: 0,
+      isFresh: false,
       newBalance: progress.amber,
       appliedMultiplier: 1.0,
       repeatCount: 0,
@@ -1274,32 +1269,22 @@ export async function applyVariantAmberBonus(
     };
   }
 
-  const repeatCount = progress.lastVariantPlayed === variant
-    ? (progress.sameVariantStreak || 0) + 1
-    : 1;
-  const consecutiveDecay = getVariantRepeatDecay(repeatCount);
+  // Full multiplier, no decay.
+  const bonus = Math.max(0, Math.round(baseAmberAward * (configuredMultiplier - 1)));
 
-  // Weekly variant usage tracking
-  const currentWeek = getWeekId();
-  if (!progress.variantWeeklyUsage || progress.variantWeeklyUsageWeek !== currentWeek) {
-    progress.variantWeeklyUsage = {};
-    progress.variantWeeklyUsageWeek = currentWeek;
-  }
-  const weeklyUsage = (progress.variantWeeklyUsage[variant] || 0) + 1;
-  progress.variantWeeklyUsage[variant] = weeklyUsage;
-  const weeklyDecay = getWeeklyVariantDecay(weeklyUsage);
+  // Once-per-day-per-variant fresh bonus.
+  const today = getLocalDateString();
+  if (!progress.variantFreshDates) progress.variantFreshDates = {};
+  const isFresh = progress.variantFreshDates[variant] !== today;
+  const freshBonus = isFresh ? FRESH_VARIANT_BONUS_AMBER : 0;
+  if (isFresh) progress.variantFreshDates[variant] = today;
 
-  // Apply the stricter of consecutive decay vs weekly decay
-  const repeatDecay = Math.min(consecutiveDecay, weeklyDecay);
-  const appliedMultiplier = 1 + ((configuredMultiplier - 1) * repeatDecay);
-  const bonus = Math.max(0, Math.round(baseAmberAward * (appliedMultiplier - 1)));
-
+  const totalBonus = bonus + freshBonus;
   progress.lastVariantPlayed = variant;
-  progress.sameVariantStreak = repeatCount;
   if (creditToBalance) {
-    progress.amber += bonus;
+    progress.amber += totalBonus;
   }
-  progress.totalAmberEarned += bonus;
+  progress.totalAmberEarned += totalBonus;
   progressCache = progress;
   await saveProgress();
 
@@ -1307,17 +1292,55 @@ export async function applyVariantAmberBonus(
     await recordTransaction({
       amount: bonus,
       type: 'earn',
-      source: `variant_${variant}_x${appliedMultiplier.toFixed(2)}`,
+      source: `variant_${variant}_x${configuredMultiplier.toFixed(2)}`,
+      timestamp: Date.now(),
+    });
+  }
+  if (freshBonus > 0) {
+    await recordTransaction({
+      amount: freshBonus,
+      type: 'earn',
+      source: `variant_fresh_${variant}`,
       timestamp: Date.now(),
     });
   }
 
   return {
     bonus,
+    freshBonus,
+    isFresh,
     newBalance: progress.amber,
-    appliedMultiplier,
-    repeatCount,
-    repeatDecay,
+    appliedMultiplier: configuredMultiplier,
+    repeatCount: 0,
+    repeatDecay: 1.0,
+  };
+}
+
+/**
+ * Record a completed puzzle's variant/blind flags for the variant achievements
+ * and the variant-offer nudge. Standard non-blind wins are a no-op. Idempotent
+ * per call (one win = one increment).
+ */
+export async function recordVariantWin(variant: string, blind: boolean): Promise<void> {
+  if ((!variant || variant === 'standard') && !blind) return;
+  const progress = await loadProgress();
+  if (variant && variant !== 'standard') {
+    if (!progress.variantWins) progress.variantWins = {};
+    progress.variantWins[variant] = (progress.variantWins[variant] || 0) + 1;
+  }
+  if (blind) {
+    progress.blindWins = (progress.blindWins || 0) + 1;
+  }
+  progressCache = progress;
+  await saveProgress();
+}
+
+/** Read per-variant + blind lifetime win counts (for achievements / nudges). */
+export async function getVariantWinStats(): Promise<{ variantWins: Record<string, number>; blindWins: number }> {
+  const progress = await loadProgress();
+  return {
+    variantWins: progress.variantWins || {},
+    blindWins: progress.blindWins || 0,
   };
 }
 
@@ -1708,17 +1731,6 @@ export async function awardBonusAmber(amount: number, source: string): Promise<n
     timestamp: Date.now(),
   });
   return progress.amber;
-}
-
-/**
- * Weekly variant decay — prevents exploitation of variant amber bonuses
- * by tracking per-variant usage per week.
- */
-function getWeeklyVariantDecay(variantUsageThisWeek: number): number {
-  if (variantUsageThisWeek <= 3) return 1.0;
-  if (variantUsageThisWeek <= 6) return 0.85;
-  if (variantUsageThisWeek <= 10) return 0.65;
-  return 0.45;
 }
 
 /**

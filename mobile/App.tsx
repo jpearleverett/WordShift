@@ -1151,7 +1151,8 @@ function MainApp() {
         result.completedWords,
         result.variant || 'standard',
         isPlayingDaily,
-        result.undosUsed ?? 0
+        result.undosUsed ?? 0,
+        result.blind ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global

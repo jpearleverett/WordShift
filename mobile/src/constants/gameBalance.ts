@@ -353,7 +353,20 @@ export const CHALLENGE_MODE_CONFIG = {
 // VARIANT ECONOMY
 // ============================================================================
 
-/** Consecutive-use decay for variant amber bonuses (anti-farming). */
+/**
+ * Fresh-variant bonus: a flat amber reward the first time each day the player
+ * wins with a non-standard variant they haven't already claimed today. Replaces
+ * the old repeat-use decay (a punishment) with a positive rotation incentive, so
+ * trying every variant reads as REWARDED, not "your bonus is shrinking". Amber
+ * only, never phase progress. One claim per variant per local day (no ping-pong
+ * farming). Sized like a small milestone so rotation feels worth it.
+ */
+export const FRESH_VARIANT_BONUS_AMBER = 15;
+
+/**
+ * @deprecated Repeat-use decay removed in favor of FRESH_VARIANT_BONUS_AMBER.
+ * Kept exported so any stale importer still compiles; no longer applied.
+ */
 export const VARIANT_REPEAT_DECAY = {
   firstTwo: 1.0,
   third: 0.85,
@@ -361,14 +374,14 @@ export const VARIANT_REPEAT_DECAY = {
   fifthPlus: 0.55,
 } as const;
 
-/** Weekly variant usage decay thresholds. */
+/** @deprecated Weekly variant usage decay removed with the repeat-decay system. */
 export const WEEKLY_VARIANT_DECAY_THRESHOLDS = [
   { maxUses: 3, multiplier: 1.0 },
   { maxUses: 6, multiplier: 0.85 },
   { maxUses: 10, multiplier: 0.65 },
 ] as const;
 
-/** Default weekly variant decay multiplier (11+ uses). */
+/** @deprecated Default weekly variant decay multiplier (unused since fresh-bonus). */
 export const WEEKLY_VARIANT_DECAY_DEFAULT = 0.45;
 
 // ============================================================================

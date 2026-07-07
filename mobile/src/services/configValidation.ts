@@ -189,9 +189,10 @@ export function validatePhaseThresholds(): ValidationResult {
 export function validateAchievements(): ValidationResult {
   const errors: string[] = [];
 
-  // Check total count (40 achievements across 5 categories)
-  if (ACHIEVEMENTS.length !== 40) {
-    errors.push(`Expected 40 achievements, got ${ACHIEVEMENTS.length}`);
+  // Check total count (51 achievements across 5 categories — includes the
+  // flawless tier, per-variant, and Blind Offering mastery achievements)
+  if (ACHIEVEMENTS.length !== 51) {
+    errors.push(`Expected 51 achievements, got ${ACHIEVEMENTS.length}`);
   }
 
   // Check unique IDs
