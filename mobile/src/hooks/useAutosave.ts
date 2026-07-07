@@ -22,6 +22,7 @@ export interface AutosaveDeps {
   solution: any;
   reverseSolution: any;
   gameMode: string;
+  blindMode: boolean;
   currentVariant: string;
   selectedVariant: string;
   moveDirection: string;
@@ -74,6 +75,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           solution: deps.solution,
           reverseSolution: deps.reverseSolution,
           gameMode: deps.gameMode as any,
+          blindMode: deps.blindMode,
           currentVariant: deps.currentVariant as any,
           selectedVariant: deps.selectedVariant as any,
           moveDirection: deps.moveDirection as any,
@@ -117,6 +119,7 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.solution,
     deps.reverseSolution,
     deps.gameMode,
+    deps.blindMode,
     deps.currentVariant,
     deps.selectedVariant,
     deps.moveDirection,

@@ -34,6 +34,9 @@ interface DifficultyMenuProps {
   onSelectVariant: (variant: PuzzleVariant) => void;
   onToggleChallengeMode: () => void;
   showChallengeToggle?: boolean;
+  blindActive?: boolean;
+  onToggleBlindMode?: () => void;
+  showBlindToggle?: boolean;
   introMode?: boolean;
   introHintText?: string;
 }
@@ -50,6 +53,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   onSelectVariant,
   onToggleChallengeMode,
   showChallengeToggle = true,
+  blindActive = false,
+  onToggleBlindMode,
+  showBlindToggle = false,
   introMode = false,
   introHintText,
 }) => {
@@ -235,6 +241,39 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
               </View>
             </TouchableOpacity>
           </>
+        )}
+
+        {showBlindToggle && !introMode && onToggleBlindMode && (
+          <TouchableOpacity
+            style={[
+              styles.menuRow,
+              blindActive && {
+                backgroundColor: t.amberText + '14',
+                borderColor: t.amberText + '55',
+              },
+            ]}
+            onPress={onToggleBlindMode}
+            accessibilityRole="button"
+            accessibilityState={{ selected: blindActive }}
+            accessibilityLabel={`Blind offering, ${blindActive ? 'on' : 'off'}`}
+          >
+            <Text style={styles.challengeMenuIcon}>
+              {blindActive ? '🌑' : '👁️'}
+            </Text>
+            <View style={styles.challengeMenuContent}>
+              <Text
+                style={[
+                  styles.menuRowText,
+                  { color: blindActive ? t.amberText : t.body },
+                ]}
+              >
+                {phase >= 3 ? 'BLIND OFFERING' : 'BLIND MODE'}
+              </Text>
+              <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
+                {blindActive ? 'No previews. Trust the words.' : 'Hide previews for a truer test'}
+              </Text>
+            </View>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </PanelCard>

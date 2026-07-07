@@ -194,6 +194,8 @@ export interface PuzzleGameState {
   hintsUsed: number;
   earnedStars: number;
   gameMode: GameMode;
+  /** Blind Offering modifier active (ghost previews hidden). */
+  blindMode: boolean;
   undosRemaining: number;
   currentPhase: DialoguePhase;
   /** The word chain from the last completed puzzle (for ritual echo display) */
@@ -247,7 +249,8 @@ export interface PuzzleGameActions {
   startNewGame: (
     selectedDifficulty?: Difficulty,
     mode?: GameMode,
-    variant?: PuzzleVariant
+    variant?: PuzzleVariant,
+    blind?: boolean
   ) => Promise<void>;
   handleLetterPress: (letter: Letter, rowIndex: number) => void;
   /**
@@ -271,6 +274,8 @@ export interface PuzzleGameActions {
     undosUsed?: number;
     /** Solve duration (ms) for a freshly-started board; absent for restored/retried boards. */
     solveTimeMs?: number;
+    /** Whether this board was played with the Blind Offering modifier on. */
+    blind?: boolean;
   } | null>;
   handleUndo: () => void;
   grantExtraUndo: () => void;
@@ -354,6 +359,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const cleanMoveStreakRef = useRef(0);
   const [earnedStars, setEarnedStars] = useState(0);
   const [gameMode, setGameMode] = useState<GameMode>('standard');
+  // Blind Offering modifier (opt-in, Wordle-Hard-Mode shape): when on, the ghost
+  // word previews are hidden, so the player commits from their own word knowledge
+  // and learns only from the rejection shake. Sticky across Next Level like
+  // gameMode; forced OFF on daily/shared-challenge boards. Composes with any
+  // variant/difficulty. No amber bonus by design — the reward is the mastery.
+  const [blindMode, setBlindMode] = useState(false);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -602,8 +613,12 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const startNewGame = useCallback(async (
     selectedDifficulty: Difficulty = difficulty,
     mode?: GameMode,
-    variantOverride?: PuzzleVariant
+    variantOverride?: PuzzleVariant,
+    blindOverride?: boolean
   ) => {
+    if (blindOverride !== undefined) {
+      setBlindMode(blindOverride);
+    }
     // Claim this generation. Any initGame commit below is skipped if a newer
     // startNewGame call has since superseded this one (see generationIdRef).
     const genId = ++generationIdRef.current;
@@ -760,6 +775,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     wordLength: number
   ) => {
     setGameMode('standard');
+    setBlindMode(false); // the daily is a shared board — never blind
     applyBoard(words, puzzleHint, undefined, wordLength, {
       resetPerformance: true,
       variant: 'standard',
@@ -792,6 +808,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // can't clobber the shared board after it starts.
     generationIdRef.current++;
     setGameMode('standard');
+    setBlindMode(false); // a friend's shared board — never blind
     setIsEchoPuzzle(false);
     applyBoard(normalized, undefined, undefined, wordLength, {
       resetPerformance: true,
@@ -1347,6 +1364,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         completedWords,
         variant: currentVariant,
         solveTimeMs,
+        blind: blindMode,
         // Full per-move record including the completing move (ref mirror is
         // already current; state would be a render behind at this point).
         moveOutcomes: moveOutcomesRef.current,
@@ -1620,6 +1638,10 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // Shows what word would form at each slot position — valid words in green, invalid in red.
   const slotPreviews = useMemo(() => {
     if (!selectedLetter || gameState !== GameState.PLAYING) return undefined;
+    // Blind Offering: no ghost previews — and, because drag snapping keys off
+    // these validity flags, suppressing them also removes the "tile jumps to a
+    // valid slot" tell, keeping the modifier honestly blind.
+    if (blindMode) return undefined;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -1688,7 +1710,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
     }
     return previews;
-  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase]);
+  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode]);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
@@ -1709,6 +1731,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setSolution(saved.solution);
     setReverseSolution(saved.reverseSolution);
     setGameMode(saved.gameMode);
+    setBlindMode(saved.blindMode ?? false);
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
@@ -1825,6 +1848,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     hintsUsed,
     earnedStars,
     gameMode,
+    blindMode,
     undosRemaining,
     currentPhase,
     lastCompletedWords,

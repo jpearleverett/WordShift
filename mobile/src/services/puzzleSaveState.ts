@@ -32,8 +32,11 @@ export interface SavedPuzzleState {
   currentVariant: PuzzleVariant;
   selectedVariant: PuzzleVariant;
   moveDirection: 'down' | 'up';
-  /** @deprecated blind mode removed — kept for backwards compatibility with existing saves */
+  /** @deprecated old progressive-reveal blind mode — kept so ancient saves parse. */
   blindRevealedRows?: number[];
+  /** Blind Offering modifier active on this board (previews hidden). Restored so
+   *  a kill+relaunch can't hand the player a free peek at the previews. */
+  blindMode?: boolean;
   currentPhase: DialoguePhase;
   lastFormedWord: string | null;
   /** Double shift input cycle phase (null for non-double-shift puzzles). */

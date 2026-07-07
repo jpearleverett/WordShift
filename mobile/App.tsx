@@ -466,6 +466,7 @@ function MainApp() {
     solution: puzzle.solution,
     reverseSolution: puzzle.reverseSolution,
     gameMode: puzzle.gameMode,
+    blindMode: puzzle.blindMode,
     currentVariant: puzzle.currentVariant,
     selectedVariant: puzzle.selectedVariant,
     moveDirection: puzzle.moveDirection,
@@ -2060,8 +2061,18 @@ function MainApp() {
     orchestrationActions.setCompletionCoda(null);
     resetSpeedRun();
     const newMode = puzzle.gameMode === 'challenge' ? 'standard' : 'challenge';
-    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant);
-  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, orchestrationActions]);
+    puzzleActions.startNewGame(puzzle.difficulty, newMode, puzzle.selectedVariant, puzzle.blindMode);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions]);
+
+  // Blind Offering: chosen before the board (a fresh board applies it so the
+  // player can't toggle previews back on mid-solve to peek). Sticky across Next
+  // Level like Challenge; composes with any variant/difficulty/challenge state.
+  const handleToggleBlindMode = useCallback(() => {
+    hapticMedium();
+    orchestrationActions.setCompletionCoda(null);
+    resetSpeedRun();
+    puzzleActions.startNewGame(puzzle.difficulty, puzzle.gameMode, puzzle.selectedVariant, !puzzle.blindMode);
+  }, [puzzleActions, puzzle.gameMode, puzzle.difficulty, puzzle.selectedVariant, puzzle.blindMode, orchestrationActions, resetSpeedRun]);
 
   // Present the daily-login grant only on a quiet home screen — never over the
   // puzzle, the victory flow, a post-victory intro, or a queued ceremony. The
@@ -2440,6 +2451,9 @@ function MainApp() {
             onToggleChallengeMode={handleToggleChallengeMode}
             onSelectVariant={handleSelectVariant}
             showChallengeToggle={puzzlesSolvedForVariantUnlocks >= 15}
+            blindActive={puzzle.blindMode}
+            onToggleBlindMode={handleToggleBlindMode}
+            showBlindToggle={puzzlesSolvedForVariantUnlocks >= 15}
             introMode={showSetupSelectorIntro}
             introHintText={showSetupSelectorIntro ? setupSelectorLines[1] : undefined}
           />
