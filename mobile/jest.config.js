@@ -18,7 +18,10 @@ module.exports = {
   // Mock react-native modules that aren't available in Node
   moduleNameMapper: {
     '^@react-native-async-storage/async-storage$': '<rootDir>/src/__tests__/__mocks__/asyncStorage.ts',
-    // Stub static assets (sound/image require()s) for Node test resolution
-    '\\.(wav|png)$': '<rootDir>/src/__tests__/__mocks__/fileMock.js',
+    // expo-font ships an untransformed ESM build; the app only calls loadAsync
+    // at runtime (theme/fonts.ts), so stub it for the Node test env.
+    '^expo-font$': '<rootDir>/src/__tests__/__mocks__/expoFont.ts',
+    // Stub static assets (sound/image/font require()s) for Node test resolution
+    '\\.(wav|png|ttf)$': '<rootDir>/src/__tests__/__mocks__/fileMock.js',
   },
 };

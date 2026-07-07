@@ -12,6 +12,8 @@ import { Room, Animal, RoomTheme, DialoguePhase } from '../../types/homeWorld';
 import { ROOM_THEME_COLORS } from '../../services/homeWorldData';
 import { AnimalSprite } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
+import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
+import { NineSliceFrame } from '../ui/NineSlice';
 
 // Room background images - maps theme to image asset
 const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
@@ -245,6 +247,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           truly centered whatever size the chip renders at. */}
       {animal && !animal.isUnlocked && (() => {
         const chip = getInviteChipContent(inviteCost, amberBalance);
+        const inviteSkin = getPixelSkin(currentPhase);
         return (
           <View style={styles.inviteCenterWrap} pointerEvents="box-none">
             <Pressable
@@ -254,6 +257,13 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
               accessibilityLabel={getInviteAccessibilityLabel(room.name, inviteCost)}
             >
               <View style={styles.inviteAnimalBadge}>
+                {/* Cottage card-frame chrome (replaces the flat white webby chip) */}
+                <NineSliceFrame
+                  skin={inviteSkin.card}
+                  cornerDp={CARD_CORNER_DP}
+                  edgeDp={CARD_EDGE_DP}
+                  fillColor={inviteSkin.fillCard}
+                />
                 {chip.kind === 'cost' ? (
                   <View style={styles.inviteCostRow}>
                     <Text style={styles.inviteAnimalText}>{chip.label}</Text>
@@ -422,21 +432,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Cottage card-frame chip: the wood-and-parchment chrome comes from the
+  // NineSliceFrame; content must clear the 12dp card wood band, so the padding
+  // is generous. No white bg / gold border — the pixel frame owns the edge.
   inviteAnimalBadge: {
-    minWidth: 96,
-    minHeight: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    minWidth: 104,
+    minHeight: 58,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 2,
-    borderColor: CandyColors.yellow.main,
-    shadowColor: CandyColors.yellow.main,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
     elevation: 5,
   },
   // Action line: "Invite [gem] 100" as an explicit row so the 16px gem and

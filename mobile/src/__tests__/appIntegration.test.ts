@@ -23,8 +23,8 @@ describe('bootstrap is non-blocking', () => {
     expect(APP_TSX).toMatch(/void initAds\(\)\.catch/);
   });
 
-  test('cosmetics + hints + entitlements stay awaited (sync caches must be warm at first render)', () => {
-    expect(APP_TSX).toMatch(/await Promise\.all\(\[initCosmetics\(\), initHints\(\), loadEntitlements\(\)\]\)/);
+  test('cosmetics + hints + entitlements + fonts stay awaited (sync caches / pixel font must be warm at first render)', () => {
+    expect(APP_TSX).toMatch(/await Promise\.all\(\[initCosmetics\(\), initHints\(\), loadEntitlements\(\), loadPixelFonts\(\)\]\)/);
     // The old blocking form must not come back.
     expect(APP_TSX).not.toMatch(/Promise\.all\(\[initIAP\(\)/);
   });

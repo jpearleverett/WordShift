@@ -33,6 +33,7 @@ import {
   BTN_MD_DP,
   BTN_SHADOW_DP,
 } from '../../theme/pixelSkin.generated';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
@@ -1658,16 +1659,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       {ANIMAL_INFO[dialogueFlow.selectedAnimal.type]?.emoji || '🐾'}
                     </Text>
                   )}
+                  {/* Name as a portrait nameplate BELOW the sprite (reclaims the
+                      wasted header space; the bubble now starts at the top). */}
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.dialogueAnimalName, { color: dt.nameColor }]}
+                  >
+                    {dialogueFlow.selectedAnimal.name}
+                  </Text>
+                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
                 </View>
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <Text style={[styles.dialogueAnimalName, { color: dt.nameColor }]}>
-                    {dialogueFlow.selectedAnimal.name}
-                  </Text>
-                  {/* Decorative separator under name */}
-                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
-
                   <View style={styles.dialogueBubble}>
                     <NineSliceFrame
                       skin={pixelSkin.card}
@@ -2623,16 +2627,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
                     </Text>
                   )}
+                  {/* Name as a portrait nameplate BELOW the sprite (reclaims the
+                      wasted header space; the bubble now starts at the top). */}
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.dialogueAnimalName, { color: dt.nameColor }]}
+                  >
+                    {introAnimal.name}
+                  </Text>
+                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
                 </View>
 
                 {/* Text column - 70% width */}
                 <View style={styles.dialogueTextCol}>
-                  <Text style={[styles.dialogueAnimalName, { color: dt.nameColor }]}>
-                    {introAnimal.name}
-                  </Text>
-                  {/* Decorative separator under name */}
-                  <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
-
                   <View style={styles.dialogueBubble}>
                     <NineSliceFrame
                       skin={pixelSkin.card}
@@ -2940,29 +2947,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
 
             <View style={styles.journalSpotlightDialogueRow}>
-              <View
-                style={[
-                  styles.journalSpotlightSpriteCol,
-                  { backgroundColor: dt.spriteBg, borderColor: dt.bubbleBorder },
-                ]}
-              >
-                {CHARACTER_SPRITES.fox ? (
-                  <Image
-                    source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
-                    style={styles.journalSpotlightSpriteImage}
-                    resizeMode="cover"
-                    accessibilityLabel="Fox portrait"
-                  />
-                ) : (
-                  <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
-                )}
-              </View>
-
-              <View style={styles.journalSpotlightDialogueCol}>
-                <Text style={[styles.journalSpotlightSpeaker, { color: dt.nameColor }]}>
+              {/* Portrait + name below it (reclaims the wasted header space;
+                  the bubble now starts at the top of the text column). */}
+              <View style={styles.journalSpotlightSpriteWrap}>
+                <View
+                  style={[
+                    styles.journalSpotlightSpriteCol,
+                    { backgroundColor: dt.spriteBg, borderColor: dt.bubbleBorder },
+                  ]}
+                >
+                  {CHARACTER_SPRITES.fox ? (
+                    <Image
+                      source={CHARACTER_SPRITES.fox.talk || CHARACTER_SPRITES.fox.idle}
+                      style={styles.journalSpotlightSpriteImage}
+                      resizeMode="cover"
+                      accessibilityLabel="Fox portrait"
+                    />
+                  ) : (
+                    <Text style={styles.dialogueSpriteEmoji}>🦊</Text>
+                  )}
+                </View>
+                <Text numberOfLines={1} style={[styles.journalSpotlightSpeaker, { color: dt.nameColor }]}>
                   {ANIMAL_INFO.fox?.name || 'Ember'}
                 </Text>
                 <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
+              </View>
+
+              <View style={styles.journalSpotlightDialogueCol}>
 
                 <View style={styles.journalSpotlightBubble}>
                   <NineSliceFrame
@@ -3408,22 +3419,27 @@ const styles = StyleSheet.create({
   },
   dialogueTextCol: {
     flex: 1,
-    paddingTop: 20,
+    // Name moved below the sprite — the bubble now starts near the top.
+    paddingTop: 6,
     paddingBottom: 34,
     paddingHorizontal: 18,
   },
+  // Portrait nameplate: sits under the sprite, centered in the alcove.
   dialogueAnimalName: {
-    fontSize: 22,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 15,
     fontWeight: '900',
     letterSpacing: 0.5,
-    marginBottom: 4,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 3,
   },
   dialogueNameSeparator: {
     height: 2,
-    width: 32,
+    width: 28,
     borderRadius: 1,
     opacity: 0.5,
-    marginBottom: 12,
+    alignSelf: 'center',
   },
   // Cottage parchment tray (NineSliceFrame card background); clear its 12dp
   // wood band. No borderRadius/borderWidth — the pixel frame owns the edge.
@@ -3435,9 +3451,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialogueText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 15,
-    lineHeight: 23,
-    letterSpacing: 0.1,
+    lineHeight: 25,
+    letterSpacing: 0.2,
   },
   // The cottage bevel sits flush-right in the footer at its own strip height.
   dialogueContinueBevel: {
@@ -3449,6 +3466,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   continueButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -3817,6 +3835,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dialogueChoiceBtnText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
@@ -4144,8 +4163,14 @@ const styles = StyleSheet.create({
     paddingBottom: 22,
     gap: 12,
   },
+  // Portrait + nameplate stacked; the framed box no longer stretches to the
+  // row (it is wrapped), so it carries an explicit height.
+  journalSpotlightSpriteWrap: {
+    alignItems: 'center',
+  },
   journalSpotlightSpriteCol: {
     width: 92,
+    height: 140,
     borderRadius: 20,
     overflow: 'hidden',
     justifyContent: 'center',
@@ -4160,11 +4185,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 6,
   },
+  // Portrait nameplate below the framed portrait, centered in the alcove.
   journalSpotlightSpeaker: {
-    fontSize: 21,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 15,
     fontWeight: '900',
-    letterSpacing: 0.4,
-    marginBottom: 4,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 3,
+    maxWidth: 100,
   },
   journalSpotlightBubble: {
     // Cottage parchment tray; clear the 12dp wood band, ≥44dp for the caps.

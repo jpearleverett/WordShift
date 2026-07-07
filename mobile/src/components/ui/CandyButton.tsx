@@ -19,6 +19,7 @@ import {
 } from '../../theme/pixelSkin.generated';
 import { ThreeSliceStrip } from './NineSlice';
 import { getSettingsSync } from '../../services/settings';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 export type CandyButtonVariant = 'primary' | 'amber' | 'secondary' | 'quiet';
 
@@ -153,17 +154,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   label: {
-    fontSize: 15,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 16,
     fontWeight: '800',
-    letterSpacing: 0.4,
+    letterSpacing: 0.6,
     textAlign: 'center',
   },
   labelLg: {
-    fontSize: 17,
+    fontSize: 18,
   },
   quietLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 15,
   },
 });
 

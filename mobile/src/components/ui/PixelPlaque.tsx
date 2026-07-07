@@ -7,6 +7,7 @@ import {
 } from '../../theme/pixelSkin.generated';
 import { SURFACE } from '../../theme/surfaces';
 import { ThreeSliceStrip } from './NineSlice';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface PixelPlaqueProps {
   phase: number;
@@ -43,7 +44,8 @@ const styles = StyleSheet.create({
     minWidth: PLAQUE_CAP_DP * 2 + 40,
   },
   label: {
-    fontSize: 13,
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 14,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     textAlign: 'center',

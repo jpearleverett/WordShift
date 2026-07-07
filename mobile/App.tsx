@@ -116,6 +116,7 @@ import { initIAP, setBillingProvider } from './src/services/iap';
 import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
+import { loadPixelFonts } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
@@ -2304,7 +2305,10 @@ function MainApp() {
           {onboardingFlow.isOnboarding && (onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering') && (
             <FoxGuide
               visible={onboardingFlow.onboardingStep === 'pit_intro' || onboardingFlow.onboardingStep === 'pit_offering'}
-              variant="dialogue"
+              // Compact + top-anchored so Ember never covers the pit or the
+              // floating words the player must tap during the offering step
+              // (the pit + float zone live in the lower two-thirds of the screen).
+              variant="compact"
               text={onboardingActions.getOnboardingFoxText()}
               buttonText={onboardingActions.getOnboardingButtonText()}
               onContinue={
@@ -2320,7 +2324,7 @@ function MainApp() {
               }
               showSkip={true}
               onSkip={onboardingActions.handleSkipOnboarding}
-              position="bottom"
+              position="top"
             />
           )}
         </View>
@@ -3106,7 +3110,9 @@ function App() {
         // Store first-purchase badge) — a cheap local read that must NOT ride on
         // the fire-and-forget initIAP, or a cold cache briefly misreports
         // Patron/ad-free status and the Store's 2x-first-purchase badge.
-        await Promise.all([initCosmetics(), initHints(), loadEntitlements()]);
+        // loadPixelFonts registers the cottage dialogue/chrome font before the
+        // first frame (never throws — falls back to system font on failure).
+        await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
       } finally {
