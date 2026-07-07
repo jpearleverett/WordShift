@@ -2398,6 +2398,36 @@ export function getMandatoryHarvestCTA(phase: DialoguePhase): string {
 }
 
 /**
+ * Fox greets the player AT the pit the first time a manual harvest is
+ * required (words waiting, pit still unlearned). The victory gate's line only
+ * says the house stopped carrying; this beat explains, in-world, what to DO
+ * down here. Shown until a real offer marks the harvest learned, so an
+ * interrupted first visit re-teaches on the next one. Fires just past
+ * AUTO_COLLECT_PUZZLE_LIMIT, squarely Phase 0, but kept phase-aware.
+ */
+export function getMandatoryHarvestPitIntroLines(phase: DialoguePhase): string[] {
+  if (phase >= 3) {
+    return [
+      'Your words wait above the pit. They will not offer themselves.',
+      'The house carries nothing now. What you form, you bring. What you bring, you give.',
+      'Tap each word and let the pit take it. The amber returns to you, as it must.',
+    ];
+  }
+  if (phase >= 2) {
+    return [
+      'You found your way down. Your words are waiting... see them drifting there?',
+      'The house does not carry them anymore. That kindness has ended, friend. This part is yours now.',
+      'Tap each word and let the pit take it. The amber comes back to you. It always comes back.',
+    ];
+  }
+  return [
+    'There you are! And look, your words came down with you... see them floating over the pit?',
+    'The house used to carry them down and trade them for you, remember? That part is done now. The pit likes your hands better.',
+    'Tap each word and watch it go under! Every one comes back to you as amber, I promise. Go on, try one!',
+  ];
+}
+
+/**
  * Onboarding skip confirmation (FoxGuide): shown after the first Skip tap so a
  * stray touch can't silently abandon the guided intro. The SAFE action gets
  * the prominent pill; the skip is the quiet text button.

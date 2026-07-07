@@ -42,8 +42,10 @@ import {
   getTendingResultMessage,
   getTendingMilestoneCeremonyText,
   getTendingLevelLabel,
+  getMandatoryHarvestPitIntroLines,
 } from '../services/phaseNarrative';
-import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen } from '../services/amberCurrency';
+import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
+import { FoxGuide } from './FoxGuide';
 import {
   loadTendingState,
   getNextTendingInfo,
@@ -646,6 +648,28 @@ export function getPitOnboardingOfferAction(
 }
 
 /**
+ * Whether the one-time-until-learned Fox harvest intro should greet the
+ * player on pit arrival. The victory gate's modal says the house stopped
+ * carrying; this beat explains what to DO at the pit, in Fox's voice. It
+ * shows only while the manual harvest is genuinely teachable: outside
+ * onboarding (the onboarding FoxGuide owns the pit there), with no phase
+ * ceremony claiming the pit, with words actually waiting to point at, and
+ * only until a real offer marks the harvest learned (repeat-until-learned,
+ * matching the victory gate's semantics).
+ */
+export function shouldShowHarvestPitIntro(
+  isOnboarding: boolean | undefined,
+  pendingPhaseTransition: DialoguePhase | null,
+  pendingBatchCount: number | null,
+  hasLearned: boolean,
+): boolean {
+  if (isOnboarding) return false;
+  if (pendingPhaseTransition != null) return false;
+  if (pendingBatchCount == null || pendingBatchCount <= 0) return false;
+  return !hasLearned;
+}
+
+/**
  * How long the pit_offering step may sit with pending words and no successful
  * devour before the stalled-pending safety net auto-offers the remainder.
  * Generous on purpose: the manual tap-to-devour flow is primary, and every
@@ -772,6 +796,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   // Tracks amber visually consumed during harvest-all cascade (for decrementing pending display)
   const [pendingAmberOffset, setPendingAmberOffset] = useState(0);
   const [showUtilityModal, setShowUtilityModal] = useState(false);
+
+  // One-time-until-learned Fox beat on arrival with an unlearned harvest
+  // waiting (see shouldShowHarvestPitIntro). Null = hidden.
+  const [harvestIntroLines, setHarvestIntroLines] = useState<string[] | null>(null);
+  const [harvestIntroIndex, setHarvestIntroIndex] = useState(0);
+  // Decide once per pit visit — devouring words mid-visit must not re-fire it.
+  const harvestIntroCheckedRef = useRef(false);
 
   // Tending Shrine (Phase 5 endgame loop) — the repeatable cosmetic amber sink.
   const tendingEnabled = isTendingAvailable(phase);
@@ -1152,6 +1183,26 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
   }, []);
 
   useEffect(() => { loadState(); }, [loadState]);
+
+  // Fox greets the player at the pit the first time a manual harvest is
+  // required. Decision runs once per visit, after the harvest state loads.
+  useEffect(() => {
+    if (harvestIntroCheckedRef.current || !harvestState) return;
+    harvestIntroCheckedRef.current = true;
+    const pendingCount = harvestState.pendingBatches.length;
+    (async () => {
+      try {
+        const learned = await hasSeenMandatoryHarvest();
+        if (!mountedRef.current) return;
+        if (shouldShowHarvestPitIntro(isOnboarding, pendingPhaseTransition, pendingCount, learned)) {
+          setHarvestIntroIndex(0);
+          setHarvestIntroLines(getMandatoryHarvestPitIntroLines(phase));
+        }
+      } catch {
+        // Never block the pit on a storage read.
+      }
+    })();
+  }, [harvestState, isOnboarding, pendingPhaseTransition, phase]);
 
   // ---- Build flying words ----
   useEffect(() => {
@@ -2517,6 +2568,27 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
             </TouchableOpacity>
           )}
         </View>
+      )}
+
+      {/* Fox explains the first manual harvest on arrival (repeat-until-
+          learned: a real offer sets the learned flag; dismissing this card
+          does not). The floating words stay tappable behind the card, and
+          any successful offer still teaches regardless of the card state. */}
+      {harvestIntroLines != null && (
+        <FoxGuide
+          visible={true}
+          variant="dialogue"
+          text={harvestIntroLines[Math.min(harvestIntroIndex, harvestIntroLines.length - 1)]}
+          buttonText={harvestIntroIndex < harvestIntroLines.length - 1 ? 'Next' : 'Got it'}
+          onContinue={() => {
+            if (harvestIntroIndex < harvestIntroLines.length - 1) {
+              setHarvestIntroIndex(i => i + 1);
+            } else {
+              setHarvestIntroLines(null);
+            }
+          }}
+          position="bottom"
+        />
       )}
     </View>
   );

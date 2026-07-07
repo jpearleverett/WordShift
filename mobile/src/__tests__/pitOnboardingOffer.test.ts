@@ -112,6 +112,7 @@ import {
   PitOnboardingOfferAction,
   createPitOnboardingStallRescue,
   PIT_ONBOARDING_STALL_RESCUE_MS,
+  shouldShowHarvestPitIntro,
 } from '../components/OfferingPitScreen';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -279,5 +280,29 @@ describe('auto-offer removal tripwire', () => {
     );
     expect(src).not.toMatch(/onboardingAutoOffer/);
     expect(src).not.toMatch(/handleHarvestAllRef/);
+  });
+});
+
+describe('shouldShowHarvestPitIntro (first-manual-harvest Fox beat)', () => {
+  test('fires on arrival with unlearned harvest and words waiting', () => {
+    expect(shouldShowHarvestPitIntro(false, null, 2, false)).toBe(true);
+    expect(shouldShowHarvestPitIntro(undefined, null, 1, false)).toBe(true);
+  });
+
+  test('never fires during onboarding (the onboarding FoxGuide owns the pit)', () => {
+    expect(shouldShowHarvestPitIntro(true, null, 2, false)).toBe(false);
+  });
+
+  test('yields to a pending phase-transition ceremony', () => {
+    expect(shouldShowHarvestPitIntro(false, 1 as any, 2, false)).toBe(false);
+  });
+
+  test('needs words to point at (no batches, or state not loaded yet)', () => {
+    expect(shouldShowHarvestPitIntro(false, null, 0, false)).toBe(false);
+    expect(shouldShowHarvestPitIntro(false, null, null, false)).toBe(false);
+  });
+
+  test('goes quiet once a real offer has marked the harvest learned', () => {
+    expect(shouldShowHarvestPitIntro(false, null, 2, true)).toBe(false);
   });
 });

@@ -24,6 +24,7 @@ import {
 import {
   getHarvestHomeIntroLines,
   getHarvestNudgeLine,
+  getMandatoryHarvestPitIntroLines,
   getSkipConfirmText,
   getSkipConfirmStayLabel,
   getSkipConfirmLeaveLabel,
@@ -85,6 +86,19 @@ describe('harvest gate narrative copy', () => {
         expect(line.length).toBeGreaterThan(10);
         expect(line).not.toMatch(/[—–]/);
       }
+    }
+  });
+
+  test('pit-arrival intro lines exist for every phase, teach the tap, without em dashes', () => {
+    for (const phase of phases) {
+      const lines = getMandatoryHarvestPitIntroLines(phase);
+      expect(lines.length).toBeGreaterThanOrEqual(2);
+      for (const line of lines) {
+        expect(line.length).toBeGreaterThan(10);
+        expect(line).not.toMatch(/[—–]/);
+      }
+      // The beat must always contain the actual instruction: tap the words.
+      expect(lines.some(l => /tap/i.test(l))).toBe(true);
     }
   });
 
