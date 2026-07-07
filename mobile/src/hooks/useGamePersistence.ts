@@ -25,6 +25,7 @@ import { updatePuzzleCount, updateSessionPhase } from '../services/dialogueSessi
 import { calculateRitualEnergy, extractTriggerWords } from '../services/localGenerator';
 import { GameEvent, logEvent } from '../services/eventLogger';
 import { updateQuestProgress } from '../services/weeklyQuests';
+import { recordOfferingFulfillment } from '../services/offeringRequests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
 import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, HarvestSummary } from '../services/wordHarvest';
 
@@ -298,6 +299,9 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         const triggerWords = extractTriggerWords(completedWords);
         const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
+        // Fulfill any animal's outstanding offering request whose theme these
+        // words match — the animal reacts by name on the next visit.
+        recordOfferingFulfillment(completedWords).catch(() => {});
       }
 
       // Queue a one-time variant tutorial for animal dialogue.

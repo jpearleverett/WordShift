@@ -99,6 +99,7 @@ const SYNC_KEYS = [
   'wordshift_whisper_gallery',
   'wordshift_sacrifices',
   'wordshift_tending',
+  'wordshift_offering_requests', // per-animal offering request / fulfillment state
   // Settings, onboarding & one-time intro flags
   'wordshift_settings',
   'wordshift_notification_prefs',
