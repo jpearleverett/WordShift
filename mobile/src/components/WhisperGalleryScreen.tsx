@@ -85,8 +85,8 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
           <Text style={[styles.backChipText, { color: t.title }]}>{'<'} Back</Text>
         </TouchableOpacity>
         <PanelCard phase={phase} kind="card" style={styles.titlePlaque}>
-          <Text style={[styles.title, { color: t.title }]}>{title}</Text>
-          <Text style={[styles.subtitle, { color: t.muted }]}>{subtitle}</Text>
+          <Text style={[styles.title, { color: t.headerTitle }]}>{title}</Text>
+          <Text style={[styles.subtitle, { color: t.headerMuted }]}>{subtitle}</Text>
         </PanelCard>
       </View>
 
@@ -97,7 +97,7 @@ export const WhisperGalleryScreen: React.FC<WhisperGalleryScreenProps> = ({
       >
         {loading && (
           <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color={t.primaryText} />
+            <ActivityIndicator size="large" color={t.headerTitle} />
           </View>
         )}
 

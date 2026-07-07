@@ -46,6 +46,16 @@ import {
 } from '../services/phaseNarrative';
 import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
 import { FoxGuide } from './FoxGuide';
+import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
+import {
+  getPixelSkin,
+  CARD_CORNER_DP,
+  CARD_EDGE_DP,
+  BTN_CAP_DP,
+  BTN_LG_DP,
+  BTN_SHADOW_DP,
+} from '../theme/pixelSkin.generated';
+import { getSurfaceTheme } from '../theme/surfaces';
 import {
   loadTendingState,
   getNextTendingInfo,
@@ -779,6 +789,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 }) => {
   const screenInsets = useScreenInsets();
   const phaseTheme = getPhaseTheme(phase);
+  // Cottage signage chrome for the pit banners: wooden card frames that age
+  // with the world (bright parchment → ash paper), on-parchment inks that
+  // flip to cream at phase 4+. The pit art stays untouched behind them.
+  const pitSkin = getPixelSkin(phase);
+  const pitSurface = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync()?.reducedMotion ?? false;
   const simplify = shouldSimplifyAnimations();
 
@@ -2284,8 +2299,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {/* Ward hint / ready text — shown above the pit */}
       {wardHintText && ceremonyStatus === 'idle' && (
         <View style={styles.wardHintContainer} pointerEvents="none">
+          <NineSliceFrame
+            skin={pitSkin.card}
+            cornerDp={CARD_CORNER_DP}
+            edgeDp={CARD_EDGE_DP}
+            fillColor={pitSkin.fillCard}
+          />
+          {/* A pending transition glows in the ward color (the 7 marks below
+              echo it); the idle "stirs below" hint reads in the sign's own
+              readable ink. */}
           <Text style={[styles.wardHintText, {
-            color: pendingPhaseTransition != null ? wardColors.pendingPulse : wardColors.lit,
+            color: pendingPhaseTransition != null ? wardColors.pendingPulse : pitSurface.title,
             fontSize: pendingPhaseTransition != null ? 18 : 15,
           }]}>
             {wardHintText}
@@ -2483,22 +2507,19 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       </Modal>
 
       {/* Empty state */}
-      {pendingWordCount === 0 && !resultMessage && (() => {
-        const bt = getOverlayBannerTheme(phase);
-        return (
-          <View style={[styles.emptyContainer, {
-            backgroundColor: bt.containerBg,
-            borderColor: bt.borderColor,
-          }]}>
-            <Text style={[styles.emptyText, {
-              color: bt.textColor,
-              textShadowColor: bt.textShadowColor,
-            }]}>
-              {getPitEmptyMessage(phase)}
-            </Text>
-          </View>
-        );
-      })()}
+      {pendingWordCount === 0 && !resultMessage && (
+        <View style={styles.emptyContainer}>
+          <NineSliceFrame
+            skin={pitSkin.card}
+            cornerDp={CARD_CORNER_DP}
+            edgeDp={CARD_EDGE_DP}
+            fillColor={pitSkin.fillCard}
+          />
+          <Text style={[styles.emptyText, { color: pitSurface.body }]}>
+            {getPitEmptyMessage(phase)}
+          </Text>
+        </View>
+      )}
 
       {/* Overflow indicator */}
       {overflowCount > 0 && (
@@ -2525,46 +2546,45 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       {/* Bottom panel — hidden during onboarding (FoxGuide occupies this space) */}
       {!isOnboarding && (
         <View style={[styles.bottomPanel, { paddingBottom: Math.max(Platform.OS === 'ios' ? 34 : 16, screenInsets.bottom) }]}>
-          {(() => {
-            const bt = getOverlayBannerTheme(phase);
-            return (
-              <View style={[styles.summaryRow, {
-                backgroundColor: phase >= 3 ? 'rgba(8, 4, 16, 0.82)' : 'rgba(20, 12, 45, 0.72)',
-                borderColor: bt.borderColor,
-              }]}>
-                <View style={styles.summaryItem}>
-                  <Text style={[styles.summaryValue, { color: bt.textColor, textShadowColor: bt.textShadowColor }]}>
-                    <AmberInline size={16} /> {Math.max(0, pendingAmber - pendingAmberOffset)}
-                  </Text>
-                  <Text style={[styles.summaryLabel, { color: bt.secondaryTextColor }]}>
-                    {getPitPendingAmberLabel(phase)}
-                  </Text>
-                </View>
-                <View style={[styles.summaryDivider, { backgroundColor: 'rgba(255,255,255,0.15)' }]} />
-                <View style={styles.summaryItem}>
-                  <Text style={[styles.summaryValue, { color: bt.textColor, textShadowColor: bt.textShadowColor }]}>{harvestState.totalWordsOffered}</Text>
-                  <Text style={[styles.summaryLabel, { color: bt.secondaryTextColor }]}>
-                    Lifetime {getPitHarvestLabel(phase)}
-                  </Text>
-                </View>
-              </View>
-            );
-          })()}
+          <View style={styles.summaryRow}>
+            <NineSliceFrame
+              skin={pitSkin.card}
+              cornerDp={CARD_CORNER_DP}
+              edgeDp={CARD_EDGE_DP}
+              fillColor={pitSkin.fillCard}
+            />
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: pitSurface.title }]}>
+                <AmberInline size={16} /> {Math.max(0, pendingAmber - pendingAmberOffset)}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
+                {getPitPendingAmberLabel(phase)}
+              </Text>
+            </View>
+            <View style={[styles.summaryDivider, { backgroundColor: pitSurface.sectionBorder }]} />
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryValue, { color: pitSurface.title }]}>{harvestState.totalWordsOffered}</Text>
+              <Text style={[styles.summaryLabel, { color: pitSurface.muted }]}>
+                Lifetime {getPitHarvestLabel(phase)}
+              </Text>
+            </View>
+          </View>
 
           {pendingWordCount > 0 && pendingAmber - pendingAmberOffset > 0 && (
             <TouchableOpacity
-              style={[styles.harvestAllButton, {
-                backgroundColor: phase >= 3 ? '#8B1A3A' : CandyColors.pink.main,
-                opacity: isOffering ? 0.5 : 1,
-              }]}
+              style={[styles.harvestAllButton, { opacity: isOffering ? 0.5 : 1 }]}
               onPress={handleHarvestAll}
               disabled={isOffering}
+              activeOpacity={0.85}
               accessibilityLabel={`${getPitOfferAllLabel(phase)}: ${Math.max(0, pendingAmber - pendingAmberOffset)} amber from ${pendingWordCount} words`}
               accessibilityRole="button"
             >
-              <Text style={styles.harvestAllText}>
-                {getPitOfferAllLabel(phase)} (<AmberInline size={14} /> {Math.max(0, pendingAmber - pendingAmberOffset)})
-              </Text>
+              <ThreeSliceStrip skin={pitSkin.buttons.primary.lg.up} capDp={BTN_CAP_DP} />
+              <View style={styles.harvestAllContent}>
+                <Text style={[styles.harvestAllText, { color: pitSkin.ink.primary }]}>
+                  {getPitOfferAllLabel(phase)} (<AmberInline size={14} /> {Math.max(0, pendingAmber - pendingAmberOffset)})
+                </Text>
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -2792,10 +2812,10 @@ const styles = StyleSheet.create({
     top: FLOAT_ZONE.top + 40,
     left: 24, right: 24,
     alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 24,
-    paddingVertical: 18,
-    borderWidth: 1,
+    // Clear the card frame's 12dp wood band with breathing room; no
+    // borderRadius/borderWidth (the pixel frame owns the edge).
+    paddingHorizontal: 26,
+    paddingVertical: 22,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
@@ -2803,11 +2823,9 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   emptyText: {
-    fontSize: 17, fontWeight: '600',
-    textAlign: 'center', lineHeight: 26,
+    fontSize: 16, fontWeight: '700',
+    textAlign: 'center', lineHeight: 24,
     letterSpacing: 0.3,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
   },
   overflowContainer: {
     position: 'absolute',
@@ -2844,11 +2862,10 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    // Cottage card frame background; clear its 12dp wood band top/bottom.
+    paddingVertical: 16,
+    paddingHorizontal: 18,
     marginBottom: 10,
-    borderWidth: 1,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -2859,30 +2876,28 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 18, fontWeight: '900',
     letterSpacing: 0.3,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
   summaryLabel: {
     fontSize: 10.5, fontWeight: '700', marginTop: 2, textAlign: 'center',
     letterSpacing: 0.4,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-  summaryDivider: { width: 1, height: 28, borderRadius: 1 },
+  summaryDivider: { width: 1.5, height: 28 },
   harvestAllButton: {
-    borderRadius: 22,
-    paddingVertical: 15,
-    paddingHorizontal: 32,
+    // Cottage pixel bevel (ThreeSliceStrip); height carries the baked shadow
+    // row. No borderRadius/backgroundColor — the strip owns the look.
+    height: BTN_LG_DP + BTN_SHADOW_DP,
+    minWidth: 220,
     alignSelf: 'center',
-    shadowColor: CandyColors.pink.main,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    elevation: 8,
+  },
+  harvestAllContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: BTN_SHADOW_DP,
   },
   harvestAllText: {
-    color: '#FFFFFF',
     fontSize: 16, fontWeight: '900', letterSpacing: 1, textAlign: 'center',
   },
   // ---- Ward mark & ceremony ----
@@ -2891,12 +2906,9 @@ const styles = StyleSheet.create({
     top: PIT_CENTER.y - PIT_OVAL.radiusY * 4.5,
     left: 24, right: 24,
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.50)',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    // Wooden sign frame; clear its 12dp wood band.
+    paddingHorizontal: 22,
+    paddingVertical: 16,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -2909,9 +2921,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.5,
     lineHeight: 20,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
   },
   ceremonyOverlay: {
     position: 'absolute',

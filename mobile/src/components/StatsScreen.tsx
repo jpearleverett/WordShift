@@ -77,14 +77,14 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
       {/* Header */}
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
-          style={[styles.backChip, { backgroundColor: CHROME_CHIP_BG, borderColor: t.cardBorder }]}
+          style={[styles.backChip, { backgroundColor: CHROME_CHIP_BG, borderColor: t.headerChipBorder }]}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Back to home"
         >
-          <Text style={[styles.backChipText, { color: t.primaryText }]}>{'<'} Back</Text>
+          <Text style={[styles.backChipText, { color: t.headerTitle }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: t.primaryText }]}>Statistics</Text>
+        <Text style={[styles.title, { color: t.headerTitle }]}>Statistics</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -107,7 +107,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               styles.tabText,
               overviewSelected
                 ? [styles.tabTextActive, { color: t.primaryText }]
-                : { color: t.primaryText, opacity: 0.92 },
+                : { color: t.headerMuted },
             ]}
           >
             Overview
@@ -130,7 +130,7 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               styles.tabText,
               achievementsSelected
                 ? [styles.tabTextActive, { color: t.primaryText }]
-                : { color: t.primaryText, opacity: 0.92 },
+                : { color: t.headerMuted },
             ]}
           >
             Achievements ({unlockedAchievements.length}/{totalAchievements})
