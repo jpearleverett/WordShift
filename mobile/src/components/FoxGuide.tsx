@@ -10,13 +10,59 @@ import {
   ImageSourcePropType,
   Dimensions,
 } from 'react-native';
-import { CandyColors, getDialogueTheme } from '../theme/colors';
+import { getDialogueTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import {
   getSkipConfirmText,
   getSkipConfirmStayLabel,
   getSkipConfirmLeaveLabel,
 } from '../services/phaseNarrative';
+import { getSurfaceTheme } from '../theme/surfaces';
+import {
+  getPixelSkin,
+  CARD_CORNER_DP,
+  CARD_EDGE_DP,
+  BTN_CAP_DP,
+  BTN_MD_DP,
+  BTN_SHADOW_DP,
+} from '../theme/pixelSkin.generated';
+import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
+
+// FoxGuide is always a Phase-0 tutorial moment → bright cottage skin.
+const FOX_SKIN = getPixelSkin(0);
+const FOX_SURFACE = getSurfaceTheme(0);
+
+/** Cottage pixel-bevel button for the FoxGuide footer (accepts a string label). */
+const FoxBevelButton: React.FC<{
+  label: string;
+  onPress?: () => void;
+  accessibilityLabel: string;
+}> = ({ label, onPress, accessibilityLabel }) => (
+  <TouchableOpacity
+    style={foxBevelStyles.strip}
+    onPress={onPress}
+    activeOpacity={0.85}
+    accessibilityLabel={accessibilityLabel}
+    accessibilityRole="button"
+  >
+    <ThreeSliceStrip skin={FOX_SKIN.buttons.primary.md.up} capDp={BTN_CAP_DP} />
+    <View style={foxBevelStyles.content}>
+      <Text style={[foxBevelStyles.label, { color: FOX_SKIN.ink.primary }]}>{label}</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+const foxBevelStyles = StyleSheet.create({
+  strip: { height: BTN_MD_DP + BTN_SHADOW_DP, minWidth: 112 },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    paddingBottom: BTN_SHADOW_DP,
+  },
+  label: { fontSize: 15, fontWeight: '800', letterSpacing: 0.4 },
+});
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -264,9 +310,15 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
             <Text style={[isCompact ? styles.compactName : styles.dialogueName, { color: dt.nameColor }]}>Ember</Text>
             <View style={[isCompact ? styles.compactNameSep : styles.dialogueNameSep, { backgroundColor: dt.accentLine }]} />
 
-            <View style={[isCompact ? styles.compactBubble : styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+            <View style={isCompact ? styles.compactBubble : styles.dialogueBubble}>
+              <NineSliceFrame
+                skin={FOX_SKIN.card}
+                cornerDp={CARD_CORNER_DP}
+                edgeDp={CARD_EDGE_DP}
+                fillColor={FOX_SKIN.fillCard}
+              />
               <Animated.Text
-                style={[isCompact ? styles.compactText : styles.dialogueText, { color: dt.textColor, opacity: textFadeAnim }]}
+                style={[isCompact ? styles.compactText : styles.dialogueText, { color: FOX_SURFACE.body, opacity: textFadeAnim }]}
               >
                 {displayText}
               </Animated.Text>
@@ -289,18 +341,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
                   >
                     <Text style={[isCompact ? styles.compactSkipText : styles.dialogueSkipText, { color: dt.subtitleColor }]}>{getSkipConfirmLeaveLabel()}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      isCompact ? styles.compactContinueBtn : styles.dialogueContinueBtn,
-                      { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
-                    ]}
+                  <FoxBevelButton
+                    label={getSkipConfirmStayLabel()}
                     onPress={() => setConfirmingSkip(false)}
                     accessibilityLabel="Keep going with the intro"
-                    accessibilityRole="button"
-                  >
-                    <View style={isCompact ? styles.compactBtnShine : styles.dialogueBtnShine} />
-                    <Text style={isCompact ? styles.compactContinueBtnText : styles.dialogueContinueBtnText}>{getSkipConfirmStayLabel()}</Text>
-                  </TouchableOpacity>
+                  />
                 </>
               ) : (
                 <>
@@ -315,18 +360,11 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
                     </TouchableOpacity>
                   )}
                   {onContinue && (
-                    <TouchableOpacity
-                      style={[
-                        isCompact ? styles.compactContinueBtn : styles.dialogueContinueBtn,
-                        { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
-                      ]}
+                    <FoxBevelButton
+                      label={buttonText}
                       onPress={onContinue}
                       accessibilityLabel={buttonText}
-                      accessibilityRole="button"
-                    >
-                      <View style={isCompact ? styles.compactBtnShine : styles.dialogueBtnShine} />
-                      <Text style={isCompact ? styles.compactContinueBtnText : styles.dialogueContinueBtnText}>{buttonText}</Text>
-                    </TouchableOpacity>
+                    />
                   )}
                 </>
               )}
@@ -406,12 +444,13 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginBottom: 12,
   },
+  // Cottage parchment tray (NineSliceFrame card); clear the 12dp wood band.
   dialogueBubble: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     marginBottom: 14,
-    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   dialogueText: {
     fontSize: 15,
@@ -423,40 +462,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 10,
-    // Pill height (12 + 20 + 12 + 2 border): stable whether or not it renders.
-    minHeight: 46,
+    // Stable footer height (matches the cottage bevel strip) so the card
+    // never jumps when the continue button appears/disappears.
+    minHeight: BTN_MD_DP + BTN_SHADOW_DP,
   },
   dialogueSkipText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  dialogueContinueBtn: {
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderRadius: 22,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  dialogueBtnShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
-  dialogueContinueBtnText: {
-    color: CandyColors.white,
-    fontSize: 16,
-    fontWeight: '800',
-    lineHeight: 20,
   },
 
   // ---- Compact variant: the same anatomy shrunk down (move-required steps,
@@ -503,12 +515,13 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginBottom: 8,
   },
+  // Cottage parchment tray, compact; still clears the 12dp wood band.
   compactBubble: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     marginBottom: 8,
-    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   compactText: {
     fontSize: 14,
@@ -520,40 +533,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 10,
-    // Pill height (8 + 17 + 8 + 2 border): stable whether or not it renders —
-    // during move-required steps only Skip shows and the card doesn't jump.
-    minHeight: 36,
+    // Stable footer height (cottage bevel strip) so move-required steps that
+    // show only Skip don't make the card jump when a button appears.
+    minHeight: BTN_MD_DP + BTN_SHADOW_DP,
   },
   compactSkipText: {
     fontSize: 13,
     fontWeight: '600',
-  },
-  compactContinueBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  compactBtnShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  compactContinueBtnText: {
-    color: CandyColors.white,
-    fontSize: 13,
-    fontWeight: '800',
     lineHeight: 17,
     letterSpacing: 0.4,
   },
