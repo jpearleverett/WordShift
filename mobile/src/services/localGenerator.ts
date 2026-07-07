@@ -488,6 +488,23 @@ function _buildTierMap() {
 }
 _buildTierMap();
 
+/**
+ * The strongest dread word in a list (highest tier wins; ties → first seen), or
+ * null if none are dread words. Used to name a dread offering "by name" when the
+ * player feeds the pit.
+ */
+export function getStrongestDreadWord(words: string[]): { word: string; tier: number } | null {
+  let best: { word: string; tier: number } | null = null;
+  for (const raw of words) {
+    const w = raw.toUpperCase();
+    const tier = DREAD_WORD_TIER.get(w);
+    if (tier != null && (!best || tier > best.tier)) {
+      best = { word: w, tier };
+    }
+  }
+  return best;
+}
+
 // Combined set (backward compat for isDreadWord, calculateRitualEnergy, extractTriggerWords)
 const DREAD_WORDS = new Set([
   ...DREAD_WORDS_PHASE_1,

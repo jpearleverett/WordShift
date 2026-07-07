@@ -1726,6 +1726,20 @@ export function getEchoPuzzleMessage(phase: DialoguePhase): string {
 }
 
 /**
+ * "Remembered by name" — when the player feeds the pit a dread word, the
+ * arrangement notes the specific offering (assessment §6, the cheapest real
+ * complicity lever). Phase 2+ only; {word} is the strongest dread word offered.
+ * The point is quiet accusation: you didn't have to give us this.
+ */
+export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
+  const w = word.toUpperCase();
+  if (phase >= 5) return `${w}. It is part of the weave now. Woven by your hand.`;
+  if (phase >= 4) return `You gave us ${w}. You didn't have to.`;
+  if (phase >= 3) return `${w} slips into the dark. The pit remembers it.`;
+  return `Something in ${w} sinks deeper than the rest.`;
+}
+
+/**
  * Reset micro-beats tracking (for Reset All Data).
  */
 export async function resetMicroBeats(): Promise<void> {

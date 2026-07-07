@@ -43,7 +43,9 @@ import {
   getTendingMilestoneCeremonyText,
   getTendingLevelLabel,
   getMandatoryHarvestPitIntroLines,
+  getDreadOfferingLine,
 } from '../services/phaseNarrative';
+import { getStrongestDreadWord } from '../services/localGenerator';
 import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
 import { FoxGuide } from './FoxGuide';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
@@ -1698,6 +1700,9 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     const devoured = devouredPerBatch.current.get(batchId);
     if (!devoured || devoured.size < totalWords) return;
     finalizingBatches.current.add(batchId);
+    // Capture the batch's words BEFORE offering (offerBatch removes the batch and
+    // returns only counts) so a fed dread word can be named back to the player.
+    const batchWords = harvestStateRef.current?.pendingBatches.find(b => b.id === batchId)?.words ?? [];
     try {
       const result = await offerBatch(batchId);
       if (!result) return;
@@ -1721,6 +1726,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         spawnAmberRise(result.amberAwarded);
         hapticMedium();
         showResultToast(getPitOfferResultMessage(phase, result.wordsOffered, result.amberAwarded));
+        // Remembered by name: if the offered batch carried a dread word, the pit
+        // names it back (Phase 2+) — complicity enacted. Delayed so it lands
+        // after the amber result toast; strongest tier wins.
+        if (phase >= 2) {
+          const dread = getStrongestDreadWord(batchWords);
+          if (dread) {
+            setTimeout(() => {
+              if (mountedRef.current) showResultToast(getDreadOfferingLine(dread.word, phase));
+            }, 1600);
+          }
+        }
         // Refresh harvest state so pending amber/count updates in UI
         // Spread to create new reference — harvestCache is mutated in-place by offerBatch,
         // so getHarvestState returns the same object; React skips re-render without a new ref.
@@ -1884,6 +1900,17 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
     const totalAmber = harvestState.pendingBatches.reduce((s, b) => s + b.amberValue, 0);
     const totalWordCount = harvestState.pendingBatches.reduce((s, b) => s + b.words.length, 0);
+    // Strongest dread word across everything being offered — named back to the
+    // player (Phase 2+) after the result toast, once for the whole harvest.
+    const allOfferedWords = harvestState.pendingBatches.flatMap(b => b.words);
+    const harvestDread = phase >= 2 ? getStrongestDreadWord(allOfferedWords) : null;
+    const nameDreadOffering = () => {
+      if (harvestDread) {
+        setTimeout(() => {
+          if (mountedRef.current) showResultToast(getDreadOfferingLine(harvestDread.word, phase));
+        }, 1600);
+      }
+    };
 
     // Pre-offer REAL balance — the cascade counts the display up from here to
     // the final credited balance, never beyond it.
@@ -1915,6 +1942,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
+        nameDreadOffering();
         const freshState = await getHarvestState();
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setOverflowCount(0);
@@ -2009,6 +2037,7 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         setDisplayBalance(finalBalance);
         spawnAmberRise(result.amberAwarded);
         showResultToast(getPitOfferResultMessage(phase, totalWordCount, result.amberAwarded));
+        nameDreadOffering();
         setHarvestState({ ...freshState, pendingBatches: [...freshState.pendingBatches] });
         setFlyingWords([]);
         setOverflowCount(0);
