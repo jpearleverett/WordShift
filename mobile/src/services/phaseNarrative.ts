@@ -231,6 +231,30 @@ export function getMoveMessage(phase: DialoguePhase): string {
 }
 
 // ============================================================================
+// SHARE CARD TAGLINE — a spoiler-safe "mood signature" printed on the shareable
+// result card. It stays pristine and cozy in the bright phases, then grows
+// quietly wrong as the story darkens, so a late-game shared card reads as
+// "something is off with this cute word game" WITHOUT ever naming or explaining
+// the turn (the lure, not the reveal). Never says cult/summon/ritual; never
+// names the entity; never reveals a phase number.
+// ============================================================================
+
+const SHARE_CARD_TAGLINES: Record<DialoguePhase, string> = {
+  0: 'A cozy little word game.',
+  1: 'Just a cozy word game.',
+  2: 'The words are listening.',
+  3: 'The words remember.',
+  4: 'It is almost arranged.',
+  5: 'The pattern continues.',
+};
+
+export function getShareCardTagline(phase: number): string {
+  // Tolerant of any stored phase value (share results are serialized data).
+  const p = Math.max(0, Math.min(5, Math.round(phase))) as DialoguePhase;
+  return SHARE_CARD_TAGLINES[p];
+}
+
+// ============================================================================
 // COMBO MOVE MESSAGES — Escalating feedback for consecutive clean moves within a
 // single puzzle. `streak` is the count of successful moves so far this board (2+).
 // Each tier ramps the energy so a clean run *feels* like it's building, which is

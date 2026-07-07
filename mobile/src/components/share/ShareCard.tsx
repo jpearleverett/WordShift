@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
+import { getShareCardTagline } from '../../services/phaseNarrative';
 import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
 
 /**
@@ -65,9 +66,24 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
 
   const bg = theme.bgPrimary;
   const cardBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)';
-  const cardBorder = isDark ? 'rgba(180,120,160,0.3)' : 'rgba(255,255,255,0.3)';
+  // The border creeps toward crimson at the reveal — a quiet wrongness.
+  const cardBorder = phase >= 4
+    ? 'rgba(196,72,92,0.42)'
+    : isDark ? 'rgba(180,120,160,0.3)' : 'rgba(255,255,255,0.3)';
   const textColor = isDark ? 'rgba(225,205,225,0.95)' : '#FFFFFF';
   const subColor = isDark ? 'rgba(200,170,195,0.8)' : 'rgba(255,255,255,0.8)';
+
+  // Phase-decay: the wordmark splits into a faint chromatic glitch as the story
+  // darkens (Phase 2+), so a late-game shared card reads as subtly corrupted.
+  // Deliberately pristine in the bright candy phases (0-1) — early shares, and
+  // the store screenshots, must still look clean and inviting.
+  const glitchStrength = phase >= 2 ? (phase - 1) / 4 : 0; // 0.25 .. 1.0
+  const glitch = {
+    on: glitchStrength > 0,
+    dx: 1.4 + glitchStrength * 2.0,
+    red: `rgba(255,45,80,${(0.22 + glitchStrength * 0.28).toFixed(3)})`,
+    cyan: `rgba(70,205,255,${(0.22 + glitchStrength * 0.28).toFixed(3)})`,
+  };
 
   const spoilerSafe = !result.isDaily;
   const diffLabel = result.difficulty === 'MEDIUM_PLUS' ? 'MED+' : result.difficulty;
@@ -75,8 +91,16 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
   return (
     <View ref={ref} collapsable={false} style={[styles.card, { backgroundColor: bg, borderColor: cardBorder }]}>
       <View style={[styles.inner, { backgroundColor: cardBg }]}>
-        {/* Wordmark */}
-        <Text style={[styles.wordmark, { color: textColor }]}>WordShift</Text>
+        {/* Wordmark — splits into a chromatic glitch as the descent deepens */}
+        <View style={styles.wordmarkWrap}>
+          {glitch.on && (
+            <Text style={[styles.wordmark, styles.wordmarkGhost, { color: glitch.red, transform: [{ translateX: -glitch.dx }] }]} numberOfLines={1}>WordShift</Text>
+          )}
+          {glitch.on && (
+            <Text style={[styles.wordmark, styles.wordmarkGhost, { color: glitch.cyan, transform: [{ translateX: glitch.dx }] }]} numberOfLines={1}>WordShift</Text>
+          )}
+          <Text style={[styles.wordmark, { color: textColor }]}>WordShift</Text>
+        </View>
         {result.isDaily && result.dailyDate && (
           <Text style={[styles.daily, { color: subColor }]}>Daily · {result.dailyDate}</Text>
         )}
@@ -127,6 +151,11 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
           </Text>
         )}
 
+        {/* Mood signature — a spoiler-safe tagline that quietly decays with phase */}
+        <Text style={[styles.tagline, { color: subColor }]} numberOfLines={1}>
+          {getShareCardTagline(phase)}
+        </Text>
+
         {/* Footer */}
         <View style={[styles.footer, { borderTopColor: cardBorder }]}>
           <Text style={[styles.footerText, { color: subColor }]}>
@@ -158,6 +187,9 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 1,
   },
+  wordmarkWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  wordmarkGhost: { position: 'absolute', left: 0, right: 0, top: 0, textAlign: 'center' },
+  tagline: { fontSize: 11.5, fontWeight: '600', fontStyle: 'italic', marginTop: 16, letterSpacing: 0.3, textAlign: 'center' },
   daily: {
     fontSize: 12,
     fontWeight: '700',

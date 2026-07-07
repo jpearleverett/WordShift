@@ -2,6 +2,7 @@ import {
   getVictoryTitle,
   getVictoryFeedback,
   getMoveMessage,
+  getShareCardTagline,
   getHintMessage,
   getHintFallback,
   getLoadingMessage,
@@ -125,6 +126,25 @@ describe('getMoveMessage', () => {
       const msg = getMoveMessage(4);
       expect(phase4Words.some(w => msg.includes(w))).toBe(true);
     }
+  });
+});
+
+describe('getShareCardTagline', () => {
+  test.each(ALL_PHASES)('returns a non-empty, spoiler-safe tagline for phase %i', (phase) => {
+    const line = getShareCardTagline(phase);
+    expect(typeof line).toBe('string');
+    expect(line.length).toBeGreaterThan(0);
+    // Spoiler-safe: the decaying share card lures, it never explains the turn.
+    expect(line.toLowerCase()).not.toMatch(/cult|summon|ritual|sacrifice|phase|shadow|entity/);
+    expect(line).not.toMatch(/[—–]/); // no em/en dashes in player-facing copy
+  });
+
+  test('stays cozy in the bright phases, grows wrong in the dark ones', () => {
+    expect(getShareCardTagline(0).toLowerCase()).toContain('cozy');
+    expect(getShareCardTagline(1).toLowerCase()).toContain('cozy');
+    // The dark phases drop the "cozy" framing entirely.
+    expect(getShareCardTagline(4).toLowerCase()).not.toContain('cozy');
+    expect(getShareCardTagline(5).toLowerCase()).not.toContain('cozy');
   });
 });
 
