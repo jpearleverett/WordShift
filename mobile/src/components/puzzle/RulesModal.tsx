@@ -1,21 +1,46 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Modal,
+  Animated,
+  Easing,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { PanelCard } from '../ui/PanelCard';
+import { CandyButton } from '../ui/CandyButton';
+import { getSettingsSync } from '../../services/settings';
 import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 
-const STEP_COLORS = [
-  { bg: CandyColors.pink.light, text: CandyColors.pink.dark },
-  { bg: CandyColors.blue.light, text: CandyColors.blue.dark },
-  { bg: CandyColors.yellow.light, text: CandyColors.yellow.shadow },
-  { bg: CandyColors.green.light, text: CandyColors.green.dark },
+/**
+ * Numbered step-chip hue rotation. The candy cycle survives every phase; only
+ * its loudness changes: full pastels through Phase 1, tinted down at Phase 2,
+ * dim glowing rings once the dark phases arrive.
+ */
+const STEP_HUES = [
+  // `ink` is a purpose-picked deep tone per hue: the CandyColors dark values
+  // sit under 4.5:1 on their own pastel fills, so the chip numbers carry
+  // their own ink (>= 4.5:1 on both the full pastel and the phase-2 tint).
+  { bright: CandyColors.pink.light, deep: CandyColors.pink.dark, ink: '#701A43' },
+  { bright: CandyColors.blue.light, deep: CandyColors.blue.dark, ink: '#1E3A8A' },
+  { bright: CandyColors.yellow.light, deep: CandyColors.yellow.shadow, ink: '#5C3D00' },
+  { bright: CandyColors.green.light, deep: CandyColors.green.dark, ink: '#0F3D22' },
 ];
+
+function getStepChipColors(
+  idx: number,
+  phase: number
+): { bg: string; border: string; text: string } {
+  const hue = STEP_HUES[idx % STEP_HUES.length];
+  if (phase <= 1) return { bg: hue.bright, border: 'transparent', text: hue.ink };
+  if (phase === 2) return { bg: hue.bright + '59', border: hue.deep + '26', text: hue.ink };
+  // Dark phases: the hue survives as a dim ember behind a faint ring.
+  return { bg: hue.deep + '2E', border: hue.bright + '3D', text: hue.bright };
+}
 
 interface RulesModalProps {
   visible: boolean;
@@ -29,109 +54,168 @@ export const RulesModal: React.FC<RulesModalProps> = ({
   onClose,
 }) => {
   const rules = getRulesText(phase);
+  const t = getSurfaceTheme(phase);
+  const reducedMotion = getSettingsSync().reducedMotion;
+
+  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
+  const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const closingRef = useRef(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    closingRef.current = false;
+    if (reducedMotion) {
+      backdropOpacity.setValue(1);
+      cardScale.setValue(1);
+      cardOpacity.setValue(1);
+      return;
+    }
+    backdropOpacity.setValue(0);
+    cardScale.setValue(0.92);
+    cardOpacity.setValue(0);
+    const anim = Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardScale, {
+        toValue: 1,
+        ...SURFACE.modalIn,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity]);
+
+  const handleClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (reducedMotion) {
+      onClose();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={styles.rulesModal} onStartShouldSetResponder={() => true}>
-          <View style={styles.modalShine} />
-
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={onClose}
-            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
+    <Modal visible={visible} transparent animationType="none">
+      <View style={styles.overlayRoot}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: t.overlay, opacity: backdropOpacity },
+          ]}
+        />
+        <TouchableOpacity
+          style={styles.overlayTouch}
+          activeOpacity={1}
+          onPress={handleClose}
+        >
+          <Animated.View
+            style={[
+              styles.cardWrap,
+              { transform: [{ scale: cardScale }], opacity: cardOpacity },
+            ]}
+            onStartShouldSetResponder={() => true}
           >
-            <Text style={styles.closeButtonText}>{'\u2715'}</Text>
-          </TouchableOpacity>
+            <PanelCard phase={phase} kind="panel" style={styles.rulesModal}>
+              <CandyButton
+                label={'✕'}
+                onPress={handleClose}
+                phase={phase}
+                variant="quiet"
+                style={styles.closeButton}
+                accessibilityLabel="Close"
+              />
 
-          <Text style={styles.rulesTitle}>{rules.title}</Text>
+              <Text style={[styles.rulesTitle, { color: t.title }]}>{rules.title}</Text>
 
-          {rules.steps.map((step, idx) => {
-            const color = STEP_COLORS[idx % STEP_COLORS.length];
-            return (
-              <View key={idx} style={styles.ruleItem}>
-                <View style={[styles.ruleNumber, { backgroundColor: color.bg }]}>
-                  <Text style={[styles.ruleNumberText, { color: color.text }]}>{idx + 1}</Text>
-                </View>
-                <View style={styles.ruleContent}>
-                  <Text style={styles.ruleHeading}>{step.heading}</Text>
-                  <Text style={styles.ruleDesc}>{step.desc}</Text>
-                </View>
-              </View>
-            );
-          })}
+              {rules.steps.map((step, idx) => {
+                const chip = getStepChipColors(idx, phase);
+                return (
+                  <View key={idx} style={styles.ruleItem}>
+                    <View
+                      style={[
+                        styles.ruleNumber,
+                        { backgroundColor: chip.bg, borderColor: chip.border },
+                      ]}
+                    >
+                      <Text style={[styles.ruleNumberText, { color: chip.text }]}>{idx + 1}</Text>
+                    </View>
+                    <View style={styles.ruleContent}>
+                      <Text style={[styles.ruleHeading, { color: t.title }]}>{step.heading}</Text>
+                      <Text style={[styles.ruleDesc, { color: t.body }]}>{step.desc}</Text>
+                    </View>
+                  </View>
+                );
+              })}
 
-          <TouchableOpacity
-            style={styles.gotItButton}
-            onPress={onClose}
-          >
-            <View style={styles.buttonShine} />
-            <Text style={styles.gotItButtonText}>{rules.dismissLabel}</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+              <CandyButton
+                label={rules.dismissLabel}
+                onPress={handleClose}
+                phase={phase}
+                variant="primary"
+                size="lg"
+                style={styles.gotItButton}
+              />
+            </PanelCard>
+          </Animated.View>
+        </TouchableOpacity>
+      </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlayRoot: {
     flex: 1,
-    backgroundColor: 'rgba(76, 29, 149, 0.7)',
+  },
+  overlayTouch: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
-  modalShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-  },
-  rulesModal: {
-    backgroundColor: CandyColors.white,
-    borderRadius: 32,
-    padding: 28,
+  cardWrap: {
     width: '100%',
     maxWidth: 340,
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 20,
-    overflow: 'hidden',
+  },
+  rulesModal: {
+    width: '100%',
+    padding: 28,
   },
   closeButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: CandyColors.gray[100],
-    justifyContent: 'center',
-    alignItems: 'center',
+    top: 8,
+    right: 8,
     zIndex: 10,
-  },
-  closeButtonText: {
-    fontSize: 18,
-    color: CandyColors.gray[400],
-    fontWeight: '700',
   },
   rulesTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: CandyColors.purple.main,
+    letterSpacing: 0.4,
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -144,6 +228,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -158,40 +243,13 @@ const styles = StyleSheet.create({
   ruleHeading: {
     fontSize: 16,
     fontWeight: '800',
-    color: CandyColors.gray[700],
     marginBottom: 2,
   },
   ruleDesc: {
-    fontSize: 13,
-    color: CandyColors.gray[500],
+    fontSize: 14,
+    lineHeight: 19,
   },
   gotItButton: {
-    backgroundColor: CandyColors.purple.main,
-    borderRadius: 18,
-    paddingVertical: 16,
-    marginTop: 12,
-    overflow: 'hidden',
-    shadowColor: CandyColors.purple.main,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  buttonShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '45%',
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-  },
-  gotItButtonText: {
-    color: CandyColors.white,
-    fontSize: 17,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: 2,
+    marginTop: 8,
   },
 });

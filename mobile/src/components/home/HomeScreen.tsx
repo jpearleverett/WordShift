@@ -11,6 +11,9 @@ import {
   Image,
   ScrollView,
   Pressable,
+  ImageSourcePropType,
+  StyleProp,
+  ViewStyle,
 } from 'react-native';
 // Note: HomeScreen's own UI (header, modals) is outside GestureHandlerRootView,
 // so we use react-native's TouchableOpacity here. RoomView and AnimalSprite
@@ -19,6 +22,9 @@ import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
 import { CandyColors, getDialogueTheme, getOverlayBannerTheme, getPhaseTheme } from '../../theme/colors';
+import { SURFACE, getPressSpring, getSurfaceTheme } from '../../theme/surfaces';
+import { CandyButton } from '../ui/CandyButton';
+import { PanelCard } from '../ui/PanelCard';
 import {
   getFullProgress,
   markIntroSeen,
@@ -48,6 +54,8 @@ import { AmberInline } from '../AmberInline';
 const AMBER_ICON = require('../../../assets/ui/amber.png');
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const JOURNAL_ICON = require('../../../assets/ui/journal.png');
+const HINT_ICON = require('../../../assets/ui/hint.png');
+const STAR_ICON = require('../../../assets/ui/star_filled.png');
 import {
   getChallengeIntroLines,
   getHouseCompletionText,
@@ -216,6 +224,155 @@ export const getQuestPillAccessibilityLabel = (
     : claimableAmber > 0 ? '' : ' All quests complete.') +
   (claimableAmber > 0 ? ` ${claimableAmber} amber ready to claim.` : '') +
   ` Daily quests reset in ${dailyResetHint}.`;
+
+// --- Local feel-kit primitives (shared anatomy for this file's modals) ---
+
+/**
+ * Springy modal-panel entrance: scale 0.92 -> 1 (SURFACE.modalIn). Mounts fresh
+ * each time its Modal opens, so the spring runs once per open. Reduced motion
+ * pins the end state. Native driver only.
+ */
+const SpringIn: React.FC<{
+  style?: StyleProp<ViewStyle>;
+  claimTouches?: boolean;
+  children: React.ReactNode;
+}> = ({ style, claimTouches, children }) => {
+  const reducedMotion = getSettingsSync().reducedMotion;
+  const scale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
+  useEffect(() => {
+    if (reducedMotion) return;
+    const anim = Animated.spring(scale, {
+      toValue: 1,
+      ...SURFACE.modalIn,
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [scale, reducedMotion]);
+  return (
+    <Animated.View
+      style={[style, { transform: [{ scale }] }]}
+      onStartShouldSetResponder={claimTouches ? () => true : undefined}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
+/**
+ * Framed hub-row (Journal / Utility menus): layered tinted material with an
+ * optional ui-sprite icon — replaces the old uniform ghost rows.
+ */
+const HubRow: React.FC<{
+  phase: number;
+  label: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+  icon?: ImageSourcePropType;
+  /** Host panel is dt.modalBg, which darkens at phase 2 (see dtHostDark). */
+  hostDark?: boolean;
+}> = ({ phase, label, onPress, accessibilityLabel, icon, hostDark = false }) => {
+  const t = getSurfaceTheme(hostDark && phase < 3 ? 3 : phase);
+  return (
+    <TouchableOpacity
+      style={[styles.hubRow, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+    >
+      <View pointerEvents="none" style={styles.hubRowHighlight} />
+      {icon ? <Image source={icon} style={styles.hubRowIcon} resizeMode="contain" /> : null}
+      <Text style={[styles.hubRowText, { color: t.body }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
+
+/**
+ * Chunky two-layer bevel button that accepts arbitrary children (needed where
+ * the label embeds <AmberInline /> inside the Text run — CandyButton itself
+ * only takes a string label). Mirrors CandyButton's anatomy exactly: darker
+ * bottom edge, face travels down SURFACE.pressTravel while pressed, springs
+ * back with phase weight. Secondary variant is the flat tinted frame.
+ */
+const BevelRowButton: React.FC<{
+  phase: number;
+  variant: 'primary' | 'amber' | 'secondary';
+  onPress: () => void;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+  /** Host panel is dt.modalBg, which darkens at phase 2 (see dtHostDark). */
+  hostDark?: boolean;
+}> = ({ phase, variant, onPress, disabled = false, accessibilityLabel, style, children, hostDark = false }) => {
+  const t = getSurfaceTheme(hostDark && phase < 3 ? 3 : phase);
+  const reducedMotion = getSettingsSync().reducedMotion;
+  const travel = useRef(new Animated.Value(0)).current;
+  const handlePressIn = useCallback(() => {
+    if (reducedMotion) return;
+    Animated.timing(travel, { toValue: 1, duration: 70, useNativeDriver: true }).start();
+  }, [travel, reducedMotion]);
+  const handlePressOut = useCallback(() => {
+    if (reducedMotion) return;
+    Animated.spring(travel, { toValue: 0, ...getPressSpring(phase), useNativeDriver: true }).start();
+  }, [travel, phase, reducedMotion]);
+  const translateY = travel.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, SURFACE.pressTravel],
+  });
+  if (variant === 'secondary') {
+    return (
+      <Pressable
+        onPress={disabled ? undefined : onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled }}
+        style={[disabled && styles.bevelDisabled, style]}
+      >
+        <Animated.View
+          style={[
+            styles.bevelFace,
+            styles.bevelSecondaryFace,
+            {
+              backgroundColor: t.secondaryBg,
+              borderColor: t.secondaryBorder,
+              transform: [{ translateY }],
+            },
+          ]}
+        >
+          {children}
+        </Animated.View>
+      </Pressable>
+    );
+  }
+  const face = variant === 'primary'
+    ? { bg: t.primaryBg, edge: t.primaryEdge }
+    : { bg: t.pillBg, edge: t.pillEdge };
+  return (
+    <Pressable
+      onPress={disabled ? undefined : onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      style={[styles.bevelWrapper, disabled && styles.bevelDisabled, style]}
+    >
+      <View style={[styles.bevelEdge, { backgroundColor: face.edge }]} />
+      <Animated.View
+        style={[styles.bevelFace, { backgroundColor: face.bg, transform: [{ translateY }] }]}
+      >
+        <View pointerEvents="none" style={styles.bevelHighlight} />
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+};
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
@@ -1141,6 +1298,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Phase-aware dialogue theme for all modals and dialogue boxes
   const dt = getDialogueTheme(progress.currentPhase);
+  // Phase-aware surface theme (feel kit) for modal chrome: rows, buttons, scrims
+  const st = getSurfaceTheme(progress.currentPhase);
+  // The home modals host their content on dt.modalBg, and the dialogue theme
+  // darkens at phase 2 — one phase BEFORE the surface theme. hostDark tells
+  // every kit component on those panels to use dark-surface tokens at phase 2
+  // so nothing renders dark-on-dark or as a glaring light island; panelSt is
+  // the same mapping for direct token reads (text/fills placed straight on
+  // the panel).
+  const dtHostDark = progress.currentPhase >= 2;
+  const panelSt = getSurfaceTheme(progress.currentPhase === 2 ? 3 : progress.currentPhase);
   const phaseTheme = getPhaseTheme(progress.currentPhase);
   const currentJournalSpotlightStep = journalSpotlightStepMeta[
     Math.max(0, Math.min(journalSpotlightIndex, journalSpotlightStepMeta.length - 1))
@@ -1564,13 +1731,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => { if (!journalSpotlightActive) setShowJournalModal(false); }}
       >
         <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: journalSpotlightActive ? 'transparent' : dt.overlayBg }]}
+          style={[styles.modalOverlay, { backgroundColor: journalSpotlightActive ? 'transparent' : st.overlay }]}
           activeOpacity={1}
           onPress={() => { if (!journalSpotlightActive) setShowJournalModal(false); }}
           accessibilityLabel="Close journal"
           accessibilityRole="button"
         >
-          <View
+          <SpringIn
+            claimTouches
             style={[
               styles.compactHubModal,
               {
@@ -1579,54 +1747,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 shadowColor: dt.modalShadowColor,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Journal</Text>
             <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
               Keep the house&apos;s records in one place.
             </Text>
             {onOpenLedger && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={JOURNAL_ICON}
+                label="Word Ledger"
                 onPress={() => {
                   setShowJournalModal(false);
                   onOpenLedger?.();
                 }}
                 accessibilityLabel="Open Word Ledger"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📘 Word Ledger</Text>
-              </TouchableOpacity>
+              />
             )}
             {onOpenGallery && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={FLAME_ICON}
+                label={getGalleryTitle(progress.currentPhase)}
                 onPress={() => {
                   setShowJournalModal(false);
                   onOpenGallery?.();
                 }}
                 accessibilityLabel="Open Whisper Gallery"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📜 {getGalleryTitle(progress.currentPhase)}</Text>
-              </TouchableOpacity>
+              />
             )}
             {!!weeklyQuestState && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                label={getJournalQuestLabel(actionableQuestCount, claimableQuestAmber)}
                 onPress={() => {
                   setShowJournalModal(false);
                   handleOpenQuestModal().catch(() => {});
                 }}
                 accessibilityLabel={`Open quests${claimableQuestAmber > 0 ? `, ${claimableQuestAmber} amber ready` : ''}`}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>
-                  {getJournalQuestLabel(actionableQuestCount, claimableQuestAmber)}
-                </Text>
-              </TouchableOpacity>
+              />
             )}
-          </View>
+          </SpringIn>
         </TouchableOpacity>
       </Modal>
 
@@ -1639,13 +1803,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => setShowUtilityModal(false)}
       >
         <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
+          style={[styles.modalOverlay, { backgroundColor: st.overlay }]}
           activeOpacity={1}
           onPress={() => setShowUtilityModal(false)}
           accessibilityLabel="Close utility menu"
           accessibilityRole="button"
         >
-          <View
+          <SpringIn
+            claimTouches
             style={[
               styles.compactHubModal,
               {
@@ -1654,89 +1819,86 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 shadowColor: dt.modalShadowColor,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Menu</Text>
             <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
               Everything else can stay tucked away until you need it.
             </Text>
             {onOpenStats && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={STAR_ICON}
+                label="Statistics"
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenStats?.();
                 }}
                 accessibilityLabel="Open statistics"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📊 Statistics</Text>
-              </TouchableOpacity>
+              />
             )}
             {onOpenShop && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                label={`✨ ${getShopTitle(progress.currentPhase)}`}
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenShop?.();
                 }}
                 accessibilityLabel={`Open ${getShopTitle(progress.currentPhase)}`}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>✨ {getShopTitle(progress.currentPhase)}</Text>
-              </TouchableOpacity>
+              />
             )}
             {onOpenStore && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={AMBER_ICON}
+                label="Store"
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenStore?.();
                 }}
                 accessibilityLabel="Open store"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>🛒 Store</Text>
-              </TouchableOpacity>
+              />
             )}
-            <TouchableOpacity
-              style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+            <HubRow
+              phase={progress.currentPhase}
+                hostDark={dtHostDark}
+              icon={HINT_ICON}
+              label="How to Play"
               onPress={() => {
                 setShowUtilityModal(false);
                 setShowRulesModal(true);
               }}
               accessibilityLabel="How to play"
-              accessibilityRole="button"
-            >
-              <Text style={[styles.hubButtonText, { color: dt.textColor }]}>📖 How to Play</Text>
-            </TouchableOpacity>
+            />
             {onOpenSettings && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                label="⚙️ Settings"
                 onPress={() => {
                   setShowUtilityModal(false);
                   onOpenSettings?.();
                 }}
                 accessibilityLabel="Open settings"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>⚙️ Settings</Text>
-              </TouchableOpacity>
+              />
             )}
             {isSacrificeAvailable(progress.currentPhase) && (
-              <TouchableOpacity
-                style={[styles.hubButton, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+              <HubRow
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                icon={FLAME_ICON}
+                label={getSacrificePrompt(progress.currentPhase).title}
                 onPress={() => {
                   setShowUtilityModal(false);
                   setShowSacrificeModal(true);
                 }}
                 accessibilityLabel="Open sacrifice"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.hubButtonText, { color: dt.textColor }]}>🕯️ {getSacrificePrompt(progress.currentPhase).title}</Text>
-              </TouchableOpacity>
+              />
             )}
-          </View>
+          </SpringIn>
         </TouchableOpacity>
       </Modal>
 
@@ -1756,13 +1918,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => unlockFlow.setShowShop(false)}
       >
         <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
+          style={[styles.modalOverlay, { backgroundColor: st.overlay }]}
           activeOpacity={1}
           onPress={() => unlockFlow.setShowShop(false)}
           accessibilityLabel="Close shop"
           accessibilityRole="button"
         >
-          <View
+          <SpringIn
+            claimTouches
             style={[
               styles.shopModal,
               {
@@ -1771,7 +1934,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 shadowColor: dt.modalShadowColor,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Unlock Progress</Text>
             <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
@@ -1786,8 +1948,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             {/* Next unlock */}
             {unlockFlow.nextUnlock && (
               <View style={styles.nextUnlockContainer}>
-                <Text style={styles.nextUnlockLabel}>Next Unlock:</Text>
-                <View style={[styles.unlockItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
+                <Text style={[styles.nextUnlockLabel, { color: panelSt.muted }]}>Next Unlock:</Text>
+                <PanelCard phase={progress.currentPhase} hostDark={dtHostDark} kind="card" style={styles.unlockItem}>
                   <View style={styles.unlockInfo}>
                     <Text style={[styles.unlockName, { color: dt.textColor }]}>{unlockFlow.nextUnlock.name}</Text>
                     <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
@@ -1795,15 +1957,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         ? getRoomDescription(unlockFlow.nextUnlock.targetId, progress.currentPhase)
                         : unlockFlow.nextUnlock.description}
                     </Text>
-                    <Text style={styles.unlockCost}>
+                    <Text style={[styles.unlockCost, { color: panelSt.amberText }]}>
                       <AmberInline /> {unlockFlow.nextUnlock.cost} amber
                     </Text>
                     {unlockFlow.reservedUnlockId === unlockFlow.nextUnlock.id ? (
-                      <Text style={styles.unlockBlockedText}>
+                      <Text style={[styles.unlockBlockedText, { color: panelSt.muted }]}>
                         {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                       </Text>
                     ) : unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available ? (
-                      <Text style={styles.unlockBlockedText}>
+                      <Text style={[styles.unlockBlockedText, { color: panelSt.muted }]}>
                         {unlockFlow.canReserve && unlockFlow.nextUnlock.minPuzzles
                           ? `${getReserveGateText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}. Reserve it now and it builds itself then`
                           : unlockFlow.unlockAvailability.reason}
@@ -1812,60 +1974,58 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </View>
                   {unlockFlow.reservedUnlockId === unlockFlow.nextUnlock.id ? (
                     unlockFlow.canSpeedUpReserved ? (
-                      <TouchableOpacity
-                        style={[styles.buyButton, styles.skipButton]}
+                      <CandyButton
+                        label="Speed up"
+                        variant="amber"
+                        phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                        style={styles.rowAction}
                         onPress={() => unlockFlow.handleSpeedUpReserved(unlockFlow.nextUnlock!)}
                         accessibilityLabel={`Speed up ${unlockFlow.nextUnlock.name} and unlock now for ${unlockFlow.reservedSkipCost} amber`}
-                        accessibilityRole="button"
-                      >
-                        <Text style={[styles.buyButtonText, styles.skipButtonText]}>Speed up</Text>
-                      </TouchableOpacity>
+                      />
                     ) : (
-                      <View style={[styles.buyButton, styles.buyButtonDisabled]}>
-                        <Text style={styles.buyButtonText}>Reserved ✓</Text>
+                      <View style={[styles.reservedChip, { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder }]}>
+                        <Text style={[styles.reservedChipText, { color: panelSt.secondaryText }]}>Reserved ✓</Text>
                       </View>
                     )
                   ) : unlockFlow.canReserve ? (
-                    <TouchableOpacity
-                      style={styles.buyButton}
+                    <CandyButton
+                      label="Reserve"
+                      variant="secondary"
+                      phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                      style={styles.rowAction}
                       onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
                       accessibilityLabel={`Reserve ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber; it builds at level ${unlockFlow.nextUnlock.minPuzzles}, you're at ${progress.puzzlesSolved}`}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.buyButtonText}>Reserve</Text>
-                    </TouchableOpacity>
+                    />
                   ) : (
-                    <TouchableOpacity
-                      style={[
-                        styles.buyButton,
-                        (progress.amber < unlockFlow.nextUnlock.cost ||
-                         (unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available)) &&
-                          styles.buyButtonDisabled,
-                      ]}
+                    <CandyButton
+                      label={
+                        unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
+                          ? 'Locked'
+                          : progress.amber >= unlockFlow.nextUnlock.cost
+                            ? 'Unlock'
+                            : 'Need More'
+                      }
+                      variant="primary"
+                      phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                      style={styles.rowAction}
                       onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
                       disabled={
                         progress.amber < unlockFlow.nextUnlock.cost ||
                         (unlockFlow.unlockAvailability !== null && !unlockFlow.unlockAvailability.available)
                       }
                       accessibilityLabel={`Unlock ${unlockFlow.nextUnlock.name} for ${unlockFlow.nextUnlock.cost} amber`}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.buyButtonText}>
-                        {unlockFlow.unlockAvailability && !unlockFlow.unlockAvailability.available
-                          ? 'Locked'
-                          : progress.amber >= unlockFlow.nextUnlock.cost
-                            ? 'Unlock'
-                            : 'Need More'}
-                      </Text>
-                    </TouchableOpacity>
+                    />
                   )}
-                </View>
+                </PanelCard>
               </View>
             )}
 
             {!unlockFlow.nextUnlock && (
               <View>
-                <Text style={styles.allUnlockedText}>
+                <Text style={[styles.allUnlockedText, { color: panelSt.amberText }]}>
                   All characters and rooms unlocked!
                 </Text>
               </View>
@@ -1873,41 +2033,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             {areUpgradesAvailable(progress.currentPhase) && (
               <View style={styles.upgradeSection}>
-                <Text style={styles.nextUnlockLabel}>Room Upgrades</Text>
+                <Text style={[styles.nextUnlockLabel, { color: panelSt.muted }]}>Room Upgrades</Text>
                 {availableRoomUpgrades.length === 0 ? (
                   <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
                     Every unlocked room already has its decorative upgrade.
                   </Text>
                 ) : (
                   availableRoomUpgrades.slice(0, 4).map(({ room, upgrade }) => (
-                    <View
+                    <PanelCard
                       key={room.id}
-                      style={[styles.unlockItem, styles.upgradeItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                      phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                      kind="card"
+                      style={StyleSheet.flatten([styles.unlockItem, styles.upgradeItem])}
                     >
                       <View style={styles.unlockInfo}>
                         <Text style={[styles.unlockName, { color: dt.textColor }]}>{room.name}: {upgrade.name}</Text>
                         <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
                           {getUpgradeDescription(room.id, progress.currentPhase)}
                         </Text>
-                        <Text style={styles.unlockCost}><AmberInline /> {upgrade.cost} amber</Text>
+                        <Text style={[styles.unlockCost, { color: panelSt.amberText }]}><AmberInline /> {upgrade.cost} amber</Text>
                       </View>
-                      <TouchableOpacity
-                        style={[
-                          styles.buyButton,
-                          progress.amber < upgrade.cost && styles.buyButtonDisabled,
-                        ]}
+                      <CandyButton
+                        label={progress.amber >= upgrade.cost ? 'Decorate' : 'Need More'}
+                        variant="amber"
+                        phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                        style={styles.rowAction}
                         onPress={() => {
                           handlePurchaseUpgrade(room.id).catch(() => {});
                         }}
                         disabled={progress.amber < upgrade.cost}
                         accessibilityLabel={`Upgrade ${room.name} with ${upgrade.name} for ${upgrade.cost} amber`}
-                        accessibilityRole="button"
-                      >
-                        <Text style={styles.buyButtonText}>
-                          {progress.amber >= upgrade.cost ? 'Decorate' : 'Need More'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                      />
+                    </PanelCard>
                   ))
                 )}
               </View>
@@ -1915,50 +2074,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             {areDeepeningsAvailable(progress.currentPhase) && availableRoomDeepenings.length > 0 && (
               <View style={styles.upgradeSection}>
-                <Text style={styles.nextUnlockLabel}>The House Deepens</Text>
+                <Text style={[styles.nextUnlockLabel, { color: panelSt.muted }]}>The House Deepens</Text>
                 {availableRoomDeepenings.slice(0, 4).map(({ room, deepening }) => (
-                  <View
+                  <PanelCard
                     key={`deepen_${room.id}`}
-                    style={[styles.unlockItem, styles.upgradeItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                    phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                    kind="card"
+                    style={StyleSheet.flatten([styles.unlockItem, styles.upgradeItem])}
                   >
                     <View style={styles.unlockInfo}>
                       <Text style={[styles.unlockName, { color: dt.textColor }]}>{room.name}: {deepening.name}</Text>
                       <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
                         {deepening.description}
                       </Text>
-                      <Text style={styles.unlockCost}><AmberInline /> {deepening.cost} amber</Text>
+                      <Text style={[styles.unlockCost, { color: panelSt.amberText }]}><AmberInline /> {deepening.cost} amber</Text>
                     </View>
-                    <TouchableOpacity
-                      style={[
-                        styles.buyButton,
-                        progress.amber < deepening.cost && styles.buyButtonDisabled,
-                      ]}
+                    <CandyButton
+                      label={progress.amber >= deepening.cost ? 'Deepen' : 'Need More'}
+                      variant="amber"
+                      phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                      style={styles.rowAction}
                       onPress={() => {
                         handlePurchaseDeepening(room.id).catch(() => {});
                       }}
                       disabled={progress.amber < deepening.cost}
                       accessibilityLabel={`Deepen ${room.name} with ${deepening.name} for ${deepening.cost} amber`}
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.buyButtonText}>
-                        {progress.amber >= deepening.cost ? 'Deepen' : 'Need More'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                    />
+                  </PanelCard>
                 ))}
               </View>
             )}
 
             {/* Close button */}
-            <TouchableOpacity
-              style={styles.closeButton}
+            <CandyButton
+              label="Close"
+              variant="quiet"
+              phase={progress.currentPhase}
+                hostDark={dtHostDark}
+              style={styles.closeAction}
               onPress={() => unlockFlow.setShowShop(false)}
               accessibilityLabel="Close shop"
-              accessibilityRole="button"
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
+            />
+          </SpringIn>
         </TouchableOpacity>
       </Modal>
 
@@ -1970,14 +2129,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={() => setShowQuestModal(false)}
       >
-        <View style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: st.overlay }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setShowQuestModal(false)}
             accessibilityLabel="Close quests"
             accessibilityRole="button"
           />
-          <View
+          <SpringIn
             style={[
               styles.shopModal,
               styles.questModal,
@@ -1994,12 +2153,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {questFeedback}
               </Text>
             )}
-            {/* Tab Bar */}
-            <View style={styles.questTabBar}>
+            {/* Tab Bar — framed segmented chips */}
+            <View style={[styles.questTabBar, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
               <TouchableOpacity
                 style={[
                   styles.questTab,
-                  questTab === 'daily' && [styles.questTabActive, { borderBottomColor: dt.nameColor }],
+                  questTab === 'daily' && { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder },
                 ]}
                 onPress={() => setQuestTab('daily')}
                 accessibilityLabel="Daily quests tab"
@@ -2013,7 +2172,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <TouchableOpacity
                 style={[
                   styles.questTab,
-                  questTab === 'weekly' && [styles.questTabActive, { borderBottomColor: dt.nameColor }],
+                  questTab === 'weekly' && { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder },
                 ]}
                 onPress={() => setQuestTab('weekly')}
                 accessibilityLabel="Weekly quests tab"
@@ -2032,58 +2191,73 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.questListContent}
             >
-              {(questTab === 'daily' ? weeklyQuestState?.daily?.quests : weeklyQuestState?.weekly?.quests)?.map(quest => (
-                <View
-                  key={quest.id}
-                  style={[styles.unlockItem, styles.questItem, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
-                >
-                  <View style={styles.unlockInfo}>
-                    <Text style={[styles.unlockName, { color: dt.textColor }]}>{quest.title}</Text>
-                    <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
-                      {getQuestDescription(quest, progress.currentPhase)}
-                    </Text>
-                    <Text style={styles.questProgressText}>
-                      {quest.completed ? 'Complete' : `${quest.progress} / ${quest.target}`}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={[
-                      styles.buyButton,
-                      (!quest.completed || quest.claimed) && styles.buyButtonDisabled,
-                    ]}
-                    onPress={() => {
-                      handleClaimQuest(quest.id).catch(() => {});
-                    }}
-                    disabled={!quest.completed || quest.claimed}
-                    accessibilityLabel={
-                      quest.claimed
-                        ? `${quest.title} already claimed`
-                        : quest.completed
-                          ? `Claim ${quest.rewardAmber} amber from ${quest.title}`
-                          : `${quest.title} in progress`
-                    }
-                    accessibilityRole="button"
+              {(questTab === 'daily' ? weeklyQuestState?.daily?.quests : weeklyQuestState?.weekly?.quests)?.map(quest => {
+                const questPct = quest.completed
+                  ? 100
+                  : Math.max(0, Math.min(100, Math.round((quest.progress / Math.max(1, quest.target)) * 100)));
+                return (
+                  <PanelCard
+                    key={quest.id}
+                    phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                    kind="card"
+                    style={StyleSheet.flatten([styles.unlockItem, styles.questItem])}
                   >
-                    <Text style={styles.buyButtonText}>
-                      {quest.claimed
-                        ? 'Claimed'
-                        : quest.completed
-                          ? `Claim +${Math.round(quest.rewardAmber * getPhaseRewardMultiplier(progress.currentPhase))}`
-                          : 'In Progress'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+                    <View style={styles.unlockInfo}>
+                      <Text style={[styles.unlockName, { color: dt.textColor }]}>{quest.title}</Text>
+                      <Text style={[styles.unlockDescription, { color: dt.subtitleColor }]}>
+                        {getQuestDescription(quest, progress.currentPhase)}
+                      </Text>
+                      <Text style={[styles.questProgressText, { color: panelSt.amberText }]}>
+                        {quest.completed ? 'Complete' : `${quest.progress} / ${quest.target}`}
+                      </Text>
+                      <View style={[styles.questBarTrack, { backgroundColor: panelSt.amberTint, borderColor: panelSt.amberTintBorder }]}>
+                        <View
+                          style={[
+                            styles.questBarFill,
+                            { backgroundColor: panelSt.amberText, width: `${questPct}%` },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                    <CandyButton
+                      label={
+                        quest.claimed
+                          ? 'Claimed'
+                          : quest.completed
+                            ? `Claim +${Math.round(quest.rewardAmber * getPhaseRewardMultiplier(progress.currentPhase))}`
+                            : 'In Progress'
+                      }
+                      variant="amber"
+                      phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                      style={styles.rowAction}
+                      onPress={() => {
+                        handleClaimQuest(quest.id).catch(() => {});
+                      }}
+                      disabled={!quest.completed || quest.claimed}
+                      accessibilityLabel={
+                        quest.claimed
+                          ? `${quest.title} already claimed`
+                          : quest.completed
+                            ? `Claim ${quest.rewardAmber} amber from ${quest.title}`
+                            : `${quest.title} in progress`
+                      }
+                    />
+                  </PanelCard>
+                );
+              })}
             </ScrollView>
-            <TouchableOpacity
-              style={styles.closeButton}
+            <CandyButton
+              label="Close"
+              variant="quiet"
+              phase={progress.currentPhase}
+                hostDark={dtHostDark}
+              style={styles.closeAction}
               onPress={() => setShowQuestModal(false)}
               accessibilityLabel="Close quests"
-              accessibilityRole="button"
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
+            />
+          </SpringIn>
         </View>
       </Modal>
 
@@ -2096,13 +2270,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         onRequestClose={() => unlockFlow.setShowRoomUnlock(null)}
       >
         <TouchableOpacity
-          style={[styles.modalOverlay, { backgroundColor: dt.overlayBg }]}
+          style={[styles.modalOverlay, { backgroundColor: st.overlay }]}
           activeOpacity={1}
           onPress={() => unlockFlow.setShowRoomUnlock(null)}
           accessibilityLabel="Close room unlock"
           accessibilityRole="button"
         >
-          <View
+          <SpringIn
+            claimTouches
             style={[
               styles.shopModal,
               {
@@ -2111,19 +2286,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 shadowColor: dt.modalShadowColor,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             {unlockFlow.showRoomUnlock && (
               <>
-                <Text style={[styles.shopTitle, { color: dt.nameColor }]}>🔒 Locked Room</Text>
+                <View style={[styles.lockBadge, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}>
+                  <Text style={styles.lockBadgeEmoji}>🔒</Text>
+                </View>
+                <Text style={[styles.shopTitle, { color: dt.nameColor }]}>Locked Room</Text>
                 <Text style={[styles.lockedRoomName, { color: dt.textColor }]}>{unlockFlow.showRoomUnlock.name}</Text>
                 <Text style={[styles.shopSubtitle, { color: dt.subtitleColor }]}>
                   Play more puzzles to earn amber and unlock this room!
                 </Text>
-                <Text style={styles.amberBalance}>Your Amber: <AmberInline /> {progress.amber}</Text>
+                <Text style={[styles.amberBalance, { color: panelSt.amberText }]}>Your Amber: <AmberInline /> {progress.amber}</Text>
 
                 {unlockFlow.purchaseError && (
-                  <Text style={[styles.shopSubtitle, { color: '#E85050', marginTop: 8, fontWeight: '600' }]}>
+                  <Text style={[styles.shopSubtitle, { color: panelSt.dangerText, marginTop: 8, fontWeight: '600' }]}>
                     {unlockFlow.purchaseError}
                   </Text>
                 )}
@@ -2143,16 +2320,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                         </Text>
                         {unlockFlow.canSpeedUpReserved && (
-                          <TouchableOpacity
-                            style={[styles.buyButton, styles.buyButtonLarge, styles.skipButton]}
+                          <BevelRowButton
+                            phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                            variant="amber"
+                            style={styles.largeAction}
                             onPress={() => unlockFlow.handleSpeedUpReserved(unlockFlow.nextUnlock!)}
                             accessibilityLabel={`Speed up ${unlockFlow.nextUnlock!.name} and unlock now for ${unlockFlow.reservedSkipCost} amber`}
-                            accessibilityRole="button"
                           >
-                            <Text style={[styles.buyButtonText, styles.skipButtonText]}>
+                            <Text style={[styles.bevelBtnText, { color: panelSt.pillText }]}>
                               Speed it up for <AmberInline /> {unlockFlow.reservedSkipCost}
                             </Text>
-                          </TouchableOpacity>
+                          </BevelRowButton>
                         )}
                       </>
                     );
@@ -2165,27 +2344,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <Text style={[styles.shopSubtitle, { color: dt.subtitleColor, marginTop: 8, fontStyle: 'italic' }]}>
                           {getReserveGateText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}. Reserve it now and it builds itself the moment you get there.
                         </Text>
-                        <TouchableOpacity
-                          style={[styles.buyButton, styles.buyButtonLarge]}
+                        <BevelRowButton
+                          phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                          variant="secondary"
+                          style={styles.largeAction}
                           onPress={() => unlockFlow.handleReserve(unlockFlow.nextUnlock!)}
                           accessibilityLabel={`Reserve room for ${unlockFlow.nextUnlock!.cost} amber; builds at level ${unlockFlow.nextUnlock!.minPuzzles}, you're at ${progress.puzzlesSolved}`}
-                          accessibilityRole="button"
                         >
-                          <Text style={styles.buyButtonText}>
+                          <Text style={[styles.bevelBtnText, { color: panelSt.secondaryText }]}>
                             Reserve for <AmberInline /> {unlockFlow.nextUnlock!.cost}
                           </Text>
-                        </TouchableOpacity>
+                        </BevelRowButton>
                         {unlockFlow.canSkip && (
-                          <TouchableOpacity
-                            style={[styles.buyButton, styles.buyButtonLarge, styles.skipButton]}
+                          <BevelRowButton
+                            phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                            variant="amber"
+                            style={styles.largeAction}
                             onPress={() => unlockFlow.handleSkip(unlockFlow.nextUnlock!)}
                             accessibilityLabel={`Skip the wait and unlock ${unlockFlow.nextUnlock!.name} now for ${unlockFlow.skipCost} amber`}
-                            accessibilityRole="button"
                           >
-                            <Text style={[styles.buyButtonText, styles.skipButtonText]}>
+                            <Text style={[styles.bevelBtnText, { color: panelSt.pillText }]}>
                               Skip the wait for <AmberInline /> {unlockFlow.skipCost}
                             </Text>
-                          </TouchableOpacity>
+                          </BevelRowButton>
                         )}
                       </>
                     );
@@ -2197,36 +2380,35 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           {unlockFlow.unlockAvailability!.reason}
                         </Text>
                       )}
-                      <TouchableOpacity
-                        style={[
-                          styles.buyButton,
-                          styles.buyButtonLarge,
-                          isDisabled && styles.buyButtonDisabled,
-                        ]}
+                      <BevelRowButton
+                        phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                        variant="primary"
+                        style={styles.largeAction}
                         onPress={() => unlockFlow.handlePurchase(unlockFlow.nextUnlock!)}
                         disabled={isDisabled}
                         accessibilityLabel={`Unlock room for ${unlockFlow.nextUnlock!.cost} amber`}
-                        accessibilityRole="button"
                       >
-                        <Text style={styles.buyButtonText}>
+                        <Text style={[styles.bevelBtnText, { color: panelSt.primaryText }]}>
                           Unlock for <AmberInline /> {unlockFlow.nextUnlock!.cost}
                         </Text>
-                      </TouchableOpacity>
+                      </BevelRowButton>
                     </>
                   );
                 })()}
 
-                <TouchableOpacity
-                  style={styles.closeButton}
+                <CandyButton
+                  label="Close"
+                  variant="quiet"
+                  phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                  style={styles.closeAction}
                   onPress={() => unlockFlow.setShowRoomUnlock(null)}
                   accessibilityLabel="Close"
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.closeButtonText}>Close</Text>
-                </TouchableOpacity>
+                />
               </>
             )}
-          </View>
+          </SpringIn>
         </TouchableOpacity>
       </Modal>
 
@@ -2238,8 +2420,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={() => unlockFlow.setShowInvitePrompt(false)}
       >
-        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
-          <View
+        <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
+          <SpringIn
+            claimTouches
             style={[
               styles.inviteModal,
               {
@@ -2248,7 +2431,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 shadowColor: dt.modalShadowColor,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             {unlockFlow.nextUnlock && unlockFlow.nextUnlock.type === 'character' && (() => {
               const animalData = ANIMALS.find(a => a.id === unlockFlow.nextUnlock!.targetId);
@@ -2258,16 +2440,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
               return (
                 <>
-                  {animalSprites ? (
-                    <Image
-                      source={animalSprites.talk || animalSprites.idle}
-                      style={styles.inviteSpriteImage}
-                      resizeMode="contain"
-                      accessibilityLabel={`${animalData?.type || 'animal'} portrait`}
-                    />
-                  ) : (
-                    <Text style={styles.inviteEmoji}>{animalEmoji}</Text>
-                  )}
+                  <View style={styles.inviteHeroWrap}>
+                    <View pointerEvents="none" style={[styles.inviteHeroGlow, { backgroundColor: panelSt.glow }]} />
+                    <View style={[styles.inviteHeroRing, { borderColor: panelSt.secondaryBorder, backgroundColor: panelSt.sectionBg }]}>
+                      {animalSprites ? (
+                        <Image
+                          source={animalSprites.talk || animalSprites.idle}
+                          style={styles.inviteSpriteImage}
+                          resizeMode="contain"
+                          accessibilityLabel={`${animalData?.type || 'animal'} portrait`}
+                        />
+                      ) : (
+                        <Text style={styles.inviteEmoji}>{animalEmoji}</Text>
+                      )}
+                    </View>
+                  </View>
                   <Text style={[styles.inviteTitle, { color: dt.nameColor }]}>
                     {isFirstAnimal ? 'A Visitor Approaches!' : 'A New Friend!'}
                   </Text>
@@ -2282,17 +2469,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </Text>
 
                   {unlockFlow.nextUnlock!.cost > 0 && (
-                    <Text style={styles.inviteCost}>
+                    <Text style={[styles.inviteCost, { color: panelSt.amberText }]}>
                       Cost: <AmberInline /> {unlockFlow.nextUnlock!.cost} amber
                     </Text>
                   )}
 
-                  <TouchableOpacity
-                    style={[
-                      styles.inviteButton,
-                      { backgroundColor: dt.secondaryButtonBg, shadowColor: dt.secondaryButtonBg },
-                      progress && progress.amber < unlockFlow.nextUnlock!.cost && styles.inviteButtonDisabled,
-                    ]}
+                  <CandyButton
+                    label={
+                      unlockFlow.nextUnlock!.cost === 0
+                        ? 'Welcome, Friend! 🏠'
+                        : progress && progress.amber >= unlockFlow.nextUnlock!.cost
+                          ? `Invite ${unlockFlow.nextUnlock!.name.split(' ')[0]}! 🏠`
+                          : 'Need More Amber'
+                    }
+                    variant="primary"
+                    size="lg"
+                    phase={progress ? progress.currentPhase : 0}
+                    style={styles.inviteAction}
                     onPress={async () => {
                       const suppressIntro = onboardingStep === 'home_empty';
                       await unlockFlow.handlePurchase(unlockFlow.nextUnlock!, { suppressIntro });
@@ -2310,33 +2503,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     }}
                     disabled={progress ? progress.amber < unlockFlow.nextUnlock!.cost : false}
                     accessibilityLabel={unlockFlow.nextUnlock!.cost === 0 ? 'Welcome friend' : `Invite for ${unlockFlow.nextUnlock!.cost} amber`}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.inviteButtonText}>
-                      {unlockFlow.nextUnlock!.cost === 0
-                        ? 'Welcome, Friend! 🏠'
-                        : progress && progress.amber >= unlockFlow.nextUnlock!.cost
-                          ? `Invite ${unlockFlow.nextUnlock!.name.split(' ')[0]}! 🏠`
-                          : 'Need More Amber'
-                      }
-                    </Text>
-                  </TouchableOpacity>
+                  />
 
                   {/* Hide "Maybe Later" during onboarding — player must invite Fox */}
                   {!isOnboarding && (
-                  <TouchableOpacity
-                    style={styles.inviteCloseButton}
+                  <CandyButton
+                    label="Maybe Later"
+                    variant="quiet"
+                    phase={progress ? progress.currentPhase : 0}
+                    style={styles.inviteCloseAction}
                     onPress={() => unlockFlow.setShowInvitePrompt(false)}
                     accessibilityLabel="Maybe later"
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.inviteCloseButtonText}>Maybe Later</Text>
-                  </TouchableOpacity>
+                  />
                   )}
                 </>
               );
             })()}
-          </View>
+          </SpringIn>
         </View>
       </Modal>
 
@@ -2442,8 +2625,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={() => setShowSacrificeModal(false)}
       >
-        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
-          <View
+        <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
+          <SpringIn
+            claimTouches
             style={[
               styles.sacrificeModal,
               {
@@ -2452,7 +2636,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 shadowColor: dt.modalShadowColor,
               },
             ]}
-            onStartShouldSetResponder={() => true}
           >
             <Text style={styles.sacrificeEmoji}>🕯️</Text>
             <Text style={[styles.sacrificeTitle, { color: dt.nameColor }]}>
@@ -2470,22 +2653,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.sacrificeResponseText, { color: dt.textColor }]}>
                   {sacrificeMessage}
                 </Text>
-                <TouchableOpacity
-                  style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg }]}
+                <CandyButton
+                  label="Close"
+                  variant="primary"
+                  phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                  style={styles.sacrificeCloseAction}
                   onPress={() => {
                     setSacrificeMessage(null);
                     setShowSacrificeModal(false);
                   }}
-                >
-                  <Text style={styles.continueButtonText}>Close</Text>
-                </TouchableOpacity>
+                />
               </View>
             ) : (
               <View style={styles.sacrificeAmounts}>
                 {getSacrificeAmounts(progress.amber).map(amount => (
                   <TouchableOpacity
                     key={amount}
-                    style={[styles.sacrificeAmountBtn, { borderColor: dt.bubbleBorder }]}
+                    style={[styles.sacrificeAmountBtn, { backgroundColor: panelSt.sectionBg, borderColor: panelSt.sectionBorder }]}
                     onPress={async () => {
                       const spendResult = await spendAmber(amount, 'sacrifice');
                       if (!spendResult.success) return;
@@ -2513,14 +2698,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
 
             {!sacrificeMessage && (
-              <TouchableOpacity
-                style={styles.closeButton}
+              <CandyButton
+                label="Not now"
+                variant="quiet"
+                phase={progress.currentPhase}
+                hostDark={dtHostDark}
+                style={styles.closeAction}
                 onPress={() => setShowSacrificeModal(false)}
-              >
-                <Text style={styles.closeButtonText}>Not now</Text>
-              </TouchableOpacity>
+              />
             )}
-          </View>
+          </SpringIn>
         </View>
       </Modal>
 
@@ -2532,8 +2719,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="fade"
         onRequestClose={() => setShowHouseCompletion(false)}
       >
-        <View style={[styles.centeredOverlay, { backgroundColor: dt.overlayBg }]}>
-          <View
+        <View style={[styles.centeredOverlay, { backgroundColor: st.overlay }]}>
+          <SpringIn
+            claimTouches
             style={[
               styles.houseCompletionModal,
               {
@@ -2543,8 +2731,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               },
               progress.currentPhase >= 3 && styles.houseCompletionModalDark,
             ]}
-            onStartShouldSetResponder={() => true}
           >
+            <View pointerEvents="none" style={[styles.houseCompletionGlow, { backgroundColor: panelSt.glow }]} />
             {(() => {
               const lines = getHouseCompletionText();
               return (
@@ -2568,11 +2756,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <Text style={[styles.introDialogueProgress, { color: dt.progressColor }]}>
                       {houseCompletionTextIndex + 1}/{lines.length}
                     </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.introContinueButton,
-                        { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
-                      ]}
+                    <CandyButton
+                      label={houseCompletionTextIndex + 1 < lines.length ? 'Continue' : 'Close'}
+                      variant="primary"
+                      phase={progress.currentPhase}
+                hostDark={dtHostDark}
                       onPress={() => {
                         if (houseCompletionTextIndex + 1 < lines.length) {
                           setHouseCompletionTextIndex(houseCompletionTextIndex + 1);
@@ -2583,17 +2771,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       accessibilityLabel={
                         houseCompletionTextIndex + 1 < lines.length ? 'Continue' : 'Close'
                       }
-                      accessibilityRole="button"
-                    >
-                      <Text style={styles.introContinueButtonText}>
-                        {houseCompletionTextIndex + 1 < lines.length ? 'Continue' : 'Close'}
-                      </Text>
-                    </TouchableOpacity>
+                    />
                   </View>
                 </>
               );
             })()}
-          </View>
+          </SpringIn>
         </View>
       </Modal>
 
@@ -3134,15 +3317,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
-  // Modal styles
+  // Modal styles — scrim color always comes from the phase theme inline
+  // (st.overlay for feel-kit modals, dt.overlayBg for dialogue surfaces).
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   centeredOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -3277,6 +3459,7 @@ const styles = StyleSheet.create({
   shopTitle: {
     fontSize: 24,
     fontWeight: '900',
+    letterSpacing: 0.5,
     textAlign: 'center',
     marginBottom: 8,
   },
@@ -3291,19 +3474,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
-  hubButton: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+  // Framed layered hub rows (Journal / Utility menus)
+  hubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: SURFACE.cardRadius,
+    borderWidth: 1.5,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    minHeight: 52,
     marginBottom: 10,
+    overflow: 'hidden',
   },
-  hubButtonText: {
-    color: 'white',
+  hubRowHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '45%',
+    borderTopLeftRadius: SURFACE.cardRadius,
+    borderTopRightRadius: SURFACE.cardRadius,
+    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
+  },
+  hubRowIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 10,
+  },
+  hubRowText: {
     fontSize: 15,
     fontWeight: '800',
+    letterSpacing: 0.2,
   },
   nextUnlockContainer: {
     marginBottom: 24,
@@ -3312,39 +3512,108 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   nextUnlockLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    color: CandyColors.gray[500],
+    letterSpacing: SURFACE.sectionLetterSpacing,
     marginBottom: 12,
   },
   unlockItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
     padding: 16,
-    borderWidth: 1,
   },
   upgradeItem: {
     marginBottom: 10,
   },
+  // Shared action placement inside rows / at panel foot
+  rowAction: {
+    marginLeft: 12,
+  },
+  closeAction: {
+    marginTop: 12,
+  },
+  largeAction: {
+    marginTop: 16,
+    alignSelf: 'stretch',
+  },
+  reservedChip: {
+    marginLeft: 12,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reservedChipText: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  // Two-layer bevel button anatomy (mirrors CandyButton; needed for labels
+  // that embed <AmberInline /> inside the Text run)
+  bevelWrapper: {
+    paddingBottom: SURFACE.bevelDepth,
+  },
+  bevelDisabled: {
+    opacity: 0.45,
+  },
+  bevelEdge: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    top: SURFACE.bevelDepth,
+    borderRadius: SURFACE.buttonRadius,
+  },
+  bevelFace: {
+    borderRadius: SURFACE.buttonRadius,
+    minHeight: 46,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  bevelSecondaryFace: {
+    borderWidth: 1.5,
+  },
+  bevelHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '46%',
+    borderTopLeftRadius: SURFACE.buttonRadius,
+    borderTopRightRadius: SURFACE.buttonRadius,
+    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
+  },
+  bevelBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
   questModal: {
     maxHeight: SCREEN_HEIGHT * 0.8,
   },
+  // Framed segmented tab chips (replaces the web-style underline tabs)
   questTabBar: {
     flexDirection: 'row' as const,
-    marginBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    marginBottom: 10,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
+    padding: 4,
+    gap: 4,
   },
   questTab: {
     flex: 1,
     alignItems: 'center' as const,
-    paddingVertical: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  questTabActive: {
-    borderBottomWidth: 2,
+    paddingVertical: 8,
+    borderRadius: SURFACE.buttonRadius - 6,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   questTabText: {
     fontSize: 15,
@@ -3353,6 +3622,18 @@ const styles = StyleSheet.create({
   questTabTimer: {
     fontSize: 10,
     marginTop: 2,
+  },
+  // Real quest progress bar: tinted track + amber fill
+  questBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  questBarFill: {
+    height: '100%',
+    borderRadius: 3,
   },
   questList: {
     flexGrow: 0,
@@ -3380,13 +3661,11 @@ const styles = StyleSheet.create({
   unlockCost: {
     fontSize: 14,
     fontWeight: '700',
-    color: CandyColors.yellow.dark,
     marginTop: 6,
   },
   questProgressText: {
     fontSize: 12,
     fontWeight: '700',
-    color: CandyColors.orange.dark,
     marginTop: 6,
   },
   questSectionHeader: {
@@ -3408,73 +3687,38 @@ const styles = StyleSheet.create({
   unlockBlockedText: {
     fontSize: 12,
     fontWeight: '600',
-    color: CandyColors.orange.main,
     marginTop: 4,
     fontStyle: 'italic',
   },
-  buyButton: {
-    backgroundColor: CandyColors.green.main,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  buyButtonLarge: {
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    alignSelf: 'center',
-    marginTop: 16,
-  },
-  buyButtonDisabled: {
-    backgroundColor: CandyColors.gray[300],
-  },
-  buyButtonText: {
-    color: CandyColors.white,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  // Secondary "skip the wait" action — outlined amber so it reads as the paid
-  // premium shortcut, one step below the recommended (cheaper) Reserve.
-  skipButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: CandyColors.yellow.dark,
-    marginTop: 10,
-  },
-  skipButtonText: {
-    color: CandyColors.yellow.dark,
-  },
   allUnlockedText: {
     fontSize: 16,
-    color: CandyColors.green.main,
     textAlign: 'center',
     fontWeight: '700',
     marginBottom: 24,
   },
-  closeButton: {
-    backgroundColor: 'rgba(128, 128, 128, 0.12)',
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.1)',
+  // Tinted circle badge framing the locked-room title emoji
+  lockBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  closeButtonText: {
-    color: 'rgba(150, 150, 150, 0.8)',
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
+  lockBadgeEmoji: {
+    fontSize: 24,
   },
   lockedRoomName: {
     fontSize: 18,
     fontWeight: '700',
-    color: CandyColors.gray[700],
     textAlign: 'center',
     marginBottom: 8,
   },
   amberBalance: {
     fontSize: 18,
     fontWeight: '700',
-    color: CandyColors.yellow.dark,
     textAlign: 'center',
     marginTop: 16,
   },
@@ -3517,14 +3761,34 @@ const styles = StyleSheet.create({
     maxWidth: 380,
     width: '90%',
   },
-  inviteEmoji: {
-    fontSize: 80,
+  // Sprite hero: tinted ring + soft glow blob behind the portrait
+  inviteHeroWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
   },
+  inviteHeroGlow: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    opacity: 0.35,
+  },
+  inviteHeroRing: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  inviteEmoji: {
+    fontSize: 80,
+  },
   inviteSpriteImage: {
-    width: 120,
-    height: 120,
-    marginBottom: 16,
+    width: 116,
+    height: 116,
   },
   inviteTitle: {
     fontSize: 24,
@@ -3539,42 +3803,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 10,
   },
-  inviteButton: {
-    paddingHorizontal: 30,
-    paddingVertical: 16,
-    borderRadius: 25,
+  inviteAction: {
     marginTop: 16,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  inviteButtonDisabled: {
-    backgroundColor: CandyColors.gray[400],
-    shadowColor: CandyColors.gray[500],
-  },
-  inviteButtonText: {
-    color: CandyColors.white,
-    fontSize: 18,
-    fontWeight: '900',
+    alignSelf: 'stretch',
   },
   inviteCost: {
     fontSize: 16,
     fontWeight: '700',
-    color: CandyColors.yellow.dark,
     marginTop: 12,
   },
-  inviteCloseButton: {
-    marginTop: 16,
-    paddingVertical: 10,
-  },
-  inviteCloseButtonText: {
-    color: CandyColors.gray[500],
-    fontSize: 14,
-    fontWeight: '600',
+  inviteCloseAction: {
+    marginTop: 10,
   },
 
   // Intro dialogue progress text (inline in footer)
@@ -3593,24 +3832,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  introContinueButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  introContinueButtonText: {
-    color: CandyColors.white,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-
   // Dialogue choice buttons (Phase 3)
   dialogueChoiceRow: {
     flexDirection: 'column',
@@ -3737,12 +3958,16 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 16,
   },
+  // Framed selectable offering chips (colors from the surface theme inline —
+  // dark phases keep the dread tone via getSurfaceTheme's dark values)
   sacrificeAmountBtn: {
     paddingHorizontal: 18,
-    paddingVertical: 10,
+    minHeight: 46,
+    minWidth: 84,
     borderRadius: 14,
-    borderWidth: 1,
-    backgroundColor: 'rgba(100, 30, 50, 0.15)',
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sacrificeAmountText: {
     fontSize: 14,
@@ -3768,6 +3993,9 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: 16,
   },
+  sacrificeCloseAction: {
+    alignSelf: 'stretch',
+  },
 
   // House completion ceremony styles
   houseCompletionModal: {
@@ -3785,6 +4013,14 @@ const styles = StyleSheet.create({
   },
   houseCompletionModalDark: {
     // Kept for backward compat but colors now come from dt
+  },
+  houseCompletionGlow: {
+    position: 'absolute',
+    top: 4,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    opacity: 0.3,
   },
   houseCompletionEmoji: {
     fontSize: 60,

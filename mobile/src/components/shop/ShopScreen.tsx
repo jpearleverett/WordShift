@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { CandyButton } from '../ui/CandyButton';
+import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import {
@@ -45,6 +48,8 @@ interface ShopScreenProps {
   /** Open the Store (amber packs). Renders a "Need more amber?" row when provided. */
   onOpenStore?: () => void;
 }
+
+const AMBER_ICON = require('../../../assets/ui/amber.png');
 
 const PREVIEW_LETTERS = ['A', 'B', 'C', 'D'];
 
@@ -91,12 +96,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onOpenStore,
 }) => {
   const screenInsets = useScreenInsets();
-  const isDark = phase >= 3;
-  const bgColor = isDark ? '#0A0A14' : '#1A1030';
-  const textColor = isDark ? 'rgba(200, 170, 190, 0.9)' : 'rgba(220, 200, 240, 0.92)';
-  const headerColor = isDark ? '#B36A86' : CandyColors.white;
-  const cardBg = isDark ? 'rgba(60, 20, 40, 0.32)' : 'rgba(100, 70, 150, 0.18)';
-  const cardBorder = isDark ? 'rgba(120, 40, 60, 0.4)' : 'rgba(150, 120, 200, 0.3)';
+  const t = getSurfaceTheme(phase);
+  // Framed light lift for the back chip: the kit's own highlight band alpha
+  // over the deep screen base, framed with the panel border tint.
+  const chipBg = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
 
   const [balance, setBalance] = useState(amberBalance);
   const [owned, setOwned] = useState<Record<string, boolean>>({});
@@ -177,44 +180,44 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     const isEquipped = equipped[item.category] === item.id;
     if (isEquipped) {
       return (
-        <View style={[styles.actionBtn, styles.actionEquipped]}>
-          <Text style={styles.actionEquippedText}>Equipped ✓</Text>
+        <View style={[styles.statusChip, styles.equippedChip, { borderColor: t.sectionBorder }]}>
+          <Text style={[styles.equippedChipText, { color: t.body }]}>Equipped ✓</Text>
         </View>
       );
     }
     if (isOwned) {
       return (
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionEquip]}
+        <CandyButton
+          label="Equip"
           onPress={() => handleEquip(item)}
+          phase={phase}
+          variant="secondary"
           disabled={busy != null}
-          accessibilityRole="button"
+          style={styles.actionSlot}
           accessibilityLabel={`Equip ${item.name}`}
-        >
-          <Text style={styles.actionEquipText}>Equip</Text>
-        </TouchableOpacity>
+        />
       );
     }
     if (item.acquisition.kind === 'amber') {
       const cost = item.acquisition.cost;
       const affordable = balance >= cost;
       return (
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionBuy, !affordable && styles.actionDisabled]}
+        <CandyButton
+          label={`${cost}`}
           onPress={() => handleBuy(item)}
+          phase={phase}
+          variant="amber"
+          icon={AMBER_ICON}
           disabled={!affordable || busy != null}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !affordable || busy != null }}
+          style={styles.actionSlot}
           accessibilityLabel={`Buy ${item.name} for ${cost} amber`}
-        >
-          <Text style={styles.actionBuyText}><AmberInline size={14} /> {cost}</Text>
-        </TouchableOpacity>
+        />
       );
     }
-    // entitlement (e.g. Patron) — locked unless owned
+    // entitlement (e.g. Patron): locked unless owned
     return (
-      <View style={[styles.actionBtn, styles.actionLocked]}>
-        <Text style={styles.actionLockedText}>{getShopPatronLockedLabel()}</Text>
+      <View style={[styles.statusChip, { borderColor: t.sectionBorder }]}>
+        <Text style={[styles.lockedChipText, { color: t.muted }]}>{getShopPatronLockedLabel()}</Text>
       </View>
     );
   };
@@ -230,72 +233,69 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     const defaultEquipped = equipped[category] === undefined;
     return (
       <View key={category}>
-        <Text style={[styles.sectionLabel, { color: textColor }]}>{sectionLabel}</Text>
+        <Text style={[styles.sectionLabel, { color: t.primaryText }]}>{sectionLabel}</Text>
 
         {/* Default (free) option */}
-        <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+        <PanelCard phase={phase} kind="card" style={styles.card}>
           <Preview themeId={null} />
           <View style={styles.cardBody}>
-            <Text style={[styles.cardName, { color: headerColor }]}>{defaultName}</Text>
-            <Text style={[styles.cardDesc, { color: textColor }]}>{defaultDesc}</Text>
+            <Text style={[styles.cardName, { color: t.title }]}>{defaultName}</Text>
+            <Text style={[styles.cardDesc, { color: t.body }]}>{defaultDesc}</Text>
           </View>
           {defaultEquipped ? (
-            <View style={[styles.actionBtn, styles.actionEquipped]}>
-              <Text style={styles.actionEquippedText}>Equipped ✓</Text>
+            <View style={[styles.statusChip, styles.equippedChip, { borderColor: t.sectionBorder }]}>
+              <Text style={[styles.equippedChipText, { color: t.body }]}>Equipped ✓</Text>
             </View>
           ) : (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionEquip]}
+            <CandyButton
+              label="Equip"
               onPress={() => handleEquipDefault(category)}
+              phase={phase}
+              variant="secondary"
               disabled={busy != null}
-              accessibilityRole="button"
+              style={styles.actionSlot}
               accessibilityLabel={`Equip ${defaultName}`}
-            >
-              <Text style={styles.actionEquipText}>Equip</Text>
-            </TouchableOpacity>
+            />
           )}
-        </View>
+        </PanelCard>
 
         {items.map(item => (
-          <View
-            key={item.id}
-            style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}
-          >
+          <PanelCard key={item.id} phase={phase} kind="card" style={styles.card}>
             <Preview themeId={item.id} />
             <View style={styles.cardBody}>
-              <Text style={[styles.cardName, { color: headerColor }]}>{item.name}</Text>
-              <Text style={[styles.cardDesc, { color: textColor }]} numberOfLines={2}>
+              <Text style={[styles.cardName, { color: t.title }]}>{item.name}</Text>
+              <Text style={[styles.cardDesc, { color: t.body }]} numberOfLines={2}>
                 {item.description}
               </Text>
             </View>
             {renderActionButton(item)}
-          </View>
+          </PanelCard>
         ))}
       </View>
     );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
+    <View style={[styles.container, { backgroundColor: t.screenBg }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       <View style={[styles.header, { paddingTop: screenInsets.top + 12 }]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.cardBorder }]}
           onPress={onClose}
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text style={styles.backButtonText}>{'<'} Back</Text>
+          <Text style={[styles.backChipText, { color: t.primaryText }]}>{'<'} Back</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.title, { color: headerColor }]}>{getShopTitle(phase)}</Text>
-          <Text style={[styles.subtitle, { color: textColor }]} numberOfLines={2}>
+          <Text style={[styles.title, { color: t.primaryText }]}>{getShopTitle(phase)}</Text>
+          <Text style={[styles.subtitle, { color: t.primaryText }]} numberOfLines={2}>
             {getShopSubtitle(phase)}
           </Text>
         </View>
-        <View style={styles.amberPill}>
-          <Text style={styles.amberPillText}><AmberInline size={14} /> {Math.max(0, balance)}</Text>
+        <View style={[styles.amberPill, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
+          <Text style={[styles.amberPillText, { color: t.amberText }]}><AmberInline size={14} /> {Math.max(0, balance)}</Text>
         </View>
       </View>
 
@@ -306,19 +306,26 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       >
         {loading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color={textColor} />
+            <ActivityIndicator size="large" color={t.primaryText} />
           </View>
         ) : (
           <>
             {onOpenPatron && !isPatronSync() && (
               <TouchableOpacity
-                style={styles.patronBanner}
                 onPress={() => { hapticLight(); onOpenPatron(); }}
                 accessibilityLabel="Become a Patron"
                 accessibilityRole="button"
+                activeOpacity={0.85}
               >
-                <Text style={styles.patronBannerTitle}>{'✦'} Become a Patron</Text>
-                <Text style={styles.patronBannerSub}>Support WordShift. A small amber bonus + an exclusive gold tile set</Text>
+                <PanelCard
+                  phase={phase}
+                  kind="card"
+                  style={{ ...styles.patronBanner, borderColor: t.amberTintBorder }}
+                >
+                  <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.amberTint }]} />
+                  <Text style={[styles.patronBannerTitle, { color: t.amberText }]}>{'✦'} Become a Patron</Text>
+                  <Text style={[styles.patronBannerSub, { color: t.body }]}>Support WordShift. A small amber bonus + an exclusive gold tile set</Text>
+                </PanelCard>
               </TouchableOpacity>
             )}
             {renderSection(
@@ -340,19 +347,29 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
             {onOpenStore && (
               <TouchableOpacity
-                style={styles.storeBridge}
                 onPress={() => { hapticLight(); onOpenStore(); }}
                 accessibilityRole="button"
                 accessibilityLabel="Open the Store for amber packs"
+                activeOpacity={0.85}
               >
-                <Text style={styles.storeBridgeTitle}>{getShopStoreBridgeText(phase).title}</Text>
-                <Text style={[styles.storeBridgeSub, { color: textColor }]}>
-                  {getShopStoreBridgeText(phase).subtitle}
-                </Text>
+                <PanelCard
+                  phase={phase}
+                  kind="card"
+                  style={{ ...styles.storeBridge, borderColor: t.amberTintBorder }}
+                >
+                  <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.amberTint }]} />
+                  <View style={styles.storeBridgeBody}>
+                    <Text style={[styles.storeBridgeTitle, { color: t.amberText }]}>{getShopStoreBridgeText(phase).title}</Text>
+                    <Text style={[styles.storeBridgeSub, { color: t.body }]}>
+                      {getShopStoreBridgeText(phase).subtitle}
+                    </Text>
+                  </View>
+                  <Text style={[styles.storeBridgeChevron, { color: t.amberText }]}>{'>'}</Text>
+                </PanelCard>
               </TouchableOpacity>
             )}
 
-            <Text style={[styles.footnote, { color: textColor }]}>
+            <Text style={[styles.footnote, { color: t.primaryText }]}>
               Cosmetics are for expression only. They never change the puzzle, the
               story, or your progress.
             </Text>
@@ -364,7 +381,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+    // backgroundColor applied inline (phase-aware screenBg)
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -372,43 +392,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingBottom: 12,
   },
-  backButton: { width: 72, paddingVertical: 8 },
-  backButtonText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '700' },
-  headerCenter: { flex: 1, alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '900', letterSpacing: 0.5 },
-  subtitle: { fontSize: 12, fontWeight: '500', textAlign: 'center', marginTop: 2, paddingHorizontal: 4 },
-  amberPill: {
-    width: 72,
-    alignItems: 'flex-end',
-    paddingRight: 4,
-  },
-  amberPillText: { color: '#FFD479', fontSize: 15, fontWeight: '900' },
-  patronBanner: {
-    backgroundColor: 'rgba(139, 105, 20, 0.18)',
-    borderColor: 'rgba(255, 212, 121, 0.55)',
+  backChip: {
+    width: 76,
+    minHeight: 44,
+    borderRadius: SURFACE.buttonRadius,
     borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backChipText: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  headerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
+  title: { fontSize: 22, fontWeight: '900', letterSpacing: 0.5 },
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 2,
+    paddingHorizontal: 4,
+    opacity: 0.78,
+  },
+  amberPill: {
+    minWidth: 76,
+    minHeight: 40,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  amberPillText: { fontSize: 15, fontWeight: '900' },
+  patronBanner: {
+    paddingVertical: 14,
     paddingHorizontal: 16,
     marginBottom: 18,
   },
-  patronBannerTitle: { color: '#FFD479', fontSize: 16, fontWeight: '900', marginBottom: 3 },
-  patronBannerSub: { color: 'rgba(220, 200, 240, 0.85)', fontSize: 12.5, fontWeight: '600' },
+  patronBannerTitle: { fontSize: 16, fontWeight: '900', marginBottom: 3 },
+  patronBannerSub: { fontSize: 12.5, fontWeight: '600' },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 48 },
   loading: { paddingTop: 80, alignItems: 'center' },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '800',
-    letterSpacing: 1.5,
+    letterSpacing: SURFACE.sectionLetterSpacing,
     marginTop: 8,
     marginBottom: 12,
+    opacity: 0.8,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
     padding: 12,
     marginBottom: 12,
   },
@@ -424,7 +462,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  previewTileText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  previewTileText: { color: CandyColors.white, fontSize: 12, fontWeight: '900' },
   previewConfetti: {
     width: 96,
     height: 52,
@@ -435,42 +473,41 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   previewDot: { width: 12, height: 12, borderRadius: 3 },
-  actionBtn: {
-    minWidth: 76,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
+  actionSlot: { minWidth: 96 },
+  statusChip: {
+    minWidth: 96,
+    minHeight: 46,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  actionBuy: { backgroundColor: 'rgba(120, 80, 180, 0.7)', borderWidth: 1, borderColor: 'rgba(200,170,240,0.5)' },
-  actionBuyText: { color: CandyColors.white, fontSize: 15, fontWeight: '900' },
-  actionEquip: { backgroundColor: 'rgba(80, 160, 120, 0.55)', borderWidth: 1, borderColor: 'rgba(150,230,190,0.5)' },
-  actionEquipText: { color: CandyColors.white, fontSize: 14, fontWeight: '800' },
-  actionEquipped: { backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)' },
-  actionEquippedText: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '800' },
-  actionLocked: { backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
-  actionLockedText: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: '700' },
-  actionDisabled: { opacity: 0.45 },
+  equippedChip: {
+    // Settled, lifted tint: the framed "this one is worn" state.
+    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
+  },
+  equippedChipText: { fontSize: 13, fontWeight: '800' },
+  lockedChipText: { fontSize: 12, fontWeight: '700', textAlign: 'center' },
   storeBridge: {
-    backgroundColor: 'rgba(120, 100, 60, 0.14)',
-    borderColor: 'rgba(255, 212, 121, 0.35)',
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
     paddingHorizontal: 16,
     marginTop: 8,
     marginBottom: 4,
-    alignItems: 'center',
   },
-  storeBridgeTitle: { color: '#FFD479', fontSize: 14.5, fontWeight: '800', marginBottom: 2 },
+  storeBridgeBody: { flex: 1 },
+  storeBridgeTitle: { fontSize: 14.5, fontWeight: '800', marginBottom: 2 },
   storeBridgeSub: { fontSize: 12, fontWeight: '600' },
+  storeBridgeChevron: { fontSize: 18, fontWeight: '900', marginLeft: 10 },
   footnote: {
     fontSize: 11.5,
     fontWeight: '500',
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 16,
-    opacity: 0.8,
+    opacity: 0.75,
   },
 });

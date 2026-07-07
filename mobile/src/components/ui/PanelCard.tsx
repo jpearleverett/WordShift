@@ -7,6 +7,14 @@ interface PanelCardProps {
   children: React.ReactNode;
   /** panel = modal/screen card (radius 28); card = inner row/section (radius 16). */
   kind?: 'panel' | 'card';
+  /**
+   * Set when the card sits on a host panel that is ALREADY dark at phases
+   * below 3 (the home modals use getDialogueTheme, which darkens at phase 2 —
+   * one phase before getSurfaceTheme). Maps the fill to the dark-surface
+   * tokens so the card never renders as a glaring light island on a dark
+   * panel (and its dialogue-theme ink keeps its contrast).
+   */
+  hostDark?: boolean;
   style?: ViewStyle;
 }
 
@@ -20,9 +28,10 @@ export const PanelCard: React.FC<PanelCardProps> = ({
   phase,
   children,
   kind = 'card',
+  hostDark = false,
   style,
 }) => {
-  const t = getSurfaceTheme(phase);
+  const t = getSurfaceTheme(hostDark && phase < 3 ? 3 : phase);
   const radius = kind === 'panel' ? SURFACE.panelRadius : SURFACE.cardRadius;
   return (
     <View

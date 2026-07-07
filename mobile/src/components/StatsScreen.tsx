@@ -2,19 +2,28 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { PanelCard } from './ui/PanelCard';
 import { useScreenInsets } from '../hooks/useScreenInsets';
 import { AmberInline } from './AmberInline';
-import { CumulativeStats, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
+import { CumulativeStats, PersonalBest, getCumulativeStats, getAverageStars, getThreeStarRate } from '../services/starRating';
 import { getAchievementsWithStatus, Achievement, getTotalCount } from '../services/achievements';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { getStreakInfo } from '../services/amberCurrency';
 import { Difficulty } from '../types';
 import { getJourneyAtmosphereText } from '../services/phaseNarrative';
+
+const STAR_FILLED = require('../../assets/ui/star_filled.png');
+const STAR_EMPTY = require('../../assets/ui/star_empty.png');
+
+/** Tinted chip fill for chrome sitting directly on the deep screen base. */
+const CHROME_CHIP_BG = `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`;
 
 interface StatsScreenProps {
   onClose: () => void;
@@ -48,58 +57,81 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 
   if (!stats) return null;
 
+  const t = getSurfaceTheme(effectivePhase);
+  const isDarkPhase = effectivePhase >= 3;
+  // Alternating row depth: a whisper of the panel's own shade/highlight
+  // material instead of hairline dividers.
+  const rowAltTint = isDarkPhase ? 'rgba(255, 255, 255, 0.05)' : 'rgba(10, 6, 24, 0.05)';
+
   const avgStars = getAverageStars(stats);
   const perfectRate = getThreeStarRate(stats);
   const unlockedAchievements = achievements.filter(a => a.isUnlocked);
   const totalAchievements = getTotalCount();
 
-  const phaseCardStyle = effectivePhase >= 4
-    ? { backgroundColor: '#D0C0E0' }
-    : effectivePhase >= 3
-      ? { backgroundColor: '#E8E0F0' }
-      : undefined;
+  const overviewSelected = selectedTab === 'overview';
+  const achievementsSelected = selectedTab === 'achievements';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: t.screenBg }]}>
       {/* Header */}
-      <View style={[
-        styles.header,
-        { paddingTop: screenInsets.top + 16 },
-        effectivePhase >= 4 && { backgroundColor: '#4A3570' },
-      ]}>
+      <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backChip, { backgroundColor: CHROME_CHIP_BG, borderColor: t.cardBorder }]}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Back to home"
         >
-          <Text style={styles.backButtonText}>{'<'} Back</Text>
+          <Text style={[styles.backChipText, { color: t.primaryText }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Statistics</Text>
-        <View style={styles.backButton} />
+        <Text style={[styles.title, { color: t.primaryText }]}>Statistics</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      {/* Tab bar */}
+      {/* Tab bar — framed segmented chips */}
       <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'overview' && styles.tabActive]}
+          style={[
+            styles.tab,
+            overviewSelected
+              ? { backgroundColor: t.primaryBg, borderColor: t.primaryEdge }
+              : { backgroundColor: CHROME_CHIP_BG, borderColor: t.cardBorder },
+          ]}
           onPress={() => setSelectedTab('overview')}
           accessibilityRole="tab"
           accessibilityLabel="Overview stats"
           accessibilityState={{ selected: selectedTab === 'overview' }}
         >
-          <Text style={[styles.tabText, selectedTab === 'overview' && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              overviewSelected
+                ? [styles.tabTextActive, { color: t.primaryText }]
+                : { color: t.primaryText, opacity: 0.92 },
+            ]}
+          >
             Overview
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, selectedTab === 'achievements' && styles.tabActive]}
+          style={[
+            styles.tab,
+            achievementsSelected
+              ? { backgroundColor: t.primaryBg, borderColor: t.primaryEdge }
+              : { backgroundColor: CHROME_CHIP_BG, borderColor: t.cardBorder },
+          ]}
           onPress={() => setSelectedTab('achievements')}
           accessibilityRole="tab"
           accessibilityLabel={`Achievements, ${unlockedAchievements.length} of ${totalAchievements} unlocked`}
           accessibilityState={{ selected: selectedTab === 'achievements' }}
         >
-          <Text style={[styles.tabText, selectedTab === 'achievements' && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              achievementsSelected
+                ? [styles.tabTextActive, { color: t.primaryText }]
+                : { color: t.primaryText, opacity: 0.92 },
+            ]}
+          >
             Achievements ({unlockedAchievements.length}/{totalAchievements})
           </Text>
         </TouchableOpacity>
@@ -108,129 +140,128 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {selectedTab === 'overview' ? (
           <>
-            {/* Hero stats */}
-            <View style={[
-              styles.heroRow,
-              effectivePhase >= 3 && effectivePhase < 4 && { backgroundColor: '#E8E0F0' },
-              effectivePhase >= 4 && { backgroundColor: '#D0C0E0' },
-            ]}>
-              <View style={styles.heroStat}>
-                <Text style={styles.heroValue}>{stats.totalPuzzlesCompleted}</Text>
-                <Text style={styles.heroLabel}>Puzzles</Text>
+            {/* Hero stats — panel card with a soft glow blob behind */}
+            <PanelCard phase={effectivePhase} kind="panel" style={styles.heroCard}>
+              <View
+                pointerEvents="none"
+                style={[styles.heroGlow, { backgroundColor: t.glow }]}
+              />
+              <View style={styles.heroRow}>
+                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+                  <Text style={[styles.heroValue, { color: t.title }]}>{stats.totalPuzzlesCompleted}</Text>
+                  <Text style={[styles.heroLabel, { color: t.muted }]}>Puzzles</Text>
+                </View>
+                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+                  <Text style={[styles.heroValue, { color: t.title }]}>{stats.totalStars}</Text>
+                  <Text style={[styles.heroLabel, { color: t.muted }]}>Stars</Text>
+                </View>
+                <View style={[styles.heroStat, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+                  <Text style={[styles.heroValue, { color: t.title }]}>{currentStreak}</Text>
+                  <Text style={[styles.heroLabel, { color: t.muted }]}>Streak</Text>
+                </View>
               </View>
-              <View style={styles.heroDivider} />
-              <View style={styles.heroStat}>
-                <Text style={styles.heroValue}>{stats.totalStars}</Text>
-                <Text style={styles.heroLabel}>Stars</Text>
-              </View>
-              <View style={styles.heroDivider} />
-              <View style={styles.heroStat}>
-                <Text style={styles.heroValue}>{currentStreak}</Text>
-                <Text style={styles.heroLabel}>Streak</Text>
-              </View>
-            </View>
+            </PanelCard>
 
             {/* Star breakdown */}
-            <Text style={styles.sectionTitle}>STAR BREAKDOWN</Text>
-            <View style={[styles.card, phaseCardStyle]}>
-              <StarBar label="3 Stars" count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} />
-              <StarBar label="2 Stars" count={stats.twoStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.orange.main} />
-              <StarBar label="1 Star" count={stats.oneStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.gray[400]} />
+            <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+              <Text style={[styles.sectionTitle, { color: t.muted }]}>STAR BREAKDOWN</Text>
+              <StarBar label="3 Stars" stars={3} count={stats.threeStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.yellow.main} trackColor={t.rowBorder} countColor={t.body} />
+              <StarBar label="2 Stars" stars={2} count={stats.twoStarCount} total={stats.totalPuzzlesCompleted} color={CandyColors.orange.main} trackColor={t.rowBorder} countColor={t.body} />
+              <StarBar label="1 Star" stars={1} count={stats.oneStarCount} total={stats.totalPuzzlesCompleted} color={t.muted} trackColor={t.rowBorder} countColor={t.body} />
               <View style={styles.starSummary}>
-                <Text style={styles.starSummaryText}>
+                <Text style={[styles.starSummaryText, { color: t.muted }]}>
                   Avg: {avgStars.toFixed(1)} stars | Perfect rate: {perfectRate.toFixed(0)}%
                 </Text>
               </View>
-            </View>
+            </PanelCard>
 
             {/* Difficulty breakdown */}
-            <Text style={styles.sectionTitle}>BY DIFFICULTY</Text>
-            <View style={[styles.card, phaseCardStyle]}>
+            <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+              <Text style={[styles.sectionTitle, { color: t.muted }]}>BY DIFFICULTY</Text>
               <DifficultyRow
                 difficulty="EASY"
                 completed={stats.byDifficulty.EASY.completed}
                 stars={stats.byDifficulty.EASY.stars}
                 color={CandyColors.green.main}
+                labelColor={t.body}
+                countColor={t.muted}
+                avgColor={t.title}
               />
-              <View style={styles.rowDivider} />
               <DifficultyRow
                 difficulty="MEDIUM"
                 completed={stats.byDifficulty.MEDIUM.completed}
                 stars={stats.byDifficulty.MEDIUM.stars}
                 color={CandyColors.yellow.main}
+                labelColor={t.body}
+                countColor={t.muted}
+                avgColor={t.title}
+                altBg={rowAltTint}
               />
-              <View style={styles.rowDivider} />
               <DifficultyRow
                 difficulty="HARD"
                 completed={stats.byDifficulty.HARD.completed}
                 stars={stats.byDifficulty.HARD.stars}
                 color={CandyColors.red.main}
+                labelColor={t.body}
+                countColor={t.muted}
+                avgColor={t.title}
               />
-            </View>
+            </PanelCard>
 
             {/* Personal bests */}
             {stats.personalBests && Object.keys(stats.personalBests).length > 0 && (
-              <>
-                <Text style={styles.sectionTitle}>PERSONAL BESTS</Text>
-                <View style={[styles.card, phaseCardStyle]}>
-                  {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[]).map((diff, i) => {
-                    const pb = stats.personalBests?.[diff];
-                    if (!pb) return null;
-                    const label = diff === 'MEDIUM_PLUS' ? 'MED+' : diff;
+              <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+                <Text style={[styles.sectionTitle, { color: t.muted }]}>PERSONAL BESTS</Text>
+                {(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[])
+                  .map(diff => ({ diff, pb: stats.personalBests?.[diff] }))
+                  .filter((entry): entry is { diff: Difficulty; pb: PersonalBest } => !!entry.pb)
+                  .map((entry, i) => {
+                    const label = entry.diff === 'MEDIUM_PLUS' ? 'MED+' : entry.diff;
                     return (
-                      <React.Fragment key={diff}>
-                        {i > 0 && stats.personalBests?.[(['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'] as Difficulty[])[i - 1]] && (
-                          <View style={styles.rowDivider} />
-                        )}
-                        <View style={styles.journeyRow}>
-                          <Text style={styles.journeyLabel}>{label}</Text>
-                          <Text style={styles.journeyValue}>
-                            {pb.fewestHints === 0 ? '✨ ' : `${pb.fewestHints}h `}
-                            {pb.fewestInvalidAttempts === 0 ? '✨' : `${pb.fewestInvalidAttempts}m`}
-                          </Text>
-                        </View>
-                      </React.Fragment>
+                      <View
+                        key={entry.diff}
+                        style={[styles.journeyRow, i % 2 === 1 && { backgroundColor: rowAltTint }]}
+                      >
+                        <Text style={[styles.journeyLabel, { color: t.body }]}>{label}</Text>
+                        <Text style={[styles.journeyValue, { color: t.title }]}>
+                          {entry.pb.fewestHints === 0 ? '✨ ' : `${entry.pb.fewestHints}h `}
+                          {entry.pb.fewestInvalidAttempts === 0 ? '✨' : `${entry.pb.fewestInvalidAttempts}m`}
+                        </Text>
+                      </View>
                     );
                   })}
-                  <View style={styles.rowDivider} />
-                  <Text style={styles.personalBestLegend}>h = hints · m = mistakes · ✨ = perfect</Text>
-                </View>
-              </>
+                <Text style={[styles.personalBestLegend, { color: t.muted }]}>h = hints · m = mistakes · ✨ = perfect</Text>
+              </PanelCard>
             )}
 
             {/* Journey progress */}
-            <Text style={styles.sectionTitle}>YOUR JOURNEY</Text>
-            <View style={[styles.card, phaseCardStyle]}>
+            <PanelCard phase={effectivePhase} style={styles.sectionCard}>
+              <Text style={[styles.sectionTitle, { color: t.muted }]}>YOUR JOURNEY</Text>
               <View style={styles.journeyRow}>
-                <Text style={styles.journeyLabel}>Atmosphere</Text>
-                <Text style={styles.journeyValue}>{getJourneyAtmosphereText(effectivePhase)}</Text>
+                <Text style={[styles.journeyLabel, { color: t.body }]}>Atmosphere</Text>
+                <Text style={[styles.journeyValue, { color: t.title }]}>{getJourneyAtmosphereText(effectivePhase)}</Text>
               </View>
-              <View style={styles.rowDivider} />
+              <View style={[styles.journeyRow, { backgroundColor: rowAltTint }]}>
+                <Text style={[styles.journeyLabel, { color: t.body }]}>Amber Balance</Text>
+                <Text style={[styles.journeyValue, { color: t.amberText }]}><AmberInline /> {amberBalance}</Text>
+              </View>
               <View style={styles.journeyRow}>
-                <Text style={styles.journeyLabel}>Amber Balance</Text>
-                <Text style={styles.journeyValue}><AmberInline /> {amberBalance}</Text>
+                <Text style={[styles.journeyLabel, { color: t.body }]}>Daily Challenges</Text>
+                <Text style={[styles.journeyValue, { color: t.title }]}>{dailyStatus?.totalCompleted || 0}</Text>
               </View>
-              <View style={styles.rowDivider} />
+              <View style={[styles.journeyRow, { backgroundColor: rowAltTint }]}>
+                <Text style={[styles.journeyLabel, { color: t.body }]}>Best Daily Streak</Text>
+                <Text style={[styles.journeyValue, { color: t.title }]}>{dailyStatus?.bestStreak || 0} days</Text>
+              </View>
               <View style={styles.journeyRow}>
-                <Text style={styles.journeyLabel}>Daily Challenges</Text>
-                <Text style={styles.journeyValue}>{dailyStatus?.totalCompleted || 0}</Text>
+                <Text style={[styles.journeyLabel, { color: t.body }]}>Hints Used</Text>
+                <Text style={[styles.journeyValue, { color: t.title }]}>{stats.totalHintsUsed}</Text>
               </View>
-              <View style={styles.rowDivider} />
-              <View style={styles.journeyRow}>
-                <Text style={styles.journeyLabel}>Best Daily Streak</Text>
-                <Text style={styles.journeyValue}>{dailyStatus?.bestStreak || 0} days</Text>
+              <View style={[styles.journeyRow, { backgroundColor: rowAltTint }]}>
+                <Text style={[styles.journeyLabel, { color: t.body }]}>Wrong Moves</Text>
+                <Text style={[styles.journeyValue, { color: t.title }]}>{stats.totalInvalidAttempts}</Text>
               </View>
-              <View style={styles.rowDivider} />
-              <View style={styles.journeyRow}>
-                <Text style={styles.journeyLabel}>Hints Used</Text>
-                <Text style={styles.journeyValue}>{stats.totalHintsUsed}</Text>
-              </View>
-              <View style={styles.rowDivider} />
-              <View style={styles.journeyRow}>
-                <Text style={styles.journeyLabel}>Wrong Moves</Text>
-                <Text style={styles.journeyValue}>{stats.totalInvalidAttempts}</Text>
-              </View>
-            </View>
+            </PanelCard>
           </>
         ) : (
           <>
@@ -246,43 +277,45 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
               }[category];
 
               return (
-                <View key={category}>
-                  <Text style={styles.sectionTitle}>{categoryName}</Text>
-                  <View style={[styles.card, phaseCardStyle]}>
-                    {categoryAchievements.map((achievement, i) => (
-                      <View key={achievement.id}>
-                        {i > 0 && <View style={styles.rowDivider} />}
-                        <View
-                          style={[
-                            styles.achievementRow,
-                            !achievement.isUnlocked && styles.achievementLocked,
-                          ]}
-                        >
-                          <Text style={[
-                            styles.achievementIcon,
-                            !achievement.isUnlocked && styles.achievementIconLocked,
-                          ]}>
-                            {achievement.isUnlocked ? achievement.icon : '🔒'}
-                          </Text>
-                          <View style={styles.achievementInfo}>
-                            <Text style={[
-                              styles.achievementTitle,
-                              !achievement.isUnlocked && styles.achievementTitleLocked,
-                            ]}>
-                              {achievement.title}
-                            </Text>
-                            <Text style={styles.achievementDesc}>
-                              {achievement.description}
-                            </Text>
-                          </View>
-                          {achievement.isUnlocked && (
-                            <Text style={styles.achievementCheck}>✓</Text>
-                          )}
-                        </View>
+                <PanelCard key={category} phase={effectivePhase} style={styles.sectionCard}>
+                  <Text style={[styles.sectionTitle, { color: t.muted }]}>{categoryName}</Text>
+                  {categoryAchievements.map((achievement, i) => (
+                    <View
+                      key={achievement.id}
+                      style={[
+                        styles.achievementRow,
+                        i % 2 === 1 && { backgroundColor: rowAltTint },
+                        !achievement.isUnlocked && styles.achievementLocked,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.achievementIcon,
+                        !achievement.isUnlocked && styles.achievementIconLocked,
+                      ]}>
+                        {achievement.isUnlocked ? achievement.icon : '🔒'}
+                      </Text>
+                      <View style={styles.achievementInfo}>
+                        <Text style={[
+                          styles.achievementTitle,
+                          { color: achievement.isUnlocked ? t.title : t.muted },
+                        ]}>
+                          {achievement.title}
+                        </Text>
+                        <Text style={[styles.achievementDesc, { color: t.muted }]}>
+                          {achievement.description}
+                        </Text>
                       </View>
-                    ))}
-                  </View>
-                </View>
+                      <View style={[styles.achievementReward, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
+                        <Text style={[styles.achievementRewardText, { color: t.amberText }]}>
+                          <AmberInline size={12} /> +{achievement.rewardAmber}
+                        </Text>
+                      </View>
+                      {achievement.isUnlocked && (
+                        <Text style={styles.achievementCheck}>✓</Text>
+                      )}
+                    </View>
+                  ))}
+                </PanelCard>
               );
             })}
           </>
@@ -297,14 +330,20 @@ export const StatsScreen: React.FC<StatsScreenProps> = ({
 // Star distribution bar sub-component
 function StarBar({
   label,
+  stars,
   count,
   total,
   color,
+  trackColor,
+  countColor,
 }: {
   label: string;
+  stars: number;
   count: number;
   total: number;
   color: string;
+  trackColor: string;
+  countColor: string;
 }) {
   const pct = total > 0 ? (count / total) * 100 : 0;
   return (
@@ -315,11 +354,20 @@ function StarBar({
       accessibilityLabel={`${label}: ${count} of ${total}`}
       accessibilityValue={{ min: 0, max: total, now: count }}
     >
-      <Text style={styles.starBarLabel}>{label}</Text>
-      <View style={styles.starBarTrack}>
+      <View style={styles.starBarStars}>
+        {[1, 2, 3].map(slot => (
+          <Image
+            key={slot}
+            source={slot <= stars ? STAR_FILLED : STAR_EMPTY}
+            style={[styles.starBarStarIcon, slot > stars && styles.starBarStarEmpty]}
+            resizeMode="contain"
+          />
+        ))}
+      </View>
+      <View style={[styles.starBarTrack, { backgroundColor: trackColor }]}>
         <View style={[styles.starBarFill, { width: `${Math.max(pct, 2)}%`, backgroundColor: color }]} />
       </View>
-      <Text style={styles.starBarCount}>{count}</Text>
+      <Text style={[styles.starBarCount, { color: countColor }]}>{count}</Text>
     </View>
   );
 }
@@ -330,19 +378,27 @@ function DifficultyRow({
   completed,
   stars,
   color,
+  labelColor,
+  countColor,
+  avgColor,
+  altBg,
 }: {
   difficulty: Difficulty;
   completed: number;
   stars: number;
   color: string;
+  labelColor: string;
+  countColor: string;
+  avgColor: string;
+  altBg?: string;
 }) {
   const avg = completed > 0 ? (stars / completed).toFixed(1) : '0.0';
   return (
-    <View style={styles.difficultyRow}>
+    <View style={[styles.difficultyRow, altBg ? { backgroundColor: altBg } : null]}>
       <View style={[styles.difficultyDot, { backgroundColor: color }]} />
-      <Text style={styles.difficultyLabel}>{difficulty}</Text>
-      <Text style={styles.difficultyCount}>{completed} puzzles</Text>
-      <Text style={styles.difficultyAvg}>{avg} avg</Text>
+      <Text style={[styles.difficultyLabel, { color: labelColor }]}>{difficulty}</Text>
+      <Text style={[styles.difficultyCount, { color: countColor }]}>{completed} puzzles</Text>
+      <Text style={[styles.difficultyAvg, { color: avgColor }]}>{avg} avg</Text>
     </View>
   );
 }
@@ -350,7 +406,6 @@ function DifficultyRow({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: CandyColors.gray[100],
   },
   header: {
     flexDirection: 'row',
@@ -358,107 +413,108 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     // paddingTop applied inline via useScreenInsets (safe-area aware)
-    paddingBottom: 16,
-    backgroundColor: CandyColors.purple.main,
+    paddingBottom: 12,
   },
-  backButton: {
+  backChip: {
+    minWidth: 80,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
+  },
+  backChipText: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  headerSpacer: {
     width: 80,
   },
-  backButtonText: {
-    color: CandyColors.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
   title: {
-    color: CandyColors.white,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
+    letterSpacing: 0.5,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: CandyColors.purple.dark,
     paddingHorizontal: 16,
-    paddingBottom: 4,
+    paddingBottom: 12,
+    gap: 10,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: CandyColors.yellow.main,
+    justifyContent: 'center',
+    borderRadius: SURFACE.buttonRadius,
+    borderWidth: 1.5,
   },
   tabText: {
-    color: 'rgba(255,255,255,0.6)',
     fontSize: 13,
     fontWeight: '700',
+    textAlign: 'center',
   },
   tabTextActive: {
-    color: CandyColors.white,
+    fontWeight: '800',
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 8,
   },
 
   // Hero stats
+  heroCard: {
+    marginBottom: 18,
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: -60,
+    left: -40,
+    right: -40,
+    height: 190,
+    borderRadius: 120,
+    opacity: 0.3,
+  },
   heroRow: {
     flexDirection: 'row',
-    backgroundColor: CandyColors.white,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
-    alignItems: 'center',
-    shadowColor: CandyColors.purple.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    padding: 16,
+    gap: 10,
   },
   heroStat: {
     flex: 1,
     alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   heroValue: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '900',
-    color: CandyColors.purple.main,
   },
   heroLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: CandyColors.gray[400],
     letterSpacing: 1,
     marginTop: 4,
   },
-  heroDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: CandyColors.gray[200],
-  },
 
   // Sections
+  sectionCard: {
+    marginBottom: 18,
+  },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: CandyColors.gray[400],
-    letterSpacing: 1.5,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  card: {
-    backgroundColor: CandyColors.white,
-    borderRadius: 16,
-    marginBottom: 24,
-    overflow: 'hidden',
-  },
-  rowDivider: {
-    height: 1,
-    backgroundColor: CandyColors.gray[100],
-    marginLeft: 16,
+    letterSpacing: SURFACE.sectionLetterSpacing,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
   },
 
   // Star bars
@@ -468,16 +524,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  starBarLabel: {
+  starBarStars: {
     width: 60,
-    fontSize: 13,
-    fontWeight: '600',
-    color: CandyColors.gray[600],
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  starBarStarIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 2,
+  },
+  starBarStarEmpty: {
+    opacity: 0.45,
   },
   starBarTrack: {
     flex: 1,
     height: 12,
-    backgroundColor: CandyColors.gray[100],
     borderRadius: 6,
     marginHorizontal: 10,
     overflow: 'hidden',
@@ -491,16 +553,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 13,
     fontWeight: '700',
-    color: CandyColors.gray[700],
   },
   starSummary: {
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingBottom: 12,
     paddingTop: 4,
   },
   starSummaryText: {
     fontSize: 12,
-    color: CandyColors.gray[400],
     textAlign: 'center',
   },
 
@@ -520,18 +580,15 @@ const styles = StyleSheet.create({
   difficultyLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: CandyColors.gray[700],
     width: 70,
   },
   difficultyCount: {
     flex: 1,
     fontSize: 13,
-    color: CandyColors.gray[500],
   },
   difficultyAvg: {
     fontSize: 13,
-    fontWeight: '600',
-    color: CandyColors.purple.main,
+    fontWeight: '700',
   },
 
   // Journey rows
@@ -545,19 +602,16 @@ const styles = StyleSheet.create({
   journeyLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: CandyColors.gray[600],
   },
   journeyValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: CandyColors.purple.main,
   },
   personalBestLegend: {
     fontSize: 10,
-    color: CandyColors.gray[400],
     textAlign: 'center',
-    paddingTop: 6,
-    paddingBottom: 2,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
 
   // Achievement rows
@@ -580,24 +634,33 @@ const styles = StyleSheet.create({
   achievementInfo: {
     flex: 1,
     marginLeft: 8,
+    marginRight: 8,
   },
   achievementTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: CandyColors.gray[700],
-  },
-  achievementTitleLocked: {
-    color: CandyColors.gray[400],
   },
   achievementDesc: {
     fontSize: 12,
-    color: CandyColors.gray[400],
     marginTop: 2,
+  },
+  achievementReward: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  achievementRewardText: {
+    fontSize: 12,
+    fontWeight: '800',
   },
   achievementCheck: {
     fontSize: 18,
     color: CandyColors.green.main,
     fontWeight: '900',
+    marginLeft: 8,
   },
 
   bottomSpacer: {

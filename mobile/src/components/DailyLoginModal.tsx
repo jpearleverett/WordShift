@@ -1,18 +1,20 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Animated,
+  Easing,
   Modal,
   Image,
 } from 'react-native';
-import { CandyColors, getPhaseTheme } from '../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { PanelCard } from './ui/PanelCard';
+import { CandyButton } from './ui/CandyButton';
 import { AmberInline } from './AmberInline';
 import { DailyLoginGrant, DAILY_LOGIN_REWARDS, DAILY_LOGIN_CYCLE_LENGTH } from '../services/dailyLoginReward';
 import { getSettingsSync } from '../services/settings';
-// First-ever-claim copy — a brand-new player has never left, so "Welcome Back"
+// First-ever-claim copy: a brand-new player has never left, so "Welcome Back"
 // is wrong. Lives in phaseNarrative with the rest of the player-facing text.
 import { getDailyLoginFirstClaimCopy } from '../services/phaseNarrative';
 
@@ -27,38 +29,47 @@ interface DailyLoginModalProps {
 }
 
 /**
- * Celebratory daily-login claim modal. Purely presentational — the amber has
+ * Celebratory daily-login claim modal. Purely presentational: the amber has
  * already been credited by claimDailyLoginReward() before this renders. Shows
  * the full 7-day escalating cycle so the player feels the "don't break the
  * chain" pull, with the just-claimed day popped and highlighted.
  */
 export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, onClose }) => {
-  const phaseTheme = getPhaseTheme(phase);
+  const t = getSurfaceTheme(phase);
   const reducedMotion = getSettingsSync().reducedMotion;
 
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.85)).current;
+  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const claimedPop = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const closingRef = useRef(false);
 
   const visible = grant !== null;
 
   useEffect(() => {
     if (!visible) return;
+    closingRef.current = false;
     if (reducedMotion) {
+      backdropOpacity.setValue(1);
       cardScale.setValue(1);
       cardOpacity.setValue(1);
       claimedPop.setValue(1);
       return;
     }
-    cardScale.setValue(0.85);
+    backdropOpacity.setValue(0);
+    cardScale.setValue(0.92);
     cardOpacity.setValue(0);
     claimedPop.setValue(0);
     const anim = Animated.sequence([
       Animated.parallel([
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
         Animated.spring(cardScale, {
           toValue: 1,
-          friction: 6,
-          tension: 120,
+          ...SURFACE.modalIn,
           useNativeDriver: true,
         }),
         Animated.timing(cardOpacity, {
@@ -76,7 +87,30 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
     ]);
     anim.start();
     return () => anim.stop();
-  }, [visible, reducedMotion, cardScale, cardOpacity, claimedPop]);
+  }, [visible, reducedMotion, backdropOpacity, cardScale, cardOpacity, claimedPop]);
+
+  const handleClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (reducedMotion) {
+      onClose();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  }, [reducedMotion, backdropOpacity, cardOpacity, onClose]);
 
   if (!grant) return null;
 
@@ -88,117 +122,126 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
-      <View style={[styles.overlay, { backgroundColor: phaseTheme.modalOverlayColor }]}>
+      <View style={styles.overlayRoot}>
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
+        />
         <Animated.View
           style={[
-            styles.card,
+            styles.cardWrap,
             {
-              backgroundColor: phaseTheme.modalBgColor,
               transform: [{ scale: cardScale }],
               opacity: cardOpacity,
             },
           ]}
         >
-          <View style={[styles.glow, { backgroundColor: phaseTheme.victoryGlowColor }]} />
+          <PanelCard phase={phase} kind="panel" style={styles.card}>
+            <View style={[styles.glow, { backgroundColor: t.glow }]} />
 
-          <Text style={[styles.title, { color: phaseTheme.modalTextColor }]}>
-            {firstClaimCopy ? firstClaimCopy.title : 'Welcome Back'}
-          </Text>
-
-          {firstClaimCopy && (
-            <Text style={[styles.resetLine, { color: phaseTheme.modalSecondaryTextColor }]}>
-              {firstClaimCopy.subtitle}
+            <Text style={[styles.title, { color: t.title }]}>
+              {firstClaimCopy ? firstClaimCopy.title : 'Welcome Back'}
             </Text>
-          )}
 
-          {!firstClaimCopy && grant.reset && (
-            <Text style={[styles.resetLine, { color: phaseTheme.modalSecondaryTextColor }]}>
-              A new chain begins
-            </Text>
-          )}
+            {firstClaimCopy && (
+              <Text style={[styles.resetLine, { color: t.muted }]}>
+                {firstClaimCopy.subtitle}
+              </Text>
+            )}
 
-          {/* 7-day cycle row */}
-          <View
-            style={styles.cycleRow}
-            accessible
-            accessibilityLabel={`Daily login cycle, day ${claimedDay} of ${DAILY_LOGIN_CYCLE_LENGTH}`}
-          >
-            {DAILY_LOGIN_REWARDS.map((amount, idx) => {
-              const dayNum = idx + 1;
-              const isClaimed = dayNum === claimedDay;
-              const isPast = dayNum < claimedDay;
-              const isJackpot = dayNum === DAILY_LOGIN_CYCLE_LENGTH;
-              return (
-                <Animated.View
-                  key={dayNum}
-                  style={[
-                    styles.dayCell,
-                    { backgroundColor: phaseTheme.modalStatBgColor, borderColor: phaseTheme.modalDividerColor },
-                    isJackpot && styles.dayCellJackpot,
-                    isClaimed && styles.dayCellClaimed,
-                    !isClaimed && !isPast && styles.dayCellFuture,
-                    isClaimed && { transform: [{ scale: claimedPop }] },
-                  ]}
-                >
-                  <Text
+            {!firstClaimCopy && grant.reset && (
+              <Text style={[styles.resetLine, { color: t.muted }]}>
+                A new chain begins
+              </Text>
+            )}
+
+            {/* 7-day cycle row */}
+            <View
+              style={styles.cycleRow}
+              accessible
+              accessibilityLabel={`Daily login cycle, day ${claimedDay} of ${DAILY_LOGIN_CYCLE_LENGTH}`}
+            >
+              {DAILY_LOGIN_REWARDS.map((amount, idx) => {
+                const dayNum = idx + 1;
+                const isClaimed = dayNum === claimedDay;
+                const isPast = dayNum < claimedDay;
+                const isJackpot = dayNum === DAILY_LOGIN_CYCLE_LENGTH;
+                return (
+                  <Animated.View
+                    key={dayNum}
                     style={[
-                      styles.dayLabel,
-                      { color: phaseTheme.modalSecondaryTextColor },
-                      isClaimed && styles.dayLabelClaimed,
+                      styles.dayCell,
+                      { backgroundColor: t.sectionBg, borderColor: t.sectionBorder },
+                      isJackpot && { borderColor: t.amberTintBorder },
+                      isClaimed && {
+                        borderColor: t.amberTintBorder,
+                        borderWidth: 2,
+                        backgroundColor: t.amberTint,
+                      },
+                      !isClaimed && !isPast && styles.dayCellFuture,
+                      isClaimed && { transform: [{ scale: claimedPop }] },
                     ]}
                   >
-                    {isJackpot ? 'Day 7' : `Day ${dayNum}`}
-                  </Text>
-                  {isPast ? (
-                    <Text style={styles.checkMark} accessibilityLabel="claimed">✓</Text>
-                  ) : (
-                    <View style={styles.dayAmount}>
-                      <Image source={AMBER_ICON} style={styles.dayAmberIcon} accessibilityLabel="amber" />
-                      <Text
-                        style={[
-                          styles.dayAmountText,
-                          { color: phaseTheme.modalTextColor },
-                          isClaimed && styles.dayAmountClaimed,
-                        ]}
-                      >
-                        {amount}
-                      </Text>
-                    </View>
-                  )}
-                </Animated.View>
-              );
-            })}
-          </View>
+                    <Text
+                      style={[
+                        styles.dayLabel,
+                        { color: t.muted },
+                        isClaimed && { color: t.amberText },
+                      ]}
+                    >
+                      {isJackpot ? 'Day 7' : `Day ${dayNum}`}
+                    </Text>
+                    {isPast ? (
+                      <Text style={[styles.checkMark, { color: t.amberText }]} accessibilityLabel="claimed">✓</Text>
+                    ) : (
+                      <View style={styles.dayAmount}>
+                        <Image source={AMBER_ICON} style={styles.dayAmberIcon} accessibilityLabel="amber" />
+                        <Text
+                          style={[
+                            styles.dayAmountText,
+                            { color: t.title },
+                            isClaimed && [styles.dayAmountClaimed, { color: t.amberText }],
+                          ]}
+                        >
+                          {amount}
+                        </Text>
+                      </View>
+                    )}
+                  </Animated.View>
+                );
+              })}
+            </View>
 
-          {/* Claimed amount, prominent */}
-          <View style={styles.claimedBanner}>
-            <Text style={[styles.claimedText, { color: phaseTheme.modalTextColor }]}>
-              You received <AmberInline size={18} /> {grant.amount + grant.comebackBonus}
-            </Text>
-            {/* Win-back line — a first claim can never be a comeback. */}
-            {!grant.isFirstClaim && grant.comebackBonus > 0 && (
-              <Text style={[styles.jackpotText, { color: CandyColors.yellow.dark }]}>
-                +{grant.comebackBonus} welcome-back bonus
+            {/* Claimed amount, prominent */}
+            <View style={styles.claimedBanner}>
+              <Text style={[styles.claimedText, { color: t.title }]}>
+                You received <AmberInline size={18} /> {grant.amount + grant.comebackBonus}
               </Text>
-            )}
-            {claimedDay === DAILY_LOGIN_CYCLE_LENGTH && (
-              <Text style={[styles.jackpotText, { color: CandyColors.yellow.dark }]}>
-                Jackpot!
-              </Text>
-            )}
-          </View>
+              {/* Win-back line: a first claim can never be a comeback. */}
+              {!grant.isFirstClaim && grant.comebackBonus > 0 && (
+                <Text style={[styles.jackpotText, { color: t.amberText }]}>
+                  +{grant.comebackBonus} welcome-back bonus
+                </Text>
+              )}
+              {claimedDay === DAILY_LOGIN_CYCLE_LENGTH && (
+                <Text style={[styles.jackpotText, { color: t.amberText }]}>
+                  Jackpot!
+                </Text>
+              )}
+            </View>
 
-          <TouchableOpacity
-            style={styles.collectButton}
-            onPress={onClose}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Collect daily reward"
-          >
-            <Text style={styles.collectButtonText}>Collect</Text>
-          </TouchableOpacity>
+            <CandyButton
+              label="Collect"
+              onPress={handleClose}
+              phase={phase}
+              variant="primary"
+              size="lg"
+              style={styles.collectButton}
+              accessibilityLabel="Collect daily reward"
+            />
+          </PanelCard>
         </Animated.View>
       </View>
     </Modal>
@@ -206,28 +249,22 @@ export const DailyLoginModal: React.FC<DailyLoginModalProps> = ({ grant, phase, 
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  overlayRoot: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
   },
-  card: {
+  cardWrap: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: 28,
+  },
+  card: {
+    width: '100%',
     paddingTop: 26,
     paddingHorizontal: 20,
     paddingBottom: 22,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 20,
-    overflow: 'hidden',
   },
   glow: {
     position: 'absolute',
@@ -240,7 +277,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '900',
     letterSpacing: 0.5,
   },
   resetLine: {
@@ -270,26 +307,14 @@ const styles = StyleSheet.create({
   dayCellFuture: {
     opacity: 0.45,
   },
-  dayCellClaimed: {
-    borderColor: CandyColors.yellow.main,
-    borderWidth: 2,
-    backgroundColor: 'rgba(250, 204, 21, 0.18)',
-  },
-  dayCellJackpot: {
-    borderColor: CandyColors.orange.main,
-  },
   dayLabel: {
     fontSize: 9,
     fontWeight: '700',
     marginBottom: 3,
   },
-  dayLabelClaimed: {
-    color: CandyColors.yellow.dark,
-  },
   checkMark: {
     fontSize: 16,
     fontWeight: '800',
-    color: CandyColors.success,
   },
   dayAmount: {
     flexDirection: 'row',
@@ -307,7 +332,6 @@ const styles = StyleSheet.create({
   dayAmountClaimed: {
     fontSize: 14,
     fontWeight: '800',
-    color: CandyColors.yellow.dark,
   },
   claimedBanner: {
     marginTop: 18,
@@ -326,20 +350,6 @@ const styles = StyleSheet.create({
   },
   collectButton: {
     marginTop: 22,
-    backgroundColor: CandyColors.purple.main,
-    paddingVertical: 14,
-    paddingHorizontal: 48,
-    borderRadius: 22,
-    shadowColor: CandyColors.purple.dark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  collectButtonText: {
-    color: CandyColors.white,
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    alignSelf: 'stretch',
   },
 });

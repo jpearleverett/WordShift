@@ -8,8 +8,12 @@ import {
   Animated,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
-import { CandyColors, getPhaseTheme } from '../../theme/colors';
+import { CandyColors } from '../../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { CandyButton } from '../ui/CandyButton';
+import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
 import {
   PRODUCT_IDS,
@@ -42,6 +46,8 @@ import {
 } from '../../services/dailyAmberReward';
 import { DAILY_AMBER_REWARD } from '../../constants/gameBalance';
 
+const HINT_ICON = require('../../../assets/ui/hint.png');
+
 interface StoreModalProps {
   visible: boolean;
   /** Narrative phase, for phase-aware theming. */
@@ -63,41 +69,6 @@ const AMBER_PACK_IDS = [PRODUCT_IDS.AMBER_SMALL, PRODUCT_IDS.AMBER_MEDIUM, PRODU
 const HINT_PACK_IDS = [PRODUCT_IDS.HINTS_SMALL, PRODUCT_IDS.HINTS_LARGE];
 
 /**
- * Store/Patron surface theming — speaks the same visual language as the game's
- * best modals (VictoryModal / DailyLoginModal): the card takes the phase's
- * `getPhaseTheme` modal background, sections sit in the phase's stat-box tone
- * with subtle divider borders, and ONE warm amber accent is reserved for
- * prices and amber amounts. Every text/background pair below holds >= 4.5:1
- * WCAG contrast across phases 0-5 (the theme's light cards need deeper body
- * tones than its gray-400 secondary; the dark cards' secondary passes as-is).
- */
-function getStoreSurfaceTheme(phase: number) {
-  const pt = getPhaseTheme(phase);
-  const dark = phase >= 3;
-  const body = dark
-    ? pt.modalSecondaryTextColor
-    : phase >= 2 ? '#493C66' : phase >= 1 ? '#554B70' : '#475569';
-  return {
-    overlay: pt.modalOverlayColor,
-    cardBg: pt.modalBgColor,
-    cardBorder: dark ? 'rgba(147, 51, 234, 0.22)' : 'rgba(255, 255, 255, 0.4)',
-    glow: pt.victoryGlowColor,
-    title: pt.modalTextColor,
-    body,
-    sectionBg: pt.modalStatBgColor,
-    sectionBorder: pt.modalDividerColor,
-    // The single warm amber accent (prices + amber amounts). Muted at dark
-    // phases so the endgame never turns cheerful-gold.
-    amberText: dark ? '#E9B468' : '#7A4E00',
-    amberTint: dark ? 'rgba(255, 201, 77, 0.10)' : 'rgba(202, 138, 4, 0.10)',
-    amberTintBorder: dark ? 'rgba(255, 201, 77, 0.30)' : 'rgba(202, 138, 4, 0.35)',
-    pillBg: dark ? '#C98A4A' : '#F6BA3F',
-    pillEdge: dark ? '#8F5F2E' : '#C8901E',
-    pillText: dark ? '#241302' : '#3F2B04',
-  };
-}
-
-/**
  * The Store — consumable amber & hint packs plus the one-time cosmetic bundle.
  *
  * Consumables credit the amber reward balance / hint balance directly (the caller
@@ -110,6 +81,10 @@ function getStoreSurfaceTheme(phase: number) {
  * Every billing failure (NoOp/unconfigured, e.g. Expo Go or iOS-before-keys) is a
  * calm "not available right now" — never a crash. Prices come from the store when
  * fetchable, else each product's `fallbackPrice` label.
+ *
+ * Surface language: the shared feel kit (`getSurfaceTheme` + PanelCard rows +
+ * CandyButton price pills) — the amber variant is reserved for prices/claims,
+ * the one primary CTA is the starter-pack hero.
  */
 export const StoreModal: React.FC<StoreModalProps> = ({
   visible,
@@ -188,7 +163,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     cardScale.setValue(0.92);
     cardOpacity.setValue(0);
     const anim = Animated.parallel([
-      Animated.spring(cardScale, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }),
+      Animated.spring(cardScale, { toValue: 1, ...SURFACE.modalIn, useNativeDriver: true }),
       Animated.timing(cardOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
     ]);
     anim.start();
@@ -329,36 +304,28 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     onClose();
   }, [onClose]);
 
-  const t = getStoreSurfaceTheme(phase);
+  const t = getSurfaceTheme(phase);
   const working = flow === 'working';
 
-  /** Price pinned right in a weighty amber pill — the store's single accent. */
+  /** Price pinned right in a chunky amber CandyButton — the store's single accent. */
   const renderPricePill = (
     label: string,
     onPress: () => void,
     accessibilityLabel: string,
   ) => (
-    <TouchableOpacity
-      style={[
-        styles.pricePill,
-        { backgroundColor: t.pillBg, borderBottomColor: t.pillEdge },
-        working && styles.pricePillDisabled,
-      ]}
+    <CandyButton
+      label={label}
       onPress={onPress}
+      phase={phase}
+      variant="amber"
       disabled={working}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: working }}
       accessibilityLabel={accessibilityLabel}
-    >
-      <Text style={[styles.pricePillText, { color: t.pillText }]}>{label}</Text>
-    </TouchableOpacity>
+      style={styles.pricePill}
+    />
   );
 
   const renderPackRow = (info: ConsumableProductInfo, suffix: React.ReactNode) => (
-    <View
-      key={info.productId}
-      style={[styles.row, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}
-    >
+    <PanelCard key={info.productId} phase={phase} style={styles.row}>
       <View style={styles.rowInfo}>
         <View style={styles.rowTitleLine}>
           <Text style={[styles.rowTitle, { color: t.title }]}>{info.name}</Text>
@@ -382,8 +349,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
         () => handleBuyConsumable(info),
         `Buy ${info.name} for ${priceLabel(info)}`,
       )}
-    </View>
+    </PanelCard>
   );
+
+  const heroPrice = prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice;
 
   return (
     <Modal
@@ -400,39 +369,49 @@ export const StoreModal: React.FC<StoreModalProps> = ({
           ]}
         >
           <View style={[styles.glow, { backgroundColor: t.glow }]} />
+          {/* Layered material bands (PanelCard anatomy, inline for the animated card). */}
+          <View pointerEvents="none" style={styles.cardHighlight} />
+          <View pointerEvents="none" style={styles.cardShade} />
 
           <View style={styles.headerRow}>
             <Text style={[styles.title, { color: t.title }]}>Store</Text>
-            <View style={[styles.balances, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+            <View style={[styles.balances, { backgroundColor: t.rowBg, borderColor: t.rowBorder }]}>
               <Text style={[styles.balanceText, { color: t.amberText }]}>
                 <AmberInline size={13} /> {amberBalance}
               </Text>
-              <Text style={[styles.balanceText, { color: t.body }]}>💡 {hintBalance}</Text>
+              <Text style={[styles.balanceText, { color: t.body }]}>
+                <Image source={HINT_ICON} style={styles.hintInline} accessibilityLabel="hints" />{' '}
+                {hintBalance}
+              </Text>
             </View>
           </View>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {!ownsStarter && (
-              <View style={[styles.heroCard, { backgroundColor: t.sectionBg, borderColor: t.amberTintBorder }]}>
+              <PanelCard
+                phase={phase}
+                style={{ ...styles.heroCard, borderColor: t.amberTintBorder }}
+              >
                 <View style={styles.heroRibbonRow}>
                   <Text style={[styles.ribbon, { color: t.pillText, backgroundColor: t.pillBg }]}>
                     BEST VALUE · ONE TIME
                   </Text>
                 </View>
-                <View style={styles.heroBody}>
-                  <View style={styles.rowInfo}>
-                    <Text style={[styles.heroTitle, { color: t.title }]}>{STARTER_PACK_INFO.name}</Text>
-                    <Text style={[styles.rowDesc, { color: t.body }]}>
-                      {STARTER_PACK_INFO.description} <AmberInline size={11} />
-                    </Text>
-                  </View>
-                  {renderPricePill(
-                    prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice,
-                    handleBuyStarter,
-                    `Buy ${STARTER_PACK_INFO.name} for ${prices[STARTER_PACK_INFO.productId] ?? STARTER_PACK_INFO.fallbackPrice}`,
-                  )}
-                </View>
-              </View>
+                <Text style={[styles.heroTitle, { color: t.title }]}>{STARTER_PACK_INFO.name}</Text>
+                <Text style={[styles.rowDesc, { color: t.body }]}>
+                  {STARTER_PACK_INFO.description} <AmberInline size={11} />
+                </Text>
+                <CandyButton
+                  label={heroPrice}
+                  onPress={handleBuyStarter}
+                  phase={phase}
+                  variant="primary"
+                  size="lg"
+                  disabled={working}
+                  accessibilityLabel={`Buy ${STARTER_PACK_INFO.name} for ${heroPrice}`}
+                  style={styles.heroCta}
+                />
+              </PanelCard>
             )}
 
             {/* Daily free-amber faucet: watch a short clip (or free for Patron).
@@ -440,8 +419,8 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 backend for free players, or always for Patron holders. */}
             {amberFaucet && (isPatronSync() || isAdsReady()) && (
               <>
-                <Text style={[styles.sectionLabel, { color: t.body }]}>FREE AMBER</Text>
-                <View style={[styles.row, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+                <Text style={[styles.sectionLabel, { color: t.muted }]}>FREE AMBER</Text>
+                <PanelCard phase={phase} style={styles.row}>
                   <View style={styles.rowInfo}>
                     <Text style={[styles.rowTitle, { color: t.title }]}>Daily Amber</Text>
                     <Text style={[styles.rowDesc, { color: t.body }]}>
@@ -460,22 +439,22 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                         phase={phase}
                       />
                     ))}
-                </View>
+                </PanelCard>
               </>
             )}
 
-            <Text style={[styles.sectionLabel, { color: t.body }]}>AMBER</Text>
+            <Text style={[styles.sectionLabel, { color: t.muted }]}>AMBER</Text>
             {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'amber').map(info =>
               renderPackRow(info, <AmberInline size={11} />),
             )}
 
-            <Text style={[styles.sectionLabel, { color: t.body }]}>HINTS</Text>
+            <Text style={[styles.sectionLabel, { color: t.muted }]}>HINTS</Text>
             {CONSUMABLE_PRODUCTS.filter(p => p.reward.kind === 'hints').map(info =>
-              renderPackRow(info, '💡'),
+              renderPackRow(info, <Image source={HINT_ICON} style={styles.hintInlineSmall} accessibilityLabel="hints" />),
             )}
 
-            <Text style={[styles.sectionLabel, { color: t.body }]}>COSMETIC BUNDLE</Text>
-            <View style={[styles.row, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+            <Text style={[styles.sectionLabel, { color: t.muted }]}>COSMETIC BUNDLE</Text>
+            <PanelCard phase={phase} style={styles.row}>
               <View style={styles.rowInfo}>
                 <Text style={[styles.rowTitle, { color: t.title }]}>The Keeper&apos;s Collection</Text>
                 <Text style={[styles.rowDesc, { color: t.body }]}>
@@ -491,11 +470,10 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                   "Buy The Keeper's Collection",
                 )
               )}
-            </View>
+            </PanelCard>
 
             {onOpenPatron && (
               <TouchableOpacity
-                style={[styles.patronLink, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}
                 onPress={() => {
                   hapticLight();
                   onClose();
@@ -504,10 +482,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel="Learn about Patron"
               >
-                <Text style={[styles.patronLinkText, { color: t.body }]}>
-                  Want a quieter table and a little amber every puzzle?{' '}
-                  <Text style={{ fontWeight: '800', color: t.title }}>Become a Patron →</Text>
-                </Text>
+                <PanelCard phase={phase} style={styles.patronLink}>
+                  <Text style={[styles.patronLinkText, { color: t.body }]}>
+                    Want a quieter table and a little amber every puzzle?{' '}
+                    <Text style={{ fontWeight: '800', color: t.title }}>Become a Patron →</Text>
+                  </Text>
+                </PanelCard>
               </TouchableOpacity>
             )}
           </ScrollView>
@@ -535,14 +515,14 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             </View>
           )}
 
-          <TouchableOpacity
-            style={[styles.closeBtn, { borderColor: t.sectionBorder }]}
+          <CandyButton
+            label="Close"
             onPress={handleClose}
-            accessibilityRole="button"
+            phase={phase}
+            variant="quiet"
             accessibilityLabel="Close store"
-          >
-            <Text style={[styles.closeBtnText, { color: t.body }]}>Close</Text>
-          </TouchableOpacity>
+            style={styles.closeBtn}
+          />
         </Animated.View>
       </View>
     </Modal>
@@ -555,7 +535,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     maxHeight: '86%',
-    borderRadius: 28,
+    borderRadius: SURFACE.panelRadius,
     borderWidth: 1.5,
     padding: 20,
     shadowColor: CandyColors.purple.dark,
@@ -575,48 +555,69 @@ const styles = StyleSheet.create({
     opacity: 0.25,
     borderRadius: 100,
   },
+  // Top highlight / bottom shade — the panel reads as lit material.
+  cardHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '34%',
+    borderTopLeftRadius: SURFACE.panelRadius,
+    borderTopRightRadius: SURFACE.panelRadius,
+    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
+  },
+  cardShade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '22%',
+    borderBottomLeftRadius: SURFACE.panelRadius,
+    borderBottomRightRadius: SURFACE.panelRadius,
+    backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: 0.5 },
+  title: { fontSize: 24, fontWeight: '900', letterSpacing: 0.5 },
   balances: {
     flexDirection: 'row',
     gap: 12,
     borderRadius: 14,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   balanceText: { fontSize: 14, fontWeight: '700' },
+  hintInline: { width: 13, height: 13 },
+  hintInlineSmall: { width: 11, height: 11 },
   scroll: { flexGrow: 0 },
   scrollContent: { paddingBottom: 4 },
-  sectionLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginTop: 16, marginBottom: 6 },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: SURFACE.sectionLetterSpacing,
+    marginTop: 16,
+    marginBottom: 6,
+  },
 
   // Starter pack hero — first card, framed by the amber accent border.
   heroCard: {
-    borderRadius: 18,
-    borderWidth: 1.5,
     padding: 14,
     marginTop: 12,
   },
   heroRibbonRow: { flexDirection: 'row', marginBottom: 8 },
-  heroBody: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   heroTitle: { fontSize: 18, fontWeight: '900', marginBottom: 2 },
+  heroCta: { marginTop: 12 },
 
-  // Section rows — quiet phase-toned cards; consistent heights.
+  // Section rows — layered PanelCard material; consistent heights.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 16,
-    borderWidth: 1,
     padding: 12,
     marginBottom: 8,
     minHeight: 68,
@@ -635,23 +636,12 @@ const styles = StyleSheet.create({
   },
   rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17 },
 
-  // Price pill — solid amber, weighty bottom edge (JuicyButton-style mass).
-  pricePill: {
-    borderRadius: 14,
-    borderBottomWidth: 3,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    minWidth: 76,
-    alignItems: 'center',
-  },
-  pricePillDisabled: { opacity: 0.5 },
-  pricePillText: { fontSize: 14, fontWeight: '900' },
+  // Price pill — chunky amber CandyButton (the single warm accent).
+  pricePill: { minWidth: 84 },
   ownedText: { fontSize: 13, fontWeight: '800', paddingHorizontal: 8 },
 
   patronLink: {
     marginTop: 16,
-    borderRadius: 16,
-    borderWidth: 1,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
@@ -660,7 +650,7 @@ const styles = StyleSheet.create({
   successBox: {
     marginTop: 12,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
@@ -668,20 +658,13 @@ const styles = StyleSheet.create({
   unavailableBox: {
     marginTop: 12,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
   unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center' },
   workingRow: { marginTop: 12, alignItems: 'center' },
-  closeBtn: {
-    marginTop: 16,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  closeBtnText: { fontSize: 15, fontWeight: '700' },
+  closeBtn: { marginTop: 12 },
 });
 
 export default StoreModal;

@@ -26,6 +26,13 @@ interface CandyButtonProps {
    */
   variant?: CandyButtonVariant;
   disabled?: boolean;
+  /**
+   * Set when the button sits on a host panel that is ALREADY dark at phases
+   * below 3 (the home modals use getDialogueTheme, which darkens at phase 2 —
+   * one phase before getSurfaceTheme). Maps the quiet/secondary ink to the
+   * dark-surface tokens so labels never render dark-on-dark.
+   */
+  hostDark?: boolean;
   /** Optional ui-sprite icon rendered left of the label. */
   icon?: ImageSourcePropType;
   size?: 'md' | 'lg';
@@ -46,12 +53,13 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
   phase,
   variant = 'primary',
   disabled = false,
+  hostDark = false,
   icon,
   size = 'md',
   style,
   accessibilityLabel,
 }) => {
-  const t = getSurfaceTheme(phase);
+  const t = getSurfaceTheme(hostDark && phase < 3 ? 3 : phase);
   const reducedMotion = getSettingsSync().reducedMotion;
   const travel = useRef(new Animated.Value(0)).current;
 

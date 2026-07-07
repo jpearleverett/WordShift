@@ -2,13 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   Modal,
   Animated,
   ActivityIndicator,
 } from 'react-native';
-import { CandyColors, getPhaseTheme } from '../../theme/colors';
+import { CandyColors } from '../../theme/colors';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { CandyButton } from '../ui/CandyButton';
+import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
 import {
   PRODUCT_IDS,
@@ -39,38 +41,6 @@ interface PatronModalProps {
 type FlowState = 'idle' | 'working' | 'unavailable';
 
 /**
- * Store/Patron surface theming — mirrors StoreModal's helper so the two
- * monetization surfaces speak one language: the phase's `getPhaseTheme` modal
- * card, quiet stat-box section tones, and ONE warm amber accent reserved for
- * the purchase CTA and amber amounts. Every text/background pair holds
- * >= 4.5:1 WCAG contrast across phases 0-5. (Duplicated rather than imported
- * across component modules to keep each modal's dependency graph standalone.)
- */
-function getStoreSurfaceTheme(phase: number) {
-  const pt = getPhaseTheme(phase);
-  const dark = phase >= 3;
-  const body = dark
-    ? pt.modalSecondaryTextColor
-    : phase >= 2 ? '#493C66' : phase >= 1 ? '#554B70' : '#475569';
-  return {
-    overlay: pt.modalOverlayColor,
-    cardBg: pt.modalBgColor,
-    cardBorder: dark ? 'rgba(147, 51, 234, 0.22)' : 'rgba(255, 255, 255, 0.4)',
-    glow: pt.victoryGlowColor,
-    title: pt.modalTextColor,
-    body,
-    sectionBg: pt.modalStatBgColor,
-    sectionBorder: pt.modalDividerColor,
-    amberText: dark ? '#E9B468' : '#7A4E00',
-    amberTint: dark ? 'rgba(255, 201, 77, 0.10)' : 'rgba(202, 138, 4, 0.10)',
-    amberTintBorder: dark ? 'rgba(255, 201, 77, 0.30)' : 'rgba(202, 138, 4, 0.35)',
-    pillBg: dark ? '#C98A4A' : '#F6BA3F',
-    pillEdge: dark ? '#8F5F2E' : '#C8901E',
-    pillText: dark ? '#241302' : '#3F2B04',
-  };
-}
-
-/**
  * "Become a Patron" modal — cosmetic & convenience only.
  *
  * Patron's Key grants two things, both read live from the source-of-truth
@@ -83,6 +53,9 @@ function getStoreSurfaceTheme(phase: number) {
  * `success:false` / `'billing_unavailable'`, which surfaces as a quiet "not
  * available right now" state — never a crash or a scary error. Copy never breaks
  * the fourth wall (the animals don't know they're in a game).
+ *
+ * Surface language: the shared feel kit (`getSurfaceTheme`, PanelCard benefit
+ * card, CandyButton actions — one primary CTA, quiet restore/dismiss).
  */
 export const PatronModal: React.FC<PatronModalProps> = ({
   visible,
@@ -98,7 +71,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
   const [priceString, setPriceString] = useState<string | null>(null);
   const [adsPriceString, setAdsPriceString] = useState<string | null>(null);
 
-  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.9)).current;
+  const cardScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
   const cardOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
 
   // Sync entitlement flags whenever the modal opens (cache may have warmed since mount).
@@ -143,13 +116,12 @@ export const PatronModal: React.FC<PatronModalProps> = ({
       cardOpacity.setValue(1);
       return;
     }
-    cardScale.setValue(0.9);
+    cardScale.setValue(0.92);
     cardOpacity.setValue(0);
     const anim = Animated.parallel([
       Animated.spring(cardScale, {
         toValue: 1,
-        friction: 6,
-        tension: 120,
+        ...SURFACE.modalIn,
         useNativeDriver: true,
       }),
       Animated.timing(cardOpacity, {
@@ -245,7 +217,7 @@ export const PatronModal: React.FC<PatronModalProps> = ({
     onClose();
   }, [onClose]);
 
-  const t = getStoreSurfaceTheme(phase);
+  const t = getSurfaceTheme(phase);
 
   const benefits: { key: string; render: React.ReactNode }[] = [
     {
@@ -297,15 +269,25 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           ]}
         >
           <View style={[styles.glow, { backgroundColor: t.glow }]} />
+          {/* Layered material bands (PanelCard anatomy, inline for the animated card). */}
+          <View pointerEvents="none" style={styles.cardHighlight} />
+          <View pointerEvents="none" style={styles.cardShade} />
 
-          <Text style={[styles.eyebrow, { color: t.body }]}>WORDSHIFT</Text>
+          <Text style={[styles.eyebrow, { color: t.muted }]}>WORDSHIFT</Text>
           <Text style={[styles.title, { color: t.title }]}>Become a Patron</Text>
           <Text style={[styles.subtitle, { color: t.body }]}>
             A one-time thank-you that dresses up the table, never the path through it.
           </Text>
 
           {isPatron ? (
-            <View style={[styles.patronActiveBox, { backgroundColor: t.amberTint, borderColor: t.amberTintBorder }]}>
+            <PanelCard
+              phase={phase}
+              style={{
+                ...styles.patronActiveBox,
+                backgroundColor: t.amberTint,
+                borderColor: t.amberTintBorder,
+              }}
+            >
               <Text style={[styles.patronActiveTitle, { color: t.amberText }]}>
                 You are a Patron ✦
               </Text>
@@ -313,16 +295,16 @@ export const PatronModal: React.FC<PatronModalProps> = ({
                 The warmth is already yours. {'+'}{PATRON_AMBER_BONUS} amber a puzzle and the
                 Patron tile set in the shop. Thank you.
               </Text>
-            </View>
+            </PanelCard>
           ) : (
-            <View style={[styles.benefits, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
+            <PanelCard phase={phase} style={styles.benefits}>
               {benefits.map(b => (
                 <View key={b.key} style={styles.benefitRow}>
                   <Text style={[styles.benefitBullet, { color: t.amberText }]}>✦</Text>
                   {b.render}
                 </View>
               ))}
-            </View>
+            </PanelCard>
           )}
 
           {flow === 'unavailable' && !isPatron && (
@@ -336,43 +318,33 @@ export const PatronModal: React.FC<PatronModalProps> = ({
 
           {/* Actions */}
           {!isPatron && (
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: t.pillBg, borderBottomColor: t.pillEdge }]}
+            <CandyButton
+              label={priceString ? `Become a Patron · ${priceString}` : 'Become a Patron'}
               onPress={handlePurchase}
+              phase={phase}
+              variant="primary"
+              size="lg"
               disabled={flow === 'working'}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: flow === 'working' }}
               accessibilityLabel="Become a Patron"
-            >
-              {flow === 'working' ? (
-                <ActivityIndicator size="small" color={t.pillText} />
-              ) : (
-                <Text style={[styles.primaryBtnText, { color: t.pillText }]}>
-                  {priceString ? `Become a Patron · ${priceString}` : 'Become a Patron'}
-                </Text>
-              )}
-            </TouchableOpacity>
+              style={styles.primaryBtn}
+            />
           )}
 
           {/* Secondary, cheaper tier: Remove Ads — your 2x rewards instantly, no ad. */}
           {!isPatron && !adFree && (
-            <View style={[styles.removeAdsBlock, { borderTopColor: t.sectionBorder }]}>
+            <View style={styles.removeAdsBlock}>
               <Text style={[styles.removeAdsHint, { color: t.body }]}>
                 Just want the convenience? Skip the ads and claim your doubled
                 reward after each puzzle with a single tap.
               </Text>
-              <TouchableOpacity
-                style={[styles.secondaryBtn, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}
+              <CandyButton
+                label={adsPriceString ? `Remove Ads · ${adsPriceString}` : 'Remove Ads'}
                 onPress={handlePurchaseRemoveAds}
+                phase={phase}
+                variant="secondary"
                 disabled={flow === 'working'}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: flow === 'working' }}
                 accessibilityLabel="Remove ads"
-              >
-                <Text style={[styles.secondaryBtnText, { color: t.title }]}>
-                  {adsPriceString ? `Remove Ads · ${adsPriceString}` : 'Remove Ads'}
-                </Text>
-              </TouchableOpacity>
+              />
             </View>
           )}
 
@@ -382,31 +354,33 @@ export const PatronModal: React.FC<PatronModalProps> = ({
             </Text>
           )}
 
-          {(!isPatron || !adFree) && (
-            <TouchableOpacity
-              style={styles.restoreBtn}
-              onPress={handleRestore}
-              disabled={flow === 'working'}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: flow === 'working' }}
-              accessibilityLabel="Restore purchases"
-            >
-              <Text style={[styles.restoreText, { color: t.body }]}>Restore Purchases</Text>
-            </TouchableOpacity>
+          {flow === 'working' && (
+            <View style={styles.workingRow}>
+              <ActivityIndicator size="small" color={t.amberText} />
+            </View>
           )}
 
-          <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={handleClose}
-            accessibilityRole="button"
-            accessibilityLabel={isPatron ? 'Close' : 'Maybe later'}
-          >
-            <Text style={[styles.closeText, { color: t.body }]}>
-              {isPatron ? 'Close' : 'Maybe later'}
-            </Text>
-          </TouchableOpacity>
+          {(!isPatron || !adFree) && (
+            <CandyButton
+              label="Restore Purchases"
+              onPress={handleRestore}
+              phase={phase}
+              variant="quiet"
+              disabled={flow === 'working'}
+              accessibilityLabel="Restore purchases"
+              style={styles.restoreBtn}
+            />
+          )}
 
-          <Text style={[styles.footnote, { color: t.body }]}>
+          <CandyButton
+            label={isPatron ? 'Close' : 'Maybe later'}
+            onPress={handleClose}
+            phase={phase}
+            variant="quiet"
+            accessibilityLabel={isPatron ? 'Close' : 'Maybe later'}
+          />
+
+          <Text style={[styles.footnote, { color: t.muted }]}>
             Patron changes how the game looks and feels, never the story, the puzzles,
             or your progress.
           </Text>
@@ -426,7 +400,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 420,
-    borderRadius: 28,
+    borderRadius: SURFACE.panelRadius,
     borderWidth: 1.5,
     padding: 24,
     shadowColor: CandyColors.purple.dark,
@@ -446,6 +420,27 @@ const styles = StyleSheet.create({
     opacity: 0.25,
     borderRadius: 100,
   },
+  // Top highlight / bottom shade — the panel reads as lit material.
+  cardHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '34%',
+    borderTopLeftRadius: SURFACE.panelRadius,
+    borderTopRightRadius: SURFACE.panelRadius,
+    backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
+  },
+  cardShade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '22%',
+    borderBottomLeftRadius: SURFACE.panelRadius,
+    borderBottomRightRadius: SURFACE.panelRadius,
+    backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
+  },
   eyebrow: {
     fontSize: 11,
     fontWeight: '800',
@@ -455,6 +450,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '900',
+    letterSpacing: 0.4,
     textAlign: 'center',
     marginTop: 4,
   },
@@ -469,8 +465,6 @@ const styles = StyleSheet.create({
   benefits: {
     marginTop: 20,
     gap: 12,
-    borderRadius: 16,
-    borderWidth: 1,
     padding: 14,
   },
   benefitRow: {
@@ -492,8 +486,6 @@ const styles = StyleSheet.create({
   patronActiveBox: {
     marginTop: 20,
     padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
   },
   patronActiveTitle: {
     fontSize: 16,
@@ -511,7 +503,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 12,
     borderRadius: 12,
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
   unavailableText: {
     fontSize: 12.5,
@@ -519,24 +511,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 17,
   },
-  // Primary CTA — the modal's single amber accent, weighty bottom edge.
+  // Primary CTA — the surface's ONE chunky primary CandyButton.
   primaryBtn: {
     marginTop: 22,
-    paddingVertical: 15,
-    borderRadius: 16,
-    borderBottomWidth: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtnText: {
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.3,
   },
   removeAdsBlock: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 18,
   },
   removeAdsHint: {
     fontSize: 12.5,
@@ -545,47 +525,24 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     marginBottom: 12,
   },
-  secondaryBtn: {
-    paddingVertical: 13,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
   adFreeNote: {
     fontSize: 12.5,
     fontWeight: '600',
     textAlign: 'center',
     marginTop: 16,
   },
-  restoreBtn: {
+  workingRow: {
     marginTop: 12,
-    paddingVertical: 10,
     alignItems: 'center',
   },
-  restoreText: {
-    fontSize: 13,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
-  closeBtn: {
+  restoreBtn: {
     marginTop: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  closeText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   footnote: {
     fontSize: 11,
     fontWeight: '500',
     textAlign: 'center',
-    marginTop: 14,
+    marginTop: 12,
     lineHeight: 15,
   },
 });

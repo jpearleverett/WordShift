@@ -1,10 +1,14 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Modal, Animated, Easing, ActivityIndicator } from 'react-native';
 import { ShareCard } from './ShareCard';
 import { ShareableResult, isDailyShareBonusAvailable, shareChallengeText, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { shareResultImage, isImageShareAvailable } from '../../services/shareImage';
 import { getChallengeFriendLabel } from '../../services/phaseNarrative';
 import { hapticLight } from '../../services/haptics';
+import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
+import { PanelCard } from '../ui/PanelCard';
+import { CandyButton } from '../ui/CandyButton';
+import { getSettingsSync } from '../../services/settings';
 
 /**
  * Share preview: shows the polished result card and shares it. Captures a PNG
@@ -26,11 +30,75 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
   const [sharing, setSharing] = useState(false);
   const [bonusAvailable, setBonusAvailable] = useState(false);
 
+  const reducedMotion = getSettingsSync().reducedMotion;
+  const backdropOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const contentScale = useRef(new Animated.Value(reducedMotion ? 1 : 0.92)).current;
+  const contentOpacity = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const closingRef = useRef(false);
+
+  const visible = result != null;
+
   useEffect(() => {
     if (result) {
       isDailyShareBonusAvailable().then(setBonusAvailable).catch(() => {});
     }
   }, [result]);
+
+  useEffect(() => {
+    if (!visible) return;
+    closingRef.current = false;
+    if (reducedMotion) {
+      backdropOpacity.setValue(1);
+      contentScale.setValue(1);
+      contentOpacity.setValue(1);
+      return;
+    }
+    backdropOpacity.setValue(0);
+    contentScale.setValue(0.92);
+    contentOpacity.setValue(0);
+    const anim = Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(contentScale, {
+        toValue: 1,
+        ...SURFACE.modalIn,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]);
+    anim.start();
+    return () => anim.stop();
+  }, [visible, reducedMotion, backdropOpacity, contentScale, contentOpacity]);
+
+  const handleClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (reducedMotion) {
+      onClose();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentOpacity, {
+        toValue: 0,
+        duration: SURFACE.modalOutMs,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => onClose());
+  }, [reducedMotion, backdropOpacity, contentOpacity, onClose]);
 
   const handleShare = async () => {
     if (!result || sharing) return;
@@ -60,127 +128,147 @@ export const ShareResultModal: React.FC<ShareResultModalProps> = ({ result, onCl
   };
 
   const phase = result?.phase ?? 0;
-  const isDark = phase >= 3;
+  const t = getSurfaceTheme(phase);
 
   return (
     <Modal
-      visible={result != null}
+      visible={visible}
       transparent
       statusBarTranslucent
-      animationType="fade"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.content}>
+      <View style={styles.overlayRoot}>
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: t.overlay, opacity: backdropOpacity }]}
+        />
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              transform: [{ scale: contentScale }],
+              opacity: contentOpacity,
+            },
+          ]}
+        >
           {result && (
             <>
               <ShareCard ref={cardRef} result={result} />
 
-              {bonusAvailable && (
-                <Text style={styles.bonusHint}>
-                  +{DAILY_SHARE_BONUS_AMBER} amber for your first share today
+              <PanelCard phase={phase} kind="panel" style={styles.actionPanel}>
+                {bonusAvailable && (
+                  <Text style={[styles.bonusHint, { color: t.amberText }]}>
+                    +{DAILY_SHARE_BONUS_AMBER} amber for your first share today
+                  </Text>
+                )}
+                <Text style={[styles.captureHint, { color: t.muted }]}>
+                  {isImageShareAvailable()
+                    ? 'Shares as an image.'
+                    : 'Shares your result, or screenshot the card above.'}
                 </Text>
-              )}
-              <Text style={styles.captureHint}>
-                {isImageShareAvailable()
-                  ? 'Shares as an image.'
-                  : 'Shares your result, or screenshot the card above.'}
-              </Text>
 
-              <View style={styles.buttons}>
-                <TouchableOpacity
-                  style={[styles.btn, styles.shareBtn, isDark && styles.shareBtnDark]}
-                  onPress={handleShare}
-                  disabled={sharing}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share result"
-                >
-                  {sharing ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.shareBtnText}>Share</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btn, styles.closeBtn]}
-                  onPress={onClose}
-                  disabled={sharing}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close"
-                >
-                  <Text style={styles.closeBtnText}>Close</Text>
-                </TouchableOpacity>
-              </View>
+                <View style={styles.buttons}>
+                  <View style={styles.shareBtnWrap}>
+                    <CandyButton
+                      label="Share"
+                      onPress={handleShare}
+                      phase={phase}
+                      variant="primary"
+                      disabled={sharing}
+                      style={styles.shareBtn}
+                      accessibilityLabel="Share result"
+                    />
+                    {sharing && (
+                      <View style={styles.spinnerOverlay} pointerEvents="none">
+                        <ActivityIndicator color={t.primaryText} />
+                      </View>
+                    )}
+                  </View>
+                  <CandyButton
+                    label="Close"
+                    onPress={handleClose}
+                    phase={phase}
+                    variant="quiet"
+                    disabled={sharing}
+                    style={styles.closeBtn}
+                    accessibilityLabel="Close"
+                  />
+                </View>
 
-              {challengeText != null && (
-                <TouchableOpacity
-                  style={[styles.challengeBtn, isDark && styles.challengeBtnDark]}
-                  onPress={handleChallengeShare}
-                  disabled={sharing}
-                  accessibilityRole="button"
-                  accessibilityLabel="Challenge a friend with this puzzle"
-                >
-                  <Text style={styles.challengeBtnText}>{getChallengeFriendLabel(phase)}</Text>
-                </TouchableOpacity>
-              )}
+                {challengeText != null && (
+                  <CandyButton
+                    label={getChallengeFriendLabel(phase)}
+                    onPress={handleChallengeShare}
+                    phase={phase}
+                    variant="secondary"
+                    disabled={sharing}
+                    style={styles.challengeBtn}
+                    accessibilityLabel="Challenge a friend with this puzzle"
+                  />
+                )}
+              </PanelCard>
             </>
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  overlayRoot: {
     flex: 1,
-    backgroundColor: 'rgba(6, 4, 14, 0.78)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
   content: { alignItems: 'center' },
+  actionPanel: {
+    width: 320,
+    marginTop: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
   bonusHint: {
-    color: '#FFD479',
     fontSize: 13,
     fontWeight: '800',
-    marginTop: 16,
+    marginBottom: 4,
   },
   captureHint: {
-    color: 'rgba(225,215,240,0.7)',
     fontSize: 12,
     fontWeight: '600',
-    marginTop: 6,
     textAlign: 'center',
   },
-  buttons: { flexDirection: 'row', gap: 12, marginTop: 18 },
-  btn: {
-    minWidth: 120,
-    paddingVertical: 14,
-    borderRadius: 16,
+  buttons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  shareBtnWrap: {
+    position: 'relative',
   },
   shareBtn: {
-    backgroundColor: '#7E57C2',
-    borderWidth: 1,
-    borderColor: 'rgba(200,170,240,0.5)',
+    minWidth: 130,
   },
-  shareBtnDark: { backgroundColor: '#7A2A48', borderColor: 'rgba(200,120,150,0.5)' },
-  shareBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
-  closeBtn: { backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
-  closeBtnText: { color: 'rgba(255,255,255,0.85)', fontSize: 15, fontWeight: '700' },
-  challengeBtn: {
-    marginTop: 12,
-    minWidth: 252,
-    paddingVertical: 12,
-    borderRadius: 16,
+  closeBtn: {
+    minWidth: 90,
+  },
+  spinnerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(200,170,240,0.45)',
   },
-  challengeBtnDark: { borderColor: 'rgba(200,120,150,0.45)' },
-  challengeBtnText: { color: 'rgba(235,225,250,0.95)', fontSize: 14, fontWeight: '800', letterSpacing: 0.3 },
+  challengeBtn: {
+    alignSelf: 'stretch',
+    marginTop: 12,
+  },
 });
