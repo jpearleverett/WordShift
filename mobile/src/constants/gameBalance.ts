@@ -239,6 +239,15 @@ export const AUTO_COLLECT_PUZZLE_LIMIT = 8;
 export const FINALE_DWELL_PUZZLES = 8;
 
 /**
+ * New Cycle (NG+) phase-progress acceleration per completed cycle. Each cycle
+ * makes the descent ~30% faster (dread arrives earlier) while the collection is
+ * kept, capped so even a deep cycle can't collapse the arc to nothing.
+ * Multiplied onto the normal phase acceleration in awardPuzzleAmber.
+ */
+export const NEW_CYCLE_ACCELERATION_PER_CYCLE = 0.3;
+export const NEW_CYCLE_ACCELERATION_MAX = 2.0;
+
+/**
  * Pending (unoffered) pit amber at or above which the home screen gives a
  * gentle once-per-session Fox nudge to go harvest. High enough that a player
  * banking a puzzle or two never sees it; the pit-entrance glow remains the

@@ -20,6 +20,13 @@ import {
   getVariantWinStats,
   pickNudgeVariant,
   consumeVariantNudge,
+  getCycleCount,
+  getCycleAcceleration,
+  canStartNewCycle,
+  startNewCycle,
+  consumeCycleOpening,
+  markHouseCompleted,
+  markFinalPuzzleCompleted,
   hasSeenDailyChallengeIntro,
   markDailyChallengeIntroSeen,
   hasSeenFoxPlayNudge,
@@ -345,6 +352,54 @@ describe('variant-offer nudge', () => {
     await recordVariantWin('reverse', false);
     const nudge = await consumeVariantNudge(['standard', 'reverse'], 'standard');
     expect(nudge).toBeNull(); // reverse already won, nothing else unlocked+untried
+  });
+});
+
+describe('New Cycle (NG+)', () => {
+  test('getCycleAcceleration grows with cycles and is capped', () => {
+    expect(getCycleAcceleration(0)).toBe(1);
+    expect(getCycleAcceleration(1)).toBeGreaterThan(1);
+    expect(getCycleAcceleration(2)).toBeGreaterThan(getCycleAcceleration(1));
+    // Capped — a deep cycle can't collapse the arc.
+    expect(getCycleAcceleration(100)).toBeLessThanOrEqual(2.0);
+  });
+
+  test('cannot start a cycle before the true endgame', async () => {
+    expect(await canStartNewCycle()).toBe(false);
+    // Only house complete — still not enough.
+    await markHouseCompleted();
+    expect(await canStartNewCycle()).toBe(false);
+    // startNewCycle is a no-op here.
+    expect(await startNewCycle()).toBe(0);
+    expect(await getCycleCount()).toBe(0);
+  });
+
+  test('startNewCycle re-descends but keeps the collection', async () => {
+    await devAddAmber(500);
+    await markHouseCompleted();
+    await markFinalPuzzleCompleted();
+    await markPostRevelation();
+    expect(await getCurrentPhase()).toBe(5);
+    expect(await canStartNewCycle()).toBe(true);
+
+    const cycle = await startNewCycle();
+    expect(cycle).toBe(1);
+    // Re-descended to the bright days.
+    expect(await getCurrentPhase()).toBe(0);
+    // Collection kept.
+    expect(await getAmberBalance()).toBe(500);
+    // The finale can fire again.
+    expect(await canStartNewCycle()).toBe(false);
+  });
+
+  test('consumeCycleOpening fires once per new cycle', async () => {
+    await markHouseCompleted();
+    await markFinalPuzzleCompleted();
+    await markPostRevelation();
+    await startNewCycle();
+    expect(await consumeCycleOpening()).toBe(1);
+    // Second call in the same cycle: nothing.
+    expect(await consumeCycleOpening()).toBeNull();
   });
 });
 

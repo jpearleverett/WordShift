@@ -1742,6 +1742,36 @@ export function getDailyHostLine(hostName: string, phase: DialoguePhase): string
   return `${hostName} prepared today's puzzle just for you!`;
 }
 
+// ============================================================================
+// NEW CYCLE (NG+) — "The pattern continues" made literal. A second descent with
+// the collection kept and the animals subtly remembering.
+// ============================================================================
+
+/** Title of the New Cycle offer shown at the Phase-5 endgame surface. */
+export function getNewCycleTitle(): string {
+  return 'The Pattern Continues';
+}
+
+/** Body copy explaining the New Cycle (never breaks the fourth wall). */
+export function getNewCycleDescription(): string {
+  return 'It could all begin again. The bright days, the warmth, the slow turning. The house would stay as you built it, but the descent would come faster this time. Some part of them would remember.';
+}
+
+/** CTA label to begin a New Cycle. */
+export function getNewCycleCTA(): string {
+  return 'Begin Again';
+}
+
+/**
+ * The opening beat when a New Cycle begins — the bright days return, but wrongly.
+ * Escalates with the cycle number: the pretense wears thinner each time.
+ */
+export function getNewCycleOpeningLine(cycle: number): string {
+  if (cycle >= 3) return 'Bright morning. Again. You have all stopped pretending this is the first time.';
+  if (cycle >= 2) return 'The sun comes up over the house once more. The animals smile. They remember your face from before, though none of them will say so.';
+  return 'Morning breaks bright and warm, as if none of it had happened. The animals greet you like an old friend. Somewhere beneath the warmth, something already knows how this ends.';
+}
+
 export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
   const w = word.toUpperCase();
   if (phase >= 5) return `${w}. It is part of the weave now. Woven by your hand.`;

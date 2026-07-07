@@ -54,6 +54,7 @@ import {
   recordPhase4Dwell,
   consumeVariantNudge,
   getFullProgress,
+  consumeCycleOpening,
 } from './src/services/amberCurrency';
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
@@ -92,6 +93,7 @@ import {
   getSpeedRecordMessage,
   getVariantNudgeMessage,
   getDailyHostLine,
+  getNewCycleOpeningLine,
 } from './src/services/phaseNarrative';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
@@ -492,6 +494,17 @@ function MainApp() {
   useEffect(() => {
     setAudioPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
+  // landing after it begins, the bright days announce themselves (wrongly).
+  useEffect(() => {
+    if (onboardingFlow.isOnboarding) return;
+    consumeCycleOpening().then(cycle => {
+      if (cycle != null) {
+        Alert.alert('', getNewCycleOpeningLine(cycle));
+      }
+    }).catch(() => {});
+  }, [onboardingFlow.isOnboarding]);
 
   // App-level initialization (non-onboarding)
   useEffect(() => {

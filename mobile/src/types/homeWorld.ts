@@ -283,6 +283,13 @@ export interface HomeWorldProgress {
   variantFreshDates?: Record<string, string>;
   // Local date the player last saw the variant-offer nudge (once-per-day cap).
   lastVariantNudgeDate?: string;
+  // New Cycle (NG+): how many times the player has begun the descent again. 0 =
+  // first playthrough. Each cycle re-descends faster (dread arrives earlier)
+  // while the collection (rooms, animals, amber, cosmetics) is kept.
+  cycleCount?: number;
+  // The cycleCount whose opening beat has already been shown (so the "bright
+  // days return" line fires exactly once per new cycle).
+  cycleOpeningSeen?: number;
   // Streak freeze: number of streak freezes available
   streakFreezes?: number;
   // Last time a free streak freeze was granted (ISO date)

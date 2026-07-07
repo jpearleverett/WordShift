@@ -23,6 +23,8 @@ import {
   SURPRISE_BONUS_CHANCE,
   SURPRISE_BONUS_AMOUNTS,
   SURPRISE_BONUS_MIN_PUZZLES,
+  NEW_CYCLE_ACCELERATION_PER_CYCLE,
+  NEW_CYCLE_ACCELERATION_MAX,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -491,7 +493,8 @@ export async function awardPuzzleAmber(
   const phaseAcceleration = calculatePhaseAcceleration(
     threeStarRate, currentStreak, difficulty, gameMode
   );
-  const phaseProgressIncrement = phaseAcceleration;
+  // New Cycle: each completed descent makes the next one faster (dread earlier).
+  const phaseProgressIncrement = phaseAcceleration * getCycleAcceleration(progress.cycleCount ?? 0);
   // Initialize phaseProgress from puzzlesSolved for migrated players missing the field
   if (progress.phaseProgress === undefined || progress.phaseProgress === null) {
     progress.phaseProgress = progress.puzzlesSolved - 1; // -1 because we already incremented puzzlesSolved above
@@ -1446,6 +1449,102 @@ export async function markPostRevelation(): Promise<void> {
 export async function isPostRevelation(): Promise<boolean> {
   const progress = await loadProgress();
   return progress.postRevelation === true;
+}
+
+// ============================================================================
+// NEW CYCLE (NG+)
+// ============================================================================
+
+/** How many descents the player has completed (0 = first playthrough). */
+export async function getCycleCount(): Promise<number> {
+  const progress = await loadProgress();
+  return progress.cycleCount ?? 0;
+}
+
+/**
+ * If a New Cycle has begun whose opening beat hasn't been shown yet, mark it
+ * shown and return the cycle number (so App can announce it once). Otherwise
+ * null. Fires exactly once per new cycle.
+ */
+export async function consumeCycleOpening(): Promise<number | null> {
+  const progress = await loadProgress();
+  const cycle = progress.cycleCount ?? 0;
+  if (cycle >= 1 && (progress.cycleOpeningSeen ?? 0) !== cycle) {
+    progress.cycleOpeningSeen = cycle;
+    progressCache = progress;
+    await saveProgress();
+    return cycle;
+  }
+  return null;
+}
+
+/** Phase-progress multiplier from completed cycles (each cycle descends faster). */
+export function getCycleAcceleration(cycleCount: number): number {
+  return Math.min(
+    NEW_CYCLE_ACCELERATION_MAX,
+    1 + Math.max(0, cycleCount) * NEW_CYCLE_ACCELERATION_PER_CYCLE
+  );
+}
+
+/**
+ * Whether the player has reached the true end of the current descent and can
+ * begin a New Cycle: the house is complete, the finale has been played, and
+ * they are post-revelation (Phase 5). "The pattern continues."
+ */
+export async function canStartNewCycle(): Promise<boolean> {
+  const progress = await loadProgress();
+  return (
+    progress.postRevelation === true &&
+    progress.houseCompleted === true &&
+    progress.finalPuzzleCompleted === true
+  );
+}
+
+/**
+ * Begin a New Cycle (NG+). Resets ONLY the narrative-progression state so the
+ * descent replays from the bright days — phase, phase progress, the finale /
+ * post-revelation pins, the dwell counter, and the progress-owned dialogue
+ * bookkeeping (read indices, consumed coordinated events, trigger queue). The
+ * COLLECTION is deliberately kept: amber, totalAmberEarned, unlocked rooms and
+ * animals (the house stays built), streak, puzzlesSolved, and everything owned
+ * by other services (cosmetics, achievements, stats). The cycle counter drives
+ * a faster descent (dread earlier) via getCycleAcceleration.
+ *
+ * Cross-service narrative state (dialogue sessions, narrative delivery, offering
+ * requests, micro-beats) is reset by the CALLER (App) so those services stay in
+ * charge of their own storage — mirroring the partial-reset convention.
+ *
+ * No-op (returns the current count) unless canStartNewCycle() would be true.
+ */
+export async function startNewCycle(): Promise<number> {
+  const progress = await loadProgress();
+  if (
+    progress.postRevelation !== true ||
+    progress.houseCompleted !== true ||
+    progress.finalPuzzleCompleted !== true
+  ) {
+    return progress.cycleCount ?? 0;
+  }
+
+  progress.cycleCount = (progress.cycleCount ?? 0) + 1;
+  // Re-descend from the bright days.
+  progress.currentPhase = 0;
+  progress.phaseProgress = 0;
+  progress.phaseProgressFraction = 0;
+  progress.pendingPhaseTransition = null;
+  progress.phasePuzzleThresholds = [...PHASE_THRESHOLDS];
+  progress.phase4Dwell = 0;
+  // Clear the endgame pins so the finale + post-revelation can fire again.
+  progress.postRevelation = false;
+  progress.finalPuzzleCompleted = false;
+  // Dialogue replays from the top; drop the progress-owned dialogue bookkeeping.
+  progress.lastDialogueRead = {};
+  progress.consumedCoordinatedEvents = [];
+  progress.triggerWordQueue = [];
+
+  progressCache = progress;
+  await saveProgress();
+  return progress.cycleCount;
 }
 
 /**

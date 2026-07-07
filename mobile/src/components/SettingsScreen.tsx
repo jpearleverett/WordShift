@@ -35,6 +35,8 @@ import {
   getStreakFreezeCount,
   purchaseStreakFreeze,
   STREAK_FREEZE_AMBER_COST,
+  canStartNewCycle,
+  startNewCycle,
 } from '../services/amberCurrency';
 import { restorePurchases } from '../services/iap';
 import { isPatronSync, isAdFreeSync } from '../services/entitlements';
@@ -52,7 +54,7 @@ import { clearWeeklyQuests } from '../services/weeklyQuests';
 import { clearWhisperGallery } from '../services/whisperGallery';
 import { clearChoiceState } from '../services/dialogueChoices';
 import { clearNarrativeDeliveryState } from '../services/dialogue/animalDialogueNarrative';
-import { resetMicroBeats } from '../services/phaseNarrative';
+import { resetMicroBeats, getNewCycleTitle, getNewCycleDescription, getNewCycleCTA } from '../services/phaseNarrative';
 import {
   resetNotificationPrefs,
   getNotificationPrefs,
@@ -188,6 +190,40 @@ export async function performFullReset(): Promise<string[]> {
   return failures;
 }
 
+/**
+ * Begin a New Cycle (NG+) — a PARTIAL reset that replays the descent while
+ * keeping the collection. amberCurrency.startNewCycle() resets the phase /
+ * finale / post-revelation progression and its own dialogue bookkeeping; here we
+ * additionally reset the cross-service narrative state (dialogue sessions,
+ * narrative delivery, player choices, micro-beats, offering requests) so the
+ * story genuinely replays. Amber, unlocked rooms/animals, cosmetics,
+ * achievements, stats, and the whisper archive are deliberately KEPT.
+ *
+ * No-op (returns 0) if the player hasn't reached the true endgame.
+ * Exported for regression testing.
+ */
+export async function performNewCycle(): Promise<number> {
+  const before = await canStartNewCycle();
+  if (!before) return 0;
+  const cycle = await startNewCycle();
+  // Reset only the narrative-gating state so the descent replays; each is
+  // independent, so one failure can't abort the rest.
+  const clears: Array<() => Promise<unknown>> = [
+    clearAllSessions,
+    clearNarrativeDeliveryState,
+    clearChoiceState,
+    resetMicroBeats,
+    clearOfferingRequests,
+  ];
+  await Promise.allSettled(clears.map(async (fn) => fn()));
+  try {
+    await uploadToCloud();
+  } catch {
+    // Non-fatal.
+  }
+  return cycle;
+}
+
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, onReset }) => {
   const screenInsets = useScreenInsets();
   const [settings, setSettings] = useState<GameSettings | null>(null);
@@ -207,6 +243,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
   // Restore-modal choreography (presentation only — showRestore remains the
   // source of truth): backdrop fade + panel spring in, fast timing out.
+  // New Cycle (NG+) availability — only at the true endgame (post-revelation).
+  const [canCycle, setCanCycle] = useState(false);
   // `restoreVisible` keeps the Modal mounted while the exit animation plays.
   const [restoreVisible, setRestoreVisible] = useState(false);
   const restoreBackdrop = useRef(new Animated.Value(0)).current;
@@ -328,7 +366,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     });
     privacyOptionsRequired().then(setPrivacyOptionsAvailable);
     refreshStreakFreeze();
+    canStartNewCycle().then(setCanCycle).catch(() => {});
   }, []);
+
+  const handleNewCycle = () => {
+    hapticLight();
+    Alert.alert(
+      getNewCycleTitle(),
+      getNewCycleDescription(),
+      [
+        { text: 'Not yet', style: 'cancel' },
+        {
+          text: getNewCycleCTA(),
+          onPress: async () => {
+            await performNewCycle();
+            try {
+              await Updates.reloadAsync();
+            } catch {
+              // Expo Go / dev: reload throws. The reset is committed to storage;
+              // ask the player to restart so the fresh cycle loads cleanly.
+              Alert.alert('The pattern turns', 'Restart WordShift to begin again.', [
+                { text: 'OK', onPress: onClose },
+              ]);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleBuyStreakFreeze = () => {
     hapticLight();
@@ -581,6 +646,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
         )}
 
         {/* Data */}
+        {/* New Cycle (NG+) — only surfaced at the true endgame (post-revelation) */}
+        {canCycle && (
+          <PanelCard phase={phase} kind="panel" style={styles.section}>
+            <PixelPlaque phase={phase} label={'THE PATTERN'} style={styles.sectionPlaque} />
+            <TouchableOpacity
+              style={styles.aboutRow}
+              onPress={handleNewCycle}
+              accessibilityRole="button"
+              accessibilityLabel={getNewCycleTitle()}
+            >
+              <Text style={[styles.linkText, { color: t.title }]}>{getNewCycleTitle()}</Text>
+              <Text style={[styles.linkChevron, { color: t.muted }]}>{'>'}</Text>
+            </TouchableOpacity>
+            <Text style={[styles.dangerDescription, { color: t.muted, paddingHorizontal: 4 }]}>
+              Begin the descent again. The house stays as you built it.
+            </Text>
+          </PanelCard>
+        )}
+
         <PanelCard phase={phase} kind="panel" style={styles.section}>
           <PixelPlaque phase={phase} label={'DATA'} style={styles.sectionPlaque} />
           <TouchableOpacity style={styles.dangerRow} onPress={handleResetData}>
