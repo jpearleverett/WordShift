@@ -33,8 +33,6 @@ export const SURFACE = {
   pressTravel: 3,
   /** Top highlight band alpha (the "glossy" light from above). */
   highlightAlpha: 0.10,
-  /** Bottom shade band alpha (the panel's own weight). */
-  shadeAlpha: 0.08,
   /** Uppercase section-label letterSpacing (replaces the web gray-caption look). */
   sectionLetterSpacing: 1.2,
   /** Stagger interval for content cascade inside freshly opened panels. */

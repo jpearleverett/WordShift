@@ -20,9 +20,13 @@ interface PanelCardProps {
 
 /**
  * Layered material panel — the shared card anatomy for menus and modals.
- * A tinted framed body with a top highlight band and bottom shade band, so
- * every surface reads as lit material in the world instead of a flat white
- * web card floating on a drop shadow. Pure Views: zero animation cost.
+ * A tinted framed body with a soft top highlight band, so every surface
+ * reads as lit material in the world instead of a flat white web card
+ * floating on a drop shadow. Pure Views: zero animation cost.
+ *
+ * Deliberately NO bottom shade band: a flat translucent stripe has a hard
+ * top edge that reads as a misrendered grey footer on light cards (player
+ * feedback), not as weight. The top highlight alone carries the material.
  */
 export const PanelCard: React.FC<PanelCardProps> = ({
   phase,
@@ -56,17 +60,6 @@ export const PanelCard: React.FC<PanelCardProps> = ({
           },
         ]}
       />
-      <View
-        pointerEvents="none"
-        style={[
-          styles.shade,
-          {
-            borderBottomLeftRadius: radius,
-            borderBottomRightRadius: radius,
-            backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
-          },
-        ]}
-      />
       {children}
     </View>
   );
@@ -83,13 +76,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '34%',
-  },
-  shade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '22%',
   },
 });
 

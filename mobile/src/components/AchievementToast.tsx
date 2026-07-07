@@ -103,7 +103,6 @@ export const AchievementToast: React.FC<AchievementToastProps> = ({
     >
       <View style={[styles.inner, { backgroundColor: t.cardBg, borderColor: t.cardBorder }]}>
         <View pointerEvents="none" style={styles.highlightBand} />
-        <View pointerEvents="none" style={styles.shadeBand} />
         <View style={[styles.iconBadge, { backgroundColor: t.sectionBg, borderColor: t.sectionBorder }]}>
           <Text style={styles.icon}>{achievement.icon}</Text>
         </View>
@@ -151,16 +150,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: SURFACE.cardRadius,
     borderTopRightRadius: SURFACE.cardRadius,
     backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
-  },
-  shadeBand: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '22%',
-    borderBottomLeftRadius: SURFACE.cardRadius,
-    borderBottomRightRadius: SURFACE.cardRadius,
-    backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
   },
   iconBadge: {
     width: 44,

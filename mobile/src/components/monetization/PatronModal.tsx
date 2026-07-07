@@ -271,7 +271,6 @@ export const PatronModal: React.FC<PatronModalProps> = ({
           <View style={[styles.glow, { backgroundColor: t.glow }]} />
           {/* Layered material bands (PanelCard anatomy, inline for the animated card). */}
           <View pointerEvents="none" style={styles.cardHighlight} />
-          <View pointerEvents="none" style={styles.cardShade} />
 
           <Text style={[styles.eyebrow, { color: t.muted }]}>WORDSHIFT</Text>
           <Text style={[styles.title, { color: t.title }]}>Become a Patron</Text>
@@ -420,7 +419,7 @@ const styles = StyleSheet.create({
     opacity: 0.25,
     borderRadius: 100,
   },
-  // Top highlight / bottom shade — the panel reads as lit material.
+  // Top highlight — the panel reads as lit material.
   cardHighlight: {
     position: 'absolute',
     top: 0,
@@ -430,16 +429,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: SURFACE.panelRadius,
     borderTopRightRadius: SURFACE.panelRadius,
     backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
-  },
-  cardShade: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '22%',
-    borderBottomLeftRadius: SURFACE.panelRadius,
-    borderBottomRightRadius: SURFACE.panelRadius,
-    backgroundColor: `rgba(10, 6, 24, ${SURFACE.shadeAlpha})`,
   },
   eyebrow: {
     fontSize: 11,
