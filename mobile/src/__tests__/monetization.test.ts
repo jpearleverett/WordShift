@@ -243,9 +243,11 @@ describe('iap', () => {
 // ===========================================================================
 
 describe('ads policy', () => {
-  it('uses looser interstitial cadence early, tighter late', () => {
-    expect(interstitialFrequency(0)).toBe(3);
-    expect(interstitialFrequency(2)).toBe(3);
+  it('keeps a light interstitial cadence in the candy phase, widening toward the reveal', () => {
+    // Early (Phase 0-2) is the LOOSER base gap so the cozy first-impression /
+    // review window is the least ad-dense; Phase 3 doubles it, Phase 4+ silences.
+    expect(interstitialFrequency(0)).toBe(6);
+    expect(interstitialFrequency(2)).toBe(6);
     expect(interstitialFrequency(3)).toBe(5);
     expect(interstitialFrequency(5 as 5)).toBe(5);
   });
@@ -261,8 +263,9 @@ describe('ads policy', () => {
 
   it('shows an interstitial only once the cadence threshold is met', () => {
     const base = { phase: 0 as const, isAdFree: false, exempt: false };
-    expect(shouldShowInterstitial({ ...base, puzzlesSolved: 2, lastInterstitialPuzzle: 0 })).toBe(false);
-    expect(shouldShowInterstitial({ ...base, puzzlesSolved: 3, lastInterstitialPuzzle: 0 })).toBe(true);
+    const earlyFreq = interstitialFrequency(0); // candy-phase cadence
+    expect(shouldShowInterstitial({ ...base, puzzlesSolved: earlyFreq - 1, lastInterstitialPuzzle: 0 })).toBe(false);
+    expect(shouldShowInterstitial({ ...base, puzzlesSolved: earlyFreq, lastInterstitialPuzzle: 0 })).toBe(true);
   });
 
   it('suppresses interstitials entirely at Phase 4+ (tonal protection of the reveal/endgame)', () => {
@@ -321,10 +324,11 @@ describe('ads runtime', () => {
 
   it('shows an interstitial when cadence is met for a non-Patron', async () => {
     setAdProvider(fakeAdProvider());
-    const shown = await maybeShowInterstitial({ puzzlesSolved: 3, phase: 0 });
+    const freq = interstitialFrequency(0);
+    const shown = await maybeShowInterstitial({ puzzlesSolved: freq, phase: 0 });
     expect(shown).toBe(true);
     // Counter advanced — immediately after, not due again
-    const again = await maybeShowInterstitial({ puzzlesSolved: 4, phase: 0 });
+    const again = await maybeShowInterstitial({ puzzlesSolved: freq + 1, phase: 0 });
     expect(again).toBe(false);
   });
 

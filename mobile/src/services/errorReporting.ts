@@ -11,8 +11,9 @@ import { logEvent } from './eventLogger';
  * when `extra.supabaseUrl`/`supabaseAnonKey` are set (or a custom
  * `extra.telemetryEndpoint` if that's configured instead) — so configured
  * telemetry yields remote crash visibility with no extra SDK. Richer crash
- * grouping/symbolication (Sentry) is wired via `setErrorForwarder` /
- * `initCrashReporter`, which forwards `error` from `reportError()`.
+ * grouping/symbolication ships via the native @sentry/react-native SDK
+ * (initialized in App.tsx); `setErrorForwarder` remains an optional seam to
+ * also forward `error` from `reportError()` to a custom sink.
  */
 
 interface ErrorContext {
@@ -32,9 +33,10 @@ const sessionErrors: Array<{
 const MAX_SESSION_ERRORS = 50;
 
 /**
- * Optional pluggable forwarder for remote crash reporting (e.g. Sentry over
- * HTTP). Default = none, so the local-only behavior is unchanged until a
- * forwarder is registered (see crashReporter.initCrashReporter).
+ * Optional pluggable forwarder for remote crash reporting. Default = none, so
+ * the local-only behavior is unchanged until a forwarder is registered. (The
+ * shipping remote crash path is the native @sentry/react-native SDK in App.tsx;
+ * this seam stays available for a custom sink.)
  */
 type ErrorForwarder = (error: Error | string, context: ErrorContext) => void;
 let errorForwarder: ErrorForwarder | null = null;

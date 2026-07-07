@@ -70,6 +70,7 @@ import { clearMonetPrompts } from '../services/monetizationPrompts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
 import { clearDailyAmberReward } from '../services/dailyAmberReward';
 import { clearMasteryRecords } from '../services/masteryRecords';
+import { clearDailyLadder } from '../services/dailyLadder';
 import { clearOfferingRequests } from '../services/offeringRequests';
 import { clearReviewPrompt } from '../services/reviewPrompt';
 
@@ -160,6 +161,7 @@ export async function performFullReset(): Promise<string[]> {
     ['dailyLogin', clearDailyLoginReward],
     ['dailyAmber', clearDailyAmberReward],
     ['masteryRecords', clearMasteryRecords],
+    ['dailyLadder', clearDailyLadder],
     ['offeringRequests', clearOfferingRequests],
     ['reviewPrompt', clearReviewPrompt],
     ['syncStatus', clearSyncStatus],

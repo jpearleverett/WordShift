@@ -15,7 +15,7 @@ jest.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
   TouchableOpacity: 'TouchableOpacity',
-  StyleSheet: { create: (styles: any) => styles },
+  StyleSheet: { create: (styles: any) => styles, absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } },
   Animated: {
     View: 'AnimatedView',
     Value: jest.fn().mockImplementation((val: number) => ({
@@ -59,7 +59,7 @@ import React from 'react';
 import { Row } from '../components/Row';
 import { LetterTile } from '../components/LetterTile';
 import { DraggableTile } from '../components/DraggableTile';
-import { ShareCard, gridSquareKinds, SQUARE_COLORS } from '../components/share/ShareCard';
+import { ShareCard, gridSquareKinds, SQUARE_COLORS, getShareDecay } from '../components/share/ShareCard';
 import type { HintHighlight, ArrivalMark } from '../hooks/usePuzzleGame';
 import type { ShareableResult, MoveOutcome } from '../services/shareResults';
 
@@ -131,6 +131,22 @@ describe('Row hint-glow + arrival prop contract', () => {
     expect(arrivalProp).toBe(arrival);
     expect(hintLetterProp).toBe('l3');
     expect(hintSlotProp).toBe(2);
+  });
+});
+
+// --- Row drop effects are visual-only (App owns the haptic) ------------------
+// Regression pin for the doubled-buzz fix: App.tsx fires the weighted valid/
+// invalid drop haptic; Row.tsx renders only the shake/bounce. Re-adding a
+// haptic in Row would double every tap's buzz. Guard-by-source (Row can't
+// render in Node), matching the isStuck source-guard idiom.
+describe('Row drop effects are visual-only', () => {
+  const rowSrc = require('fs').readFileSync(
+    require('path').join(__dirname, '../components/Row.tsx'),
+    'utf8',
+  );
+  test('Row.tsx does not import or call hapticMedium / hapticError', () => {
+    expect(rowSrc).not.toMatch(/hapticMedium/);
+    expect(rowSrc).not.toMatch(/hapticError/);
   });
 });
 
@@ -221,5 +237,79 @@ describe('ShareCard honest performance grid', () => {
   test('renders the legacy distribution when moveOutcomes is absent', () => {
     const colors = renderedGridColors({ ...baseShareResult, invalidAttempts: 1, moveCount: 3 });
     expect(colors).toEqual([SQUARE_COLORS.mistake, SQUARE_COLORS.clean, SQUARE_COLORS.clean]);
+  });
+});
+
+// ─── ShareCard phase decay (the spoiler-safe "something's off" lure) ─────────
+
+function renderCardTree(result: ShareableResult): React.ReactElement {
+  const forwardRefRender = (ShareCard as unknown as {
+    render: (props: { result: ShareableResult }, ref: null) => React.ReactElement;
+  }).render;
+  return forwardRefRender({ result }, null);
+}
+
+function collectText(node: unknown, out: string[] = []): string[] {
+  if (node == null) return out;
+  if (typeof node === 'string') { out.push(node); return out; }
+  if (Array.isArray(node)) { node.forEach((c) => collectText(c, out)); return out; }
+  if (typeof node === 'object') collectText((node as { props?: { children?: unknown } }).props?.children, out);
+  return out;
+}
+
+describe('ShareCard phase decay', () => {
+  test('is pristine at Phase 0 and earns its wrongness toward the reveal', () => {
+    expect(getShareDecay(0)).toEqual({ scrim: 0, scanline: 0, soot: 0, tear: 0, aberration: 0, aberrationShift: 0 });
+    expect(getShareDecay(1).soot).toBe(0);
+    expect(getShareDecay(1).aberration).toBe(0);
+    // Aberration climbs toward the reveal (Phase 4 is peak wrongness)...
+    expect(getShareDecay(2).aberration).toBeGreaterThan(0);
+    expect(getShareDecay(3).aberration).toBeGreaterThan(getShareDecay(2).aberration);
+    expect(getShareDecay(4).aberration).toBeGreaterThan(getShareDecay(3).aberration);
+    // ...then Phase 5 SETTLES (jitter calms) without returning to pristine.
+    expect(getShareDecay(5).scanline).toBeLessThan(getShareDecay(4).scanline);
+    expect(getShareDecay(5).scrim).toBeLessThan(getShareDecay(4).scrim);
+    expect(getShareDecay(5).aberration).toBeGreaterThan(0);
+  });
+
+  test('every decay field stays in a sane range for all phases', () => {
+    for (let p = 0; p <= 5; p++) {
+      const d = getShareDecay(p);
+      (['scrim', 'scanline', 'soot', 'tear', 'aberration'] as const).forEach((k) => {
+        expect(d[k]).toBeGreaterThanOrEqual(0);
+        expect(d[k]).toBeLessThanOrEqual(1);
+      });
+      expect(d.aberrationShift).toBeGreaterThanOrEqual(0);
+      expect(d.aberrationShift).toBeLessThanOrEqual(2);
+    }
+  });
+
+  test('Phase 0 card renders no decay layers; the grid still renders', () => {
+    const tree = renderCardTree({ ...baseShareResult, phase: 0 });
+    expect(findByTestID(tree, 'share-decay-underlay')).toBeNull();
+    expect(findByTestID(tree, 'share-decay-overlay')).toBeNull();
+    expect(findByTestID(tree, 'share-wordmark-ghost')).toBeNull();
+    expect(findByTestID(tree, 'share-grid')).not.toBeNull();
+  });
+
+  test('Phase 4 card renders the decay layers and still shows the grid', () => {
+    const tree = renderCardTree({ ...baseShareResult, phase: 4 });
+    expect(findByTestID(tree, 'share-decay-underlay')).not.toBeNull();
+    expect(findByTestID(tree, 'share-decay-overlay')).not.toBeNull();
+    expect(findByTestID(tree, 'share-wordmark-ghost')).not.toBeNull();
+    expect(findByTestID(tree, 'share-grid')).not.toBeNull();
+  });
+
+  test('decay never leaks the daily word chain (spoiler rule holds under corruption)', () => {
+    const tree = renderCardTree({
+      ...baseShareResult, phase: 4, isDaily: true, dailyDate: '2026-07-07',
+      wordChain: ['DOOM', 'ROOM'], incantationName: 'The Offering',
+    });
+    const text = collectText(tree).join(' ');
+    expect(text).not.toContain('DOOM');
+    expect(text).not.toContain('ROOM');
+    expect(text).not.toContain('The Offering');
+    // ...but the corruption IS present on the daily card.
+    expect(findByTestID(tree, 'share-decay-underlay')).not.toBeNull();
   });
 });

@@ -42,6 +42,27 @@ export const SPEED_TIMER_INTERVAL_MS = 250;
 // keeps a speed streak tense instead of letting skilled players idle.
 export const SPEED_ESCALATION_STEP_SEC = 5;
 export const SPEED_ESCALATION_MIN_SEC = 30;
+/** Speed clock enters the final-countdown tension zone at/below this many seconds. */
+export const SPEED_TICK_THRESHOLD_SEC = 5;
+/** At/below this, the countdown intensifies (heavier haptic, bigger pop, brighter color). */
+export const SPEED_TICK_CRITICAL_SEC = 3;
+
+/**
+ * Pure decision for the final-countdown tick: given the previous and next
+ * displayed whole-second values, should a tick fire and how intense? Fires only
+ * on a genuine downward step INTO the zone (never on the null->value start, and
+ * never when a rescue raises the value back up), and never at 0.
+ */
+export function speedTickKind(
+  prev: number | null,
+  next: number | null,
+  threshold: number = SPEED_TICK_THRESHOLD_SEC,
+  critical: number = SPEED_TICK_CRITICAL_SEC,
+): 'none' | 'normal' | 'critical' {
+  if (next === null || next > threshold || next <= 0) return 'none';
+  if (prev === null || next >= prev) return 'none';
+  return next <= critical ? 'critical' : 'normal';
+}
 
 // === MICRO-BEAT ===
 export const MICRO_BEAT_GLITCH_DELAY_MS = 600;

@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
+import { getShareCardTagline } from '../../services/phaseNarrative';
 import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
 
 /**
@@ -12,6 +13,13 @@ import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
  * Spoiler rule: daily challenges are the same for everyone today, so the card
  * shows the Wordle-style colored grid (a spoiler-free performance signal) but
  * NOT the actual words / incantation name on daily results.
+ *
+ * Phase decay: from Phase 2 the card quietly corrupts (a scrim veil, faint
+ * scanlines, corner soot, a glitch tear, and a chromatic split of the wordmark)
+ * so a late-game share reads as "something is off with this cute word game" (the
+ * word-of-mouth lure) WITHOUT ever spoiling the turn. It PEAKS at the reveal
+ * (Phase 4) and SETTLES at Phase 5 (terrible peace, not chaos). The candy grid,
+ * gold stars, and all text render on top and stay fully legible at every phase.
  */
 
 const CARD_WIDTH = 320;
@@ -58,6 +66,43 @@ const DIFFICULTY_DOT: Record<string, string> = {
   HARD: '#E0524D',
 };
 
+/** Chromatic-aberration ghost hues (an effect pair, like SQUARE_COLORS). Their
+ * visibility is phase-gated by the `aberration` opacity, so Phase 0 shows none. */
+const GLITCH_GHOST_WARM = SQUARE_COLORS.both; // '#E0524D'
+const GLITCH_GHOST_COOL = '#4DAFFF';
+/** Scanline positions, % from the card top. */
+const SCANLINE_TOPS = [10, 22, 34, 46, 58, 70, 82];
+
+export interface ShareDecay {
+  scrim: number; // uniform ground veil opacity (underlay, behind content)
+  scanline: number; // scanline stripe opacity (underlay)
+  soot: number; // corner soot-blob opacity (overlay, on top)
+  tear: number; // single glitch "tear" line opacity (overlay)
+  aberration: number; // wordmark chromatic-ghost opacity
+  aberrationShift: number; // px offset of the two wordmark ghosts
+}
+
+/**
+ * Progressive "something is off" decay baked into the shared card. Purely static
+ * (no animation, so the PNG capture is deterministic and reduced-motion is moot).
+ * Phase 0 is pristine (all zeros: byte-identical to the pre-decay card, so early
+ * shares and store screenshots stay clean). Peak wrongness is Phase 4; Phase 5
+ * SETTLES (the ground and ghost persist but the scanline jitter calms, matching
+ * the "terrible peace" of the endgame). Spoiler-safe by construction: abstract
+ * grime + mis-registration, never imagery, never text.
+ */
+export function getShareDecay(phase: number): ShareDecay {
+  switch (Math.max(0, Math.min(5, Math.round(phase)))) {
+    case 0:  return { scrim: 0,    scanline: 0,    soot: 0,    tear: 0,    aberration: 0,    aberrationShift: 0    };
+    case 1:  return { scrim: 0.06, scanline: 0.03, soot: 0,    tear: 0,    aberration: 0,    aberrationShift: 0    };
+    case 2:  return { scrim: 0.12, scanline: 0.05, soot: 0.10, tear: 0.10, aberration: 0.10, aberrationShift: 0.5  };
+    case 3:  return { scrim: 0.20, scanline: 0.08, soot: 0.20, tear: 0.18, aberration: 0.22, aberrationShift: 1.0  };
+    case 4:  return { scrim: 0.30, scanline: 0.12, soot: 0.32, tear: 0.26, aberration: 0.42, aberrationShift: 1.5  };
+    case 5:
+    default: return { scrim: 0.26, scanline: 0.05, soot: 0.28, tear: 0.12, aberration: 0.30, aberrationShift: 1.25 };
+  }
+}
+
 export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
   const phase = result.phase ?? 0;
   const theme = getPhaseTheme(phase);
@@ -65,18 +110,57 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
 
   const bg = theme.bgPrimary;
   const cardBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)';
-  const cardBorder = isDark ? 'rgba(180,120,160,0.3)' : 'rgba(255,255,255,0.3)';
+  // The border creeps toward crimson at the reveal — a quiet wrongness.
+  const cardBorder = phase >= 4
+    ? 'rgba(196,72,92,0.42)'
+    : isDark ? 'rgba(180,120,160,0.3)' : 'rgba(255,255,255,0.3)';
   const textColor = isDark ? 'rgba(225,205,225,0.95)' : '#FFFFFF';
   const subColor = isDark ? 'rgba(200,170,195,0.8)' : 'rgba(255,255,255,0.8)';
 
+  const decay = getShareDecay(phase);
   const spoilerSafe = !result.isDaily;
   const diffLabel = result.difficulty === 'MEDIUM_PLUS' ? 'MED+' : result.difficulty;
 
   return (
     <View ref={ref} collapsable={false} style={[styles.card, { backgroundColor: bg, borderColor: cardBorder }]}>
       <View style={[styles.inner, { backgroundColor: cardBg }]}>
-        {/* Wordmark */}
-        <Text style={[styles.wordmark, { color: textColor }]}>WordShift</Text>
+        {/* Decay UNDERLAY — painted behind content, so grid/stars/text stay crisp */}
+        {(decay.scrim > 0 || decay.scanline > 0) && (
+          <View testID="share-decay-underlay" pointerEvents="none" style={StyleSheet.absoluteFill}>
+            {decay.scrim > 0 && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.vignetteColor, opacity: decay.scrim }]} />
+            )}
+            {decay.scanline > 0 && SCANLINE_TOPS.map((topPct, i) => (
+              <View
+                key={i}
+                style={[styles.scanline, { top: `${topPct}%`, backgroundColor: theme.vignetteColor, opacity: decay.scanline }]}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Wordmark — splits into a chromatic glitch as the descent deepens */}
+        <View style={styles.wordmarkWrap}>
+          {decay.aberration > 0 && (
+            <>
+              <Text
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                testID="share-wordmark-ghost"
+                numberOfLines={1}
+                style={[styles.wordmark, styles.wordmarkGhost, { color: GLITCH_GHOST_COOL, opacity: decay.aberration, transform: [{ translateX: -decay.aberrationShift }] }]}
+              >WordShift</Text>
+              <Text
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                testID="share-wordmark-ghost"
+                numberOfLines={1}
+                style={[styles.wordmark, styles.wordmarkGhost, { color: GLITCH_GHOST_WARM, opacity: decay.aberration, transform: [{ translateX: decay.aberrationShift }] }]}
+              >WordShift</Text>
+            </>
+          )}
+          <Text style={[styles.wordmark, { color: textColor }]}>WordShift</Text>
+        </View>
         {result.isDaily && result.dailyDate && (
           <Text style={[styles.daily, { color: subColor }]}>Daily · {result.dailyDate}</Text>
         )}
@@ -127,12 +211,32 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
           </Text>
         )}
 
+        {/* Mood signature — a spoiler-safe tagline that quietly decays with phase */}
+        <Text style={[styles.tagline, { color: subColor }]} numberOfLines={1}>
+          {getShareCardTagline(phase)}
+        </Text>
+
         {/* Footer */}
         <View style={[styles.footer, { borderTopColor: cardBorder }]}>
           <Text style={[styles.footerText, { color: subColor }]}>
             {result.isDaily ? 'Take today’s daily challenge' : 'Play WordShift'}
           </Text>
         </View>
+
+        {/* Decay OVERLAY — painted on top, but corners/upper band only, off the grid */}
+        {(decay.soot > 0 || decay.tear > 0) && (
+          <View testID="share-decay-overlay" pointerEvents="none" style={StyleSheet.absoluteFill}>
+            {decay.soot > 0 && (
+              <>
+                <View style={[styles.sootCorner, styles.sootTL, { backgroundColor: theme.vignetteColor, opacity: decay.soot }]} />
+                <View style={[styles.sootCorner, styles.sootBR, { backgroundColor: theme.vignetteColor, opacity: decay.soot }]} />
+              </>
+            )}
+            {decay.tear > 0 && (
+              <View style={[styles.tearLine, { backgroundColor: theme.vignetteColor, opacity: decay.tear }]} />
+            )}
+          </View>
+        )}
       </View>
     </View>
   );
@@ -152,12 +256,21 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
     paddingHorizontal: 20,
     alignItems: 'center',
+    overflow: 'hidden', // clip the decay layers to the rounded frame
   },
+  scanline: { position: 'absolute', left: 0, right: 0, height: 1 },
+  sootCorner: { position: 'absolute', width: 72, height: 72, borderRadius: 40 },
+  sootTL: { top: -28, left: -28 },
+  sootBR: { bottom: -28, right: -28 },
+  tearLine: { position: 'absolute', top: '17%', left: '9%', right: '31%', height: 2 },
   wordmark: {
     fontSize: 26,
     fontWeight: '900',
     letterSpacing: 1,
   },
+  wordmarkWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  wordmarkGhost: { position: 'absolute', left: 0, right: 0, top: 0, textAlign: 'center' },
+  tagline: { fontSize: 11.5, fontWeight: '600', fontStyle: 'italic', marginTop: 16, letterSpacing: 0.3, textAlign: 'center' },
   daily: {
     fontSize: 12,
     fontWeight: '700',

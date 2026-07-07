@@ -92,6 +92,7 @@ const SYNC_KEYS = [
   'wordshift_daily_quests',
   'wordshift_daily_login',
   'wordshift_daily_amber',
+  'wordshift_daily_ladder', // persistent local daily-ladder history (best this week / participation)
   // Narrative state
   'wordshift_dialogue_sessions',
   'wordshift_dialogue_choices',
@@ -115,6 +116,9 @@ const SYNC_KEYS = [
   'wordshift_mandatory_harvest_seen',
   'wordshift_gated_unlock_intro_seen',
   'wordshift_harvest_home_intro_seen',
+  'wordshift_fox_play_nudge_seen', // one-time Fox "here is Play" nudge
+  'wordshift_pit_nudge_seen', // one-time pit-arrival nudge
+  'wordshift_starter_intro_seen', // one-time Keeper's Welcome starter intro
   'wordshift_micro_beats_seen',
 ];
 

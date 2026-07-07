@@ -2,6 +2,9 @@ import {
   getVictoryTitle,
   getVictoryFeedback,
   getMoveMessage,
+  getShareCardTagline,
+  getDailyLadderLine,
+  getDailyLadderTrendLabel,
   getHintMessage,
   getHintFallback,
   getLoadingMessage,
@@ -120,11 +123,68 @@ describe('getMoveMessage', () => {
   });
 
   test('phase 4 messages are dark', () => {
-    const phase4Words = ['void', 'dissolve', 'Nothing', 'matter', 'shift', '...', 'silence', 'arrangement', 'verse', 'deeper', 'going', 'listening'];
+    const phase4Words = ['void', 'dissolve', 'Nothing', 'matter', 'shift', '...', 'silence', 'arrangement', 'verse', 'deeper', 'going', 'listening', 'pattern', 'Given', 'offering', 'always', 'closer', 'house'];
     for (let i = 0; i < 50; i++) {
       const msg = getMoveMessage(4);
       expect(phase4Words.some(w => msg.includes(w))).toBe(true);
     }
+  });
+});
+
+describe('getShareCardTagline', () => {
+  test.each(ALL_PHASES)('returns a non-empty, spoiler-safe tagline for phase %i', (phase) => {
+    const line = getShareCardTagline(phase);
+    expect(typeof line).toBe('string');
+    expect(line.length).toBeGreaterThan(0);
+    // Spoiler-safe: the decaying share card lures, it never explains the turn.
+    expect(line.toLowerCase()).not.toMatch(/cult|summon|ritual|sacrifice|phase|shadow|entity/);
+    expect(line).not.toMatch(/[—–]/); // no em/en dashes in player-facing copy
+  });
+
+  test('stays cozy in the bright phases, grows wrong in the dark ones', () => {
+    expect(getShareCardTagline(0).toLowerCase()).toContain('cozy');
+    expect(getShareCardTagline(1).toLowerCase()).toContain('cozy');
+    // The dark phases drop the "cozy" framing entirely.
+    expect(getShareCardTagline(4).toLowerCase()).not.toContain('cozy');
+    expect(getShareCardTagline(5).toLowerCase()).not.toContain('cozy');
+  });
+});
+
+describe('getDailyLadderLine', () => {
+  test('prefers this week best rank, tone shifts with phase', () => {
+    const s = { bestRankThisWeek: 3, bestPercentileThisWeek: 90, participationCount: 5 };
+    expect(getDailyLadderLine(s, 0)).toBe('Best this week: #3');
+    expect(getDailyLadderLine(s, 2)).toContain('#3');
+    expect(getDailyLadderLine(s, 4)).toContain('#3');
+    // Tone actually differs across the descent.
+    expect(getDailyLadderLine(s, 0)).not.toBe(getDailyLadderLine(s, 4));
+  });
+
+  test('falls back to percentile, then participation, then null', () => {
+    expect(getDailyLadderLine({ bestRankThisWeek: null, bestPercentileThisWeek: 82, participationCount: 4 }, 0))
+      .toContain('82%');
+    expect(getDailyLadderLine({ bestRankThisWeek: null, bestPercentileThisWeek: null, participationCount: 3 }, 0))
+      .toContain('3');
+    // First daily (participation 1, no rank) → nothing worth showing.
+    expect(getDailyLadderLine({ bestRankThisWeek: null, bestPercentileThisWeek: null, participationCount: 1 }, 0))
+      .toBeNull();
+  });
+
+  test('is safe for null / non-object input (getter-sweep safety)', () => {
+    expect(getDailyLadderLine(null, 0)).toBeNull();
+    expect(getDailyLadderLine(undefined, 3)).toBeNull();
+  });
+});
+
+describe('getDailyLadderTrendLabel', () => {
+  test('maps up/down/flat per phase, null otherwise', () => {
+    expect(getDailyLadderTrendLabel('up', 0)).toBe('Rising');
+    expect(getDailyLadderTrendLabel('up', 2)).toBe('Ascending');
+    expect(getDailyLadderTrendLabel('down', 0)).toBe('Slipping');
+    expect(getDailyLadderTrendLabel('down', 2)).toBe('Receding');
+    expect(getDailyLadderTrendLabel('flat', 4)).toBe('Holding');
+    expect(getDailyLadderTrendLabel(null, 0)).toBeNull();
+    expect(getDailyLadderTrendLabel(undefined, 0)).toBeNull();
   });
 });
 

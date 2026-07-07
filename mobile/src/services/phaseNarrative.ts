@@ -204,12 +204,17 @@ const MOVE_MESSAGES: Record<DialoguePhase, string[]> = {
   3: [
     'The word trembles.', 'Shifting shadows.', 'Something stirs.', 'It changes.',
     'Cold progress.', 'Darker now.', 'The letters obey.', 'For now.',
+    'The cold deepens.', 'It knows your hand.', 'Something waits beneath.',
+    'The warmth thins.',
   ],
   4: [
     'The void accepts.', 'Letters dissolve and reform.', 'Nothing changes. Everything changes.',
     'Does it matter?', 'Another shift.', '...', 'The silence between words.',
     'The arrangement notes your move.', 'Another verse written.', 'One step deeper.',
     'The letters go where they were always going.', 'It is listening.',
+    'The pattern receives it.', 'Given freely.', 'The offering is noted.',
+    'It was always this word.', 'Closer now. Always closer.', 'The house leans nearer.',
+    'You were always going to.', 'Nothing resists the pattern.',
   ],
   5: [
     'The weave tightens.', 'Another thread.', 'The pattern knows.',
@@ -223,6 +228,83 @@ export function getMoveMessage(phase: DialoguePhase): string {
   if (phase === 0) return getPhase0MoveMessageWithSeed();
   const messages = MOVE_MESSAGES[phase];
   return messages[Math.floor(Math.random() * messages.length)];
+}
+
+// ============================================================================
+// SHARE CARD TAGLINE — a spoiler-safe "mood signature" printed on the shareable
+// result card. It stays pristine and cozy in the bright phases, then grows
+// quietly wrong as the story darkens, so a late-game shared card reads as
+// "something is off with this cute word game" WITHOUT ever naming or explaining
+// the turn (the lure, not the reveal). Never says cult/summon/ritual; never
+// names the entity; never reveals a phase number.
+// ============================================================================
+
+const SHARE_CARD_TAGLINES: Record<DialoguePhase, string> = {
+  0: 'A cozy little word game.',
+  1: 'Just a cozy word game.',
+  2: 'The words are listening.',
+  3: 'The words remember.',
+  4: 'It is almost arranged.',
+  5: 'The pattern continues.',
+};
+
+export function getShareCardTagline(phase: number): string {
+  // Tolerant of any stored phase value (share results are serialized data).
+  const p = Math.max(0, Math.min(5, Math.round(phase))) as DialoguePhase;
+  return SHARE_CARD_TAGLINES[p];
+}
+
+// ============================================================================
+// DAILY LADDER — spoiler-safe "your daily history" copy for the leaderboard
+// card. Rank / percentile / participation only; never words, the solution, or a
+// phase label. Works offline (falls back to a bare participation count when the
+// backend gave no rank), and the tone shifts with the descent. No em dashes.
+// ============================================================================
+
+export function getDailyLadderLine(
+  summary: {
+    bestRankThisWeek: number | null;
+    bestPercentileThisWeek: number | null;
+    participationCount: number;
+  } | null | undefined,
+  phase: number,
+): string | null {
+  if (!summary || typeof summary !== 'object') return null;
+
+  if (summary.bestRankThisWeek != null) {
+    const r = summary.bestRankThisWeek;
+    if (phase >= 4) return `Best among the gathered this week: #${r}`;
+    if (phase >= 2) return `Your best standing this week: #${r}`;
+    return `Best this week: #${r}`;
+  }
+  if (summary.bestPercentileThisWeek != null) {
+    const p = summary.bestPercentileThisWeek;
+    if (phase >= 4) return `This week you stood ahead of ${p}% at your best`;
+    if (phase >= 2) return `This week's best: ahead of ${p}% of seekers`;
+    return `Best this week: ahead of ${p}% of seekers`;
+  }
+  // Offline / never ranked: celebrate the habit itself (spoiler-safe, no rank).
+  if (summary.participationCount >= 2) {
+    const n = summary.participationCount;
+    if (phase >= 4) return `${n} offerings kept in the pattern`;
+    if (phase >= 2) return `${n} dailies answered`;
+    return `${n} dailies completed`;
+  }
+  return null;
+}
+
+/**
+ * Short, phase-aware, color-independent placement-trend tag for the ladder card
+ * (rendered as text + an a11y label, never color alone). Null for no trend.
+ */
+export function getDailyLadderTrendLabel(
+  trend: 'up' | 'down' | 'flat' | null | undefined,
+  phase: number,
+): string | null {
+  if (trend === 'up') return phase >= 2 ? 'Ascending' : 'Rising';
+  if (trend === 'down') return phase >= 2 ? 'Receding' : 'Slipping';
+  if (trend === 'flat') return 'Holding';
+  return null;
 }
 
 // ============================================================================

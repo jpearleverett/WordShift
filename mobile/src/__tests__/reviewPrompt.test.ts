@@ -2,6 +2,13 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
 
+// Native store-review module — mocked so maybePromptReview is deterministic in
+// Node. Per-test behavior is set by reassigning these functions.
+jest.mock('expo-store-review', () => ({
+  isAvailableAsync: jest.fn(),
+  requestReview: jest.fn(),
+}));
+
 import {
   shouldPromptReview,
   maybePromptReview,
@@ -12,11 +19,15 @@ import {
 } from '../services/reviewPrompt';
 
 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+const StoreReview = require('expo-store-review');
 
 beforeEach(async () => {
   AsyncStorage.clear();
   await clearReviewPrompt();
   _clearReviewPromptCache();
+  // Default: native sheet available and the prompt resolves cleanly.
+  StoreReview.isAvailableAsync = jest.fn().mockResolvedValue(true);
+  StoreReview.requestReview = jest.fn().mockResolvedValue(undefined);
 });
 
 const base = {
@@ -58,15 +69,37 @@ describe('shouldPromptReview', () => {
 });
 
 describe('maybePromptReview', () => {
-  test('fires once, then never again (persisted)', async () => {
+  test('fires once (native prompt actually called), then never again', async () => {
     expect(await maybePromptReview({ phase: 0, stars: 3, puzzlesSolved: 20 })).toBe(true);
+    expect(StoreReview.requestReview).toHaveBeenCalledTimes(1);
     // Second eligible call is suppressed by the persisted one-time flag.
     expect(await maybePromptReview({ phase: 0, stars: 3, puzzlesSolved: 25 })).toBe(false);
+    expect(StoreReview.requestReview).toHaveBeenCalledTimes(1);
   });
 
   test('does not fire (or consume the one-time flag) at Phase 2+', async () => {
     expect(await maybePromptReview({ phase: 2, stars: 3, puzzlesSolved: 20 })).toBe(false);
+    expect(StoreReview.requestReview).not.toHaveBeenCalled();
     // The flag is untouched, so a later legit Phase 0-1 peak can still prompt.
     expect(await maybePromptReview({ phase: 1, stars: 3, puzzlesSolved: 20 })).toBe(true);
+  });
+
+  test('does not consume the one-time flag when the OS review sheet is unavailable', async () => {
+    StoreReview.isAvailableAsync = jest.fn().mockResolvedValue(false);
+    expect(await maybePromptReview({ phase: 0, stars: 3, puzzlesSolved: 20 })).toBe(false);
+    expect(StoreReview.requestReview).not.toHaveBeenCalled();
+    // Flag survived: once the sheet is available, a later peak still prompts.
+    StoreReview.isAvailableAsync = jest.fn().mockResolvedValue(true);
+    expect(await maybePromptReview({ phase: 1, stars: 3, puzzlesSolved: 21 })).toBe(true);
+    expect(StoreReview.requestReview).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not consume the flag when the native module lacks requestReview', async () => {
+    StoreReview.requestReview = undefined;
+    expect(await maybePromptReview({ phase: 1, stars: 3, puzzlesSolved: 20 })).toBe(false);
+    // Flag survived: a build that later ships the module can still prompt.
+    StoreReview.requestReview = jest.fn().mockResolvedValue(undefined);
+    expect(await maybePromptReview({ phase: 1, stars: 3, puzzlesSolved: 21 })).toBe(true);
+    expect(StoreReview.requestReview).toHaveBeenCalledTimes(1);
   });
 });

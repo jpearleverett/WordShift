@@ -14,7 +14,6 @@ import { DraggableTile } from './DraggableTile';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
-import { hapticMedium, hapticError } from '../services/haptics';
 import { getWordPhaseTier } from '../services/localGenerator';
 import {
   ROW_HORIZONTAL_MARGIN,
@@ -587,10 +586,11 @@ export const Row: React.FC<RowProps> = memo(({
     }
   }, [showSlots, selectedLetter?.id]);
 
-  // Micro-shake the target row on invalid drop attempts.
+  // Micro-shake the target row on invalid drop attempts. Visual-only: the
+  // haptic + sound are owned by App.tsx's handleSlotPress so the rejection buzz
+  // fires exactly once instead of being doubled by a second impact here.
   useEffect(() => {
     if (!isTarget || invalidDropSignal <= 0) return;
-    hapticError();
     invalidShakeX.setValue(0);
     Animated.sequence([
       Animated.timing(invalidShakeX, { toValue: 7, duration: 45, useNativeDriver: true }),
@@ -602,9 +602,10 @@ export const Row: React.FC<RowProps> = memo(({
   }, [invalidDropSignal, isTarget, invalidShakeX]);
 
   // Brief scale bounce on the target row when a letter successfully lands.
+  // Visual-only: App.tsx owns the landing haptic (weighted heavy for a drag vs
+  // medium for a tap), so this effect must not fire a second impact.
   useEffect(() => {
     if (!isTarget || successDropSignal <= 0) return;
-    hapticMedium();
     if (getSettingsSync().reducedMotion) return;
     successBounceScale.setValue(1.08);
     Animated.spring(successBounceScale, {
