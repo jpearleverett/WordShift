@@ -21,7 +21,7 @@ import {
 import { Animal, Room, HomeWorldProgress } from '../../types/homeWorld';
 import { HouseWorld } from './HouseWorld';
 import { CHARACTER_SPRITES } from './AnimalSprite';
-import { CandyColors, getDialogueTheme, getOverlayBannerTheme, getPhaseTheme } from '../../theme/colors';
+import { CandyColors, getDialogueTheme, getPhaseTheme } from '../../theme/colors';
 import { SURFACE, getPressSpring, getSurfaceTheme } from '../../theme/surfaces';
 import {
   getPixelSkin,
@@ -1455,13 +1455,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Next Unlock Progress Bar (hidden during early onboarding, shown during unlock_explained) */}
           {unlockFlow.nextUnlock && (!isOnboarding || onboardingStep === 'unlock_explained') && (
             <TouchableOpacity
-              style={[styles.unlockProgressContainer, {
-                backgroundColor: progress.currentPhase >= 3
-                  ? 'rgba(15, 10, 25, 0.80)'
-                  : progress.currentPhase >= 2
-                    ? 'rgba(15, 15, 25, 0.78)'
-                    : 'rgba(15, 25, 15, 0.75)',
-              }]}
+              style={styles.unlockProgressContainer}
               activeOpacity={0.85}
               onPress={() => {
                 hapticLight();
@@ -1476,14 +1470,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 now: Math.min(progress.amber, unlockFlow.nextUnlock.cost || 1),
               }}
             >
+              {/* Wooden sign — cottage card frame over the outdoor world. */}
+              <NineSliceFrame
+                skin={getPixelSkin(progress.currentPhase).card}
+                cornerDp={CARD_CORNER_DP}
+                edgeDp={CARD_EDGE_DP}
+                fillColor={getPixelSkin(progress.currentPhase).fillCard}
+              />
               <View style={styles.unlockProgressInner}>
-                <Text style={styles.unlockProgressLabel}>
+                <Text style={[styles.unlockProgressLabel, { color: st.title }]}>
                   Next Unlock
                 </Text>
-                <View style={styles.unlockProgressBarBg}>
+                <View style={[styles.unlockProgressBarBg, { backgroundColor: st.sectionBorder }]}>
                   <View
                     style={[
                       styles.unlockProgressBarFill,
+                      { backgroundColor: st.pillBg },
                       {
                         width: `${Math.min(100, unlockFlow.nextUnlock.cost > 0
                           ? (progress.amber / unlockFlow.nextUnlock.cost) * 100
@@ -1492,7 +1494,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     ]}
                   />
                 </View>
-                <Text style={styles.unlockProgressText}>
+                <Text style={[styles.unlockProgressText, { color: st.body }]}>
                   {unlockFlow.nextUnlock.cost === 0
                     ? 'FREE'
                     : <><AmberInline /> {progress.amber} / {unlockFlow.nextUnlock.cost}</>}
@@ -1502,28 +1504,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
 
           {/* Ambient home line — atmospheric text when idle (auto-dismiss with fade) */}
-          {ambientLine && !isOnboarding && (() => {
-            const bannerTheme = getOverlayBannerTheme(progress.currentPhase);
-            return (
-              <Animated.View style={[styles.ambientLineContainer, {
-                opacity: ambientOpacity,
-                backgroundColor: bannerTheme.containerBg,
-                borderColor: bannerTheme.borderColor,
-              }]}>
-                <Text
-                  style={[
-                    styles.ambientLineText,
-                    {
-                      color: bannerTheme.textColor,
-                      textShadowColor: bannerTheme.textShadowColor,
-                    },
-                  ]}
-                >
-                  {ambientLine}
-                </Text>
-              </Animated.View>
-            );
-          })()}
+          {ambientLine && !isOnboarding && (
+            <Animated.View style={[styles.ambientLineContainer, { opacity: ambientOpacity }]}>
+              {/* Small wooden sign — cottage card frame over the world. */}
+              <NineSliceFrame
+                skin={getPixelSkin(progress.currentPhase).card}
+                cornerDp={CARD_CORNER_DP}
+                edgeDp={CARD_EDGE_DP}
+                fillColor={getPixelSkin(progress.currentPhase).fillCard}
+              />
+              <Text style={[styles.ambientLineText, { color: st.body }]}>
+                {ambientLine}
+              </Text>
+            </Animated.View>
+          )}
 
         </View>
 
@@ -1664,47 +1658,66 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   {/* Decorative separator under name */}
                   <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
 
-                  <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
-                    <Text style={[styles.dialogueText, { color: dt.textColor }]}>{dialogueFlow.dialogueText}</Text>
+                  <View style={styles.dialogueBubble}>
+                    <NineSliceFrame
+                      skin={pixelSkin.card}
+                      cornerDp={CARD_CORNER_DP}
+                      edgeDp={CARD_EDGE_DP}
+                      fillColor={pixelSkin.fillCard}
+                    />
+                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{dialogueFlow.dialogueText}</Text>
                   </View>
 
                   {/* Dialogue choice buttons (Phase 3 choice points) */}
                   {dialogueFlow.activeChoice && dialogueFlow.dialogueText === dialogueFlow.activeChoice.prompt ? (
                     <View style={styles.dialogueChoiceRow}>
                       <TouchableOpacity
-                        style={[styles.dialogueChoiceBtn, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                        style={styles.dialogueChoiceBtn}
                         onPress={() => dialogueFlow.handleDialogueChoice('ask')}
                         accessibilityLabel={dialogueFlow.activeChoice.options.ask}
                         accessibilityRole="button"
                       >
-                        <Text style={[styles.dialogueChoiceBtnText, { color: dt.textColor }]}>
+                        <NineSliceFrame
+                          skin={pixelSkin.card}
+                          cornerDp={CARD_CORNER_DP}
+                          edgeDp={CARD_EDGE_DP}
+                          fillColor={pixelSkin.fillCard}
+                        />
+                        <Text style={[styles.dialogueChoiceBtnText, { color: panelSt.body }]}>
                           {dialogueFlow.activeChoice.options.ask}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={[styles.dialogueChoiceBtn, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}
+                        style={styles.dialogueChoiceBtn}
                         onPress={() => dialogueFlow.handleDialogueChoice('refuse')}
                         accessibilityLabel={dialogueFlow.activeChoice.options.refuse}
                         accessibilityRole="button"
                       >
-                        <Text style={[styles.dialogueChoiceBtnText, { color: dt.textColor }]}>
+                        <NineSliceFrame
+                          skin={pixelSkin.card}
+                          cornerDp={CARD_CORNER_DP}
+                          edgeDp={CARD_EDGE_DP}
+                          fillColor={pixelSkin.fillCard}
+                        />
+                        <Text style={[styles.dialogueChoiceBtnText, { color: panelSt.body }]}>
                           {dialogueFlow.activeChoice.options.refuse}
                         </Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                   <View style={styles.dialogueFooter}>
-                    <TouchableOpacity
-                      style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
+                    <BevelRowButton
+                      phase={progress.currentPhase}
+                      variant="primary"
+                      hostDark={dtHostDark}
                       onPress={dialogueFlow.handleNextDialogue}
                       accessibilityLabel="Continue dialogue"
-                      accessibilityRole="button"
+                      style={styles.dialogueContinueBevel}
                     >
-                      <View style={styles.dialogueButtonShine} />
-                      <Text style={styles.continueButtonText}>
+                      <Text style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
                         {dialogueFlow.hasMoreToShow ? 'Next' : 'Close'}
                       </Text>
-                    </TouchableOpacity>
+                    </BevelRowButton>
                   </View>
                   )}
                 </View>
@@ -2606,22 +2619,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   {/* Decorative separator under name */}
                   <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
 
-                  <View style={[styles.dialogueBubble, { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder }]}>
-                    <Text style={[styles.dialogueText, { color: dt.textColor }]}>{getCurrentIntroText()}</Text>
+                  <View style={styles.dialogueBubble}>
+                    <NineSliceFrame
+                      skin={pixelSkin.card}
+                      cornerDp={CARD_CORNER_DP}
+                      edgeDp={CARD_EDGE_DP}
+                      fillColor={pixelSkin.fillCard}
+                    />
+                    <Text style={[styles.dialogueText, { color: panelSt.body }]}>{getCurrentIntroText()}</Text>
                   </View>
 
                   <View style={styles.dialogueFooter}>
-                    <TouchableOpacity
-                      style={[styles.continueButton, { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow }]}
+                    <BevelRowButton
+                      phase={progress.currentPhase}
+                      variant="primary"
+                      hostDark={dtHostDark}
                       onPress={handleAdvanceIntroDialogue}
                       accessibilityLabel={hasMoreIntroDialogues() ? 'Continue intro' : 'Welcome and close'}
-                      accessibilityRole="button"
+                      style={styles.dialogueContinueBevel}
                     >
-                      <View style={styles.dialogueButtonShine} />
-                      <Text style={styles.continueButtonText}>
+                      <Text style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
                         {hasMoreIntroDialogues() ? 'Next' : 'Welcome!'}
                       </Text>
-                    </TouchableOpacity>
+                    </BevelRowButton>
                   </View>
                 </View>
               </View>
@@ -2930,13 +2950,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
                 <View style={[styles.dialogueNameSeparator, { backgroundColor: dt.accentLine }]} />
 
-                <View
-                  style={[
-                    styles.journalSpotlightBubble,
-                    { backgroundColor: dt.bubbleBg, borderColor: dt.bubbleBorder },
-                  ]}
-                >
-                  <Text style={[styles.dialogueText, { color: dt.textColor }]}>
+                <View style={styles.journalSpotlightBubble}>
+                  <NineSliceFrame
+                    skin={pixelSkin.card}
+                    cornerDp={CARD_CORNER_DP}
+                    edgeDp={CARD_EDGE_DP}
+                    fillColor={pixelSkin.fillCard}
+                  />
+                  <Text style={[styles.dialogueText, { color: panelSt.body }]}>
                     {journalSpotlightLines[journalSpotlightIndex]}
                   </Text>
                 </View>
@@ -2961,11 +2982,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     })}
                   </View>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.continueButton,
-                      { backgroundColor: dt.primaryButtonBg, shadowColor: dt.primaryButtonShadow },
-                    ]}
+                  <BevelRowButton
+                    phase={progress.currentPhase}
+                    variant="primary"
+                    hostDark={dtHostDark}
                     onPress={journalSpotlightIndex < journalSpotlightLines.length - 1
                       ? () => setJournalSpotlightIndex(prev => prev + 1)
                       : async () => {
@@ -2974,15 +2994,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         }
                     }
                     accessibilityLabel={journalSpotlightIndex < journalSpotlightLines.length - 1 ? 'Continue journal intro' : 'Close journal intro'}
-                    accessibilityRole="button"
+                    style={styles.dialogueContinueBevel}
                   >
-                    <View style={styles.dialogueButtonShine} />
-                    <Text style={styles.continueButtonText}>
+                    <Text style={[styles.continueButtonText, { color: pixelSkin.ink.primary }]}>
                       {journalSpotlightIndex < journalSpotlightLines.length - 1
                         ? 'Next'
                         : currentJournalSpotlightStep.finalCtaLabel}
                     </Text>
-                  </TouchableOpacity>
+                  </BevelRowButton>
                 </View>
               </View>
             </View>
@@ -3275,11 +3294,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 4,
     marginBottom: 4,
-    borderRadius: 14,
-    padding: 12,
+    // Cottage card frame background; clear its 12dp wood band.
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     zIndex: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
@@ -3290,44 +3308,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   unlockProgressLabel: {
-    color: CandyColors.white,
     fontSize: 12.5,
     fontWeight: '800',
     letterSpacing: 0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
     flex: 1,
   },
   unlockProgressText: {
-    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 11.5,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: 0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
+  // Recessed wood trough (square pixel ends), amber fill.
   unlockProgressBarBg: {
     flex: 2,
     height: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderRadius: 5,
     overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   unlockProgressBarFill: {
     height: '100%',
-    backgroundColor: CandyColors.yellow.main,
-    borderRadius: 5,
-    shadowColor: CandyColors.yellow.light,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
   },
 
   // Modal styles — scrim color always comes from the phase theme inline
@@ -3399,47 +3400,30 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     marginBottom: 12,
   },
+  // Cottage parchment tray (NineSliceFrame card background); clear its 12dp
+  // wood band. No borderRadius/borderWidth — the pixel frame owns the edge.
   dialogueBubble: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     marginBottom: 14,
-    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   dialogueText: {
     fontSize: 15,
     lineHeight: 23,
     letterSpacing: 0.1,
   },
+  // The cottage bevel sits flush-right in the footer at its own strip height.
+  dialogueContinueBevel: {
+    minWidth: 132,
+  },
   dialogueFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
-  dialogueButtonShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-  },
-  continueButton: {
-    paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderRadius: 22,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
   continueButtonText: {
-    color: CandyColors.white,
     fontSize: 16,
     fontWeight: '800',
   },
@@ -3800,10 +3784,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   dialogueChoiceBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    borderWidth: 1,
+    // Cottage card frame background; clear its wood band; ≥44dp for the caps.
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    minHeight: 46,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   dialogueChoiceBtnText: {
@@ -3849,15 +3834,14 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.9)',
   },
 
-  // Ambient home line
+  // Ambient home line — cottage card frame; clear the 12dp wood band.
   ambientLineContainer: {
     alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
     marginBottom: 4,
+    minWidth: 120,
     zIndex: 10,
-    borderRadius: 18,
-    borderWidth: 1,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -3866,13 +3850,11 @@ const styles = StyleSheet.create({
   },
   ambientLineText: {
     fontSize: 15,
-    fontWeight: '500',
+    fontWeight: '600',
     fontStyle: 'italic',
     textAlign: 'center',
     letterSpacing: 0.5,
     lineHeight: 22,
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
   },
 
   // Sacrifice modal — chrome comes from the NineSliceFrame pixel panel
@@ -4162,11 +4144,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   journalSpotlightBubble: {
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
+    // Cottage parchment tray; clear the 12dp wood band, ≥44dp for the caps.
+    paddingHorizontal: 18,
+    paddingVertical: 16,
     marginBottom: 14,
-    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: 'center',
   },
   journalSpotlightFooter: {
     flexDirection: 'row',

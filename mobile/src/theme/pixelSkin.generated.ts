@@ -5,13 +5,13 @@ import { ImageSourcePropType } from 'react-native';
 export interface FrameSkin { tl: ImageSourcePropType; tr: ImageSourcePropType; bl: ImageSourcePropType; br: ImageSourcePropType; top: ImageSourcePropType; bottom: ImageSourcePropType; left: ImageSourcePropType; right: ImageSourcePropType; }
 export interface ThreeSlice { l: ImageSourcePropType; m: ImageSourcePropType; r: ImageSourcePropType; }
 export interface ButtonSkin { up: ThreeSlice; down: ThreeSlice; }
-export interface PixelSkin { panel: FrameSkin; card: FrameSkin; buttons: { primary: { md: ButtonSkin; lg: ButtonSkin }; secondary: { md: ButtonSkin; lg: ButtonSkin }; quiet: { md: ButtonSkin; lg: ButtonSkin } }; plaque: ThreeSlice; fill: string; fillCard: string; ink: { primary: string; secondary: string; quiet: string; plaque: string }; }
+export interface PixelSkin { panel: FrameSkin; card: FrameSkin; buttons: { primary: { md: ButtonSkin; lg: ButtonSkin }; secondary: { md: ButtonSkin; lg: ButtonSkin }; quiet: { md: ButtonSkin; lg: ButtonSkin } }; plaque: ThreeSlice; fill: string; fillCard: string; /** Painted-inlay second hue per skin (structural accent, never an action color). */ accent: string; accentLo: string; ink: { primary: string; secondary: string; quiet: string; plaque: string }; }
 
 /** dp sizes (1 art-px = 3 dp; PNGs are baked at 9 real px per art-px). */
 export const PANEL_CORNER_DP = 36;
-export const PANEL_EDGE_DP = 24;
-export const CARD_CORNER_DP = 18;
-export const CARD_EDGE_DP = 15;
+export const PANEL_EDGE_DP = 30;
+export const CARD_CORNER_DP = 21;
+export const CARD_EDGE_DP = 18;
 export const BTN_CAP_DP = 24;
 export const BTN_MD_DP = 42;
 export const BTN_LG_DP = 57;
@@ -31,6 +31,8 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
     plaque: { l: require('../../assets/ui/panels/bright/plaque_l.png'), m: require('../../assets/ui/panels/bright/plaque_m.png'), r: require('../../assets/ui/panels/bright/plaque_r.png') },
     fill: '#F3E2BF',
     fillCard: '#EBD8B2',
+    accent: '#6E9A4B',
+    accentLo: '#527A36',
     ink: { primary: '#3B2416', secondary: '#4A3222', quiet: '#6B4A2F', plaque: '#FBF0D9' },
   },
   dusk: {
@@ -44,6 +46,8 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
     plaque: { l: require('../../assets/ui/panels/dusk/plaque_l.png'), m: require('../../assets/ui/panels/dusk/plaque_m.png'), r: require('../../assets/ui/panels/dusk/plaque_r.png') },
     fill: '#E6D0A9',
     fillCard: '#DCC49B',
+    accent: '#A9535C',
+    accentLo: '#873E46',
     ink: { primary: '#33201E', secondary: '#43301F', quiet: '#64492E', plaque: '#F2D2A9' },
   },
   storm: {
@@ -57,6 +61,8 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
     plaque: { l: require('../../assets/ui/panels/storm/plaque_l.png'), m: require('../../assets/ui/panels/storm/plaque_m.png'), r: require('../../assets/ui/panels/storm/plaque_r.png') },
     fill: '#CDB289',
     fillCard: '#C2A67D',
+    accent: '#5F6E96',
+    accentLo: '#485577',
     ink: { primary: '#2A1A10', secondary: '#2F1F14', quiet: '#4A3626', plaque: '#E48B6D' },
   },
   dark: {
@@ -70,6 +76,8 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
     plaque: { l: require('../../assets/ui/panels/dark/plaque_l.png'), m: require('../../assets/ui/panels/dark/plaque_m.png'), r: require('../../assets/ui/panels/dark/plaque_r.png') },
     fill: '#352A31',
     fillCard: '#2E2429',
+    accent: '#9E3B2A',
+    accentLo: '#77281C',
     ink: { primary: '#F5E3CB', secondary: '#E8D5B7', quiet: '#BBA68E', plaque: '#A55B2E' },
   },
   serene: {
@@ -83,6 +91,8 @@ export const PIXEL_SKINS: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene'
     plaque: { l: require('../../assets/ui/panels/serene/plaque_l.png'), m: require('../../assets/ui/panels/serene/plaque_m.png'), r: require('../../assets/ui/panels/serene/plaque_r.png') },
     fill: '#332A38',
     fillCard: '#2C2431',
+    accent: '#8A6E96',
+    accentLo: '#6B5277',
     ink: { primary: '#1F1512', secondary: '#D9C8D4', quiet: '#A793A6', plaque: '#A95341' },
   },
 };

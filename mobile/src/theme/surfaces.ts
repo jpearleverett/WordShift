@@ -64,6 +64,16 @@ export interface SurfaceTheme {
   overlay: string;
   /** Full-screen background for secondary screens (deep tinted base). */
   screenBg: string;
+  /**
+   * Header inks for text sitting DIRECTLY on screenBg (screen titles, back
+   * chips, section labels outside a card). screenBg is a deep wood tone in
+   * every group, so these are cream — never reuse card inks (title/body/
+   * primaryText) on screenBg: those are dark on the light skins and vanish.
+   */
+  headerTitle: string;
+  headerMuted: string;
+  /** Border for chips/pills that sit directly on screenBg. */
+  headerChipBorder: string;
   /** Panel / modal card background. */
   cardBg: string;
   /** Panel frame border. */
@@ -113,7 +123,7 @@ export interface SurfaceTheme {
  */
 const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<SurfaceTheme, 'overlay' | 'glow'>> = {
   bright: {
-    screenBg: '#5C4130', cardBg: '#F3E2BF', cardBorder: '#5A3418',
+    screenBg: '#5C4130', headerTitle: '#FBF0D9', headerMuted: '#E3CBA0', headerChipBorder: 'rgba(251, 240, 217, 0.35)', cardBg: '#F3E2BF', cardBorder: '#5A3418',
     title: '#3B2416', body: '#4A3222', muted: '#6B4A2F',
     sectionBg: '#EBD8B2', sectionBorder: '#D9BE8F', rowBg: '#EBD8B2', rowBorder: '#D9BE8F',
     amberText: '#7A4E00', amberTint: 'rgba(202, 138, 4, 0.12)', amberTintBorder: 'rgba(176, 111, 30, 0.45)',
@@ -123,7 +133,7 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     dangerText: '#A6402E',
   },
   dusk: {
-    screenBg: '#4A3524', cardBg: '#E6D0A9', cardBorder: '#48301C',
+    screenBg: '#4A3524', headerTitle: '#F2E2C2', headerMuted: '#DCC49B', headerChipBorder: 'rgba(242, 226, 194, 0.35)', cardBg: '#E6D0A9', cardBorder: '#48301C',
     title: '#33201E', body: '#43301F', muted: '#64492E',
     sectionBg: '#DCC49B', sectionBorder: '#C3A67D', rowBg: '#DCC49B', rowBorder: '#C3A67D',
     amberText: '#6F4700', amberTint: 'rgba(190, 128, 8, 0.12)', amberTintBorder: 'rgba(160, 100, 26, 0.45)',
@@ -133,7 +143,7 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     dangerText: '#96382A',
   },
   storm: {
-    screenBg: '#33241E', cardBg: '#CDB289', cardBorder: '#301B14',
+    screenBg: '#33241E', headerTitle: '#DEC49E', headerMuted: '#C8AE85', headerChipBorder: 'rgba(222, 196, 158, 0.35)', cardBg: '#CDB289', cardBorder: '#301B14',
     title: '#2A1A10', body: '#2F1F14', muted: '#4A3626',
     sectionBg: '#C2A67D', sectionBorder: '#A3875F', rowBg: '#C2A67D', rowBorder: '#A3875F',
     amberText: '#5E3B00', amberTint: 'rgba(150, 98, 20, 0.14)', amberTintBorder: 'rgba(130, 82, 24, 0.5)',
@@ -143,7 +153,7 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     dangerText: '#8A2F22',
   },
   dark: {
-    screenBg: '#171013', cardBg: '#352A31', cardBorder: '#0F0A10',
+    screenBg: '#171013', headerTitle: '#E8D5B7', headerMuted: '#BBA68E', headerChipBorder: 'rgba(232, 213, 183, 0.30)', cardBg: '#352A31', cardBorder: '#0F0A10',
     title: '#E8D5B7', body: '#E8D5B7', muted: '#BBA68E',
     sectionBg: '#2E2429', sectionBorder: '#241B20', rowBg: '#2E2429', rowBorder: '#241B20',
     amberText: '#E9B468', amberTint: 'rgba(233, 180, 104, 0.10)', amberTintBorder: 'rgba(233, 180, 104, 0.35)',
@@ -153,7 +163,7 @@ const COTTAGE: Record<'bright' | 'dusk' | 'storm' | 'dark' | 'serene', Omit<Surf
     dangerText: '#E08A8A',
   },
   serene: {
-    screenBg: '#241B26', cardBg: '#332A38', cardBorder: '#151019',
+    screenBg: '#241B26', headerTitle: '#D9C8D4', headerMuted: '#A793A6', headerChipBorder: 'rgba(217, 200, 212, 0.30)', cardBg: '#332A38', cardBorder: '#151019',
     title: '#D9C8D4', body: '#D9C8D4', muted: '#A793A6',
     sectionBg: '#2C2431', sectionBorder: '#221B28', rowBg: '#2C2431', rowBorder: '#221B28',
     amberText: '#C99E63', amberTint: 'rgba(201, 158, 99, 0.10)', amberTintBorder: 'rgba(201, 158, 99, 0.35)',

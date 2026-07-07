@@ -442,14 +442,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     <View style={[styles.container, { backgroundColor: t.screenBg }]}>
       <View style={[styles.header, { paddingTop: screenInsets.top + 16 }]}>
         <TouchableOpacity
-          style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.cardBorder }]}
+          style={[styles.backChip, { backgroundColor: chipBg, borderColor: t.headerChipBorder }]}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Back to home"
         >
-          <Text style={[styles.backChipText, { color: t.primaryText }]}>{'<'} Back</Text>
+          <Text style={[styles.backChipText, { color: t.headerTitle }]}>{'<'} Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: t.primaryText }]}>Settings</Text>
+        <Text style={[styles.title, { color: t.headerTitle }]}>Settings</Text>
         <View style={styles.headerSpacer} />
       </View>
 

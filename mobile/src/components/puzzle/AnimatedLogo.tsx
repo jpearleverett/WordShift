@@ -1,7 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import { CandyColors } from '../../theme/colors';
+import { StyleSheet, Animated, Easing, Image } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
+
+// Hand-authored wooden WordShift wordmark (transparent PNG, 1000x250 → 4:1).
+const WORDMARK = require('../../../assets/ui/wordmark.png');
+const LOGO_WIDTH = 236;
+const LOGO_HEIGHT = LOGO_WIDTH * (250 / 1000);
 
 export const AnimatedLogo: React.FC = () => {
   const bounceAnim = useRef(new Animated.Value(0)).current;
@@ -81,14 +85,12 @@ export const AnimatedLogo: React.FC = () => {
       accessibilityLabel="WordShift"
       accessibilityRole="header"
     >
-      <View style={styles.logoInner}>
-        <Text style={styles.logoWord}>WORD</Text>
-        <Text style={styles.logoShift}>SHIFT</Text>
-      </View>
-      {/* Sparkle decorations */}
-      <View style={[styles.logoSparkle, styles.logoSparkle1]} />
-      <View style={[styles.logoSparkle, styles.logoSparkle2]} />
-      <View style={[styles.logoSparkle, styles.logoSparkle3]} />
+      <Image
+        source={WORDMARK}
+        style={styles.wordmark}
+        resizeMode="contain"
+        fadeDuration={0}
+      />
     </Animated.View>
   );
 };
@@ -96,44 +98,11 @@ export const AnimatedLogo: React.FC = () => {
 const styles = StyleSheet.create({
   logoContainer: {
     position: 'relative',
-  },
-  logoInner: {
-    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  logoWord: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: CandyColors.white,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-  logoShift: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: CandyColors.yellow.main,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
-  },
-  logoSparkle: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    backgroundColor: CandyColors.white,
-    borderRadius: 4,
-  },
-  logoSparkle1: {
-    top: -5,
-    left: 20,
-  },
-  logoSparkle2: {
-    top: 5,
-    right: -10,
-  },
-  logoSparkle3: {
-    bottom: -3,
-    left: 60,
+  wordmark: {
+    width: LOGO_WIDTH,
+    height: LOGO_HEIGHT,
   },
 });
