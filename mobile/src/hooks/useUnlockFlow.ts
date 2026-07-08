@@ -137,7 +137,11 @@ export function useUnlockFlow({
       setCanSkip(skippable);
       setSkipCost(skippable ? getUnlockSkipCost(unlock) : 0);
       setCanSpeedUpReserved(speedable);
-      setReservedSkipCost(speedable ? getReservedSkipCost(unlock) : 0);
+      // Expose the speed-up premium whenever this unlock is the reservation
+      // (even when it's not yet affordable), so the UI can show the option and
+      // its cost instead of hiding it — the premium equals the base cost again,
+      // which surprises players who just spent that base cost reserving.
+      setReservedSkipCost(reserved === unlock.id ? getReservedSkipCost(unlock) : 0);
     } else {
       setUnlockAvailability(null);
       setCanReserve(false);

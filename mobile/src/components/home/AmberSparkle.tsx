@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Animated } from 'react-native';
+import { BODY_FONT } from '../../theme/fonts';
 
 export const AmberSparkle: React.FC = () => {
   const sparkles = useRef(
@@ -57,6 +58,7 @@ export const AmberSparkle: React.FC = () => {
         <Animated.Text
           key={i}
           style={{
+            fontFamily: BODY_FONT,
             position: 'absolute',
             fontSize: 8,
             transform: [

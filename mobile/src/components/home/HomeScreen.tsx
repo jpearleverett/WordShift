@@ -33,7 +33,7 @@ import {
   BTN_MD_DP,
   BTN_SHADOW_DP,
 } from '../../theme/pixelSkin.generated';
-import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, BODY_FONT_BOLD, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
@@ -367,6 +367,11 @@ const BevelRowButton: React.FC<{
     </Pressable>
   );
 };
+
+// The axolotl (scuba mask) and fennec (tall ears) are framed tighter in their
+// source sprites and read larger than the other animals in the dialogue alcove;
+// render those two a touch smaller so they don't clip the card.
+const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox']);
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
@@ -1635,10 +1640,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             {dialogueFlow.selectedAnimal && (
               <View style={styles.dialogueRow}>
-                {/* Sprite column — the zoomed portrait sits on the parchment
-                    (transparent bg); a slim accent rail marks the alcove. */}
+                {/* Sprite column — the zoomed portrait sits on the parchment. */}
                 <View style={styles.dialogueSpriteCol}>
-                  <View style={[styles.dialogueSpriteRail, { backgroundColor: pixelSkin.accent }]} />
                   {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
                     <Image
                       source={
@@ -1650,6 +1653,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       }
                       style={[
                         styles.dialogueSpriteImage,
+                        COMPACT_DIALOGUE_SPRITES.has(dialogueFlow.selectedAnimal.type) &&
+                          styles.dialogueSpriteImageSmall,
                         dialogueFlow.isTalking && styles.dialogueSpriteTalking,
                       ]}
                       resizeMode="cover"
@@ -2016,6 +2021,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     ) : (
                       <View style={[styles.reservedChip, { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder }]}>
                         <Text style={[styles.reservedChipText, { color: panelSt.secondaryText }]}>Reserved ✓</Text>
+                        {unlockFlow.reservedSkipCost > 0 && (
+                          <Text style={[styles.reservedChipSubtext, { color: panelSt.muted }]}>
+                            Speed up <AmberInline /> {unlockFlow.reservedSkipCost}
+                          </Text>
+                        )}
                       </View>
                     )
                   ) : unlockFlow.canReserve ? (
@@ -2339,7 +2349,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.amberBalance, { color: panelSt.amberText }]}>Your Amber: <AmberInline /> {progress.amber}</Text>
 
                 {unlockFlow.purchaseError && (
-                  <Text style={[styles.shopSubtitle, { color: panelSt.dangerText, marginTop: 8, fontWeight: '600' }]}>
+                  <Text style={[styles.shopSubtitle, { color: panelSt.dangerText, marginTop: 8, fontWeight: '600', fontFamily: BODY_FONT_BOLD }]}>
                     {unlockFlow.purchaseError}
                   </Text>
                 )}
@@ -2355,10 +2365,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   if (isReserved) {
                     return (
                       <>
-                        <Text style={[styles.shopSubtitle, { color: panelSt.title, marginTop: 8, fontWeight: '700' }]}>
+                        <Text style={[styles.shopSubtitle, { color: panelSt.title, marginTop: 8, fontWeight: '700', fontFamily: BODY_FONT_BOLD }]}>
                           {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                         </Text>
-                        {unlockFlow.canSpeedUpReserved && (
+                        {unlockFlow.canSpeedUpReserved ? (
                           <BevelRowButton
                             phase={progress.currentPhase}
                 hostDark={dtHostDark}
@@ -2371,7 +2381,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                               Speed it up for <AmberInline /> {unlockFlow.reservedSkipCost}
                             </Text>
                           </BevelRowButton>
-                        )}
+                        ) : unlockFlow.reservedSkipCost > 0 ? (
+                          <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 6, fontStyle: 'italic', fontFamily: BODY_FONT_ITALIC }]}>
+                            Or speed it up for <AmberInline /> {unlockFlow.reservedSkipCost} once you can afford it.
+                          </Text>
+                        ) : null}
                       </>
                     );
                   }
@@ -2609,7 +2623,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.dialogueRow}>
                 {/* Sprite column — zoomed portrait on the parchment. */}
                 <View style={styles.dialogueSpriteCol}>
-                  <View style={[styles.dialogueSpriteRail, { backgroundColor: pixelSkin.accent }]} />
                   {CHARACTER_SPRITES[introAnimal.type] ? (
                     <Image
                       source={
@@ -2619,7 +2632,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             ? CHARACTER_SPRITES[introAnimal.type]!.talk!
                             : CHARACTER_SPRITES[introAnimal.type]!.idle
                       }
-                      style={styles.dialogueSpriteImage}
+                      style={[
+                        styles.dialogueSpriteImage,
+                        COMPACT_DIALOGUE_SPRITES.has(introAnimal.type) &&
+                          styles.dialogueSpriteImageSmall,
+                      ]}
                       resizeMode="cover"
                       accessibilityLabel={`${introAnimal.name} portrait`}
                     />
@@ -3292,6 +3309,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   wordsOfferedHomeTextDark: {
+    fontFamily: BODY_FONT_ITALIC,
     color: 'rgba(180, 100, 130, 0.8)',
     fontStyle: 'italic',
   },
@@ -3376,20 +3394,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  // Slim accent rail on the sprite alcove's inner edge (replaces the old flat
-  // accent line — carries the skin's second hue between portrait and text).
-  dialogueSpriteRail: {
-    position: 'absolute',
-    right: 0,
-    top: 8,
-    bottom: 8,
-    width: 2,
-    borderRadius: 1,
-    opacity: 0.6,
-  },
   dialogueSpriteImage: {
     width: SCREEN_WIDTH * 0.36,
     height: SCREEN_WIDTH * 0.48,
+  },
+  // Axolotl/fennec render a touch smaller (see COMPACT_DIALOGUE_SPRITES) so
+  // their tighter source framing doesn't clip the dialogue card.
+  dialogueSpriteImageSmall: {
+    width: SCREEN_WIDTH * 0.31,
+    height: SCREEN_WIDTH * 0.41,
   },
   // Subtle "talking" lift applied while isTalking toggles (every 300ms). Reads as
   // gentle movement for every animal and ensures the portrait never looks frozen
@@ -3561,6 +3574,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.4,
+  },
+  reservedChipSubtext: {
+    fontFamily: BODY_FONT,
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'center',
   },
   // Pixel bevel button anatomy (mirrors CandyButton; needed for labels
   // that embed <AmberInline /> inside the Text run)

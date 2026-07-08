@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from '
 import { PhaseTransitionEvent, PhaseScene, CinematicParticleConfig } from '../services/phaseEvents';
 import { getSettingsSync } from '../services/settings';
 import { hapticLight, hapticMedium, hapticHeavy, hapticWarning } from '../services/haptics';
+import { BODY_FONT, BODY_FONT_BOLD } from '../theme/fonts';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -424,6 +425,7 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   title: {
+    fontFamily: BODY_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 3,
@@ -437,10 +439,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sceneEmoji: {
+    fontFamily: BODY_FONT,
     fontSize: 48,
     marginBottom: 24,
   },
   sceneText: {
+    fontFamily: BODY_FONT_BOLD,
     fontSize: 20,
     fontWeight: '600',
     textAlign: 'center',
@@ -468,6 +472,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   skipText: {
+    fontFamily: BODY_FONT_BOLD,
     fontSize: 14,
     fontWeight: '600',
   },

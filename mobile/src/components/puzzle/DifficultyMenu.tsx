@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   ViewStyle,
+  Dimensions,
 } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
@@ -14,6 +15,14 @@ import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
 import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../../services/puzzleVariety';
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+// The menu floats at top: 52. Size it to the device so DIFFICULTY + PUZZLE STYLE
+// (Standard/Reverse/Speed/Double + combos) + CHALLENGE/BLIND all fit without the
+// last row clipping the frame — taller than the old fixed 650 once Speed Shift
+// unlocks, but never so tall it runs off a short device.
+const MENU_MAX_HEIGHT = Math.max(560, Math.min(SCREEN_HEIGHT - 100, 840));
+const SCROLL_MAX_HEIGHT = MENU_MAX_HEIGHT - 52;
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
 const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
@@ -112,7 +121,7 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                 SELECTED
               </Text>
             )}
-            {isActive && (
+            {isActive && !isSelected && (
               <Text
                 style={[
                   styles.variantBadge,
@@ -287,9 +296,9 @@ const styles = StyleSheet.create({
     right: 20,
     top: 52,
     width: 290,
-    maxHeight: 650,
-    paddingTop: 24,
-    paddingBottom: 20,
+    maxHeight: MENU_MAX_HEIGHT,
+    paddingTop: 18,
+    paddingBottom: 16,
     paddingHorizontal: 10,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.45,
@@ -306,42 +315,42 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   scrollArea: {
-    maxHeight: 610,
+    maxHeight: SCROLL_MAX_HEIGHT,
   },
   scrollContent: {
     paddingHorizontal: 10,
-    paddingBottom: 12,
+    paddingBottom: 16,
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
-    marginTop: 8,
-    marginBottom: 6,
+    marginTop: 5,
+    marginBottom: 4,
     paddingHorizontal: 6,
   },
   combosComingText: {
     fontFamily: BODY_FONT,
     fontSize: 13,
     lineHeight: 18,
-    marginTop: 4,
-    marginBottom: 8,
+    marginTop: 2,
+    marginBottom: 5,
     paddingHorizontal: 8,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 46,
+    minHeight: 42,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'transparent',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   difficultyRing: {
     width: 12,
@@ -359,7 +368,7 @@ const styles = StyleSheet.create({
   sectionDivider: {
     height: 1.5,
     borderRadius: 1,
-    marginVertical: 8,
+    marginVertical: 5,
     marginHorizontal: 6,
   },
   challengeMenuIcon: {
@@ -378,13 +387,13 @@ const styles = StyleSheet.create({
   variantItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    minHeight: 46,
+    minHeight: 42,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'transparent',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 4,
+    paddingVertical: 8,
+    marginBottom: 3,
   },
   variantIcon: {
     fontFamily: BODY_FONT,

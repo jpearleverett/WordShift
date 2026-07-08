@@ -452,6 +452,7 @@ const styles = StyleSheet.create({
     height: SCREEN_WIDTH * 0.48,
   },
   dialogueSpriteEmoji: {
+    fontFamily: BODY_FONT,
     fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
   },
   // HomeScreen dialogueTextCol uses paddingBottom 34 because it is a bottom
@@ -532,6 +533,7 @@ const styles = StyleSheet.create({
     height: 114,
   },
   compactSpriteEmoji: {
+    fontFamily: BODY_FONT,
     fontSize: 48,
   },
   compactTextCol: {

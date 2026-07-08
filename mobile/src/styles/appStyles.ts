@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSurfaceTheme } from '../theme/surfaces';
+import { BODY_FONT, BODY_FONT_BOLD, BODY_FONT_ITALIC } from '../theme/fonts';
 
 /**
  * Returns the dominant background color for a given screen at a given phase.
@@ -54,6 +55,7 @@ export const appStyles = StyleSheet.create({
   initialLoadingTitle: {
     marginTop: 14,
     fontSize: 22,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
     letterSpacing: 1.2,
@@ -61,6 +63,7 @@ export const appStyles = StyleSheet.create({
   initialLoadingSubtitle: {
     marginTop: 8,
     fontSize: 13,
+    fontFamily: BODY_FONT,
     color: 'rgba(255, 255, 255, 0.75)',
     letterSpacing: 0.4,
   },
@@ -90,6 +93,7 @@ export const appStyles = StyleSheet.create({
   },
   headerHomeText: {
     fontSize: 20,
+    fontFamily: BODY_FONT,
   },
   headerTitleArea: {
     flex: 1,
@@ -103,6 +107,7 @@ export const appStyles = StyleSheet.create({
   },
   dailyBadgeText: {
     fontSize: 14,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.gray[800],
     letterSpacing: 2,
@@ -128,6 +133,7 @@ export const appStyles = StyleSheet.create({
   },
   helpButtonText: {
     fontSize: 22,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
   },
@@ -193,12 +199,14 @@ export const appStyles = StyleSheet.create({
   },
   difficultyText: {
     fontSize: 12,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.white,
     marginRight: 6,
   },
   difficultyArrow: {
     fontSize: 8,
+    fontFamily: BODY_FONT,
     color: 'rgba(255, 255, 255, 0.7)',
   },
 
@@ -243,18 +251,21 @@ export const appStyles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '700',
     color: CandyColors.purple.main,
   },
   loadingGlyph: {
     marginTop: 8,
     fontSize: 18,
+    fontFamily: BODY_FONT,
     color: CandyColors.purple.main,
     opacity: 0.8,
   },
   loadingHint: {
     marginTop: 6,
     fontSize: 11,
+    fontFamily: BODY_FONT_BOLD,
     color: CandyColors.gray[500],
     fontWeight: '600',
     letterSpacing: 0.2,
@@ -263,6 +274,7 @@ export const appStyles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
     fontSize: 16,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.purple.main,
     textAlign: 'center',
@@ -291,12 +303,14 @@ export const appStyles = StyleSheet.create({
   },
   timeUpButtonText: {
     fontSize: 15,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.white,
     letterSpacing: 0.3,
   },
   timeUpButtonTextSecondary: {
     fontSize: 15,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.gray[700],
     letterSpacing: 0.3,
@@ -335,6 +349,7 @@ export const appStyles = StyleSheet.create({
   },
   stuckPanelTitle: {
     fontSize: 16,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: CandyColors.gray[800],
     textAlign: 'center',
@@ -342,6 +357,7 @@ export const appStyles = StyleSheet.create({
   },
   stuckPanelBody: {
     fontSize: 13,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '600',
     color: CandyColors.gray[600],
     textAlign: 'center',
@@ -373,6 +389,7 @@ export const appStyles = StyleSheet.create({
   },
   stuckPanelButtonText: {
     fontSize: 15,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: '#FFFFFF',
   },
@@ -404,12 +421,14 @@ export const appStyles = StyleSheet.create({
   },
   challengeBadgeText: {
     fontSize: 10,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
     letterSpacing: 1,
   },
   challengeUndoText: {
     fontSize: 11,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.3,
@@ -428,6 +447,7 @@ export const appStyles = StyleSheet.create({
   },
   buyUndoText: {
     fontSize: 11,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: '#FFD479',
   },
@@ -445,6 +465,7 @@ export const appStyles = StyleSheet.create({
   },
   speedTimerText: {
     fontSize: 28,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     color: CandyColors.white,
     letterSpacing: 1,
@@ -464,6 +485,7 @@ export const appStyles = StyleSheet.create({
   },
   speedRoundText: {
     fontSize: 12,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: '#FFE9B0',
     letterSpacing: 0.5,
@@ -487,9 +509,11 @@ export const appStyles = StyleSheet.create({
   },
   variantBadgeIcon: {
     fontSize: 10,
+    fontFamily: BODY_FONT,
   },
   variantBadgeText: {
     fontSize: 9,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
     color: 'rgba(255, 255, 255, 0.85)',
     letterSpacing: 0.2,
@@ -520,9 +544,11 @@ export const appStyles = StyleSheet.create({
   },
   phaseBadgeIcon: {
     fontSize: 12,
+    fontFamily: BODY_FONT,
   },
   phaseBadgeText: {
     fontSize: 10,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.8)',
     letterSpacing: 1,
@@ -552,6 +578,7 @@ export const appStyles = StyleSheet.create({
   victoryGlitchText: {
     color: '#FF0040',
     fontSize: 28,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '900',
     letterSpacing: 4,
     textShadowColor: '#FF0040',
@@ -564,6 +591,7 @@ export const appStyles = StyleSheet.create({
   microBeatWhisperText: {
     color: 'rgba(200, 180, 220, 0.9)',
     fontSize: 18,
+    fontFamily: BODY_FONT_ITALIC,
     fontWeight: '500',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -583,6 +611,7 @@ export const appStyles = StyleSheet.create({
   },
   interjectionText: {
     fontSize: 13,
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
