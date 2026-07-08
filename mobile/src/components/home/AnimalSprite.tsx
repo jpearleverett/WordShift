@@ -12,7 +12,7 @@ import { TouchableOpacity } from 'react-native-gesture-handler';
 import { Animal, AnimalType, DialoguePhase } from '../../types/homeWorld';
 import { ANIMAL_EMOJIS } from '../../services/homeWorldData';
 import { CandyColors } from '../../theme/colors';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
 
@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   emoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 38,
   },
   spriteImage: {
@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   cooldownIndicator: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 8,
     marginLeft: 2,
   },
@@ -962,7 +962,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emotionEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 18,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },

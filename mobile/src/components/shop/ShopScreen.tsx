@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { CandyColors, TILE_THEMES, CONFETTI_THEMES } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
 import { AmberInline } from '../AmberInline';
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 12.5,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     textAlign: 'center',
     marginTop: 2,
     paddingHorizontal: 4,
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   },
   cardBody: { flex: 1, paddingHorizontal: 12 },
   cardName: { fontSize: 16, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
-  cardDesc: { fontSize: 12.5, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: PIXEL_FONT },
+  cardDesc: { fontSize: 12.5, fontWeight: '500', marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
   previewRow: { flexDirection: 'row', width: 96, flexWrap: 'wrap', gap: 4 },
   previewTile: {
     width: 22,
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   footnote: {
     fontSize: 11.5,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 16,

@@ -81,7 +81,10 @@
         {
           "fonts": [
             "./assets/fonts/PixelifySans-Regular.ttf",
-            "./assets/fonts/PixelifySans-Bold.ttf"
+            "./assets/fonts/PixelifySans-Bold.ttf",
+            "./assets/fonts/Nunito-Regular.ttf",
+            "./assets/fonts/Nunito-Bold.ttf",
+            "./assets/fonts/Nunito-Italic.ttf"
           ]
         }
       ],

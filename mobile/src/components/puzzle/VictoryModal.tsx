@@ -39,7 +39,7 @@ import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel } from '../../services/phaseNarrative';
 import { isAdFreeSync } from '../../services/entitlements';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -1414,7 +1414,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   harvestWordIcon: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 22,
     marginRight: 8,
   },
@@ -1445,7 +1445,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   winStreakEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 20,
     marginRight: 6,
   },
@@ -1470,7 +1470,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   milestoneEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 28,
     marginBottom: 4,
   },
@@ -1498,7 +1498,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   questBadgeIcon: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 14,
   },
   questBadgeText: {
@@ -1532,7 +1532,7 @@ const styles = StyleSheet.create({
     color: '#f1b8c6',
   },
   completionCodaText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 11,
     lineHeight: 16,
     color: CandyColors.gray[700],
@@ -1552,7 +1552,7 @@ const styles = StyleSheet.create({
     borderColor: CandyColors.purple.main,
   },
   phaseChangeEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 32,
     marginBottom: 8,
   },
@@ -1641,7 +1641,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(100, 30, 60, 0.3)',
   },
   ritualEchoArrow: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     color: '#655483',
     marginHorizontal: 2,

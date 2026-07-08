@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { CandyColors } from '../theme/colors';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { reportError } from '../services/errorReporting';
 
 interface ErrorBoundaryProps {
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   emoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 64,
     marginBottom: 16,
   },
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   message: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',

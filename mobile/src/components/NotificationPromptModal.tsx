@@ -8,7 +8,7 @@ import {
   Modal,
 } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { PanelCard } from './ui/PanelCard';
 import { CandyButton } from './ui/CandyButton';
 import { getSettingsSync } from '../services/settings';
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   },
   iconGlyph: {
     fontSize: 30,
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
   },
   title: {
     fontSize: 22,

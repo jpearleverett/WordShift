@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { CandyColors } from '../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   starSummaryText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     textAlign: 'center',
   },
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
     width: 70,
   },
   difficultyCount: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     flex: 1,
     fontSize: 13,
   },
@@ -700,7 +700,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   personalBestLegend: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 10,
     textAlign: 'center',
     paddingTop: 8,
@@ -718,12 +718,12 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   achievementIcon: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 28,
     width: 40,
   },
   achievementIconLocked: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 20,
   },
   achievementInfo: {
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   achievementDesc: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     marginTop: 2,
   },

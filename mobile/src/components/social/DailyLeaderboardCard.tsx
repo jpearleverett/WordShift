@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { CandyColors, getPhaseTheme } from '../../theme/colors';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface DailyLeaderboardCardProps {
   /** 1-based standing (1 = best). Omit/undefined while loading or no data. */
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   icon: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 14,
     marginRight: 6,
   },

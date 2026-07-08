@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { getSettingsSync } from '../../services/settings';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Generated candy-style sprites (assets/ui, generateUiIcons.mjs) replacing the
 // emoji icons App.tsx passes. Unknown icon strings still render as text, so
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   actionButtonIconText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 28,
   },
   // Matches the visual footprint of the fontSize-28 emoji it replaces

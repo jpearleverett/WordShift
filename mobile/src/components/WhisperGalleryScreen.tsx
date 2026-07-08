@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { useScreenInsets } from '../hooks/useScreenInsets';
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     height: 34,
   },
   animalEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 22,
   },
   animalName: {
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   entryText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT_ITALIC,
     fontSize: 14,
     lineHeight: 20,
     fontStyle: 'italic',
