@@ -119,6 +119,10 @@ interface RoomViewProps {
   unlockCost?: number | null;
   amberBalance?: number;
   inviteCost?: number | null;
+  // Hide the in-room "Invite" chip while the invite prompt modal is open
+  // (the modal already offers the invite action; the chip would otherwise
+  // peek through the translucent scrim and read as a doubled surface).
+  suppressInviteChip?: boolean;
 }
 
 export const RoomView: React.FC<RoomViewProps> = React.memo(({
@@ -136,6 +140,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
   unlockCost = null,
   amberBalance = 0,
   inviteCost = null,
+  suppressInviteChip = false,
 }) => {
   const themeColors = ROOM_THEME_COLORS[room.theme];
 
@@ -245,7 +250,7 @@ export const RoomView: React.FC<RoomViewProps> = React.memo(({
           Centered by an absolute-fill wrapper (box-none: only the chip itself
           is tappable) instead of hand-tuned translate offsets, so it stays
           truly centered whatever size the chip renders at. */}
-      {animal && !animal.isUnlocked && (() => {
+      {animal && !animal.isUnlocked && !suppressInviteChip && (() => {
         const chip = getInviteChipContent(inviteCost, amberBalance);
         const inviteSkin = getPixelSkin(currentPhase);
         return (

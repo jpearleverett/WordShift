@@ -33,7 +33,7 @@ import {
   BTN_MD_DP,
   BTN_SHADOW_DP,
 } from '../../theme/pixelSkin.generated';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
@@ -1450,6 +1450,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           amberBalance={progress.amber}
           purchasedUpgrades={purchasedUpgrades}
           tendingLevel={tendingLevel}
+          suppressInviteChips={unlockFlow.showInvitePrompt}
           savedPanY={initialHousePanY}
           onPanYChange={onHousePanChange}
           pitNeedsAttention={pitNeedsAttention}
@@ -2379,7 +2380,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   if (unlockFlow.canReserve) {
                     return (
                       <>
-                        <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 8, fontStyle: 'italic' }]}>
+                        <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 8, fontStyle: 'italic', fontFamily: BODY_FONT_ITALIC }]}>
                           {getReserveGateText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}. Reserve it now and it builds itself the moment you get there.
                         </Text>
                         <BevelRowButton
@@ -2414,7 +2415,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   return (
                     <>
                       {isGated && (
-                        <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 8, fontStyle: 'italic' }]}>
+                        <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 8, fontStyle: 'italic', fontFamily: BODY_FONT_ITALIC }]}>
                           {unlockFlow.unlockAvailability!.reason}
                         </Text>
                       )}
@@ -2517,9 +2518,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   <CandyButton
                     label={
                       unlockFlow.nextUnlock!.cost === 0
-                        ? 'Welcome, Friend! 🏠'
+                        ? 'Welcome, Friend!'
                         : progress && progress.amber >= unlockFlow.nextUnlock!.cost
-                          ? `Invite ${unlockFlow.nextUnlock!.name.split(' ')[0]}! 🏠`
+                          ? `Invite ${unlockFlow.nextUnlock!.name.split(' ')[0]}!`
                           : 'Need More Amber'
                     }
                     variant="primary"
@@ -3041,7 +3042,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   loadingEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 34,
   },
   loadingText: {
@@ -3105,7 +3106,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   amberEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 20,
   },
   amberCount: {
@@ -3131,7 +3132,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,60,60,0.4)',
   },
   streakBadgeEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 14,
   },
   streakBadgeCount: {
@@ -3188,7 +3189,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   headerIconText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 16,
   },
   headerIconImage: {
@@ -3398,7 +3399,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -2 }, { scale: 1.02 }],
   },
   dialogueSpriteEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
   },
   dialogueTextCol: {
@@ -3437,7 +3438,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialogueText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 15,
     lineHeight: 25,
     letterSpacing: 0.2,
@@ -3481,7 +3482,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   shopSubtitle: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
@@ -3613,7 +3614,7 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
   },
   questTabTimer: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 10,
     marginTop: 2,
   },
@@ -3650,7 +3651,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   unlockDescription: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     marginTop: 2,
   },
@@ -3710,7 +3711,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   lockBadgeEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 24,
   },
   lockedRoomName: {
@@ -3784,7 +3785,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   inviteEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 80,
   },
   inviteSpriteImage: {
@@ -3792,7 +3793,7 @@ const styles = StyleSheet.create({
     height: 116,
   },
   inviteText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
@@ -3847,7 +3848,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dialogueChoiceBtnText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
@@ -3922,7 +3923,7 @@ const styles = StyleSheet.create({
     width: '90%',
   },
   sacrificeEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 50,
     marginBottom: 12,
   },
@@ -3934,7 +3935,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sacrificeSubtitle: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
@@ -3971,7 +3972,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   sacrificeNoAmber: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT_ITALIC,
     fontSize: 13,
     textAlign: 'center',
     fontStyle: 'italic',
@@ -3985,7 +3986,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sacrificeResponseText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT_ITALIC,
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
@@ -4016,7 +4017,7 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   houseCompletionEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 60,
     marginBottom: 16,
   },
@@ -4029,7 +4030,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   houseCompletionText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
@@ -4112,7 +4113,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   journalSpotlightHeroBadgeText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 28,
   },
   journalSpotlightHeroText: {
@@ -4132,7 +4133,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   journalSpotlightSubtitle: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     marginTop: 4,
     fontSize: 13,
     lineHeight: 18,
@@ -4166,7 +4167,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   journalSpotlightCardIcon: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 18,
     marginBottom: 8,
   },
