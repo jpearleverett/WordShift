@@ -2021,6 +2021,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     ) : (
                       <View style={[styles.reservedChip, { backgroundColor: panelSt.secondaryBg, borderColor: panelSt.secondaryBorder }]}>
                         <Text style={[styles.reservedChipText, { color: panelSt.secondaryText }]}>Reserved ✓</Text>
+                        {unlockFlow.reservedSkipCost > 0 && (
+                          <Text style={[styles.reservedChipSubtext, { color: panelSt.muted }]}>
+                            Speed up <AmberInline /> {unlockFlow.reservedSkipCost}
+                          </Text>
+                        )}
                       </View>
                     )
                   ) : unlockFlow.canReserve ? (
@@ -2363,7 +2368,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         <Text style={[styles.shopSubtitle, { color: panelSt.title, marginTop: 8, fontWeight: '700', fontFamily: BODY_FONT_BOLD }]}>
                           {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                         </Text>
-                        {unlockFlow.canSpeedUpReserved && (
+                        {unlockFlow.canSpeedUpReserved ? (
                           <BevelRowButton
                             phase={progress.currentPhase}
                 hostDark={dtHostDark}
@@ -2376,7 +2381,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                               Speed it up for <AmberInline /> {unlockFlow.reservedSkipCost}
                             </Text>
                           </BevelRowButton>
-                        )}
+                        ) : unlockFlow.reservedSkipCost > 0 ? (
+                          <Text style={[styles.shopSubtitle, { color: panelSt.muted, marginTop: 6, fontStyle: 'italic', fontFamily: BODY_FONT_ITALIC }]}>
+                            Or speed it up for <AmberInline /> {unlockFlow.reservedSkipCost} once you can afford it.
+                          </Text>
+                        ) : null}
                       </>
                     );
                   }
@@ -3565,6 +3574,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.4,
+  },
+  reservedChipSubtext: {
+    fontFamily: BODY_FONT,
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: 'center',
   },
   // Pixel bevel button anatomy (mirrors CandyButton; needed for labels
   // that embed <AmberInline /> inside the Text run)
