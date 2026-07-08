@@ -1,49 +1,102 @@
+import React from 'react';
+import { Text, TextInput } from 'react-native';
 import * as Font from 'expo-font';
 
 /**
- * Two-typeface system.
+ * Single-typeface system — Kurale everywhere.
  *
- * The UI chrome is drawn in a hand-authored pixel-art cottage skin. Text plays
- * two roles against it:
+ * The whole game renders in Kurale (SIL OFL, Google Fonts): every screen,
+ * every element, no exceptions. There is intentionally no second face — the
+ * goal is one cohesive voice with zero chance of a stray system font (or the
+ * old pixel/body faces) showing through.
  *
- * - COTTAGE / display (PIXEL_FONT*): Pixelify Sans (SIL OFL), a legible pixel
- *   font, for the "chrome" — headers, wooden plaques, buttons, big numbers,
- *   and the puzzle letter tiles. It belongs to the pixel art.
- * - BODY / prose (BODY_FONT*): Nunito (SIL OFL), a warm rounded humanist sans,
- *   for running text — descriptions, dialogue body, labels, stats. It is far
- *   more readable at paragraph sizes than a pixel font and, crucially, ships a
- *   real italic (Pixelify has none, so italic body text used to fall back to
- *   the system font — a smooth intruder among the pixels).
+ * Kurale ships a single weight (Regular / 400). Existing `fontWeight` /
+ * `fontStyle` props are left in place; with only one face the renderer either
+ * synthesizes weight/slant or draws the regular glyphs, but it always stays
+ * Kurale — it never falls back to another family.
  *
  * The family NAME is the key we register in Font.loadAsync, so we control it.
- * If loading ever fails, React Native falls back to the system font for these
- * families — text stays readable, just un-styled.
  */
 
-// Cottage / display (pixel)
-export const PIXEL_FONT = 'PixelifySans-Regular';
-export const PIXEL_FONT_BOLD = 'PixelifySans-Bold';
+// The one font.
+export const KURALE_FONT = 'Kurale';
 
-// Body / prose (Nunito)
-export const BODY_FONT = 'Nunito-Regular';
-export const BODY_FONT_BOLD = 'Nunito-Bold';
-export const BODY_FONT_ITALIC = 'Nunito-Italic';
+// Legacy aliases — all resolve to Kurale. Kept so the ~320 existing
+// `fontFamily` references (PIXEL_FONT_BOLD / BODY_FONT / BODY_FONT_ITALIC ...)
+// and their imports keep working unchanged; there is only one font now.
+export const PIXEL_FONT = KURALE_FONT;
+export const PIXEL_FONT_BOLD = KURALE_FONT;
+export const BODY_FONT = KURALE_FONT;
+export const BODY_FONT_BOLD = KURALE_FONT;
+export const BODY_FONT_ITALIC = KURALE_FONT;
 
 /**
- * Load the app fonts. Awaited in the App bootstrap gate so the first frame is
+ * Load the app font. Awaited in the App bootstrap gate so the first frame is
  * already styled (no swap-in flash). Never throws — a load failure degrades to
  * the system font. (Kept the historical name so the bootstrap import is stable.)
  */
 export async function loadPixelFonts(): Promise<void> {
   try {
     await Font.loadAsync({
-      [PIXEL_FONT]: require('../../assets/fonts/PixelifySans-Regular.ttf'),
-      [PIXEL_FONT_BOLD]: require('../../assets/fonts/PixelifySans-Bold.ttf'),
-      [BODY_FONT]: require('../../assets/fonts/Nunito-Regular.ttf'),
-      [BODY_FONT_BOLD]: require('../../assets/fonts/Nunito-Bold.ttf'),
-      [BODY_FONT_ITALIC]: require('../../assets/fonts/Nunito-Italic.ttf'),
+      [KURALE_FONT]: require('../../assets/fonts/Kurale-Regular.ttf'),
     });
   } catch {
-    // Non-fatal — the UI falls back to the system font for these families.
+    // Non-fatal — the UI falls back to the system font for this family.
   }
+}
+
+/**
+ * Force Kurale as the BASE family on every <Text> / <TextInput> in the app,
+ * including ones whose style omits `fontFamily` entirely (those would otherwise
+ * render the system font). Element styles still win, but every `fontFamily` in
+ * the codebase already resolves to Kurale, so the net result is Kurale
+ * everywhere — nothing else can show.
+ *
+ * Called once at App module load (before the first render). Fully defensive:
+ * if the renderer internals differ, it degrades to the well-understood
+ * `defaultProps` default and, failing that, no-ops — the explicit `fontFamily`
+ * aliases above still route all styled text to Kurale.
+ */
+let globalFontInstalled = false;
+export function installGlobalFont(): void {
+  if (globalFontInstalled) return;
+  globalFontInstalled = true;
+
+  const base = { fontFamily: KURALE_FONT };
+
+  const patch = (Component: unknown): void => {
+    try {
+      const Comp = Component as {
+        render?: (...args: unknown[]) => unknown;
+        defaultProps?: { style?: unknown };
+      };
+      if (!Comp) return;
+
+      // Preferred: wrap the forwardRef render so the base family is prepended
+      // to the resolved style of EVERY instance (even styled-but-no-family
+      // text). Element style stays last, so it always wins.
+      const orig = Comp.render;
+      if (typeof orig === 'function') {
+        Comp.render = function patchedRender(this: unknown, ...args: unknown[]) {
+          const el = orig.apply(this, args);
+          if (!React.isValidElement(el)) return el;
+          const prevStyle = (el.props as { style?: unknown } | null)?.style;
+          return React.cloneElement(
+            el as React.ReactElement<{ style?: unknown }>,
+            { style: [base, prevStyle] },
+          );
+        };
+        return;
+      }
+
+      // Fallback: default style (covers text with no `style` prop at all).
+      Comp.defaultProps = Comp.defaultProps || {};
+      Comp.defaultProps.style = [base, Comp.defaultProps.style];
+    } catch {
+      // Non-fatal — the fontFamily aliases already route styled text to Kurale.
+    }
+  };
+
+  patch(Text);
+  patch(TextInput);
 }

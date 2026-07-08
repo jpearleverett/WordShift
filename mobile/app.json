@@ -3,7 +3,7 @@
     "name": "WordShift",
     "slug": "wordshift",
     "scheme": "wordshift",
-    "version": "1.2.3",
+    "version": "1.2.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -47,7 +47,7 @@
         "backgroundColor": "#FFF0F5"
       },
       "package": "com.wordshift.app",
-      "versionCode": 38,
+      "versionCode": 39,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
@@ -80,11 +80,7 @@
         "expo-font",
         {
           "fonts": [
-            "./assets/fonts/PixelifySans-Regular.ttf",
-            "./assets/fonts/PixelifySans-Bold.ttf",
-            "./assets/fonts/Nunito-Regular.ttf",
-            "./assets/fonts/Nunito-Bold.ttf",
-            "./assets/fonts/Nunito-Italic.ttf"
+            "./assets/fonts/Kurale-Regular.ttf"
           ]
         }
       ],

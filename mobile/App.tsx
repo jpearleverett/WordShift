@@ -119,7 +119,7 @@ import { initIAP, setBillingProvider } from './src/services/iap';
 import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
-import { loadPixelFonts } from './src/theme/fonts';
+import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
 import { initHints, addHints } from './src/services/hints';
 import { loadEntitlements, hasEntitlementSync, ENTITLEMENTS } from './src/services/entitlements';
 import { StoreModal } from './src/components/monetization/StoreModal';
@@ -171,6 +171,9 @@ const SPEED_RESCUE_PLACEMENT: RewardedPlacement = 'speed_rescue';
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
 installGlobalErrorHandler();
+// Force the single app font (Kurale) onto every Text/TextInput before the
+// first render, so no screen can flash a system font while the font loads.
+installGlobalFont();
 // Initialize Sentry's native SDK for crash reporting. Unlike the JS-only error
 // handler above, this captures NATIVE crashes (force-closes / SIGSEGV / Java
 // FATAL EXCEPTION) that never reach JS — plus unhandled JS errors. No-op when
