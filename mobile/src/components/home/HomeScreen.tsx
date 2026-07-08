@@ -368,6 +368,11 @@ const BevelRowButton: React.FC<{
   );
 };
 
+// The axolotl (scuba mask) and fennec (tall ears) are framed tighter in their
+// source sprites and read larger than the other animals in the dialogue alcove;
+// render those two a touch smaller so they don't clip the card.
+const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox']);
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
   onStartDaily,
@@ -1635,10 +1640,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             {dialogueFlow.selectedAnimal && (
               <View style={styles.dialogueRow}>
-                {/* Sprite column — the zoomed portrait sits on the parchment
-                    (transparent bg); a slim accent rail marks the alcove. */}
+                {/* Sprite column — the zoomed portrait sits on the parchment. */}
                 <View style={styles.dialogueSpriteCol}>
-                  <View style={[styles.dialogueSpriteRail, { backgroundColor: pixelSkin.accent }]} />
                   {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
                     <Image
                       source={
@@ -1650,6 +1653,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       }
                       style={[
                         styles.dialogueSpriteImage,
+                        COMPACT_DIALOGUE_SPRITES.has(dialogueFlow.selectedAnimal.type) &&
+                          styles.dialogueSpriteImageSmall,
                         dialogueFlow.isTalking && styles.dialogueSpriteTalking,
                       ]}
                       resizeMode="cover"
@@ -2609,7 +2614,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.dialogueRow}>
                 {/* Sprite column — zoomed portrait on the parchment. */}
                 <View style={styles.dialogueSpriteCol}>
-                  <View style={[styles.dialogueSpriteRail, { backgroundColor: pixelSkin.accent }]} />
                   {CHARACTER_SPRITES[introAnimal.type] ? (
                     <Image
                       source={
@@ -2619,7 +2623,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                             ? CHARACTER_SPRITES[introAnimal.type]!.talk!
                             : CHARACTER_SPRITES[introAnimal.type]!.idle
                       }
-                      style={styles.dialogueSpriteImage}
+                      style={[
+                        styles.dialogueSpriteImage,
+                        COMPACT_DIALOGUE_SPRITES.has(introAnimal.type) &&
+                          styles.dialogueSpriteImageSmall,
+                      ]}
                       resizeMode="cover"
                       accessibilityLabel={`${introAnimal.name} portrait`}
                     />
@@ -3377,20 +3385,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  // Slim accent rail on the sprite alcove's inner edge (replaces the old flat
-  // accent line — carries the skin's second hue between portrait and text).
-  dialogueSpriteRail: {
-    position: 'absolute',
-    right: 0,
-    top: 8,
-    bottom: 8,
-    width: 2,
-    borderRadius: 1,
-    opacity: 0.6,
-  },
   dialogueSpriteImage: {
     width: SCREEN_WIDTH * 0.36,
     height: SCREEN_WIDTH * 0.48,
+  },
+  // Axolotl/fennec render a touch smaller (see COMPACT_DIALOGUE_SPRITES) so
+  // their tighter source framing doesn't clip the dialogue card.
+  dialogueSpriteImageSmall: {
+    width: SCREEN_WIDTH * 0.31,
+    height: SCREEN_WIDTH * 0.41,
   },
   // Subtle "talking" lift applied while isTalking toggles (every 300ms). Reads as
   // gentle movement for every animal and ensures the portrait never looks frozen
