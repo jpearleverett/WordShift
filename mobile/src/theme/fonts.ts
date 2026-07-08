@@ -77,10 +77,8 @@ export function installGlobalFont(): void {
 
   const base = { fontFamily: SHANTELL_REGULAR };
 
-  const wrap = (modulePath: string): void => {
+  const patch = (mod: { default?: unknown } | undefined): void => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const mod = require(modulePath) as { default?: unknown };
       const Orig = mod?.default as
         | (React.ComponentType<{ style?: unknown }> & { __fontWrapped?: boolean })
         | undefined;
@@ -96,12 +94,26 @@ export function installGlobalFont(): void {
       (Wrapped as { __fontWrapped?: boolean }).__fontWrapped = true;
       (Wrapped as { displayName?: string }).displayName = 'ShantellText';
 
-      mod.default = Wrapped;
+      mod!.default = Wrapped;
     } catch {
       // Non-fatal — explicit fontFamily aliases already route styled text.
     }
   };
 
-  wrap('react-native/Libraries/Text/Text');
-  wrap('react-native/Libraries/Components/TextInput/TextInput');
+  // Metro only bundles a module it can see via a STATIC require('literal'); a
+  // dynamic require(variable) is rejected at transform time ("Invalid call").
+  // So require each Text module by its literal path and hand the module object
+  // to patch(). Each require is guarded in case the internal path ever moves.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    patch(require('react-native/Libraries/Text/Text'));
+  } catch {
+    // Non-fatal.
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    patch(require('react-native/Libraries/Components/TextInput/TextInput'));
+  } catch {
+    // Non-fatal.
+  }
 }
