@@ -12,7 +12,7 @@ import {
   Dimensions,
   Modal,
 } from 'react-native';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import {
   CandyColors,
   getOverlayBannerTheme,
@@ -2727,7 +2727,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerIconText: {
-    fontFamily: PIXEL_FONT, fontSize: 16 },
+    fontFamily: BODY_FONT, fontSize: 16 },
   utilityOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -2793,7 +2793,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   tendingSubtitle: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 15,
     fontWeight: '500',
     color: 'rgba(225, 215, 240, 0.85)',

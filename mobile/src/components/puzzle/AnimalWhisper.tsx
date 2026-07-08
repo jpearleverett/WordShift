@@ -3,7 +3,7 @@ import { Text, StyleSheet, Animated } from 'react-native';
 import { DialoguePhase } from '../../types/homeWorld';
 import { getSettingsSync } from '../../services/settings';
 import { CandyColors } from '../../theme/colors';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface AnimalWhisperProps {
   visible: boolean;
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     color: 'rgba(180, 60, 70, 0.9)',
   },
   whisperText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT_ITALIC,
     fontSize: 14,
     fontWeight: '500',
     fontStyle: 'italic',

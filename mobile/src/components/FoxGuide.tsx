@@ -29,7 +29,7 @@ import {
   BTN_SHADOW_DP,
 } from '../theme/pixelSkin.generated';
 import { NineSliceFrame, ThreeSliceStrip } from './ui/NineSlice';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 
 // FoxGuide is always a Phase-0 tutorial moment → bright cottage skin.
 const FOX_SKIN = getPixelSkin(0);
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialogueText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 15,
     lineHeight: 25,
     letterSpacing: 0.2,
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   compactText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 14,
     lineHeight: 22,
     letterSpacing: 0.2,

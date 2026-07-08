@@ -20,7 +20,7 @@ import {
 import { Room, Animal, DialoguePhase, Unlockable } from '../../types/homeWorld';
 import { RoomView } from './RoomView';
 import { CandyColors } from '../../theme/colors';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { isOnCooldown, getSessionStatus } from '../../services/dialogueSession';
 import { clampHomeScenePanY, resolveHomeScenePanY } from '../../services/homeScenePan';
 import { getSettingsSync } from '../../services/settings';
@@ -854,6 +854,11 @@ interface HouseWorldProps {
   pitNeedsAttention?: boolean;
   /** Phase-5 Tending Level — drives the "deepening" of the arrangement sigils. */
   tendingLevel?: number;
+  /**
+   * Hide the in-room "Invite" chips while the invite prompt modal is open, so
+   * the chip doesn't peek through the modal's translucent scrim.
+   */
+  suppressInviteChips?: boolean;
 }
 
 export const HouseWorld: React.FC<HouseWorldProps> = ({
@@ -871,6 +876,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
   onPitPress,
   pitNeedsAttention = false,
   tendingLevel = 0,
+  suppressInviteChips = false,
 }) => {
   const tendingIntensity = getTendingIntensity(tendingLevel);
   const ambientMotionEnabled = !getSettingsSync().reducedMotion && !shouldSimplifyAnimations();
@@ -1246,6 +1252,7 @@ export const HouseWorld: React.FC<HouseWorldProps> = ({
                             unlockCost={roomUnlockCost}
                             amberBalance={amberBalance}
                             inviteCost={inviteCost}
+                            suppressInviteChip={suppressInviteChips}
                           />
                         </View>
                         {/* Arrangement sigil connection between rooms */}
@@ -1377,7 +1384,7 @@ const styles = StyleSheet.create({
     zIndex: 200,
   },
   cloudEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 45,
     opacity: 0.9,
   },
@@ -1392,7 +1399,7 @@ const styles = StyleSheet.create({
     zIndex: 150,
   },
   star: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     position: 'absolute',
     color: '#FFFFFF',
   },
@@ -1492,7 +1499,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 214, 130, 0.38)',
   },
   smokeEmoji: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 18,
     position: 'absolute',
     top: -25,
@@ -1605,7 +1612,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyHouseText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 60,
     marginBottom: 10,
   },

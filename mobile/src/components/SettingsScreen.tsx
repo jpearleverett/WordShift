@@ -14,7 +14,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
@@ -900,7 +900,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   settingDescription: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     marginTop: 2,
   },
@@ -922,7 +922,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   dangerDescription: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     marginTop: 2,
   },
@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   aboutValue: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 14,
   },
   linkText: {
@@ -975,7 +975,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   recoveryCodeHint: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 6,
@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   restoreHint: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 13.5,
     marginBottom: 16,
     lineHeight: 19,

@@ -10,7 +10,7 @@ import {
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 18,
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13.5,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     lineHeight: 19,
   },
   patronActiveBox: {
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   patronActiveBody: {
     fontSize: 13,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 18,
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   unavailableText: {
     fontSize: 12.5,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     textAlign: 'center',
     lineHeight: 17,
   },
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   removeAdsHint: {
     fontSize: 12.5,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     textAlign: 'center',
     lineHeight: 17,
     marginBottom: 12,
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   footnote: {
     fontSize: 11,
     fontWeight: '500',
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     textAlign: 'center',
     marginTop: 12,
     lineHeight: 15,

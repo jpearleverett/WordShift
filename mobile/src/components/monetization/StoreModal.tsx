@@ -13,7 +13,7 @@ import {
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
@@ -618,7 +618,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     overflow: 'hidden',
   },
-  rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17, fontFamily: PIXEL_FONT },
+  rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17, fontFamily: BODY_FONT },
 
   // Price pill — chunky amber CandyButton (the single warm accent).
   pricePill: { minWidth: 84 },
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center', fontFamily: PIXEL_FONT },
+  patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center', fontFamily: BODY_FONT },
 
   successBox: {
     marginTop: 12,
@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontFamily: PIXEL_FONT },
+  unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontFamily: BODY_FONT },
   workingRow: { marginTop: 12, alignItems: 'center' },
   closeBtn: { marginTop: 12 },
 });

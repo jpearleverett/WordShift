@@ -15,7 +15,7 @@ import { CandyButton } from '../ui/CandyButton';
 import { getSettingsSync } from '../../services/settings';
 import { getRulesText } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 /**
  * Numbered step-chip hue rotation. The candy cycle survives every phase; only
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   ruleDesc: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 14,
     lineHeight: 19,
   },

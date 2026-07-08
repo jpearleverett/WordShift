@@ -13,7 +13,7 @@ import { PanelCard } from '../ui/PanelCard';
 import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
 import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../../services/puzzleVariety';
-import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
 const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   combosComingText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 13,
     lineHeight: 18,
     marginTop: 4,
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   challengeMenuIcon: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 18,
     marginRight: 10,
   },
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   challengeMenuDesc: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 12,
     marginTop: 1,
   },
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   variantIcon: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 18,
     marginRight: 8,
     marginTop: 1,
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   variantDescription: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   variantUnlockHintText: {
-    fontFamily: PIXEL_FONT,
+    fontFamily: BODY_FONT_ITALIC,
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',
