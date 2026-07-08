@@ -39,6 +39,7 @@ import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel } from '../../services/phaseNarrative';
 import { isAdFreeSync } from '../../services/entitlements';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -620,6 +621,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               const milestoneAmber = victoryData.milestoneBonus ?? 0;
               const streakMilestoneAmber = victoryData.streakMilestoneBonus ?? 0;
               const totalAmber = victoryData.amberEarned ?? 0;
+              // The rewarded "double" grants a bonus equal to amberEarned (a true
+              // 2x, credited to the balance in App). Reflect it in the displayed
+              // total + a breakdown line so the number the player sees AFTER the
+              // ad matches the amber they actually received — otherwise it reads
+              // as "I watched an ad and got nothing."
+              const rewardDoubleBonus = rewardedDoubleClaimed ? totalAmber : 0;
+              const displayTotal = totalAmber + rewardDoubleBonus;
 
               return (
                 <>
@@ -635,7 +643,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         <View style={styles.earlyVictoryValueRow}>
                           <Image source={AMBER_ICON} style={styles.amberIconLarge} />
                           <Text style={[styles.earlyVictoryValue, { color: phaseTheme.modalTextColor }]}>
-                            {totalAmber}
+                            {displayTotal}
                           </Text>
                         </View>
                       </>
@@ -720,6 +728,19 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         )}
                       </>
                     )}
+                    {/* Doubled line — appears once the rewarded 2x is claimed, so
+                        the breakdown visibly sums to the new (doubled) total. */}
+                    {rewardDoubleBonus > 0 && (
+                      <View style={styles.bonusRow}>
+                        <Text style={[styles.bonusLabel, { color: phaseTheme.modalTextColor, fontWeight: '800' }]}>
+                          {'✦'} Doubled
+                        </Text>
+                        <View style={styles.amberValueRow}>
+                          <Image source={AMBER_ICON} style={styles.amberIcon} />
+                          <Text style={[styles.bonusValue, { color: accent.gold, fontWeight: '900' }]}>+{rewardDoubleBonus}</Text>
+                        </View>
+                      </View>
+                    )}
                     <View style={[styles.bonusDivider, { backgroundColor: phaseTheme.modalDividerColor }]} />
                     {/* Total — the amber earned is second only to the stars in
                         visual weight, so it renders larger than the line items */}
@@ -728,7 +749,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                       <View style={styles.amberValueRow}>
                         <Image source={AMBER_ICON} style={[styles.amberIcon, styles.amberIconTotal]} />
                         <Text style={[styles.bonusValue, { color: phaseTheme.modalTextColor, fontSize: 19, fontWeight: '900' }]}>
-                          {totalAmber}
+                          {displayTotal}
                         </Text>
                       </View>
                     </View>
@@ -1018,6 +1039,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   streakMilestoneHint: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
@@ -1048,6 +1070,7 @@ const styles = StyleSheet.create({
     height: 19,
   },
   victoryTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 42,
     fontWeight: '900',
     marginBottom: 6,
@@ -1057,6 +1080,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   victorySubtitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '700',
     color: CandyColors.gray[500],
@@ -1071,12 +1095,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   flawlessBadgeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 1.5,
     textAlign: 'center',
   },
   socialProofLine: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12.5,
     fontWeight: '600',
     fontStyle: 'italic',
@@ -1090,6 +1116,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   rewardedDoubleConfirm: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
@@ -1112,12 +1139,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(150, 90, 60, 0.18)',
     borderColor: 'rgba(180, 110, 70, 0.4)',
   },
-  freeDoubleText: { fontSize: 13.5, fontWeight: '800' },
+  freeDoubleText: { fontFamily: PIXEL_FONT_BOLD, fontSize: 13.5, fontWeight: '800' },
   // Deep antique gold — 5.8:1 on the pale gold pill over light stat cards
   // (the old #FFD479 measured ~1.3:1, gold-on-cream)
   freeDoubleTextLight: { color: '#755A00' },
   freeDoubleTextDark: { color: '#E0B080' }, // 7.3:1 on the dark pill
   victoryFeedback: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 10,
@@ -1136,12 +1164,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   earlyVictoryLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 6,
   },
   earlyVictoryValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 28,
     fontWeight: '900',
     textAlign: 'center',
@@ -1155,11 +1185,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   bonusLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
     color: CandyColors.gray[500],
   },
   bonusValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '800',
     color: CandyColors.purple.main,
@@ -1181,11 +1213,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cumulativeStatValue: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18,
     fontWeight: '800',
     color: CandyColors.purple.main,
   },
   cumulativeStatLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 10,
     fontWeight: '600',
     color: CandyColors.gray[400],
@@ -1257,6 +1291,7 @@ const styles = StyleSheet.create({
     width: '88%',
   },
   btn3dPrimaryText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     // 19px/900 qualifies as WCAG large text (3:1 threshold — white on the
     // candy-pink body is 3.5:1) and gives the primary CTA its visual rank.
@@ -1268,6 +1303,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   btn3dSecondaryText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 13,
     fontWeight: '900',
@@ -1279,6 +1315,7 @@ const styles = StyleSheet.create({
 
   // Pit phase transition hint
   pitHintText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     fontStyle: 'italic',
@@ -1289,6 +1326,7 @@ const styles = StyleSheet.create({
 
   // Mandatory pit text (shown when phase transition pending)
   pitMandatoryText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     fontStyle: 'italic',
@@ -1301,6 +1339,7 @@ const styles = StyleSheet.create({
   // One-time first-harvest gate dialogue — a touch larger than pitMandatoryText
   // because it's a first-time teaching beat that reads as Fox/house speaking.
   mandatoryHarvestText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13.5,
     fontWeight: '700',
     textAlign: 'center',
@@ -1312,6 +1351,7 @@ const styles = StyleSheet.create({
 
   // Lore caption under the amber total while the pit auto-collects early rewards
   autoCollectCaption: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11.5,
     fontWeight: '600',
     fontStyle: 'italic',
@@ -1330,6 +1370,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnFlatUniform: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -1356,6 +1397,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   collectNowText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '800',
     textAlign: 'center',
@@ -1372,14 +1414,17 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   harvestWordIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 22,
     marginRight: 8,
   },
   harvestWordText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '900',
   },
   harvestBonusHint: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
@@ -1400,6 +1445,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   winStreakEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 20,
     marginRight: 6,
   },
@@ -1409,6 +1455,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   winStreakText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
   },
@@ -1423,10 +1470,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   milestoneEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 28,
     marginBottom: 4,
   },
   milestoneMessage: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '800',
     // Deep amber-brown — 6.6:1 on the yellow.light chip (yellow.dark was 1.5:1)
@@ -1449,9 +1498,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   questBadgeIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
   },
   questBadgeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1469,6 +1520,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(194, 76, 102, 0.5)',
   },
   completionCodaTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '900',
     color: CandyColors.blue.dark,
@@ -1480,6 +1532,7 @@ const styles = StyleSheet.create({
     color: '#f1b8c6',
   },
   completionCodaText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 11,
     lineHeight: 16,
     color: CandyColors.gray[700],
@@ -1499,10 +1552,12 @@ const styles = StyleSheet.create({
     borderColor: CandyColors.purple.main,
   },
   phaseChangeEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 32,
     marginBottom: 8,
   },
   phaseChangeTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '900',
     color: CandyColors.white,
@@ -1510,6 +1565,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   phaseChangeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.92)', // 5.1:1 on purple.dark (0.8 was 4.2:1)
@@ -1545,6 +1601,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(120, 30, 60, 0.4)',
   },
   ritualEchoHeader: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 10,
     fontWeight: '700',
     color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
@@ -1566,6 +1623,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   ritualEchoWord: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     color: CandyColors.purple.shadow, // 5.5:1 on the word chip (purple.main was 3.3:1)
@@ -1583,6 +1641,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(100, 30, 60, 0.3)',
   },
   ritualEchoArrow: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     color: '#655483',
     marginHorizontal: 2,
@@ -1591,6 +1650,7 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[400],
   },
   ritualIncantationName: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     fontStyle: 'italic',
@@ -1606,6 +1666,7 @@ const styles = StyleSheet.create({
     color: '#BC80DC', // 4.9:1 on the Phase 3 container (#9B4DCA was 2.5:1 there)
   },
   ritualEchoFooter: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 10,
     fontWeight: '600',
     color: '#655483', // 4.7:1 on the Phase 2 container (gray[400] was 1.8:1)
@@ -1616,6 +1677,7 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[400], // 5.6:1 on the Phase 3+ containers
   },
   wordsOfferedText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 12,

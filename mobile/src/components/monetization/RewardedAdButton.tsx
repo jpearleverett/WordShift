@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import {
   showRewarded,
   isRewardedCapReached,
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(180, 110, 70, 0.4)',
   },
   disabled: { opacity: 0.4 },
-  label: { fontSize: 13.5, fontWeight: '800' },
+  label: { fontSize: 13.5, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   // Dark amber ink on the light gold pill (matches freeDoubleTextLight in the
   // victory modal); the old #FFD479 was near-invisible on cream surfaces.
   labelLight: { color: '#755A00' },

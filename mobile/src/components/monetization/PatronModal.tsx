@@ -10,6 +10,7 @@ import {
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
@@ -419,12 +420,14 @@ const styles = StyleSheet.create({
   eyebrow: {
     fontSize: 11,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 3,
     textAlign: 'center',
   },
   title: {
     fontSize: 26,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.4,
     textAlign: 'center',
     marginTop: 4,
@@ -432,6 +435,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 18,
@@ -449,6 +453,7 @@ const styles = StyleSheet.create({
   benefitBullet: {
     fontSize: 14,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     marginRight: 10,
     marginTop: 1,
   },
@@ -456,6 +461,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13.5,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     lineHeight: 19,
   },
   patronActiveBox: {
@@ -465,11 +471,13 @@ const styles = StyleSheet.create({
   patronActiveTitle: {
     fontSize: 16,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     textAlign: 'center',
   },
   patronActiveBody: {
     fontSize: 13,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 18,
@@ -483,6 +491,7 @@ const styles = StyleSheet.create({
   unavailableText: {
     fontSize: 12.5,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     textAlign: 'center',
     lineHeight: 17,
   },
@@ -496,6 +505,7 @@ const styles = StyleSheet.create({
   removeAdsHint: {
     fontSize: 12.5,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     textAlign: 'center',
     lineHeight: 17,
     marginBottom: 12,
@@ -503,6 +513,7 @@ const styles = StyleSheet.create({
   adFreeNote: {
     fontSize: 12.5,
     fontWeight: '600',
+    fontFamily: PIXEL_FONT_BOLD,
     textAlign: 'center',
     marginTop: 16,
   },
@@ -516,6 +527,7 @@ const styles = StyleSheet.create({
   footnote: {
     fontSize: 11,
     fontWeight: '500',
+    fontFamily: PIXEL_FONT,
     textAlign: 'center',
     marginTop: 12,
     lineHeight: 15,

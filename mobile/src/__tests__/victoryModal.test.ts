@@ -559,3 +559,33 @@ describe('mandatory first-harvest gate', () => {
     expect(textOf(tree)).not.toContain(getMandatoryHarvestText(0 as DialoguePhase));
   });
 });
+
+describe('rewarded double display (the doubled reward must be visible after the ad)', () => {
+  it('shows the doubled total + a Doubled line once claimed, so the 2x is visible', () => {
+    // The bug: after watching the "double" ad the balance really doubled, but
+    // the modal kept showing the original amberEarned — reading as "I watched
+    // an ad and got nothing." The total must reflect the doubling.
+    const tree = render(baseProps({
+      phase: 0,
+      rewardedDoubleEnabled: true,
+      rewardedDoubleClaimed: true,
+      onRewardedDouble: jest.fn(),
+      victoryData: baseVictoryData({ amberEarned: 15, autoCollected: false }),
+    }));
+    const text = textOf(tree);
+    expect(text).toContain('Doubled');
+    expect(text).toContain('30'); // 15 doubled — the new total is shown
+  });
+
+  it('shows only the single reward before the double is claimed', () => {
+    const tree = render(baseProps({
+      phase: 0,
+      rewardedDoubleEnabled: false,
+      rewardedDoubleClaimed: false,
+      victoryData: baseVictoryData({ amberEarned: 15, autoCollected: false }),
+    }));
+    const text = textOf(tree);
+    expect(text).not.toContain('Doubled');
+    expect(text).toContain('15');
+  });
+});

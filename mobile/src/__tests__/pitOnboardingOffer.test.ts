@@ -284,25 +284,32 @@ describe('auto-offer removal tripwire', () => {
 });
 
 describe('shouldShowHarvestPitIntro (first-manual-harvest Fox beat)', () => {
-  test('fires on arrival with unlearned harvest and words waiting', () => {
-    expect(shouldShowHarvestPitIntro(false, null, 2, false)).toBe(true);
-    expect(shouldShowHarvestPitIntro(undefined, null, 1, false)).toBe(true);
+  test('fires on arrival with unlearned harvest and words waiting (past auto-collect)', () => {
+    expect(shouldShowHarvestPitIntro(false, null, 2, false, true)).toBe(true);
+    expect(shouldShowHarvestPitIntro(undefined, null, 1, false, true)).toBe(true);
   });
 
   test('never fires during onboarding (the onboarding FoxGuide owns the pit)', () => {
-    expect(shouldShowHarvestPitIntro(true, null, 2, false)).toBe(false);
+    expect(shouldShowHarvestPitIntro(true, null, 2, false, true)).toBe(false);
   });
 
   test('yields to a pending phase-transition ceremony', () => {
-    expect(shouldShowHarvestPitIntro(false, 1 as any, 2, false)).toBe(false);
+    expect(shouldShowHarvestPitIntro(false, 1 as any, 2, false, true)).toBe(false);
   });
 
   test('needs words to point at (no batches, or state not loaded yet)', () => {
-    expect(shouldShowHarvestPitIntro(false, null, 0, false)).toBe(false);
-    expect(shouldShowHarvestPitIntro(false, null, null, false)).toBe(false);
+    expect(shouldShowHarvestPitIntro(false, null, 0, false, true)).toBe(false);
+    expect(shouldShowHarvestPitIntro(false, null, null, false, true)).toBe(false);
   });
 
   test('goes quiet once a real offer has marked the harvest learned', () => {
-    expect(shouldShowHarvestPitIntro(false, null, 2, true)).toBe(false);
+    expect(shouldShowHarvestPitIntro(false, null, 2, true, true)).toBe(false);
+  });
+
+  test('never fires inside the auto-collect window — even with words waiting', () => {
+    // The reported bug: onboarding words left un-offered after a skip linger as
+    // a pending batch; returning to the pit at 0 real puzzles must NOT trigger
+    // "now harvest them yourself" while the house is still carrying words down.
+    expect(shouldShowHarvestPitIntro(false, null, 3, false, false)).toBe(false);
   });
 });

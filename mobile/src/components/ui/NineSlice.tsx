@@ -88,7 +88,9 @@ export const ThreeSliceStrip: React.FC<{
   capDp: number;
 }> = ({ skin, capDp }) => (
   <View style={StyleSheet.absoluteFill} pointerEvents="none">
-    <View style={{ position: 'absolute', top: 0, bottom: 0, left: capDp, right: capDp }}>
+    {/* Middle tucks 1dp under each opaque cap (drawn on top) so no background
+        seam can show where the stretched middle meets a cap. */}
+    <View style={{ position: 'absolute', top: 0, bottom: 0, left: capDp - 1, right: capDp - 1 }}>
       <Image source={skin.m} style={styles.stretch} resizeMode="stretch" fadeDuration={0} />
     </View>
     <Image source={skin.l} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: capDp, height: '100%' }} resizeMode="stretch" fadeDuration={0} />

@@ -2842,73 +2842,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         animationType="none"
       >
         <View style={[styles.journalSpotlightBackdrop, { backgroundColor: dt.overlayBg }]}>
-          <View
-            style={[
-              styles.journalSpotlightPointer,
-              {
-                // Legacy offsets: Android +26 over the status bar, iOS 60 (44 base + 16)
-                top: screenInsets.top + (Platform.OS === 'android' ? 26 : 16),
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: phaseTheme.victoryGlowColor,
-              },
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={[styles.journalSpotlightPointerText, { color: dt.nameColor }]}>
-              {currentJournalSpotlightStep.pointerText}
-            </Text>
-            <View
-              style={[
-                styles.journalSpotlightPointerTail,
-                {
-                  borderTopColor: dt.modalBg,
-                  borderRightColor: dt.modalBg,
-                  shadowColor: phaseTheme.victoryGlowColor,
-                },
-              ]}
+          <View style={[styles.journalSpotlightPanel, { shadowColor: dt.modalShadowColor }]}>
+            {/* Cottage wood-and-parchment sheet (matches the Fox dialogue below
+                and every other home sheet); replaces the old flat white panel. */}
+            <NineSliceFrame
+              skin={pixelSkin.panel}
+              cornerDp={PANEL_CORNER_DP}
+              edgeDp={PANEL_EDGE_DP}
+              fillColor={pixelSkin.fill}
+              openBottom
             />
-          </View>
-
-          <View
-            style={[
-              styles.journalSpotlightPanel,
-              {
-                backgroundColor: dt.modalBg,
-                borderColor: dt.modalBorder,
-                shadowColor: dt.modalShadowColor,
-              },
-            ]}
-          >
-            <View style={[styles.dialogueAccentLine, { backgroundColor: dt.accentLine }]} />
 
             <View style={styles.journalSpotlightHeroRow}>
-              <View
-                style={[
-                  styles.journalSpotlightHeroBadge,
-                  {
-                    backgroundColor: phaseTheme.modalStatBgColor,
-                    borderColor: dt.bubbleBorder,
-                    shadowColor: phaseTheme.victoryGlowColor,
-                  },
-                ]}
-              >
+              <View style={styles.journalSpotlightHeroBadge}>
+                <NineSliceFrame
+                  skin={pixelSkin.card}
+                  cornerDp={CARD_CORNER_DP}
+                  edgeDp={CARD_EDGE_DP}
+                  fillColor={pixelSkin.fillCard}
+                />
                 <Text style={styles.journalSpotlightHeroBadgeText}>{currentJournalSpotlightStep.icon}</Text>
               </View>
 
               <View style={styles.journalSpotlightHeroText}>
-                <Text style={[styles.journalSpotlightEyebrow, { color: dt.progressColor }]}>
+                <Text style={[styles.journalSpotlightEyebrow, { color: panelSt.muted }]}>
                   {currentJournalSpotlightStep.eyebrow}
                 </Text>
-                <Text style={[styles.journalSpotlightTitle, { color: dt.nameColor }]}>
+                <Text style={[styles.journalSpotlightTitle, { color: panelSt.title }]}>
                   {currentJournalSpotlightStep.title}
                 </Text>
-                <Text style={[styles.journalSpotlightSubtitle, { color: dt.subtitleColor }]}>
+                <Text style={[styles.journalSpotlightSubtitle, { color: panelSt.muted }]}>
                   {currentJournalSpotlightStep.preview}
                 </Text>
               </View>
 
-              <Text style={[styles.journalSpotlightCounter, { color: dt.progressColor }]}>
+              <Text style={[styles.journalSpotlightCounter, { color: panelSt.muted }]}>
                 {journalSpotlightIndex + 1}/{journalSpotlightStepMeta.length}
               </Text>
             </View>
@@ -2921,24 +2889,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     key={step.id}
                     style={[
                       styles.journalSpotlightCard,
-                      {
-                        backgroundColor: isActive ? phaseTheme.modalStatBgColor : dt.bubbleBg,
-                        borderColor: isActive ? dt.accentLine : dt.bubbleBorder,
-                        shadowColor: isActive ? phaseTheme.victoryGlowColor : 'transparent',
-                      },
                       isActive && styles.journalSpotlightCardActive,
                     ]}
                   >
+                    <NineSliceFrame
+                      skin={pixelSkin.card}
+                      cornerDp={CARD_CORNER_DP}
+                      edgeDp={CARD_EDGE_DP}
+                      fillColor={pixelSkin.fillCard}
+                    />
                     <Text style={styles.journalSpotlightCardIcon}>{step.icon}</Text>
                     <Text
                       style={[
                         styles.journalSpotlightCardTitle,
-                        { color: isActive ? dt.nameColor : dt.textColor },
+                        { color: isActive ? panelSt.title : panelSt.body },
                       ]}
                     >
                       {step.title}
                     </Text>
-                    <Text style={[styles.journalSpotlightCardIndex, { color: dt.progressColor }]}>
+                    <Text style={[styles.journalSpotlightCardIndex, { color: panelSt.muted }]}>
                       {step.cardLabel}
                     </Text>
                   </View>
@@ -3072,14 +3041,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   loadingEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 34,
   },
   loadingText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 18,
     fontWeight: '700',
   },
   loadingSubtext: {
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
     color: 'rgba(255,255,255,0.8)',
     fontSize: 12,
@@ -3133,9 +3105,11 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   amberEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 20,
   },
   amberCount: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 16,
     fontWeight: '800',
@@ -3157,9 +3131,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,60,60,0.4)',
   },
   streakBadgeEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
   },
   streakBadgeCount: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
     color: '#FF8C00',
@@ -3188,6 +3164,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   questPillText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 13,
     fontWeight: '800',
@@ -3205,11 +3182,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerBadgeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 10,
     fontWeight: '800',
   },
   headerIconText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
   },
   headerIconImage: {
@@ -3280,6 +3259,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
   playButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 17,
     fontWeight: '900',
@@ -3303,6 +3283,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120, 30, 60, 0.2)',
   },
   wordsOfferedHomeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.6)',
@@ -3336,12 +3317,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   unlockProgressLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12.5,
     fontWeight: '800',
     letterSpacing: 0.5,
     flex: 1,
   },
   unlockProgressText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -3415,6 +3398,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -2 }, { scale: 1.02 }],
   },
   dialogueSpriteEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: Math.min(80, SCREEN_WIDTH * 0.2),
   },
   dialogueTextCol: {
@@ -3447,7 +3431,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
     marginBottom: 14,
-    minHeight: 44,
+    // Stable-ish height so paging short and 2-3 line lines doesn't resize the
+    // sheet and slide the nameplate up and down mid-conversation.
+    minHeight: 66,
     justifyContent: 'center',
   },
   dialogueText: {
@@ -3487,6 +3473,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   shopTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -3494,11 +3481,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   shopSubtitle: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 24,
   },
   shopFeedbackText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
@@ -3520,6 +3509,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   hubRowText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.2,
@@ -3531,6 +3521,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   nextUnlockLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -3565,6 +3556,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   reservedChipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.4,
@@ -3589,6 +3581,7 @@ const styles = StyleSheet.create({
     paddingBottom: BTN_SHADOW_DP,
   },
   bevelBtnText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.4,
@@ -3615,10 +3608,12 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   questTabText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '700' as const,
   },
   questTabTimer: {
+    fontFamily: PIXEL_FONT,
     fontSize: 10,
     marginTop: 2,
   },
@@ -3650,19 +3645,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   unlockName: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '800',
   },
   unlockDescription: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     marginTop: 2,
   },
   unlockCost: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
     marginTop: 6,
   },
   questProgressText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     marginTop: 6,
@@ -3675,21 +3674,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   questSectionTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   questSectionTimer: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '600',
   },
   unlockBlockedText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '600',
     marginTop: 4,
     fontStyle: 'italic',
   },
   allUnlockedText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     textAlign: 'center',
     fontWeight: '700',
@@ -3707,15 +3710,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   lockBadgeEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 24,
   },
   lockedRoomName: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
   },
   amberBalance: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
@@ -3740,6 +3746,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   cooldownToastText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '700',
@@ -3777,6 +3784,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   inviteEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 80,
   },
   inviteSpriteImage: {
@@ -3784,6 +3792,7 @@ const styles = StyleSheet.create({
     height: 116,
   },
   inviteText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
@@ -3795,6 +3804,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   inviteCost: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '700',
     marginTop: 12,
@@ -3805,6 +3815,7 @@ const styles = StyleSheet.create({
 
   // Intro dialogue progress text (inline in footer)
   introProgressInline: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
     marginRight: 12,
@@ -3816,6 +3827,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   introDialogueProgress: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -3873,6 +3885,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   actionRowButtonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '700',
     color: 'rgba(255, 255, 255, 0.9)',
@@ -3887,6 +3900,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   ambientLineText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: '#FBF0D9',
     fontSize: 15,
     fontWeight: '600',
@@ -3908,16 +3922,19 @@ const styles = StyleSheet.create({
     width: '90%',
   },
   sacrificeEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 50,
     marginBottom: 12,
   },
   sacrificeTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 20,
     fontWeight: '900',
     textAlign: 'center',
     marginBottom: 8,
   },
   sacrificeSubtitle: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
@@ -3925,6 +3942,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   sacrificeBalance: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 16,
@@ -3948,10 +3966,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sacrificeAmountText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '800',
   },
   sacrificeNoAmber: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13,
     textAlign: 'center',
     fontStyle: 'italic',
@@ -3965,6 +3985,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sacrificeResponseText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
@@ -3995,10 +4016,12 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   houseCompletionEmoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 60,
     marginBottom: 16,
   },
   houseCompletionTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     textAlign: 'center',
@@ -4006,6 +4029,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   houseCompletionText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
@@ -4046,6 +4070,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   journalSpotlightPointerText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 17,
@@ -4065,57 +4090,55 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   journalSpotlightPanel: {
-    borderRadius: 28,
-    borderWidth: 1,
+    // Cottage pixel frame (NineSliceFrame) owns the edge — no CSS radius/border.
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.24,
     shadowRadius: 18,
     elevation: 12,
-    overflow: 'hidden',
   },
   journalSpotlightHeroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingTop: 18,
+    // Clear the 24dp panel wood band (the panel itself carries no padding).
+    paddingHorizontal: 24,
+    paddingTop: 24,
     paddingBottom: 14,
     gap: 12,
   },
   journalSpotlightHeroBadge: {
     width: 58,
     height: 58,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 5,
   },
   journalSpotlightHeroBadgeText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 28,
   },
   journalSpotlightHeroText: {
     flex: 1,
   },
   journalSpotlightEyebrow: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
     marginBottom: 4,
   },
   journalSpotlightTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0.3,
   },
   journalSpotlightSubtitle: {
+    fontFamily: PIXEL_FONT,
     marginTop: 4,
     fontSize: 13,
     lineHeight: 18,
   },
   journalSpotlightCounter: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '700',
     alignSelf: 'flex-start',
@@ -4125,16 +4148,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    paddingHorizontal: 18,
+    paddingHorizontal: 24,
     paddingBottom: 12,
   },
   journalSpotlightCard: {
     width: '48%',
     minHeight: 84,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
+    // Cottage card frame owns the edge; clear its 12dp wood band comfortably.
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   journalSpotlightCardActive: {
     transform: [{ translateY: -1 }],
@@ -4144,22 +4166,25 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   journalSpotlightCardIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 18,
     marginBottom: 8,
   },
   journalSpotlightCardTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '800',
     lineHeight: 17,
   },
   journalSpotlightCardIndex: {
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 6,
     fontSize: 11,
     fontWeight: '600',
   },
   journalSpotlightDialogueRow: {
     flexDirection: 'row',
-    paddingHorizontal: 18,
+    paddingHorizontal: 24,
     paddingBottom: 22,
     gap: 12,
   },

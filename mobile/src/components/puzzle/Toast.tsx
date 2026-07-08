@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
+import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface ToastProps {
   message: string;
@@ -119,6 +120,7 @@ const styles = StyleSheet.create({
     shadowColor: CandyColors.red.dark,
   },
   toastText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     color: CandyColors.purple.main,

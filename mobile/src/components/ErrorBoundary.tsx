@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { CandyColors } from '../theme/colors';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { reportError } from '../services/errorReporting';
 
 interface ErrorBoundaryProps {
@@ -73,16 +74,19 @@ const styles = StyleSheet.create({
     padding: 32,
   },
   emoji: {
+    fontFamily: PIXEL_FONT,
     fontSize: 64,
     marginBottom: 16,
   },
   title: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 28,
     fontWeight: '900',
     color: CandyColors.white,
     marginBottom: 12,
   },
   message: {
+    fontFamily: PIXEL_FONT,
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
@@ -101,6 +105,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   buttonText: {
+    fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 18,
     fontWeight: '800',

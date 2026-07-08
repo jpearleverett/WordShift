@@ -13,6 +13,7 @@ import {
 import { CandyColors } from '../../theme/colors';
 import { SURFACE, getSurfaceTheme } from '../../theme/surfaces';
 import { getPixelSkin, PANEL_CORNER_DP, PANEL_EDGE_DP } from '../../theme/pixelSkin.generated';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame } from '../ui/NineSlice';
 import { CandyButton } from '../ui/CandyButton';
 import { PanelCard } from '../ui/PanelCard';
@@ -563,7 +564,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  title: { fontSize: 24, fontWeight: '900', letterSpacing: 0.5 },
+  title: { fontSize: 24, fontWeight: '900', letterSpacing: 0.5, fontFamily: PIXEL_FONT_BOLD },
   balances: {
     flexDirection: 'row',
     gap: 12,
@@ -572,7 +573,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  balanceText: { fontSize: 14, fontWeight: '700' },
+  balanceText: { fontSize: 14, fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
   hintInline: { width: 13, height: 13 },
   hintInlineSmall: { width: 11, height: 11 },
   scroll: { flexGrow: 0 },
@@ -580,6 +581,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 12,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
     marginTop: 16,
     marginBottom: 6,
@@ -591,7 +593,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   heroRibbonRow: { flexDirection: 'row', marginBottom: 8 },
-  heroTitle: { fontSize: 18, fontWeight: '900', marginBottom: 2 },
+  heroTitle: { fontSize: 18, fontWeight: '900', marginBottom: 2, fontFamily: PIXEL_FONT_BOLD },
   heroCta: { marginTop: 12 },
 
   // Section rows — layered PanelCard material; consistent heights.
@@ -605,28 +607,29 @@ const styles = StyleSheet.create({
   },
   rowInfo: { flex: 1, paddingRight: 12 },
   rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  rowTitle: { fontSize: 15, fontWeight: '800' },
+  rowTitle: { fontSize: 15, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD },
   ribbon: {
     fontSize: 9,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: 0.5,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 7,
     overflow: 'hidden',
   },
-  rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17 },
+  rowDesc: { fontSize: 12.5, marginTop: 3, lineHeight: 17, fontFamily: PIXEL_FONT },
 
   // Price pill — chunky amber CandyButton (the single warm accent).
   pricePill: { minWidth: 84 },
-  ownedText: { fontSize: 13, fontWeight: '800', paddingHorizontal: 8 },
+  ownedText: { fontSize: 13, fontWeight: '800', paddingHorizontal: 8, fontFamily: PIXEL_FONT_BOLD },
 
   patronLink: {
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  patronLinkText: { fontSize: 13, lineHeight: 18, textAlign: 'center', fontFamily: PIXEL_FONT },
 
   successBox: {
     marginTop: 12,
@@ -635,7 +638,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  successText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontWeight: '700' },
+  successText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontWeight: '700', fontFamily: PIXEL_FONT_BOLD },
   unavailableBox: {
     marginTop: 12,
     borderRadius: 12,
@@ -643,7 +646,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center' },
+  unavailableText: { fontSize: 12.5, lineHeight: 17, textAlign: 'center', fontFamily: PIXEL_FONT },
   workingRow: { marginTop: 12, alignItems: 'center' },
   closeBtn: { marginTop: 12 },
 });

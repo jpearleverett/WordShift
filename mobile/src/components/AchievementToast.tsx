@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../theme/pixelSkin.generated';
 import { NineSliceFrame } from './ui/NineSlice';
 import { Achievement } from '../services/achievements';
@@ -160,6 +161,7 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 24,
+    fontFamily: PIXEL_FONT,
   },
   textContainer: {
     flex: 1,
@@ -167,17 +169,20 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '800',
+    fontFamily: PIXEL_FONT_BOLD,
     letterSpacing: SURFACE.sectionLetterSpacing,
     textTransform: 'uppercase',
   },
   title: {
     fontSize: 16,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     marginTop: 2,
   },
   reward: {
     fontSize: 15,
     fontWeight: '900',
+    fontFamily: PIXEL_FONT_BOLD,
     marginLeft: 8,
   },
 });

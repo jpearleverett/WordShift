@@ -13,6 +13,7 @@ import { PanelCard } from '../ui/PanelCard';
 import { Difficulty, GameMode } from '../../types';
 import { DialoguePhase } from '../../types/homeWorld';
 import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../../services/puzzleVariety';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
 const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
@@ -300,6 +301,7 @@ const styles = StyleSheet.create({
     width: 210,
   },
   menuTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -314,6 +316,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   sectionTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -322,6 +325,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   combosComingText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13,
     lineHeight: 18,
     marginTop: 4,
@@ -347,6 +351,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   menuRowText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.3,
@@ -358,6 +363,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   challengeMenuIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 18,
     marginRight: 10,
   },
@@ -365,6 +371,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   challengeMenuDesc: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     marginTop: 1,
   },
@@ -380,6 +387,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   variantIcon: {
+    fontFamily: PIXEL_FONT,
     fontSize: 18,
     marginRight: 8,
     marginTop: 1,
@@ -394,14 +402,17 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   variantTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
   },
   variantDescription: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13,
     lineHeight: 18,
   },
   variantBadge: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 9,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -421,6 +432,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   variantUnlockHintText: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13,
     lineHeight: 18,
     textAlign: 'center',

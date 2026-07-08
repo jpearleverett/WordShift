@@ -14,6 +14,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
+import { PIXEL_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
@@ -842,6 +843,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backChipText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -850,6 +852,7 @@ const styles = StyleSheet.create({
     width: 88,
   },
   title: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.5,
@@ -863,6 +866,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: SURFACE.sectionLetterSpacing,
@@ -891,10 +895,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   settingLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '700',
   },
   settingDescription: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     marginTop: 2,
   },
@@ -911,10 +917,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dangerText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 16,
     fontWeight: '700',
   },
   dangerDescription: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     marginTop: 2,
   },
@@ -930,17 +938,21 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   aboutLabel: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '600',
   },
   aboutValue: {
+    fontFamily: PIXEL_FONT,
     fontSize: 14,
   },
   linkText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '600',
   },
   linkChevron: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -956,12 +968,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   recoveryCodeText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 2,
     textAlign: 'center',
   },
   recoveryCodeHint: {
+    fontFamily: PIXEL_FONT,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 6,
@@ -982,17 +996,20 @@ const styles = StyleSheet.create({
     padding: 22,
   },
   restoreTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 22,
     fontWeight: '900',
     letterSpacing: 0.3,
     marginBottom: 8,
   },
   restoreHint: {
+    fontFamily: PIXEL_FONT,
     fontSize: 13.5,
     marginBottom: 16,
     lineHeight: 19,
   },
   restoreInput: {
+    fontFamily: PIXEL_FONT_BOLD,
     borderWidth: 1.5,
     borderRadius: 12,
     paddingHorizontal: 14,
@@ -1044,6 +1061,7 @@ const styles = StyleSheet.create({
     backgroundColor: `rgba(255, 255, 255, ${SURFACE.highlightAlpha})`,
   },
   restoreConfirmText: {
+    fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.4,
