@@ -3183,8 +3183,8 @@ function App() {
         // Store first-purchase badge) — a cheap local read that must NOT ride on
         // the fire-and-forget initIAP, or a cold cache briefly misreports
         // Patron/ad-free status and the Store's 2x-first-purchase badge.
-        // loadPixelFonts registers the cottage pixel font before the first
-        // frame so text never flashes system-font then swaps. Never throws.
+        // loadPixelFonts registers the cottage dialogue/chrome font before the
+        // first frame (never throws — falls back to system font on failure).
         await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);

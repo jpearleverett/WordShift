@@ -29,23 +29,25 @@ export const NineSliceFrame: React.FC<{
   openBottom?: boolean;
 }> = ({ skin, cornerDp, edgeDp, fillColor, openBottom = false }) => {
   const C = cornerDp, E = edgeDp;
-  // Tuck the fill a hair UNDER the opaque edge slices (the edges draw on top of
-  // it). Without this, the fill's inset boundary meets the edge exactly, and any
-  // sub-pixel rounding or a transparent inner margin in an edge PNG leaks the
-  // container background through as a thin light seam (most visible on the right
-  // edge of parchment trays). The overlap stays well inside the straight edges,
-  // never reaching the transparent outer corner notches, so rounded corners hold.
-  const O = 1;
+  // The solid center is drawn FIRST (behind the edge strips) and deliberately
+  // UNDERLAPS them by ~1dp on every side. At fractional screen densities the
+  // center View's inner edge (at E dp) and a stretched edge Image's inner edge
+  // round to different physical pixels, leaving a hairline where the layer
+  // behind bleeds through (the "thin white/black lines"). Extending the fill
+  // under the opaque wood strips closes that gap with no visible bleed — the
+  // strips draw on top and hide the extra dp.
+  const OVERLAP = 1;
+  const inner = Math.max(0, E - OVERLAP);
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* center fill (under the frame pieces; overlapped under the edges) */}
+      {/* center fill (underlaps the frame pieces to kill subpixel seams) */}
       <View
         style={{
           position: 'absolute',
-          top: E - O,
-          left: E - O,
-          right: E - O,
-          bottom: openBottom ? 0 : E - O,
+          top: inner,
+          left: inner,
+          right: inner,
+          bottom: openBottom ? 0 : inner,
           backgroundColor: fillColor,
         }}
       />
