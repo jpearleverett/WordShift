@@ -152,7 +152,7 @@ const FloatingParticle: React.FC<{ particle: Particle }> = ({ particle }) => {
       }}
       pointerEvents="none"
     >
-      <Text style={{ fontSize: 16 }}>{particle.emoji}</Text>
+      <Text style={{ fontFamily: BODY_FONT, fontSize: 16 }}>{particle.emoji}</Text>
     </Animated.View>
   );
 };
@@ -247,7 +247,7 @@ const SmokePuff: React.FC<{ delay: number; isStatic?: boolean }> = ({ delay, isS
         opacity,
       }}
     >
-      <Text style={{ fontSize: 20, color: '#999' }}>💨</Text>
+      <Text style={{ fontFamily: BODY_FONT, fontSize: 20, color: '#999' }}>💨</Text>
     </Animated.View>
   );
 };
@@ -330,7 +330,7 @@ const FlyingBird: React.FC<{ startDelay: number; yPosition: number }> = ({ start
       }}
       pointerEvents="none"
     >
-      <Text style={{ fontSize: 18 }}>🐦</Text>
+      <Text style={{ fontFamily: BODY_FONT, fontSize: 18 }}>🐦</Text>
     </Animated.View>
   );
 };
@@ -409,7 +409,7 @@ const ShootingStar: React.FC = () => {
       }}
       pointerEvents="none"
     >
-      <Text style={{ fontSize: 14 }}>⭐</Text>
+      <Text style={{ fontFamily: BODY_FONT, fontSize: 14 }}>⭐</Text>
     </Animated.View>
   );
 };

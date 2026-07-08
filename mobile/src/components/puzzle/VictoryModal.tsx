@@ -39,7 +39,7 @@ import { getBeatPercentText, DailyRank } from '../../services/leaderboard';
 import { RewardedAdButton } from '../monetization/RewardedAdButton';
 import { getRewardedDoubleLabel, getRewardedDoubleConfirm, getDailyLadderTrendLabel } from '../../services/phaseNarrative';
 import { isAdFreeSync } from '../../services/entitlements';
-import { BODY_FONT, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 // Candy-styled UI sprite icons (replace emoji for critical info)
 const STAR_FILLED = require('../../../assets/ui/star_filled.png');
@@ -1659,6 +1659,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   ritualIncantationNameBright: {
+    fontFamily: BODY_FONT_ITALIC,
     color: '#C21E63',
     fontStyle: 'italic',
   },
@@ -1691,6 +1692,7 @@ const styles = StyleSheet.create({
     color: CandyColors.pink.shadow,
   },
   wordsOfferedTextDark: {
+    fontFamily: BODY_FONT_ITALIC,
     color: '#C8809A', // 5.1:1 on the Phase 3 modal (old rgba value was 2.8:1)
     fontStyle: 'italic',
   },

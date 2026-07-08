@@ -14,6 +14,7 @@ import { AnimalSprite } from './AnimalSprite';
 import { CandyColors } from '../../theme/colors';
 import { getPixelSkin, CARD_CORNER_DP, CARD_EDGE_DP } from '../../theme/pixelSkin.generated';
 import { NineSliceFrame } from '../ui/NineSlice';
+import { BODY_FONT, BODY_FONT_BOLD } from '../../theme/fonts';
 
 // Room background images - maps theme to image asset
 const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
@@ -377,6 +378,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   roomName: {
+    fontFamily: BODY_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 10,
     fontWeight: '700',
@@ -386,6 +388,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
   },
   upgradeBadge: {
+    fontFamily: BODY_FONT,
     fontSize: 8,
     color: '#FFD700',
     marginLeft: 3,
@@ -400,20 +403,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   lockIcon: {
+    fontFamily: BODY_FONT,
     fontSize: 32,
     marginBottom: 8,
   },
   lockedText: {
+    fontFamily: BODY_FONT_BOLD,
     color: CandyColors.white,
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 4,
   },
   lockedSubtext: {
+    fontFamily: BODY_FONT,
     color: CandyColors.gray[300],
     fontSize: 10,
   },
   lockedSubtextAffordable: {
+    fontFamily: BODY_FONT_BOLD,
     color: '#D6FFD6',
     fontWeight: '700',
   },
@@ -421,6 +428,7 @@ const styles = StyleSheet.create({
     color: CandyColors.gray[300],
   },
   lockedCost: {
+    fontFamily: BODY_FONT_BOLD,
     color: CandyColors.yellow.main,
     fontSize: 12,
     fontWeight: '800',
@@ -466,11 +474,13 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   inviteCostAmount: {
+    fontFamily: BODY_FONT_BOLD,
     color: CandyColors.purple.main,
     fontSize: 12,
     fontWeight: '800',
   },
   inviteAnimalText: {
+    fontFamily: BODY_FONT_BOLD,
     color: CandyColors.purple.main,
     fontSize: 12,
     fontWeight: '800',
@@ -489,6 +499,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   inviteAnimalCostSubtext: {
+    fontFamily: BODY_FONT_BOLD,
     color: CandyColors.gray[600],
     fontSize: 10,
     fontWeight: '700',
@@ -508,6 +519,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   wordEchoText: {
+    fontFamily: BODY_FONT_BOLD,
     position: 'absolute',
     fontWeight: '700',
     letterSpacing: 2,

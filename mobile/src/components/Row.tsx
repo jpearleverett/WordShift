@@ -22,7 +22,7 @@ import {
   ARC_LETTER_MARGIN_H,
   ARC_SLOT_MARGIN_H,
 } from '../constants/tileLayout';
-import { PIXEL_FONT_BOLD } from '../theme/fonts';
+import { BODY_FONT, BODY_FONT_BOLD, PIXEL_FONT_BOLD } from '../theme/fonts';
 
 // Arc layout configuration
 const ARC_ROTATION = 12; // Max rotation in degrees for edge elements (steeper fan)
@@ -1185,6 +1185,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   slotPreviewTextCompact: {
+    fontFamily: BODY_FONT,
     fontSize: 9,
   },
   slotPreviewValid: {
@@ -1192,6 +1193,7 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   slotPreviewValidBold: {
+    fontFamily: BODY_FONT_BOLD,
     fontWeight: '800',
   },
   slotPreviewInvalid: {

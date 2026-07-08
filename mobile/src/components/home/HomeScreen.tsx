@@ -33,7 +33,7 @@ import {
   BTN_MD_DP,
   BTN_SHADOW_DP,
 } from '../../theme/pixelSkin.generated';
-import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { BODY_FONT, BODY_FONT_BOLD, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { NineSliceFrame, ThreeSliceStrip } from '../ui/NineSlice';
 import { PixelPlaque } from '../ui/PixelPlaque';
 import { CandyButton } from '../ui/CandyButton';
@@ -2339,7 +2339,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={[styles.amberBalance, { color: panelSt.amberText }]}>Your Amber: <AmberInline /> {progress.amber}</Text>
 
                 {unlockFlow.purchaseError && (
-                  <Text style={[styles.shopSubtitle, { color: panelSt.dangerText, marginTop: 8, fontWeight: '600' }]}>
+                  <Text style={[styles.shopSubtitle, { color: panelSt.dangerText, marginTop: 8, fontWeight: '600', fontFamily: BODY_FONT_BOLD }]}>
                     {unlockFlow.purchaseError}
                   </Text>
                 )}
@@ -2355,7 +2355,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   if (isReserved) {
                     return (
                       <>
-                        <Text style={[styles.shopSubtitle, { color: panelSt.title, marginTop: 8, fontWeight: '700' }]}>
+                        <Text style={[styles.shopSubtitle, { color: panelSt.title, marginTop: 8, fontWeight: '700', fontFamily: BODY_FONT_BOLD }]}>
                           {getReservedArrivalText(unlockFlow.nextUnlock.minPuzzles, progress.puzzlesSolved)}
                         </Text>
                         {unlockFlow.canSpeedUpReserved && (
@@ -3292,6 +3292,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   wordsOfferedHomeTextDark: {
+    fontFamily: BODY_FONT_ITALIC,
     color: 'rgba(180, 100, 130, 0.8)',
     fontStyle: 'italic',
   },
