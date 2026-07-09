@@ -21,8 +21,12 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // (Standard/Reverse/Speed/Double + combos) + CHALLENGE/BLIND all fit without the
 // last row clipping the frame — taller than the old fixed 650 once Speed Shift
 // unlocks, but never so tall it runs off a short device.
-const MENU_MAX_HEIGHT = Math.max(560, Math.min(SCREEN_HEIGHT - 100, 840));
-const SCROLL_MAX_HEIGHT = MENU_MAX_HEIGHT - 52;
+const MENU_MAX_HEIGHT = Math.max(560, Math.min(SCREEN_HEIGHT - 88, 900));
+// The scroll area must fit ABOVE the frame's ~21dp bottom wood band, or its
+// last row is clipped by the panel's overflow:hidden and can't be scrolled
+// into view. Reserve the top padding (18) + title (~26) + a bottom clearance
+// (28 > the wood band) so the final row always scrolls into clear parchment.
+const SCROLL_MAX_HEIGHT = MENU_MAX_HEIGHT - 72;
 
 /** Semantic difficulty ring colors (shared candy identity with the header dot). */
 const DIFFICULTY_RING_COLORS: Record<Difficulty, string> = {
@@ -297,8 +301,8 @@ const styles = StyleSheet.create({
     top: 52,
     width: 290,
     maxHeight: MENU_MAX_HEIGHT,
-    paddingTop: 18,
-    paddingBottom: 16,
+    paddingTop: 14,
+    paddingBottom: 26,
     paddingHorizontal: 10,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.45,
@@ -311,46 +315,46 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
     paddingHorizontal: 16,
-    paddingBottom: 4,
+    paddingBottom: 3,
   },
   scrollArea: {
     maxHeight: SCROLL_MAX_HEIGHT,
   },
   scrollContent: {
     paddingHorizontal: 10,
-    paddingBottom: 16,
+    paddingBottom: 24,
   },
   sectionTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: SURFACE.sectionLetterSpacing,
-    marginTop: 5,
-    marginBottom: 4,
+    marginTop: 4,
+    marginBottom: 3,
     paddingHorizontal: 6,
   },
   combosComingText: {
     fontFamily: BODY_FONT,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     marginTop: 2,
-    marginBottom: 5,
+    marginBottom: 4,
     paddingHorizontal: 8,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 42,
+    minHeight: 38,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'transparent',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   difficultyRing: {
     width: 12,
@@ -361,19 +365,19 @@ const styles = StyleSheet.create({
   },
   menuRowText: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   sectionDivider: {
     height: 1.5,
     borderRadius: 1,
-    marginVertical: 5,
+    marginVertical: 4,
     marginHorizontal: 6,
   },
   challengeMenuIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 18,
+    fontSize: 17,
     marginRight: 10,
   },
   challengeMenuContent: {
@@ -381,23 +385,23 @@ const styles = StyleSheet.create({
   },
   challengeMenuDesc: {
     fontFamily: BODY_FONT,
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 1,
   },
   variantItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    minHeight: 42,
+    minHeight: 38,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'transparent',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 3,
+    paddingVertical: 6,
+    marginBottom: 2,
   },
   variantIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 18,
+    fontSize: 17,
     marginRight: 8,
     marginTop: 1,
   },
@@ -412,13 +416,13 @@ const styles = StyleSheet.create({
   },
   variantTitle: {
     fontFamily: PIXEL_FONT_BOLD,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
   },
   variantDescription: {
     fontFamily: BODY_FONT,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   variantBadge: {
     fontFamily: PIXEL_FONT_BOLD,
@@ -432,18 +436,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   variantUnlockHint: {
-    marginTop: 8,
+    marginTop: 6,
     marginHorizontal: 6,
     marginBottom: 4,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1.5,
   },
   variantUnlockHintText: {
     fontFamily: BODY_FONT_ITALIC,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     textAlign: 'center',
     fontStyle: 'italic',
   },
