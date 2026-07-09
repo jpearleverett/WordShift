@@ -3,7 +3,7 @@
     "name": "WordShift",
     "slug": "wordshift",
     "scheme": "wordshift",
-    "version": "1.2.7",
+    "version": "1.2.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -47,7 +47,7 @@
         "backgroundColor": "#FFF0F5"
       },
       "package": "com.wordshift.app",
-      "versionCode": 42,
+      "versionCode": 43,
       "blockedPermissions": [
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
@@ -76,6 +76,51 @@
       ],
       "expo-audio",
       "expo-sharing",
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "ShantellSans-Regular",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 400, "style": "italic" },
+                  { "path": "./assets/fonts/ShantellSans-Regular.ttf", "weight": 700, "style": "italic" }
+                ]
+              },
+              {
+                "fontFamily": "ShantellSans-Bold",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 400, "style": "italic" },
+                  { "path": "./assets/fonts/ShantellSans-Bold.ttf", "weight": 700, "style": "italic" }
+                ]
+              },
+              {
+                "fontFamily": "ShantellSans-Italic",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 400, "style": "italic" },
+                  { "path": "./assets/fonts/ShantellSans-Italic.ttf", "weight": 700, "style": "italic" }
+                ]
+              },
+              {
+                "fontFamily": "ShantellSans-BoldItalic",
+                "fontDefinitions": [
+                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 400 },
+                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 700 },
+                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 400, "style": "italic" },
+                  { "path": "./assets/fonts/ShantellSans-BoldItalic.ttf", "weight": 700, "style": "italic" }
+                ]
+              }
+            ]
+          }
+        }
+      ],
       [
         "expo-build-properties",
         {
