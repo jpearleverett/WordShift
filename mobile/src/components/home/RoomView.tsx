@@ -28,16 +28,13 @@ const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
   burrow: require('../../../assets/rooms/burrow.png'),
   garden: require('../../../assets/rooms/garden.png'),
   bamboo: require('../../../assets/rooms/bamboo.png'),
-  // TODO: interim placeholders until the real room art lands — drop in
-  // assets/rooms/star_loft.png, assets/rooms/belfry.png, and
-  // assets/rooms/sky_garden.png (1456x720, matching the existing room set)
-  // and point these three entries at them. Placeholder choices: the study's
-  // dark indigo book-lined walls read closest to a night loft; the burrow's
-  // earthen stonework reads closest to a stone bell tower; the garden IS an
-  // open-air green, so it stands in for the rooftop garden directly.
-  star_loft: require('../../../assets/rooms/study.png'),
-  belfry: require('../../../assets/rooms/burrow.png'),
-  sky_garden: require('../../../assets/rooms/garden.png'),
+  // The descent trio's real art (hand-authored, processed to 1456x720). The
+  // filenames carry the art's own concept names; the in-game rooms keep their
+  // canon names (Star Loft / Belfry / Sky Garden — the belfry art shows the
+  // workshop floor, the bell hangs up the tower shaft, out of frame).
+  star_loft: require('../../../assets/rooms/observatory.png'),
+  belfry: require('../../../assets/rooms/workshop.png'),
+  sky_garden: require('../../../assets/rooms/rainforest.png'),
 };
 
 // Phase-appropriate windows. The room art paints bright day-sky windows that

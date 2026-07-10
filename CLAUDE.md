@@ -406,7 +406,7 @@ The last three (the "descent trio", unlock gates 150/170/190) are late-game recr
 
 **Canon pronouns** (established by in-dialogue references — keep consistent): Ember she/her, Panko she/her, Archimedes he/him, Axel he/him, Chill he/him, Fennick he/him, Sloane she/her, Warren he/him, Thyme she/her, Bamboo they/them, Vesper she/her, Tock he/him, Moss he/him.
 
-**Art status (descent trio)**: no sprites or room art yet — `CHARACTER_SPRITES` is Partial so they render as emoji, and `ROOM_BACKGROUNDS` maps their themes to placeholder existing rooms (see the TODO in RoomView.tsx). Drop in `assets/characters/{tarsier,aye_aye,kakapo}/idle|talk|robed.png` (500×500) and `assets/rooms/{star_loft,belfry,sky_garden}.png` (1456×720) to light them up.
+**Art status (descent trio)**: LANDED — `assets/characters/{tarsier,aye_aye,kakapo}/idle|talk|robed.png` (player-provided 1254² art, background flood-fill keyed from the borders + alpha-weighted box downscale to 500²; all three frames per animal share identical framing so the talk toggle never jumps) and `assets/rooms/{observatory,workshop,rainforest}.png` (1456×720 — the art's concept names; ROOM_BACKGROUNDS maps star_loft/belfry/sky_garden themes to them; the belfry art shows the workshop floor, the bell hangs out of frame up the tower). Kakapo (77%) and aye-aye (76%) subject heights exceed the axolotl/fennec compact threshold → both are in `COMPACT_DIALOGUE_SPRITES`; tarsier carries a measured `FLOOR_OFFSET: 8`.
 
 ### Dialogue System
 

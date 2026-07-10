@@ -375,7 +375,10 @@ const BevelRowButton: React.FC<{
 // The axolotl (scuba mask) and fennec (tall ears) are framed tighter in their
 // source sprites and read larger than the other animals in the dialogue alcove;
 // render those two a touch smaller so they don't clip the card.
-const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox']);
+// (Measured subject-height fractions: axolotl 74%, fennec 70%, aye_aye 76%,
+// kakapo 77% — all noticeably above fox's 61% baseline, so all four render
+// compact; tarsier at 65% stays standard.)
+const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox', 'aye_aye', 'kakapo']);
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,

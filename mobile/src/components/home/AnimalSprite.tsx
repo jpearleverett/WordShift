@@ -96,6 +96,21 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
     talk: require('../../../assets/characters/rabbit/talk.png'),
     robed: require('../../../assets/characters/rabbit/robed.png'),
   },
+  tarsier: {
+    idle: require('../../../assets/characters/tarsier/idle.png'),
+    talk: require('../../../assets/characters/tarsier/talk.png'),
+    robed: require('../../../assets/characters/tarsier/robed.png'),
+  },
+  aye_aye: {
+    idle: require('../../../assets/characters/aye_aye/idle.png'),
+    talk: require('../../../assets/characters/aye_aye/talk.png'),
+    robed: require('../../../assets/characters/aye_aye/robed.png'),
+  },
+  kakapo: {
+    idle: require('../../../assets/characters/kakapo/idle.png'),
+    talk: require('../../../assets/characters/kakapo/talk.png'),
+    robed: require('../../../assets/characters/kakapo/robed.png'),
+  },
 };
 
 // Emotion bubble emojis based on phase
@@ -267,9 +282,10 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
   capybara: 0,
   wombat: 0,
   rabbit: 0,
-  // No sprite art yet for the three high-room animals (emoji fallback) —
-  // re-measure these once idle.png frames land.
-  tarsier: 0,
+  // Measured from the landed art (lowest-opaque-row): tarsier carries 21%
+  // bottom padding (between fox's 18% -> 0 and owl's 24% -> 15); the other
+  // two sit at 13%/11%, well inside the grounded range.
+  tarsier: 8,
   aye_aye: 0,
   kakapo: 0,
 };
