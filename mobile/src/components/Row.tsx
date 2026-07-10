@@ -35,6 +35,31 @@ export interface SlotPreview {
   isValid: boolean;
 }
 
+/**
+ * Accessibility label for a drop slot. When a ghost preview is available the
+ * label announces the word the drop would form and whether the move is legal,
+ * so screen-reader players get the same guidance sighted players read from the
+ * visual ✓/✗ preview. Deliberately functional, literal copy (not phase
+ * narrative). "Not a valid move" rather than "not a valid word" because a
+ * preview can be invalid even when the formed word is real — removing the
+ * letter may break the word above. When previews are suppressed (Blind
+ * Offering, Challenge mode) `preview` is undefined and the plain positional
+ * label is kept.
+ */
+export function getSlotAccessibilityLabel(
+  index: number,
+  slotCount: number,
+  isGuided: boolean,
+  preview?: SlotPreview
+): string {
+  const base = `${isGuided ? 'Guided drop zone' : 'Drop zone'} ${index + 1}`;
+  if (!preview) return base;
+  const position = `${base} of ${slotCount}`;
+  return preview.isValid
+    ? `${position}, forms ${preview.word}, valid word`
+    : `${position}, would form ${preview.word}, not a valid move`;
+}
+
 interface RowProps {
   rowData: RowData;
   rowIndex: number;
@@ -142,13 +167,15 @@ function getPhaseRowColors(phase: number) {
 const Slot: React.FC<{
   onPress: (origin?: { x: number; y: number }) => void;
   index: number;
+  /** Total slot count in the target row (for the "N of M" accessibility label). */
+  slotCount?: number;
   compact?: boolean;
   phase?: number;
   isGuided?: boolean;
   preview?: SlotPreview;
   /** Incremented when a letter successfully lands in this slot (triggers catch bounce) */
   triggerCatch?: number;
-}> = ({ onPress, index, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
+}> = ({ onPress, index, slotCount = 0, compact = false, phase = 0, isGuided = false, preview, triggerCatch = 0 }) => {
   const settings = getSettingsSync();
   const phaseColors = getPhaseRowColors(phase);
   const scaleAnim = useRef(new Animated.Value(settings.reducedMotion ? 1 : 0)).current;
@@ -311,7 +338,7 @@ const Slot: React.FC<{
       onPressOut={handlePressOut}
       activeOpacity={1}
       hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
-      accessibilityLabel={isGuided ? `Guided drop zone ${index + 1}` : `Drop zone ${index + 1}`}
+      accessibilityLabel={getSlotAccessibilityLabel(index, slotCount, isGuided, preview)}
       accessibilityRole="button"
     >
       <Animated.View
@@ -669,6 +696,7 @@ export const Row: React.FC<RowProps> = memo(({
             <Slot
               onPress={(origin) => onSlotPress(slotIndex, origin)}
               index={slotIndex}
+              slotCount={letters.length + 1}
               compact
               phase={phase}
               isGuided={

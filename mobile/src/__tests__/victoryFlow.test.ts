@@ -104,10 +104,11 @@ jest.mock('react-native', () => {
   };
 });
 
-// --- Mock settings (mutable reducedMotion) ---
+// --- Mock settings (mutable reducedMotion + swiftVictories) ---
 let mockReducedMotion = false;
+let mockSwiftVictories = false;
 jest.mock('../services/settings', () => ({
-  getSettingsSync: () => ({ reducedMotion: mockReducedMotion }),
+  getSettingsSync: () => ({ reducedMotion: mockReducedMotion, swiftVictories: mockSwiftVictories }),
 }));
 
 // --- Mock haptics ---
@@ -119,7 +120,16 @@ jest.mock('../services/haptics', () => ({
 }));
 
 import { Animated } from 'react-native';
-import { useVictoryFlow, VictoryFlowState, VictoryFlowActions } from '../hooks/useVictoryFlow';
+import {
+  useVictoryFlow,
+  VictoryFlowState,
+  VictoryFlowActions,
+  isRoutineVictory,
+  shouldUseCompactVictory,
+  RoutineVictorySignals,
+  SWIFT_VICTORY_MIN_PUZZLES,
+  RITUAL_MICRO_EVENT_MIN_ENERGY,
+} from '../hooks/useVictoryFlow';
 
 function renderHook(): [VictoryFlowState, VictoryFlowActions] {
   rewindHookIndices();
@@ -137,6 +147,7 @@ beforeEach(() => {
   resetHookState();
   mockStartedAnims.length = 0;
   mockReducedMotion = false;
+  mockSwiftVictories = false;
 });
 
 afterEach(() => {
@@ -320,5 +331,162 @@ describe('skipToEnd (tap-to-skip)', () => {
     root.finish();
     const [state] = renderHook();
     expect(state.victoryStage).toBe('settled');
+  });
+});
+
+// ===========================================================================
+// Swift Victories — routine-victory policy (pure) + the instant flow path
+// ===========================================================================
+
+/** A fully routine victory: past the early game, no special beat attached. */
+function routineVictory(overrides: Partial<RoutineVictorySignals> = {}): RoutineVictorySignals {
+  return {
+    isDaily: false,
+    mandatoryHarvest: false,
+    phaseTransitionPending: false,
+    phaseChanged: false,
+    firstCompletionBonus: 0,
+    milestoneBonus: 0,
+    streakMilestoneBonus: 0,
+    questsCompleted: [],
+    ritualEnergy: 0,
+    puzzlesSolved: SWIFT_VICTORY_MIN_PUZZLES + 30,
+    ...overrides,
+  };
+}
+
+describe('isRoutineVictory (pure policy)', () => {
+  test('a plain mid-game win is routine', () => {
+    expect(isRoutineVictory(routineVictory())).toBe(true);
+  });
+
+  test('missing data is never routine (safe default: full ceremony)', () => {
+    expect(isRoutineVictory(null)).toBe(false);
+    expect(isRoutineVictory(undefined)).toBe(false);
+  });
+
+  test('the Daily Challenge always gets the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ isDaily: true }))).toBe(false);
+  });
+
+  test('the mandatory first-harvest gate always gets the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ mandatoryHarvest: true }))).toBe(false);
+  });
+
+  test('a pending or new phase transition always gets the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ phaseTransitionPending: true }))).toBe(false);
+    expect(isRoutineVictory(routineVictory({ phaseChanged: true }))).toBe(false);
+  });
+
+  test('a first-completion bonus always gets the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ firstCompletionBonus: 20 }))).toBe(false);
+  });
+
+  test('puzzle-count and streak milestones always get the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ milestoneBonus: 50 }))).toBe(false);
+    expect(isRoutineVictory(routineVictory({ streakMilestoneBonus: 30 }))).toBe(false);
+  });
+
+  test('completed quests always get the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ questsCompleted: ['Solve 3 puzzles'] }))).toBe(false);
+  });
+
+  test('a ritual micro-event win (energy >= threshold) always gets the full ceremony', () => {
+    expect(isRoutineVictory(routineVictory({ ritualEnergy: RITUAL_MICRO_EVENT_MIN_ENERGY }))).toBe(false);
+    expect(isRoutineVictory(routineVictory({ ritualEnergy: 10 }))).toBe(false);
+    // Just below the App-side micro-event trigger stays routine
+    expect(isRoutineVictory(routineVictory({ ritualEnergy: RITUAL_MICRO_EVENT_MIN_ENERGY - 1 }))).toBe(true);
+  });
+
+  test('the early game always gets the full ceremony (ceremony is part of the delight)', () => {
+    expect(isRoutineVictory(routineVictory({ puzzlesSolved: 0 }))).toBe(false);
+    expect(isRoutineVictory(routineVictory({ puzzlesSolved: SWIFT_VICTORY_MIN_PUZZLES - 1 }))).toBe(false);
+    expect(isRoutineVictory(routineVictory({ puzzlesSolved: SWIFT_VICTORY_MIN_PUZZLES }))).toBe(true);
+  });
+
+  test('missing puzzlesSolved is treated as early game (full ceremony)', () => {
+    expect(isRoutineVictory(routineVictory({ puzzlesSolved: undefined }))).toBe(false);
+  });
+
+  test('flawless alone does NOT force the full ceremony (compact shows the marker)', () => {
+    // flawless is not a special-beat signal; a clean routine solve stays compact
+    expect(isRoutineVictory({ ...routineVictory(), flawless: true } as RoutineVictorySignals)).toBe(true);
+  });
+
+  test('any combination of special signals stays non-routine', () => {
+    expect(isRoutineVictory(routineVictory({
+      isDaily: true,
+      milestoneBonus: 50,
+      ritualEnergy: 9,
+    }))).toBe(false);
+  });
+});
+
+describe('shouldUseCompactVictory (setting gate)', () => {
+  test('requires BOTH the setting and a routine victory', () => {
+    const routine = routineVictory();
+    expect(shouldUseCompactVictory(routine, true)).toBe(true);
+    expect(shouldUseCompactVictory(routine, false)).toBe(false);
+    expect(shouldUseCompactVictory(routineVictory({ isDaily: true }), true)).toBe(false);
+    expect(shouldUseCompactVictory(null, true)).toBe(false);
+  });
+});
+
+describe('swift victories instant flow path', () => {
+  test('swift ON + routine victory settles instantly with no choreography', () => {
+    mockSwiftVictories = true;
+    const [, actions] = renderHook();
+    actions.setVictoryData(routineVictory() as never);
+    actions.playVictorySequence(3);
+    const [state] = renderHook();
+    expect(state.victoryStage).toBe('settled');
+    expect(mockStartedAnims).toHaveLength(0);
+    expect(valueOf(state.victoryStar1)).toBe(1);
+    expect(valueOf(state.victoryStar2)).toBe(1);
+    expect(valueOf(state.victoryStar3)).toBe(1);
+    expect(valueOf(state.victoryModalScale)).toBe(1);
+    expect(valueOf(state.victoryModalOpacity)).toBe(1);
+    expect(mockHapticHeavy).toHaveBeenCalledTimes(1);
+  });
+
+  test('swift ON + special victory (milestone) keeps the full choreography', () => {
+    mockSwiftVictories = true;
+    const [, actions] = renderHook();
+    actions.setVictoryData(routineVictory({ milestoneBonus: 50 }) as never);
+    actions.playVictorySequence(3);
+    const [state] = renderHook();
+    expect(state.victoryStage).toBe('choreographing');
+    expect(mockStartedAnims.length).toBeGreaterThan(0);
+  });
+
+  test('swift OFF keeps the full choreography for routine wins', () => {
+    mockSwiftVictories = false;
+    const [, actions] = renderHook();
+    actions.setVictoryData(routineVictory() as never);
+    actions.playVictorySequence(2);
+    const [state] = renderHook();
+    expect(state.victoryStage).toBe('choreographing');
+  });
+
+  test('reducedMotion still settles instantly regardless of swift/routine (composition)', () => {
+    mockReducedMotion = true;
+    mockSwiftVictories = false;
+    const [, actions] = renderHook();
+    actions.setVictoryData(routineVictory({ milestoneBonus: 50 }) as never);
+    actions.playVictorySequence(1);
+    const [state] = renderHook();
+    expect(state.victoryStage).toBe('settled');
+    expect(mockStartedAnims).toHaveLength(0);
+  });
+
+  test('resetVictory clears the victory data the swift path reads', () => {
+    mockSwiftVictories = true;
+    const [, actions] = renderHook();
+    actions.setVictoryData(routineVictory() as never);
+    actions.resetVictory();
+    // With the data cleared, the next sequence is NOT compact (safe default)
+    actions.playVictorySequence(2);
+    const [state] = renderHook();
+    expect(state.victoryStage).toBe('choreographing');
   });
 });

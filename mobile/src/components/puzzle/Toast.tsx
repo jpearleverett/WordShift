@@ -1,20 +1,57 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { CandyColors } from '../../theme/colors';
+import { CandyColors, getPhaseTheme } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 interface ToastProps {
   message: string;
   isError: boolean;
+  /** Current narrative phase (0-5) — drives the toast's surface colors. */
+  phase?: number;
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
+/**
+ * Phase-aware toast colors. Reuses the phase theme's AA-audited modal
+ * text/background pairs for the normal toast (the same pairs VictoryModal
+ * renders on), plus contrast-checked error pairs per phase group:
+ * - Phase 0-2 error: white on CandyColors.red.shadow #B91C1C — 6.5:1
+ *   (the old red.main #EF4444 measured only 3.8:1 with white)
+ * - Phase 3+ error: #F6C8CE on deep crimson #4A1520 — 9.9:1
+ * Exported for the contrast regression tests.
+ */
+export function getToastTheme(phase: number) {
+  const theme = getPhaseTheme(phase);
+  if (phase >= 3) {
+    return {
+      normalBg: theme.modalBgColor,
+      normalText: theme.modalTextColor,
+      errorBg: '#4A1520',
+      errorText: '#F6C8CE',
+      // The candy shine reads as a smudge on the dark tinted fills — keep a
+      // faint top light so the pill still has form without going bright.
+      shine: 'rgba(255, 255, 255, 0.06)',
+      shadow: theme.vignetteColor,
+    };
+  }
+  return {
+    normalBg: theme.modalBgColor,
+    normalText: theme.modalTextColor,
+    errorBg: CandyColors.red.shadow,
+    errorText: CandyColors.white,
+    shine: 'rgba(255, 255, 255, 0.3)',
+    shadow: theme.vignetteColor,
+  };
+}
+
+export const Toast: React.FC<ToastProps> = ({ message, isError, phase = 0 }) => {
   const slideAnim = useRef(new Animated.Value(-20)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const toastTheme = getToastTheme(phase);
 
   useEffect(() => {
     // Stop any in-flight animations from a previous message before starting new ones
@@ -70,7 +107,10 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
     <Animated.View
       style={[
         styles.toast,
-        isError ? styles.toastError : styles.toastNormal,
+        {
+          backgroundColor: isError ? toastTheme.errorBg : toastTheme.normalBg,
+          shadowColor: toastTheme.shadow,
+        },
         {
           transform: [
             { translateY: slideAnim },
@@ -82,8 +122,8 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
       accessibilityLiveRegion="polite"
       accessibilityRole="alert"
     >
-      <View style={styles.toastShine} />
-      <Text style={[styles.toastText, isError && styles.toastTextError]}>
+      <View style={[styles.toastShine, { backgroundColor: toastTheme.shine }]} />
+      <Text style={[styles.toastText, { color: isError ? toastTheme.errorText : toastTheme.normalText }]}>
         {message}
       </Text>
     </Animated.View>
@@ -107,25 +147,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-  },
-  toastNormal: {
-    backgroundColor: CandyColors.white,
-    shadowColor: CandyColors.purple.main,
-  },
-  toastError: {
-    backgroundColor: CandyColors.red.main,
-    shadowColor: CandyColors.red.dark,
   },
   toastText: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 15,
     fontWeight: '800',
-    color: CandyColors.purple.main,
-  },
-  toastTextError: {
-    color: CandyColors.white,
   },
 });

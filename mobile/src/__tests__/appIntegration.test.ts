@@ -121,8 +121,11 @@ describe('reset-all wiring', () => {
     // Without this, the Expo Go / dev fallback (Updates.reloadAsync throws)
     // returned the player to a home screen still rendering the old save.
     expect(APP_TSX).toMatch(/onReset=\{handleResetComplete\}/);
-    // The rebuild refreshes persistence and restarts onboarding live.
-    expect(APP_TSX).toMatch(/advanceOnboarding\('home_empty'\)/);
+    // The shared rebuild refreshes persistence; Reset All restarts onboarding
+    // live while the creator-snapshot path keeps it complete.
+    expect(APP_TSX).toMatch(/restartOnboarding \? 'home_empty' : 'complete'/);
+    expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: true \}\)/);
+    expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: false \}\)/);
     expect(APP_TSX).toMatch(/puzzleActions\.clearBoard\(\)/);
   });
 });

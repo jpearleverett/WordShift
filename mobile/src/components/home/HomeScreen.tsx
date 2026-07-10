@@ -59,7 +59,7 @@ import {
   markHarvestHomeIntroSeen,
 } from '../../services/amberCurrency';
 import { shouldSimplifyAnimations } from '../../services/deviceTier';
-import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER } from '../../constants/gameBalance';
+import { AUTO_COLLECT_PUZZLE_LIMIT, HARVEST_NUDGE_MIN_AMBER, JOURNAL_UNLOCK_PUZZLES } from '../../constants/gameBalance';
 import { useScreenInsets } from '../../hooks/useScreenInsets';
 import { AmberInline } from '../AmberInline';
 
@@ -134,9 +134,9 @@ import { getSettingsSync } from '../../services/settings';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
+import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion } from '../../services/phaseNarrative';
 import { DailyChallengeCard } from '../DailyChallengeCard';
-import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
+import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection } from '../../services/haptics';
@@ -457,6 +457,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const ambientOpacity = useRef(new Animated.Value(0)).current;
   const ambientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ambientAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  // Alternates the ambient slot between atmosphere and a goal suggestion.
+  const preferGoalSuggestionRef = useRef(false);
   // Bounds the home_empty onboarding recovery reloads (see safety-net effect).
   const homeEmptyRecoveryAttemptsRef = useRef(0);
 
@@ -606,7 +608,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const isPostTutorialLightMode = useMemo(() => {
     if (!progress || isOnboarding) return false;
-    return progress.puzzlesSolved <= 5;
+    return progress.puzzlesSolved < JOURNAL_UNLOCK_PUZZLES;
   }, [progress, isOnboarding]);
 
   const shouldShowJournalButton = Boolean(
@@ -935,36 +937,71 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       return;
     }
 
-    const line = getHomeAmbientLine(progress.currentPhase);
-    setAmbientLine(line);
+    let cancelled = false;
+    (async () => {
+      // Alternate atmosphere with a gentle, actionable goal suggestion (pit >
+      // quest claim > daily > untried difficulty > active quests) so the idle
+      // slot nudges without becoming a chore list. Suggestion inputs are read
+      // live rather than dep-tracked so the cadence stays tied to phase and
+      // dialogue changes, exactly as before.
+      let line: string | null = null;
+      preferGoalSuggestionRef.current = !preferGoalSuggestionRef.current;
+      if (preferGoalSuggestionRef.current) {
+        try {
+          const dailyUnlocked = isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase);
+          const dailyDone = dailyUnlocked ? (await getDailyStatus()).isCompleted : true;
+          const completedDiffs = progress.completedDifficulties ?? [];
+          const untried = ['MEDIUM', 'MEDIUM_PLUS', 'HARD'].filter(d => !completedDiffs.includes(d));
+          const hasActiveQuests =
+            (weeklyQuestState?.daily?.quests?.length ?? 0) > 0 ||
+            (weeklyQuestState?.weekly?.quests?.length ?? 0) > 0;
+          const suggestion = getGoalSuggestion(
+            progress.currentPhase,
+            dailyUnlocked && !dailyDone,
+            untried,
+            null,
+            pitNeedsAttention,
+            claimableQuestAmber,
+            hasActiveQuests,
+          );
+          if (suggestion) line = suggestion.text;
+        } catch {
+          // Fall back to atmosphere.
+        }
+      }
+      if (line == null) line = getHomeAmbientLine(progress.currentPhase);
+      if (cancelled) return;
+      setAmbientLine(line);
 
-    const { reducedMotion } = getSettingsSync();
-    if (reducedMotion) {
-      ambientOpacity.setValue(1);
-      ambientTimerRef.current = setTimeout(() => {
-        ambientOpacity.setValue(0);
-        setAmbientLine(null);
-      }, 5000);
-    } else {
-      ambientOpacity.setValue(0);
-      const fadeIn = Animated.timing(ambientOpacity, { toValue: 1, duration: 600, useNativeDriver: true });
-      ambientAnimRef.current = fadeIn;
-      fadeIn.start(({ finished }) => {
-        if (!finished) return; // Animation was stopped by cleanup — don't start orphaned timer
-        ambientAnimRef.current = null;
+      const { reducedMotion } = getSettingsSync();
+      if (reducedMotion) {
+        ambientOpacity.setValue(1);
         ambientTimerRef.current = setTimeout(() => {
-          const fadeOut = Animated.timing(ambientOpacity, { toValue: 0, duration: 800, useNativeDriver: true });
-          ambientAnimRef.current = fadeOut;
-          fadeOut.start(({ finished: fadeOutFinished }) => {
-            if (!fadeOutFinished) return; // Animation was stopped by cleanup
-            ambientAnimRef.current = null;
-            setAmbientLine(null);
-          });
+          ambientOpacity.setValue(0);
+          setAmbientLine(null);
         }, 5000);
-      });
-    }
+      } else {
+        ambientOpacity.setValue(0);
+        const fadeIn = Animated.timing(ambientOpacity, { toValue: 1, duration: 600, useNativeDriver: true });
+        ambientAnimRef.current = fadeIn;
+        fadeIn.start(({ finished }) => {
+          if (!finished) return; // Animation was stopped by cleanup — don't start orphaned timer
+          ambientAnimRef.current = null;
+          ambientTimerRef.current = setTimeout(() => {
+            const fadeOut = Animated.timing(ambientOpacity, { toValue: 0, duration: 800, useNativeDriver: true });
+            ambientAnimRef.current = fadeOut;
+            fadeOut.start(({ finished: fadeOutFinished }) => {
+              if (!fadeOutFinished) return; // Animation was stopped by cleanup
+              ambientAnimRef.current = null;
+              setAmbientLine(null);
+            });
+          }, 5000);
+        });
+      }
+    })();
 
     return () => {
+      cancelled = true;
       if (ambientAnimRef.current) { ambientAnimRef.current.stop(); ambientAnimRef.current = null; }
       if (ambientTimerRef.current) { clearTimeout(ambientTimerRef.current); ambientTimerRef.current = null; }
     };

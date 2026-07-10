@@ -231,6 +231,14 @@ export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
  */
 export const STARTER_INTRO_MIN_PUZZLES = 12;
 
+/**
+ * Puzzle count where the Journal Hub (ledger, gallery, quests) and the header
+ * quest pill become visible, ending the post-tutorial "light mode" home.
+ * Quest GENERATION is gated on the same number (weeklyQuests) so quests can
+ * never accrue and expire invisibly before the player has a surface for them.
+ */
+export const JOURNAL_UNLOCK_PUZZLES = 6;
+
 // ============================================================================
 // OFFERING PIT
 // ============================================================================

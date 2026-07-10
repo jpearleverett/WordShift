@@ -46,6 +46,7 @@ import {
   getTendingLevelLabel,
   getMandatoryHarvestPitIntroLines,
   getDreadOfferingLine,
+  getNewCyclePointerLine,
 } from '../services/phaseNarrative';
 import { getStrongestDreadWord } from '../services/localGenerator';
 import { confirmPhaseTransition, spendAmber, awardBonusAmber, markMandatoryHarvestSeen, hasSeenMandatoryHarvest } from '../services/amberCurrency';
@@ -73,6 +74,8 @@ import {
   getHarvestState,
   offerBatch,
   offerAllBatches,
+  acknowledgeBatchCredit,
+  reconcilePendingCredits,
   HarvestState,
 } from '../services/wordHarvest';
 import { getSettingsSync } from '../services/settings';
@@ -1215,6 +1218,33 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
 
   useEffect(() => { loadState(); }, [loadState]);
 
+  // Recover any offered batch whose amber credit never landed (app killed
+  // between the offer write and the award write). Apply-then-ack: at-least-once
+  // delivery, deduped by the ledger. Runs once per pit visit, before the player
+  // can interact with anything money-shaped.
+  const creditRecoveryRanRef = useRef(false);
+  useEffect(() => {
+    if (creditRecoveryRanRef.current) return;
+    creditRecoveryRanRef.current = true;
+    (async () => {
+      try {
+        const orphans = await reconcilePendingCredits();
+        let recovered = 0;
+        for (const credit of orphans) {
+          const balance = await awardBonusAmber(credit.amber, 'word_offering');
+          await acknowledgeBatchCredit(credit.id);
+          recovered = balance;
+        }
+        if (orphans.length > 0 && mountedRef.current) {
+          setDisplayBalance(recovered);
+          onAmberChange?.(recovered);
+        }
+      } catch {
+        // Unacked entries persist harmlessly; the next visit retries.
+      }
+    })();
+  }, [onAmberChange]);
+
   // Fox greets the player at the pit the first time a manual harvest is
   // required. Decision runs once per visit, after the harvest state loads.
   useEffect(() => {
@@ -1699,6 +1729,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         const lines = getTendingMilestoneCeremonyText(result.milestone);
         lines.forEach((line, i) => schedule(line, i * 2600, i === 0));
         nextDelay = lines.length * 2600;
+        // A quiet pointer toward beginning again (NG+ lives in Settings; the
+        // line never names UI, it just lets the player know the way exists).
+        const pointer = getNewCyclePointerLine(phase as DialoguePhase);
+        if (pointer) {
+          schedule(pointer, nextDelay);
+          nextDelay += 2600;
+        }
       } else {
         hapticMedium();
         showResultToast(getTendingResultMessage(result.level));
@@ -1744,6 +1781,12 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
         markMandatoryHarvestSeen().catch(() => {});
       }
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
+      // Apply-then-ack: the pending-credit ledger entry is cleared only after
+      // the amber actually landed, so a kill between the two writes replays
+      // the credit instead of destroying it.
+      if (result.creditId) {
+        acknowledgeBatchCredit(result.creditId).catch(() => {});
+      }
       if (mountedRef.current) {
         // Settle on the real credited balance. The per-word optimistic bumps
         // for this batch summed to exactly its amberValue, so this lands
@@ -1963,6 +2006,11 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     let finalBalance = baseBalance;
     if (result.amberAwarded > 0) {
       finalBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
+      // Apply-then-ack (see tryFinalizeBatch): clear the pending-credit ledger
+      // entry only after the amber landed.
+      if (result.creditId) {
+        acknowledgeBatchCredit(result.creditId).catch(() => {});
+      }
       if (mountedRef.current) onAmberChange?.(finalBalance);
     }
 

@@ -50,6 +50,7 @@ import {
   invalidateProgressCache,
   awardBonusAmber,
   confirmPhaseTransition,
+  recordRitualWords,
 } from '../services/amberCurrency';
 import {
   SURPRISE_BONUS_AMOUNTS,
@@ -168,6 +169,37 @@ describe('awardPuzzleAmber', () => {
   test('no Patron bonus for non-patrons', async () => {
     const result = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
     expect(result.patronBonus).toBe(0);
+  });
+
+  // Itemization fields (additive): the Victory modal renders the REAL
+  // breakdown from these instead of re-deriving base/star math locally.
+  test('returns baseAmber (pure difficulty base) and starBonusAmber separately', async () => {
+    const threeStar = await awardPuzzleAmber('MEDIUM', 3, 'standard', 0, true);
+    expect(threeStar.baseAmber).toBe(10); // AMBER_REWARDS.MEDIUM
+    expect(threeStar.starBonusAmber).toBe(5); // floor(10 * 1.5) - 10
+    expect(threeStar.baseAmber + threeStar.starBonusAmber).toBe(threeStar.baseAmount);
+
+    await clearProgress();
+    const oneStar = await awardPuzzleAmber('MEDIUM', 1, 'standard', 0, true);
+    expect(oneStar.baseAmber).toBe(10);
+    expect(oneStar.starBonusAmber).toBe(0);
+  });
+
+  test('itemized parts sum exactly to the awarded amount (breakdown invariant)', async () => {
+    // A streak + challenge win with a forced surprise hit exercises every
+    // per-puzzle line at once (milestone/first-completion are separate adds).
+    await devAddPuzzles(SURPRISE_BONUS_MIN_PUZZLES);
+    setSurpriseRng(() => 0); // force the surprise bonus ON
+    const result = await awardPuzzleAmber('HARD', 3, 'challenge', 0, true);
+    expect(result.surpriseBonus).toBeGreaterThan(0);
+    expect(
+      result.baseAmber +
+      result.starBonusAmber +
+      result.streakBonus +
+      result.challengeBonus +
+      result.patronBonus +
+      result.surpriseBonus
+    ).toBe(result.amount);
   });
 });
 
@@ -1058,6 +1090,18 @@ describe('awardPuzzleAmber skipPhaseProgress option', () => {
     expect(progress.puzzlesSolved).toBe(5);
     expect(progress.currentPhase).toBe(0);
     expect(progress.pendingPhaseTransition).toBeNull();
+  });
+
+  test('recordRitualWords with zero energy records words but feeds no phaseProgress', async () => {
+    // The shared-challenge path passes energy 0: the ledger + trigger queue
+    // still fill (flavor stays) but the energy * 0.1 phase feed gets nothing.
+    const before = (await getFullProgress()).phaseProgress ?? 0;
+    const result = await recordRitualWords(['VOID', 'DOOM'], 0, ['VOID']);
+    const after = (await getFullProgress()).phaseProgress ?? 0;
+
+    expect(result.totalWordsFormed).toBe(2);
+    expect(result.triggerWordQueue).toContain('VOID');
+    expect(after).toBe(before);
   });
 });
 

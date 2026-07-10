@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { getLocalDateString, parseLocalDate } from './dateUtils';
+import { JOURNAL_UNLOCK_PUZZLES } from '../constants/gameBalance';
 
 /**
  * Quest system for WordShift.
@@ -238,10 +239,10 @@ export function getDayId(date: Date = new Date()): string {
  * Quests stay dormant until the quest surfaces (header quest pill + Journal
  * Hub) become visible at puzzle 6. Before that, generated quests would accrue
  * and expire invisibly — the player has no surface to see or claim them.
- * Mirrors HomeScreen's isPostTutorialLightMode gate (`puzzlesSolved <= 5`,
- * also used by isQuestPillVisible); keep the two in sync.
+ * Same constant as HomeScreen's isPostTutorialLightMode gate (also used by
+ * isQuestPillVisible) via JOURNAL_UNLOCK_PUZZLES.
  */
-export const QUEST_GENERATION_MIN_PUZZLES = 6;
+export const QUEST_GENERATION_MIN_PUZZLES = JOURNAL_UNLOCK_PUZZLES;
 
 /**
  * True when the known context explicitly says the player has not reached the

@@ -117,8 +117,8 @@ import {
   markPromptedForNotifications,
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
-import { initIAP, setBillingProvider } from './src/services/iap';
-import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement } from './src/services/ads';
+import { initIAP, setBillingProvider, reconcilePendingConsumableGrants, acknowledgeConsumableGrant } from './src/services/iap';
+import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
 import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
@@ -145,7 +145,9 @@ import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
-import { offerBatch } from './src/services/wordHarvest';
+import { offerBatch, acknowledgeBatchCredit } from './src/services/wordHarvest';
+import * as Updates from 'expo-updates';
+import { isCreatorKitEnabled, validateCreatorCode, applyCreatorSnapshot, isCreatorEra } from './src/services/creatorKit';
 import {
   hasVariantModifier,
   getNewlyUnlockedVariants,
@@ -534,6 +536,7 @@ function MainApp() {
     lastFormedWord: puzzle.lastFormedWord,
     doubleShiftPhase: puzzle.doubleShiftPhase,
     speedTimeRemaining: speedTimer.speedTimeRemaining,
+    isSharedChallenge: puzzle.isSharedChallenge,
   });
 
   // ========================================================================
@@ -940,7 +943,7 @@ function MainApp() {
   // no stats), an empty board, no victory/ceremony remnants, and onboarding
   // restarted from the empty den — instead of dumping the player back onto
   // a home screen still rendering their old save.
-  const handleResetComplete = useCallback(() => {
+  const rebuildSessionFromStorage = useCallback((opts: { restartOnboarding: boolean }) => {
     clearVictoryTimeouts();
     puzzleActions.clearBoard();
     puzzleActions.setShowConfetti(false);
@@ -964,12 +967,14 @@ function MainApp() {
     pendingPostVictoryActionRef.current = null;
     setHomePanY(null);
     puzzlesSinceHomeVisit.current = 0;
-    // Re-read the wiped persistence (amber, phase, stats, pending transition).
+    // Re-read the rebuilt persistence (amber, phase, stats, pending transition).
     persistenceActions.refreshStats().catch(() => {});
-    // Onboarding storage is back to 'not_started'; mirror the fresh-launch
-    // init by advancing the live state machine to the first step so the
-    // intro actually replays this session.
-    onboardingActions.advanceOnboarding('home_empty').catch(() => {});
+    // Reset All: onboarding storage is back to 'not_started'; mirror the
+    // fresh-launch init so the intro replays this session. Creator snapshot:
+    // storage says 'complete' and must stay complete.
+    onboardingActions
+      .advanceOnboarding(opts.restartOnboarding ? 'home_empty' : 'complete')
+      .catch(() => {});
     transitionTo('home');
   }, [
     clearVictoryTimeouts,
@@ -981,6 +986,10 @@ function MainApp() {
     resetSpeedRun,
     transitionTo,
   ]);
+
+  const handleResetComplete = useCallback(() => {
+    rebuildSessionFromStorage({ restartOnboarding: true });
+  }, [rebuildSessionFromStorage]);
 
   // Re-check today's daily leaderboard standing (tapping the completed daily
   // card). The standing used to be shown exactly once, on completion; this gives
@@ -1021,7 +1030,7 @@ function MainApp() {
       puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
       try {
         const daily = await generateDailyPuzzle();
-        puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength);
+        puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
         puzzleStartTimeRef.current = Date.now();
         logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true } });
         // First-daily mercy: a one-time hint cushion so the first HARD daily
@@ -1099,7 +1108,53 @@ function MainApp() {
 
   const handleIncomingLink = useCallback((url: string) => {
     if (!url.startsWith('wordshift://')) return;
-    logEvent({ type: 'deep_link_opened', data: { url } });
+    // Never upload the creator code to telemetry.
+    logEvent({
+      type: 'deep_link_opened',
+      data: { url: url.startsWith('wordshift://creator') ? 'wordshift://creator?<redacted>' : url },
+    });
+
+    // Creator/press fast-forward: wordshift://creator?code=CODE&era=dusk|shadows|reveal|peace.
+    // Deliberately BEFORE the onboarding guard (a reviewer on a fresh install is
+    // mid-onboarding; the snapshot itself completes onboarding). Fully inert
+    // unless a creatorCode is configured in app config extra.
+    if (url.startsWith('wordshift://creator')) {
+      if (!isCreatorKitEnabled()) return;
+      let code = '';
+      let era = '';
+      for (const pair of (url.split('?')[1] ?? '').split('&')) {
+        const [k, v] = pair.split('=');
+        if (k === 'code') code = decodeURIComponent(v ?? '');
+        if (k === 'era') era = decodeURIComponent(v ?? '').toLowerCase();
+      }
+      if (!validateCreatorCode(code) || !isCreatorEra(era)) return;
+      showGameAlert(
+        'Creator fast-forward',
+        `This replaces ALL progress on this device with a review save ("${era}"). This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Overwrite save',
+            onPress: async () => {
+              const ok = await applyCreatorSnapshot(era);
+              if (!ok) {
+                showGameAlert('Creator fast-forward', 'The snapshot could not be applied.');
+                return;
+              }
+              try {
+                await Updates.reloadAsync();
+              } catch {
+                // Expo Go / dev client: reload throws. The snapshot mutated
+                // storage through the services, so rebuilding App-level state
+                // (WITHOUT restarting onboarding) is sufficient.
+                rebuildSessionFromStorage({ restartOnboarding: false });
+              }
+            },
+          },
+        ],
+      );
+      return;
+    }
 
     if (onboardingFlow.onboardingStep && onboardingFlow.onboardingStep !== 'complete') {
       return;
@@ -1458,6 +1513,11 @@ function MainApp() {
         const autoCollected = await offerBatch(victory.harvestBatchId);
         if (autoCollected && autoCollected.amberAwarded > 0) {
           const newBalance = await awardBonusAmber(autoCollected.amberAwarded, 'auto_word_offering');
+          // Apply-then-ack: clear the pending-credit ledger entry only after
+          // the amber landed (kill between the writes replays, never loses).
+          if (autoCollected.creditId) {
+            acknowledgeBatchCredit(autoCollected.creditId).catch(() => {});
+          }
           persistenceActions.setAmberBalance(newBalance);
           logEvent({
             type: 'harvest_auto_collected',
@@ -2047,7 +2107,10 @@ function MainApp() {
     const inOnboarding = step !== undefined && step !== 'complete';
     const exempt =
       inOnboarding ||
-      isPlayingDaily ||
+      // The daily is exempt only from Phase 3 on (protecting the dread arc);
+      // at the bright phases its reliably habitual session carries the normal
+      // interstitial cadence (policy in ads.isDailyInterstitialAllowed).
+      (isPlayingDaily && !isDailyInterstitialAllowed(vd.newPhase as number)) ||
       vd.mandatoryHarvest ||                           // first-harvest teaching beat: never interrupt with an ad
       vd.phaseTransitionPending ||                     // pit ignition ceremony incoming
       persistence.pendingPhaseTransition != null ||    // ward ceremony waiting in the pit
@@ -3285,6 +3348,25 @@ function App() {
         // loadPixelFonts registers the cottage dialogue/chrome font before the
         // first frame (never throws — falls back to system font on failure).
         await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
+        // Recover any consumable purchase whose reward never landed (app killed
+        // between the store success and the grant). Apply-then-ack gives
+        // at-least-once delivery: a crash mid-recovery replays rather than
+        // loses a paid purchase. Local-only reads/writes — cheap to await, and
+        // doing it before MainApp mounts means the first frame shows the
+        // recovered balance.
+        try {
+          const pendingGrants = await reconcilePendingConsumableGrants();
+          for (const grant of pendingGrants) {
+            if (grant.reward.kind === 'amber') {
+              await awardBonusAmber(grant.reward.amount, `iap_recovered_${grant.productId}`);
+            } else {
+              await addHints(grant.reward.amount, `iap_recovered_${grant.productId}`);
+            }
+            await acknowledgeConsumableGrant(grant.grantId);
+          }
+        } catch (error) {
+          console.warn('Pending IAP grant recovery failed:', error);
+        }
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
       } finally {

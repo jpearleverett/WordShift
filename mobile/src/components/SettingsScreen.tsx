@@ -18,7 +18,7 @@ import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
-import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud } from '../services/cloudSave';
+import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud, getSyncStatus } from '../services/cloudSave';
 import { showGameAlert } from '../services/gameAlert';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
@@ -40,6 +40,7 @@ import {
   startNewCycle,
 } from '../services/amberCurrency';
 import { restorePurchases } from '../services/iap';
+import { STREAK_FREEZE_CAP } from '../constants/gameBalance';
 import { isPatronSync, isAdFreeSync } from '../services/entitlements';
 import { clearWordHistory } from '../services/wordHistory';
 import { clearAllSessions } from '../services/dialogueSession';
@@ -220,7 +221,9 @@ export async function performNewCycle(): Promise<number> {
   ];
   await Promise.allSettled(clears.map(async (fn) => fn()));
   try {
-    await uploadToCloud();
+    // NG+ is a deliberate overwrite of narrative state — force past the
+    // newer-save conflict guard so the new cycle always becomes the cloud row.
+    await uploadToCloud(true);
   } catch {
     // Non-fatal.
   }
@@ -239,6 +242,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   const [showRestore, setShowRestore] = useState(false);
   const [restoreInput, setRestoreInput] = useState('');
   const [restoreBusy, setRestoreBusy] = useState(false);
+  // A newer cloud save exists on another device (upload conflict guard fired).
+  const [syncConflict, setSyncConflict] = useState(false);
   const [purchaseRestoreBusy, setPurchaseRestoreBusy] = useState(false);
   // UMP privacy-options entry point (required to stay visible for EEA users
   // under the Google EU User Consent Policy; hidden everywhere else).
@@ -370,7 +375,49 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     privacyOptionsRequired().then(setPrivacyOptionsAvailable);
     refreshStreakFreeze();
     canStartNewCycle().then(setCanCycle).catch(() => {});
+    getSyncStatus().then((status) => setSyncConflict(!!status.conflictDetected)).catch(() => {});
   }, []);
+
+  // A newer cloud save exists on another device (upload conflict guard fired).
+  // Surface it with an explicit choice instead of silently clobbering either side.
+  const handleUseCloudSave = () => {
+    hapticLight();
+    (async () => {
+      try {
+        const restored = await downloadFromCloud();
+        setSyncConflict(false);
+        if (restored) {
+          showGameAlert('Restored', 'The newer save was restored. The app will use it from now on.');
+        } else {
+          showGameAlert('Restore', 'Could not fetch the newer save right now. Try again later.');
+        }
+      } catch {
+        showGameAlert('Restore', 'Something went wrong restoring your progress.');
+      }
+    })();
+  };
+
+  const handleKeepThisDevice = () => {
+    hapticLight();
+    showGameAlert(
+      'Keep this device?',
+      'This will overwrite the newer save from your other device with this one.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Keep this device',
+          onPress: async () => {
+            try {
+              await uploadToCloud(true);
+              setSyncConflict(false);
+            } catch {
+              // Non-fatal; the conflict row stays until an upload succeeds.
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleNewCycle = () => {
     hapticLight();
@@ -400,6 +447,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
   const handleBuyStreakFreeze = () => {
     hapticLight();
+    if (freezeCount >= STREAK_FREEZE_CAP) {
+      showGameAlert(
+        'Freezes Full',
+        `You can hold up to ${STREAK_FREEZE_CAP} streak freezes. Use one first, then stock up again.`
+      );
+      return;
+    }
     if (amberBalance < STREAK_FREEZE_AMBER_COST) {
       showGameAlert(
         'Not enough amber',
@@ -584,6 +638,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
               accessibilityState={{ checked: settings.reducedMotion }}
             />
           </View>
+
+          <View style={[styles.settingRow, rowTint]}>
+            <View style={styles.settingInfo}>
+              <Text style={[styles.settingLabel, { color: t.title }]}>Swift Victories</Text>
+              <Text style={[styles.settingDescription, { color: t.muted }]}>
+                A quicker results card after each solve. Big moments still play in full.
+              </Text>
+            </View>
+            <Switch
+              value={settings.swiftVictories}
+              onValueChange={(v) => handleToggle('swiftVictories', v)}
+              trackColor={switchTrack}
+              thumbColor={settings.swiftVictories ? t.primaryText : t.secondaryText}
+              accessibilityRole="switch"
+              accessibilityLabel="Swift victories"
+              accessibilityState={{ checked: settings.swiftVictories }}
+            />
+          </View>
         </PanelCard>
 
         {/* Notifications */}
@@ -647,6 +719,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             <TouchableOpacity style={[styles.aboutRow, rowTint]} onPress={() => { hapticLight(); setShowRestore(true); }} accessibilityRole="button" accessibilityLabel="Restore from another device">
               <Text style={[styles.linkText, { color: t.secondaryText }]}>Restore from another device</Text>
             </TouchableOpacity>
+            {syncConflict && (
+              <View style={[styles.recoveryCodeBox, { backgroundColor: t.rowBg, borderColor: t.amberTintBorder }]}>
+                <Text style={[styles.recoveryCodeHint, { color: t.title }]}>
+                  A newer save was found from another device.
+                </Text>
+                <TouchableOpacity style={styles.aboutRow} onPress={handleUseCloudSave} accessibilityRole="button" accessibilityLabel="Use the newer save">
+                  <Text style={[styles.linkText, { color: t.amberText }]}>Use the newer save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.aboutRow} onPress={handleKeepThisDevice} accessibilityRole="button" accessibilityLabel="Keep this device's progress">
+                  <Text style={[styles.linkText, { color: t.secondaryText }]}>Keep this device's progress</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </PanelCard>
         )}
 

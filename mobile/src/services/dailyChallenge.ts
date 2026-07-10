@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Difficulty } from '../types';
+import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { generateLocalPuzzle } from './localGenerator';
 import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
@@ -266,6 +266,12 @@ export async function isDailyCompleted(): Promise<boolean> {
 export interface DailyPuzzleData {
   words: string[];
   hint?: string;
+  /**
+   * The generator's solution steps, threaded through so daily hints use the
+   * stored solution (via startDailyGame's optional solution param) instead of
+   * the blind live search. Deterministic like the rest of the daily.
+   */
+  solution?: PuzzleSolutionStep[];
   difficulty: Difficulty;
   date: string;
   wordLength: number;
@@ -317,6 +323,7 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
       const result: DailyPuzzleData = {
         words: puzzle.words,
         hint: puzzle.hint,
+        solution: puzzle.solution,
         difficulty,
         date: today,
         wordLength: puzzle.wordLength ?? ramp.wordLength,

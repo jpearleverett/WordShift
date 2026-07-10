@@ -112,8 +112,14 @@ jest.mock('react-native', () => ({
 // Service/component mocks (keep the module graph Node-safe)
 // ---------------------------------------------------------------------------
 
+let mockSwiftVictories = false;
 jest.mock('../services/settings', () => ({
-  getSettingsSync: () => ({ reducedMotion: true, soundEnabled: false, hapticsEnabled: false }),
+  getSettingsSync: () => ({
+    reducedMotion: true,
+    soundEnabled: false,
+    hapticsEnabled: false,
+    swiftVictories: mockSwiftVictories,
+  }),
 }));
 
 jest.mock('../services/haptics', () => ({
@@ -146,6 +152,8 @@ jest.mock('../components/monetization/RewardedAdButton', () => ({
 // ---------------------------------------------------------------------------
 
 import { VictoryModal, VictoryData } from '../components/puzzle/VictoryModal';
+import { getToastTheme } from '../components/puzzle/Toast';
+import { SWIFT_VICTORY_MIN_PUZZLES } from '../hooks/useVictoryFlow';
 import {
   getVictoryFeedback,
   getRitualEchoFooter,
@@ -153,6 +161,8 @@ import {
   getAutoCollectCaption,
   getMandatoryHarvestText,
   getMandatoryHarvestCTA,
+  getVictoryTitle,
+  getFlawlessHonorific,
 } from '../services/phaseNarrative';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../services/shareResults';
 import { getPhaseTheme } from '../theme/colors';
@@ -287,6 +297,7 @@ function baseProps(overrides: Record<string, unknown> = {}): Record<string, unkn
 
 beforeEach(() => {
   resetHookState();
+  mockSwiftVictories = false;
 });
 
 // ===========================================================================

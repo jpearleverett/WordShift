@@ -27,6 +27,7 @@ import {
   purchaseConsumable,
   purchaseStarterPack,
   purchaseProduct,
+  acknowledgeConsumableGrant,
   IapProduct,
 } from '../../services/iap';
 import {
@@ -233,6 +234,12 @@ export const StoreModal: React.FC<StoreModalProps> = ({
             onHintsChange?.(balance);
             setSuccessMsg(`+${result.reward.amount} hints added.`);
           }
+          // Apply-then-ack: the grant is only cleared from the pending ledger
+          // once the reward has actually landed, so a kill mid-flow replays the
+          // grant (at-least-once) instead of losing a paid purchase.
+          if (result.grantId) {
+            acknowledgeConsumableGrant(result.grantId).catch(() => {});
+          }
           logEvent({ type: 'iap_purchase', data: { productId: info.productId, kind: result.reward.kind } });
           hapticMedium();
           setFlow('idle');
@@ -262,10 +269,18 @@ export const StoreModal: React.FC<StoreModalProps> = ({
     try {
       const result = await purchaseStarterPack();
       if (result.success && result.reward) {
+        // Apply-then-ack per grant (see handleBuyConsumable): a kill mid-flow
+        // replays the missing half rather than losing a paid bundle.
         const balance = await awardBonusAmber(result.reward.amber, 'iap_starter');
         onAmberChange?.(balance);
+        if (result.grantIds?.amber) {
+          acknowledgeConsumableGrant(result.grantIds.amber).catch(() => {});
+        }
         const hints = await addHints(result.reward.hints, 'iap_starter');
         onHintsChange?.(hints);
+        if (result.grantIds?.hints) {
+          acknowledgeConsumableGrant(result.grantIds.hints).catch(() => {});
+        }
         setOwnsStarter(true);
         setSuccessMsg(`+${result.reward.amber} amber and +${result.reward.hints} hints added.`);
         logEvent({ type: 'iap_purchase', data: { productId: STARTER_PACK_INFO.productId, kind: 'starter' } });

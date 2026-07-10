@@ -1147,6 +1147,16 @@ async function generateReverseChain(
   return bestChain;
 }
 
+/**
+ * Quality floor for forced-start generation (echo puzzles seed a word from the
+ * player's ritual history). Echo boards are the descent's showcase moment, so
+ * they no longer bypass the quality gate entirely (the old floor was 0) — but
+ * the floor stays modest because the start word is non-negotiable, and if no
+ * chain clears it within the attempt budget the best valid chain is accepted
+ * anyway (see bestBelowFloor) so echo generation never starts failing.
+ */
+export const FORCED_START_MIN_SCORE = 20;
+
 export const generateLocalPuzzle = async (
   difficulty: Difficulty = 'MEDIUM',
   overrides?: { wordLength?: number; targetRows?: number; startWord?: string; requireReverseSolvable?: boolean; relaxBoring?: boolean }
@@ -1238,8 +1248,12 @@ export const generateLocalPuzzle = async (
   // --- Standard forward generation path ---
   const GLOBAL_TIMEOUT = 2500;
   const CANDIDATES_TO_GENERATE = forcedStartWord ? 1 : 3;
-  const MIN_ACCEPTABLE_SCORE = forcedStartWord ? 0 : 45;
+  const MIN_ACCEPTABLE_SCORE = forcedStartWord ? FORCED_START_MIN_SCORE : 45;
   const generatedPuzzles: GeneratedPuzzle[] = [];
+  // Graceful relaxation for forced-start (echo) generation: remember the best
+  // below-floor chain so, if no attempt clears the floor within the budget,
+  // we ship that instead of failing (echo boards must never stop generating).
+  let bestBelowFloor: GeneratedPuzzle | null = null;
 
   const state: GenState = {
     startTime: Date.now(),
@@ -1287,12 +1301,21 @@ export const generateLocalPuzzle = async (
         if (score >= 70 && generatedPuzzles.length >= 2) {
           break;
         }
+      } else if (forcedStartWord && (!bestBelowFloor || score > bestBelowFloor.score)) {
+        bestBelowFloor = { chain: path, score };
       }
     }
   }
 
   if (generatedPuzzles.length === 0) {
-    throw new Error("Could not generate valid puzzle locally");
+    if (forcedStartWord && bestBelowFloor) {
+      // No forced-start chain cleared the quality floor within the attempt
+      // budget — accept the best valid chain rather than failing (the old
+      // floor-0 behavior, kept as the relaxation path).
+      generatedPuzzles.push(bestBelowFloor);
+    } else {
+      throw new Error("Could not generate valid puzzle locally");
+    }
   }
 
   generatedPuzzles.sort((a, b) => b.score - a.score);

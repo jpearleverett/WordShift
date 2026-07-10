@@ -470,6 +470,12 @@ export interface StarterPackPurchaseResult {
   productId?: ProductId;
   /** The bundle to apply on success (caller credits amber + hints). */
   reward?: { amber: number; hints: number };
+  /**
+   * Pending-ledger ids for the bundle's two grants (amber, hints). The caller
+   * acknowledges each after applying its half of the reward — same crash-replay
+   * contract as `purchaseConsumable` (see PendingConsumableGrant).
+   */
+  grantIds?: { amber?: string; hints?: string };
   /** True when the one-per-account limit blocked the purchase. */
   alreadyOwned?: boolean;
   cancelled?: boolean;
@@ -491,7 +497,29 @@ export async function purchaseStarterPack(): Promise<StarterPackPurchaseResult> 
   const result = await provider.purchase(productId);
   if (result.success) {
     await grantEntitlements([ENTITLEMENTS.STARTER_PACK]);
-    return { success: true, productId, reward: { ...STARTER_PACK_GRANTS } };
+    // Same crash-replay net as purchaseConsumable: the entitlement persists
+    // instantly, but the amber+hints currency grant could be lost to a kill
+    // between this return and the caller's award. Two ledger entries (one per
+    // reward kind) ride the existing consumable reconcile path.
+    const txBase = result.transactionId;
+    const amberGrantId = await persistPendingConsumableGrant({
+      productId,
+      reward: { kind: 'amber', amount: STARTER_PACK_GRANTS.amber },
+      transactionId: txBase ? `${txBase}:amber` : undefined,
+      firstPurchaseDoubled: false,
+    });
+    const hintsGrantId = await persistPendingConsumableGrant({
+      productId,
+      reward: { kind: 'hints', amount: STARTER_PACK_GRANTS.hints },
+      transactionId: txBase ? `${txBase}:hints` : undefined,
+      firstPurchaseDoubled: false,
+    });
+    return {
+      success: true,
+      productId,
+      reward: { ...STARTER_PACK_GRANTS },
+      grantIds: { amber: amberGrantId, hints: hintsGrantId },
+    };
   }
   return { success: false, productId, cancelled: result.cancelled, error: result.error };
 }

@@ -123,7 +123,7 @@ jest.mock('../services/starRating', () => ({
 }));
 
 // --- Mock amberCurrency ---
-const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: any, _c?: any) => ({
+const mockAwardPuzzleAmber = jest.fn(async (_d?: any, _s?: any, _m?: any, _r?: any, _c?: any, _o?: any) => ({
   amount: 15,
   baseAmount: 15,
   newBalance: 115,
@@ -162,7 +162,7 @@ const mockRecordRitualWords = jest.fn(async (_w?: any, _e?: any, _t?: any) => ({
 }));
 
 jest.mock('../services/amberCurrency', () => ({
-  awardPuzzleAmber: (...args: any[]) => mockAwardPuzzleAmber(args[0], args[1], args[2], args[3], args[4]),
+  awardPuzzleAmber: (...args: any[]) => mockAwardPuzzleAmber(args[0], args[1], args[2], args[3], args[4], args[5]),
   getAmberBalance: () => mockGetAmberBalance(),
   getCurrentPhase: () => mockGetCurrentPhase(),
   getPhaseProgressFraction: jest.fn(async () => 0),
@@ -314,7 +314,9 @@ describe('useGamePersistence', () => {
       const [, actions] = callHook();
       await actions.recordVictory('MEDIUM', 0, 0, 'standard');
 
-      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith('MEDIUM', 3, 'standard', expect.any(Number), false);
+      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false }
+      );
     });
 
     test('calls updatePuzzleCount with puzzlesSolved', async () => {
@@ -441,7 +443,7 @@ describe('useGamePersistence', () => {
       await actions.recordVictory('MEDIUM', 0, 0);
 
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', expect.any(Number), false
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: false }
       );
     });
 
@@ -519,7 +521,7 @@ describe('useGamePersistence', () => {
 
       // getThreeStarRate returns 50 (percentage), should be divided by 100 to get ratio 0.5
       expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
-        'MEDIUM', 3, 'standard', 0.5, false
+        'MEDIUM', 3, 'standard', 0.5, false, { skipPhaseProgress: false }
       );
     });
 
@@ -550,6 +552,186 @@ describe('useGamePersistence', () => {
       const [, actions] = callHook();
       const result = await actions.recordVictory('MEDIUM', 0, 0);
       expect(result.harvestOverflow).toBe(true);
+    });
+  });
+
+  describe('amberBreakdown (real itemization threading)', () => {
+    test('threads the economy itemization and the parts sum to amberEarned', async () => {
+      // A rich victory: base 20 + star 10, streak 3, challenge 7, patron 2,
+      // surprise 5, milestone 50, first-completion 30, streak milestone 15.
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
+        amount: 47, // 20 + 10 + 3 + 7 + 2 + 5
+        baseAmount: 30,
+        baseAmber: 20,
+        starBonusAmber: 10,
+        newBalance: 100,
+        puzzlesSolved: 40,
+        phaseChanged: false,
+        newPhase: 1,
+        streakBonus: 3,
+        challengeBonus: 7,
+        patronBonus: 2,
+        surpriseBonus: 5,
+        currentStreak: 4,
+        milestoneBonus: 50,
+        milestoneMessage: 'Milestone!',
+        phaseAcceleration: 1.0,
+        firstCompletionBonus: 30,
+        streakMilestoneBonus: 15,
+        streakMilestoneMessage: 'Streak!',
+      } as any);
+      // Variant pass adds bonus 8 + fresh 4 on top of amount.
+      mockApplyVariantAmberBonus.mockResolvedValueOnce({
+        bonus: 8,
+        freshBonus: 4,
+        isFresh: true,
+        newBalance: 100,
+        appliedMultiplier: 1.2,
+        repeatCount: 1,
+        repeatDecay: 1.0,
+      });
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('HARD', 0, 0, 'challenge', ['LIME', 'TIME'], 'reverse');
+
+      const b = result.amberBreakdown!;
+      expect(b).toBeDefined();
+      expect(b.base).toBe(20);
+      expect(b.starBonus).toBe(10);
+      expect(b.streakBonus).toBe(3);
+      expect(b.challengeBonus).toBe(7);
+      expect(b.patronBonus).toBe(2);
+      expect(b.surpriseBonus).toBe(5);
+      expect(b.variantBonus).toBe(8);
+      expect(b.freshVariantBonus).toBe(4);
+      expect(b.firstCompletionBonus).toBe(30);
+      expect(b.milestoneBonus).toBe(50);
+      expect(b.streakMilestoneBonus).toBe(15);
+
+      // The invariant the Victory modal relies on: parts sum EXACTLY to the
+      // amber earned — no re-derived display math can desync from this.
+      const partsSum =
+        b.base + b.starBonus + b.streakBonus + b.challengeBonus + b.patronBonus +
+        b.surpriseBonus + b.variantBonus + b.freshVariantBonus +
+        b.firstCompletionBonus + b.milestoneBonus + b.streakMilestoneBonus;
+      expect(partsSum).toBe(result.amberEarned);
+      expect(b.total).toBe(result.amberEarned);
+      // amount(47) + variant(8) + fresh(4) + milestone(50) + firstComp(30) + streakMilestone(15)
+      expect(result.amberEarned).toBe(154);
+    });
+
+    test('a plain victory sums too (base + star only)', async () => {
+      mockAwardPuzzleAmber.mockResolvedValueOnce({
+        amount: 15,
+        baseAmount: 15,
+        baseAmber: 10,
+        starBonusAmber: 5,
+        newBalance: 115,
+        puzzlesSolved: 30,
+        phaseChanged: false,
+        newPhase: 0 as const,
+        streakBonus: 0,
+        challengeBonus: 0,
+        patronBonus: 0,
+        surpriseBonus: 0,
+        currentStreak: 1,
+        milestoneBonus: 0,
+        milestoneMessage: null,
+        phaseAcceleration: 1.0,
+        firstCompletionBonus: 0,
+        streakMilestoneBonus: 0,
+        streakMilestoneMessage: null,
+      } as any);
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0);
+
+      const b = result.amberBreakdown!;
+      expect(b.base + b.starBonus).toBe(15);
+      expect(b.total).toBe(result.amberEarned);
+      expect(result.amberEarned).toBe(15);
+    });
+
+    test('the concurrent-guard fallback carries no breakdown (display falls back)', async () => {
+      // Make recordPuzzleCompletion hang so a second call hits the guard.
+      let release: () => void = () => {};
+      mockRecordPuzzleCompletion.mockImplementationOnce(
+        () => new Promise(resolve => { release = () => resolve({} as any); })
+      );
+      const [, actions] = callHook();
+      const first = actions.recordVictory('MEDIUM', 0, 0);
+      const second = await actions.recordVictory('MEDIUM', 0, 0);
+      expect(second.amberBreakdown).toBeUndefined();
+      release();
+      await first;
+    });
+  });
+
+  describe('shared-challenge wins are amber-only', () => {
+    test('passes skipPhaseProgress: true to awardPuzzleAmber', async () => {
+      const [, actions] = callHook();
+      await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'standard',
+        false, 0, false, true // isSharedChallenge
+      );
+
+      expect(mockAwardPuzzleAmber).toHaveBeenCalledWith(
+        'MEDIUM', 3, 'standard', expect.any(Number), false, { skipPhaseProgress: true }
+      );
+    });
+
+    test('zeroes the ritual-energy phase feed but still records words + triggers', async () => {
+      const { calculateRitualEnergy, extractTriggerWords } = jest.requireMock('../services/localGenerator');
+      (calculateRitualEnergy as jest.Mock).mockReturnValue(9); // would be a high-dread board
+      (extractTriggerWords as jest.Mock).mockReturnValue(['VOID']);
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', ['VOID', 'DOOM'], 'standard',
+        false, 0, false, true // isSharedChallenge
+      );
+
+      // Words still land in the ledger with their trigger flavor, but the
+      // energy passed to recordRitualWords is ZERO — its phaseProgress feed
+      // (energy * 0.1) gets nothing from a self-crafted challenge chain.
+      expect(mockRecordRitualWords).toHaveBeenCalledWith(['VOID', 'DOOM'], 0, ['VOID']);
+      expect(result.ritualEnergy).toBe(0);
+
+      (calculateRitualEnergy as jest.Mock).mockReturnValue(0);
+      (extractTriggerWords as jest.Mock).mockReturnValue([]);
+    });
+
+    test('a normal win keeps the real ritual energy', async () => {
+      const { calculateRitualEnergy } = jest.requireMock('../services/localGenerator');
+      (calculateRitualEnergy as jest.Mock).mockReturnValue(6);
+
+      const [, actions] = callHook();
+      const result = await actions.recordVictory('MEDIUM', 0, 0, 'standard', ['LIME', 'TIME']);
+
+      expect(mockRecordRitualWords).toHaveBeenCalledWith(['LIME', 'TIME'], 6, []);
+      expect(result.ritualEnergy).toBe(6);
+
+      (calculateRitualEnergy as jest.Mock).mockReturnValue(0);
+    });
+
+    test('shared wins still pay full amber (amount untouched)', async () => {
+      const [, actions] = callHook();
+      const result = await actions.recordVictory(
+        'MEDIUM', 0, 0, 'standard', ['LIME', 'TIME'], 'standard',
+        false, 0, false, true
+      );
+      expect(result.amberEarned).toBe(15);
+      expect(mockEnqueueHarvestBatch).toHaveBeenCalledWith(
+        expect.objectContaining({ amberValue: 15 })
+      );
+    });
+
+    test('returns isDaily so the routine-victory policy can gate the daily', async () => {
+      const [, actions] = callHook();
+      const daily = await actions.recordVictory('HARD', 0, 0, 'standard', [], 'standard', true);
+      expect(daily.isDaily).toBe(true);
+      const normal = await actions.recordVictory('MEDIUM', 0, 0);
+      expect(normal.isDaily).toBe(false);
     });
   });
 

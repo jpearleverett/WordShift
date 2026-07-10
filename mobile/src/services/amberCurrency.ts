@@ -429,6 +429,10 @@ export async function awardPuzzleAmber(
 ): Promise<{
   amount: number;
   baseAmount: number;
+  /** Pure difficulty base (AMBER_REWARDS[difficulty]) before the star bonus. */
+  baseAmber: number;
+  /** Star-rating increment folded into baseAmount (baseAmber + starBonusAmber = baseAmount). */
+  starBonusAmber: number;
   streakBonus: number;
   challengeBonus: number;
   patronBonus: number;
@@ -459,7 +463,8 @@ export async function awardPuzzleAmber(
   streakFreezeJustConsumed = false;
 
   // Base reward by difficulty
-  let baseAmount = AMBER_REWARDS[difficulty];
+  const baseAmber = AMBER_REWARDS[difficulty];
+  let baseAmount = baseAmber;
 
   // Star bonuses
   if (starsEarned === 3) {
@@ -469,6 +474,8 @@ export async function awardPuzzleAmber(
     // 2 stars: +25%
     baseAmount = Math.floor(baseAmount * 1.25);
   }
+  // Itemized star increment (kept separate so display never re-derives the math)
+  const starBonusAmber = baseAmount - baseAmber;
 
   // Apply streak bonus
   const streakMultiplier = calculateStreakMultiplier(currentStreak);
@@ -648,6 +655,8 @@ export async function awardPuzzleAmber(
   return {
     amount: totalAmount,
     baseAmount,
+    baseAmber,
+    starBonusAmber,
     streakBonus,
     challengeBonus,
     patronBonus,

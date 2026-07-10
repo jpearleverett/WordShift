@@ -126,6 +126,15 @@ jest.mock('../constants', () => ({
     'BCD', 'AEFGH', 'AFGH', 'EIJKL',
     // Synthetic double-shift step: ABCDE → FGHIJ (move A then B → ABFGHIJ)
     'CDE', 'ABFGHIJ',
+    // Hint dead-end awareness: MNOP → QRST → UVWX. First valid candidate is
+    // M@0 (remainder NOP, forms MQRST) but MQRST is a dead end (no removal of
+    // Q/R/S/T is a word). The solvable alternative is N@0 (remainder MOP,
+    // forms NQRST; then Q → NRST + QUVWX completes).
+    'NOP', 'MQRST', 'MOP', 'NQRST', 'NRST', 'QUVWX',
+    // Only-dead-ends board: MNOP → JQXZ → UVWX. Single candidate M@0 forms
+    // MJQXZ, which is a dead end (no onward word exists) — the hint must
+    // still fall back to it rather than refusing.
+    'MJQXZ',
   ]),
   CURATED_EARLY_PUZZLES: [
     { words: ['GLOW', 'ABLE', 'EACH'], solution: [
@@ -141,7 +150,7 @@ jest.mock('../constants', () => ({
   },
 }));
 
-import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
+import { usePuzzleGame, hasAnyValidMove, canCompleteDoubleShift, hasAnyValidDoubleShiftMove, isBoardSolvableFromState, PuzzleGameState, PuzzleGameActions } from '../hooks/usePuzzleGame';
 
 /**
  * Helper: call usePuzzleGame with fresh hook indices (simulates a re-render).
@@ -252,6 +261,26 @@ describe('usePuzzleGame', () => {
       const [state] = callHook();
       expect(state.gameMode).toBe('standard');
       expect(state.undosRemaining).toBe(Infinity);
+    });
+
+    test('threads the daily solution through for stored-step hints', () => {
+      const solution = [
+        { stepIndex: 0, sourceWord: 'PLANET', targetWord: 'PLATES', letterToMove: 'N', explanation: '' },
+      ];
+      let [, actions] = callHook();
+      actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], 'daily hint', 6, solution);
+
+      const [state] = callHook();
+      expect(state.solution).toBe(solution);
+    });
+
+    test('remains backward compatible without a solution (3-arg call)', () => {
+      let [, actions] = callHook();
+      actions.startDailyGame(['PLANET', 'PLATES', 'PLANES'], 'daily hint', 6);
+
+      const [state] = callHook();
+      expect(state.solution).toBeUndefined();
+      expect(state.gameState).toBe(GameState.PLAYING);
     });
   });
 
@@ -905,6 +934,81 @@ describe('usePuzzleGame', () => {
   });
 
   // =========================================================================
+  // Challenge mode suppresses slot previews (previews are a free hint —
+  // Challenge's no-hints/limited-undos must not be defanged by them)
+  // =========================================================================
+
+  describe('slotPreviews suppression (challenge / blind)', () => {
+    function selectLetter(char: string) {
+      const [state, actions] = callHook();
+      const letter = state.rows[state.activeRowIndex].words.find(
+        l => l.char === char && !l.isLocked
+      )!;
+      actions.handleLetterPress(letter, state.activeRowIndex);
+    }
+
+    test('challenge mode hides all slot previews', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.setGameMode('challenge');
+      [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      selectLetter('M');
+
+      const [state] = callHook();
+      expect(state.gameMode).toBe('challenge');
+      expect(state.selectedLetter).not.toBeNull();
+      expect(state.slotPreviews).toBeUndefined();
+    });
+
+    test('standard mode previews are unchanged', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']);
+      selectLetter('M');
+
+      const [state] = callHook();
+      expect(state.slotPreviews).toBeDefined();
+      expect(state.slotPreviews![2].word).toBe('TIMED');
+    });
+
+    test('challenge suppresses the double-shift drop1 look-ahead previews too', () => {
+      // Standard double shift: drop1 look-ahead previews are shown.
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+      selectLetter('A');
+      let [state] = callHook();
+      expect(state.doubleShiftPhase).toBe('drop1');
+      expect(state.slotPreviews).toBeDefined();
+
+      // Challenge double shift: same selection, no previews.
+      resetHookState();
+      [, actions] = callHook();
+      actions.setGameMode('challenge');
+      [, actions] = callHook();
+      actions.initGame(['ABCDE', 'FGHIJ'], undefined, undefined, 5, 'double_shift');
+      selectLetter('A');
+      [state] = callHook();
+      expect(state.doubleShiftPhase).toBe('drop1');
+      expect(state.slotPreviews).toBeUndefined();
+    });
+
+    test('blind mode still hides previews (unchanged by the challenge gate)', async () => {
+      resetHookState();
+      let [, actions] = callHook();
+      await actions.startNewGame('MEDIUM', 'standard', 'standard', true);
+      let [state] = callHook();
+      expect(state.blindMode).toBe(true);
+      selectLetter(state.rows[0].words[0].char);
+
+      [state] = callHook();
+      expect(state.selectedLetter).not.toBeNull();
+      expect(state.slotPreviews).toBeUndefined();
+    });
+  });
+
+  // =========================================================================
   // Hint board glow (hintHighlight)
   // =========================================================================
 
@@ -1433,6 +1537,230 @@ describe('usePuzzleGame', () => {
       // The delivered highlight points at the LIVE move's letter (A), not the
       // stale step's letter (B).
       expect(state.hintHighlight?.letterIndex).toBe(0);
+    });
+  });
+
+  // =========================================================================
+  // Hint dead-end awareness (off-solution fallback search)
+  // =========================================================================
+
+  describe('handleHint dead-end awareness', () => {
+    test('prefers a solvable candidate over the first valid dead end', () => {
+      const { getHintMessage } = require('../services/phaseNarrative');
+      (getHintMessage as jest.Mock).mockClear();
+
+      resetHookState();
+      let [, actions] = callHook();
+      // No stored solution (the daily / shared-link shape) — every hint takes
+      // the live search. Scan order finds M@0 first (NOP + MQRST, both valid)
+      // but MQRST is a dead end: no removal of Q/R/S/T leaves a word. The
+      // solvable alternative N@0 (MOP + NQRST, then Q → NRST + QUVWX
+      // completes) must win.
+      actions.initGame(['MNOP', 'QRST', 'UVWX']);
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(getHintMessage).toHaveBeenCalledWith('N', 'NQRST', expect.anything());
+      expect(state.hintHighlight!.letterIndex).toBe(1);
+      expect(state.hintHighlight!.targetSlotIndex).toBe(0);
+    });
+
+    test('falls back to the first valid move when only dead ends exist (never refuses)', () => {
+      const { consumeHintSync } = require('../services/hints');
+      (consumeHintSync as jest.Mock).mockClear();
+      const { getHintMessage } = require('../services/phaseNarrative');
+      (getHintMessage as jest.Mock).mockClear();
+
+      resetHookState();
+      let [, actions] = callHook();
+      // Single one-ply candidate M@0 (NOP + MJQXZ); MJQXZ has no onward word,
+      // so the board is a guaranteed dead end. A legal move exists, so the
+      // hint must still deliver (and charge) rather than come up empty.
+      actions.initGame(['MNOP', 'JQXZ', 'UVWX']);
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(consumeHintSync).toHaveBeenCalledTimes(1);
+      expect(getHintMessage).toHaveBeenCalledWith('M', 'MJQXZ', expect.anything());
+      expect(state.hintHighlight!.letterIndex).toBe(0);
+      expect(state.hintHighlight!.targetSlotIndex).toBe(0);
+    });
+
+    test('a completing move is always acceptable (2-row board, no downstream check)', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.initGame(['TIME', 'TIED']); // M@2 completes the puzzle
+
+      [, actions] = callHook();
+      actions.handleHint();
+
+      const [state] = callHook();
+      expect(state.hintsUsed).toBe(1);
+      expect(state.hintHighlight!.letterIndex).toBe(2);
+      expect(state.hintHighlight!.targetSlotIndex).toBe(2);
+    });
+  });
+
+  // =========================================================================
+  // isBoardSolvableFromState (pure from-state solver used by the hint filter)
+  // =========================================================================
+
+  describe('isBoardSolvableFromState', () => {
+    const cells = (word: string, lockedIdx: number[] = []) =>
+      word.split('').map((char, i) => ({ char, isLocked: lockedIdx.includes(i) }));
+    const validator = (words: string[]) => {
+      const set = new Set(words);
+      return (w: string) => set.has(w);
+    };
+
+    test('standard: locked letters cannot be picked (lock-aware, unlike isChainSolvable)', () => {
+      const board = [cells('MQRST', [0]), cells('UVWX')];
+      // The ONLY route would be picking the locked M (QRST + MUVWX) — a
+      // lock-blind solver would bless this; the from-state solver must not.
+      expect(
+        isBoardSolvableFromState(board, 0, 'down', 'standard', validator(['QRST', 'MUVWX']))
+      ).toBe(false);
+      // An unlocked route (Q → MRST + QUVWX) makes it solvable.
+      expect(
+        isBoardSolvableFromState(board, 0, 'down', 'standard', validator(['MRST', 'QUVWX']))
+      ).toBe(true);
+    });
+
+    test('standard: multi-row chains recurse with replace-lock semantics', () => {
+      const board = [cells('NQRST', [0]), cells('UVWX')];
+      // From NQRST (N locked): Q → NRST + QUVWX completes.
+      expect(
+        isBoardSolvableFromState(board, 0, 'down', 'standard', validator(['NRST', 'QUVWX']))
+      ).toBe(true);
+    });
+
+    test('reverse: ascent completes into row 0, honoring descent locks', () => {
+      // Post-midpoint state: direction up, active = last row; M locked from
+      // the descent. D → TIME + TIED (into row 0) completes.
+      const board = [cells('TIE'), cells('TIMED', [2])];
+      expect(
+        isBoardSolvableFromState(board, 1, 'up', 'reverse', validator(['TIME', 'TIED']))
+      ).toBe(true);
+      // Without a valid ascent insertion the board is lost.
+      expect(
+        isBoardSolvableFromState(board, 1, 'up', 'reverse', validator(['TIME']))
+      ).toBe(false);
+    });
+
+    test('double shift: honors accumulated locks on the two-letter step', () => {
+      const board = [cells('SPLAT'), cells('IE')];
+      // P then S: LAT (final source) + PIES (final target) completes.
+      expect(
+        isBoardSolvableFromState(board, 0, 'down', 'double_shift', validator(['LAT', 'PIES']))
+      ).toBe(true);
+      // Locking the S removes the only completion.
+      const lockedBoard = [cells('SPLAT', [0]), cells('IE')];
+      expect(
+        isBoardSolvableFromState(lockedBoard, 0, 'down', 'double_shift', validator(['LAT', 'PIES']))
+      ).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // Shared-challenge provenance flag (drives amber-only shared-link wins)
+  // =========================================================================
+
+  describe('isSharedChallenge flag lifecycle', () => {
+    test('false by default and after initGame', () => {
+      resetHookState();
+      let [state, actions] = callHook();
+      expect(state.isSharedChallenge).toBe(false);
+      actions.initGame(['LIME', 'TIME', 'TIED']);
+      [state] = callHook();
+      expect(state.isSharedChallenge).toBe(false);
+    });
+
+    test('set by startSharedChallengeGame, cleared by every other start path', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      expect(actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED'])).toBe(true);
+      let [state] = callHook();
+      expect(state.isSharedChallenge).toBe(true);
+
+      // Daily start clears it.
+      [, actions] = callHook();
+      actions.startDailyGame(['PLANET', 'PLATES'], undefined, 6);
+      [state] = callHook();
+      expect(state.isSharedChallenge).toBe(false);
+
+      // Back to shared, then initGame (the startNewGame / Next Level commit
+      // path) clears it again.
+      [, actions] = callHook();
+      actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED']);
+      [, actions] = callHook();
+      actions.initGame(['ABCD', 'EFGH', 'IJKL']);
+      [state] = callHook();
+      expect(state.isSharedChallenge).toBe(false);
+    });
+
+    test('a rejected shared chain never sets the flag', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      expect(actions.startSharedChallengeGame(['LIME', 'TIME', 'ZZZZ'])).toBe(false);
+      const [state] = callHook();
+      expect(state.isSharedChallenge).toBe(false);
+    });
+
+    test('survives resetCurrentPuzzle (a retry is the same board) but not clearBoard', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED']);
+      [, actions] = callHook();
+      actions.resetCurrentPuzzle();
+      let [state] = callHook();
+      expect(state.isSharedChallenge).toBe(true);
+
+      [, actions] = callHook();
+      actions.clearBoard();
+      [state] = callHook();
+      expect(state.isSharedChallenge).toBe(false);
+    });
+
+    test('reset to false on autosave restore (provenance is not persisted)', () => {
+      resetHookState();
+      let [, actions] = callHook();
+      actions.startSharedChallengeGame(['LIME', 'TIME', 'TIED']);
+      let [state, actions2] = callHook();
+      expect(state.isSharedChallenge).toBe(true);
+
+      const saved = {
+        rows: state.rows,
+        activeRowIndex: 0,
+        selectedLetter: null,
+        gameState: GameState.PLAYING,
+        message: '',
+        history: [],
+        invalidAttempts: 0,
+        hintsUsed: 0,
+        undosRemaining: Infinity,
+        difficulty: 'MEDIUM',
+        currentWordLength: 4,
+        hint: '',
+        solution: undefined,
+        reverseSolution: undefined,
+        gameMode: 'standard',
+        currentVariant: 'standard',
+        selectedVariant: 'standard',
+        moveDirection: 'down',
+        currentPhase: 0,
+        lastFormedWord: null,
+        isPlayingDaily: false,
+        savedAt: Date.now(),
+      };
+      actions2.restorePuzzleState(saved as unknown as import('../services/puzzleSaveState').SavedPuzzleState);
+      [state] = callHook();
+      expect(state.isSharedChallenge).toBe(false);
     });
   });
 });
