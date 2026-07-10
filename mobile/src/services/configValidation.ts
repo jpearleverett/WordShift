@@ -27,7 +27,7 @@ export interface ValidationResult {
 }
 
 // ---------------------------------------------------------------------------
-// All 10 animal types in the game
+// All 13 animal types in the game
 // ---------------------------------------------------------------------------
 
 const ALL_ANIMAL_TYPES: AnimalType[] = [
@@ -41,6 +41,9 @@ const ALL_ANIMAL_TYPES: AnimalType[] = [
   'wombat',
   'rabbit',
   'red_panda',
+  'tarsier',
+  'aye_aye',
+  'kakapo',
 ];
 
 // Expected dialogue counts per phase (from CLAUDE.md), doubled in the
@@ -251,27 +254,25 @@ export function validateAchievements(): ValidationResult {
 
 /**
  * Validate UNLOCK_PROGRESSION, ROOMS, and ANIMALS:
- * - 19 unlock entries
+ * - Rooms and animals pair up one-to-one
+ * - One unlock entry per room and per animal (minus the pre-unlocked starter room)
  * - First entry is Fox (free character invite)
  * - Alternating room/character pattern (with slight exceptions)
- * - All 10 rooms and 10 animals covered
- * - ROOMS has 10 entries, ANIMALS has 10 entries
- * - Orders are sequential 1-19
+ * - All rooms and animals covered
+ * - Orders are sequential
  */
 export function validateUnlockProgression(): ValidationResult {
   const errors: string[] = [];
 
-  // ROOMS and ANIMALS array counts
-  if (ROOMS.length !== 10) {
-    errors.push(`Expected 10 rooms, got ${ROOMS.length}`);
-  }
-  if (ANIMALS.length !== 10) {
-    errors.push(`Expected 10 animals, got ${ANIMALS.length}`);
+  // Rooms and animals pair up one-to-one (derived, not a magic count).
+  if (ROOMS.length !== ANIMALS.length) {
+    errors.push(`Expected one room per animal: ${ROOMS.length} rooms vs ${ANIMALS.length} animals`);
   }
 
-  // UNLOCK_PROGRESSION total count
-  if (UNLOCK_PROGRESSION.length !== 19) {
-    errors.push(`Expected 19 unlock entries, got ${UNLOCK_PROGRESSION.length}`);
+  // One unlock entry per room + per animal, minus the pre-unlocked starter room.
+  const expectedUnlocks = ROOMS.length + ANIMALS.length - 1;
+  if (UNLOCK_PROGRESSION.length !== expectedUnlocks) {
+    errors.push(`Expected ${expectedUnlocks} unlock entries, got ${UNLOCK_PROGRESSION.length}`);
   }
 
   // First entry: Fox, free, character type
@@ -318,7 +319,7 @@ export function validateUnlockProgression(): ValidationResult {
     }
   }
 
-  // All 10 rooms covered
+  // All rooms covered
   const roomIds = new Set(ROOMS.map((r) => r.id));
   const unlockedRoomIds = new Set(
     UNLOCK_PROGRESSION.filter((u) => u.type === 'room').map((u) => u.targetId)
@@ -331,7 +332,7 @@ export function validateUnlockProgression(): ValidationResult {
     }
   }
 
-  // All 10 animals covered
+  // All animals covered
   const animalIds = new Set(ANIMALS.map((a) => a.id));
   const unlockedAnimalIds = new Set(
     UNLOCK_PROGRESSION.filter((u) => u.type === 'character').map((u) => u.targetId)

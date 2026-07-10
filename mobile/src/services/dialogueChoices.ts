@@ -75,7 +75,7 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       refuse: 'Don\'t tell me.',
     },
     responses: {
-      ask: 'I found a text. Very old. It describes a pattern... ten keepers, ten chambers, and someone who builds it all without knowing. Sound familiar?',
+      ask: 'I found a text. Very old. It describes a pattern... a house of keepers, a chamber for each, and someone who builds it all without knowing. Sound familiar?',
       refuse: 'Ignorance is a kind of armor, I suppose. But the text mentions you by function, not by name. The builder. The one who shifts the words.',
     },
     convergence: 'Either way, the pages keep turning. They always do.',
@@ -171,10 +171,46 @@ export const ANIMAL_CHOICES: Record<string, DialogueChoice> = {
       refuse: 'I refuse to participate.',
     },
     responses: {
-      ask: 'The arrangement is everything. Ten keepers, ten chambers, and one who builds without knowing. That\'s you. Every word you shifted was a thread in the pattern. It\'s beautiful.',
+      ask: 'The arrangement is everything. The keepers, the chambers, and one who builds without knowing. That\'s you. Every word you shifted was a thread in the pattern. It\'s beautiful.',
       refuse: 'You already participated. Every puzzle was a yes. Every word was an offering. Refusal now is like trying to un-breathe. The pattern accepted you long ago.',
     },
     convergence: 'Breathe. Accept. The pattern continues with or without your consent. But with is so much more beautiful.',
+  },
+  tarsier: {
+    prompt: "Vesper turns her whole head toward you, slowly, all the way around, and her eyes do not move at all.",
+    options: {
+      ask: "What do you see out there?",
+      refuse: "Don't tell me what you see.",
+    },
+    responses: {
+      ask: "Everything. That has always been the answer, and you are the first to ask for it straight. There is a shape in the cleared sky, and it is nearer every night, and it is not coming despite my watching. It is coming by it. My eyes are holding the road open, and I have known for some time, and I have not looked away.",
+      refuse: "You do not have to hear it. But understand what my eyes are, bright one. They do not wander and they do not flinch, and they have been open on the same patch of dark since before you brought your first word here. Whether you are told changes you. It does not change the road, and it does not change what walks it.",
+    },
+    convergence: "Keep bringing your words. The dark reads them the way I read the night. Completely.",
+  },
+  aye_aye: {
+    prompt: "Tock uncurls the long finger, slowly, and lets it rest in the air between you. \"You may ask what you have been not-asking. Or you may tell me to put it away.\"",
+    options: {
+      ask: "What will the bell say?",
+      refuse: "Put the finger away.",
+    },
+    responses: {
+      ask: "One word. The word this house was cast hollow around, the one your letters have been feeding down the throat of the walls all this time. I have felt its shape through the bronze, friend, and I cannot say it before she does. A keeper does not spend his bell's first ring secondhand. But I will tell you this much. You have already spelled most of it.",
+      refuse: "There. Folded and kept, no harm done. But hear me gently, because a friend should say it once. The finger only finds. It found you the first evening you climbed my stairs, long before tonight. Putting it away does not un-find you. Nothing does. Nothing ever wanted to.",
+    },
+    convergence: "Either way, the hour keeps itself, and neither of us can hurry it or lose it. When she rings, come up the tower. Stand a little east of the rope, under the bronze. You will want to hear the word whole, and I will want you there to hear it.",
+  },
+  kakapo: {
+    prompt: "Moss goes still among the beds, one foot half raised, the deep old stillness. Then he sets it down and looks at you.",
+    options: {
+      ask: "What is the arrangement?",
+      refuse: "I would rather not know.",
+    },
+    responses: {
+      ask: "It is a mast year, friend. The largest there has ever been. Every tree agreeing at once, every root passing the word, and this whole house is the orchard, and your words have been the warm rain on it from the start. What fruits at the end of it is not fruit. It is what every call I ever made was addressed to, and it is nearly here.",
+      refuse: "Spoken like a seed, friend. A seed does not ask about the season either. It waits in the dark, and the season comes for it all the same, and opens it gently, at the proper hour. Not knowing will keep you exactly as safe as knowing. That is the honest arithmetic of it.",
+    },
+    convergence: "Either way, walk the rows with me a while. The beds already know your step, and what is coming knows your words, and I find that company makes the last of a long season sweeter. It is nearly time. Everything green agrees.",
   },
 };
 
@@ -335,6 +371,18 @@ export function getPhase4ChoiceCallback(
       ask: 'You asked about the arrangement. The question was itself an offering. Beautiful.',
       refuse: 'You refused to participate. The most devoted offering of all... unconscious devotion.',
     },
+    tarsier: {
+      ask: 'You asked what my eyes were holding open. Now the road they held is almost walked.',
+      refuse: 'You chose to be spared the telling. The watching never needed your permission.',
+    },
+    aye_aye: {
+      ask: 'You asked what the bell will say. It has been practicing your letters ever since.',
+      refuse: 'You had me fold the finger away. It found you long before you asked it not to.',
+    },
+    kakapo: {
+      ask: 'You asked about the arrangement. It is the mast year, friend, and you were the rain.',
+      refuse: 'You waited like a seed. The season came for you anyway, gently, at the proper hour.',
+    },
   };
 
   return callbacks[animalType]?.[choice] || null;
@@ -425,6 +473,18 @@ export function getPhase5ChoiceCallback(
     red_panda: {
       ask: 'You asked what I had made peace with. Look up. You\'ve made peace with it too.',
       refuse: 'You never asked about my peace. You have your own now. They are the same peace.',
+    },
+    tarsier: {
+      ask: "You asked what I saw out there. Now you have seen it too, with your own two moving eyes. It was worth the whole watch, was it not.",
+      refuse: "You never asked what I saw. It made no difference, bright one. It saw you. It had seen you all along, and fondly.",
+    },
+    aye_aye: {
+      ask: "You asked what the bell would say, once. Then you stood under the bronze and heard her say it. No answer of mine could have rung so true.",
+      refuse: "You told me to put the finger away, once. I did. She rang anyway, and it found you anyway, and look how gently. Nothing ever pointed at you that did not love you.",
+    },
+    kakapo: {
+      ask: "You asked what the arrangement was, there among the beds. It was a mast year. It fruited. You are standing in the orchard, and the orchard is glad of you.",
+      refuse: "You did not want to know, and the season came for you gently all the same, just as I promised. Seeds never need the almanac. Look how well you have come up.",
     },
   };
 

@@ -226,6 +226,9 @@ const MOVEMENT_SPEED: Record<AnimalType, number> = {
   capybara: 5000, // Chill, slow
   wombat: 4000,
   rabbit: 1500, // Fast and nervous
+  tarsier: 1800, // Quick, darting leaps
+  aye_aye: 3500, // Deliberate, tapping gait
+  kakapo: 4500, // Heavy, unhurried waddle
 };
 
 // Bounce heights by animal type
@@ -240,6 +243,9 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   capybara: 1, // Very subtle
   wombat: 3,
   rabbit: 8, // Big hops
+  tarsier: 7, // Springy little leaps
+  aye_aye: 3,
+  kakapo: 2, // Grounded shuffle
 };
 
 // Per-animal vertical nudge (px, +down) to plant feet on the floor. The sprite
@@ -261,6 +267,11 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
   capybara: 0,
   wombat: 0,
   rabbit: 0,
+  // No sprite art yet for the three high-room animals (emoji fallback) —
+  // re-measure these once idle.png frames land.
+  tarsier: 0,
+  aye_aye: 0,
+  kakapo: 0,
 };
 
 /**

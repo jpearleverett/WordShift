@@ -43,7 +43,7 @@ function getVariantDialogueLead(animalType: AnimalType, phase: number): string {
       case 'rabbit':
         return 'The whole garden leaned while you worked, and my heart kept time with every word you moved. I have learned to trust what my heart notices.';
       case 'red_panda':
-        return 'The pattern of what you offered reached the highest room before you had finished making it. The attic always knows first.';
+        return 'The pattern of what you offered reached the attic before you had finished making it. The attic always knows first.';
       default:
         return 'I felt that new shape settle into the bones of the house.';
     }

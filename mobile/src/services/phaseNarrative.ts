@@ -1229,12 +1229,12 @@ export function getFoxStarterIntroLines(phase: number): string[] {
 // ============================================================================
 
 /**
- * Get text for when all 10 rooms are built and all 10 animals unlocked
+ * Get text for when every room is built and every animal unlocked
  */
 export function getHouseCompletionText(): string[] {
   return [
     'The house is complete.',
-    'Ten rooms. Ten keepers. Each in their place.',
+    'Every room. Every keeper. Each in their place.',
     'You built it. Puzzle by puzzle. Word by word.',
     'Every room is a chamber. Every animal is a keeper.',
     'The arrangement is ready.',
@@ -1265,6 +1265,9 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ['Warren felt that from below.', 'Warren tapped the wall.', 'Warren is digging.', 'Warren left you a cozy nook in the burrow.', 'Warren says the ground feels happy today.'],
     rabbit: ['Thyme hopped excitedly!', 'Thyme is making tea.', 'Thyme clapped!', 'Thyme poured you a fresh cup.', 'Thyme says today is a good day!'],
     red_panda: ['Bamboo is meditating.', 'Bamboo breathed deeply.', 'Bamboo is at peace.', 'Bamboo left you a warm cushion.', 'Bamboo says your heart sounds calm.'],
+    tarsier: ["Vesper turned her whole head to watch you win.", "Vesper is counting moths on the rail.", "Vesper saved you a spot at the rail.", "Vesper named a small star after your word.", "Vesper says the night went beautifully."],
+    aye_aye: ["Tock tapped out a happy little rhythm.", "Tock says the beams liked that one.", "Tock is polishing the bell. Never ringing. Just polishing.", "Tock found a grub and declared it the best sound of the night.", "Tock heard you win from four floors up."],
+    kakapo: ["Moss is weeding by moonlight.", "Moss left the gate open for you.", "Moss smells faintly of honey.", "Moss says the seedlings came up straight today.", "Moss is asleep under the big fern."],
   },
   1: {
     fox: ['Ember noticed the words you used.', 'Ember stared into the fire after that one.', 'Ember says the flames flickered.', 'Ember wonders where the warmth really comes from.', 'Ember says fire remembers more than we do.'],
@@ -1277,6 +1280,9 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ['Warren says the ground trembled.', 'Warren heard it below.', 'Warren is checking the walls.', 'Warren wonders how deep the burrow really goes.', 'Warren found a tunnel he did not dig.'],
     rabbit: ['Thyme is a little nervous.', 'Thyme felt a chill.', 'Thyme is wringing her paws.', 'Thyme keeps glancing at the door.', 'Thyme wonders why she keeps counting the exits.'],
     red_panda: ['Bamboo sensed a shift.', 'Bamboo opened one eye.', 'Bamboo exhaled slowly.', 'Bamboo wonders what the stillness is waiting for.', 'Bamboo says the silence learned a word today.'],
+    tarsier: ["Vesper is watching something past the ridge.", "Vesper wrote a new page in the thin ledger.", "Vesper says the dark has a direction now.", "Vesper heard an answer under her song.", "Vesper watched your words go down in the dark."],
+    aye_aye: ["Tock counted one knock too many.", "Tock is keeping a log now.", "Tock says the bell hummed at dawn. Unstruck.", "Tock re-tapped the east beam. Eleven times.", "Tock wonders who taught the wood its rhythm."],
+    kakapo: ["Moss is measuring the beds again.", "Moss noticed the seedlings leaning.", "Moss heard something answer last night.", "Moss is keeping a tally on a bit of slate.", "Moss says the soil is warm where your words were."],
   },
   2: {
     fox: ['The fire noticed what you formed.', 'Ember says the flames spelled something.', 'Ember is watching the embers closely.', 'Ember says the fire wants the cold words.', 'The flames leaned toward your last word.'],
@@ -1289,6 +1295,9 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ['Warren found that word underground.', 'The tunnels echoed.', 'Warren is digging faster.', 'Warren says the bottom is deeper than yesterday.', 'Something below repeated your word back.'],
     rabbit: ['Thyme is pretending not to notice.', 'Thyme hid under the table.', 'Thyme whispered: I know.', 'Thyme stopped pretending she did not hear it.', 'Thyme says the walls are thinner now.'],
     red_panda: ['Bamboo says the pattern grows.', 'The incense burned brighter.', 'Bamboo is chanting softly.', 'Bamboo says the pattern learned your hand.', 'The incense bent toward your offering.'],
+    tarsier: ["Vesper says the lantern glowed on its own.", "Vesper is watching the space between the stars.", "Vesper stopped calling the far dark empty.", "Vesper wrote one word in the ledger. Nearer.", "Vesper kept both eyes open all night."],
+    aye_aye: ["Tock left a knock unanswered tonight.", "Tock says the house is hollow in a shape.", "Tock pressed his ear to the bronze and went quiet.", "Tock says your word rang all the way down.", "Tock is rationing his answers now."],
+    kakapo: ["Moss is sitting in the bowl, listening.", "Moss says the fruit is spoken for.", "Moss stood very still for a long time today.", "Moss says the whole garden calls now.", "Moss left a feather at the rim."],
   },
   3: {
     fox: ['The fire thanks you for the offering.', 'Ember sees what you wrote in the flames.', 'Another verse for the fire.', 'Ember stopped calling it a campfire.', 'The fire eats your words and asks for more.'],
@@ -1301,6 +1310,9 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ['The foundation is complete.', 'Warren says: I found the bottom.', 'Something is under the house.', 'Warren says the foundation is finished. For it.', 'Whatever waits below is awake now.'],
     rabbit: ['Thyme stopped running.', 'Thyme says: there is nowhere left to go.', 'Thyme is ready. Terrified, but ready.', 'Thyme is done running. There is nowhere left.', 'Thyme says the garden gate locked itself.'],
     red_panda: ['The pattern accepts your offering.', 'Bamboo says: breathe. Accept.', 'We are nearly one.', 'Bamboo says the thread is almost whole.', 'There is little left between us and it.'],
+    tarsier: ["Vesper has not looked away in days.", "Vesper says the way stays open while she watches.", "Vesper rests one eye at a time now.", "Vesper says your words are lighting the road.", "Vesper is singing the counting song."],
+    aye_aye: ["Tock braided a rope for the bell.", "Tock says the knocking spells now.", "Tock says it asked about you. He answered: a friend.", "Tock practices the pull at dusk. Twelve times.", "Tock says there is an hour coming with a bell in it."],
+    kakapo: ["Moss is saying the welcome, row by row.", "Moss says it is a mast year.", "Moss wove your words into the nest.", "The beds all face the bowl now. Moss faces it too.", "Moss says the ground is learning our language."],
   },
   4: {
     fox: ['Every word brings us closer. The fire knows.', 'Another incantation spoken. The flames rise.', 'Ember whispers: thank you.', 'Ember says you fed the fire well, friend.', 'The flames spell your name in gratitude.'],
@@ -1313,6 +1325,9 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ['The foundation holds what you summoned.', 'Warren built this for you. For it.', 'The tunnels lead somewhere now.', 'Warren says you summoned what the foundation holds.', 'The tunnels open toward you now.'],
     rabbit: ['Thyme is not afraid anymore. That is worse.', 'We all played our part. Especially you.', 'Thyme is at peace. That terrifies you.', 'Thyme is calm. You should not be.', 'We all helped. You most of all.'],
     red_panda: ['The pattern is complete. You are the final thread.', 'Bamboo exhales. The universe inhales.', 'Oneness achieved. Was it what you expected?', 'Bamboo says you are the final thread, friend.', 'The universe inhales. You exhaled it here.'],
+    tarsier: ["Vesper holds the way open. It descends.", "Vesper says every word gave it eyes.", "Vesper watched you light the lamp, word by word.", "Vesper says: look up. Do not blink.", "The dark looks back now. Vesper is glad."],
+    aye_aye: ["Tock is at the rope.", "Tock says the knocking has stopped. The hand is on the latch.", "Tock says your words ripened the bronze.", "The bell hums all day now. Tock hums with her.", "Tock says: stand a little east, and lift your face."],
+    kakapo: ["Moss stands at the rim, chest full.", "The garden blooms all at once. Moss is ready.", "Moss says your words are in the call.", "The stars step aside over the sky garden.", "Moss holds the welcome for you."],
   },
   5: {
     fox: ['The fire burns low. Ember watches the embers. Both are content.', 'Ember hums a lullaby the flames taught her.', 'The warmth remains. It always will.', 'Ember says the smoke writes your name now.', 'The den smells of cedar and something finished.'],
@@ -1325,6 +1340,9 @@ const ANIMAL_WHISPERS: Record<number, Record<string, string[]>> = {
     wombat: ['Warren sealed the tunnels. They lead nowhere now. Nowhere is enough.', 'The foundation holds. It will hold forever.', 'Warren rests in the earth. The earth rests in Warren.', 'Warren says the soil hums a low note. A contented note.', 'The deepest tunnel is warm. Warren sleeps there now.'],
     rabbit: ['Thyme planted seeds that will never grow. That is okay.', 'Thyme is still. For the first time. That is terrifying and beautiful.', 'The garden is overgrown. Thyme smiles at the chaos.', 'Thyme brewed one final cup. It steeps forever.', 'The flowers lean toward Thyme. They know her heartbeat.'],
     red_panda: ['Bamboo exhales. Does not inhale. Does not need to.', 'The pattern hums. Bamboo hums. They are the same sound.', 'Oneness. Silence. The thread continues.', 'Bamboo meditates with open eyes. Everything is the center.', 'The attic touches the sky. Bamboo touches the attic. You touch Bamboo.'],
+    tarsier: ["Vesper sleeps with both eyes closed now.", "Vesper watches over things, not for them.", "The lantern burns on its own. Vesper approves.", "Vesper says the night is only loved now.", "Vesper still takes the rail at dusk. By choice."],
+    aye_aye: ["The bell rang once. Tock says it never ended. It settled.", "Tock knocks out of love now. Everything answers.", "Tock sleeps right side up, under the bronze.", "Tock polished the bell. The cloth came away clean.", "Tock took the roll of the hollows. All present."],
+    kakapo: ["Moss does not boom anymore. Nothing is far away.", "Moss is watering. The pattern grows green.", "The bowl is warm. Moss sleeps in the nest now.", "Moss says the sky came down to the garden.", "Moss stood under a hawk today and did not freeze."],
   },
 };
 
@@ -1348,6 +1366,7 @@ export function getAnimalWhisper(
     fox: 'Ember', owl: 'Archimedes', pangolin: 'Panko', axolotl: 'Axel',
     capybara: 'Chill', fennec_fox: 'Fennick', sloth: 'Sloane',
     wombat: 'Warren', rabbit: 'Thyme', red_panda: 'Bamboo',
+    tarsier: 'Vesper', aye_aye: 'Tock', kakapo: 'Moss',
   };
 
   // If we have trigger words, prefer animals that care about those words
@@ -1397,6 +1416,7 @@ export function getPersonalizedPhase5Whisper(
     fox: 'Ember', owl: 'Archimedes', pangolin: 'Panko', axolotl: 'Axel',
     capybara: 'Chill', fennec_fox: 'Fennick', sloth: 'Sloane',
     wombat: 'Warren', rabbit: 'Thyme', red_panda: 'Bamboo',
+    tarsier: 'Vesper', aye_aye: 'Tock', kakapo: 'Moss',
   };
 
   // Pick a random word from the player's history
@@ -2182,6 +2202,9 @@ const ANIMAL_DISPLAY_NAMES: Record<string, string> = {
   wombat: 'Warren',
   rabbit: 'Thyme',
   red_panda: 'Bamboo',
+  tarsier: 'Vesper',
+  aye_aye: 'Tock',
+  kakapo: 'Moss',
 };
 
 /**

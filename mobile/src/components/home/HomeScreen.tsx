@@ -359,6 +359,10 @@ const BevelRowButton: React.FC<{
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       style={[styles.bevelStrip, disabled && styles.bevelDisabled, style]}
+      // Android group opacity is per-view: without offscreen compositing the
+      // strip's 1dp cap/middle overlap double-blends into a saturated sliver
+      // at the cap joints whenever the bevel is dimmed (see CandyButton).
+      needsOffscreenAlphaCompositing={disabled}
     >
       <ThreeSliceStrip skin={pressed ? buttonSkin.down : buttonSkin.up} capDp={BTN_CAP_DP} />
       <Animated.View style={[styles.bevelContent, { transform: [{ translateY }] }]}>
@@ -512,14 +516,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setRooms(roomsData);
     setAnimals(animalsData);
 
-    // Check for house completion (all 10 rooms + all 10 animals unlocked).
+    // Check for house completion (every room + every animal unlocked —
+    // derived from the data so the check tracks the roster as it grows).
     // The cinematic is NOT fired here: completion is detected in the same
     // breath as the final animal's purchase, and firing immediately ran the
     // temple cutscene on top of that animal's intro dialogue. Mark it pending
     // instead — the effect below plays it once no intro dialogue is up.
     if (!progressData.houseCompleted) {
-      const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= 10;
-      const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= 10;
+      const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= ROOMS.length;
+      const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= ANIMALS.length;
       if (allRoomsUnlocked && allAnimalsUnlocked) {
         await markHouseCompleted();
         setPendingHouseCompletion(true);
