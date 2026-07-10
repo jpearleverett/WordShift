@@ -130,6 +130,18 @@ describe('reset-all wiring', () => {
   });
 });
 
+describe('drag input without previews', () => {
+  test('drops resolve slot geometry from the live board when previews are suppressed', () => {
+    // Previews are suppressed in blind AND challenge modes; the drop handler
+    // must derive slot count from the board or every drag in those modes dies
+    // as a "miss" and only tap input works.
+    expect(APP_TSX).toMatch(/slotCount = previews\?\.length \?\? 0/);
+    expect(APP_TSX).toMatch(/targetRow\.words\.length \+ 1/);
+    // Near-miss snapping stays preview-gated (no free validity tell in blind).
+    expect(APP_TSX).toMatch(/previews && !previews\[estimated\]\?\.isValid/);
+  });
+});
+
 describe('victory flow', () => {
   test('spinner overlay uses the grace-window flag, not raw isProcessingVictory', () => {
     expect(APP_TSX).toMatch(/victoryFlow\.victorySpinnerVisible/);

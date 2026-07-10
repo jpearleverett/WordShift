@@ -438,6 +438,34 @@ export async function loadWeeklyQuests(
 }
 
 /**
+ * Read the stored quest state WITHOUT generating or persisting anything.
+ * Returns null for a tier that has no stored state (or a stale period).
+ * For read-only consumers (the notifications quest-expiry check) that must
+ * never be the trigger that mints a quest set — on a fresh install the
+ * notifications path runs during hydration and, through loadWeeklyQuests,
+ * used to win the race against the first context-full load and generate
+ * from legacy defaults.
+ */
+export async function peekWeeklyQuests(): Promise<{
+  daily: QuestState | null;
+  weekly: QuestState | null;
+}> {
+  const read = async (tier: QuestTier): Promise<QuestState | null> => {
+    try {
+      const key = tier === 'daily' ? DAILY_STORAGE_KEY : WEEKLY_STORAGE_KEY;
+      const stored = await AsyncStorage.getItem(key);
+      if (!stored) return null;
+      const parsed: QuestState = JSON.parse(stored);
+      const currentPeriod = tier === 'daily' ? getDayId() : getWeekId();
+      return parsed.periodId === currentPeriod ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+  return { daily: await read('daily'), weekly: await read('weekly') };
+}
+
+/**
  * Keep the persisted generation context fresh on context-full loads, so a
  * later context-less period rollover regenerates against the newest known
  * player state. Writes only when the context actually changed.

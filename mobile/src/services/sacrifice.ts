@@ -70,6 +70,12 @@ const SACRIFICE_MILESTONES: Record<number, string> = {
 
 let sacrificeCache: SacrificeState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateSacrificeCache(): void {
+  sacrificeCache = null;
+}
+
+
 function getDefaultState(): SacrificeState {
   return {
     totalAmberSacrificed: 0,

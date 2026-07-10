@@ -40,6 +40,12 @@ export interface WhisperGalleryState {
 
 let galleryCache: WhisperGalleryState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateWhisperGalleryCache(): void {
+  galleryCache = null;
+}
+
+
 function getDefaultState(): WhisperGalleryState {
   return {
     entries: [],

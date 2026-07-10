@@ -69,6 +69,11 @@ export interface NextTendingInfo {
 
 let tendingCache: TendingState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateTendingCache(): void {
+  tendingCache = null;
+}
+
 function getDefaultState(): TendingState {
   return {
     level: 0,

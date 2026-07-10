@@ -51,6 +51,12 @@ export interface DailyLoginGrant {
 
 let cache: DailyLoginState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateDailyLoginCache(): void {
+  cache = null;
+}
+
+
 const getDefault = (): DailyLoginState => ({ lastClaimedDate: null, cycleDay: 0 });
 
 async function load(): Promise<DailyLoginState> {

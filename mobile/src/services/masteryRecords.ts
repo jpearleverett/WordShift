@@ -52,6 +52,12 @@ export interface SolveTrend {
 
 let cache: MasteryState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateMasteryCache(): void {
+  cache = null;
+}
+
+
 const getDefault = (): MasteryState => ({ solveTimes: {}, bestSpeedRound: 0 });
 
 async function load(): Promise<MasteryState> {

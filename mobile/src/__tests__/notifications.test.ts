@@ -567,7 +567,11 @@ describe('notifications', () => {
       jest.resetModules();
       jest.doMock('expo-notifications', () => expoMock, { virtual: true });
       jest.doMock('../services/weeklyQuests', () => ({
-        loadWeeklyQuests: jest.fn(() => Promise.resolve({ weekly: { quests: [] } })),
+        // Read-only peek (never generates): a stored weekly period with an
+        // unclaimed reward ⇒ remind. Returns null tiers when nothing is stored.
+        peekWeeklyQuests: jest.fn(() =>
+          Promise.resolve({ daily: null, weekly: { periodId: 'w', quests: [], generatedAt: 0, animalsVisitedThisPeriod: [] } })
+        ),
         getUnclaimedAmber: jest.fn(() => 40), // unclaimed reward ⇒ remind
       }));
       const svc = require('../services/notifications');

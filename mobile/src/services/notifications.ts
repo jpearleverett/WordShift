@@ -600,10 +600,22 @@ async function isDailyChallengeUnlockedSafe(currentPhase: number): Promise<boole
  */
 async function shouldRemindQuestExpirySafe(phase: number): Promise<boolean> {
   try {
-    const { loadWeeklyQuests, getUnclaimedAmber } = require('./weeklyQuests');
-    const state = await loadWeeklyQuests(phase);
+    // peek, never load: loadWeeklyQuests GENERATES a quest set when none is
+    // stored, and this check runs during hydration — on a fresh install it
+    // could win the race against the first context-full load and mint quests
+    // from legacy defaults (defeating the pre-journal dormant gate).
+    const { peekWeeklyQuests, getUnclaimedAmber } = require('./weeklyQuests');
+    const peeked = await peekWeeklyQuests();
+    if (!peeked.daily && !peeked.weekly) return false;
+    // getUnclaimedAmber reads state.daily.quests / state.weekly.quests directly,
+    // so substitute empty tiers for any missing period rather than null.
+    const emptyTier = { periodId: '', quests: [], generatedAt: 0, animalsVisitedThisPeriod: [] };
+    const state = {
+      daily: peeked.daily ?? emptyTier,
+      weekly: peeked.weekly ?? emptyTier,
+    };
     if (getUnclaimedAmber(state, phase) > 0) return true;
-    return (state?.weekly?.quests ?? []).some(
+    return (peeked.weekly?.quests ?? []).some(
       (q: { progress: number; completed: boolean }) => q.progress > 0 && !q.completed
     );
   } catch {

@@ -39,6 +39,7 @@ import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
 import {
   awardBonusAmber,
   spendAmber,
+  getCurrentPhase,
   hasSeenSetupSelectorIntro,
   markSetupSelectorIntroSeen,
   hasSeenMandatoryHarvest,
@@ -139,7 +140,18 @@ import { getCumulativeStats } from './src/services/starRating';
 // firing on the very first post-onboarding Play hijacked the "just let me
 // play" beat (and the curated early window ignores difficulty anyway).
 const SETUP_SELECTOR_INTRO_MIN_PUZZLES = 3;
-import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
+
+// Module-scope launch-routing guards: an appEpoch remount (late cloud restore)
+// re-runs MainApp's mount effects, and both getInitialURL and
+// getLastNotificationResponseAsync keep returning the ORIGINAL launch payload —
+// these ensure each is routed at most once per process.
+let launchUrlProcessed = false;
+let coldStartNotificationProcessed = false;
+// Set when a slow fresh-install cloud restore lands after boot; the remounted
+// MainApp surfaces a one-time "progress restored" notice so the hard reset
+// mid-interaction doesn't read as the app glitching.
+let pendingRestoreNotice = false;
+import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall, holdUploadsUntil } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
@@ -303,6 +315,9 @@ function MainApp() {
   // Persistent daily-ladder "best this week / your history" line + trend for the
   // Victory modal. Works offline (independent of the live dailyRank fetch).
   const [dailyLadderLine, setDailyLadderLine] = useState<string | null>(null);
+  // Full-moon event bonus line, shown inside the VictoryModal on event-day
+  // daily completions (the puzzle toast renders UNDER the modal overlay).
+  const [eventBonusLine, setEventBonusLine] = useState<string | null>(null);
   const [dailyLadderTrend, setDailyLadderTrend] = useState<'up' | 'down' | 'flat' | null>(null);
   // Quiet, spoiler-safe aggregate social-proof line for the victory modal
   const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
@@ -578,6 +593,16 @@ function MainApp() {
         stopFrameMonitoring();
       }
     };
+  }, []);
+
+  // One-time notice after a late cloud restore remounted the app: without it,
+  // a fresh-install player a minute into onboarding sees the screen silently
+  // hard-reset to their restored save with zero explanation.
+  useEffect(() => {
+    if (pendingRestoreNotice) {
+      pendingRestoreNotice = false;
+      showGameAlert('Restored', 'Your saved progress was found in the cloud and restored.');
+    }
   }, []);
 
   // Schedule notifications once persistence has hydrated, with the REAL phase.
@@ -958,6 +983,7 @@ function MainApp() {
     setDailyRank(null);
     setDailyLadderLine(null);
     setDailyLadderTrend(null);
+    setEventBonusLine(null);
     setSocialProofLine(null);
     setShareResultData(null);
     setShareChallengeText(null);
@@ -1109,25 +1135,36 @@ function MainApp() {
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase]);
 
   const handleIncomingLink = useCallback((url: string) => {
-    if (!url.startsWith('wordshift://')) return;
+    // Scheme/host matching is case-insensitive on Android intents, so compare
+    // lowercased — a mixed-case link must neither bypass routing nor, worse,
+    // bypass the creator-code telemetry redaction below.
+    const lowerUrl = url.toLowerCase();
+    if (!lowerUrl.startsWith('wordshift://')) return;
     // Never upload the creator code to telemetry.
     logEvent({
       type: 'deep_link_opened',
-      data: { url: url.startsWith('wordshift://creator') ? 'wordshift://creator?<redacted>' : url },
+      data: { url: lowerUrl.startsWith('wordshift://creator') ? 'wordshift://creator?<redacted>' : url },
     });
 
     // Creator/press fast-forward: wordshift://creator?code=CODE&era=dusk|shadows|reveal|peace.
     // Deliberately BEFORE the onboarding guard (a reviewer on a fresh install is
     // mid-onboarding; the snapshot itself completes onboarding). Fully inert
     // unless a creatorCode is configured in app config extra.
-    if (url.startsWith('wordshift://creator')) {
+    if (lowerUrl.startsWith('wordshift://creator')) {
       if (!isCreatorKitEnabled()) return;
       let code = '';
       let era = '';
-      for (const pair of (url.split('?')[1] ?? '').split('&')) {
-        const [k, v] = pair.split('=');
-        if (k === 'code') code = decodeURIComponent(v ?? '');
-        if (k === 'era') era = decodeURIComponent(v ?? '').toLowerCase();
+      try {
+        for (const pair of (url.split('?')[1] ?? '').split('&')) {
+          const [k, v] = pair.split('=');
+          // decodeURIComponent throws URIError on malformed escapes ("%E0%"),
+          // and this runs before any validation — a bad link must be ignored,
+          // never crash a press build.
+          if (k?.toLowerCase() === 'code') code = decodeURIComponent(v ?? '');
+          if (k?.toLowerCase() === 'era') era = decodeURIComponent(v ?? '').toLowerCase();
+        }
+      } catch {
+        return;
       }
       if (!validateCreatorCode(code) || !isCreatorEra(era)) return;
       showGameAlert(
@@ -1168,18 +1205,28 @@ function MainApp() {
       return;
     }
 
-    if (url.startsWith('wordshift://challenge/daily')) {
+    if (lowerUrl.startsWith('wordshift://challenge/daily')) {
       // The optional ?date= param is ignored — the daily is always today's.
-      if (isDailyChallengeUnlocked(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
-        handleStartDaily('HARD');
-      } else {
-        transitionTo('home');
-        showGameAlert('Daily Challenge', getDailyLockedMessage(persistence.currentPhase));
-      }
+      // Unlock inputs read FRESH from storage: a cold-start link routes ~1.2s
+      // after launch, before React persistence state may have hydrated (a
+      // stale zero showed unlocked players a false "still locked" alert).
+      (async () => {
+        try {
+          const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
+            handleStartDaily('HARD');
+          } else {
+            transitionTo('home');
+            showGameAlert('Daily Challenge', getDailyLockedMessage(phaseNow));
+          }
+        } catch {
+          handleStartDaily('HARD');
+        }
+      })();
       return;
     }
 
-    if (url.startsWith('wordshift://challenge/p')) {
+    if (lowerUrl.startsWith('wordshift://challenge/p')) {
       const words = decodeChallengeLink(url);
       if (words) {
         handleStartSharedChallenge(words);
@@ -1189,7 +1236,7 @@ function MainApp() {
       return;
     }
 
-    if (url.includes('home')) {
+    if (lowerUrl.includes('home')) {
       transitionTo('home');
     }
   }, [
@@ -1215,7 +1262,12 @@ function MainApp() {
   useEffect(() => {
     let launchTimer: ReturnType<typeof setTimeout> | null = null;
     Linking.getInitialURL().then(url => {
-      if (url) {
+      // Module-scope guard: an appEpoch remount (late cloud restore) re-runs
+      // this effect, and getInitialURL keeps returning the original launch URL
+      // — without the guard the remount would re-route the player into the
+      // launch link's board a second time.
+      if (url && !launchUrlProcessed) {
+        launchUrlProcessed = true;
         launchTimer = setTimeout(() => handleIncomingLinkRef.current(url), 1200);
       }
     }).catch(() => {});
@@ -1245,14 +1297,26 @@ function MainApp() {
       return;
     }
     if (target === 'daily') {
-      if (isDailyChallengeUnlocked(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
-        handleStartDaily('HARD');
-      } else {
-        // Same courtesy the deep-link path gives: say why the tap landed on
-        // home instead of silently swallowing it.
-        transitionTo('home');
-        showGameAlert('Daily Challenge', getDailyLockedMessage(persistence.currentPhase));
-      }
+      // Read the unlock inputs FRESH from storage: a cold-start tap routes
+      // ~1.2s after launch, and the React persistence state can still be
+      // unhydrated then — a stale zero here showed fully-unlocked players a
+      // false "still locked" alert.
+      (async () => {
+        try {
+          const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
+            handleStartDaily('HARD');
+          } else {
+            // Same courtesy the deep-link path gives: say why the tap landed
+            // on home instead of silently swallowing it.
+            transitionTo('home');
+            showGameAlert('Daily Challenge', getDailyLockedMessage(phaseNow));
+          }
+        } catch {
+          // Storage read failed — let handleStartDaily's own guards decide.
+          handleStartDaily('HARD');
+        }
+      })();
     } else if (target === 'home') {
       transitionTo('home');
     }
@@ -1270,10 +1334,12 @@ function MainApp() {
       // Cold-start taps never reach the runtime listener — the notification
       // that LAUNCHED the app is only available via getLastNotificationResponseAsync.
       // Deferred briefly so persistence state hydrates before routing to the daily.
+      // Module-scope guard: an appEpoch remount must not re-route the tap.
       Notifications.getLastNotificationResponseAsync?.()
         .then((response: any) => {
           const target = response?.notification?.request?.content?.data?.target;
-          if (target != null) {
+          if (target != null && !coldStartNotificationProcessed) {
+            coldStartNotificationProcessed = true;
             coldStartTimer = setTimeout(() => routeNotificationTargetRef.current(target), 1200);
           }
         })
@@ -1382,7 +1448,9 @@ function MainApp() {
       const victory = await persistenceActions.recordVictory(
         // Daily Challenge always rewards as HARD regardless of the player's
         // chosen difficulty preference (which is left untouched during a daily).
-        isPlayingDaily ? 'HARD' : puzzle.difficulty,
+        // Shared-link boards price as EASY: the chain is attacker-craftable
+        // (a trivial 3-word link must not pay the crafter's HARD base).
+        isPlayingDaily ? 'HARD' : puzzle.isSharedChallenge ? 'EASY' : puzzle.difficulty,
         result.hintsUsed,
         result.invalidAttempts,
         result.gameMode,
@@ -1432,6 +1500,7 @@ function MainApp() {
         setDailyRank(null);
         setDailyLadderLine(null);
         setDailyLadderTrend(null);
+        setEventBonusLine(null);
         (async () => {
           const date = getLocalDateString();
           const elapsedMs = puzzleStartTimeRef.current > 0
@@ -1503,16 +1572,21 @@ function MainApp() {
           }
           // Full-moon event: +50% bonus on the daily's amber, credited as
           // BONUS amber only. Never feeds phase progress (same rule as every
-          // bonus/purchased amber source). The 2100ms delay keeps it clear of
-          // the 1100ms milestone/freeze toast.
+          // bonus/purchased amber source). Basis: the solve's earned parts
+          // (base + stars + streak + challenge), NOT one-time milestone /
+          // first-completion windfalls — those can be huge in the endgame tail
+          // and aren't "today's daily". Surfaced inside the VictoryModal
+          // (a toast would render underneath the modal overlay and never show).
           if (getActiveEvent()) {
-            const eventBonus = getEventDailyBonusAmber(victory.amberEarned);
+            const b = victory.amberBreakdown;
+            const bonusBasis = b
+              ? b.base + b.starBonus + b.streakBonus + b.challengeBonus
+              : victory.amberEarned;
+            const eventBonus = getEventDailyBonusAmber(bonusBasis);
             if (eventBonus > 0) {
               const newBalance = await awardBonusAmber(eventBonus, 'event_daily_bonus');
               persistenceActions.setAmberBalance(newBalance);
-              addVictoryTimeout(() => {
-                puzzleActions.setMessage(getEventDailyBonusLine(persistence.currentPhase, eventBonus));
-              }, 2100);
+              setEventBonusLine(getEventDailyBonusLine(persistence.currentPhase, eventBonus));
             }
           }
         } catch {
@@ -1898,8 +1972,10 @@ function MainApp() {
   // and a registry of each row's measurable node for Y-bounds checking on drop.
   const activeRowIndexRef = useRef(puzzle.activeRowIndex);
   const moveDirectionRef = useRef(puzzle.moveDirection);
+  const rowsRef = useRef(puzzle.rows);
   activeRowIndexRef.current = puzzle.activeRowIndex;
   moveDirectionRef.current = puzzle.moveDirection;
+  rowsRef.current = puzzle.rows;
   const rowNodeRefs = useRef(new Map<number, any>());
   const registerRowNode = useCallback((rowIndex: number, node: any) => {
     if (node) rowNodeRefs.current.set(rowIndex, node);
@@ -1917,8 +1993,20 @@ function MainApp() {
     setTimeout(() => {
       const previews = slotPreviewsRef.current;
       const onSlotPress = handleSlotPressRef.current;
-      if (!previews || previews.length === 0) {
-        // Previews weren't ready when the drop resolved (rare: a slow frame
+      // Previews are SUPPRESSED in blind and challenge modes, but a drag still
+      // needs slot geometry to resolve a drop — otherwise every drag in those
+      // modes dies as a "miss" and only taps work. Compute the slot count from
+      // the live board; only the near-miss snapping (which keys off preview
+      // validity) genuinely requires previews.
+      let slotCount = previews?.length ?? 0;
+      if (slotCount === 0) {
+        const targetRowIdx =
+          activeRowIndexRef.current + (moveDirectionRef.current === 'down' ? 1 : -1);
+        const targetRow = rowsRef.current?.[targetRowIdx];
+        if (targetRow) slotCount = targetRow.words.length + 1;
+      }
+      if (slotCount === 0) {
+        // Board state wasn't ready when the drop resolved (rare: a slow frame
         // between onDragStart's selection commit and this deferred read). Don't
         // swallow the drop silently — that reads as "the game ate my letter."
         // The picked-up letter is still selected, so give the same gentle
@@ -1929,11 +2017,11 @@ function MainApp() {
       }
 
       // Estimate which slot the user dropped over based on X position.
-      const targetWordLength = previews.length - 1;
+      const targetWordLength = slotCount - 1;
       const estimateOut: { droppedRightOfCenter?: boolean } = {};
       const estimated = estimateSlotIndex(
         position.x,
-        previews.length,
+        slotCount,
         targetWordLength,
         estimateOut,
       );
@@ -1946,7 +2034,10 @@ function MainApp() {
       // a distant valid slot — an invalid drop that isn't a clear near-miss
       // still falls through to handleSlotPress's invalid feedback.
       let targetSlot = estimated;
-      if (!previews[estimated]?.isValid) {
+      // Near-miss snapping only when previews exist — in blind/challenge the
+      // absence of a snapping tell is part of the mode, and handleSlotPress
+      // gives real validation feedback on the raw estimated slot.
+      if (previews && !previews[estimated]?.isValid) {
         const closestValid = findClosestValidSlot(
           estimated,
           previews,
@@ -2418,7 +2509,12 @@ function MainApp() {
       return (
         <View style={{ flex: 1 }}>
           <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-          <SettingsScreen phase={persistence.currentPhase} onClose={() => transitionTo('home')} onReset={handleResetComplete} />
+          <SettingsScreen
+            phase={persistence.currentPhase}
+            onClose={() => transitionTo('home')}
+            onReset={handleResetComplete}
+            onCloudRestored={() => rebuildSessionFromStorage({ restartOnboarding: false })}
+          />
         </View>
       );
     }
@@ -3024,6 +3120,8 @@ function MainApp() {
           dailyHistoryLine={dailyLadderLine}
           dailyTrend={dailyLadderTrend}
           socialProofLine={socialProofLine}
+          eventBonusLine={eventBonusLine}
+          forceFullCeremony={phaseTransitionEvent != null}
           rewardedDoubleEnabled={(persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) > AUTO_COLLECT_PUZZLE_LIMIT}
           rewardedDoubleClaimed={victoryDoubleClaimed}
           onRewardedDouble={handleRewardedDouble}
@@ -3322,6 +3420,10 @@ function App() {
         // stall must not read as a hung app.
         installCloudProviderIfConfigured();
         const restorePromise = maybeAutoRestoreOnFreshInstall();
+        // Background uploads (MainApp fires one on mount) wait for the restore
+        // to settle so a slow first launch can't push near-empty fresh-install
+        // state over the cloud row the restore is still downloading.
+        holdUploadsUntil(restorePromise);
         const raced = await Promise.race([
           restorePromise.then((restored) => ({ restored, timedOut: false })),
           new Promise<{ restored: boolean; timedOut: boolean }>((resolve) =>
@@ -3335,6 +3437,9 @@ function App() {
             .then(async (restored) => {
               if (restored && !cancelled) {
                 await runMigrations();
+                // The remount hard-resets whatever the player was doing; the
+                // notice tells them why (their cloud progress arrived).
+                pendingRestoreNotice = true;
                 setAppEpoch((epoch) => epoch + 1);
               }
             })
@@ -3421,7 +3526,10 @@ function App() {
 const bootStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1A2E',
+    // Matches the native splash background (#FFF0F5) so splash → boot is a
+    // seamless hold rather than a bright-pink-to-near-black hard cut on the
+    // first impression. The wooden wordmark reads well on both.
+    backgroundColor: '#FFF0F5',
     alignItems: 'center',
     justifyContent: 'center',
   },

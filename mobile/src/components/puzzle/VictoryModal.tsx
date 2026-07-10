@@ -104,6 +104,11 @@ interface VictoryModalProps {
   dailyTrend?: 'up' | 'down' | 'flat' | null;
   /** Quiet, spoiler-safe aggregate social-proof line (null = none / backend off) */
   socialProofLine?: string | null;
+  /** Full-moon event bonus line for daily completions on event days. */
+  eventBonusLine?: string | null;
+  /** App-level override: a queued cinematic (final puzzle / post-revelation)
+   *  must always get the full ceremony, never the compact strip. */
+  forceFullCeremony?: boolean;
   /** App-level gate for the optional rewarded "double the reward" affordance */
   rewardedDoubleEnabled?: boolean;
   /** True once the player has doubled this victory's reward */
@@ -192,6 +197,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   dailyHistoryLine,
   dailyTrend,
   socialProofLine,
+  eventBonusLine,
+  forceFullCeremony,
   rewardedDoubleEnabled,
   rewardedDoubleClaimed,
   onRewardedDouble,
@@ -235,6 +242,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
     !isPlayingDaily &&
     !mustVisitPit &&
     !completionCoda &&
+    !forceFullCeremony &&
     isRoutineVictory(victoryData);
 
   // Ritual echo chain + de-duplicated feedback register: the performance
@@ -373,13 +381,68 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
             <View
               style={styles.compactAmberRow}
               accessible
-              accessibilityLabel={`${compactTotal} amber earned`}
+              accessibilityLabel={
+                victoryData?.autoCollected
+                  ? `${compactTotal} amber earned`
+                  : `${compactTotal} amber gathered for the pit`
+              }
             >
               <Image source={AMBER_ICON} style={styles.amberIconLarge} />
               <Text style={[styles.compactAmberText, { color: phaseTheme.modalTextColor }]}>
                 +{compactTotal}
               </Text>
             </View>
+            {!!eventBonusLine && (
+              <Text style={[styles.compactFlawless, { color: phaseTheme.modalSecondaryTextColor }]}>
+                {eventBonusLine}
+              </Text>
+            )}
+            {/* The amber is QUEUED in a harvest batch, not credited — the strip
+                must keep the pit affordance (and the 2x opt-in) or routine wins
+                lose their only in-victory collection path. */}
+            {rewardedDoubleEnabled && !isOnboarding && onRewardedDouble && (
+              rewardedDoubleClaimed ? (
+                <Text style={[styles.rewardedDoubleConfirm, { color: phaseTheme.modalSecondaryTextColor }]}>
+                  {'✓ '}{getRewardedDoubleConfirm(phase as DialoguePhase)}
+                </Text>
+              ) : isAdFreeSync() ? (
+                <TouchableOpacity
+                  style={[styles.freeDoubleButton, phase >= 3 ? styles.freeDoubleButtonDark : styles.freeDoubleButtonLight]}
+                  onPress={onRewardedDouble}
+                  accessibilityRole="button"
+                  accessibilityLabel={getRewardedDoubleLabel(phase as DialoguePhase)}
+                >
+                  <Text style={[styles.freeDoubleText, phase >= 3 ? styles.freeDoubleTextDark : styles.freeDoubleTextLight]}>
+                    {'✦ '}{getRewardedDoubleLabel(phase as DialoguePhase)}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <RewardedAdButton
+                  placement="victory_double"
+                  phase={phase}
+                  label={getRewardedDoubleLabel(phase as DialoguePhase)}
+                  onReward={onRewardedDouble}
+                  style={styles.rewardedDoubleButton}
+                />
+              )
+            )}
+            {!victoryData?.autoCollected && (
+              <TouchableOpacity
+                onPress={onGoToPit}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Collect amber in the pit"
+                accessibilityRole="button"
+                style={[styles.collectNowPill, {
+                  backgroundColor: btn.harvestPill.bg,
+                  borderColor: btn.harvestPill.border,
+                }]}
+              >
+                <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
+                  {`${'🌾'} Collect Now  ›`}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               onPress={onNextLevel}
@@ -759,6 +822,17 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 accessibilityLabel={socialProofLine}
               >
                 {socialProofLine}
+              </Text>
+            )}
+
+            {/* Full-moon event bonus (daily completions on event days) — shown
+                here because the puzzle toast renders UNDER this overlay. */}
+            {!!eventBonusLine && (
+              <Text
+                style={[styles.socialProofLine, { color: phaseTheme.modalSecondaryTextColor }]}
+                accessibilityLabel={eventBonusLine}
+              >
+                {eventBonusLine}
               </Text>
             )}
             </Animated.View>

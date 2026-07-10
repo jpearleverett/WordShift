@@ -89,6 +89,12 @@ interface SettingsScreenProps {
    * a plain onClose would return the player to their stale in-memory save.
    */
   onReset?: () => void;
+  /**
+   * Called after a successful "Use the newer save" conflict restore so the
+   * host rebuilds the running session from the restored storage WITHOUT
+   * restarting onboarding (App.tsx: rebuildSessionFromStorage({restartOnboarding:false})).
+   */
+  onCloudRestored?: () => void;
 }
 
 // Native build identity. `expo-application` reads the installed APK/IPA's real
@@ -230,7 +236,7 @@ export async function performNewCycle(): Promise<number> {
   return cycle;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, onReset }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, onReset, onCloudRestored }) => {
   const screenInsets = useScreenInsets();
   const [settings, setSettings] = useState<GameSettings | null>(null);
   const [dailyRemindersOn, setDailyRemindersOn] = useState(false);
@@ -385,8 +391,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     (async () => {
       try {
         const restored = await downloadFromCloud();
-        setSyncConflict(false);
         if (restored) {
+          // The conflict clears only on a real restore, and the running
+          // session must rebuild from the restored storage (service caches
+          // were invalidated by the restore; React state was not).
+          setSyncConflict(false);
+          onCloudRestored?.();
           showGameAlert('Restored', 'The newer save was restored. The app will use it from now on.');
         } else {
           showGameAlert('Restore', 'Could not fetch the newer save right now. Try again later.');
@@ -408,8 +418,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
           text: 'Keep this device',
           onPress: async () => {
             try {
-              await uploadToCloud(true);
-              setSyncConflict(false);
+              // Clear the conflict only when the forced upload actually
+              // succeeded; a false return (offline, backend error) must leave
+              // the banner standing or the newer save silently stays at risk.
+              const uploaded = await uploadToCloud(true);
+              if (uploaded) {
+                setSyncConflict(false);
+              } else {
+                showGameAlert('Backup', 'Could not reach the cloud right now. Try again later.');
+              }
             } catch {
               // Non-fatal; the conflict row stays until an upload succeeds.
             }

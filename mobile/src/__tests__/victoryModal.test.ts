@@ -687,20 +687,24 @@ function routineVictoryData(overrides: Partial<VictoryData> = {}): VictoryData {
 describe('swift victories compact strip', () => {
   it('renders the condensed strip for a routine win when the setting is ON', () => {
     mockSwiftVictories = true;
-    const tree = render(baseProps({ victoryData: routineVictoryData() }));
+    // A routine win past the auto-collect window queues its amber in a harvest
+    // batch, so the strip must keep the Collect Now affordance and frame the
+    // amber as gathered-for-the-pit (not credited).
+    const tree = render(baseProps({ victoryData: routineVictoryData({ autoCollected: false }) }));
     const text = textOf(tree);
 
     // Condensed content: title, stars, total amber; all actions intact.
     expect(text).toContain(getVictoryTitle(3, 0));
     expect(findByA11yLabel(tree, '3 of 3 stars')).not.toBeNull();
-    expect(findByA11yLabel(tree, '18 amber earned')).not.toBeNull();
+    expect(findByA11yLabel(tree, '18 amber gathered for the pit')).not.toBeNull();
     expect(findByA11yLabel(tree, 'Next level')).not.toBeNull();
     expect(findByA11yLabel(tree, 'Share result')).not.toBeNull();
     expect(findByA11yLabel(tree, 'Return home')).not.toBeNull();
+    // Queued amber keeps its pit collection path in the compact strip.
+    expect(findByA11yLabel(tree, 'Collect amber in the pit')).not.toBeNull();
 
-    // Ceremony content is gone: no ritual echo, no Collect Now, no skip layer.
+    // Ceremony content is gone: no ritual echo, no skip layer.
     expect(text).not.toContain(getRitualEchoHeader(0));
-    expect(findByA11yLabel(tree, 'Collect amber in the pit')).toBeNull();
     expect(findByA11yLabel(tree, 'Skip celebration animation')).toBeNull();
   });
 

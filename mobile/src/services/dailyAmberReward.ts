@@ -48,6 +48,12 @@ export interface DailyAmberClaimResult extends DailyAmberStatus {
 
 let cache: DailyAmberState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateDailyAmberCache(): void {
+  cache = null;
+}
+
+
 const getDefault = (): DailyAmberState => ({ date: null, count: 0 });
 
 async function load(): Promise<DailyAmberState> {

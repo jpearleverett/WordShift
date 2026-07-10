@@ -65,6 +65,12 @@ import { AmberInline } from '../AmberInline';
 
 // Candy-style UI icon sprites (cross-platform consistent, replaces emoji)
 const AMBER_ICON = require('../../../assets/ui/amber.png');
+
+// Session-scoped (module-level) ambient-slot state. HomeScreen unmounts on
+// every navigation, so per-mount refs would restart the atmosphere/goal
+// alternation and replay the once-per-session full-moon line on every visit.
+let preferGoalSuggestionSession = false;
+let eventAmbientShownSession = false;
 const FLAME_ICON = require('../../../assets/ui/flame.png');
 const JOURNAL_ICON = require('../../../assets/ui/journal.png');
 const HINT_ICON = require('../../../assets/ui/hint.png');
@@ -458,11 +464,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const ambientOpacity = useRef(new Animated.Value(0)).current;
   const ambientTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ambientAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-  // Alternates the ambient slot between atmosphere and a goal suggestion.
-  const preferGoalSuggestionRef = useRef(false);
-  // The full-moon event line fires once per session so a 2-3 day window
-  // doesn't repeat the same moon line every idle cycle.
-  const eventAmbientShownRef = useRef(false);
+  // Live snapshot of the goal-suggestion inputs. They're deliberately NOT in
+  // the ambient effect's deps (the cadence stays tied to phase/dialogue
+  // changes), so the async line-builder reads them through this ref to avoid
+  // acting on the stale values captured at effect creation.
+  const ambientInputsRef = useRef({ pitNeedsAttention: false, claimableQuestAmber: 0, hasActiveQuests: false });
   // Bounds the home_empty onboarding recovery reloads (see safety-net effect).
   const homeEmptyRecoveryAttemptsRef = useRef(0);
 
@@ -635,6 +641,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const pitNeedsAttention = Boolean(
     (pendingHarvest && pendingHarvest.pendingBatches > 0) || pitPhaseReady
   );
+
+  // Keep the ambient goal-suggestion inputs fresh for the async line builder
+  // (see ambientInputsRef) — updated every render, read at suggestion time.
+  ambientInputsRef.current = {
+    pitNeedsAttention,
+    claimableQuestAmber,
+    hasActiveQuests:
+      (weeklyQuestState?.daily?.quests?.length ?? 0) > 0 ||
+      (weeklyQuestState?.weekly?.quests?.length ?? 0) > 0,
+  };
 
   // Load data on mount
   useEffect(() => {
@@ -949,24 +965,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // live rather than dep-tracked so the cadence stays tied to phase and
       // dialogue changes, exactly as before.
       let line: string | null = null;
-      preferGoalSuggestionRef.current = !preferGoalSuggestionRef.current;
-      if (preferGoalSuggestionRef.current) {
+      preferGoalSuggestionSession = !preferGoalSuggestionSession;
+      if (preferGoalSuggestionSession) {
         try {
+          const inputs = ambientInputsRef.current;
           const dailyUnlocked = isDailyChallengeUnlocked(progress.puzzlesSolved, progress.currentPhase);
           const dailyDone = dailyUnlocked ? (await getDailyStatus()).isCompleted : true;
           const completedDiffs = progress.completedDifficulties ?? [];
           const untried = ['MEDIUM', 'MEDIUM_PLUS', 'HARD'].filter(d => !completedDiffs.includes(d));
-          const hasActiveQuests =
-            (weeklyQuestState?.daily?.quests?.length ?? 0) > 0 ||
-            (weeklyQuestState?.weekly?.quests?.length ?? 0) > 0;
           const suggestion = getGoalSuggestion(
             progress.currentPhase,
             dailyUnlocked && !dailyDone,
             untried,
             null,
-            pitNeedsAttention,
-            claimableQuestAmber,
-            hasActiveQuests,
+            inputs.pitNeedsAttention,
+            inputs.claimableQuestAmber,
+            inputs.hasActiveQuests,
           );
           if (suggestion) line = suggestion.text;
         } catch {
@@ -974,8 +988,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }
       }
       if (line == null) {
-        if (getActiveEvent() && !eventAmbientShownRef.current) {
-          eventAmbientShownRef.current = true;
+        if (getActiveEvent() && !eventAmbientShownSession) {
+          eventAmbientShownSession = true;
           line = getEventAmbientLine(progress.currentPhase);
         } else {
           line = getHomeAmbientLine(progress.currentPhase);

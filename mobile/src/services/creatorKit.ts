@@ -34,6 +34,8 @@ import {
 import { checkAchievements, clearAchievements } from './achievements';
 import { UNLOCK_PROGRESSION, purchaseUnlock } from './homeWorldData';
 import { setOnboardingStep } from './onboarding';
+import { clearPuzzleState } from './puzzleSaveState';
+import { clearHarvestState } from './wordHarvest';
 
 /**
  * Creator / press kit: reviewer fast-forward snapshots.
@@ -255,10 +257,15 @@ export async function applyCreatorSnapshot(target: 'dusk' | 'shadows' | 'reveal'
   if (!spec || !isCreatorKitEnabled()) return false;
 
   try {
-    // 1. Clean base — the snapshot is a full replacement, never a merge.
+    // 1. Clean base — the snapshot is a full replacement, never a merge. Clear
+    //    the transient session state too (a mid-puzzle autosave and any pending
+    //    harvest batches from the pre-snapshot save), or the reviewer resumes a
+    //    stray old board / sees stale amber batches over a fresh era save.
     await clearProgress();
     await clearStats();
     await clearAchievements();
+    await clearPuzzleState();
+    await clearHarvestState();
     await setOnboardingStep('complete');
 
     // 2. Simulate the win history through the REAL award pipeline. Raised to

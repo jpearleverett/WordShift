@@ -53,6 +53,14 @@ export interface DailyChallengeProgress {
 // In-memory cache
 let progressCache: DailyChallengeProgress | null = null;
 
+/**
+ * Drop the in-memory cache after an external storage write (cloud restore) so
+ * the next read reflects the restored save instead of writing stale state back.
+ */
+export function invalidateDailyProgressCache(): void {
+  progressCache = null;
+}
+
 function getDefaultProgress(): DailyChallengeProgress {
   return {
     completedChallenges: [],

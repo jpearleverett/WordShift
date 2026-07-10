@@ -6,6 +6,21 @@ import { invalidateStatsCache } from './starRating';
 import { invalidateHintsCache } from './hints';
 import { invalidateCosmeticsCache } from './cosmetics';
 import { invalidateQuestCache } from './weeklyQuests';
+import { invalidateHarvestCache } from './wordHarvest';
+import { invalidateDailyProgressCache } from './dailyChallenge';
+import { invalidateTendingCache } from './tending';
+import { invalidateRoomUpgradeCache } from './roomUpgrades';
+import { invalidateOfferingRequestCache } from './offeringRequests';
+import { invalidateSessionsCache } from './dialogueSession';
+import { invalidateDailyLoginCache } from './dailyLoginReward';
+import { invalidateDailyAmberCache } from './dailyAmberReward';
+import { invalidateMasteryCache } from './masteryRecords';
+import { invalidateDailyLadderCache } from './dailyLadder';
+import { invalidateWordHistoryCache } from './wordHistory';
+import { invalidateSacrificeCache } from './sacrifice';
+import { invalidateWhisperGalleryCache } from './whisperGallery';
+import { invalidateChoiceCache } from './dialogueChoices';
+import { invalidateNarrativeDeliveryCache } from './dialogue/animalDialogueNarrative';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -413,6 +428,25 @@ function invalidateRestoredServiceCaches(): void {
   invalidateHintsCache();
   invalidateCosmeticsCache();
   invalidateQuestCache();
+  // Every remaining cloud-synced service with a module-level cache. A missing
+  // entry here means a mid-session restore leaves a warm pre-restore cache
+  // whose NEXT write silently overwrites the restored save — when adding a
+  // synced key, add its invalidator.
+  invalidateHarvestCache();
+  invalidateDailyProgressCache();
+  invalidateTendingCache();
+  invalidateRoomUpgradeCache();
+  invalidateOfferingRequestCache();
+  invalidateSessionsCache();
+  invalidateDailyLoginCache();
+  invalidateDailyAmberCache();
+  invalidateMasteryCache();
+  invalidateDailyLadderCache();
+  invalidateWordHistoryCache();
+  invalidateSacrificeCache();
+  invalidateWhisperGalleryCache();
+  invalidateChoiceCache();
+  invalidateNarrativeDeliveryCache();
 }
 
 /**
@@ -519,9 +553,27 @@ export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<bo
  * status to deliberately overwrite the cloud row) uploads unguarded, since
  * there is nothing to compare against.
  */
+// While the fresh-install boot restore is in flight, background uploads must
+// wait: MainApp mounts an upload on launch, and on a slow first launch it
+// would otherwise push the near-empty fresh-install state over the very cloud
+// row the restore is still downloading. Capped so a hung promise can never
+// wedge uploads for the whole session.
+let uploadHold: Promise<unknown> | null = null;
+const UPLOAD_HOLD_CAP_MS = 15000;
+
+export function holdUploadsUntil(promise: Promise<unknown>): void {
+  uploadHold = Promise.race([
+    promise.catch(() => {}),
+    new Promise((resolve) => setTimeout(resolve, UPLOAD_HOLD_CAP_MS)),
+  ]).finally(() => {
+    uploadHold = null;
+  });
+}
+
 export async function uploadToCloud(force: boolean = false): Promise<boolean> {
   const isReady = await provider.isReady();
   if (!isReady) return false;
+  if (uploadHold) await uploadHold;
 
   if (!force) {
     try {
@@ -614,14 +666,21 @@ export async function markPendingChanges(): Promise<void> {
 // ============================================================================
 
 async function updateSyncStatus(success: boolean): Promise<void> {
+  // The baseline (lastSyncTimestamp) advances ONLY on success. A failed
+  // upload/restore must keep the previous baseline: the newer-save conflict
+  // guard compares the server's timestamp against this value, and stamping
+  // Date.now() on failure (e.g. every offline victory's background upload)
+  // would inflate the baseline past any newer save already on the server,
+  // permanently blinding the guard to that conflict.
+  const previous = syncStatusCache ?? (await getSyncStatus());
   const status: SyncStatus = {
-    lastSyncTimestamp: Date.now(),
+    lastSyncTimestamp: success ? Date.now() : previous.lastSyncTimestamp,
     lastSyncSuccess: success,
     pendingChanges: !success,
     provider: provider.getName(),
     // A successful sync (upload or restore) resolves any recorded conflict;
     // a failed one leaves it standing.
-    conflictDetected: success ? false : syncStatusCache?.conflictDetected === true,
+    conflictDetected: success ? false : previous.conflictDetected === true,
   };
   syncStatusCache = status;
   try {

@@ -2603,27 +2603,27 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
       'The arrangement has infinite depth, friend. Some paths through it are harder than others.',
-      'Challenge Mode strips away the hints you no longer need. The pattern has already shown you everything.',
+      'Challenge Mode takes away the little marks and the hints you no longer need. The pattern has already shown you everything.',
       'It waits in the puzzle setup. If you want to face what you helped build, face it bare.',
     ];
   }
   if (phase >= 3) {
     return [
       'The patterns grow more complex. There are harder paths, if you dare.',
-      'Challenge Mode strips away your safety. No hints, limited undos. But the amber flows thicker.',
+      'Challenge Mode strips away your safety. No previews of what a move will make, no hints, limited undos. But the amber flows thicker.',
       'Look for it in the puzzle setup. The arrangement rewards those who commit fully.',
     ];
   }
   if (phase >= 2) {
     return [
       "You've grown stronger with the letters, friend. Curious about a harder path?",
-      'Challenge Mode takes away your hints and limits your undos. Rougher going, but the amber comes back half again as heavy.',
+      'Challenge Mode hides the little check marks, takes away your hints, and limits your undos. Rougher going, but the amber comes back half again as heavy.',
       'You\'ll find it in the puzzle setup. The words feel different when there\'s no safety net.',
     ];
   }
   return [
     "I've been watching you work, friend. You've got a feel for this now.",
-    'There\'s something called Challenge Mode. No hints, fewer undos. Tougher, but the amber reward is half again as much.',
+    'There\'s something called Challenge Mode. No previews telling you if a move works, no hints, fewer undos. Tougher, but the amber reward is half again as much.',
     'It\'s tucked into the puzzle setup. Give it a try when you want the letters to push back a little.',
   ];
 }

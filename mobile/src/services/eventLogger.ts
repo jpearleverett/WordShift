@@ -67,6 +67,12 @@ let installDateCache: string | null = null;
  * like `phase_reached` can segment by player age without any identity beyond
  * the anonymous install. Device meta by design: NOT cloud-synced and NOT
  * cleared by clearEvents (only the in-memory copy is dropped there).
+ *
+ * Known limitation (accepted): a player who was already mid-game when this
+ * key was introduced mints their install date on the first call after the
+ * update, so their reported age starts at 0. Harmless for launch — the game
+ * ships this key from its first public build, so the only affected cohort is
+ * internal-test devices, whose ages segment analytics don't rely on.
  */
 export async function getInstallAgeDays(): Promise<number> {
   try {

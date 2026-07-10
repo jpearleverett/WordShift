@@ -224,6 +224,11 @@ export const ROOM_DEEPENINGS: RoomUpgrade[] = [
 
 let cache: RoomUpgradeState | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateRoomUpgradeCache(): void {
+  cache = null;
+}
+
 // ---------------------------------------------------------------------------
 // Storage
 // ---------------------------------------------------------------------------
