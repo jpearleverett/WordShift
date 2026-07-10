@@ -16,15 +16,25 @@ import {
   QUEST_GENERATION_MIN_PUZZLES,
   DAILY_QUEST_POOL,
   WEEKLY_QUEST_POOL,
+  EVENT_QUEST_TARGET,
+  EVENT_QUEST_REWARD_AMBER,
   Quest,
   QuestTemplate,
   CombinedQuestState,
 } from '../services/weeklyQuests';
+import { isEventDay } from '../services/liveEvents';
 
 // Mock AsyncStorage using shared factory
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
+
+// The full-moon event flag is a pure function of the real calendar; mock it
+// so these tests are deterministic on ANY run date (an unmocked real event
+// day would append a 6th daily quest and break the count assertions).
+jest.mock('../services/liveEvents', () => ({
+  isEventDay: jest.fn(() => false),
+}));
 
 describe('weeklyQuests', () => {
   const unlockedQuestContext = {
@@ -1067,6 +1077,119 @@ describe('weeklyQuests', () => {
         const allQ1 = [...s1.daily.quests, ...s1.weekly.quests];
         expect(allQ1.find(q => q.id === mpQuest.id)?.progress).toBe(1);
       }
+    });
+  });
+
+  // ===========================================================================
+  // Full-moon event quest (bonus 6th daily slot on event days)
+  // ===========================================================================
+
+  describe('full-moon event quest', () => {
+    const isEventDayMock = isEventDay as jest.Mock;
+
+    afterEach(() => {
+      isEventDayMock.mockReturnValue(false);
+    });
+
+    it('appends exactly one event_ quest to the DAILY tier on an event day (6 total)', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const state = await loadWeeklyQuests(0, unlockedQuestContext);
+
+      expect(state.daily.quests.length).toBe(6);
+      const eventQuests = state.daily.quests.filter(q => q.id.startsWith('event_'));
+      expect(eventQuests.length).toBe(1);
+
+      const eq = eventQuests[0];
+      expect(eq.type).toBe('solve_count');
+      expect(eq.tier).toBe('daily');
+      expect(eq.target).toBe(EVENT_QUEST_TARGET);
+      expect(eq.rewardAmber).toBe(EVENT_QUEST_REWARD_AMBER);
+      expect(eq.title.length).toBeGreaterThan(0);
+      expect(eq.description).toContain(String(EVENT_QUEST_TARGET));
+      expect(eq.darkDescription).toContain(String(EVENT_QUEST_TARGET));
+
+      // The weekly tier never carries an event quest.
+      expect(state.weekly.quests.length).toBe(5);
+      expect(state.weekly.quests.some(q => q.id.startsWith('event_'))).toBe(false);
+    });
+
+    it('generates the plain 5 daily quests with no event quest on a non-event day', async () => {
+      // Default mock: not an event day.
+      const state = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(state.daily.quests.length).toBe(5);
+      expect(state.daily.quests.some(q => q.id.startsWith('event_'))).toBe(false);
+    });
+
+    it('event-day generation is deterministic for the same period', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const state1 = await loadWeeklyQuests(0, unlockedQuestContext);
+      await clearWeeklyQuests();
+      await AsyncStorage.clear();
+      const state2 = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(state1.daily.quests.map(q => q.id)).toEqual(state2.daily.quests.map(q => q.id));
+      expect(state1.daily.quests.map(q => q.type)).toEqual(state2.daily.quests.map(q => q.type));
+      expect(state1.daily.quests.map(q => q.title)).toEqual(state2.daily.quests.map(q => q.title));
+    });
+
+    it('the event quest vanishes naturally on a non-event regeneration', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const during = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(during.daily.quests.length).toBe(6);
+
+      // Simulate the next (non-event) day's regeneration: fresh period
+      // generation with the event flag off.
+      isEventDayMock.mockReturnValue(false);
+      await clearWeeklyQuests();
+      await AsyncStorage.clear();
+      const after = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(after.daily.quests.length).toBe(5);
+      expect(after.daily.quests.some(q => q.id.startsWith('event_'))).toBe(false);
+    });
+
+    it('progresses and claims through the existing pipeline untouched', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const state = await loadWeeklyQuests(0, unlockedQuestContext);
+      const eq = state.daily.quests.find(q => q.id.startsWith('event_'));
+      expect(eq).toBeDefined();
+
+      for (let i = 0; i < EVENT_QUEST_TARGET; i++) {
+        await updateQuestProgress({
+          difficulty: 'MEDIUM', stars: 2, hintsUsed: 1, amberEarned: 10,
+        }, 0);
+      }
+      const progressed = (await loadWeeklyQuests(0)).daily.quests.find(q => q.id === eq!.id);
+      expect(progressed?.progress).toBe(EVENT_QUEST_TARGET);
+      expect(progressed?.completed).toBe(true);
+
+      // Claim is phase-scaled like every other quest (x1.0 at phase 0).
+      const claim = await claimQuestReward(eq!.id, 0);
+      expect(claim).toEqual({ amber: EVENT_QUEST_REWARD_AMBER });
+      // Never double-claims.
+      expect(await claimQuestReward(eq!.id, 0)).toBeNull();
+    });
+
+    it('stays dormant behind the pre-journal gate, then activates WITH the event quest', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const gated = await loadWeeklyQuests(0, {
+        puzzlesSolved: 2,
+        unlockedAnimalCount: 1,
+        challengeUnlocked: false,
+        unlockedVariants: [],
+      });
+      expect(gated.daily.quests).toEqual([]);
+      expect(gated.daily.gatedInactive).toBe(true);
+
+      const activated = await loadWeeklyQuests(0, {
+        puzzlesSolved: QUEST_GENERATION_MIN_PUZZLES,
+        unlockedAnimalCount: 2,
+        challengeUnlocked: false,
+        unlockedVariants: [],
+      });
+      expect(activated.daily.quests.length).toBe(6);
+      expect(activated.daily.quests.filter(q => q.id.startsWith('event_')).length).toBe(1);
+      expect(activated.daily.gatedInactive).toBeUndefined();
+      // Same period — activation replaces the placeholder in place.
+      expect(activated.daily.periodId).toBe(gated.daily.periodId);
     });
   });
 });

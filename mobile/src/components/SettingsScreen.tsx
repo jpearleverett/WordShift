@@ -728,7 +728,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
                   <Text style={[styles.linkText, { color: t.amberText }]}>Use the newer save</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.aboutRow} onPress={handleKeepThisDevice} accessibilityRole="button" accessibilityLabel="Keep this device's progress">
-                  <Text style={[styles.linkText, { color: t.secondaryText }]}>Keep this device's progress</Text>
+                  <Text style={[styles.linkText, { color: t.secondaryText }]}>{"Keep this device's progress"}</Text>
                 </TouchableOpacity>
               </View>
             )}

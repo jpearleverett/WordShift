@@ -2,6 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { getLocalDateString, parseLocalDate } from './dateUtils';
 import { JOURNAL_UNLOCK_PUZZLES } from '../constants/gameBalance';
+import { isEventDay } from './liveEvents';
+import {
+  getEventQuestTitle,
+  EVENT_QUEST_DESCRIPTION_TEMPLATES,
+} from './phaseNarrative';
 
 /**
  * Quest system for WordShift.
@@ -370,6 +375,50 @@ function generateQuestsFromPool(
 }
 
 // ============================================================================
+// Full-moon event quest (bonus 6th daily slot on event days)
+// ============================================================================
+
+/** Target for the bonus full-moon event quest (exported for tests). */
+export const EVENT_QUEST_TARGET = 3;
+/**
+ * Base reward for the event quest (exported for tests). Modest — comparable
+ * to the 3-solve daily template — and phase-scaled at claim time through
+ * getPhaseRewardMultiplier like every other quest.
+ */
+export const EVENT_QUEST_REWARD_AMBER = 20;
+
+/**
+ * Build the bonus event quest appended to the DAILY tier on full-moon event
+ * days. Determinism holds because liveEvents.isEventDay is a pure function
+ * of the daily periodId (the local date string) — the same period always
+ * generates the same set. The quest vanishes naturally on the next
+ * non-event day's regeneration (new periodId) and rides the existing
+ * progress/claim pipeline untouched. The 'event_' id prefix marks it.
+ */
+function buildEventQuest(periodId: string, phase: number): Quest {
+  const target = EVENT_QUEST_TARGET;
+  return {
+    id: `event_${periodId}_daily`,
+    type: 'solve_count',
+    tier: 'daily',
+    title: getEventQuestTitle(phase),
+    description: EVENT_QUEST_DESCRIPTION_TEMPLATES.bright.replace(
+      '{target}',
+      String(target)
+    ),
+    darkDescription: EVENT_QUEST_DESCRIPTION_TEMPLATES.dark.replace(
+      '{target}',
+      String(target)
+    ),
+    target,
+    progress: 0,
+    completed: false,
+    claimed: false,
+    rewardAmber: EVENT_QUEST_REWARD_AMBER,
+  };
+}
+
+// ============================================================================
 // Public API
 // ============================================================================
 
@@ -460,11 +509,20 @@ async function loadQuestTier(
   // Existing states with quests are always served as-is (backward compatible).
   const gated = isBelowJournalGate(effectiveContext);
 
+  const quests = gated
+    ? []
+    : generateQuestsFromPool(pool, count, currentPeriod, tier, phase, effectiveContext);
+  // Full-moon event days append ONE bonus quest to the DAILY tier (a 6th
+  // slot). isEventDay is pure on the daily periodId (the local date), so the
+  // generation stays deterministic for the period; a dormant pre-journal
+  // placeholder stays empty exactly like the base quests.
+  if (!gated && tier === 'daily' && isEventDay(currentPeriod)) {
+    quests.push(buildEventQuest(currentPeriod, phase));
+  }
+
   const newState: QuestState = {
     periodId: currentPeriod,
-    quests: gated
-      ? []
-      : generateQuestsFromPool(pool, count, currentPeriod, tier, phase, effectiveContext),
+    quests,
     generatedAt: Date.now(),
     animalsVisitedThisPeriod: [],
   };

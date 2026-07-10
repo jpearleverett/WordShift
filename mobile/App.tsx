@@ -1388,7 +1388,10 @@ function MainApp() {
         result.variant || 'standard',
         isPlayingDaily,
         result.undosUsed ?? 0,
-        result.blind ?? false
+        result.blind ?? false,
+        // Shared-link boards pay amber but never feed phase progress (the
+        // chain is attacker-craftable, so it must not advance the story).
+        puzzle.isSharedChallenge ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -2755,7 +2758,7 @@ function MainApp() {
 
         {/* Toast Message */}
         <View style={styles.toastContainer}>
-          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} />
+          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} phase={persistence.currentPhase} />
         </View>
 
         {/* Speed Timer — prominent display */}

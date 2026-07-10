@@ -3075,3 +3075,103 @@ export function getDailyLoginFirstClaimCopy(phase: number): { title: string; sub
   }
   return { title: 'Welcome to the House', subtitle: 'A little gift for every day you visit' };
 }
+
+// ============================================================================
+// FULL-MOON LIVE EVENT COPY — "the night the sky thins" (liveEvents.ts).
+// Deterministic client-side event, roughly monthly. Bright phases frame it
+// as a warm little festival; the descent recasts the same moon as pale,
+// watchful, and finally thin. Never names phases, mechanics, or "events".
+// Pools are exported so the em-dash sweep covers them.
+// ============================================================================
+
+function clampEventPhase(phase: number): DialoguePhase {
+  const n = Math.floor(Number(phase));
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(5, Math.max(0, n)) as DialoguePhase;
+}
+
+/** In-world names for the full-moon nights, per phase. */
+export const EVENT_NAMES: Record<DialoguePhase, string> = {
+  0: 'The Lantern Moon',
+  1: 'The Lantern Moon',
+  2: 'The Pale Moon',
+  3: 'The Watching Moon',
+  4: 'The Thinning',
+  5: 'The Quiet Moon',
+};
+
+export function getEventName(phase: number): string {
+  return EVENT_NAMES[clampEventPhase(phase)];
+}
+
+/** Very short badge label for the daily card during the event. */
+export const EVENT_BADGE_LABELS: Record<DialoguePhase, string> = {
+  0: 'Lantern Moon tonight',
+  1: 'Lantern Moon tonight',
+  2: 'The moon is pale tonight',
+  3: 'The moon is watching',
+  4: 'The sky thins tonight',
+  5: 'The moon is full and quiet',
+};
+
+export function getEventBadgeLabel(phase: number): string {
+  return EVENT_BADGE_LABELS[clampEventPhase(phase)];
+}
+
+/** One in-world home line about the moon, per phase, for the ambient slot. */
+export const EVENT_AMBIENT_LINES: Record<DialoguePhase, string> = {
+  0: 'The moon is huge and golden tonight! Nobody in the house wants to sleep.',
+  1: 'The moon looks closer than it should tonight. Pretty, though.',
+  2: 'The moon is too bright tonight. The rooms feel thin under it.',
+  3: 'The moon has not blinked all night. Neither has the house.',
+  4: 'The sky is thin tonight. Something leans against it from the other side.',
+  5: 'The moon is full again. The house regards it like an old friend.',
+};
+
+export function getEventAmbientLine(phase: number): string {
+  return EVENT_AMBIENT_LINES[clampEventPhase(phase)];
+}
+
+/**
+ * Victory-side line when the full moon adds bonus amber to the daily.
+ * In-world; states the amber plainly, never percentages at dark phases.
+ */
+export const EVENT_DAILY_BONUS_LINES: Record<DialoguePhase, string> = {
+  0: 'The Lantern Moon loved that! +{bonus} bonus amber!',
+  1: 'Solved under the Lantern Moon! +{bonus} bonus amber!',
+  2: 'The pale moon was watching. +{bonus} amber found its way to you.',
+  3: 'The moon saw every word. It left +{bonus} amber behind.',
+  4: 'The sky is thin, and it is generous. +{bonus} amber.',
+  5: 'The full moon remembers you. +{bonus} amber.',
+};
+
+export function getEventDailyBonusLine(phase: number, bonus: number): string {
+  return EVENT_DAILY_BONUS_LINES[clampEventPhase(phase)].replace(
+    '{bonus}',
+    String(bonus)
+  );
+}
+
+/** Title for the bonus event quest appended to the daily tier on event days. */
+export const EVENT_QUEST_TITLES: Record<DialoguePhase, string> = {
+  0: 'Moonlight Party',
+  1: 'Under the Lantern Moon',
+  2: 'Under the Pale Moon',
+  3: 'While the Moon Watches',
+  4: 'While the Sky Thins',
+  5: 'By the Quiet Moon',
+};
+
+export function getEventQuestTitle(phase: number): string {
+  return EVENT_QUEST_TITLES[clampEventPhase(phase)];
+}
+
+/**
+ * Description templates for the event quest ({target} replaced by the quest
+ * system). `bright` fills Quest.description, `dark` fills darkDescription
+ * (the quest UI switches at phase 3+, like every other quest).
+ */
+export const EVENT_QUEST_DESCRIPTION_TEMPLATES = {
+  bright: 'Solve {target} puzzles under the full moon',
+  dark: 'The moon asks for {target} arrangements tonight',
+} as const;

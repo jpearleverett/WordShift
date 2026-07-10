@@ -10,6 +10,8 @@ import {
 import { CandyColors } from '../theme/colors';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getDailyStatus } from '../services/dailyChallenge';
+import { getActiveEvent } from '../services/liveEvents';
+import { getEventBadgeLabel } from '../services/phaseNarrative';
 import { Difficulty } from '../types';
 import { getSettingsSync } from '../services/settings';
 
@@ -155,6 +157,10 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
       ? 'rgba(160, 140, 60, 0.5)'
       : 'rgba(255, 200, 60, 0.5)';
 
+  // Full-moon live event (deterministic local-calendar math — no network).
+  // Cheap pure call; recomputed per render so the badge tracks the window.
+  const eventBadgeLabel = getActiveEvent() ? getEventBadgeLabel(phase) : null;
+
   return (
     <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
       <TouchableOpacity
@@ -163,9 +169,10 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         activeOpacity={isCompleted && !onRecheckStanding ? 1 : 0.7}
         accessibilityLabel={
-          isCompleted
+          (isCompleted
             ? `Daily challenge completed. ${stars} stars. ${streak > 1 ? `${streak} day streak. ` : ''}${onRecheckStanding ? 'Tap to check your standing.' : ''}`
-            : 'Start daily challenge'
+            : 'Start daily challenge') +
+          (eventBadgeLabel ? ` ${eventBadgeLabel}.` : '')
         }
         accessibilityRole="button"
       >
@@ -209,6 +216,18 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
             styles.notifDot,
             phase >= 4 && { backgroundColor: '#B83C3C' },
           ]} />
+        )}
+
+        {/* Full-moon event badge (small moon accent; the label rides the
+            card's accessibilityLabel above). Absolute, mirroring the streak
+            badge, so the card's size and layout are unchanged. */}
+        {eventBadgeLabel && (
+          <View
+            style={[styles.moonBadge, phase >= 4 && styles.moonBadgeDark]}
+            pointerEvents="none"
+          >
+            <Text style={styles.moonBadgeText}>🌕</Text>
+          </View>
         )}
       </TouchableOpacity>
     </Animated.View>
@@ -285,5 +304,23 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: CandyColors.red.main,
+  },
+  moonBadge: {
+    position: 'absolute',
+    bottom: -4,
+    left: -6,
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    backgroundColor: 'rgba(90, 80, 150, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moonBadgeDark: {
+    backgroundColor: 'rgba(120, 45, 45, 0.85)',
+  },
+  moonBadgeText: {
+    fontFamily: BODY_FONT,
+    fontSize: 9,
   },
 });
