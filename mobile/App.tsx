@@ -98,7 +98,9 @@ import {
   getNewCycleOpeningLine,
   getDailyLadderLine,
   getDailyLadderTrendLabel,
+  getEventDailyBonusLine,
 } from './src/services/phaseNarrative';
+import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
@@ -1498,6 +1500,20 @@ function MainApp() {
             addVictoryTimeout(() => {
               puzzleActions.setMessage('🛡️ A missed day, but your daily streak held.');
             }, 1100);
+          }
+          // Full-moon event: +50% bonus on the daily's amber, credited as
+          // BONUS amber only. Never feeds phase progress (same rule as every
+          // bonus/purchased amber source). The 2100ms delay keeps it clear of
+          // the 1100ms milestone/freeze toast.
+          if (getActiveEvent()) {
+            const eventBonus = getEventDailyBonusAmber(victory.amberEarned);
+            if (eventBonus > 0) {
+              const newBalance = await awardBonusAmber(eventBonus, 'event_daily_bonus');
+              persistenceActions.setAmberBalance(newBalance);
+              addVictoryTimeout(() => {
+                puzzleActions.setMessage(getEventDailyBonusLine(persistence.currentPhase, eventBonus));
+              }, 2100);
+            }
           }
         } catch {
           // Daily recording is non-critical — never block the victory flow.

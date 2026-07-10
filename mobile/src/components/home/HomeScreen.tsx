@@ -134,7 +134,8 @@ import { getSettingsSync } from '../../services/settings';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
-import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion } from '../../services/phaseNarrative';
+import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle, getGoalSuggestion, getEventAmbientLine } from '../../services/phaseNarrative';
+import { getActiveEvent } from '../../services/liveEvents';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked, getDailyStatus } from '../../services/dailyChallenge';
 import { areUpgradesAvailable, getPurchasedUpgrades } from '../../services/roomUpgrades';
@@ -459,6 +460,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const ambientAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   // Alternates the ambient slot between atmosphere and a goal suggestion.
   const preferGoalSuggestionRef = useRef(false);
+  // The full-moon event line fires once per session so a 2-3 day window
+  // doesn't repeat the same moon line every idle cycle.
+  const eventAmbientShownRef = useRef(false);
   // Bounds the home_empty onboarding recovery reloads (see safety-net effect).
   const homeEmptyRecoveryAttemptsRef = useRef(0);
 
@@ -969,7 +973,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           // Fall back to atmosphere.
         }
       }
-      if (line == null) line = getHomeAmbientLine(progress.currentPhase);
+      if (line == null) {
+        if (getActiveEvent() && !eventAmbientShownRef.current) {
+          eventAmbientShownRef.current = true;
+          line = getEventAmbientLine(progress.currentPhase);
+        } else {
+          line = getHomeAmbientLine(progress.currentPhase);
+        }
+      }
       if (cancelled) return;
       setAmbientLine(line);
 
