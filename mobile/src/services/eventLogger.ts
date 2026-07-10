@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getLocalDateString, daysAgoLocal } from './dateUtils';
 
 const STORAGE_KEY = 'wordshift_event_log';
+const INSTALL_DATE_KEY = 'wordshift_install_date';
 const MAX_EVENTS = 500;
 
 /**
@@ -17,6 +19,7 @@ export type EventType =
   | 'dialogue_started'
   | 'dialogue_completed'
   | 'phase_changed'
+  | 'phase_reached'
   | 'quest_reward_claimed'
   | 'harvest_auto_collected'
   | 'deep_link_opened'
@@ -26,6 +29,7 @@ export type EventType =
   | 'onboarding_step'
   | 'onboarding_complete'
   | 'pit_offer'
+  | 'first_manual_harvest'
   // Purchase funnel: store_opened → purchase_initiated → iap_purchase (success)
   //                                                    ↘ purchase_cancelled / purchase_failed
   | 'store_opened'
@@ -52,6 +56,36 @@ export interface StoredEvent extends GameEvent {
 // In-memory buffer — flushed to storage periodically
 let eventBuffer: StoredEvent[] = [];
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+// In-memory cache of the persisted install date (LOCAL calendar day).
+let installDateCache: string | null = null;
+
+/**
+ * Whole local calendar days since the app was first seen (0 on install day).
+ * The install date is persisted on first call under 'wordshift_install_date'
+ * as a LOCAL day key (via dateUtils — never toISOString/UTC), so telemetry
+ * like `phase_reached` can segment by player age without any identity beyond
+ * the anonymous install. Device meta by design: NOT cloud-synced and NOT
+ * cleared by clearEvents (only the in-memory copy is dropped there).
+ */
+export async function getInstallAgeDays(): Promise<number> {
+  try {
+    if (!installDateCache) {
+      const stored = await AsyncStorage.getItem(INSTALL_DATE_KEY);
+      if (stored) {
+        installDateCache = stored;
+      } else {
+        installDateCache = getLocalDateString();
+        await AsyncStorage.setItem(INSTALL_DATE_KEY, installDateCache);
+      }
+    }
+    // Clamp: a clock rolled backwards must never report a negative age.
+    return Math.max(0, daysAgoLocal(installDateCache));
+  } catch (error) {
+    console.warn('Failed to resolve install age:', error);
+    return 0;
+  }
+}
 
 /**
  * Log a game event. Events are buffered in memory and periodically
@@ -188,6 +222,9 @@ export async function getRecentEvents(type: EventType, limit: number = 20): Prom
 export async function clearEvents(): Promise<void> {
   try {
     eventBuffer = [];
+    // Drop only the in-memory install-date copy (test isolation); the persisted
+    // install date is device meta, deliberately not removed on reset.
+    installDateCache = null;
     if (flushTimer) {
       clearTimeout(flushTimer);
       flushTimer = null;

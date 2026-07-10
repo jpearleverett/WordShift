@@ -5,6 +5,7 @@ import { invalidateSettingsCache } from './settings';
 import { invalidateStatsCache } from './starRating';
 import { invalidateHintsCache } from './hints';
 import { invalidateCosmeticsCache } from './cosmetics';
+import { invalidateQuestCache } from './weeklyQuests';
 
 /**
  * Cloud save infrastructure for WordShift.
@@ -55,6 +56,13 @@ export interface SyncStatus {
   lastSyncSuccess: boolean;
   pendingChanges: boolean;
   provider: string;
+  /**
+   * True when an upload was skipped because the server holds a save newer
+   * than this device's last sync point (another device has progressed since).
+   * Cleared by a successful download/restore or a forced upload — never
+   * auto-merged or auto-downloaded mid-session.
+   */
+  conflictDetected?: boolean;
 }
 
 // ============================================================================
@@ -63,7 +71,9 @@ export interface SyncStatus {
 
 /** All AsyncStorage keys that should be included in cloud saves */
 // Keys are the ACTUAL AsyncStorage keys written by the services (verified against
-// each service's STORAGE_KEY constant). Device-specific keys (wordshift_device_id,
+// each service's STORAGE_KEY constant). Data-driven key FAMILIES (one key per
+// puzzle bank, etc.) are covered by SYNC_KEY_PREFIXES below instead of being
+// enumerated here. Device-specific keys (wordshift_device_id,
 // wordshift_install_id), the local analytics buffer (wordshift_event_log), the ad
 // pacing counter (wordshift_ad_pacing), the monetization soft-prompt pacing
 // (wordshift_monet_prompts — device UX, like ad pacing), entitlements
@@ -121,6 +131,16 @@ const SYNC_KEYS = [
   'wordshift_starter_intro_seen', // one-time Keeper's Welcome starter intro
   'wordshift_micro_beats_seen',
 ];
+
+/**
+ * Prefix-synced key families: every AsyncStorage key starting with one of
+ * these prefixes is included in cloud saves alongside SYNC_KEYS. Used where
+ * the exact key set is data-driven and enumerating it above would silently
+ * rot — currently the per-bank played-puzzle-id lists (puzzleBank.ts writes
+ * one `wordshift_played_*` key per bank; without them a restore on a new
+ * device forgets which bank puzzles were played and repeats them).
+ */
+export const SYNC_KEY_PREFIXES = ['wordshift_played_'];
 
 const SYNC_STATUS_KEY = 'wordshift_cloud_sync_status';
 const CURRENT_SAVE_VERSION = 1;
@@ -392,6 +412,7 @@ function invalidateRestoredServiceCaches(): void {
   invalidateSettingsCache();
   invalidateHintsCache();
   invalidateCosmeticsCache();
+  invalidateQuestCache();
 }
 
 /**
@@ -439,6 +460,23 @@ export async function collectLocalSaveData(): Promise<CloudSaveData> {
     } catch {}
   }
 
+  // Prefix-synced key families (e.g. the per-bank played-puzzle-id lists) —
+  // resolved dynamically from the actual stored keys, so new banks are picked
+  // up without touching SYNC_KEYS.
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    for (const key of allKeys) {
+      if (key in data) continue;
+      if (!SYNC_KEY_PREFIXES.some(prefix => key.startsWith(prefix))) continue;
+      try {
+        const value = await AsyncStorage.getItem(key);
+        if (value !== null) {
+          data[key] = value;
+        }
+      } catch {}
+    }
+  } catch {}
+
   return {
     version: CURRENT_SAVE_VERSION,
     timestamp: Date.now(),
@@ -449,7 +487,9 @@ export async function collectLocalSaveData(): Promise<CloudSaveData> {
 
 /**
  * Restore save data from a CloudSaveData object.
- * Overwrites all local data with cloud data.
+ * Overwrites all local data with cloud data. Writes every key present in the
+ * payload, so prefix-synced keys (SYNC_KEY_PREFIXES) restore with no extra
+ * handling.
  */
 export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<boolean> {
   try {
@@ -467,10 +507,37 @@ export async function restoreFromCloudData(cloudData: CloudSaveData): Promise<bo
 
 /**
  * Upload current local data to cloud.
+ *
+ * Conflict guard: when this device has a sync baseline (it has synced or
+ * restored before) and the server save is newer than that baseline, another
+ * device has progressed since — a silent last-writer-wins upload would
+ * clobber it. The upload is skipped and `conflictDetected` is recorded in the
+ * sync status instead (no auto-merge, no auto-download mid-session). A
+ * successful download/restore clears the conflict; `force` bypasses the guard
+ * for deliberate-overwrite flows. A device with NO baseline
+ * (lastSyncTimestamp === 0 — e.g. right after Reset All clears the sync
+ * status to deliberately overwrite the cloud row) uploads unguarded, since
+ * there is nothing to compare against.
  */
-export async function uploadToCloud(): Promise<boolean> {
+export async function uploadToCloud(force: boolean = false): Promise<boolean> {
   const isReady = await provider.isReady();
   if (!isReady) return false;
+
+  if (!force) {
+    try {
+      const status = await getSyncStatus();
+      if (status.lastSyncTimestamp > 0) {
+        const serverIsNewer = await provider.hasNewerSave(status.lastSyncTimestamp);
+        if (serverIsNewer) {
+          await recordSyncConflict();
+          return false;
+        }
+      }
+    } catch {
+      // The conflict probe must never block an upload path that used to work;
+      // fall through to the plain upload.
+    }
+  }
 
   const saveData = await collectLocalSaveData();
   const success = await provider.upload(saveData);
@@ -525,6 +592,7 @@ export async function getSyncStatus(): Promise<SyncStatus> {
     lastSyncSuccess: false,
     pendingChanges: false,
     provider: provider.getName(),
+    conflictDetected: false,
   };
   return syncStatusCache;
 }
@@ -551,6 +619,27 @@ async function updateSyncStatus(success: boolean): Promise<void> {
     lastSyncSuccess: success,
     pendingChanges: !success,
     provider: provider.getName(),
+    // A successful sync (upload or restore) resolves any recorded conflict;
+    // a failed one leaves it standing.
+    conflictDetected: success ? false : syncStatusCache?.conflictDetected === true,
+  };
+  syncStatusCache = status;
+  try {
+    await AsyncStorage.setItem(SYNC_STATUS_KEY, JSON.stringify(status));
+  } catch {}
+}
+
+/**
+ * Record a skipped-upload conflict WITHOUT advancing the sync baseline —
+ * bumping lastSyncTimestamp here would mask the very conflict on retry.
+ */
+async function recordSyncConflict(): Promise<void> {
+  const current = await getSyncStatus();
+  const status: SyncStatus = {
+    ...current,
+    lastSyncSuccess: false,
+    pendingChanges: true,
+    conflictDetected: true,
   };
   syncStatusCache = status;
   try {

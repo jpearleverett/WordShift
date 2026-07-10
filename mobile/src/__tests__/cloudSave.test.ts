@@ -12,8 +12,10 @@ import {
   clearSyncStatus,
   CloudProvider,
   CloudSaveData,
+  SYNC_KEY_PREFIXES,
 } from '../services/cloudSave';
 import { loadProgress } from '../services/amberCurrency';
+import { loadWeeklyQuests, clearWeeklyQuests } from '../services/weeklyQuests';
 import { initHints, getHintBalance, clearHints } from '../services/hints';
 import {
   recordAmberCosmeticPurchase,
@@ -44,6 +46,7 @@ describe('cloudSave', () => {
     await clearSyncStatus();
     await clearHints();
     await clearCosmetics();
+    await clearWeeklyQuests();
     // Reset to a default no-op provider
     setCloudProvider(createMockProvider({
       upload: async () => false,
@@ -197,6 +200,61 @@ describe('cloudSave', () => {
   });
 
   // ===========================================================================
+  // Prefix-synced keys (wordshift_played_* per-bank played-puzzle-id lists)
+  // ===========================================================================
+
+  describe('prefix-synced keys (SYNC_KEY_PREFIXES)', () => {
+    it('exports the played-puzzle prefix', () => {
+      expect(SYNC_KEY_PREFIXES).toContain('wordshift_played_');
+    });
+
+    it('collects per-bank played-puzzle-id keys via the prefix', async () => {
+      await AsyncStorage.setItem('wordshift_played_puzzle_ids', JSON.stringify(['h1']));
+      await AsyncStorage.setItem('wordshift_played_std_easy_puzzle_ids', JSON.stringify(['e1', 'e2']));
+      await AsyncStorage.setItem('wordshift_played_reverse_mp_puzzle_ids', JSON.stringify(['r9']));
+
+      const data = await collectLocalSaveData();
+      expect(data.data['wordshift_played_puzzle_ids']).toBe(JSON.stringify(['h1']));
+      expect(data.data['wordshift_played_std_easy_puzzle_ids']).toBe(JSON.stringify(['e1', 'e2']));
+      expect(data.data['wordshift_played_reverse_mp_puzzle_ids']).toBe(JSON.stringify(['r9']));
+    });
+
+    it('round-trips a played-bank key through collect then restore', async () => {
+      const value = JSON.stringify(['p1', 'p2', 'p3']);
+      await AsyncStorage.setItem('wordshift_played_std_easy_puzzle_ids', value);
+
+      const collected = await collectLocalSaveData();
+      await AsyncStorage.clear();
+      expect(await AsyncStorage.getItem('wordshift_played_std_easy_puzzle_ids')).toBeNull();
+
+      const restored = await restoreFromCloudData({
+        version: 1,
+        timestamp: Date.now(),
+        deviceId: 'test',
+        data: collected.data,
+      });
+      expect(restored).toBe(true);
+      expect(await AsyncStorage.getItem('wordshift_played_std_easy_puzzle_ids')).toBe(value);
+    });
+
+    it('still excludes deliberately-unsynced and unrelated keys', async () => {
+      await AsyncStorage.setItem('wordshift_event_log', '[]'); // deliberate exclusion
+      await AsyncStorage.setItem('wordshift_entitlements', '{}'); // deliberate exclusion
+      await AsyncStorage.setItem('wordshift_ad_pacing', '{}'); // deliberate exclusion
+      await AsyncStorage.setItem('some_random_key', 'x');
+      // Near-miss: shares the 'wordshift_played' stem but not the underscore prefix.
+      await AsyncStorage.setItem('wordshift_playedish', 'x');
+
+      const data = await collectLocalSaveData();
+      expect(data.data['wordshift_event_log']).toBeUndefined();
+      expect(data.data['wordshift_entitlements']).toBeUndefined();
+      expect(data.data['wordshift_ad_pacing']).toBeUndefined();
+      expect(data.data['some_random_key']).toBeUndefined();
+      expect(data.data['wordshift_playedish']).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
   // restoreFromCloudData
   // ===========================================================================
 
@@ -289,6 +347,27 @@ describe('cloudSave', () => {
       await restoreFromCloudData(cloudData);
       expect(await getHintBalance()).toBe(42);
       expect(await getEquipped('tile_theme')).toBe('theme_tide');
+    });
+
+    it('invalidates the quest caches after overwriting local data (quest keys are synced)', async () => {
+      const before = await loadWeeklyQuests(0);
+      expect(before.daily.quests.length).toBe(5);
+
+      // A cloud save from another device: same period, all daily quests done.
+      const restoredDaily = {
+        ...before.daily,
+        quests: before.daily.quests.map(q => ({ ...q, progress: q.target, completed: true })),
+      };
+      await restoreFromCloudData({
+        version: 1,
+        timestamp: Date.now(),
+        deviceId: 'other_device',
+        data: { wordshift_daily_quests: JSON.stringify(restoredDaily) },
+      });
+
+      const after = await loadWeeklyQuests(0);
+      expect(after.daily.quests.length).toBe(5);
+      expect(after.daily.quests.every(q => q.completed)).toBe(true);
     });
 
     it('handles empty data object', async () => {
@@ -394,6 +473,129 @@ describe('cloudSave', () => {
       await uploadToCloud();
       const status = await getSyncStatus();
       expect(status.pendingChanges).toBe(true);
+    });
+  });
+
+  // ===========================================================================
+  // Upload conflict guard (multi-device last-writer-wins protection)
+  // ===========================================================================
+
+  describe('upload conflict guard', () => {
+    /** Give this device a sync baseline (lastSyncTimestamp > 0) via a normal upload. */
+    async function establishSyncBaseline(): Promise<void> {
+      setCloudProvider(createMockProvider());
+      expect(await uploadToCloud()).toBe(true);
+    }
+
+    it('skips the upload and flags a conflict when the server save is newer than the baseline', async () => {
+      await establishSyncBaseline();
+
+      // Another device has progressed since this device last synced.
+      const mockUpload = jest.fn(async () => true);
+      setCloudProvider(createMockProvider({
+        upload: mockUpload,
+        hasNewerSave: jest.fn(async () => true),
+      }));
+
+      const result = await uploadToCloud();
+      expect(result).toBe(false);
+      expect(mockUpload).not.toHaveBeenCalled();
+
+      const status = await getSyncStatus();
+      expect(status.conflictDetected).toBe(true);
+      expect(status.pendingChanges).toBe(true);
+    });
+
+    it('a conflict skip preserves the sync baseline, so a retry still sees the conflict', async () => {
+      await establishSyncBaseline();
+      const baseline = (await getSyncStatus()).lastSyncTimestamp;
+      expect(baseline).toBeGreaterThan(0);
+
+      const hasNewer = jest.fn(async () => true);
+      setCloudProvider(createMockProvider({ hasNewerSave: hasNewer }));
+
+      await uploadToCloud();
+      expect((await getSyncStatus()).lastSyncTimestamp).toBe(baseline);
+
+      await uploadToCloud();
+      expect(hasNewer).toHaveBeenLastCalledWith(baseline);
+      expect((await getSyncStatus()).conflictDetected).toBe(true);
+    });
+
+    it('uploads normally when the server has nothing newer', async () => {
+      await establishSyncBaseline();
+
+      const mockUpload = jest.fn(async () => true);
+      setCloudProvider(createMockProvider({
+        upload: mockUpload,
+        hasNewerSave: async () => false,
+      }));
+
+      expect(await uploadToCloud()).toBe(true);
+      expect(mockUpload).toHaveBeenCalledTimes(1);
+      expect((await getSyncStatus()).conflictDetected).toBe(false);
+    });
+
+    it('uploads unguarded when this device has no sync baseline (e.g. right after Reset All cleared the sync status)', async () => {
+      // performFullReset clears the sync status BEFORE its deliberate
+      // cloud-overwrite upload — the guard must not block that flow.
+      const mockUpload = jest.fn(async () => true);
+      const hasNewer = jest.fn(async () => true);
+      setCloudProvider(createMockProvider({ upload: mockUpload, hasNewerSave: hasNewer }));
+
+      expect(await uploadToCloud()).toBe(true);
+      expect(mockUpload).toHaveBeenCalledTimes(1);
+      expect(hasNewer).not.toHaveBeenCalled();
+    });
+
+    it('force upload bypasses the guard and clears the recorded conflict', async () => {
+      await establishSyncBaseline();
+
+      const mockUpload = jest.fn(async () => true);
+      const hasNewer = jest.fn(async () => true);
+      setCloudProvider(createMockProvider({ upload: mockUpload, hasNewerSave: hasNewer }));
+
+      await uploadToCloud(); // flags the conflict
+      expect((await getSyncStatus()).conflictDetected).toBe(true);
+      expect(mockUpload).not.toHaveBeenCalled();
+
+      expect(await uploadToCloud(true)).toBe(true);
+      expect(mockUpload).toHaveBeenCalledTimes(1);
+      expect(hasNewer).toHaveBeenCalledTimes(1); // force skipped the probe
+      expect((await getSyncStatus()).conflictDetected).toBe(false);
+    });
+
+    it('a successful download/restore clears the recorded conflict', async () => {
+      await establishSyncBaseline();
+
+      setCloudProvider(createMockProvider({
+        hasNewerSave: async () => true,
+        download: async () => ({
+          version: 1,
+          timestamp: Date.now(),
+          deviceId: 'other_device',
+          data: {},
+        }),
+      }));
+
+      await uploadToCloud();
+      expect((await getSyncStatus()).conflictDetected).toBe(true);
+
+      expect(await downloadFromCloud()).toBe(true);
+      expect((await getSyncStatus()).conflictDetected).toBe(false);
+    });
+
+    it('a failing conflict probe falls back to the plain upload path', async () => {
+      await establishSyncBaseline();
+
+      const mockUpload = jest.fn(async () => true);
+      setCloudProvider(createMockProvider({
+        upload: mockUpload,
+        hasNewerSave: async () => { throw new Error('network down'); },
+      }));
+
+      expect(await uploadToCloud()).toBe(true);
+      expect(mockUpload).toHaveBeenCalledTimes(1);
     });
   });
 

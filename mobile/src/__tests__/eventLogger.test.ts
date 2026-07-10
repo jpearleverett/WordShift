@@ -1,4 +1,5 @@
-import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents } from '../services/eventLogger';
+import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents, getInstallAgeDays } from '../services/eventLogger';
+import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 beforeEach(async () => {

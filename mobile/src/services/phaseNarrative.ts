@@ -1465,6 +1465,18 @@ export function getPersonalizedPhase5Whisper(
       `${name} breathes in ${word}. Breathes out silence.`,
       `${word} is the thread. ${name} is the loom. You are the weaver.`,
     ],
+    tarsier: [
+      `${name} saw ${word} between the stars long before you spelled it.`,
+      `${name} does not blink. "${word}," she says. "It is still there."`,
+    ],
+    aye_aye: [
+      `${name} taps the wall twice. The hollow answers: ${word}.`,
+      `${name} says the bell very nearly rang for ${word}.`,
+    ],
+    kakapo: [
+      `${name} called ${word} into the dark once. The dark finally said it back.`,
+      `${name} says ${word} was the answer he waited a lifetime to hear.`,
+    ],
   };
 
   const animalTemplates = templates[selectedType];
@@ -1872,6 +1884,29 @@ export function getNewCycleOpeningLine(cycle: number): string {
   if (cycle >= 3) return 'Bright morning. Again. You have all stopped pretending this is the first time.';
   if (cycle >= 2) return 'The sun comes up over the house once more. The animals smile. They remember your face from before, though none of them will say so.';
   return 'Morning breaks bright and warm, as if none of it had happened. The animals greet you like an old friend. Somewhere beneath the warmth, something already knows how this ends.';
+}
+
+/**
+ * Serene Phase-5 pointers toward beginning again. Exported so the em-dash
+ * guard sweeps every variant; player-facing via getNewCyclePointerLine.
+ * In-world only: never names settings, buttons, or any UI surface.
+ */
+export const NEW_CYCLE_POINTER_LINES = [
+  'When you are ready to walk the pattern from its first bright morning again, the house remembers the way.',
+  'Someday, if you wish it, the bright days can come around once more. The house keeps that door open for you.',
+  'The pattern has no true ending. Whenever you want the warmth of the beginning back, the house will carry you there.',
+];
+
+/**
+ * A soft pointer toward the New Cycle, surfaced at Tending milestones.
+ * Returns null below Phase 5. The pick is deterministic (no Math.random):
+ * it rotates with the local calendar day, so the line varies across visits
+ * but never flickers within one.
+ */
+export function getNewCyclePointerLine(phase: DialoguePhase): string | null {
+  if (phase < 5) return null;
+  const idx = new Date().getDate() % NEW_CYCLE_POINTER_LINES.length;
+  return NEW_CYCLE_POINTER_LINES[idx];
 }
 
 export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {

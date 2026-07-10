@@ -440,13 +440,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       setDailyRemindersOn(true);
       const granted = await requestNotificationPermission();
       if (granted) {
-        await setNotificationPrefs({ enabled: true, dailyReminderEnabled: true });
+        // Pass the current narrative phase so the rescheduled ladder carries
+        // phase-appropriate copy, never bright Phase-0 lines at Phase 3-4.
+        await setNotificationPrefs({ enabled: true, dailyReminderEnabled: true }, phase);
       } else {
         setDailyRemindersOn(false);
       }
     } else {
       setDailyRemindersOn(false);
-      await setNotificationPrefs({ dailyReminderEnabled: false });
+      await setNotificationPrefs({ dailyReminderEnabled: false }, phase);
     }
   };
 

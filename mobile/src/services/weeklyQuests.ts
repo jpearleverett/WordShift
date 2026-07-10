@@ -64,6 +64,21 @@ export interface QuestState {
   generatedAt: number;
   /** Distinct animal ids visited this period (for visit_animals quests) */
   animalsVisitedThisPeriod: string[];
+  /**
+   * True for a dormant pre-journal placeholder (no quests generated because
+   * the player hadn't reached the journal gate when this period started).
+   * A dormant state activates in place, same period, the moment a
+   * context-full load reports the gate crossed.
+   */
+  gatedInactive?: boolean;
+  /**
+   * The generation context recorded by the last context-FULL load. Persisted
+   * with the state so a context-LESS load after a period rollover (e.g. the
+   * first quest-touching action of a new day is a puzzle completion in a
+   * session held open past midnight, or right after a relaunch) regenerates
+   * against real player state instead of optimistic defaults.
+   */
+  lastGenerationContext?: WeeklyQuestGenerationContext;
 }
 
 /** Combined view of both daily and weekly quests */
@@ -173,6 +188,16 @@ export const WEEKLY_QUEST_POOL: QuestTemplate[] = [
 
 let dailyQuestCache: QuestState | null = null;
 let weeklyQuestCache: QuestState | null = null;
+/**
+ * The generation context supplied by the most recent context-FULL load this
+ * session. Context-less loads (updateQuestProgress / recordAnimalVisit /
+ * claimQuestReward / notifications) fall back to this — and then to the
+ * context persisted inside the stored quest state — instead of the optimistic
+ * generation defaults, so a period rollover mid-session can never mint quests
+ * for a player state that doesn't exist (e.g. "talk to 2 animals" with only
+ * 1 animal unlocked).
+ */
+let lastKnownContext: WeeklyQuestGenerationContext | null = null;
 
 // ============================================================================
 // Period ID calculation
@@ -203,6 +228,47 @@ export function getDayId(date: Date = new Date()): string {
   const m = (date.getMonth() + 1).toString().padStart(2, '0');
   const d = date.getDate().toString().padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+// ============================================================================
+// Pre-journal generation gate
+// ============================================================================
+
+/**
+ * Quests stay dormant until the quest surfaces (header quest pill + Journal
+ * Hub) become visible at puzzle 6. Before that, generated quests would accrue
+ * and expire invisibly — the player has no surface to see or claim them.
+ * Mirrors HomeScreen's isPostTutorialLightMode gate (`puzzlesSolved <= 5`,
+ * also used by isQuestPillVisible); keep the two in sync.
+ */
+export const QUEST_GENERATION_MIN_PUZZLES = 6;
+
+/**
+ * True when the known context explicitly says the player has not reached the
+ * journal yet. An unknown context (or one without puzzlesSolved) never gates —
+ * legacy behavior is preserved when player state has never been reported.
+ */
+function isBelowJournalGate(context?: WeeklyQuestGenerationContext): boolean {
+  return (
+    context !== undefined &&
+    context.puzzlesSolved !== undefined &&
+    context.puzzlesSolved < QUEST_GENERATION_MIN_PUZZLES
+  );
+}
+
+/**
+ * True when `state` is a dormant pre-journal placeholder that can now be
+ * replaced with real quests: a context-full load reports the gate crossed.
+ */
+function canActivateGatedState(
+  state: QuestState,
+  context?: WeeklyQuestGenerationContext
+): boolean {
+  return (
+    state.gatedInactive === true &&
+    context !== undefined &&
+    (context.puzzlesSolved ?? 0) >= QUEST_GENERATION_MIN_PUZZLES
+  );
 }
 
 // ============================================================================
@@ -313,9 +379,29 @@ export async function loadWeeklyQuests(
   currentPhase: number = 0,
   generationContext?: WeeklyQuestGenerationContext
 ): Promise<CombinedQuestState> {
+  if (generationContext) {
+    lastKnownContext = generationContext;
+  }
   const daily = await loadQuestTier('daily', currentPhase, generationContext);
   const weekly = await loadQuestTier('weekly', currentPhase, generationContext);
   return { daily, weekly };
+}
+
+/**
+ * Keep the persisted generation context fresh on context-full loads, so a
+ * later context-less period rollover regenerates against the newest known
+ * player state. Writes only when the context actually changed.
+ */
+async function rememberGenerationContext(
+  tier: QuestTier,
+  state: QuestState,
+  context: WeeklyQuestGenerationContext
+): Promise<void> {
+  if (JSON.stringify(state.lastGenerationContext ?? null) === JSON.stringify(context)) {
+    return;
+  }
+  state.lastGenerationContext = context;
+  await saveQuestTier(tier, state);
 }
 
 async function loadQuestTier(
@@ -329,15 +415,20 @@ async function loadQuestTier(
   const count = 5;
   const pool = tier === 'daily' ? DAILY_QUEST_POOL : WEEKLY_QUEST_POOL;
 
-  if (cache && cache.periodId === currentPeriod) {
+  if (cache && cache.periodId === currentPeriod && !canActivateGatedState(cache, context)) {
+    if (context) await rememberGenerationContext(tier, cache, context);
     return cache;
   }
+
+  // A stale state (previous period) is still useful: it carries the last
+  // persisted generation context, which a context-less rollover load needs.
+  let staleContext: WeeklyQuestGenerationContext | undefined = cache?.lastGenerationContext;
 
   try {
     const stored = await AsyncStorage.getItem(storageKey);
     if (stored) {
       const parsed: QuestState = JSON.parse(stored);
-      if (parsed.periodId === currentPeriod) {
+      if (parsed.periodId === currentPeriod && !canActivateGatedState(parsed, context)) {
         if (!parsed.animalsVisitedThisPeriod) {
           parsed.animalsVisitedThisPeriod = [];
         }
@@ -347,18 +438,37 @@ async function loadQuestTier(
         }
         if (tier === 'daily') dailyQuestCache = parsed;
         else weeklyQuestCache = parsed;
+        if (context) await rememberGenerationContext(tier, parsed, context);
         return parsed;
       }
+      staleContext = parsed.lastGenerationContext ?? staleContext;
     }
   } catch {}
 
-  // New period — generate fresh quests
+  // New period (or a dormant pre-journal placeholder whose gate just lifted) —
+  // generate fresh quests. An explicit context wins; otherwise fall back to
+  // the last context a context-full load recorded (this session, then the one
+  // persisted with the previous state) — never the optimistic generation
+  // defaults once player state has ever been known.
+  const effectiveContext = context ?? lastKnownContext ?? staleContext;
+
+  // Pre-journal gate: quest surfaces appear at puzzle 6, so generating earlier
+  // means quests silently accrue and expire unseen. Persist a dormant
+  // placeholder instead; it owns the period and activates in place once a
+  // context-full load reports the gate crossed (canActivateGatedState above).
+  // Existing states with quests are always served as-is (backward compatible).
+  const gated = isBelowJournalGate(effectiveContext);
+
   const newState: QuestState = {
     periodId: currentPeriod,
-    quests: generateQuestsFromPool(pool, count, currentPeriod, tier, phase, context),
+    quests: gated
+      ? []
+      : generateQuestsFromPool(pool, count, currentPeriod, tier, phase, effectiveContext),
     generatedAt: Date.now(),
     animalsVisitedThisPeriod: [],
   };
+  if (gated) newState.gatedInactive = true;
+  if (effectiveContext) newState.lastGenerationContext = effectiveContext;
 
   if (tier === 'daily') dailyQuestCache = newState;
   else weeklyQuestCache = newState;
@@ -390,6 +500,12 @@ export async function updateQuestProgress(event: {
   variant?: string;
 }, currentPhase: number = 0): Promise<Quest[]> {
   const combined = await loadWeeklyQuests(currentPhase);
+
+  // Pre-journal gate: both tiers dormant — nothing to progress, nothing to save.
+  if (combined.daily.gatedInactive && combined.weekly.gatedInactive) {
+    return [];
+  }
+
   const allNewlyCompleted: Quest[] = [];
 
   for (const state of [combined.daily, combined.weekly]) {
@@ -481,6 +597,12 @@ export async function recordAnimalVisit(
   currentStreak?: number
 ): Promise<Quest[]> {
   const combined = await loadWeeklyQuests(currentPhase);
+
+  // Pre-journal gate: both tiers dormant — nothing to progress, nothing to save.
+  if (combined.daily.gatedInactive && combined.weekly.gatedInactive) {
+    return [];
+  }
+
   const allNewlyCompleted: Quest[] = [];
 
   for (const state of [combined.daily, combined.weekly]) {
@@ -625,11 +747,21 @@ async function saveQuestTier(tier: QuestTier, state: QuestState): Promise<void> 
 }
 
 /**
+ * Drop the in-memory quest caches (and the session's last-known generation
+ * context) without touching storage. Called after a cloud restore overwrites
+ * the underlying AsyncStorage keys so the next load re-reads from storage.
+ */
+export function invalidateQuestCache(): void {
+  dailyQuestCache = null;
+  weeklyQuestCache = null;
+  lastKnownContext = null;
+}
+
+/**
  * Clear all quest data (for Settings > Reset All).
  */
 export async function clearWeeklyQuests(): Promise<void> {
-  dailyQuestCache = null;
-  weeklyQuestCache = null;
+  invalidateQuestCache();
   try {
     await AsyncStorage.removeItem(DAILY_STORAGE_KEY);
     await AsyncStorage.removeItem(WEEKLY_STORAGE_KEY);

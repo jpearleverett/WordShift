@@ -1732,6 +1732,15 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
       // this is what retires the first-harvest victory gate (the onboarding
       // pit beat doesn't count; the gate re-teaches the auto-collect handoff).
       if (!isOnboarding) {
+        // Funnel checkpoint: the FIRST real manual offer gets its own event so
+        // the puzzle 6-12 onboarding-to-economy funnel is directly queryable.
+        hasSeenMandatoryHarvest()
+          .then((seen) => {
+            if (!seen) {
+              logEvent({ type: 'first_manual_harvest', data: { amber: result.amberAwarded, words: result.wordsOffered } });
+            }
+          })
+          .catch(() => {});
         markMandatoryHarvestSeen().catch(() => {});
       }
       const newBalance = await awardBonusAmber(result.amberAwarded, 'word_offering');
@@ -1942,6 +1951,13 @@ export const OfferingPitScreen: React.FC<OfferingPitScreenProps> = ({
     logEvent({ type: 'pit_offer', data: { amber: result.amberAwarded, words: result.wordsOffered } });
     // Manual offer completed — the pit is learned (see tryFinalizeBatch).
     if (!isOnboarding) {
+      hasSeenMandatoryHarvest()
+        .then((seen) => {
+          if (!seen) {
+            logEvent({ type: 'first_manual_harvest', data: { amber: result.amberAwarded, words: result.wordsOffered } });
+          }
+        })
+        .catch(() => {});
       markMandatoryHarvestSeen().catch(() => {});
     }
     let finalBalance = baseBalance;

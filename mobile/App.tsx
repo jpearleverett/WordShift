@@ -13,6 +13,7 @@ import {
   Pressable,
   Linking,
   BackHandler,
+  Image,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -130,6 +131,12 @@ import { createRevenueCatBillingProvider } from './src/services/providers/revenu
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES } from './src/constants/gameBalance';
+import { getCumulativeStats } from './src/services/starRating';
+
+// Defer the one-time difficulty-selector intro until a few boards are done —
+// firing on the very first post-onboarding Play hijacked the "just let me
+// play" beat (and the curated early window ignores difficulty anyway).
+const SETUP_SELECTOR_INTRO_MIN_PUZZLES = 3;
 import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
@@ -560,7 +567,6 @@ function MainApp() {
     if (__DEV__) {
       startFrameMonitoring();
     }
-    scheduleAllNotifications(0).catch(() => {});
     uploadToCloud().catch(() => {});
     return () => {
       if (__DEV__) {
@@ -568,6 +574,20 @@ function MainApp() {
       }
     };
   }, []);
+
+  // Schedule notifications once persistence has hydrated, with the REAL phase.
+  // The old mount-time scheduleAllNotifications(0) rewrote the entire reminder
+  // ladder with bright Phase-0 copy on every browse-only launch — precisely for
+  // the lapsed dark-phase players the win-back ladder targets. cumulativeStats
+  // flips from null exactly once, when the initial persistence load lands (the
+  // same batch that sets currentPhase), so this fires once with correct data.
+  const notificationsScheduledRef = useRef(false);
+  useEffect(() => {
+    if (persistence.cumulativeStats === null) return;
+    if (notificationsScheduledRef.current) return;
+    notificationsScheduledRef.current = true;
+    scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+  }, [persistence.cumulativeStats, persistence.currentPhase]);
 
   // (The Android hardware-back handler lives below handleGoToPit — its deps
   // array references that callback, which must be initialized first.)
@@ -760,6 +780,13 @@ function MainApp() {
     if (onboardingFlow.isOnboarding) return;
     const seen = await hasSeenSetupSelectorIntro();
     if (seen) return;
+    // Defer the one-time selector reveal until the player has a few boards
+    // behind them: firing on the very first free Play hijacked the "just let
+    // me play" beat with a second tutorial, before changing difficulty was
+    // ever relevant. The curated window (first 5 puzzles) ignores difficulty
+    // anyway, so the taught choice was inert at that moment.
+    const stats = await getCumulativeStats();
+    if ((stats?.totalPuzzlesCompleted ?? 0) < SETUP_SELECTOR_INTRO_MIN_PUZZLES) return;
 
     setSetupSelectorIntroIndex(0);
     setTimeout(() => {
@@ -771,7 +798,11 @@ function MainApp() {
   const dismissSetupSelectorIntro = useCallback(async () => {
     await markSetupSelectorIntroSeen();
     setShowSetupSelectorIntro(false);
-  }, []);
+    // Close the menu the intro auto-opened. Leaving it floating after the Fox
+    // card was dismissed read as a stuck modal (and picking a row regenerated
+    // the fresh board underneath).
+    puzzleActions.setShowDifficultyMenu(false);
+  }, [puzzleActions]);
 
   const handleAdvanceSetupSelectorIntro = useCallback(async () => {
     const nextIndex = setupSelectorIntroIndex + 1;
@@ -951,10 +982,36 @@ function MainApp() {
     transitionTo,
   ]);
 
-  // Start the Daily Challenge (seeded, always HARD: 6-letter words, 5 rows).
-  const handleStartDaily = useCallback((_difficulty: Difficulty) => {
+  // Re-check today's daily leaderboard standing (tapping the completed daily
+  // card). The standing used to be shown exactly once, on completion; this gives
+  // it a re-check surface (assessment §7). Degrades gracefully when the backend
+  // is off or standings haven't aggregated yet.
+  const handleRecheckDailyStanding = useCallback(() => {
     hapticLight();
-    soundTap();
+    (async () => {
+      try {
+        // The card's corner badge is the daily streak — name it here so the
+        // number on the calendar icon always has an in-context explanation.
+        const daily = await getDailyStatus();
+        const streakLine = daily.streak > 1 ? `\nDaily streak: ${daily.streak} days.` : '';
+        const rank = await getDailyRank(getLocalDateString());
+        if (rank) {
+          showGameAlert(
+            'Today’s Standing',
+            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
+          );
+        } else {
+          showGameAlert('Today’s Standing', `The standings are still gathering. Check back a little later.${streakLine}`);
+        }
+      } catch {
+        // Non-critical — leaderboard is decorative.
+      }
+    })();
+  }, [persistence.currentPhase]);
+
+  // The daily board start proper — reached only through handleStartDaily's
+  // replay guard below.
+  const startDailyBoard = useCallback(() => {
     persistenceActions.refreshStats();
     orchestrationActions.setCompletionCoda(null);
     setIsPlayingDaily(true);
@@ -996,32 +1053,29 @@ function MainApp() {
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
 
-  // Re-check today's daily leaderboard standing (tapping the completed daily
-  // card). The standing used to be shown exactly once, on completion; this gives
-  // it a re-check surface (assessment §7). Degrades gracefully when the backend
-  // is off or standings haven't aggregated yet.
-  const handleRecheckDailyStanding = useCallback(() => {
+  // Start the Daily Challenge (seeded; difficulty follows the week ramp).
+  const handleStartDaily = useCallback((_difficulty: Difficulty) => {
     hapticLight();
+    soundTap();
     (async () => {
+      // Replay guard: the seeded daily board is identical all day and pays full
+      // HARD-tier amber plus phase progress, so replays (deep link, notification
+      // tap, any future surface) would be pure farming. A daily already
+      // completed today re-checks the standing instead — the same surface as
+      // tapping the completed card.
       try {
-        // The card's corner badge is the daily streak — name it here so the
-        // number on the calendar icon always has an in-context explanation.
-        const daily = await getDailyStatus();
-        const streakLine = daily.streak > 1 ? `\nDaily streak: ${daily.streak} days.` : '';
-        const rank = await getDailyRank(getLocalDateString());
-        if (rank) {
-          showGameAlert(
-            'Today’s Standing',
-            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
-          );
-        } else {
-          showGameAlert('Today’s Standing', `The standings are still gathering. Check back a little later.${streakLine}`);
+        const status = await getDailyStatus();
+        if (status.isCompleted) {
+          transitionTo('home');
+          handleRecheckDailyStanding();
+          return;
         }
       } catch {
-        // Non-critical — leaderboard is decorative.
+        // Status read failed — fall through and let the daily start.
       }
+      startDailyBoard();
     })();
-  }, [persistence.currentPhase]);
+  }, [transitionTo, handleRecheckDailyStanding, startDailyBoard]);
 
   // Start a puzzle from a friend-shared challenge link. The hook validates the
   // decoded words (dictionary membership, uniform length) and returns false
@@ -1137,7 +1191,10 @@ function MainApp() {
       if (isDailyChallengeUnlocked(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
         handleStartDaily('HARD');
       } else {
+        // Same courtesy the deep-link path gives: say why the tap landed on
+        // home instead of silently swallowing it.
         transitionTo('home');
+        showGameAlert('Daily Challenge', getDailyLockedMessage(persistence.currentPhase));
       }
     } else if (target === 'home') {
       transitionTo('home');
@@ -3156,8 +3213,20 @@ function MainApp() {
  * service caches read migrated data. Never blocks forever — the app renders
  * even if migrations fail (failures are logged, not fatal).
  */
+// How long the first frame may wait on the fresh-install cloud restore. The
+// restore is a single RPC that normally resolves well under a second; on a
+// slow/flaky network its 8s client timeout would otherwise hold the very first
+// launch hostage behind a boot screen. If the race times out we boot as a
+// fresh install and, should the slow restore eventually succeed, re-run
+// migrations and remount MainApp (restoreFromCloudData already invalidates
+// the service caches, so the remount re-reads the restored save).
+const BOOT_RESTORE_RACE_MS = 2500;
+
 function App() {
   const [bootReady, setBootReady] = useState(false);
+  // Bumped when a slow cloud restore lands after boot — remounts MainApp so
+  // every hook re-reads the restored storage.
+  const [appEpoch, setAppEpoch] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -3167,8 +3236,28 @@ function App() {
         // Install the cloud provider (no-op unless Supabase is configured), then
         // pull a cloud save BEFORE migrations/services read storage — so a fresh
         // install (or a device switch via recovery code) restores prior progress.
+        // The wait is capped: D1 is decided on this exact launch, and a network
+        // stall must not read as a hung app.
         installCloudProviderIfConfigured();
-        await maybeAutoRestoreOnFreshInstall();
+        const restorePromise = maybeAutoRestoreOnFreshInstall();
+        const raced = await Promise.race([
+          restorePromise.then((restored) => ({ restored, timedOut: false })),
+          new Promise<{ restored: boolean; timedOut: boolean }>((resolve) =>
+            setTimeout(() => resolve({ restored: false, timedOut: true }), BOOT_RESTORE_RACE_MS)
+          ),
+        ]);
+        if (raced.timedOut) {
+          // Boot proceeds as a fresh install. If the restore later succeeds,
+          // apply it: re-run migrations over the restored data, then remount.
+          void restorePromise
+            .then(async (restored) => {
+              if (restored && !cancelled) {
+                await runMigrations();
+                setAppEpoch((epoch) => epoch + 1);
+              }
+            })
+            .catch(() => {});
+        }
         await runMigrations();
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in
@@ -3205,15 +3294,44 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // Plain dark view while booting — matches the root default background
-  // so there's no flash before MainApp renders. SafeAreaProvider wraps both
-  // branches so useSafeAreaInsets is available everywhere in MainApp.
+  // Branded boot view while booting — the wordmark + a quiet spinner on the
+  // root background, so a slow first launch reads as loading rather than a
+  // hung black screen. SafeAreaProvider wraps both branches so
+  // useSafeAreaInsets is available everywhere in MainApp.
   return (
     <SafeAreaProvider>
-      {bootReady ? <MainApp /> : <View style={{ flex: 1, backgroundColor: '#1A1A2E' }} />}
+      {bootReady ? (
+        <MainApp key={appEpoch} />
+      ) : (
+        <View style={bootStyles.container}>
+          <Image
+            source={require('./assets/ui/wordmark.png')}
+            style={bootStyles.wordmark}
+            resizeMode="contain"
+            accessibilityLabel="WordShift"
+          />
+          <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
+        </View>
+      )}
     </SafeAreaProvider>
   );
 }
+
+const bootStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1A1A2E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wordmark: {
+    width: 260,
+    height: 65,
+  },
+  spinner: {
+    marginTop: 28,
+  },
+});
 
 // Wrap the root in Sentry's higher-order component so native crash context and
 // (if enabled) profiling attach to the running app. No-op when Sentry isn't

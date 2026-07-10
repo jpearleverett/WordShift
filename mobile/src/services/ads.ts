@@ -1,10 +1,12 @@
 /**
- * Ads layer (scaffold).
+ * Ads layer.
  *
  * A real ad SDK is a NATIVE module that breaks Expo Go, so it sits behind an
- * `AdProvider` interface — same pattern as iap.ts / cloudSave.ts. The active
- * provider is a `NoOpAdProvider`: the app builds, runs in Expo Go, and stays
- * unit-testable; ad calls resolve to "no ad shown / reward not granted".
+ * `AdProvider` interface — same pattern as iap.ts / cloudSave.ts. The DEFAULT
+ * provider is a `NoOpAdProvider` (ad calls resolve to "no ad shown / reward
+ * not granted"), which keeps Expo Go / Jest working; at boot App.tsx registers
+ * the live AdMob adapter (`providers/googleAdMobAds.ts`) via `setAdProvider()`,
+ * so real builds serve ads whenever the ad unit ids are configured.
  *
  * This module owns ALL ad-policy logic (Patron suppression, interstitial cadence,
  * rewarded daily cap) as pure/testable code. Rewarded ads are always OPT-IN (a
@@ -117,9 +119,13 @@ export function setAdProvider(newProvider: AdProvider): void {
 }
 
 /**
- * Request GDPR/UMP consent + iOS ATT exactly once, lazily, at FIRST ad exposure
- * — never at cold start. A consent/tracking dialog before the player has seen the
- * game is the textbook permission-wall anti-pattern (hurts D1, especially EEA).
+ * Request GDPR/UMP consent + iOS ATT exactly once per session. NOTE: with the
+ * live AdMob adapter this is a SAFETY NET, not the primary consent path — that
+ * adapter resolves UMP consent in a background chain kicked off by its own
+ * initialize() (consent → SDK init → preload; non-blocking, so initAds() and
+ * cold start never wait on it), meaning consent is normally settled long before
+ * a show path reaches this call. For providers that do NOT resolve consent at
+ * init, this lazy call still guarantees consent/ATT precede the very first ad.
  * Idempotent: the OS won't re-prompt once the user has decided, and the session
  * flag prevents redundant calls. Safe on NoOp (both methods are no-ops there).
  * Called from the interstitial + rewarded show paths so it precedes the very
@@ -235,6 +241,21 @@ export function shouldShowInterstitial(params: {
   if ((phase as number) >= 4) return false;
   const freq = interstitialFrequency(phase) * ((phase as number) >= 3 ? 2 : 1);
   return puzzlesSolved - lastInterstitialPuzzle >= freq;
+}
+
+/**
+ * Pure policy: may a DAILY CHALLENGE victory exit show an interstitial at this
+ * phase? Today App.tsx unconditionally exempts the daily from interstitials;
+ * this policy exists so App can instead exempt it only where the exemption
+ * earns its keep. The daily is the game's most reliable, habit-driven session
+ * — at the bright phases (0-2) an interstitial there is tonally harmless and
+ * monetizes the stickiest traffic, while Phase 3+ stays exempt to protect the
+ * dread arc, the ceremonies, and the serene endgame (the same tonal-protection
+ * rationale as shouldShowInterstitial, which independently suppresses Phase 4+
+ * entirely and doubles the gap at Phase 3). Not yet wired into App.tsx.
+ */
+export function isDailyInterstitialAllowed(phase: number): boolean {
+  return phase <= 2;
 }
 
 // ---------------------------------------------------------------------------

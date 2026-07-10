@@ -45,11 +45,21 @@ import { isAdsReady } from '../../services/ads';
 import {
   getDailyAmberStatus,
   recordDailyAmberClaim,
+  dailyAmberGrantFor,
   DailyAmberStatus,
 } from '../../services/dailyAmberReward';
 import { DAILY_AMBER_REWARD } from '../../constants/gameBalance';
 
 const HINT_ICON = require('../../../assets/ui/hint.png');
+
+/**
+ * Fallback price label for The Keeper's Collection when the store product isn't
+ * fetchable (NoOp billing, Expo Go, or a failed fetch) — mirrors the
+ * `fallbackPrice` pattern on the consumable catalog in services/iap.ts. Keep in
+ * sync with the Play Console / App Store Connect price tier; the charge sheet
+ * always shows the store's own localized price.
+ */
+export const COSMETIC_BUNDLE_FALLBACK_PRICE = '$4.99';
 
 interface StoreModalProps {
   visible: boolean;
@@ -180,15 +190,23 @@ export const StoreModal: React.FC<StoreModalProps> = ({
 
   // Grant the daily free-amber reward (called after a completed rewarded view, or
   // directly for Patron holders who don't watch ads). recordDailyAmberClaim caps
-  // it per local day; awardBonusAmber credits the reward-only amber.
+  // it per local day and reports whether THIS claim was recorded — amber is
+  // credited only when it was, so a repeat tap past the cap (cheap for Patrons,
+  // who skip the ad) can never over-grant while the tracker stays pinned.
   const handleClaimDailyAmber = useCallback(async () => {
     hapticMedium();
-    const status = await recordDailyAmberClaim();
-    const balance = await awardBonusAmber(DAILY_AMBER_REWARD, 'rewarded_daily_amber');
+    const result = await recordDailyAmberClaim();
+    setAmberFaucet(result);
+    const grant = dailyAmberGrantFor(result);
+    if (grant <= 0) {
+      // Already collected today (stale card or rapid re-tap): the card flips to
+      // its "Collected for today" state above; nothing is credited.
+      return;
+    }
+    const balance = await awardBonusAmber(grant, 'rewarded_daily_amber');
     onAmberChange?.(balance);
-    setAmberFaucet(status);
-    setSuccessMsg(`+${DAILY_AMBER_REWARD} amber added.`);
-    logEvent({ type: 'daily_amber_claimed', data: { amount: DAILY_AMBER_REWARD, remaining: status.remaining } });
+    setSuccessMsg(`+${grant} amber added.`);
+    logEvent({ type: 'daily_amber_claimed', data: { amount: grant, remaining: result.remaining } });
   }, [onAmberChange]);
 
   const handleBuyConsumable = useCallback(
@@ -470,7 +488,7 @@ export const StoreModal: React.FC<StoreModalProps> = ({
                 <Text style={[styles.ownedText, { color: t.amberText }]}>Owned ✦</Text>
               ) : (
                 renderPricePill(
-                  prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? '$4.99',
+                  prices[PRODUCT_IDS.COSMETIC_BUNDLE] ?? COSMETIC_BUNDLE_FALLBACK_PRICE,
                   handleBuyBundle,
                   "Buy The Keeper's Collection",
                 )

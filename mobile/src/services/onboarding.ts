@@ -14,7 +14,7 @@ const ONBOARDING_KEY = 'wordshift_onboarding_step';
  * 5. puzzle_complete → Victory shown, Fox congratulates
  * 6. going_to_pit    → Fox introduces word harvesting concept
  * 7. pit_intro       → Fox explains the Offering Pit on the pit screen
- * 8. pit_offering    → Auto-offer words, Fox reacts to amber earned
+ * 8. pit_offering    → Player taps each floating word to offer it; Fox reacts once all are offered
  * 9. returning_home  → Transitioning back to home screen
  * 10. unlock_explained → Fox explains amber & unlock system
  * 11. complete        → Player is free
@@ -119,8 +119,12 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   puzzle_tutorial_drop: [
     "Beautiful! Now tuck it into the glowing spot below.",
   ],
+  // Between-moves reinforcement (App.tsx renders index 0 after the first
+  // guided move). This is also where Fox teaches the core rule: BOTH resulting
+  // words must stay valid, and the green check / red cross ghost previews show
+  // which drops keep them that way.
   puzzle_tutorial_valid_move: [
-    "There it is, that little click when a word falls into place.\nMade a wrong move? Tap undo, no harm done. Stuck? Tap hint.\nKeep going, all the way down.",
+    "There it is, that little click when a word falls into place.\nSee the little marks when you pick up a letter? A green check means both words stay real words. A red cross means one of them would break.\nWrong move? Tap undo. Stuck? Tap hint. Keep going, all the way down.",
   ],
   puzzle_tutorial_invalid: [
     "Hmm, that didn't land quite right.\nTry undoing and picking a different spot.",

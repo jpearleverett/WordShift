@@ -5,6 +5,7 @@ import {
   getNotificationMessage,
   getStreakRiskMessage,
   getQuestExpiryMessage,
+  getEarlyReminderMessage,
   resetNotificationPrefs,
   scheduleAllNotifications,
   cancelAllNotifications,
@@ -83,7 +84,7 @@ describe('notifications', () => {
 
   describe('setNotificationPrefs', () => {
     it('merges partial prefs with defaults', async () => {
-      await setNotificationPrefs({ dailyReminderHour: 10 });
+      await setNotificationPrefs({ dailyReminderHour: 10 }, 0);
       const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderHour).toBe(10);
       expect(prefs.enabled).toBe(true); // default preserved
@@ -91,37 +92,37 @@ describe('notifications', () => {
     });
 
     it('can disable master toggle', async () => {
-      await setNotificationPrefs({ enabled: false });
+      await setNotificationPrefs({ enabled: false }, 0);
       const prefs = await getNotificationPrefs();
       expect(prefs.enabled).toBe(false);
     });
 
     it('can disable daily reminders', async () => {
-      await setNotificationPrefs({ dailyReminderEnabled: false });
+      await setNotificationPrefs({ dailyReminderEnabled: false }, 0);
       const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderEnabled).toBe(false);
     });
 
     it('can disable reengagement', async () => {
-      await setNotificationPrefs({ reengagementEnabled: false });
+      await setNotificationPrefs({ reengagementEnabled: false }, 0);
       const prefs = await getNotificationPrefs();
       expect(prefs.reengagementEnabled).toBe(false);
     });
 
     it('can set custom reminder hour', async () => {
-      await setNotificationPrefs({ dailyReminderHour: 22 });
+      await setNotificationPrefs({ dailyReminderHour: 22 }, 0);
       const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderHour).toBe(22);
     });
 
     it('persists to storage', async () => {
-      await setNotificationPrefs({ dailyReminderHour: 15 });
+      await setNotificationPrefs({ dailyReminderHour: 15 }, 0);
       expect(AsyncStorage.setItem).toHaveBeenCalled();
     });
 
     it('overwrites previous prefs', async () => {
-      await setNotificationPrefs({ dailyReminderHour: 10 });
-      await setNotificationPrefs({ dailyReminderHour: 14 });
+      await setNotificationPrefs({ dailyReminderHour: 10 }, 0);
+      await setNotificationPrefs({ dailyReminderHour: 14 }, 0);
       const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderHour).toBe(14);
     });
@@ -131,7 +132,7 @@ describe('notifications', () => {
         dailyReminderEnabled: false,
         reengagementEnabled: false,
         dailyReminderHour: 7,
-      });
+      }, 0);
       const prefs = await getNotificationPrefs();
       expect(prefs.dailyReminderEnabled).toBe(false);
       expect(prefs.reengagementEnabled).toBe(false);
@@ -256,6 +257,49 @@ describe('notifications', () => {
   });
 
   // ===========================================================================
+  // getEarlyReminderMessage (pre-daily-unlock come-back copy)
+  // ===========================================================================
+
+  describe('getEarlyReminderMessage', () => {
+    it('returns a non-empty message at each phase', () => {
+      for (let phase = 0; phase <= 5; phase++) {
+        const message = getEarlyReminderMessage(phase);
+        expect(typeof message).toBe('string');
+        expect(message.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('clamps out-of-bounds phases', () => {
+      expect(() => getEarlyReminderMessage(-1)).not.toThrow();
+      expect(() => getEarlyReminderMessage(99)).not.toThrow();
+      expect(getEarlyReminderMessage(-1).length).toBeGreaterThan(0);
+      expect(getEarlyReminderMessage(99).length).toBeGreaterThan(0);
+    });
+
+    it('never advertises the daily challenge and contains no em dashes', () => {
+      // Sample repeatedly (messages are random) across every phase: the whole
+      // point of this copy is to never mention a daily the player can't open,
+      // and player-facing text must never carry em dashes.
+      for (let phase = 0; phase <= 5; phase++) {
+        for (let i = 0; i < 20; i++) {
+          const message = getEarlyReminderMessage(phase);
+          expect(message).not.toMatch(/daily/i);
+          expect(message).not.toMatch(/[—–]/);
+        }
+      }
+    });
+
+    it('phase 0 copy stays warm and bright', () => {
+      for (let i = 0; i < 20; i++) {
+        const message = getEarlyReminderMessage(0);
+        expect(message).not.toContain('void');
+        expect(message).not.toContain('arrangement');
+        expect(message).not.toContain('cold');
+      }
+    });
+  });
+
+  // ===========================================================================
   // scheduleAllNotifications
   // ===========================================================================
 
@@ -265,7 +309,7 @@ describe('notifications', () => {
     });
 
     it('respects disabled master toggle', async () => {
-      await setNotificationPrefs({ enabled: false });
+      await setNotificationPrefs({ enabled: false }, 0);
       // Should not throw even if module missing
       await expect(scheduleAllNotifications(0)).resolves.not.toThrow();
     });
@@ -331,7 +375,7 @@ describe('notifications', () => {
 
   describe('resetNotificationPrefs', () => {
     it('clears stored preferences', async () => {
-      await setNotificationPrefs({ enabled: false, dailyReminderHour: 22 });
+      await setNotificationPrefs({ enabled: false, dailyReminderHour: 22 }, 0);
       await resetNotificationPrefs();
       const prefs = await getNotificationPrefs();
       expect(prefs.enabled).toBe(true);
@@ -349,7 +393,7 @@ describe('notifications', () => {
         dailyReminderEnabled: false,
         dailyReminderHour: 23,
         reengagementEnabled: false,
-      });
+      }, 0);
       await resetNotificationPrefs();
 
       const prefs = await getNotificationPrefs();
@@ -432,14 +476,20 @@ describe('notifications', () => {
     });
 
     // Classify scheduled notifications by their trigger HOUR. Daily reminders
-    // fire at the configured reminder hour (default 9), win-back rungs at
-    // 18:00, streak-risk at 19:00. This is more robust than fixed call
-    // counts/indices now that both ladders pre-arm multiple one-shots.
-    function scheduledTriggers(): { hour: number; date: Date; body: string; data: any }[] {
+    // fire at the configured reminder hour (default 9), quest-expiry at 17:30,
+    // win-back rungs at 18:00, streak-risk at 19:00. This is more robust than
+    // fixed call counts/indices now that both ladders pre-arm multiple one-shots.
+    function scheduledTriggers(): { hour: number; minute: number; date: Date; body: string; data: any }[] {
       return (expoMock.scheduleNotificationAsync.mock.calls as any[][]).map((c) => {
         const arg = c[0];
         const date: Date = arg.trigger.date;
-        return { hour: date.getHours(), date, body: arg.content.body as string, data: arg.content.data };
+        return {
+          hour: date.getHours(),
+          minute: date.getMinutes(),
+          date,
+          body: arg.content.body as string,
+          data: arg.content.data,
+        };
       });
     }
 
@@ -497,7 +547,9 @@ describe('notifications', () => {
 
     it('every scheduled notification carries a tap-routing data payload', async () => {
       const svc = loadWithStatus('granted');
-      await svc.scheduleAllNotifications(0);
+      // Phase 2: the Daily Challenge is unlocked (phase >= 1), so the morning
+      // ladder routes to the daily. The locked case is covered separately below.
+      await svc.scheduleAllNotifications(2);
 
       const triggers = scheduledTriggers();
       expect(triggers.length).toBeGreaterThan(0);
@@ -522,19 +574,35 @@ describe('notifications', () => {
 
       await svc.scheduleAllNotifications(2);
 
-      // The quest ping targets the upcoming Sunday 18:00; if that window has
-      // already passed this week (test running Sunday evening), it is skipped.
+      // The quest ping targets the upcoming Sunday 17:30 (staggered off the
+      // 18:00 win-back rungs); if that window has already passed this week
+      // (test running Sunday evening), it is skipped.
       const now = new Date();
       let daysUntilMonday = (1 - now.getDay() + 7) % 7;
       if (daysUntilMonday === 0) daysUntilMonday = 7;
       const nextMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysUntilMonday);
-      const questTrigger = new Date(nextMonday.getTime() - 6 * 60 * 60 * 1000);
+      const questTrigger = new Date(nextMonday.getTime() - 6.5 * 60 * 60 * 1000);
       const questEligible = questTrigger.getTime() > now.getTime();
 
-      // 18:00 pings = 5 win-back rungs + the quest-expiry ping (when eligible).
-      const evening = scheduledTriggers().filter((t) => t.hour === 18);
-      expect(evening.length).toBe(questEligible ? 6 : 5);
+      const triggers = scheduledTriggers();
+      // 18:00 pings are the 5 win-back rungs ONLY — the quest ping no longer
+      // shares their minute.
+      const evening = triggers.filter((t) => t.hour === 18);
+      expect(evening.length).toBe(5);
       evening.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
+
+      // The quest-expiry ping fires at 17:30 with a home-routing payload.
+      const questPings = triggers.filter((t) => t.hour === 17 && t.minute === 30);
+      expect(questPings.length).toBe(questEligible ? 1 : 0);
+      questPings.forEach((t) => expect(t.data).toEqual({ target: 'home' }));
+
+      // Same-minute collision guard: no two scheduled notifications may ever
+      // land in the same minute (the old 18:00 quest ping could collide with a
+      // win-back rung on the same evening).
+      const minuteStamps = triggers.map(
+        (t) => `${t.date.getFullYear()}-${t.date.getMonth()}-${t.date.getDate()} ${t.hour}:${t.minute}`
+      );
+      expect(new Set(minuteStamps).size).toBe(minuteStamps.length);
 
       jest.dontMock('../services/weeklyQuests');
     });
@@ -650,6 +718,109 @@ describe('notifications', () => {
       expect(streakRisk.length).toBe(0);
 
       jest.dontMock('../services/amberCurrency');
+    });
+
+    // =========================================================================
+    // Daily reminder unlock gate: while the Daily Challenge is locked (< 8
+    // puzzles AND phase 0), the morning ladder still arms but carries generic
+    // come-back copy routed home, never "your daily puzzle is ready".
+    // =========================================================================
+
+    function loadGrantedWithProgress(progress: Record<string, unknown>) {
+      expoMock = createExpoMock('granted');
+      jest.resetModules();
+      jest.doMock('expo-notifications', () => expoMock, { virtual: true });
+      jest.doMock('../services/amberCurrency', () => ({
+        getFullProgress: jest.fn(() => Promise.resolve(progress)),
+      }));
+      return require('../services/notifications');
+    }
+
+    it('routes the morning ladder HOME with generic copy while the daily is locked', async () => {
+      // 4 puzzles at phase 0: past the permission prompt (3rd win) but well
+      // short of the daily unlock (8 puzzles / phase 1).
+      const svc = loadGrantedWithProgress({ currentStreak: 0, lastPlayDate: null, puzzlesSolved: 4 });
+
+      // Pin message selection to the first entry of each pool so bodies are
+      // exactly comparable.
+      const realRandom = Math.random;
+      Math.random = () => 0;
+      let expectedBody = '';
+      try {
+        await svc.scheduleAllNotifications(0);
+        expectedBody = svc.getEarlyReminderMessage(0);
+      } finally {
+        Math.random = realRandom;
+      }
+
+      const morning = scheduledTriggers().filter((t) => t.hour === 9);
+      expect(morning.length).toBeGreaterThanOrEqual(7);
+      for (const t of morning) {
+        expect(t.data).toEqual({ target: 'home' });
+        expect(t.body).toBe(expectedBody);
+        expect(t.body).not.toMatch(/daily/i);
+      }
+
+      jest.dontMock('../services/amberCurrency');
+    });
+
+    it('routes the morning ladder to the DAILY once unlocked by puzzle count (still phase 0)', async () => {
+      const svc = loadGrantedWithProgress({ currentStreak: 0, lastPlayDate: null, puzzlesSolved: 12 });
+
+      const realRandom = Math.random;
+      Math.random = () => 0;
+      let expectedBody = '';
+      try {
+        await svc.scheduleAllNotifications(0);
+        expectedBody = svc.getNotificationMessage('daily', 0);
+      } finally {
+        Math.random = realRandom;
+      }
+
+      const morning = scheduledTriggers().filter((t) => t.hour === 9);
+      expect(morning.length).toBeGreaterThanOrEqual(7);
+      for (const t of morning) {
+        expect(t.data).toEqual({ target: 'daily' });
+        expect(t.body).toBe(expectedBody);
+      }
+
+      jest.dontMock('../services/amberCurrency');
+    });
+
+    it('routes the morning ladder to the DAILY when phase >= 1 regardless of puzzle count', async () => {
+      const svc = loadGrantedWithProgress({ currentStreak: 0, lastPlayDate: null, puzzlesSolved: 0 });
+
+      await svc.scheduleAllNotifications(2);
+
+      const morning = scheduledTriggers().filter((t) => t.hour === 9);
+      expect(morning.length).toBeGreaterThanOrEqual(7);
+      morning.forEach((t) => expect(t.data).toEqual({ target: 'daily' }));
+
+      jest.dontMock('../services/amberCurrency');
+    });
+
+    // =========================================================================
+    // setNotificationPrefs phase passthrough: toggling reminders in Settings
+    // must re-arm the ladder with the CALLER's phase, never Phase-0 copy.
+    // =========================================================================
+
+    it('setNotificationPrefs reschedules with the passed phase, not phase 0', async () => {
+      const svc = loadWithStatus('granted');
+
+      await svc.setNotificationPrefs({ enabled: true, dailyReminderEnabled: true }, 4);
+
+      const { getWinBackMessage } = require('../services/phaseNarrative');
+      const winBack = scheduledTriggers().filter((t) => t.hour === 18);
+      expect(winBack.map((t) => t.body)).toEqual([
+        getWinBackMessage(4, 1),
+        getWinBackMessage(4, 2),
+        getWinBackMessage(4, 3),
+        getWinBackMessage(4, 4),
+        getWinBackMessage(4, 5),
+      ]);
+      // Phase-4 copy on rung 1 is the reverent register — proof the phase
+      // flowed through instead of the old hardcoded 0.
+      expect(winBack[0].body).toContain('arrangement is incomplete');
     });
   });
 });

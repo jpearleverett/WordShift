@@ -1,11 +1,16 @@
 /**
  * Centralized game balance constants for WordShift.
  *
- * ALL numeric tuning values that affect game economy, progression,
+ * Numeric tuning values that affect game economy, progression,
  * puzzle generation, and narrative pacing live here. When a designer
- * wants to tweak "how many puzzles until Phase 2?", "how much amber
- * for a streak freeze?", or "how long before a word can repeat?",
- * this is the single file to edit.
+ * wants to tweak "how many puzzles until Phase 2?" or "how much amber
+ * for a streak freeze?", this is the first file to check.
+ *
+ * Known exceptions (live values owned elsewhere — keep them there):
+ * - Word cooldown/diversity tuning lives in services/wordHistory.ts
+ *   (HARD_COOLDOWN / SOFT_COOLDOWN / MAX_HISTORY_SIZE).
+ * - The daily-challenge streak-freeze interval lives in
+ *   services/dailyChallenge.ts (DAILY_FREE_FREEZE_INTERVAL_DAYS).
  *
  * DO NOT put UI layout values, color palettes, or animation curves
  * here — those belong in theme/ or component-level constants.
@@ -37,7 +42,7 @@ export const PHASE_THRESHOLDS = [0, 20, 65, 150, 235];
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
   1: 15,
-  2: 55,
+  2: 40, // Pacing compression: accelerated players reach Deeper Questions inside week one (weighted PHASE_THRESHOLDS unchanged)
   3: 135,
   4: 155, // The Horizon — the cult reveal, just after the house completes
   5: 210, // Post-revelation — after house completion + final puzzle
@@ -88,9 +93,11 @@ export const PATRON_AMBER_BONUS = 2;
 // ============================================================================
 
 /**
- * Variable-ratio "lucky" amber bonus on a normal win — the one intentionally
- * non-deterministic reward in an otherwise fully predictable economy. On a small
- * fraction of standard victories the player gets a modest extra amber windfall,
+ * Variable-ratio "lucky" amber bonus on a win — the one intentionally
+ * non-deterministic reward in an otherwise fully predictable economy. Applies
+ * to EVERY victory past the onboarding window (standard, challenge, and daily
+ * alike — computeSurpriseBonus runs unconditionally in awardPuzzleAmber). On a
+ * small fraction of victories the player gets a modest extra amber windfall,
  * the unpredictable-reward lever that keeps "just one more puzzle" alive.
  *
  * IMPORTANT (hard rule, mirrors PATRON_AMBER_BONUS): this is additive to the
@@ -298,6 +305,14 @@ export const STREAK_FREEZE_COST = 50;
 /** Days between free streak freeze grants. */
 export const FREE_FREEZE_INTERVAL_DAYS = 14;
 
+/**
+ * Maximum banked main-streak freezes (purchased + free 14-day grants combined).
+ * Uncapped freezes were stackable into an effectively unbreakable streak, which
+ * hollows out the daily-habit tension the streak exists to create. Purchases
+ * refuse at the cap and the free grant simply waits until a freeze is consumed.
+ */
+export const STREAK_FREEZE_CAP = 3;
+
 /** Streak milestones that award one-time amber bonuses when crossed. */
 export const STREAK_MILESTONES: {
   streak: number;
@@ -419,19 +434,6 @@ export const DOUBLE_SHIFT_GENERATION_TIMEOUT = 5000;
 
 /** Minimum quality score for double shift puzzles. */
 export const DOUBLE_SHIFT_MIN_ACCEPTABLE_SCORE = 30;
-
-// ============================================================================
-// WORD HISTORY
-// ============================================================================
-
-/** Puzzles before a word can reappear (hard exclusion). */
-export const WORD_HARD_COOLDOWN = 15;
-
-/** Puzzles before freshness penalty fully decays. */
-export const WORD_SOFT_COOLDOWN = 40;
-
-/** Maximum number of puzzle groups tracked in word history. */
-export const WORD_MAX_HISTORY_SIZE = 100;
 
 // ============================================================================
 // PUZZLE BANK

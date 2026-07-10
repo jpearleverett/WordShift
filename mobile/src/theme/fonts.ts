@@ -89,45 +89,68 @@ export function installGlobalFont(): void {
   if (globalFontInstalled) return;
   globalFontInstalled = true;
 
-  const base = { fontFamily: SHANTELL_REGULAR };
-
-  const patch = (mod: { default?: unknown } | undefined): void => {
+  // Everything below touches PRIVATE React Native internals
+  // ('react-native/Libraries/...') that an RN minor bump is free to move or
+  // reshape. The entire patch is therefore layered in try/catch guards with a
+  // safe no-op fallback: if any step fails, we log a warning and boot
+  // continues on the system font (the explicit fontFamily aliases above still
+  // route all styled text to Shantell). This must NEVER be able to crash boot.
+  const warnPatchSkipped = (which: string, err: unknown): void => {
     try {
-      const Orig = mod?.default as
-        | (React.ComponentType<{ style?: unknown }> & { __fontWrapped?: boolean })
-        | undefined;
-      if (typeof Orig !== 'function' || Orig.__fontWrapped) return;
-
-      const Wrapped = (props: { style?: unknown }) =>
-        React.createElement(Orig, {
-          ...props,
-          style: [base, props?.style],
-        });
-      // Preserve statics (e.g. TextInput.State) and identity markers.
-      Object.assign(Wrapped, Orig);
-      (Wrapped as { __fontWrapped?: boolean }).__fontWrapped = true;
-      (Wrapped as { displayName?: string }).displayName = 'ShantellText';
-
-      mod!.default = Wrapped;
+      console.warn(
+        `[fonts] global ${which} font patch skipped (React Native internals changed?); ` +
+          'falling back to explicit fontFamily styles.',
+        err
+      );
     } catch {
-      // Non-fatal — explicit fontFamily aliases already route styled text.
+      // Even logging is best-effort.
     }
   };
 
-  // Metro only bundles a module it can see via a STATIC require('literal'); a
-  // dynamic require(variable) is rejected at transform time ("Invalid call").
-  // So require each Text module by its literal path and hand the module object
-  // to patch(). Each require is guarded in case the internal path ever moves.
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    patch(require('react-native/Libraries/Text/Text'));
-  } catch {
-    // Non-fatal.
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    patch(require('react-native/Libraries/Components/TextInput/TextInput'));
-  } catch {
-    // Non-fatal.
+    const base = { fontFamily: SHANTELL_REGULAR };
+
+    const patch = (mod: { default?: unknown } | undefined, which: string): void => {
+      try {
+        const Orig = mod?.default as
+          | (React.ComponentType<{ style?: unknown }> & { __fontWrapped?: boolean })
+          | undefined;
+        if (typeof Orig !== 'function' || Orig.__fontWrapped) return;
+
+        const Wrapped = (props: { style?: unknown }) =>
+          React.createElement(Orig, {
+            ...props,
+            style: [base, props?.style],
+          });
+        // Preserve statics (e.g. TextInput.State) and identity markers.
+        Object.assign(Wrapped, Orig);
+        (Wrapped as { __fontWrapped?: boolean }).__fontWrapped = true;
+        (Wrapped as { displayName?: string }).displayName = 'ShantellText';
+
+        mod!.default = Wrapped;
+      } catch (err) {
+        warnPatchSkipped(which, err);
+      }
+    };
+
+    // Metro only bundles a module it can see via a STATIC require('literal'); a
+    // dynamic require(variable) is rejected at transform time ("Invalid call").
+    // So require each Text module by its literal path and hand the module object
+    // to patch(). Each require is guarded in case the internal path ever moves.
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      patch(require('react-native/Libraries/Text/Text'), 'Text');
+    } catch (err) {
+      warnPatchSkipped('Text', err);
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      patch(require('react-native/Libraries/Components/TextInput/TextInput'), 'TextInput');
+    } catch (err) {
+      warnPatchSkipped('TextInput', err);
+    }
+  } catch (err) {
+    // Outer belt-and-braces guard: no failure mode in the patch may escape.
+    warnPatchSkipped('Text/TextInput', err);
   }
 }
