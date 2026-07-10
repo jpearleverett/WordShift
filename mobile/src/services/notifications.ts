@@ -337,9 +337,10 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
 
   // Win-back ladder. Players with an active streak hear about the streak
   // first (this/next evening), then the win-back ladder starts a day later;
-  // everyone else starts the ladder tomorrow. Rungs escalate at +1, +3 and
-  // +7 days. Each app session reschedules, so these only fire on days the
-  // player actually missed — an active player never sees a win-back.
+  // everyone else starts the ladder tomorrow. Rungs escalate per
+  // WIN_BACK_RUNG_OFFSETS (+1/+3/+7/+14/+30 days). Each app session
+  // reschedules, so these only fire on days the player actually missed — an
+  // active player never sees a win-back.
   if (prefs.reengagementEnabled) {
     const streak = await getCurrentStreakSafe();
     // Streak-risk only fires when genuinely at risk: a real streak (>= 2) that

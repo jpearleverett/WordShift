@@ -199,6 +199,7 @@ export function getDailyRamp(dateStr?: string): {
 const DAILY_HOST_ORDER = [
   'fox', 'pangolin', 'owl', 'axolotl', 'capybara',
   'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda',
+  'tarsier', 'aye_aye', 'kakapo',
 ] as const;
 
 // Canonical animal display names (kept local so dailyChallenge doesn't depend on
@@ -206,7 +207,8 @@ const DAILY_HOST_ORDER = [
 const DAILY_HOST_NAMES: Record<string, string> = {
   fox: 'Ember', pangolin: 'Panko', owl: 'Archimedes', axolotl: 'Axel',
   capybara: 'Chill', fennec_fox: 'Fennick', sloth: 'Sloane', wombat: 'Warren',
-  rabbit: 'Thyme', red_panda: 'Bamboo',
+  rabbit: 'Thyme', red_panda: 'Bamboo', tarsier: 'Vesper', aye_aye: 'Tock',
+  kakapo: 'Moss',
 };
 
 /**

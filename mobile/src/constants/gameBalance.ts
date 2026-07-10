@@ -36,8 +36,9 @@ export const PHASE_THRESHOLDS = [0, 20, 65, 150, 235];
  * (post-revelation) floors are deliberately reachable — the entire narrative
  * payoff lives there, so an engaged player must be able to arrive at the
  * climax in a single committed playthrough rather than ~225-300 puzzles.
- * House-building still completes (~puzzle 130) before Phase 4, and Phase 5
- * still lands comfortably after the Phase 4 dread window + final puzzle.
+ * House-building completes at the puzzle-190 gate (descent trio), just before
+ * the finale, and Phase 5 still lands comfortably after the Phase 4 dread
+ * window + final puzzle.
  */
 export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
@@ -570,10 +571,12 @@ export const MILESTONE_BONUSES: {
   { puzzles: 100, amber: 150, message: 'Century milestone!', darkMessage: 'One hundred arrangements completed.', dreadMessage: 'The arrangement grows. One hundred offerings.' },
   { puzzles: 110, amber: 75, message: 'Double digits!', darkMessage: 'The house stirs.', dreadMessage: 'One hundred ten threads woven into the pattern.' },
   { puzzles: 125, amber: 100, message: 'Halfway to mastery!', darkMessage: 'The house feels heavier. Fuller.', dreadMessage: 'One hundred twenty-five incantations. The walls listen.' },
-  // Mid-game valley beats (~130–170): the house finishes around puzzle 130 but the
-  // Phase 4 reveal doesn't land until ~155, leaving a stretch with no new unlocks.
-  // These keep the amber faucet pulsing through that gap so the climb to the climax
-  // never feels rewardless. Kept modest so they don't outpace the room-upgrade sink.
+  // Mid-game valley beats (~130–170): the pre-descent-trio house rooms finish
+  // unlocking around here while the Phase 4 reveal doesn't land until ~155,
+  // leaving a stretch with fewer new unlocks (the trio's 150/170/190 gates thin
+  // it but don't fill it). These keep the amber faucet pulsing through that gap
+  // so the climb to the climax never feels rewardless. Kept modest so they
+  // don't outpace the room-upgrade sink.
   { puzzles: 135, amber: 90, message: 'The house is whole!', darkMessage: 'The last room is built. The house is whole... and quiet.', dreadMessage: 'The house is complete. Now it waits, with you, for what comes.' },
   { puzzles: 145, amber: 110, message: 'Going strong!', darkMessage: 'Every room is full, yet something still feels unfinished.', dreadMessage: 'The walls are full. The space between them is not.' },
   { puzzles: 150, amber: 200, message: 'Dedicated player!', darkMessage: 'The letters rearrange themselves for you now.', dreadMessage: 'One hundred fifty words offered to the pattern.' },

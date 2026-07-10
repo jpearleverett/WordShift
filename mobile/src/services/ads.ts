@@ -252,7 +252,8 @@ export function shouldShowInterstitial(params: {
  * monetizes the stickiest traffic, while Phase 3+ stays exempt to protect the
  * dread arc, the ceremonies, and the serene endgame (the same tonal-protection
  * rationale as shouldShowInterstitial, which independently suppresses Phase 4+
- * entirely and doubles the gap at Phase 3). Not yet wired into App.tsx.
+ * entirely and doubles the gap at Phase 3). Wired into App.tsx's
+ * maybeShowVictoryInterstitial daily-exemption term.
  */
 export function isDailyInterstitialAllowed(phase: number): boolean {
   return phase <= 2;
