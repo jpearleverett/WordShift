@@ -278,7 +278,7 @@ function drawFrameMaster(w, h, pal, kind) {
   const woodRows = kind === 'panel' ? 3 : 1;
   const g = new Grid(w, h);
   const { depth, inside } = ringDepth(w, h, (x, y) => insideSteppedRect(x, y, w, h, runs));
-  const P = pal.parch, W = pal.wood, A = pal.accent;
+  const P = pal.parch, W = pal.wood;
   // Ring layout v2 (the "more texture, more color" pass):
   //   0 outline | 1 rim | wood rows | seam | ACCENT INLAY (panel) |
   //   parchment transition | graded vignette | fill
@@ -290,9 +290,6 @@ function drawFrameMaster(w, h, pal, kind) {
   // rings are parchment tones every ink stays >=4.5:1 on, so text may overlap
   // them freely.
   const seamRing = 2 + woodRows;
-  const accentRing = kind === 'panel' ? seamRing + 1 : -1;
-  const transRing = kind === 'panel' ? accentRing + 1 : seamRing + 1;
-  const vigRings = kind === 'panel' ? 2 : 1;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x;
     if (!inside[i]) continue;
@@ -312,27 +309,13 @@ function drawFrameMaster(w, h, pal, kind) {
       continue;
     }
     if (d === seamRing) { g.set(x, y, W.seam); continue; }
-    if (d === accentRing) {
-      // Painted inlay: lit on the top/left run, shaded bottom/right — reads
-      // as a carved groove filled with the skin's second hue.
-      g.set(x, y, side === 'top' || side === 'left' ? A.main : A.lo);
-      continue;
-    }
-    if (d === transRing) {
-      g.set(x, y, side === 'top' || side === 'left' ? P.shadow : P.hi);
-      continue;
-    }
-    if (d <= transRing + vigRings) {
-      // Graded vignette: the paper darkens softly toward the frame on the lit
-      // sides, giving the flat center a lit-parchment depth.
-      const k = d - transRing; // 1..vigRings
-      if (side === 'top' || side === 'left') {
-        g.set(x, y, k === 1 ? P.vig1 : P.vig2);
-      } else {
-        g.set(x, y, kind === 'card' ? P.dim : P.base);
-      }
-      continue;
-    }
+    // v3 (player feedback): everything inside the seam is PLAIN FILL. The v2
+    // painted accent inlay, parchment transition shading, and graded vignette
+    // each rendered as distinct 1-art-px (3dp) runs that read on device as
+    // stray thin colored lines inside panels and down card edges — not as
+    // texture. The ring budget (strip thickness) is unchanged; the inner
+    // decorative rings are simply painted the fill tone so edge strips blend
+    // seamlessly into the NineSliceFrame center fill (fill/fillCard exports).
     g.set(x, y, kind === 'card' ? P.dim : P.base);
   }
   if (kind === 'panel') {
@@ -360,15 +343,9 @@ function drawFrameMaster(w, h, pal, kind) {
         if (cur) g.set(dx + k, dy, W.mid);
       }
     }
-  } else {
-    // Card corner stitch: a 2-px accent tick in each corner's wood — the
-    // quiet version of the panel's inlay ring, so list rows carry a hint of
-    // the skin's second hue without a full loud trim.
-    const stitches = [[3, 3], [w - 4, 3], [3, h - 4], [w - 4, h - 4]];
-    for (const [sx, sy] of stitches) {
-      if (g.get(sx, sy)) g.set(sx, sy, A.main);
-    }
   }
+  // (v3: the card corner accent stitches were removed with the inlay ring —
+  // at device scale they read as stray colored pixels, not trim.)
   return g;
 }
 
@@ -394,10 +371,8 @@ function drawButtonMaster(w, h, pal, colors, pressed) {
       else if (fromBottom <= 3) c = colors.lo;
       else if (x === 1 || (depth[i] === 1 && nearestSide(x, y, w, h) === 'left')) c = colors.hi2;
       else if (x === w - 2 || (depth[i] === 1 && nearestSide(x, y, w, h) === 'right')) c = colors.lo;
-      // Candy glint: a 2-px sparkle in the top-left cap (fixed caps only —
-      // never in the stretched middle column band).
-      else if ((x === 3 && fromTop === 3) || (x === 4 && fromTop === 3)) c = colors.hi;
-      else if (x === 3 && fromTop === 4) c = colors.hi2;
+      // (v3: the 2-px candy glint in the top-left cap was removed — at device
+      // scale it read as a stray tick mark near the button's end, not shine.)
     } else {
       // pressed: light falls into the socket — dark lip at top, shallow base
       if (fromTop === 1) c = colors.lo;
@@ -428,7 +403,8 @@ function drawPlaqueMaster(w, h, pal) {
     const fromTop = y, fromBottom = h - 1 - y;
     let c = pal.plaque.face;
     if (fromTop === 1) c = pal.plaque.rim;
-    else if (fromBottom === 2) c = pal.accent.lo; // painted carve line above the base shadow
+    // (v3: the accent carve line above the base shadow rendered as a stray
+    // green/blue horizontal hairline under every plaque — removed.)
     else if (fromBottom === 1) c = pal.plaque.lo;
     g.set(x, y, c);
   }

@@ -5,12 +5,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
+  Image,
 } from 'react-native';
 import { CandyColors } from '../theme/colors';
 import { BODY_FONT, PIXEL_FONT_BOLD } from '../theme/fonts';
 import { getDailyStatus } from '../services/dailyChallenge';
 import { Difficulty } from '../types';
 import { getSettingsSync } from '../services/settings';
+
+// Same flame sprite as the header streak pill — the badge is the DAILY streak
+// count, and the flame keeps it from reading as an unread-notification count.
+const FLAME_ICON = require('../../assets/ui/flame.png');
 
 interface DailyChallengeCardProps {
   onStartDaily: (difficulty: Difficulty) => void;
@@ -186,12 +191,14 @@ export const DailyChallengeCard: React.FC<DailyChallengeCardProps> = ({
           <Text style={styles.calendarIcon}>📅</Text>
         )}
 
-        {/* Streak badge */}
+        {/* Daily-streak badge (flame + count, mirroring the header streak
+            pill; a bare number here read as a notification count) */}
         {streak > 1 && (
           <View style={[
             styles.streakBadge,
             phase >= 3 && { backgroundColor: '#8B4513' },
           ]}>
+            <Image source={FLAME_ICON} style={styles.streakBadgeFlame} />
             <Text style={styles.streakBadgeText}>{streak}</Text>
           </View>
         )}
@@ -249,14 +256,20 @@ const styles = StyleSheet.create({
   streakBadge: {
     position: 'absolute',
     top: -4,
-    right: -4,
+    right: -6,
     backgroundColor: CandyColors.orange.main,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 3,
+  },
+  streakBadgeFlame: {
+    width: 9,
+    height: 9,
+    marginRight: 1,
   },
   streakBadgeText: {
     fontFamily: PIXEL_FONT_BOLD,

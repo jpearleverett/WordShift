@@ -249,7 +249,9 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
 // Tuned from player feedback: pangolin/owl previously sat 3px too low (feet
 // stepped just past the room's bottom edge), so their offsets were eased back.
 const FLOOR_OFFSET: Record<AnimalType, number> = {
-  red_panda: 0,
+  // Bamboo's art carries 24% bottom padding in its frame — identical to the
+  // owl's (measured lowest-opaque-row), so he takes the owl's tuned offset.
+  red_panda: 15,
   axolotl: 0, // lives in the tank — placement handled by the water, leave as-is
   pangolin: 11,
   sloth: 0,
