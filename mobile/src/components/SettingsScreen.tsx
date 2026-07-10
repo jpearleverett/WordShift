@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
-  Alert,
   Linking,
   Modal,
   TextInput,
@@ -20,6 +19,7 @@ import * as Updates from 'expo-updates';
 import * as Application from 'expo-application';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getOrCreateRecoveryCode, linkRecoveryCode, downloadFromCloud, clearSyncStatus, uploadToCloud } from '../services/cloudSave';
+import { showGameAlert } from '../services/gameAlert';
 import { SURFACE, getSurfaceTheme } from '../theme/surfaces';
 import { PanelCard } from './ui/PanelCard';
 import { PixelPlaque } from './ui/PixelPlaque';
@@ -308,14 +308,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       const patron = isPatronSync();
       const adFree = isAdFreeSync();
       if (patron) {
-        Alert.alert('Purchases Restored', 'Welcome back. Your Patron benefits are active again.');
+        showGameAlert('Purchases Restored', 'Welcome back. Your Patron benefits are active again.');
       } else if (adFree) {
-        Alert.alert('Purchases Restored', 'Your ad-free purchase has been restored.');
+        showGameAlert('Purchases Restored', 'Your ad-free purchase has been restored.');
       } else {
-        Alert.alert('Restore Purchases', 'No previous purchases were found for this store account.');
+        showGameAlert('Restore Purchases', 'No previous purchases were found for this store account.');
       }
     } catch {
-      Alert.alert('Restore Purchases', "We couldn't reach the store. Please try again in a moment.");
+      showGameAlert('Restore Purchases', "We couldn't reach the store. Please try again in a moment.");
     } finally {
       setPurchaseRestoreBusy(false);
     }
@@ -327,7 +327,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
       const code = await getOrCreateRecoveryCode();
       setRecoveryCode(code);
     } catch {
-      Alert.alert('Backup', 'Could not generate a recovery code right now.');
+      showGameAlert('Backup', 'Could not generate a recovery code right now.');
     }
   };
 
@@ -338,19 +338,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
     try {
       const linked = await linkRecoveryCode(code);
       if (!linked) {
-        Alert.alert('Restore', "That code doesn't look right. Check it and try again.");
+        showGameAlert('Restore', "That code doesn't look right. Check it and try again.");
         return;
       }
       const restored = await downloadFromCloud();
       setShowRestore(false);
       setRestoreInput('');
       if (restored) {
-        Alert.alert('Restored', 'Your progress was restored. The app will use it from now on.');
+        showGameAlert('Restored', 'Your progress was restored. The app will use it from now on.');
       } else {
-        Alert.alert('Restore', 'No saved progress was found for that code yet.');
+        showGameAlert('Restore', 'No saved progress was found for that code yet.');
       }
     } catch {
-      Alert.alert('Restore', 'Something went wrong restoring your progress.');
+      showGameAlert('Restore', 'Something went wrong restoring your progress.');
     } finally {
       setRestoreBusy(false);
     }
@@ -374,7 +374,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
 
   const handleNewCycle = () => {
     hapticLight();
-    Alert.alert(
+    showGameAlert(
       getNewCycleTitle(),
       getNewCycleDescription(),
       [
@@ -388,7 +388,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             } catch {
               // Expo Go / dev: reload throws. The reset is committed to storage;
               // ask the player to restart so the fresh cycle loads cleanly.
-              Alert.alert('The pattern turns', 'Restart WordShift to begin again.', [
+              showGameAlert('The pattern turns', 'Restart WordShift to begin again.', [
                 { text: 'OK', onPress: onClose },
               ]);
             }
@@ -401,13 +401,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   const handleBuyStreakFreeze = () => {
     hapticLight();
     if (amberBalance < STREAK_FREEZE_AMBER_COST) {
-      Alert.alert(
+      showGameAlert(
         'Not enough amber',
         `A streak freeze costs ${STREAK_FREEZE_AMBER_COST} amber. Solve a few more puzzles and come back.`
       );
       return;
     }
-    Alert.alert(
+    showGameAlert(
       'Buy Streak Freeze',
       `Spend ${STREAK_FREEZE_AMBER_COST} amber for a streak freeze? It automatically protects your streak the next time you miss a day.`,
       [
@@ -418,9 +418,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             const ok = await purchaseStreakFreeze();
             await refreshStreakFreeze();
             if (ok) {
-              Alert.alert('Streak Freeze Ready', 'Your streak is now protected against one missed day.');
+              showGameAlert('Streak Freeze Ready', 'Your streak is now protected against one missed day.');
             } else {
-              Alert.alert('Not enough amber', 'Purchase could not be completed.');
+              showGameAlert('Not enough amber', 'Purchase could not be completed.');
             }
           },
         },
@@ -455,7 +455,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
   };
 
   const handleResetData = () => {
-    Alert.alert(
+    showGameAlert(
       'Reset All Data',
       'This will reset all your progress, achievements, and statistics. This cannot be undone.',
       [
@@ -477,7 +477,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ phase, onClose, 
             // reloadAsync throws in Expo Go / dev; there onReset lets App.tsx
             // rebuild its in-memory session (persistence, puzzle board, victory
             // state, onboarding) so the reset is real without a process restart.
-            Alert.alert(
+            showGameAlert(
               'Reset Complete',
               'WordShift will restart and replay the intro.',
               [

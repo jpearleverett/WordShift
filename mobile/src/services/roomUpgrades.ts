@@ -105,6 +105,27 @@ export const ROOM_UPGRADES: RoomUpgrade[] = [
     cost: 150,
     darkDescription: 'The lanterns float higher when you\'re not looking.',
   },
+  {
+    roomId: 'star_loft',
+    name: "Moth Lantern",
+    description: "A glass lantern hung unlit at the rail. The moths circle it anyway.",
+    cost: 150,
+    darkDescription: "Some nights the lantern glows without being lit. The moths never touch the glass.",
+  },
+  {
+    roomId: 'belfry',
+    name: "Chalk Circles",
+    description: "Small neat chalk rings mark the skirting boards. Tock says every good survey deserves a fair copy.",
+    cost: 150,
+    darkDescription: "The circles are rounder in the mornings than they were the night before.",
+  },
+  {
+    roomId: 'sky_garden',
+    name: "Moonflower Bed",
+    description: "A bed of pale flowers that open only for the moon.",
+    cost: 150,
+    darkDescription: "The moonflowers open at noon now, all facing straight up.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -175,6 +196,24 @@ export const ROOM_DEEPENINGS: RoomUpgrade[] = [
     roomId: 'bamboo_attic',
     name: 'Risen Lanterns',
     description: 'The lanterns hold near the rafters now, steady, like they\'re waiting. Bamboo is at peace with it.',
+    cost: 300,
+  },
+  {
+    roomId: 'star_loft',
+    name: "The Lit Hour",
+    description: "The lantern burns one hour a night now, on its own schedule. Vesper watches it the way she watches everything. Completely.",
+    cost: 300,
+  },
+  {
+    roomId: 'belfry',
+    name: "Waking Bronze",
+    description: "The bell hums at dawn now, unstruck. Tock says she is only clearing her throat.",
+    cost: 300,
+  },
+  {
+    roomId: 'sky_garden',
+    name: "Upturned Blooms",
+    description: "The moonflowers have stopped waiting for the moon. Moss thanks them each dusk for their patience.",
     cost: 300,
   },
 ];

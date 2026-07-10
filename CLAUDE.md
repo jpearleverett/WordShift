@@ -363,7 +363,7 @@ Ward marks: 7 circles hugging the pit opening's own ellipse (same radii + a smal
 
 Rooms and animals unlock alternately. Starting: empty Cozy Den + free Fox invite. Then: build Kitchen (50 amber) → invite Pangolin (100) → build Study (75) → invite Owl (100) → etc. Costs escalate for rooms (50-400), flat 100 for animals.
 
-Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`, homeWorldData.ts). The animal after each gated room follows immediately (sequential, no separate gate). The gates are **spread across the Phase 1→3 window** so the house — the primary mid-game investment object — keeps growing instead of completing by ~puzzle 85 and leaving the long climb to the Phase 4 climax (~puzzle 155) with no new unlocks. The final room lands just before Phase 3 (threshold 135); after that, room upgrades + quests + the climax carry progression. Two guard tests in `homeWorldData.test.ts` pin this spread (strictly increasing gates; final gate ≥120 and < Phase 3 threshold) so it can't silently regress.
+Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`, homeWorldData.ts). The animal after each gated room follows immediately (sequential, no separate gate). The gates are **spread across the Phase 1→3 window and into Growing Shadows** so the house — the primary mid-game investment object — keeps growing all the way to the Phase 4 climax instead of completing early and leaving a long unlock drought. The last three rooms (the "descent trio": Star Loft/Belfry/Sky Garden, added in the 3-new-animals pass) land at 150/170/190, filling the old ~130–190 valley; house completion now arrives just before the finale. Guard tests in `homeWorldData.test.ts` pin this spread (strictly increasing gates; final-gate bounds) so it can't silently regress.
 | Gated room (then animal) | Min Puzzles |
 |--------|------------|
 | Jungle (Sloane the Sloth) | 28 |
@@ -372,6 +372,9 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 | Burrow (Warren the Wombat) | 82 |
 | Garden (Thyme the Rabbit) | 105 |
 | Bamboo Attic (Bamboo the Red Panda) | 130 |
+| Star Loft (Vesper the Tarsier) | 150 |
+| Belfry (Tock the Aye-aye) | 170 |
+| Sky Garden (Moss the Kakapo) | 190 |
 
 **Reserve-ahead (pay now, build at the gate):** the gates are tuned for a baseline earner, so a fast/skilled player (HARD + achievements + quests) reaches a gated room's amber cost well before its level gate and would otherwise sit on idle amber behind a wall. When the next unlock is blocked *only* by its puzzle gate and the player can afford it, they can **Reserve** it — `reserveNextUnlock` spends the amber up front and stores `reservedUnlockId` (on home progress); `claimReservedUnlockIfReady` (called from `HomeScreen.loadAllData`) commits the room for free the moment `puzzlesSolved` crosses `minPuzzles`, firing a celebration. Only the **immediate next** unlock can be reserved (one at a time, `canReserveUnlock`), so a rich player can stay one step ahead but can't pre-buy the whole house. The shop + room-unlock modals show gate/reserved copy via `getReserveGateText`/`getReservedArrivalText` (homeWorldData) — both include the player's current level ("Unlocks at level 42. You're at 35.") so progress-to-arrival is always visible; exact strings pinned in `homeWorldData.test.ts`. Reservation rides in `wordshift_home_progress` (cloud-synced; cleared by Reset All's `clearProgress`). Covered by `homeWorldData.test.ts`.
 
@@ -379,7 +382,7 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 
 **First-gate lore intro (one-time, Fox-led):** the first time a level-gated room actually *blocks* the player (the next unlock is a `type:'room'` with a `minPuzzles` gate and `puzzlesSolved < minPuzzles` — the Jungle Hammock at level 28 by default), a one-time HomeScreen intro fires (same `introOverrideLines` mechanism as the challenge/daily/journal intros): Fox explains the wait in-world (the house needs *time and words offered*, not just amber) and points at Reserve (set the amber aside now, it rises on its own) and Skip (press it to completion now for a little more). Copy from `getGatedRoomIntroLines(phase, roomName)` (phaseNarrative — never says "level"/"unlock"/"puzzle"; the modal's gate copy carries that). Gated by `hasSeenGatedUnlockIntro()`/`markGatedUnlockIntroSeen()` (`introContext: 'gated_room_intro'`); it fires only while the gate blocks (below `minPuzzles`) **and only once the player can afford to reserve the room** (`progress.amber >= cost`) — Reserve/Skip advice is noise before it's actionable, and firing at the moment the gate first appeared collided with the just-unlocked animal's own intro (the previous animal unlocks seconds before the gated room becomes next; the axolotl was delivering Fox's Reserve script). That race is also closed structurally: `useUnlockFlow`'s delayed character intro calls the `resetIntroOverrides` callback (clears `introOverrideLines`/`introContext`) before opening, so a HomeScreen one-time intro can never leak its script under a new animal's portrait. It fires whether the player is idling on home **or** has already opened the room's unlock modal (the intro dialogue at line ~2230 renders on top of the room-unlock modal at line ~1977, so dismissing it reveals the Reserve/Skip buttons underneath) — the blocking window can be brief (unlock the prior animal, immediately tap the gated room, reserve/skip), so it must not be suppressed while that modal is open. Key `wordshift_gated_unlock_intro_seen` is cloud-synced + cleared by Reset All. Covered by `gatedRoomIntro.test.ts`.
 
-### Animal Characters (10 total, in unlock order)
+### Animal Characters (13 total, in unlock order)
 
 | Animal | Name | Surface | Cult Role | Awareness Tier |
 |--------|------|---------|-----------|---------------|
@@ -393,14 +396,21 @@ Late room unlocks have puzzle-count gates (`minPuzzles` in `UNLOCK_PROGRESSION`,
 | Wombat | Warren | Grounded digger, burrow | Built the foundation | Lagging (-1) |
 | Rabbit | Thyme | Anxious, garden patio | Anxious because they understand | Lagging (-1) |
 | Red Panda | Bamboo | Zen, bamboo attic | Spiritual leader, at peace | Lagging (-1) |
+| Tarsier | Vesper | Unblinking night-watcher, star loft | The Witness, has already SEEN it between the stars | Vanguard (+1) |
+| Aye-aye | Tock | Tinkerer who taps for hollows, belfry | Diviner of thin places; the bell's one ring is for the arrival | Middle (=) |
+| Kakapo | Moss | Patient old caller, rooftop sky garden | The Caller; a lifetime of unanswered booming, finally answered | Lagging (-1) |
 
-**Awareness tiers**: Vanguard animals are +1 phase ahead, Lagging are -1 behind. `getAnimalPhase(globalPhase, animalType)` applies offset — and **clamps to 5 for ALL animals at global phase 5** (tiers stagger the descent, never the arrival). Narratively the lagging tier lags *publicly, not privately* — Sloane and Bamboo have always known; they simply speak late.
+The last three (the "descent trio", unlock gates 150/170/190) are late-game recruits: Bamboo recruited Vesper, Vesper recruited Tock, Tock recruited Moss — their catch-up arcs open with that chain. Tock's bell is canonically "she" (bell-founder tradition); the keeper generics stay he/him.
 
-**Canon pronouns** (established by in-dialogue references — keep consistent): Ember she/her, Panko she/her, Archimedes he/him, Axel he/him, Chill he/him, Fennick he/him, Sloane she/her, Warren he/him, Thyme she/her, Bamboo they/them.
+**Awareness tiers**: Vanguard animals are +1 phase ahead, Lagging are -1 behind. `getAnimalPhase(globalPhase, animalType)` applies offset — and **clamps to 5 for ALL animals at global phase 5** (tiers stagger the descent, never the arrival). Narratively the lagging tier lags *publicly, not privately* — Sloane, Bamboo, and Moss have always known; they simply speak late.
+
+**Canon pronouns** (established by in-dialogue references — keep consistent): Ember she/her, Panko she/her, Archimedes he/him, Axel he/him, Chill he/him, Fennick he/him, Sloane she/her, Warren he/him, Thyme she/her, Bamboo they/them, Vesper she/her, Tock he/him, Moss he/him.
+
+**Art status (descent trio)**: LANDED — `assets/characters/{tarsier,aye_aye,kakapo}/idle|talk|robed.png` (player-provided 1254² art, background flood-fill keyed from the borders + alpha-weighted box downscale to 500²; all three frames per animal share identical framing so the talk toggle never jumps) and `assets/rooms/{observatory,workshop,rainforest}.png` (1456×720 — the art's concept names; ROOM_BACKGROUNDS maps star_loft/belfry/sky_garden themes to them; the belfry art shows the workshop floor, the bell hangs out of frame up the tower). Kakapo (77%) and aye-aye (76%) subject heights exceed the axolotl/fennec compact threshold → both are in `COMPACT_DIALOGUE_SPRITES`; tarsier carries a measured `FLOOR_OFFSET: 8`.
 
 ### Dialogue System
 
-**1,340 base dialogues** (134 per animal, doubled in the dialogue-expansion pass; every line scored against a McKee-based dialogue rubric) + **200 post-revelation** (20 per animal) + **100 Phase-2 exhaustion-pool lines** (`PHASE2_EXTRA_DIALOGUES`, 10 per animal):
+**1,742 base dialogues** (134 per animal across 13 animals; every line scored against a McKee-based dialogue rubric) + **260 post-revelation** (20 per animal) + **130 Phase-2 exhaustion-pool lines** (`PHASE2_EXTRA_DIALOGUES`, 10 per animal):
 - Phase 0: 24, Phase 1: 28, Phase 2: 22 (incl. question-web hook), Phases 3-4: 30 each, Phase 5: 20 each. Each phase block is written as session-sized mini-chapters (3 lines/visit at Phases 0-1, 5 at Phases 2-3, 6 at Phase 4) with end-of-session hooks and continuing story threads. **Doubling shifted every phase-start index — dataMigration v4 (`remapDialogueIndexV4`) remaps saved `lastDialogueRead` values to the same (phase, offset) position; never resize a phase block without a companion migration.**
 - Counts are enforced by `configValidation.ts` (`EXPECTED_DIALOGUE_COUNTS_BY_PHASE`, `EXPECTED_PHASE2_EXTRA_PER_ANIMAL`=10) — update it when adding lines
 
@@ -434,7 +444,7 @@ The core system making puzzles feel like rituals:
 - **Named Incantations** (Phase 2+): Deterministic chain names. Phase 2: "The HEAT Dance". Phase 4: "Offering: VOID to DOOM".
 - **Ritual Energy**: Dread word presence scored 0-10. Each point adds 0.1 to `phaseProgress`. High-energy puzzles (7+) trigger micro-events.
 - **Word Ledger**: Scrollable screen of all formed words. Dread words highlighted at Phase 2+.
-- **Animal Whispers**: 250+ lines (5 per animal per phase). Prefers animals matching puzzle trigger words.
+- **Animal Whispers**: 325+ lines (5 per animal per phase, 13 animals). Prefers animals matching puzzle trigger words.
 - **Dread Word Visual Feedback** (Phase 2+): Crimson pulse overlay on dread word formation. Phase-scaled opacity (0.10 → 0.25).
 - **Arrangement Pattern** (Phase 2+): Visual sigil lines connecting rooms on house exterior.
 - **Room Word Echoes** (Phase 2+): Faint puzzle words scattered across room backgrounds.
@@ -506,7 +516,7 @@ One-time events at specific puzzle counts (`MICRO_BEATS` in `phaseNarrative.ts`,
 
 ## Endgame
 
-**House Completion**: All 10 rooms + animals → ceremony modal + cinematic event.
+**House Completion**: All 13 rooms + animals (counts derived from ROOMS/ANIMALS data, no hardcoded 10s) → ceremony modal + cinematic event, deferred until any open intro dialogue closes.
 **Final Puzzle**: After house completion + Phase 4, next puzzle triggers `FINAL_PUZZLE_EVENT`.
 **Post-Revelation (Phase 5)**: Next puzzle after final triggers `POST_REVELATION_EVENT` + `markPostRevelation()`, which **pins `currentPhase = 5`** (`updatePhase` respects the pin — `calculatePhase` caps at 4 and must never win; legacy post-revelation saves self-heal to 5 on load). Special victory text, 20 new dialogues per animal.
 
@@ -515,7 +525,7 @@ One-time events at specific puzzle counts (`MICRO_BEATS` in `phaseNarrative.ts`,
 The Phase-5 dead-end (no repeatable amber sink + verbatim-looping dialogue) is **resolved** by the Tending Shrine — a serene, soft-infinite, **cosmetic-only** amber sink (`src/services/tending.ts`).
 
 - **Loop:** at global phase 5 (post-revelation), a ✴ button in the Offering Pit header opens the Tending modal. The player spends amber to "deepen the pattern," advancing a **Tending Level** on an escalating cost curve (`getTendingCost`, `TENDING_*` in `gameBalance.ts`, capped 5,000) with a once-per-local-day discount (`getNextTendingInfo`, via `dateUtils`). The service does **not** spend — the pit calls `spendAmber(cost, 'tending')` then `applyTend(cost)` (mirrors `sacrifice`/`roomUpgrades`). Milestones (5/10/25/50/100) fire a serene ceremony.
-- **Honest, refreshing dialogue:** the Phase-5 branch of `useDialogueFlow` (and the home badge in `getAnimalsWithStatus`) now build a shared pool via `dialogue/phase5Pool.ts` (20 base post-rev lines + Phase-3 choice callback + unlocked Tending milestone lines). New lines deliver in order; once caught up, re-reads come in a **deterministic shuffled** order that **reshuffles each cycle** (`selectPhase5Dialogue` — no verbatim loop, no single repeating sequence). A per-animal `caughtUp` pointer (persisted in tending state) makes `hasNewDialogue` **honest**: lit only while undelivered lines remain, re-lit when a Tending milestone unlocks one. The Phase-5 session also never dead-ends at the last regular line (`hasMore` override in `useDialogueFlow`). ~50 milestone lines live in `dialogue/animalDialogueTending.ts` (5/animal), recorded to the Whisper Gallery.
+- **Honest, refreshing dialogue:** the Phase-5 branch of `useDialogueFlow` (and the home badge in `getAnimalsWithStatus`) now build a shared pool via `dialogue/phase5Pool.ts` (20 base post-rev lines + Phase-3 choice callback + unlocked Tending milestone lines). New lines deliver in order; once caught up, re-reads come in a **deterministic shuffled** order that **reshuffles each cycle** (`selectPhase5Dialogue` — no verbatim loop, no single repeating sequence). A per-animal `caughtUp` pointer (persisted in tending state) makes `hasNewDialogue` **honest**: lit only while undelivered lines remain, re-lit when a Tending milestone unlocks one. The Phase-5 session also never dead-ends at the last regular line (`hasMore` override in `useDialogueFlow`). ~65 milestone lines live in `dialogue/animalDialogueTending.ts` (5/animal), recorded to the Whisper Gallery.
 - **Cadence:** a Phase-5-gated `tend_amber` quest type (deliberately net-negative — a sink disguised as a quest) + an extended `MILESTONE_BONUSES` tail past 350.
 - **Hygiene:** `wordshift_tending` is in `cloudSave.SYNC_KEYS`; `clearTendingState` is in Settings → Reset All; covered by `tending.test.ts`.
 - **Visual deepening:** the world scales with Tending Level via `getTendingIntensity(level)` (sqrt curve, saturates ~level 50). The home Arrangement sigils (`ArrangementConnector` in HouseWorld) brighten/thicken/glow and the Offering Pit raises more rim embers + a warmer inner/core glow as the player tends (reduced-motion/device-tier gated, no new art). `HomeScreen` loads `tendingLevel` and threads it → `HouseWorld`; the pit reads its own `tendingLevel` state.

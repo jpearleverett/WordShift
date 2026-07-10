@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Difficulty } from '../types';
 import { CumulativeStats } from './starRating';
+import { ANIMALS, ROOMS } from './homeWorldData';
 
 const STORAGE_KEY = 'wordshift_achievements';
 
@@ -346,10 +347,10 @@ export const ACHIEVEMENTS: Achievement[] = [
     id: 'all_animals',
     rewardAmber: 75,
     title: 'Full House',
-    description: 'Invite all 10 animals',
+    description: 'Invite every animal',
     icon: '👑',
     category: 'collection',
-    check: (s) => s.unlockedAnimals >= 10,
+    check: (s) => s.unlockedAnimals >= ANIMALS.length,
   },
   {
     id: 'all_rooms',
@@ -358,7 +359,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Build all rooms',
     icon: '🏗️',
     category: 'collection',
-    check: (s) => s.unlockedRooms >= 10,
+    check: (s) => s.unlockedRooms >= ROOMS.length,
   },
   {
     id: 'amber_1000',

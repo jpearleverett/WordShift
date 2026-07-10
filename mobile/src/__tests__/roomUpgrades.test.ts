@@ -26,8 +26,8 @@ beforeEach(async () => {
 
 describe('room upgrade catalog', () => {
   it('has a tier-1 upgrade and a tier-2 deepening for every room (matched ids)', () => {
-    expect(ROOM_UPGRADES.length).toBe(10);
-    expect(ROOM_DEEPENINGS.length).toBe(10);
+    expect(ROOM_UPGRADES.length).toBe(13);
+    expect(ROOM_DEEPENINGS.length).toBe(13);
     const upgradeIds = ROOM_UPGRADES.map(u => u.roomId).sort();
     const deepeningIds = ROOM_DEEPENINGS.map(u => u.roomId).sort();
     expect(deepeningIds).toEqual(upgradeIds);

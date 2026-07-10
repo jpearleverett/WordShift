@@ -26,6 +26,20 @@ import {
   CosmeticCategory,
 } from '../../services/cosmetics';
 import { spendAmber } from '../../services/amberCurrency';
+import { getRoomsWithStatus } from '../../services/homeWorldData';
+import { Room, DialoguePhase } from '../../types/homeWorld';
+import {
+  areUpgradesAvailable,
+  areDeepeningsAvailable,
+  getRoomUpgrade,
+  getRoomDeepening,
+  getUpgradeDescription,
+  getPurchasedUpgrades,
+  getDeepenedRooms,
+  purchaseRoomUpgrade,
+  purchaseRoomDeepening,
+} from '../../services/roomUpgrades';
+import { logEvent } from '../../services/eventLogger';
 import {
   getShopTitle,
   getShopSubtitle,
@@ -108,6 +122,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
+  // House upgrades (tier-1 decorations + tier-2 deepenings), sold here
+  // alongside the cosmetics — amber sinks, expression only.
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
+  const [purchasedDeepenings, setPurchasedDeepenings] = useState<Record<string, number>>({});
+  const [houseFeedback, setHouseFeedback] = useState<string | null>(null);
+
   const tileThemes = useMemo(() => getCosmeticsByCategory('tile_theme'), []);
   const confettiThemes = useMemo(() => getCosmeticsByCategory('confetti'), []);
   const allItems = useMemo(() => [...tileThemes, ...confettiThemes], [tileThemes, confettiThemes]);
@@ -124,12 +145,23 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     setEquipped({ tile_theme: tile, confetti });
   }, [allItems]);
 
+  const refreshHouse = useCallback(async () => {
+    const [roomList, upgrades, deepenings] = await Promise.all([
+      getRoomsWithStatus(),
+      getPurchasedUpgrades(),
+      getDeepenedRooms(),
+    ]);
+    setRooms(roomList);
+    setPurchasedUpgrades(upgrades);
+    setPurchasedDeepenings(deepenings);
+  }, []);
+
   useEffect(() => {
     (async () => {
-      await refresh();
+      await Promise.all([refresh(), refreshHouse()]);
       setLoading(false);
     })();
-  }, [refresh]);
+  }, [refresh, refreshHouse]);
 
   useEffect(() => { setBalance(amberBalance); }, [amberBalance]);
 
@@ -175,6 +207,97 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       setBusy(null);
     }
   }, [busy, refresh]);
+
+  // -------------------------------------------------------------------------
+  // HOUSE UPGRADES — tier-1 room decorations + tier-2 "deepenings"
+  // -------------------------------------------------------------------------
+
+  const housePhase = phase as DialoguePhase;
+
+  const availableUpgrades = useMemo(() => {
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => {
+        const upgrade = getRoomUpgrade(room.id);
+        if (!upgrade || purchasedUpgrades[room.id]) return null;
+        return { room, upgrade };
+      })
+      .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => entry !== null);
+  }, [rooms, purchasedUpgrades]);
+
+  // Tier-2 "deepenings": eligible once the room's tier-1 decoration is in
+  // place and the deepening hasn't been bought yet.
+  const availableDeepenings = useMemo(() => {
+    return rooms
+      .filter(room => room.isUnlocked)
+      .map(room => {
+        const deepening = getRoomDeepening(room.id);
+        if (!deepening) return null;
+        if (!purchasedUpgrades[room.id]) return null; // tier-1 required first
+        if (purchasedDeepenings[room.id]) return null;
+        return { room, deepening };
+      })
+      .filter((entry): entry is { room: Room; deepening: NonNullable<ReturnType<typeof getRoomDeepening>> } => entry !== null);
+  }, [rooms, purchasedUpgrades, purchasedDeepenings]);
+
+  const handleBuyUpgrade = useCallback(async (roomId: string) => {
+    if (busy) return;
+    const upgrade = getRoomUpgrade(roomId);
+    if (!upgrade) return;
+    setBusy(`upgrade_${roomId}`);
+    try {
+      const spendResult = await spendAmber(upgrade.cost, `room_upgrade_${roomId}`);
+      if (!spendResult.success) {
+        setHouseFeedback('Not enough amber for that yet.');
+        return;
+      }
+      const purchased = await purchaseRoomUpgrade(roomId);
+      if (!purchased) {
+        setHouseFeedback('That upgrade is already in place.');
+        return;
+      }
+      onAmberChange?.(spendResult.newBalance);
+      setBalance(spendResult.newBalance);
+      setHouseFeedback(`${upgrade.name} added.`);
+      logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: upgrade.cost } });
+      hapticMedium();
+      await refreshHouse();
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, onAmberChange, refreshHouse]);
+
+  const handleBuyDeepening = useCallback(async (roomId: string) => {
+    if (busy) return;
+    const deepening = getRoomDeepening(roomId);
+    if (!deepening) return;
+    setBusy(`deepening_${roomId}`);
+    try {
+      const spendResult = await spendAmber(deepening.cost, `room_deepening_${roomId}`);
+      if (!spendResult.success) {
+        setHouseFeedback('Not enough amber for that yet.');
+        return;
+      }
+      const purchased = await purchaseRoomDeepening(roomId);
+      if (!purchased) {
+        setHouseFeedback('That upgrade is already in place.');
+        return;
+      }
+      onAmberChange?.(spendResult.newBalance);
+      setBalance(spendResult.newBalance);
+      setHouseFeedback(`${deepening.name} settles in.`);
+      logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: deepening.cost, tier: 2 } });
+      hapticMedium();
+      await refreshHouse();
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, onAmberChange, refreshHouse]);
+
+  const showHouseUpgrades =
+    areUpgradesAvailable(housePhase) &&
+    availableUpgrades.length +
+      (areDeepeningsAvailable(housePhase) ? availableDeepenings.length : 0) > 0;
 
   const renderActionButton = (item: CosmeticItem) => {
     const isOwned = owned[item.id];
@@ -346,6 +469,61 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               ConfettiPreview,
             )}
 
+            {showHouseUpgrades && (
+              <View>
+                <Text style={[styles.sectionLabel, { color: t.headerMuted }]}>HOUSE UPGRADES</Text>
+                {houseFeedback != null && (
+                  <Text style={[styles.houseFeedback, { color: t.headerMuted }]}>{houseFeedback}</Text>
+                )}
+                {availableUpgrades.map(({ room, upgrade }) => (
+                  <PanelCard key={`upgrade_${room.id}`} phase={phase} kind="card" style={styles.card}>
+                    <View style={styles.houseCardBody}>
+                      <Text style={[styles.cardName, { color: t.title }]}>
+                        {room.name}: {upgrade.name}
+                      </Text>
+                      <Text style={[styles.cardDesc, { color: t.body }]}>
+                        {getUpgradeDescription(room.id, housePhase)}
+                      </Text>
+                      <Text style={[styles.houseCost, { color: t.amberText }]}>
+                        <AmberInline size={12} /> {upgrade.cost}
+                      </Text>
+                    </View>
+                    <CandyButton
+                      label="Decorate"
+                      onPress={() => handleBuyUpgrade(room.id)}
+                      phase={phase}
+                      variant="amber"
+                      disabled={balance < upgrade.cost || busy != null}
+                      style={styles.actionSlot}
+                      accessibilityLabel={`Decorate ${room.name} with ${upgrade.name} for ${upgrade.cost} amber`}
+                    />
+                  </PanelCard>
+                ))}
+                {areDeepeningsAvailable(housePhase) && availableDeepenings.map(({ room, deepening }) => (
+                  <PanelCard key={`deepen_${room.id}`} phase={phase} kind="card" style={styles.card}>
+                    <View style={styles.houseCardBody}>
+                      <Text style={[styles.cardName, { color: t.title }]}>
+                        {room.name}: {deepening.name}
+                      </Text>
+                      <Text style={[styles.cardDesc, { color: t.body }]}>{deepening.description}</Text>
+                      <Text style={[styles.houseCost, { color: t.amberText }]}>
+                        <AmberInline size={12} /> {deepening.cost}
+                      </Text>
+                    </View>
+                    <CandyButton
+                      label="Deepen"
+                      onPress={() => handleBuyDeepening(room.id)}
+                      phase={phase}
+                      variant="amber"
+                      disabled={balance < deepening.cost || busy != null}
+                      style={styles.actionSlot}
+                      accessibilityLabel={`Deepen ${room.name} with ${deepening.name} for ${deepening.cost} amber`}
+                    />
+                  </PanelCard>
+                ))}
+              </View>
+            )}
+
             {onOpenStore && (
               <TouchableOpacity
                 onPress={() => { hapticLight(); onOpenStore(); }}
@@ -481,6 +659,15 @@ const styles = StyleSheet.create({
   },
   previewDot: { width: 12, height: 12, borderRadius: 3 },
   actionSlot: { minWidth: 96 },
+  houseCardBody: { flex: 1, paddingRight: 12 },
+  houseFeedback: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    fontFamily: BODY_FONT,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  houseCost: { fontSize: 13, fontWeight: '800', fontFamily: PIXEL_FONT_BOLD, marginTop: 6 },
   statusChip: {
     minWidth: 96,
     minHeight: 46,

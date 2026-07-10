@@ -28,6 +28,13 @@ const ROOM_BACKGROUNDS: Record<RoomTheme, ImageSourcePropType> = {
   burrow: require('../../../assets/rooms/burrow.png'),
   garden: require('../../../assets/rooms/garden.png'),
   bamboo: require('../../../assets/rooms/bamboo.png'),
+  // The descent trio's real art (hand-authored, processed to 1456x720). The
+  // filenames carry the art's own concept names; the in-game rooms keep their
+  // canon names (Star Loft / Belfry / Sky Garden — the belfry art shows the
+  // workshop floor, the bell hangs up the tower shaft, out of frame).
+  star_loft: require('../../../assets/rooms/observatory.png'),
+  belfry: require('../../../assets/rooms/workshop.png'),
+  sky_garden: require('../../../assets/rooms/rainforest.png'),
 };
 
 // Phase-appropriate windows. The room art paints bright day-sky windows that
@@ -402,17 +409,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  // Compact: the whole stack (icon + name + cost + progress) must fit the
+  // ~123dp room height with Shantell's taller metrics, or the bottom line
+  // overlaps the room's lower frame (the "Bamboo Attic 147/400" defect).
   lockIcon: {
     fontFamily: BODY_FONT,
-    fontSize: 32,
-    marginBottom: 8,
+    fontSize: 22,
+    marginBottom: 2,
   },
   lockedText: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   lockedSubtext: {
     fontFamily: BODY_FONT,
@@ -430,9 +440,9 @@ const styles = StyleSheet.create({
   lockedCost: {
     fontFamily: BODY_FONT_BOLD,
     color: CandyColors.yellow.main,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   // Invite chip: absolute-fill wrapper centers the chip in the room without
   // hardcoded offsets; box-none keeps touches limited to the chip itself.

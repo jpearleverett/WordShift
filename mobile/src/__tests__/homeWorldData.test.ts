@@ -32,8 +32,8 @@ beforeEach(async () => {
 });
 
 describe('ROOMS data', () => {
-  test('has 10 rooms defined', () => {
-    expect(ROOMS).toHaveLength(10);
+  test('has 13 rooms defined', () => {
+    expect(ROOMS).toHaveLength(13);
   });
 
   test('all rooms have required fields', () => {
@@ -60,8 +60,8 @@ describe('ROOMS data', () => {
 });
 
 describe('ANIMALS data', () => {
-  test('has 10 animals defined', () => {
-    expect(ANIMALS).toHaveLength(10);
+  test('has 13 animals defined', () => {
+    expect(ANIMALS).toHaveLength(13);
   });
 
   test('fox is the starter animal', () => {
@@ -80,8 +80,8 @@ describe('ANIMALS data', () => {
 });
 
 describe('UNLOCK_PROGRESSION', () => {
-  test('has 19 unlock entries', () => {
-    expect(UNLOCK_PROGRESSION).toHaveLength(19);
+  test('has one unlock entry per room and animal (minus the starter room)', () => {
+    expect(UNLOCK_PROGRESSION).toHaveLength(ROOMS.length + ANIMALS.length - 1);
   });
 
   test('first unlock is fox (free)', () => {
@@ -90,9 +90,9 @@ describe('UNLOCK_PROGRESSION', () => {
     expect(UNLOCK_PROGRESSION[0].type).toBe('character');
   });
 
-  test('last unlock is red_panda', () => {
+  test('last unlock is kakapo', () => {
     const last = UNLOCK_PROGRESSION[UNLOCK_PROGRESSION.length - 1];
-    expect(last.targetId).toBe('red_panda');
+    expect(last.targetId).toBe('kakapo');
     expect(last.type).toBe('character');
   });
 
@@ -124,17 +124,21 @@ describe('UNLOCK_PROGRESSION', () => {
     }
   });
 
-  test('the final house unlock lands before the Phase 3 threshold', () => {
+  // DELIBERATE change with the high-rooms expansion: the house now keeps
+  // growing THROUGH Growing Shadows (the original ten rooms still top out
+  // just before Phase 3; the three high rooms gate at 150/170/190). The last
+  // gate must sit at or past the Phase 3 threshold so the descent's third act
+  // still has house investment, but stay clear of the finale territory at the
+  // Phase 4 threshold — the climax must not compete with a construction gate.
+  test('the final house unlock lands inside Growing Shadows, before finale territory', () => {
     const gates = UNLOCK_PROGRESSION
       .map(u => u.minPuzzles)
       .filter((n): n is number => typeof n === 'number');
     const lastGate = gates[gates.length - 1];
     const phase3Threshold = PHASE_THRESHOLDS[3]; // 150 weighted ≈ puzzle 135 floor
-    // House finishes building before the dread peak, but deep enough that the
-    // mid-game isn't a barren stretch (last gate sits in the back half of the
-    // pre-Phase-3 window).
-    expect(lastGate).toBeGreaterThanOrEqual(120);
-    expect(lastGate).toBeLessThan(phase3Threshold);
+    const phase4Threshold = PHASE_THRESHOLDS[4]; // 235 — finale territory
+    expect(lastGate).toBeGreaterThanOrEqual(phase3Threshold);
+    expect(lastGate).toBeLessThan(phase4Threshold);
   });
 });
 

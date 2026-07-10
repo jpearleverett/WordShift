@@ -1394,7 +1394,7 @@ export async function getTotalRitualEnergy(): Promise<number> {
 }
 
 /**
- * Mark house as completed (all 10 rooms + all 10 animals)
+ * Mark house as completed (every room + every animal)
  */
 export async function markHouseCompleted(): Promise<void> {
   const progress = await loadProgress();

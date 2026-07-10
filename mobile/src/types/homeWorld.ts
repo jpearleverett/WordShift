@@ -58,7 +58,10 @@ export type AnimalType =
   | 'owl'          // Study - intellectual crisis
   | 'capybara'     // Office - calm acceptance
   | 'wombat'       // Basement burrow - grounded, earthly concerns
-  | 'rabbit';      // Garden patio - anxious, hopping thoughts
+  | 'rabbit'       // Garden patio - anxious, hopping thoughts
+  | 'tarsier'      // Star loft - tiny wide-eyed watcher of the night sky
+  | 'aye_aye'      // Belfry - taps the beams, listens for hollow answers
+  | 'kakapo';      // Sky garden - flightless, patient, rooted in the green
 
 /**
  * Dialogue phase representing the existential journey
@@ -72,9 +75,9 @@ export type ExtendedPhase = DialoguePhase;
 
 /**
  * Animal awareness tiers - not all animals realize the truth at the same time
- * Vanguard: Fox & Owl know first (+1 phase ahead) - the oracle and lorekeeper
+ * Vanguard: Fox, Owl & Tarsier know first (+1 phase ahead) - oracle, lorekeeper, night watcher
  * Middle: Most animals match the global phase - discover truth with the player
- * Lagging: Sloth, Wombat, Rabbit, Red Panda realize last (-1 phase behind)
+ * Lagging: Sloth, Wombat, Rabbit, Red Panda, Kakapo realize last (-1 phase behind)
  */
 export type AnimalAwarenessTier = 'vanguard' | 'middle' | 'lagging';
 
@@ -89,6 +92,9 @@ export const ANIMAL_AWARENESS_TIERS: Record<AnimalType, AnimalAwarenessTier> = {
   wombat: 'lagging',       // Deep underground - news travels slow
   rabbit: 'lagging',       // In denial - realizes last
   red_panda: 'lagging',    // Zen detachment delays awareness
+  tarsier: 'vanguard',     // The night watcher - saw it in the sky first
+  aye_aye: 'middle',       // Hears the hollows answer in real time
+  kakapo: 'lagging',       // Grounded and unhurried - speaks last
 };
 
 /**
@@ -123,6 +129,9 @@ export const ANIMAL_TRIGGER_WORDS: Record<AnimalType, string[]> = {
   wombat: ['DIG', 'DIRT', 'EARTH', 'DEEP', 'BONE', 'ROCK', 'CAVE', 'HOLE', 'DARK', 'BELOW'],
   rabbit: ['RUN', 'FEAR', 'HIDE', 'JUMP', 'FAST', 'BOLT', 'DASH', 'FLEE', 'SAFE', 'GUARD'],
   red_panda: ['VOID', 'GATE', 'PORTAL', 'RIFT', 'ABYSS', 'DARK', 'SHADOW', 'DOOM', 'END', 'FINAL'],
+  tarsier: ['STAR', 'NIGHT', 'MOON', 'SKY', 'GLEAM', 'WATCH', 'BLINK', 'DUSK', 'ORBIT', 'SHINE'],
+  aye_aye: ['TAP', 'KNOCK', 'BELL', 'HOLLOW', 'WOOD', 'CHIME', 'RAP', 'TOLL', 'BEAM', 'GROVE'],
+  kakapo: ['MOSS', 'FERN', 'GREEN', 'NEST', 'SEED', 'BLOOM', 'ROOST', 'VINE', 'LEAF', 'BOOM'],
 };
 
 /**
@@ -185,7 +194,10 @@ export type RoomTheme =
   | 'study'       // Books and wisdom
   | 'office'      // Modern workspace
   | 'burrow'      // Underground cave
-  | 'garden';     // Outdoor patio
+  | 'garden'      // Outdoor patio
+  | 'star_loft'   // Night loft, open to the stars
+  | 'belfry'      // Stone tower, old bell
+  | 'sky_garden'; // Rooftop green, open to the wind
 
 /**
  * Unlock types in progression order

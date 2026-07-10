@@ -101,6 +101,24 @@ export const ANIMAL_REQUESTS: Record<AnimalType, AnimalRequestDef> = {
     requestLine: 'When you are ready, bring me something EMPTY. There is peace in the hollow places.',
     fulfillTemplate: 'You brought me {word}. Yes. Rest in it a moment. There is nothing to fear in the empty. Thank you.',
   },
+  tarsier: {
+    theme: 'night',
+    words: ['NIGHT', 'MOON', 'DARK', 'DUSK', 'STAR', 'GLOOM', 'SHADE', 'DIM', 'MOTH', 'EVE', 'BLACK', 'LUNAR'],
+    requestLine: "When the words allow it, bring me something from the NIGHT. The dark likes hearing itself spoken of by day.",
+    fulfillTemplate: "You brought me {word}. I watched it go down from the rail, glowing like a slow dark star, and out past the ridge the night stood a little taller. It suits us, that word. Thank you, bright one.",
+  },
+  aye_aye: {
+    theme: 'resonance',
+    words: ['KNOCK', 'BELL', 'TOLL', 'CHIME', 'HOLLOW', 'WOOD', 'BEAM', 'TAP', 'DRUM', 'GONG', 'PEAL', 'BONE'],
+    requestLine: "Bring me a word that RINGS. Something with a knock folded in it. The bronze is listening for its letters, and so am I.",
+    fulfillTemplate: "You brought me {word}. I heard it strike true from four floors up, and the bronze held the note. It is part of her voice now, friend. Thank you.",
+  },
+  kakapo: {
+    theme: 'growth',
+    words: ['GREEN', 'SEED', 'MOSS', 'FERN', 'VINE', 'LEAF', 'ROOT', 'GROW', 'BLOOM', 'SPROUT', 'GRASS', 'BUD'],
+    requestLine: "When your hands find one, bring me something GREEN. Something that grows. The beds are asking, and I have learned to pass their messages along.",
+    fulfillTemplate: "You brought me {word}. I planted it the moment it arrived, and it was up by moonrise, friend. The garden knew you would bring it. The garden is rarely wrong about you.",
+  },
 };
 
 interface RequestState {
@@ -202,7 +220,8 @@ export async function takeOfferingDialogue(
 ): Promise<OfferingDialogue | null> {
   if (phase < OFFERING_REQUEST_MIN_PHASE) return null;
   const def = ANIMAL_REQUESTS[animal];
-  if (!def) return null;
+  // A def with no fulfillable words is a content placeholder — never ask.
+  if (!def || def.words.length === 0) return null;
   const state = await load();
   const entry = state[animal];
 

@@ -13,7 +13,6 @@ import {
   Pressable,
   Linking,
   BackHandler,
-  Alert,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -59,6 +58,8 @@ import {
 import { claimDailyLoginReward, DailyLoginGrant } from './src/services/dailyLoginReward';
 import { DailyLoginModal } from './src/components/DailyLoginModal';
 import { NotificationPromptModal } from './src/components/NotificationPromptModal';
+import { GameAlertModal } from './src/components/ui/GameAlertModal';
+import { showGameAlert } from './src/services/gameAlert';
 import { PatronModal } from './src/components/monetization/PatronModal';
 import { submitDailyResult, getDailyRank, getBeatPercentText, DailyRank } from './src/services/leaderboard';
 import { recordPuzzleContribution, getAggregateProof, getWordsOfferedText } from './src/services/socialProof';
@@ -544,7 +545,7 @@ function MainApp() {
     if (onboardingFlow.isOnboarding) return;
     consumeCycleOpening().then(cycle => {
       if (cycle != null) {
-        Alert.alert('', getNewCycleOpeningLine(cycle));
+        showGameAlert('', getNewCycleOpeningLine(cycle));
       }
     }).catch(() => {});
   }, [onboardingFlow.isOnboarding]);
@@ -610,7 +611,7 @@ function MainApp() {
       // The notice is a launch-moment courtesy only — on a mid-session day
       // rollover the player may be mid-puzzle, so the grant stays silent.
       if (granted && !onboardingFlow.isOnboarding && !isRollover) {
-        Alert.alert(
+        showGameAlert(
           'Free Streak Freeze',
           'Your streak is protected for one missed day. Keep the chain alive.'
         );
@@ -1003,14 +1004,18 @@ function MainApp() {
     hapticLight();
     (async () => {
       try {
+        // The card's corner badge is the daily streak — name it here so the
+        // number on the calendar icon always has an in-context explanation.
+        const daily = await getDailyStatus();
+        const streakLine = daily.streak > 1 ? `\nDaily streak: ${daily.streak} days.` : '';
         const rank = await getDailyRank(getLocalDateString());
         if (rank) {
-          Alert.alert(
+          showGameAlert(
             'Today’s Standing',
-            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.`
+            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
           );
         } else {
-          Alert.alert('Today’s Standing', 'The standings are still gathering. Check back a little later.');
+          showGameAlert('Today’s Standing', `The standings are still gathering. Check back a little later.${streakLine}`);
         }
       } catch {
         // Non-critical — leaderboard is decorative.
@@ -1025,7 +1030,7 @@ function MainApp() {
   const handleStartSharedChallenge = useCallback((words: string[]) => {
     const ok = puzzleActions.startSharedChallengeGame(words);
     if (!ok) {
-      Alert.alert('Challenge link', getUnplayableChallengeMessage(persistence.currentPhase));
+      showGameAlert('Challenge link', getUnplayableChallengeMessage(persistence.currentPhase));
       return;
     }
     hapticLight();
@@ -1058,7 +1063,7 @@ function MainApp() {
         handleStartDaily('HARD');
       } else {
         transitionTo('home');
-        Alert.alert('Daily Challenge', getDailyLockedMessage(persistence.currentPhase));
+        showGameAlert('Daily Challenge', getDailyLockedMessage(persistence.currentPhase));
       }
       return;
     }
@@ -1068,7 +1073,7 @@ function MainApp() {
       if (words) {
         handleStartSharedChallenge(words);
       } else {
-        Alert.alert('Challenge link', getBadChallengeLinkMessage(persistence.currentPhase));
+        showGameAlert('Challenge link', getBadChallengeLinkMessage(persistence.currentPhase));
       }
       return;
     }
@@ -1915,11 +1920,10 @@ function MainApp() {
     }
     buttons.push({ text: 'Get hints', onPress: () => { done(); setShowStoreModal(true); } });
     buttons.push({ text: 'Not now', style: 'cancel', onPress: done });
-    Alert.alert(
+    showGameAlert(
       'Out of hints',
       'Watch a short clip for a free hint, or grab a hint pack in the store.',
       buttons,
-      { onDismiss: done, cancelable: true },
     );
   }, [handleClaimRewardedHint]);
 
@@ -2003,7 +2007,7 @@ function MainApp() {
       // contextual one-time Remove-Ads upsell ("tired of these?").
       await recordInterstitialSeen();
       if (await consumeRemoveAdsNudge()) {
-        Alert.alert(
+        showGameAlert(
           'Tired of ads?',
           'You can remove interstitials for good, or become a Patron for a quieter table and a little amber every puzzle.',
           [
@@ -3140,6 +3144,9 @@ function MainApp() {
         onHintsChange={() => puzzleActions.refreshHintBalance()}
         onOpenPatron={() => setShowPatronModal(true)}
       />
+      {/* Cottage-skinned Alert.alert replacement — mounted last so it layers
+          over every screen and modal (see services/gameAlert). */}
+      <GameAlertModal phase={persistence.currentPhase} />
     </View>
   );
 }

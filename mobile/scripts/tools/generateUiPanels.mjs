@@ -319,7 +319,11 @@ function drawFrameMaster(w, h, pal, kind) {
       continue;
     }
     if (d === transRing) {
-      g.set(x, y, side === 'top' || side === 'left' ? P.shadow : P.hi);
+      // v2.1: the shadowed transition stays on the lit (top/left) sides, but
+      // the bottom/right run is FILL tone — the old P.hi highlight there drew
+      // a thin light hairline down the inside of every card/panel edge on
+      // device (the circled Store defect), reading as an artifact, not depth.
+      g.set(x, y, side === 'top' || side === 'left' ? P.shadow : (kind === 'card' ? P.dim : P.base));
       continue;
     }
     if (d <= transRing + vigRings) {

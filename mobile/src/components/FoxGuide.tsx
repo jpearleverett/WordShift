@@ -296,10 +296,9 @@ export const FoxGuide: React.FC<FoxGuideProps> = ({
         />
 
         <View style={styles.cardRow}>
-          {/* Sprite alcove — transparent (sits on parchment) with a slim accent
-              rail on its inner edge, exactly like the home dialogue portrait. */}
+          {/* Sprite alcove — transparent, sits directly on the parchment
+              (the accent rail was removed with the home dialogue's). */}
           <View style={isCompact ? styles.compactSpriteCol : styles.dialogueSpriteCol}>
-            <View style={[styles.spriteRail, { backgroundColor: FOX_SKIN.accent }]} />
             <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
               {foxSprite ? (
                 <Image
@@ -413,18 +412,6 @@ const styles = StyleSheet.create({
   skipBtn: {
     paddingVertical: 8,
     paddingHorizontal: 12,
-  },
-  // Slim accent rail on the sprite alcove's inner edge (carries the skin's
-  // second hue between portrait and text — matches the home dialogue).
-  spriteRail: {
-    position: 'absolute',
-    right: 0,
-    top: 8,
-    bottom: 8,
-    width: 2,
-    borderRadius: 1,
-    opacity: 0.6,
-    zIndex: 2,
   },
 
   // ---- Dialogue variant (cottage wood-and-parchment sheet) ----

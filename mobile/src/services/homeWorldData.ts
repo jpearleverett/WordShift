@@ -88,7 +88,28 @@ export const ROOM_DESCRIPTIONS: Record<string, Record<number, string>> = {
     1: 'The bamboo sways without wind. Bamboo meditates on this. Always.',
     2: 'From up here, you can see the shadow in the sky. Bamboo says it has always been there.',
     3: 'The highest room is closest to what gathers above. Bamboo breathes with it.',
-    4: 'The apex chamber. The spiritual leader\'s seat. Ten rooms below, one sky above. The arrangement complete.',
+    4: 'The apex chamber. The spiritual leader\'s seat. The rooms below, one sky above. The arrangement complete.',
+  },
+  star_loft: {
+    0: 'A snug loft beneath a wide window full of stars.',
+    1: 'Vesper watches the sky for hours up here. Some of the stars seem to watch back.',
+    2: 'The stars over the loft have begun to rearrange. Vesper keeps a careful chart.',
+    3: 'One patch of sky stays empty no matter the season. Vesper never looks away from it.',
+    4: 'The watching chamber. Vesper counted the lights going out. The empty patch is closer now.',
+  },
+  belfry: {
+    0: 'A quiet tower room with an old bell and a fine echo.',
+    1: 'Tock taps the beams and listens. The tower answers in little knocks.',
+    2: 'The bell hums on its own some nights. Tock says something below is tuning it.',
+    3: 'The hollow places in the walls have grown. Tock maps them, knock by knock.',
+    4: 'The sounding chamber. Every hollow is a throat. When the bell rings, the house will speak.',
+  },
+  sky_garden: {
+    0: 'A rooftop garden open to the wind. Green and bright.',
+    1: 'Moss tends the beds at night. The plants seem to prefer it that way.',
+    2: 'The moss up here grows in rings now. Moss walks them slowly, counting.',
+    3: 'The garden leans toward the sky the way roots lean toward water.',
+    4: 'The crown chamber. The highest green. What descends will touch the garden first.',
   },
 };
 
@@ -228,7 +249,7 @@ export const ROOMS: Room[] = [
     accentColor: '#228B22',
   },
 
-  // Row 9 (Top Floor)
+  // Row 9
   {
     id: 'bamboo_attic',
     name: 'Bamboo Attic',
@@ -239,6 +260,45 @@ export const ROOMS: Room[] = [
     layoutPosition: { row: 9, col: 0 },
     backgroundColor: '#90EE90',
     accentColor: '#228B22',
+  },
+
+  // Row 10
+  {
+    id: 'star_loft',
+    name: 'Star Loft',
+    floor: 10,
+    isUnlocked: false,
+    theme: 'star_loft',
+    animalId: 'tarsier',
+    layoutPosition: { row: 10, col: 0 },
+    backgroundColor: '#483D8B',
+    accentColor: '#2B2350',
+  },
+
+  // Row 11
+  {
+    id: 'belfry',
+    name: 'Belfry',
+    floor: 11,
+    isUnlocked: false,
+    theme: 'belfry',
+    animalId: 'aye_aye',
+    layoutPosition: { row: 11, col: 0 },
+    backgroundColor: '#8B8378',
+    accentColor: '#4F4A42',
+  },
+
+  // Row 12 (Top Floor)
+  {
+    id: 'sky_garden',
+    name: 'Sky Garden',
+    floor: 12,
+    isUnlocked: false,
+    theme: 'sky_garden',
+    animalId: 'kakapo',
+    layoutPosition: { row: 12, col: 0 },
+    backgroundColor: '#8FBC8F',
+    accentColor: '#2E8B57',
   },
 ];
 
@@ -382,7 +442,7 @@ export const ANIMALS: Animal[] = [
     isWalking: false,
     direction: 'right',
   },
-  // Floor 9 - Bamboo Attic (Top)
+  // Floor 9 - Bamboo Attic
   {
     id: 'red_panda',
     type: 'red_panda',
@@ -394,6 +454,51 @@ export const ANIMALS: Animal[] = [
     hasSeenIntro: false,
     lastInteraction: null,
     position: { x: 50, y: 50 },
+    isWalking: false,
+    direction: 'right',
+  },
+  // Floor 10 - Star Loft
+  {
+    id: 'tarsier',
+    type: 'tarsier',
+    name: 'Vesper',
+    roomId: 'star_loft',
+    isUnlocked: false,
+    currentDialogueIndex: 0,
+    hasNewDialogue: false,
+    hasSeenIntro: false,
+    lastInteraction: null,
+    position: { x: 45, y: 50 },
+    isWalking: false,
+    direction: 'right',
+  },
+  // Floor 11 - Belfry
+  {
+    id: 'aye_aye',
+    type: 'aye_aye',
+    name: 'Tock',
+    roomId: 'belfry',
+    isUnlocked: false,
+    currentDialogueIndex: 0,
+    hasNewDialogue: false,
+    hasSeenIntro: false,
+    lastInteraction: null,
+    position: { x: 55, y: 50 },
+    isWalking: false,
+    direction: 'left',
+  },
+  // Floor 12 - Sky Garden (Top)
+  {
+    id: 'kakapo',
+    type: 'kakapo',
+    name: 'Moss',
+    roomId: 'sky_garden',
+    isUnlocked: false,
+    currentDialogueIndex: 0,
+    hasNewDialogue: false,
+    hasSeenIntro: false,
+    lastInteraction: null,
+    position: { x: 50, y: 55 },
     isWalking: false,
     direction: 'right',
   },
@@ -610,9 +715,9 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // END GAME (Puzzles ~105-130) - Final revelations; house completes just
-  // before Phase 3 so the climb to the Phase 4 climax still has the upgrade
-  // and quest sinks rather than the house itself.
+  // LATE GAME (Puzzles ~105-130) - The original house tops out just before
+  // Phase 3; the high rooms below then carry investment onward through the
+  // Growing Shadows stretch.
   // ═══════════════════════════════════════════════════════════════════════════
 
   // 16. Build the Garden
@@ -653,7 +758,7 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     minPuzzles: 130,
   },
 
-  // 19. Invite Bamboo the Red Panda (FINAL UNLOCK)
+  // 19. Invite Bamboo the Red Panda
   {
     id: 'unlock_red_panda',
     type: 'character',
@@ -663,6 +768,87 @@ export const UNLOCK_PROGRESSION: Unlockable[] = [
     targetId: 'red_panda',
     name: 'Bamboo the Red Panda',
     description: 'Zen master seeking inner peace at the top',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // THE HIGH ROOMS (Puzzles ~150-190) - The house keeps growing through the
+  // Growing Shadows stretch, above what was once the top of the house. These
+  // gates carry investment through the long climb to the climax.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // 20. Build the Star Loft
+  {
+    id: 'unlock_star_loft',
+    type: 'room',
+    cost: 450,
+    isUnlocked: false,
+    order: 20,
+    targetId: 'star_loft',
+    name: 'Star Loft',
+    description: 'A high window for watching the night arrive',
+    minPuzzles: 150,
+  },
+
+  // 21. Invite Vesper the Tarsier
+  {
+    id: 'unlock_tarsier',
+    type: 'character',
+    cost: 100,
+    isUnlocked: false,
+    order: 21,
+    targetId: 'tarsier',
+    name: 'Vesper the Tarsier',
+    description: 'Eyes wide enough to hold the whole night',
+  },
+
+  // 22. Build the Belfry
+  {
+    id: 'unlock_belfry',
+    type: 'room',
+    cost: 500,
+    isUnlocked: false,
+    order: 22,
+    targetId: 'belfry',
+    name: 'Belfry',
+    description: 'A silent bell waiting for its hour',
+    minPuzzles: 170,
+  },
+
+  // 23. Invite Tock the Aye-Aye
+  {
+    id: 'unlock_aye_aye',
+    type: 'character',
+    cost: 100,
+    isUnlocked: false,
+    order: 23,
+    targetId: 'aye_aye',
+    name: 'Tock the Aye-Aye',
+    description: 'Knocks on the world and hears what knocks back',
+  },
+
+  // 24. Build the Sky Garden
+  {
+    id: 'unlock_sky_garden',
+    type: 'room',
+    cost: 550,
+    isUnlocked: false,
+    order: 24,
+    targetId: 'sky_garden',
+    name: 'Sky Garden',
+    description: 'A garden grown where only sky should be',
+    minPuzzles: 190,
+  },
+
+  // 25. Invite Moss the Kakapo (FINAL UNLOCK)
+  {
+    id: 'unlock_kakapo',
+    type: 'character',
+    cost: 100,
+    isUnlocked: false,
+    order: 25,
+    targetId: 'kakapo',
+    name: 'Moss the Kakapo',
+    description: 'Grounded and patient, waiting on the sky',
   },
 ];
 
@@ -1237,6 +1423,9 @@ export const ROOM_THEME_COLORS: Record<RoomTheme, {
   office: { bg: '#708090', accent: '#2F4F4F', floor: '#A9A9A9', wall: '#778899' },
   burrow: { bg: '#8B7355', accent: '#5C4033', floor: '#6B4423', wall: '#A0522D' },
   garden: { bg: '#98FB98', accent: '#228B22', floor: '#90EE90', wall: '#87CEEB' },
+  star_loft: { bg: '#483D8B', accent: '#2B2350', floor: '#5C4033', wall: '#3B3268' },
+  belfry: { bg: '#8B8378', accent: '#4F4A42', floor: '#6B5D4F', wall: '#A39A8B' },
+  sky_garden: { bg: '#8FBC8F', accent: '#2E8B57', floor: '#90EE90', wall: '#B0E0E6' },
 };
 
 /**
@@ -1253,4 +1442,7 @@ export const ANIMAL_EMOJIS: Record<AnimalType, string> = {
   capybara: '🦫',
   wombat: '🐻',
   rabbit: '🐰',
+  tarsier: '🐵',
+  aye_aye: '🐒',
+  kakapo: '🦜',
 };

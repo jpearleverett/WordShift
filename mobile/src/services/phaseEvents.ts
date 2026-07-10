@@ -226,7 +226,7 @@ export function getEventDuration(event: PhaseTransitionEvent): number {
 // ============================================================================
 
 /**
- * Cinematic event for when all 10 rooms are built and all 10 animals are unlocked.
+ * Cinematic event for when every room is built and every animal is unlocked.
  * "You didn't build a house. You built a temple."
  */
 export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
@@ -246,7 +246,7 @@ export const HOUSE_COMPLETION_EVENT: PhaseTransitionEvent = {
       duration: 3000,
     },
     {
-      text: 'Ten rooms. Ten keepers.\nEach in their place.',
+      text: 'Every room. Every keeper.\nEach in their place.',
       delay: 3200,
       duration: 3500,
     },
@@ -298,7 +298,7 @@ export const FINAL_PUZZLE_EVENT: PhaseTransitionEvent = {
       duration: 4000,
     },
     {
-      text: 'The ten keepers stand in their chambers.\nThe temple is complete.',
+      text: 'The keepers stand in their chambers.\nThe temple is complete.',
       emoji: '🏠',
       delay: 7900,
       duration: 4000,

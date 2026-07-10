@@ -35,12 +35,14 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 const ALL_ANIMALS: AnimalType[] = [
   'fox', 'pangolin', 'owl', 'axolotl', 'sloth',
   'fennec_fox', 'capybara', 'wombat', 'rabbit', 'red_panda',
+  'tarsier', 'aye_aye', 'kakapo',
 ];
 
 const DISPLAY_NAMES: Record<string, AnimalType> = {
   Ember: 'fox', Panko: 'pangolin', Archimedes: 'owl', Axel: 'axolotl',
   Sloane: 'sloth', Fennick: 'fennec_fox', Chill: 'capybara',
   Warren: 'wombat', Thyme: 'rabbit', Bamboo: 'red_panda',
+  Vesper: 'tarsier', Tock: 'aye_aye', Moss: 'kakapo',
 };
 
 /** Unlock position per animal, derived from the real progression data. */
@@ -73,7 +75,7 @@ describe('dialogue unlock gating', () => {
     (AsyncStorage.clear as jest.Mock)();
   });
 
-  it('unlock order covers all ten animals', () => {
+  it('unlock order covers all thirteen animals', () => {
     for (const animal of ALL_ANIMALS) {
       expect(order[animal]).toBeGreaterThan(0);
     }

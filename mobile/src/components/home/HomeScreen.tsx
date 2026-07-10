@@ -137,7 +137,7 @@ import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
 import { getHomeAmbientLine, getFoxPitNudgeLines, getShopTitle } from '../../services/phaseNarrative';
 import { DailyChallengeCard } from '../DailyChallengeCard';
 import { isDailyChallengeUnlocked } from '../../services/dailyChallenge';
-import { areUpgradesAvailable, getPurchasedUpgrades, getRoomUpgrade, getUpgradeDescription, purchaseRoomUpgrade, areDeepeningsAvailable, getDeepenedRooms, getRoomDeepening, purchaseRoomDeepening } from '../../services/roomUpgrades';
+import { areUpgradesAvailable, getPurchasedUpgrades } from '../../services/roomUpgrades';
 import { getTendingLevel } from '../../services/tending';
 import { hapticLight, hapticSelection } from '../../services/haptics';
 import { logEvent } from '../../services/eventLogger';
@@ -359,6 +359,10 @@ const BevelRowButton: React.FC<{
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       style={[styles.bevelStrip, disabled && styles.bevelDisabled, style]}
+      // Android group opacity is per-view: without offscreen compositing the
+      // strip's 1dp cap/middle overlap double-blends into a saturated sliver
+      // at the cap joints whenever the bevel is dimmed (see CandyButton).
+      needsOffscreenAlphaCompositing={disabled}
     >
       <ThreeSliceStrip skin={pressed ? buttonSkin.down : buttonSkin.up} capDp={BTN_CAP_DP} />
       <Animated.View style={[styles.bevelContent, { transform: [{ translateY }] }]}>
@@ -371,7 +375,10 @@ const BevelRowButton: React.FC<{
 // The axolotl (scuba mask) and fennec (tall ears) are framed tighter in their
 // source sprites and read larger than the other animals in the dialogue alcove;
 // render those two a touch smaller so they don't clip the card.
-const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox']);
+// (Measured subject-height fractions: axolotl 74%, fennec 70%, aye_aye 76%,
+// kakapo 77% — all noticeably above fox's 61% baseline, so all four render
+// compact; tarsier at 65% stays standard.)
+const COMPACT_DIALOGUE_SPRITES = new Set<string>(['axolotl', 'fennec_fox', 'aye_aye', 'kakapo']);
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onPlayPuzzle,
@@ -425,6 +432,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // House completion ceremony state
   const [showHouseCompletion, setShowHouseCompletion] = useState(false);
   const [houseCompletionTextIndex, setHouseCompletionTextIndex] = useState(0);
+  // House completion detected but the celebration not yet played — held while
+  // the final animal's intro dialogue is on screen (see the effect below).
+  const [pendingHouseCompletion, setPendingHouseCompletion] = useState(false);
 
   // Sacrifice modal state (Phase 4+)
   const [showSacrificeModal, setShowSacrificeModal] = useState(false);
@@ -454,9 +464,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Room upgrades
   const [purchasedUpgrades, setPurchasedUpgrades] = useState<Record<string, number>>({});
-  const [purchasedDeepenings, setPurchasedDeepenings] = useState<Record<string, number>>({});
   const [tendingLevel, setTendingLevel] = useState(0);
-  const [upgradeFeedback, setUpgradeFeedback] = useState<string | null>(null);
 
   // Dialogue flow hook
   const dialogueFlow = useDialogueFlow({
@@ -511,20 +519,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     setRooms(roomsData);
     setAnimals(animalsData);
 
-    // Check for house completion (all 10 rooms + all 10 animals unlocked)
+    // Check for house completion (every room + every animal unlocked —
+    // derived from the data so the check tracks the roster as it grows).
+    // The cinematic is NOT fired here: completion is detected in the same
+    // breath as the final animal's purchase, and firing immediately ran the
+    // temple cutscene on top of that animal's intro dialogue. Mark it pending
+    // instead — the effect below plays it once no intro dialogue is up.
     if (!progressData.houseCompleted) {
-      const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= 10;
-      const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= 10;
+      const allRoomsUnlocked = roomsData.filter(r => r.isUnlocked).length >= ROOMS.length;
+      const allAnimalsUnlocked = animalsData.filter(a => a.isUnlocked).length >= ANIMALS.length;
       if (allRoomsUnlocked && allAnimalsUnlocked) {
         await markHouseCompleted();
-        if (onHouseCompleted) {
-          // App plays the full HOUSE_COMPLETION_EVENT cinematic over the home scene.
-          onHouseCompleted();
-        } else {
-          // Fallback (e.g. in isolation/tests): the inline completion modal.
-          setShowHouseCompletion(true);
-          setHouseCompletionTextIndex(0);
-        }
+        setPendingHouseCompletion(true);
       }
     }
 
@@ -548,14 +554,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     // Load room upgrades (tier 1) + deepenings (tier 2)
     const upgrades = await getPurchasedUpgrades();
     setPurchasedUpgrades(upgrades);
-    setPurchasedDeepenings(await getDeepenedRooms());
 
     // Phase-5 Tending Level — drives the visual "deepening" of the house sigils.
     setTendingLevel(await getTendingLevel());
-  }, [unlockFlow.refreshUnlockData, onHouseCompleted]);
+  }, [unlockFlow.refreshUnlockData]);
 
   // Keep the ref in sync
   loadAllDataRef.current = loadAllData;
+
+  // Play the house-completion celebration only once the final animal's intro
+  // dialogue has closed. Completion is detected in the same tick as Bamboo's
+  // purchase, but his intro opens ~300ms later — the 650ms grace lets the
+  // intro claim the screen first, and the effect re-arms when it closes.
+  useEffect(() => {
+    if (!pendingHouseCompletion) return;
+    // Held while any intro dialogue surface is up (same pair the other
+    // one-time home intros gate on).
+    if (showIntroDialogue || introOverrideLines) return;
+    const timer = setTimeout(() => {
+      setPendingHouseCompletion(false);
+      if (onHouseCompleted) {
+        // App plays the full HOUSE_COMPLETION_EVENT cinematic over the home scene.
+        onHouseCompleted();
+      } else {
+        // Fallback (e.g. in isolation/tests): the inline completion modal.
+        setShowHouseCompletion(true);
+        setHouseCompletionTextIndex(0);
+      }
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [pendingHouseCompletion, showIntroDialogue, introOverrideLines, onHouseCompleted]);
 
   const claimableQuestAmber = useMemo(() => {
     if (!weeklyQuestState || !progress) return 0;
@@ -575,35 +603,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     const { hours, minutes } = getTimeUntilDailyReset();
     return hours > 0 ? `${hours} hours` : `${minutes} minutes`;
   }, []);
-
-  const availableRoomUpgrades = useMemo(() => {
-    if (!progress) return [];
-    return rooms
-      .filter(room => room.isUnlocked)
-      .map(room => {
-        const upgrade = getRoomUpgrade(room.id);
-        if (!upgrade || purchasedUpgrades[room.id]) return null;
-        return { room, upgrade };
-      })
-      .filter((entry): entry is { room: Room; upgrade: NonNullable<ReturnType<typeof getRoomUpgrade>> } => entry !== null);
-  }, [rooms, purchasedUpgrades, progress]);
-
-  // Tier-2 "deepenings": a room is eligible once its tier-1 decoration is in
-  // place and the deepening hasn't been bought. Opens at Phase 2 to fill the
-  // ~puzzle 65–135 mid-game spend valley (continuous with tier-1 decorations).
-  const availableRoomDeepenings = useMemo(() => {
-    if (!progress) return [];
-    return rooms
-      .filter(room => room.isUnlocked)
-      .map(room => {
-        const deepening = getRoomDeepening(room.id);
-        if (!deepening) return null;
-        if (!purchasedUpgrades[room.id]) return null; // tier-1 required first
-        if (purchasedDeepenings[room.id]) return null;
-        return { room, deepening };
-      })
-      .filter((entry): entry is { room: Room; deepening: NonNullable<ReturnType<typeof getRoomDeepening>> } => entry !== null);
-  }, [rooms, purchasedUpgrades, purchasedDeepenings, progress]);
 
   const isPostTutorialLightMode = useMemo(() => {
     if (!progress || isOnboarding) return false;
@@ -1172,52 +1171,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     });
   }, [progress, onAmberChange, animals]);
 
-  const handlePurchaseUpgrade = useCallback(async (roomId: string) => {
-    if (!progress) return;
-    const upgrade = getRoomUpgrade(roomId);
-    if (!upgrade) return;
-
-    const spendResult = await spendAmber(upgrade.cost, `room_upgrade_${roomId}`);
-    if (!spendResult.success) {
-      setUpgradeFeedback('Not enough amber for that room upgrade yet.');
-      return;
-    }
-
-    const purchased = await purchaseRoomUpgrade(roomId);
-    if (!purchased) {
-      setUpgradeFeedback('That upgrade is already in place.');
-      return;
-    }
-
-    onAmberChange?.(spendResult.newBalance);
-    setUpgradeFeedback(`${upgrade.name} added to ${rooms.find(r => r.id === roomId)?.name || 'the room'}.`);
-    logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: upgrade.cost } });
-    await loadAllData();
-  }, [progress, onAmberChange, rooms, loadAllData]);
-
-  const handlePurchaseDeepening = useCallback(async (roomId: string) => {
-    if (!progress) return;
-    const deepening = getRoomDeepening(roomId);
-    if (!deepening) return;
-
-    const spendResult = await spendAmber(deepening.cost, `room_deepening_${roomId}`);
-    if (!spendResult.success) {
-      setUpgradeFeedback('Not enough amber for that yet.');
-      return;
-    }
-
-    const purchased = await purchaseRoomDeepening(roomId);
-    if (!purchased) {
-      setUpgradeFeedback('That change is already in place.');
-      return;
-    }
-
-    onAmberChange?.(spendResult.newBalance);
-    setUpgradeFeedback(`${deepening.name} settles into ${rooms.find(r => r.id === roomId)?.name || 'the room'}.`);
-    logEvent({ type: 'room_upgrade_purchased', data: { roomId, cost: deepening.cost, tier: 2 } });
-    await loadAllData();
-  }, [progress, onAmberChange, rooms, loadAllData]);
-
   const handleOpenJournal = useCallback(() => {
     hapticLight();
     setShowJournalModal(true);
@@ -1473,7 +1426,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               activeOpacity={0.85}
               onPress={() => {
                 hapticLight();
-                setUpgradeFeedback(null);
                 unlockFlow.setShowShop(true);
               }}
               accessibilityLabel={`Next unlock. ${unlockFlow.nextUnlock.cost === 0 ? 'Free' : `${progress.amber} of ${unlockFlow.nextUnlock.cost} amber`}`}
@@ -1643,23 +1595,50 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {/* Sprite column — the zoomed portrait sits on the parchment. */}
                 <View style={styles.dialogueSpriteCol}>
                   {CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type] ? (
-                    <Image
-                      source={
-                        progress.currentPhase >= 4 && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!
-                          : dialogueFlow.isTalking && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.idle
-                      }
+                    /* Idle + talk are PRE-MOUNTED and opacity-switched (never
+                       swap one Image's source per talk tick — the async
+                       re-decode flickers; see the fox walk-cycle note). */
+                    <View
                       style={[
                         styles.dialogueSpriteImage,
                         COMPACT_DIALOGUE_SPRITES.has(dialogueFlow.selectedAnimal.type) &&
                           styles.dialogueSpriteImageSmall,
                         dialogueFlow.isTalking && styles.dialogueSpriteTalking,
                       ]}
-                      resizeMode="cover"
+                      accessibilityRole="image"
                       accessibilityLabel={`${dialogueFlow.selectedAnimal.name} portrait`}
-                    />
+                    >
+                      {progress.currentPhase >= 4 && CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.robed ? (
+                        <Image
+                          source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.robed!}
+                          style={styles.dialogueSpriteLayer}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <>
+                          <Image
+                            source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.idle}
+                            style={[
+                              styles.dialogueSpriteLayer,
+                              dialogueFlow.isTalking &&
+                                Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.talk) &&
+                                styles.dialogueSpriteLayerHidden,
+                            ]}
+                            resizeMode="cover"
+                          />
+                          {Boolean(CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]?.talk) && (
+                            <Image
+                              source={CHARACTER_SPRITES[dialogueFlow.selectedAnimal.type]!.talk!}
+                              style={[
+                                styles.dialogueSpriteLayer,
+                                !dialogueFlow.isTalking && styles.dialogueSpriteLayerHidden,
+                              ]}
+                              resizeMode="cover"
+                            />
+                          )}
+                        </>
+                      )}
+                    </View>
                   ) : (
                     <Text style={styles.dialogueSpriteEmoji}>
                       {ANIMAL_INFO[dialogueFlow.selectedAnimal.type]?.emoji || '🐾'}
@@ -1974,11 +1953,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={[styles.shopSubtitle, { color: panelSt.muted }]}>
               Your Amber: <AmberInline /> {progress.amber}
             </Text>
-            {upgradeFeedback && (
-              <Text style={[styles.shopFeedbackText, { color: panelSt.title }]}>
-                {upgradeFeedback}
-              </Text>
-            )}
+            <ScrollView style={styles.shopScroll} contentContainerStyle={styles.shopScrollContent}>
 
             {/* Next unlock */}
             {unlockFlow.nextUnlock && (
@@ -2071,81 +2046,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </View>
             )}
 
-            {areUpgradesAvailable(progress.currentPhase) && (
-              <View style={styles.upgradeSection}>
-                <Text style={[styles.nextUnlockLabel, { color: panelSt.muted }]}>Room Upgrades</Text>
-                {availableRoomUpgrades.length === 0 ? (
-                  <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
-                    Every unlocked room already has its decorative upgrade.
-                  </Text>
-                ) : (
-                  availableRoomUpgrades.slice(0, 4).map(({ room, upgrade }) => (
-                    <PanelCard
-                      key={room.id}
-                      phase={progress.currentPhase}
+            {/* Room upgrades moved to the Shop screen (they were crammed in
+                here behind the progress bar — a weird, unscrollable home).
+                Leave a pointer so the old path still leads somewhere. */}
+            {areUpgradesAvailable(progress.currentPhase) && onOpenShop && (
+              <BevelRowButton
+                phase={progress.currentPhase}
                 hostDark={dtHostDark}
-                      kind="card"
-                      style={StyleSheet.flatten([styles.unlockItem, styles.upgradeItem])}
-                    >
-                      <View style={styles.unlockInfo}>
-                        <Text style={[styles.unlockName, { color: panelSt.body }]}>{room.name}: {upgrade.name}</Text>
-                        <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
-                          {getUpgradeDescription(room.id, progress.currentPhase)}
-                        </Text>
-                        <Text style={[styles.unlockCost, { color: panelSt.amberText }]}><AmberInline /> {upgrade.cost} amber</Text>
-                      </View>
-                      <CandyButton
-                        label={progress.amber >= upgrade.cost ? 'Decorate' : 'Need More'}
-                        variant="amber"
-                        phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                        style={styles.rowAction}
-                        onPress={() => {
-                          handlePurchaseUpgrade(room.id).catch(() => {});
-                        }}
-                        disabled={progress.amber < upgrade.cost}
-                        accessibilityLabel={`Upgrade ${room.name} with ${upgrade.name} for ${upgrade.cost} amber`}
-                      />
-                    </PanelCard>
-                  ))
-                )}
-              </View>
+                variant="secondary"
+                style={styles.largeAction}
+                onPress={() => {
+                  unlockFlow.setShowShop(false);
+                  onOpenShop();
+                }}
+                accessibilityLabel="Open the Shop for room upgrades"
+              >
+                <Text style={[styles.bevelBtnText, { color: pixelSkin.ink.secondary }]}>
+                  Room Upgrades: in the Shop
+                </Text>
+              </BevelRowButton>
             )}
-
-            {areDeepeningsAvailable(progress.currentPhase) && availableRoomDeepenings.length > 0 && (
-              <View style={styles.upgradeSection}>
-                <Text style={[styles.nextUnlockLabel, { color: panelSt.muted }]}>The House Deepens</Text>
-                {availableRoomDeepenings.slice(0, 4).map(({ room, deepening }) => (
-                  <PanelCard
-                    key={`deepen_${room.id}`}
-                    phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                    kind="card"
-                    style={StyleSheet.flatten([styles.unlockItem, styles.upgradeItem])}
-                  >
-                    <View style={styles.unlockInfo}>
-                      <Text style={[styles.unlockName, { color: panelSt.body }]}>{room.name}: {deepening.name}</Text>
-                      <Text style={[styles.unlockDescription, { color: panelSt.muted }]}>
-                        {deepening.description}
-                      </Text>
-                      <Text style={[styles.unlockCost, { color: panelSt.amberText }]}><AmberInline /> {deepening.cost} amber</Text>
-                    </View>
-                    <CandyButton
-                      label={progress.amber >= deepening.cost ? 'Deepen' : 'Need More'}
-                      variant="amber"
-                      phase={progress.currentPhase}
-                hostDark={dtHostDark}
-                      style={styles.rowAction}
-                      onPress={() => {
-                        handlePurchaseDeepening(room.id).catch(() => {});
-                      }}
-                      disabled={progress.amber < deepening.cost}
-                      accessibilityLabel={`Deepen ${room.name} with ${deepening.name} for ${deepening.cost} amber`}
-                    />
-                  </PanelCard>
-                ))}
-              </View>
-            )}
+            </ScrollView>
 
             {/* Close button */}
             <CandyButton
@@ -2624,22 +2545,48 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {/* Sprite column — zoomed portrait on the parchment. */}
                 <View style={styles.dialogueSpriteCol}>
                   {CHARACTER_SPRITES[introAnimal.type] ? (
-                    <Image
-                      source={
-                        progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed
-                          ? CHARACTER_SPRITES[introAnimal.type]!.robed!
-                          : introIsTalking && CHARACTER_SPRITES[introAnimal.type]?.talk
-                            ? CHARACTER_SPRITES[introAnimal.type]!.talk!
-                            : CHARACTER_SPRITES[introAnimal.type]!.idle
-                      }
+                    /* Pre-mounted idle+talk stack, same as the main dialogue
+                       portrait — source swaps re-decode and flicker. */
+                    <View
                       style={[
                         styles.dialogueSpriteImage,
                         COMPACT_DIALOGUE_SPRITES.has(introAnimal.type) &&
                           styles.dialogueSpriteImageSmall,
                       ]}
-                      resizeMode="cover"
+                      accessibilityRole="image"
                       accessibilityLabel={`${introAnimal.name} portrait`}
-                    />
+                    >
+                      {progress && progress.currentPhase >= 4 && CHARACTER_SPRITES[introAnimal.type]?.robed ? (
+                        <Image
+                          source={CHARACTER_SPRITES[introAnimal.type]!.robed!}
+                          style={styles.dialogueSpriteLayer}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <>
+                          <Image
+                            source={CHARACTER_SPRITES[introAnimal.type]!.idle}
+                            style={[
+                              styles.dialogueSpriteLayer,
+                              introIsTalking &&
+                                Boolean(CHARACTER_SPRITES[introAnimal.type]?.talk) &&
+                                styles.dialogueSpriteLayerHidden,
+                            ]}
+                            resizeMode="cover"
+                          />
+                          {Boolean(CHARACTER_SPRITES[introAnimal.type]?.talk) && (
+                            <Image
+                              source={CHARACTER_SPRITES[introAnimal.type]!.talk!}
+                              style={[
+                                styles.dialogueSpriteLayer,
+                                !introIsTalking && styles.dialogueSpriteLayerHidden,
+                              ]}
+                              resizeMode="cover"
+                            />
+                          )}
+                        </>
+                      )}
+                    </View>
                   ) : (
                     <Text style={styles.dialogueSpriteEmoji}>
                       {ANIMAL_INFO[introAnimal.type]?.emoji || '🐾'}
@@ -3404,6 +3351,19 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.31,
     height: SCREEN_WIDTH * 0.41,
   },
+  // One layer of the pre-mounted idle/talk portrait stack. Explicit 100%
+  // dims — an inset-only absolute Image collapses to intrinsic size on Fabric
+  // (see the HouseWorld wall note).
+  dialogueSpriteLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+  dialogueSpriteLayerHidden: {
+    opacity: 0,
+  },
   // Subtle "talking" lift applied while isTalking toggles (every 300ms). Reads as
   // gentle movement for every animal and ensures the portrait never looks frozen
   // even if an animal's talk frame matches its idle frame. Under reduced motion
@@ -3477,6 +3437,16 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
   },
+  // Scrollable middle of the Unlock Progress modal (title/subtitle above and
+  // Close below stay pinned); bounded so tall content scrolls instead of
+  // pushing the Close button off-panel.
+  shopScroll: {
+    flexGrow: 0,
+    maxHeight: Math.round(SCREEN_HEIGHT * 0.52),
+  },
+  shopScrollContent: {
+    paddingBottom: 8,
+  },
   compactHubModal: {
     padding: 24,
     paddingBottom: 32,
@@ -3531,9 +3501,6 @@ const styles = StyleSheet.create({
   nextUnlockContainer: {
     marginBottom: 24,
   },
-  upgradeSection: {
-    marginBottom: 16,
-  },
   nextUnlockLabel: {
     fontFamily: PIXEL_FONT_BOLD,
     fontSize: 13,
@@ -3545,9 +3512,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-  },
-  upgradeItem: {
-    marginBottom: 10,
   },
   // Shared action placement inside rows / at panel foot
   rowAction: {

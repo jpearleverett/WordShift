@@ -109,6 +109,12 @@ export const CandyButton: React.FC<CandyButtonProps> = ({
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled }}
       style={[{ height: stripHeight, minWidth: BTN_CAP_DP * 2 + 24 }, disabled && styles.disabled, style]}
+      // Disabled dims the whole button with opacity. Android applies group
+      // opacity PER-VIEW, so the strip's deliberate 1dp cap/middle overlap
+      // double-blends into a more-opaque vertical sliver at both cap joints
+      // (the "thin vertical lines" on In Progress / unaffordable buttons).
+      // Offscreen compositing fades the subtree as one layer.
+      needsOffscreenAlphaCompositing={disabled}
       hitSlop={variant === 'quiet' ? { top: 4, bottom: 4, left: 6, right: 6 } : undefined}
     >
       <ThreeSliceStrip skin={pressed ? buttonSkin.down : buttonSkin.up} capDp={BTN_CAP_DP} />

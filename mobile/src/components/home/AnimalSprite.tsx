@@ -96,6 +96,21 @@ export const CHARACTER_SPRITES: Partial<Record<AnimalType, {
     talk: require('../../../assets/characters/rabbit/talk.png'),
     robed: require('../../../assets/characters/rabbit/robed.png'),
   },
+  tarsier: {
+    idle: require('../../../assets/characters/tarsier/idle.png'),
+    talk: require('../../../assets/characters/tarsier/talk.png'),
+    robed: require('../../../assets/characters/tarsier/robed.png'),
+  },
+  aye_aye: {
+    idle: require('../../../assets/characters/aye_aye/idle.png'),
+    talk: require('../../../assets/characters/aye_aye/talk.png'),
+    robed: require('../../../assets/characters/aye_aye/robed.png'),
+  },
+  kakapo: {
+    idle: require('../../../assets/characters/kakapo/idle.png'),
+    talk: require('../../../assets/characters/kakapo/talk.png'),
+    robed: require('../../../assets/characters/kakapo/robed.png'),
+  },
 };
 
 // Emotion bubble emojis based on phase
@@ -226,6 +241,9 @@ const MOVEMENT_SPEED: Record<AnimalType, number> = {
   capybara: 5000, // Chill, slow
   wombat: 4000,
   rabbit: 1500, // Fast and nervous
+  tarsier: 1800, // Quick, darting leaps
+  aye_aye: 3500, // Deliberate, tapping gait
+  kakapo: 4500, // Heavy, unhurried waddle
 };
 
 // Bounce heights by animal type
@@ -240,6 +258,9 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
   capybara: 1, // Very subtle
   wombat: 3,
   rabbit: 8, // Big hops
+  tarsier: 7, // Springy little leaps
+  aye_aye: 3,
+  kakapo: 2, // Grounded shuffle
 };
 
 // Per-animal vertical nudge (px, +down) to plant feet on the floor. The sprite
@@ -249,7 +270,9 @@ const BOUNCE_HEIGHT: Record<AnimalType, number> = {
 // Tuned from player feedback: pangolin/owl previously sat 3px too low (feet
 // stepped just past the room's bottom edge), so their offsets were eased back.
 const FLOOR_OFFSET: Record<AnimalType, number> = {
-  red_panda: 0,
+  // Bamboo's art carries 24% bottom padding in its frame — identical to the
+  // owl's (measured lowest-opaque-row), so he takes the owl's tuned offset.
+  red_panda: 15,
   axolotl: 0, // lives in the tank — placement handled by the water, leave as-is
   pangolin: 11,
   sloth: 0,
@@ -259,6 +282,12 @@ const FLOOR_OFFSET: Record<AnimalType, number> = {
   capybara: 0,
   wombat: 0,
   rabbit: 0,
+  // Measured from the landed art (lowest-opaque-row): tarsier carries 21%
+  // bottom padding (between fox's 18% -> 0 and owl's 24% -> 15); the other
+  // two sit at 13%/11%, well inside the grounded range.
+  tarsier: 8,
+  aye_aye: 0,
+  kakapo: 0,
 };
 
 /**
