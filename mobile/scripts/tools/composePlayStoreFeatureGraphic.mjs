@@ -26,6 +26,11 @@ const BACKGROUND_PATH = path.join(
 const WORDMARK_PATH = path.join(MOBILE_DIR, 'assets/ui/wordmark.png');
 const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 
+const FEATURE_TILE_LETTERS = Object.freeze([
+  Object.freeze({ letter: 'W', left: 334, top: 331, width: 38, height: 38 }),
+  Object.freeze({ letter: 'S', left: 399, top: 399, width: 36, height: 40 }),
+]);
+
 export const FEATURE_GRAPHIC_LAYOUT = Object.freeze({
   canvasWidth: 1024,
   canvasHeight: 500,
@@ -35,7 +40,28 @@ export const FEATURE_GRAPHIC_LAYOUT = Object.freeze({
   wordmarkTop: 70,
   wordmarkWidth: 592,
   wordmarkHeight: 148,
+  tileLetters: FEATURE_TILE_LETTERS,
 });
+
+const TILE_LETTER_PATHS = Object.freeze({
+  W: 'M6 14H26L34 65L44 30H57L67 65L75 14H95L81 88H62L51 55L41 88H22Z',
+  S: 'M30 8H92V30H36Q29 30 29 36T36 42H68Q92 42 92 62V74Q92 94 69 94H8V72H65Q72 72 72 66T65 60H31Q8 60 8 40V28Q8 8 30 8Z',
+});
+
+function buildTileLetterSvg(tileLetter) {
+  const classSuffix = tileLetter.letter.toLowerCase();
+  const pathData = TILE_LETTER_PATHS[tileLetter.letter];
+  if (!pathData) {
+    throw new Error(`Unsupported feature tile letter "${tileLetter.letter}"`);
+  }
+  return `<svg
+        class="tile-letter tile-letter-${classSuffix}" data-letter="${tileLetter.letter}"
+        viewBox="0 0 100 100" aria-hidden="true"
+      >
+        <path class="tile-letter-depth" d="${pathData}" transform="translate(0 6)"></path>
+        <path class="tile-letter-face" d="${pathData}"></path>
+      </svg>`;
+}
 
 function assertPercentage(value, name) {
   if (!Number.isFinite(value) || value < 0 || value > 100) {
@@ -139,6 +165,35 @@ export function buildFeatureGraphicHtml({
           drop-shadow(0 4px 3px rgba(24, 30, 22, 0.45))
           drop-shadow(0 10px 14px rgba(24, 30, 22, 0.28));
       }
+      .tile-letter {
+        position: absolute;
+        display: block;
+        overflow: visible;
+        pointer-events: none;
+      }
+      .tile-letter-w {
+        left: ${layout.tileLetters[0].left}px;
+        top: ${layout.tileLetters[0].top}px;
+        width: ${layout.tileLetters[0].width}px;
+        height: ${layout.tileLetters[0].height}px;
+      }
+      .tile-letter-s {
+        left: ${layout.tileLetters[1].left}px;
+        top: ${layout.tileLetters[1].top}px;
+        width: ${layout.tileLetters[1].width}px;
+        height: ${layout.tileLetters[1].height}px;
+      }
+      .tile-letter-depth {
+        fill: rgba(45, 34, 62, 0.62);
+      }
+      .tile-letter-face {
+        fill: #FFF9EA;
+        stroke: rgba(73, 50, 73, 0.55);
+        stroke-width: 2.5;
+        stroke-linejoin: round;
+        paint-order: stroke fill;
+        filter: drop-shadow(0 1px 1px rgba(42, 29, 55, 0.38));
+      }
     </style>
   </head>
   <body>
@@ -153,6 +208,7 @@ export function buildFeatureGraphicHtml({
         src="data:image/png;base64,${wordmarkBase64}"
         alt=""
       >
+      ${layout.tileLetters.map(buildTileLetterSvg).join('\n      ')}
     </main>
   </body>
 </html>`;
@@ -162,10 +218,13 @@ async function waitForFeatureComposition(page) {
   const audit = await page.evaluate(async () => {
     const background = document.querySelector('.background');
     const wordmark = document.querySelector('.wordmark');
+    const tileLetters = Array.from(document.querySelectorAll('.tile-letter'));
     const root = document.querySelector('.feature-graphic');
     if (
       !(background instanceof HTMLImageElement)
       || !(wordmark instanceof HTMLImageElement)
+      || tileLetters.length !== 2
+      || tileLetters.some(letter => !(letter instanceof SVGSVGElement))
       || !(root instanceof HTMLElement)
     ) {
       throw new Error('Feature composition structure is incomplete');
@@ -199,6 +258,13 @@ async function waitForFeatureComposition(page) {
         width: wordmark.naturalWidth,
         height: wordmark.naturalHeight,
       },
+      tileLetters: tileLetters.map(letter => ({
+        letter: letter.dataset.letter,
+        ...bounds(letter),
+      })),
+      tileLetterPathCount: document.querySelectorAll(
+        '.tile-letter-depth, .tile-letter-face'
+      ).length,
       backgroundFit: backgroundStyle.objectFit,
       backgroundPosition: backgroundStyle.objectPosition,
       imageCount: document.images.length,
@@ -223,6 +289,15 @@ async function waitForFeatureComposition(page) {
     width: layout.wordmarkWidth,
     height: layout.wordmarkHeight,
   };
+  const expectedTileLetters = layout.tileLetters.map(tileLetter => ({
+    letter: tileLetter.letter,
+    left: tileLetter.left,
+    top: tileLetter.top,
+    right: tileLetter.left + tileLetter.width,
+    bottom: tileLetter.top + tileLetter.height,
+    width: tileLetter.width,
+    height: tileLetter.height,
+  }));
 
   if (
     audit.viewport.width !== layout.canvasWidth
@@ -234,6 +309,12 @@ async function waitForFeatureComposition(page) {
   }
   if (JSON.stringify(audit.wordmark) !== JSON.stringify(expectedWordmark)) {
     throw new Error('Exact wordmark is outside its approved safe geometry');
+  }
+  if (
+    JSON.stringify(audit.tileLetters) !== JSON.stringify(expectedTileLetters)
+    || audit.tileLetterPathCount !== layout.tileLetters.length * 2
+  ) {
+    throw new Error('Feature tile letters are outside their approved geometry');
   }
   if (
     audit.backgroundNatural.width !== 1536

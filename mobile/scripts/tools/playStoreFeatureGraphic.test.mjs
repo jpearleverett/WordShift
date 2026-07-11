@@ -107,6 +107,7 @@ describe('Play Store feature graphic source and geometry', () => {
         wordmarkTop: layout.wordmarkTop,
         wordmarkWidth: layout.wordmarkWidth,
         wordmarkHeight: layout.wordmarkHeight,
+        tileLetters: layout.tileLetters,
       },
       {
         canvasWidth: 1024,
@@ -117,6 +118,10 @@ describe('Play Store feature graphic source and geometry', () => {
         wordmarkTop: 70,
         wordmarkWidth: 592,
         wordmarkHeight: 148,
+        tileLetters: [
+          { letter: 'W', left: 334, top: 331, width: 38, height: 38 },
+          { letter: 'S', left: 399, top: 399, width: 36, height: 40 },
+        ],
       }
     );
 
@@ -142,9 +147,17 @@ describe('Play Store feature graphic source and geometry', () => {
     assert.ok(
       layout.wordmarkTop + layout.wordmarkHeight <= likelyCenterCrop.bottom
     );
+    for (const tileLetter of layout.tileLetters) {
+      assert.ok(tileLetter.left >= 0);
+      assert.ok(tileLetter.top >= 0);
+      assert.ok(tileLetter.left + tileLetter.width <= layout.canvasWidth);
+      assert.ok(tileLetter.top + tileLetter.height <= layout.canvasHeight);
+      assert.ok(tileLetter.left >= likelyCenterCrop.left);
+      assert.ok(tileLetter.left + tileLetter.width <= likelyCenterCrop.right);
+    }
   });
 
-  test('embeds the exact existing wordmark and no generated copy', async () => {
+  test('embeds the exact wordmark plus path-based W and S tile layers', async () => {
     const { buildFeatureGraphicHtml } = await loadComposer();
     const wordmark = await fs.readFile(WORDMARK_PATH);
     const background = Buffer.from('audited-background');
@@ -169,6 +182,12 @@ describe('Play Store feature graphic source and geometry', () => {
       html,
       /<(?:h[1-6]|p|span|strong|em|button|figcaption)\b/i
     );
+    assert.equal((html.match(/<svg\b/g) ?? []).length, 2);
+    assert.match(html, /class="tile-letter tile-letter-w" data-letter="W"/);
+    assert.match(html, /class="tile-letter tile-letter-s" data-letter="S"/);
+    assert.equal((html.match(/class="tile-letter-depth"/g) ?? []).length, 2);
+    assert.equal((html.match(/class="tile-letter-face"/g) ?? []).length, 2);
+    assert.doesNotMatch(html, /<text\b/i);
   });
 });
 
@@ -230,6 +249,28 @@ describe('Play Store feature graphic composition', { concurrency: false }, () =>
       width: 592,
       height: 148,
     });
+    assert.deepEqual(result.audit.tileLetters, [
+      {
+        letter: 'W',
+        left: 334,
+        top: 331,
+        right: 372,
+        bottom: 369,
+        width: 38,
+        height: 38,
+      },
+      {
+        letter: 'S',
+        left: 399,
+        top: 399,
+        right: 435,
+        bottom: 439,
+        width: 36,
+        height: 40,
+      },
+    ]);
+    assert.equal(result.audit.tileLetterPathCount, 4);
+    assert.equal(result.audit.renderedText, '');
     assert.deepEqual(await readPngMetadata(outputPath), result.metadata);
   });
 
