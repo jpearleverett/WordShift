@@ -250,7 +250,9 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
                   CHALLENGE
                 </Text>
                 <Text style={[styles.challengeMenuDesc, { color: t.muted }]}>
-                  {challengeActive ? '1 undo, no hints, 1.5x amber' : 'Limited undos, +50% amber'}
+                  {challengeActive
+                    ? 'No previews, no hints, limited undos, 1.5x amber'
+                    : 'No previews or hints, limited undos, +50% amber'}
                 </Text>
               </View>
             </TouchableOpacity>

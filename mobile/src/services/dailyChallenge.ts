@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Difficulty } from '../types';
+import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { generateLocalPuzzle } from './localGenerator';
 import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
@@ -52,6 +52,14 @@ export interface DailyChallengeProgress {
 
 // In-memory cache
 let progressCache: DailyChallengeProgress | null = null;
+
+/**
+ * Drop the in-memory cache after an external storage write (cloud restore) so
+ * the next read reflects the restored save instead of writing stale state back.
+ */
+export function invalidateDailyProgressCache(): void {
+  progressCache = null;
+}
 
 function getDefaultProgress(): DailyChallengeProgress {
   return {
@@ -199,6 +207,7 @@ export function getDailyRamp(dateStr?: string): {
 const DAILY_HOST_ORDER = [
   'fox', 'pangolin', 'owl', 'axolotl', 'capybara',
   'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda',
+  'tarsier', 'aye_aye', 'kakapo',
 ] as const;
 
 // Canonical animal display names (kept local so dailyChallenge doesn't depend on
@@ -206,7 +215,8 @@ const DAILY_HOST_ORDER = [
 const DAILY_HOST_NAMES: Record<string, string> = {
   fox: 'Ember', pangolin: 'Panko', owl: 'Archimedes', axolotl: 'Axel',
   capybara: 'Chill', fennec_fox: 'Fennick', sloth: 'Sloane', wombat: 'Warren',
-  rabbit: 'Thyme', red_panda: 'Bamboo',
+  rabbit: 'Thyme', red_panda: 'Bamboo', tarsier: 'Vesper', aye_aye: 'Tock',
+  kakapo: 'Moss',
 };
 
 /**
@@ -266,6 +276,12 @@ export async function isDailyCompleted(): Promise<boolean> {
 export interface DailyPuzzleData {
   words: string[];
   hint?: string;
+  /**
+   * The generator's solution steps, threaded through so daily hints use the
+   * stored solution (via startDailyGame's optional solution param) instead of
+   * the blind live search. Deterministic like the rest of the daily.
+   */
+  solution?: PuzzleSolutionStep[];
   difficulty: Difficulty;
   date: string;
   wordLength: number;
@@ -317,6 +333,7 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
       const result: DailyPuzzleData = {
         words: puzzle.words,
         hint: puzzle.hint,
+        solution: puzzle.solution,
         difficulty,
         date: today,
         wordLength: puzzle.wordLength ?? ramp.wordLength,

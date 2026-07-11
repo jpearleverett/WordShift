@@ -20,14 +20,14 @@ spoiling the reveal, while the age rating must declare it honestly.
 > Easy to learn, endlessly chewy to master.
 >
 > 🦊 **Build a home.** Earn amber with every puzzle and fill a charming house
-> with ten animal friends — a fox who loves the fire, a pangolin who cooks, an
-> owl buried in old books.
+> with thirteen animal friends — a fox who loves the fire, a pangolin who
+> cooks, an owl buried in old books.
 >
 > 🧩 **Thousands of puzzles.** Four difficulties, Reverse and Double Shift
 > modes, timed Speed runs, and a Daily Challenge shared by every player.
 >
 > 🔥 **Keep your streak.** Daily streaks with streak freezes to protect them,
-> weekly quests, and 40 achievements.
+> weekly quests, and 51 achievements.
 >
 > 🌙 **Stay a while.** The animals have so much to tell you. They find you
 > fascinating. They're so glad you're here.
@@ -96,5 +96,5 @@ assets — the reveal is the product.
 
 > The house is ready. The animals are waiting.
 > • Thousands of letter-shifting puzzles across four difficulties
-> • Ten animal friends, a house to build, a daily challenge to share
+> • Thirteen animal friends, a house to build, a daily challenge to share
 > • Streaks, quests, achievements — and a story that unfolds the longer you stay

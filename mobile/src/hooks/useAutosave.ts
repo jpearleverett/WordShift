@@ -30,6 +30,7 @@ export interface AutosaveDeps {
   lastFormedWord: string | null;
   doubleShiftPhase: string | null;
   speedTimeRemaining: number | null;
+  isSharedChallenge: boolean;
 }
 
 /**
@@ -85,6 +86,7 @@ export function useAutosave(deps: AutosaveDeps): void {
           doubleShiftPhase: deps.doubleShiftPhase as any,
           isPlayingDaily: deps.isPlayingDaily,
           dailyDate: deps.isPlayingDaily ? getTodayString() : null,
+          isSharedChallenge: deps.isSharedChallenge,
           speedTimerExpireAt: deps.speedTimeRemaining != null
             ? Date.now() + deps.speedTimeRemaining * 1000
             : null,
@@ -127,5 +129,6 @@ export function useAutosave(deps: AutosaveDeps): void {
     deps.lastFormedWord,
     deps.doubleShiftPhase,
     deps.speedTimeRemaining,
+    deps.isSharedChallenge,
   ]);
 }

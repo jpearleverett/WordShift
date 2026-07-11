@@ -29,6 +29,31 @@ import { recordOfferingFulfillment } from '../services/offeringRequests';
 import { PuzzleVariant, getVariantAmberMultiplier, getNewlyUnlockedVariants } from '../services/puzzleVariety';
 import { enqueueHarvestBatch, generateBatchId, getPendingHarvestSummary, HarvestSummary } from '../services/wordHarvest';
 
+/**
+ * Itemized amber breakdown for a single victory, straight from the economy
+ * (awardPuzzleAmber + the variant bonus pass). Every line is additive and the
+ * parts sum exactly to `total` (=== VictoryData.amberEarned), so the Victory
+ * modal can render the REAL itemization instead of re-deriving base/star math
+ * from AMBER_REWARDS and hardcoded multipliers.
+ */
+export interface AmberBreakdown {
+  /** Pure difficulty base (AMBER_REWARDS[difficulty]) before the star bonus. */
+  base: number;
+  /** Star-rating increment (3-star +50% / 2-star +25%), already floored. */
+  starBonus: number;
+  streakBonus: number;
+  challengeBonus: number;
+  patronBonus: number;
+  surpriseBonus: number;
+  variantBonus: number;
+  freshVariantBonus: number;
+  firstCompletionBonus: number;
+  milestoneBonus: number;
+  streakMilestoneBonus: number;
+  /** Sum of every line above — equals VictoryData.amberEarned. */
+  total: number;
+}
+
 export interface VictoryData {
   earnedStars: number;
   /** Perfect play: 0 hints, 0 invalid attempts, 0 undos (the tier above 3 stars). */
@@ -37,7 +62,11 @@ export interface VictoryData {
   flawlessCount?: number;
   /** Total amber value computed for this puzzle (queued, not yet spendable) */
   amberEarned: number;
+  /** Real itemization of amberEarned (absent only on guard/error fallbacks) */
+  amberBreakdown?: AmberBreakdown;
   amberBalance: number;
+  /** True when this victory was the Daily Challenge (never a compact victory) */
+  isDaily?: boolean;
   phaseChanged: boolean;
   newPhase: DialoguePhase;
   streakBonus: number;
@@ -113,7 +142,8 @@ export interface PersistenceActions {
     variant?: PuzzleVariant,
     isDaily?: boolean,
     undosUsed?: number,
-    blind?: boolean
+    blind?: boolean,
+    isSharedChallenge?: boolean
   ) => Promise<VictoryData>;
   setAmberBalance: (balance: number) => void;
   refreshStats: () => Promise<void>;
@@ -172,7 +202,11 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
     variant: PuzzleVariant = 'standard',
     isDaily: boolean = false,
     undosUsed: number = 0,
-    blind: boolean = false
+    blind: boolean = false,
+    // Shared-challenge-link wins are AMBER-ONLY: they skip weighted phase
+    // progress AND the ritual-energy phase feed, so a self-crafted trivial
+    // chain can never accelerate the narrative descent.
+    isSharedChallenge: boolean = false
   ): Promise<VictoryData> => {
     const stars = calculateStars(hintsUsed, invalidAttempts);
     const flawless = isFlawless(hintsUsed, invalidAttempts, undosUsed);
@@ -183,6 +217,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         earnedStars: stars,
         amberEarned: 0,
         amberBalance,
+        isDaily,
         phaseChanged: false,
         newPhase: currentPhase,
         streakBonus: 0,
@@ -214,8 +249,12 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
       const stats = await getCumulativeStats();
       const threeStarRate = getThreeStarRate(stats) / 100; // Convert percentage to ratio
 
-      // creditToBalance=false: amber is queued in a harvest batch, not credited yet
-      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false);
+      // creditToBalance=false: amber is queued in a harvest batch, not credited yet.
+      // skipPhaseProgress: shared-challenge wins pay full amber but feed ZERO
+      // weighted phase progress (see awardPuzzleAmber's option contract).
+      const amberResult = await awardPuzzleAmber(difficulty, stars, gameMode, threeStarRate, false, {
+        skipPhaseProgress: isSharedChallenge,
+      });
 
       // Phase 5 (post-revelation) is set via markPostRevelation(), not phase progression.
       // calculatePhase() maxes at 4, so amberResult.newPhase can't exceed 4. If the player
@@ -256,6 +295,23 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         + amberResult.firstCompletionBonus
         + amberResult.streakMilestoneBonus;
 
+      // Real itemization for the Victory modal — every part comes from the
+      // economy itself (never re-derived in the UI); parts sum to the total.
+      const amberBreakdown: AmberBreakdown = {
+        base: amberResult.baseAmber ?? 0,
+        starBonus: amberResult.starBonusAmber ?? 0,
+        streakBonus: amberResult.streakBonus ?? 0,
+        challengeBonus: amberResult.challengeBonus ?? 0,
+        patronBonus: amberResult.patronBonus ?? 0,
+        surpriseBonus: amberResult.surpriseBonus ?? 0,
+        variantBonus,
+        freshVariantBonus,
+        firstCompletionBonus: amberResult.firstCompletionBonus ?? 0,
+        milestoneBonus: amberResult.milestoneBonus ?? 0,
+        streakMilestoneBonus: amberResult.streakMilestoneBonus ?? 0,
+        total: totalQueuedAmber,
+      };
+
       // Enqueue harvest batch with all completed words and computed amber value
       const harvestedWords = completedWords.length > 0
         ? [...new Set(completedWords.map(w => w.toUpperCase()))]
@@ -291,11 +347,14 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         setPhaseProgressFraction(1.0);
       }
 
-      // Record ritual words from the completed puzzle
+      // Record ritual words from the completed puzzle. Shared-challenge wins
+      // pass ZERO ritual energy: the words still land in the ledger and the
+      // trigger-word queue (flavor stays), but recordRitualWords' energy-based
+      // phaseProgress feed gets nothing — the second half of the amber-only rule.
       let totalWordsFormed = 0;
       let ritualEnergy = 0;
       if (completedWords.length > 0) {
-        ritualEnergy = calculateRitualEnergy(completedWords, effectivePhase);
+        ritualEnergy = isSharedChallenge ? 0 : calculateRitualEnergy(completedWords, effectivePhase);
         const triggerWords = extractTriggerWords(completedWords);
         const ritualResult = await recordRitualWords(completedWords, ritualEnergy, triggerWords);
         totalWordsFormed = ritualResult.totalWordsFormed;
@@ -364,7 +423,9 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         flawless,
         flawlessCount: stats.flawlessCount ?? 0,
         amberEarned: totalQueuedAmber,
+        amberBreakdown,
         amberBalance: amberResult.newBalance,
+        isDaily,
         phaseChanged: amberResult.phaseChanged,
         newPhase: effectivePhase,
         streakBonus: amberResult.streakBonus,
@@ -401,6 +462,7 @@ export function useGamePersistence(): [PersistenceState, PersistenceActions] {
         earnedStars: stars,
         amberEarned: 0,
         amberBalance,
+        isDaily,
         phaseChanged: false,
         newPhase: currentPhase,
         streakBonus: 0,

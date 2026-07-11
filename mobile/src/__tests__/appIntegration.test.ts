@@ -121,9 +121,24 @@ describe('reset-all wiring', () => {
     // Without this, the Expo Go / dev fallback (Updates.reloadAsync throws)
     // returned the player to a home screen still rendering the old save.
     expect(APP_TSX).toMatch(/onReset=\{handleResetComplete\}/);
-    // The rebuild refreshes persistence and restarts onboarding live.
-    expect(APP_TSX).toMatch(/advanceOnboarding\('home_empty'\)/);
+    // The shared rebuild refreshes persistence; Reset All restarts onboarding
+    // live while the creator-snapshot path keeps it complete.
+    expect(APP_TSX).toMatch(/restartOnboarding \? 'home_empty' : 'complete'/);
+    expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: true \}\)/);
+    expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: false \}\)/);
     expect(APP_TSX).toMatch(/puzzleActions\.clearBoard\(\)/);
+  });
+});
+
+describe('drag input without previews', () => {
+  test('drops resolve slot geometry from the live board when previews are suppressed', () => {
+    // Previews are suppressed in blind AND challenge modes; the drop handler
+    // must derive slot count from the board or every drag in those modes dies
+    // as a "miss" and only tap input works.
+    expect(APP_TSX).toMatch(/slotCount = previews\?\.length \?\? 0/);
+    expect(APP_TSX).toMatch(/targetRow\.words\.length \+ 1/);
+    // Near-miss snapping stays preview-gated (no free validity tell in blind).
+    expect(APP_TSX).toMatch(/previews && !previews\[estimated\]\?\.isValid/);
   });
 });
 

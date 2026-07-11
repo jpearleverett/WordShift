@@ -52,6 +52,9 @@ jest.mock('../services/localGenerator', () => ({
     Promise.resolve({
       words: ['FARM', 'ARM', 'WARM', 'WAR'],
       hint: 'Think about letters...',
+      solution: [
+        { stepIndex: 0, sourceWord: 'FARM', targetWord: 'ARM', letterToMove: 'F', explanation: '' },
+      ],
       difficulty: 'MEDIUM',
     })
   ),
@@ -316,6 +319,13 @@ describe('generateDailyPuzzle caching / prewarm', () => {
     const second = await generateDailyPuzzle();
     expect(second).toEqual(first);
     expect((generateLocalPuzzle as jest.Mock)).toHaveBeenCalledTimes(1);
+  });
+
+  test('threads the generator solution through DailyPuzzleData (stored-step daily hints)', async () => {
+    const daily = await generateDailyPuzzle();
+    expect(daily.solution).toEqual([
+      { stepIndex: 0, sourceWord: 'FARM', targetWord: 'ARM', letterToMove: 'F', explanation: '' },
+    ]);
   });
 
   test('prewarm generates the puzzle ahead of time so the next call is cached', async () => {

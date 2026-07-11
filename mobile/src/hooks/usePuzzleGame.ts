@@ -142,6 +142,144 @@ export function hasAnyValidDoubleShiftMove(
 }
 
 /**
+ * From-state solvability: can the CURRENT mid-game board still be completed
+ * under the shipped rules? This is the lock-aware analogue of
+ * puzzleSolvability.isChainSolvable — that solver only accepts fresh,
+ * lock-free word chains, so it cannot be seeded with a live board where
+ * received letters are already locked (and treating them as pickable would
+ * bless dead ends). The rules here mirror handleSlotPress exactly, per
+ * variant family:
+ * - standard/speed: forward moves only; the target row's lock map is
+ *   REPLACED (only the just-moved letter stays locked).
+ * - reverse: descend with replace-locks, flip at row n-1, ascend with
+ *   CUMULATIVE locks; completes when the ascent move into row 0 commits.
+ * - double_shift: two-letter steps (drop1 unvalidated), locks accumulate.
+ *
+ * Pure and render-free (used by handleHint to avoid steering the player into
+ * an unsolvable line). Bounded by a node budget: exhaustion returns false
+ * ("not provably solvable"), which callers treat as a soft signal — the hint
+ * path degrades to its legacy first-valid behavior rather than failing.
+ */
+export function isBoardSolvableFromState(
+  rows: Array<Array<{ char: string; isLocked: boolean }>>,
+  activeRowIndex: number,
+  moveDirection: 'down' | 'up',
+  kind: 'standard' | 'reverse' | 'double_shift',
+  isWordValid: (word: string) => boolean,
+  nodeCap: number = 150000
+): boolean {
+  const n = rows.length;
+  if (n === 0 || activeRowIndex < 0 || activeRowIndex >= n) return false;
+  let nodes = 0;
+
+  type Cell = { char: string; isLocked: boolean };
+  const wordOf = (cells: Cell[]): string => cells.map(c => c.char).join('');
+
+  const goForward = (board: Cell[][], active: number, dbl: boolean): boolean => {
+    if (active >= n - 1) return true; // nothing left to shift
+    if (++nodes > nodeCap) return false;
+    const src = board[active];
+    const tgt = board[active + 1];
+
+    if (!dbl) {
+      for (let i = 0; i < src.length; i++) {
+        if (src[i].isLocked) continue;
+        const remaining = src.filter((_, k) => k !== i);
+        if (!isWordValid(wordOf(remaining))) continue;
+        for (let j = 0; j <= tgt.length; j++) {
+          // Standard forward leg: the target's lock map is replaced.
+          const nextTgt: Cell[] = [
+            ...tgt.slice(0, j).map(c => ({ char: c.char, isLocked: false })),
+            { char: src[i].char, isLocked: true },
+            ...tgt.slice(j).map(c => ({ char: c.char, isLocked: false })),
+          ];
+          if (!isWordValid(wordOf(nextTgt))) continue;
+          if (active === n - 2) return true; // completing move
+          const nextBoard = board.slice();
+          nextBoard[active] = remaining;
+          nextBoard[active + 1] = nextTgt;
+          if (goForward(nextBoard, active + 1, false)) return true;
+        }
+      }
+      return false;
+    }
+
+    // Double shift: ordered pair of distinct unlocked letters; cumulative locks.
+    for (let a = 0; a < src.length; a++) {
+      if (src[a].isLocked) continue;
+      const afterA = src.filter((_, k) => k !== a);
+      for (let b = 0; b < afterA.length; b++) {
+        if (afterA[b].isLocked) continue;
+        const finalSource = afterA.filter((_, k) => k !== b);
+        if (!isWordValid(wordOf(finalSource))) continue;
+        for (let i = 0; i <= tgt.length; i++) {
+          const intermediate: Cell[] = [
+            ...tgt.slice(0, i),
+            { char: src[a].char, isLocked: true },
+            ...tgt.slice(i),
+          ];
+          for (let j = 0; j <= intermediate.length; j++) {
+            const finalTarget: Cell[] = [
+              ...intermediate.slice(0, j),
+              { char: afterA[b].char, isLocked: true },
+              ...intermediate.slice(j),
+            ];
+            if (!isWordValid(wordOf(finalTarget))) continue;
+            if (active === n - 2) return true; // completing step
+            const nextBoard = board.slice();
+            nextBoard[active] = finalSource;
+            nextBoard[active + 1] = finalTarget;
+            if (goForward(nextBoard, active + 1, true)) return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
+  const goReverse = (board: Cell[][], active: number, dir: 'down' | 'up'): boolean => {
+    if (++nodes > nodeCap) return false;
+    const tgtIdx = dir === 'down' ? active + 1 : active - 1;
+    if (tgtIdx < 0 || tgtIdx >= n) return false;
+    const src = board[active];
+    const tgt = board[tgtIdx];
+    const cumulative = dir === 'up'; // ascent locks accumulate
+    for (let i = 0; i < src.length; i++) {
+      if (src[i].isLocked) continue;
+      const remaining = src.filter((_, k) => k !== i);
+      if (!isWordValid(wordOf(remaining))) continue;
+      for (let j = 0; j <= tgt.length; j++) {
+        const nextTgt: Cell[] = [
+          ...tgt.slice(0, j).map(c => ({ char: c.char, isLocked: cumulative ? c.isLocked : false })),
+          { char: src[i].char, isLocked: true },
+          ...tgt.slice(j).map(c => ({ char: c.char, isLocked: cumulative ? c.isLocked : false })),
+        ];
+        if (!isWordValid(wordOf(nextTgt))) continue;
+        if (dir === 'up' && tgtIdx === 0) return true; // completing ascent move
+        const nextBoard = board.slice();
+        nextBoard[active] = remaining;
+        nextBoard[tgtIdx] = nextTgt;
+        if (dir === 'down') {
+          if (active === n - 2) {
+            // Midpoint: flip to the ascent, starting from the last row.
+            if (goReverse(nextBoard, n - 1, 'up')) return true;
+          } else if (goReverse(nextBoard, active + 1, 'down')) {
+            return true;
+          }
+        } else if (goReverse(nextBoard, active - 1, 'up')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const board = rows.map(r => r.map(c => ({ char: c.char, isLocked: c.isLocked })));
+  if (kind === 'reverse') return goReverse(board, activeRowIndex, moveDirection);
+  return goForward(board, activeRowIndex, kind === 'double_shift');
+}
+
+/**
  * Board coordinates for the hint glow. Set when a hint is actually delivered;
  * reuses the SAME tutorial-guide visuals (LetterTile guide ring / Slot halo).
  * `targetSlotIndex` may be undefined when only the letter can be pinpointed
@@ -196,6 +334,17 @@ export interface PuzzleGameState {
   gameMode: GameMode;
   /** Blind Offering modifier active (ghost previews hidden). */
   blindMode: boolean;
+  /**
+   * True while the current board came from a friend's shared challenge link
+   * (startSharedChallengeGame). Every other start path — initGame/startNewGame
+   * (and therefore Next Level), startDailyGame, clearBoard — resets it, so a
+   * consumer (e.g. recordVictory threading) can make shared-link wins
+   * amber-only. NOT persisted in the autosave shape: restorePuzzleState resets
+   * it to false, so a shared board resumed after a process kill counts as a
+   * normal board (documented trade-off; threading it through SavedPuzzleState
+   * is a one-field change if that ever matters).
+   */
+  isSharedChallenge: boolean;
   undosRemaining: number;
   currentPhase: DialoguePhase;
   /** The word chain from the last completed puzzle (for ritual echo display) */
@@ -286,9 +435,16 @@ export interface PuzzleGameActions {
   /**
    * Start a Daily Challenge from pre-generated words. Always a standard,
    * hint-enabled board (rewards as HARD). Deliberately does NOT mutate the
-   * player's chosen difficulty preference.
+   * player's chosen difficulty preference. The optional solution (produced by
+   * the daily's seeded generator) powers stored-step hints exactly like a bank
+   * puzzle's; omitting it preserves the legacy live-search hint behavior.
    */
-  startDailyGame: (words: string[], puzzleHint: string | undefined, wordLength: number) => void;
+  startDailyGame: (
+    words: string[],
+    puzzleHint: string | undefined,
+    wordLength: number,
+    puzzleSolution?: PuzzleSolutionStep[]
+  ) => void;
   /**
    * Start a puzzle from a friend-shared word chain. Mirrors startDailyGame's
    * bypass pattern: standard, hint-enabled board; the player's difficulty
@@ -365,6 +521,8 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   // gameMode; forced OFF on daily/shared-challenge boards. Composes with any
   // variant/difficulty. No amber bonus by design — the reward is the mastery.
   const [blindMode, setBlindMode] = useState(false);
+  // Friend-challenge provenance for the current board (see PuzzleGameState doc).
+  const [isSharedChallenge, setIsSharedChallenge] = useState(false);
   const [undosRemaining, setUndosRemaining] = useState(Infinity);
   const [currentVariant, setCurrentVariant] = useState<PuzzleVariant>('standard');
   const [selectedVariant, setSelectedVariantState] = useState<PuzzleVariant>('standard');
@@ -535,6 +693,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     variant: PuzzleVariant = 'standard',
     puzzleReverseSolution?: PuzzleSolutionStep[]
   ) => {
+    // Every non-shared start path routes through here (curated/echo/bank/
+    // generated/fallback) — a fresh board is never a shared challenge.
+    setIsSharedChallenge(false);
     applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
       resetPerformance: true,
       variant,
@@ -772,11 +933,16 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
   const startDailyGame = useCallback((
     words: string[],
     puzzleHint: string | undefined,
-    wordLength: number
+    wordLength: number,
+    puzzleSolution?: PuzzleSolutionStep[]
   ) => {
     setGameMode('standard');
     setBlindMode(false); // the daily is a shared board — never blind
-    applyBoard(words, puzzleHint, undefined, wordLength, {
+    setIsSharedChallenge(false);
+    // The daily generator's solution steps thread through like a bank puzzle's,
+    // so daily hints use the stored solution instead of the blind live search.
+    // Optional param keeps older 3-arg callers working unchanged.
+    applyBoard(words, puzzleHint, puzzleSolution, wordLength, {
       resetPerformance: true,
       variant: 'standard',
     });
@@ -814,6 +980,9 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       resetPerformance: true,
       variant: 'standard',
     });
+    // Mark provenance AFTER the board applies so consumers (amber-only wins for
+    // shared links) see the flag and the board flip together.
+    setIsSharedChallenge(true);
     setUndosRemaining(Infinity);
     setMessage(getStartMessage(currentPhase));
     return true;
@@ -1083,12 +1252,67 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         ));
       }
     } else {
-      // Off solution path — try to find any valid move from the current board state
+      // Off solution path — find a valid move from the current board state.
+      // Dead-end awareness: a blind first-valid pick can steer the player into
+      // an unsolvable line, and on boards with no stored solution (the daily,
+      // shared links) EVERY hint takes this path. Prefer the first candidate
+      // whose post-move board is still solvable under the shipped rules
+      // (isBoardSolvableFromState, the lock-aware from-state analogue of
+      // puzzleSolvability.isChainSolvable); fall back to the plain first-valid
+      // candidate only when no solvability-preserving move exists — a hint
+      // must never come up empty while a legal move does.
       const sourceLetters = rows[activeRowIndex].words;
       const targetWord = currentTargetWord;
-      let foundMove: { letter: string; resultWord: string; letterIndex: number; slotIndex: number } | null = null;
+      const wordValid = (w: string) => validWordsCache.current.has(w);
+      const isReverseVariantHint = hasVariantModifier(currentVariant, 'reverse');
+      const solverKind: 'standard' | 'reverse' | 'double_shift' = isDoubleShiftHint
+        ? 'double_shift'
+        : isReverseVariantHint
+          ? 'reverse'
+          : 'standard';
+      // The one-pick-one-drop candidate model matches every path except a
+      // double-shift step still awaiting its FIRST drop, where a single move
+      // is only half a step — keep the legacy first-valid behavior there.
+      const canCheckSolvability = !isDoubleShiftHint || doubleShiftMidStep;
 
-      for (let i = 0; i < sourceLetters.length; i++) {
+      const keepsBoardSolvable = (letterIndex: number, slotIndex: number): boolean => {
+        const movedChar = sourceLetters[letterIndex].char;
+        const targetCells = rows[hintTargetRowIndex].words;
+        // Lock semantics mirror handleSlotPress: cumulative on the reverse
+        // ascent and in double shift, replaced on the forward/descent leg.
+        const cumulativeLocks =
+          solverKind === 'double_shift' || (solverKind === 'reverse' && moveDirection === 'up');
+        const nextTarget = [
+          ...targetCells.slice(0, slotIndex).map(l => ({ char: l.char, isLocked: cumulativeLocks ? l.isLocked : false })),
+          { char: movedChar, isLocked: true },
+          ...targetCells.slice(slotIndex).map(l => ({ char: l.char, isLocked: cumulativeLocks ? l.isLocked : false })),
+        ];
+        const nextBoard = rows.map(r => r.words.map(l => ({ char: l.char, isLocked: l.isLocked })));
+        nextBoard[activeRowIndex] = sourceLetters
+          .filter((_, idx) => idx !== letterIndex)
+          .map(l => ({ char: l.char, isLocked: l.isLocked }));
+        nextBoard[hintTargetRowIndex] = nextTarget;
+
+        if (solverKind === 'reverse') {
+          if (moveDirection === 'up') {
+            if (hintTargetRowIndex === 0) return true; // completing ascent move
+            return isBoardSolvableFromState(nextBoard, activeRowIndex - 1, 'up', 'reverse', wordValid);
+          }
+          if (activeRowIndex === rows.length - 2) {
+            // Descent midpoint: the ascent starts at the last row.
+            return isBoardSolvableFromState(nextBoard, rows.length - 1, 'up', 'reverse', wordValid);
+          }
+          return isBoardSolvableFromState(nextBoard, activeRowIndex + 1, 'down', 'reverse', wordValid);
+        }
+        if (activeRowIndex === rows.length - 2) return true; // completing move/step
+        return isBoardSolvableFromState(nextBoard, activeRowIndex + 1, 'down', solverKind, wordValid);
+      };
+
+      type FoundMove = { letter: string; resultWord: string; letterIndex: number; slotIndex: number };
+      let foundMove: FoundMove | null = null;
+      let firstValidMove: FoundMove | null = null;
+
+      for (let i = 0; i < sourceLetters.length && !foundMove; i++) {
         if (sourceLetters[i].isLocked) continue;
         const letter = sourceLetters[i].char;
         // Check if removing this letter leaves a valid word
@@ -1099,15 +1323,22 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
         if (!validWordsCache.current.has(remaining)) continue;
 
         // Check if inserting this letter into any position in the target creates a valid word
-        for (let j = 0; j <= targetWord.length; j++) {
+        for (let j = 0; j <= targetWord.length && !foundMove; j++) {
           const candidate = targetWord.slice(0, j) + letter + targetWord.slice(j);
-          if (validWordsCache.current.has(candidate)) {
+          if (!validWordsCache.current.has(candidate)) continue;
+          if (!firstValidMove) {
+            firstValidMove = { letter, resultWord: candidate, letterIndex: i, slotIndex: j };
+          }
+          if (!canCheckSolvability || keepsBoardSolvable(i, j)) {
             foundMove = { letter, resultWord: candidate, letterIndex: i, slotIndex: j };
-            break;
           }
         }
-        if (foundMove) break;
       }
+
+      // No solvability-preserving candidate exists (or the budget ran out) —
+      // degrade to the legacy first-valid behavior rather than refusing to
+      // help. The player can still undo out of the dead end.
+      if (!foundMove) foundMove = firstValidMove;
 
       if (foundMove) {
         setHintsUsed(prev => prev + 1);
@@ -1642,6 +1873,14 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     // these validity flags, suppressing them also removes the "tile jumps to a
     // valid slot" tell, keeping the modifier honestly blind.
     if (blindMode) return undefined;
+    // Challenge mode: previews are part of what the mode takes away. With the
+    // ✓/✗ ghost previews on, every move gets a free hint — "no hints, limited
+    // undos" costs almost nothing while paying 1.5x amber / 2x phase progress.
+    // Suppressed via the same mechanism as blindMode (which also disables the
+    // drag valid-slot snapping tell), covering the double-shift drop1
+    // look-ahead too. Stuck detection (hasAnyValidMove/…DoubleShiftMove) and
+    // the undo/restart recovery paths are preview-independent and keep working.
+    if (gameMode === 'challenge') return undefined;
 
     const isDoubleShift = hasVariantModifier(currentVariant, 'double_shift');
 
@@ -1710,7 +1949,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
       }
     }
     return previews;
-  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode]);
+  }, [selectedLetter, activeRowIndex, moveDirection, rows, gameState, currentVariant, doubleShiftPhase, blindMode, gameMode]);
 
   const restorePuzzleState = useCallback((saved: SavedPuzzleState) => {
     const selectedExists = saved.selectedLetter
@@ -1732,6 +1971,11 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setReverseSolution(saved.reverseSolution);
     setGameMode(saved.gameMode);
     setBlindMode(saved.blindMode ?? false);
+    // Shared-challenge provenance rides in the autosave (isSharedChallenge in
+    // SavedPuzzleState) so a kill+relaunch can't convert a shared board
+    // (amber-only) into one that feeds phase progress. Old saves without the
+    // field restore as normal boards.
+    setIsSharedChallenge(saved.isSharedChallenge ?? false);
     setCurrentVariant(saved.currentVariant);
     setSelectedVariantState(saved.selectedVariant);
     setMoveDirection(saved.moveDirection);
@@ -1817,6 +2061,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     setLastFormedWord(null);
     setDoubleShiftPhase(null);
     setIsEchoPuzzle(false);
+    setIsSharedChallenge(false);
     setIsStuck(false);
     setHintHighlight(null);
     setLastArrival(null);
@@ -1849,6 +2094,7 @@ export function usePuzzleGame(): [PuzzleGameState, PuzzleGameActions] {
     earnedStars,
     gameMode,
     blindMode,
+    isSharedChallenge,
     undosRemaining,
     currentPhase,
     lastCompletedWords,

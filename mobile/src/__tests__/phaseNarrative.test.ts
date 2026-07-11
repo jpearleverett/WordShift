@@ -36,6 +36,9 @@ import {
   getRitualEchoFooter,
   getWordsOfferedText,
   getIncantationName,
+  getNewCyclePointerLine,
+  NEW_CYCLE_POINTER_LINES,
+  getPersonalizedPhase5Whisper,
 } from '../services/phaseNarrative';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DialoguePhase } from '../types/homeWorld';
@@ -329,6 +332,75 @@ describe('getGoalSuggestion', () => {
     const suggestion = getGoalSuggestion(1, false, [], null, false, 40, true);
     expect(suggestion?.action).toBe('quests');
     expect(suggestion?.text).toContain('+40 amber');
+  });
+});
+
+describe('getNewCyclePointerLine', () => {
+  test.each([0, 1, 2, 3, 4] as DialoguePhase[])('returns null below phase 5 (phase %i)', (phase) => {
+    expect(getNewCyclePointerLine(phase)).toBeNull();
+  });
+
+  test('returns one of the pointer variants at phase 5', () => {
+    const line = getNewCyclePointerLine(5);
+    expect(typeof line).toBe('string');
+    expect(line!.length).toBeGreaterThan(0);
+    expect(NEW_CYCLE_POINTER_LINES).toContain(line);
+  });
+
+  test('is deterministic (repeated calls agree)', () => {
+    expect(getNewCyclePointerLine(5)).toBe(getNewCyclePointerLine(5));
+  });
+
+  test('variants stay in-world: no settings/UI/phase language, no em dashes', () => {
+    expect(NEW_CYCLE_POINTER_LINES.length).toBeGreaterThanOrEqual(2);
+    for (const line of NEW_CYCLE_POINTER_LINES) {
+      expect(line.length).toBeGreaterThan(0);
+      expect(line.toLowerCase()).not.toMatch(/setting|button|menu|screen|tap|phase|cycle/);
+      expect(line).not.toMatch(/[–—]/);
+    }
+  });
+});
+
+describe('getPersonalizedPhase5Whisper', () => {
+  const realRandom = Math.random;
+  afterEach(() => {
+    Math.random = realRandom;
+  });
+
+  test('weaves a remembered word into the whisper', () => {
+    Math.random = () => 0; // word idx 0, animal idx 0, personalized branch (0 < 0.65)
+    const whisper = getPersonalizedPhase5Whisper(['fox'], ['ember']);
+    expect(whisper).not.toBeNull();
+    expect(whisper!.animalName).toBe('Ember');
+    expect(whisper!.animalType).toBe('fox');
+    expect(whisper!.text).toContain('EMBER');
+  });
+
+  test('covers every animal including the descent trio', () => {
+    Math.random = () => 0;
+    const animals = [
+      'fox', 'pangolin', 'owl', 'axolotl', 'capybara', 'fennec_fox',
+      'sloth', 'wombat', 'rabbit', 'red_panda', 'tarsier', 'aye_aye', 'kakapo',
+    ];
+    for (const animal of animals) {
+      const whisper = getPersonalizedPhase5Whisper([animal], ['VOID']);
+      expect(whisper).not.toBeNull();
+      expect(whisper!.animalType).toBe(animal);
+      // A personalized template (not the generic pool) must exist for each.
+      expect(whisper!.text).toContain('VOID');
+      expect(whisper!.text).not.toMatch(/[–—]/);
+    }
+  });
+
+  test('falls back to the standard pool when no words are recorded', () => {
+    Math.random = () => 0;
+    const whisper = getPersonalizedPhase5Whisper(['fox'], []);
+    // Fallback delegates to getAnimalWhisper(5, ...) — may be null or generic,
+    // but must never throw and never fabricate a word reference.
+    if (whisper) {
+      expect(typeof whisper.text).toBe('string');
+      expect(whisper.text.length).toBeGreaterThan(0);
+    }
   });
 });
 

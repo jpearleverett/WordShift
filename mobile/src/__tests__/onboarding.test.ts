@@ -145,6 +145,19 @@ describe('onboarding', () => {
     test('unlock_explained stays a tight closing beat (four lines)', () => {
       expect(ONBOARDING_FOX_LINES.unlock_explained.length).toBe(4);
     });
+
+    test('the between-moves beat teaches the both-words rule and the check/cross previews', () => {
+      // App.tsx renders puzzle_tutorial_valid_move[0] after the first guided
+      // move — the tutorial's one chance to name the core rule (both resulting
+      // words must stay valid) and the ✓/✗ ghost previews that encode it.
+      const text = ONBOARDING_FOX_LINES.puzzle_tutorial_valid_move[0].toLowerCase();
+      expect(text).toContain('both words');
+      expect(text).toContain('green check');
+      expect(text).toContain('red cross');
+      // The undo/hint recovery pointers must survive the rewrite.
+      expect(text).toContain('undo');
+      expect(text).toContain('hint');
+    });
   });
 
   describe('onboarding flow ordering', () => {

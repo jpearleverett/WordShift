@@ -7,10 +7,12 @@ import { getWinBackMessage } from './phaseNarrative';
  * Push notification scheduling service for WordShift.
  *
  * Schedules local notifications for:
- * - Daily puzzle reminders (morning, 7-day one-shot ladder)
- * - Streak-at-risk reminders (evening of the first missed day, streak >= 2)
- * - Escalating win-back ladder after inactivity (+1/+3/+7 days, 6pm)
- * - Weekly-quest-expiry nudge (Sunday evening before the reset)
+ * - Daily puzzle reminders (morning, 7-day one-shot ladder; generic come-back
+ *   copy routed home while the Daily Challenge is still locked)
+ * - Streak-at-risk reminders (evening of the first missed day, streak >= 2, 19:00)
+ * - Escalating win-back ladder after inactivity (+1/+3/+7/+14/+30 days, 18:00)
+ * - Weekly-quest-expiry nudge (Sunday 17:30, before the local-Monday reset —
+ *   staggered off the 18:00 win-back rungs)
  *
  * Every notification carries a content.data.target payload ('daily' | 'home')
  * so a tap can be routed by App.tsx's notification-response listener.
@@ -70,6 +72,40 @@ const DAILY_REMINDER_MESSAGES: Record<number, string[]> = {
   5: [
     'The daily puzzle is here. The pattern continues.',
     'Another day, another arrangement. Breathe.',
+  ],
+};
+
+// Served in place of the daily-puzzle reminder while the Daily Challenge is
+// still LOCKED (the permission prompt can fire from the 3rd victory, but the
+// daily unlocks later) — generic, in-world come-back copy that never
+// advertises content the player can't reach, routed home instead of to the
+// daily. Realistically only the early phases are ever seen (phase 1+ unlocks
+// the daily on its own), but the table stays fully phase-aware by convention.
+const EARLY_REMINDER_MESSAGES: Record<number, string[]> = {
+  0: [
+    'The animals are wondering where you went. Come shift some letters!',
+    'Fresh words are waiting at the house. Come play!',
+    'Your friends at the house saved a puzzle for you. Come say hi!',
+  ],
+  1: [
+    'The house is quiet without you. The words have been thinking.',
+    'The animals keep glancing at the door. A few new words await.',
+  ],
+  2: [
+    'The house feels emptier when you are away. The words wait.',
+    'The animals have questions only the words can answer. Return soon.',
+  ],
+  3: [
+    'The house grows cold. The words have not forgotten you.',
+    'Something waits at the house. The letters keep their shape for you.',
+  ],
+  4: [
+    'The arrangement misses your hands.',
+    'The house stands ready. The words remember who moves them.',
+  ],
+  5: [
+    'The house rests. The words will be there when you return.',
+    'No hurry. The pattern keeps. Come back when you like.',
   ],
 };
 
@@ -243,9 +279,14 @@ export async function getNotificationPrefs(): Promise<NotificationPreferences> {
 }
 
 /**
- * Save notification preferences.
+ * Save notification preferences and re-schedule with the caller's current
+ * narrative phase (so a Phase 3-4 player toggling reminders in Settings never
+ * re-arms the ladder with bright Phase-0 copy).
  */
-export async function setNotificationPrefs(prefs: Partial<NotificationPreferences>): Promise<void> {
+export async function setNotificationPrefs(
+  prefs: Partial<NotificationPreferences>,
+  currentPhase: number
+): Promise<void> {
   const current = await getNotificationPrefs();
   const updated = { ...current, ...prefs };
   prefsCache = updated;
@@ -253,8 +294,8 @@ export async function setNotificationPrefs(prefs: Partial<NotificationPreference
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch {}
 
-  // Re-schedule notifications based on new prefs
-  await scheduleAllNotifications(0);
+  // Re-schedule notifications based on new prefs, phase-aware.
+  await scheduleAllNotifications(currentPhase);
 }
 
 /**
@@ -284,16 +325,22 @@ export async function scheduleAllNotifications(currentPhase: number): Promise<vo
   // so a daily player never gets a redundant "your puzzle is ready" ping.
   const playedToday = await hasPlayedTodaySafe();
 
-  // Schedule daily reminder
+  // Schedule daily reminder. While the Daily Challenge is still locked (the
+  // permission prompt can fire from the 3rd victory; the daily unlocks at 8
+  // puzzles / Phase 1) the ladder still arms, but with generic come-back copy
+  // routed home — never "your daily puzzle is ready" for content the player
+  // can't reach yet.
   if (prefs.dailyReminderEnabled) {
-    await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday);
+    const dailyUnlocked = await isDailyChallengeUnlockedSafe(currentPhase);
+    await scheduleDailyReminder(mod, prefs.dailyReminderHour, currentPhase, playedToday, dailyUnlocked);
   }
 
   // Win-back ladder. Players with an active streak hear about the streak
   // first (this/next evening), then the win-back ladder starts a day later;
-  // everyone else starts the ladder tomorrow. Rungs escalate at +1, +3 and
-  // +7 days. Each app session reschedules, so these only fire on days the
-  // player actually missed — an active player never sees a win-back.
+  // everyone else starts the ladder tomorrow. Rungs escalate per
+  // WIN_BACK_RUNG_OFFSETS (+1/+3/+7/+14/+30 days). Each app session
+  // reschedules, so these only fire on days the player actually missed — an
+  // active player never sees a win-back.
   if (prefs.reengagementEnabled) {
     const streak = await getCurrentStreakSafe();
     // Streak-risk only fires when genuinely at risk: a real streak (>= 2) that
@@ -363,6 +410,17 @@ export function getQuestExpiryMessage(phase: number): string {
   return messages[Math.floor(Math.random() * messages.length)];
 }
 
+/**
+ * Get a phase-aware generic come-back message. Used for the morning reminder
+ * ladder while the Daily Challenge is still locked, so an early player is
+ * invited back to the house instead of to a daily they can't open yet.
+ */
+export function getEarlyReminderMessage(phase: number): string {
+  const clampedPhase = Math.min(5, Math.max(0, phase));
+  const messages = EARLY_REMINDER_MESSAGES[clampedPhase];
+  return messages[Math.floor(Math.random() * messages.length)];
+}
+
 // ============================================================================
 // Internal scheduling
 // ============================================================================
@@ -376,11 +434,20 @@ const DAILY_REMINDER_LOOKAHEAD_DAYS = 7;
  */
 const WIN_BACK_RUNG_OFFSETS: [number, number, number, number, number] = [1, 3, 7, 14, 30];
 
+/**
+ * How long before the local-Monday weekly quest reset the expiry nudge fires.
+ * 6.5 hours = Sunday 17:30 — deliberately staggered off the 18:00 win-back
+ * rungs so a lapsed player with expiring quests never gets two pings in the
+ * same minute. (Streak-risk stays at 19:00.)
+ */
+const QUEST_EXPIRY_LEAD_MS = 6.5 * 60 * 60 * 1000;
+
 async function scheduleDailyReminder(
   mod: any,
   hour: number,
   phase: number,
-  playedToday: boolean
+  playedToday: boolean,
+  dailyUnlocked: boolean
 ): Promise<void> {
   try {
     // Strategy: instead of one unconditional REPEATING daily trigger (which pings
@@ -408,14 +475,18 @@ async function scheduleDailyReminder(
       // Never schedule a trigger in the past (e.g. dayOffset 0 with hour already passed).
       if (triggerDate.getTime() <= now.getTime()) continue;
 
-      // Re-roll the phase-aware message per day for variety.
-      const message = getNotificationMessage('daily', phase);
+      // Re-roll the phase-aware message per day for variety. While the Daily
+      // Challenge is locked, serve generic come-back copy routed home instead
+      // of advertising a daily the player can't open yet.
+      const message = dailyUnlocked
+        ? getNotificationMessage('daily', phase)
+        : getEarlyReminderMessage(phase);
       await mod.scheduleNotificationAsync({
         content: {
           title: 'WordShift',
           body: message,
           sound: true,
-          data: { target: 'daily' },
+          data: { target: dailyUnlocked ? 'daily' : 'home' },
         },
         trigger: {
           date: triggerDate,
@@ -501,6 +572,27 @@ async function hasPlayedTodaySafe(): Promise<boolean> {
 }
 
 /**
+ * Whether the Daily Challenge is unlocked for this player. Uses the canonical
+ * check from dailyChallenge.ts (puzzle count OR phase) fed by the same
+ * progress read as the other seams here. Lazy require — not for a cycle
+ * (dailyChallenge never imports notifications) but because a static import
+ * would drag localGenerator + the full dictionary into this module's graph.
+ * On failure, falls back to the phase half of the same check (phase 1+ always
+ * unlocks the daily), so an unreadable early save gets the safe generic copy
+ * rather than an ad for locked content.
+ */
+async function isDailyChallengeUnlockedSafe(currentPhase: number): Promise<boolean> {
+  try {
+    const { isDailyChallengeUnlocked } = require('./dailyChallenge');
+    const { getFullProgress } = require('./amberCurrency');
+    const progress = await getFullProgress();
+    return isDailyChallengeUnlocked(progress?.puzzlesSolved ?? 0, currentPhase);
+  } catch {
+    return currentPhase >= 1;
+  }
+}
+
+/**
  * Whether a weekly-quest-expiry reminder is worth scheduling. True only when the
  * player has skin in the game this week — an in-progress (but not completed)
  * weekly quest, or a completed-but-unclaimed reward. Read via a lazy require so
@@ -508,10 +600,22 @@ async function hasPlayedTodaySafe(): Promise<boolean> {
  */
 async function shouldRemindQuestExpirySafe(phase: number): Promise<boolean> {
   try {
-    const { loadWeeklyQuests, getUnclaimedAmber } = require('./weeklyQuests');
-    const state = await loadWeeklyQuests(phase);
+    // peek, never load: loadWeeklyQuests GENERATES a quest set when none is
+    // stored, and this check runs during hydration — on a fresh install it
+    // could win the race against the first context-full load and mint quests
+    // from legacy defaults (defeating the pre-journal dormant gate).
+    const { peekWeeklyQuests, getUnclaimedAmber } = require('./weeklyQuests');
+    const peeked = await peekWeeklyQuests();
+    if (!peeked.daily && !peeked.weekly) return false;
+    // getUnclaimedAmber reads state.daily.quests / state.weekly.quests directly,
+    // so substitute empty tiers for any missing period rather than null.
+    const emptyTier = { periodId: '', quests: [], generatedAt: 0, animalsVisitedThisPeriod: [] };
+    const state = {
+      daily: peeked.daily ?? emptyTier,
+      weekly: peeked.weekly ?? emptyTier,
+    };
     if (getUnclaimedAmber(state, phase) > 0) return true;
-    return (state?.weekly?.quests ?? []).some(
+    return (peeked.weekly?.quests ?? []).some(
       (q: { progress: number; completed: boolean }) => q.progress > 0 && !q.completed
     );
   } catch {
@@ -523,7 +627,7 @@ async function scheduleQuestExpiry(mod: any, phase: number): Promise<void> {
   const message = getQuestExpiryMessage(phase);
   try {
     // Weekly quests reset at the local-Monday boundary. Fire the reminder the
-    // evening before (Sunday 6pm). Rescheduled every session, so it always
+    // evening before (Sunday 17:30). Rescheduled every session, so it always
     // points at the upcoming reset and drops once the player finishes/claims.
     const now = new Date();
     const day = now.getDay(); // 0 = Sunday ... 1 = Monday
@@ -535,8 +639,9 @@ async function scheduleQuestExpiry(mod: any, phase: number): Promise<void> {
       now.getDate() + daysUntilMonday,
       0, 0, 0, 0
     );
-    // 6 hours before the reset = Sunday 18:00 local.
-    const triggerDate = new Date(nextMonday.getTime() - 6 * 60 * 60 * 1000);
+    // 6.5 hours before the reset = Sunday 17:30 local — staggered off the
+    // 18:00 win-back rungs so both can never land in the same minute.
+    const triggerDate = new Date(nextMonday.getTime() - QUEST_EXPIRY_LEAD_MS);
     if (triggerDate.getTime() <= now.getTime()) return; // window already passed this week
 
     await mod.scheduleNotificationAsync({

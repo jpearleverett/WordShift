@@ -134,6 +134,11 @@ type StoreShape = Partial<Record<AnimalType, RequestState>>;
 
 let cache: StoreShape | null = null;
 
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateOfferingRequestCache(): void {
+  cache = null;
+}
+
 async function load(): Promise<StoreShape> {
   if (cache) return cache;
   try {

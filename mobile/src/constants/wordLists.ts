@@ -106,8 +106,9 @@ export function getRandomFallback(difficulty: 'EASY' | 'MEDIUM' | 'MEDIUM_PLUS' 
 
 /**
  * Curated early-game puzzles — hand-picked & verified pick-and-drop chains.
- * Used for the first 3 post-onboarding puzzles (puzzles 0-2). All words in a chain
- * must be the same length. Each step: pick a letter from the source (shrinking it into
+ * Index 0 is the onboarding tutorial board; the full set is served while
+ * puzzlesSolved < CURATED_PUZZLE_COUNT (5). All words in a chain must be the
+ * same length. Each step: pick a letter from the source (shrinking it into
  * a valid shorter word) and drop it into the target (growing it into a valid longer word).
  * Includes pre-computed solution steps for tutorial guidance highlighting.
  */

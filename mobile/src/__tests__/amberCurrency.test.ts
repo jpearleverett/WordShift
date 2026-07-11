@@ -48,15 +48,34 @@ import {
   getPhase4DwellCount,
   getFullProgress,
   invalidateProgressCache,
+  awardBonusAmber,
+  confirmPhaseTransition,
+  recordRitualWords,
 } from '../services/amberCurrency';
-import { SURPRISE_BONUS_AMOUNTS, SURPRISE_BONUS_MIN_PUZZLES } from '../constants/gameBalance';
+import {
+  SURPRISE_BONUS_AMOUNTS,
+  SURPRISE_BONUS_MIN_PUZZLES,
+  STREAK_FREEZE_CAP,
+  FREE_FREEZE_INTERVAL_DAYS,
+} from '../constants/gameBalance';
 import { FIRST_COMPLETION_BONUS } from '../types/homeWorld';
 import { getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// amberCurrency lazy-requires eventLogger for phase_reached telemetry — mock it
+// so the debounced flush timer never runs and the calls are assertable.
+const mockLogEvent = jest.fn();
+const mockGetInstallAgeDays = jest.fn(async () => 3);
+jest.mock('../services/eventLogger', () => ({
+  logEvent: (event: unknown) => mockLogEvent(event),
+  getInstallAgeDays: () => mockGetInstallAgeDays(),
+}));
+
 beforeEach(async () => {
   (AsyncStorage.clear as jest.Mock)();
   await clearProgress();
+  mockLogEvent.mockClear();
+  mockGetInstallAgeDays.mockClear();
   // Force the variable-ratio surprise bonus OFF by default so the many exact-amount
   // assertions stay deterministic. Surprise-specific tests opt in via setSurpriseRng.
   setSurpriseRng(() => 1);
@@ -150,6 +169,37 @@ describe('awardPuzzleAmber', () => {
   test('no Patron bonus for non-patrons', async () => {
     const result = await awardPuzzleAmber('EASY', 1, 'standard', 0, true);
     expect(result.patronBonus).toBe(0);
+  });
+
+  // Itemization fields (additive): the Victory modal renders the REAL
+  // breakdown from these instead of re-deriving base/star math locally.
+  test('returns baseAmber (pure difficulty base) and starBonusAmber separately', async () => {
+    const threeStar = await awardPuzzleAmber('MEDIUM', 3, 'standard', 0, true);
+    expect(threeStar.baseAmber).toBe(10); // AMBER_REWARDS.MEDIUM
+    expect(threeStar.starBonusAmber).toBe(5); // floor(10 * 1.5) - 10
+    expect(threeStar.baseAmber + threeStar.starBonusAmber).toBe(threeStar.baseAmount);
+
+    await clearProgress();
+    const oneStar = await awardPuzzleAmber('MEDIUM', 1, 'standard', 0, true);
+    expect(oneStar.baseAmber).toBe(10);
+    expect(oneStar.starBonusAmber).toBe(0);
+  });
+
+  test('itemized parts sum exactly to the awarded amount (breakdown invariant)', async () => {
+    // A streak + challenge win with a forced surprise hit exercises every
+    // per-puzzle line at once (milestone/first-completion are separate adds).
+    await devAddPuzzles(SURPRISE_BONUS_MIN_PUZZLES);
+    setSurpriseRng(() => 0); // force the surprise bonus ON
+    const result = await awardPuzzleAmber('HARD', 3, 'challenge', 0, true);
+    expect(result.surpriseBonus).toBeGreaterThan(0);
+    expect(
+      result.baseAmber +
+      result.starBonusAmber +
+      result.streakBonus +
+      result.challengeBonus +
+      result.patronBonus +
+      result.surpriseBonus
+    ).toBe(result.amount);
   });
 });
 
@@ -641,7 +691,7 @@ describe('streak freeze', () => {
     expect(balance).toBe(10);
   });
 
-  test('multiple freezes can be purchased and stacked', async () => {
+  test('multiple freezes can be purchased and stacked up to the cap', async () => {
     await devAddAmber(200);
     await purchaseStreakFreeze();
     await purchaseStreakFreeze();
@@ -652,6 +702,42 @@ describe('streak freeze', () => {
 
     const balance = await getAmberBalance();
     expect(balance).toBe(200 - 3 * STREAK_FREEZE_AMBER_COST);
+  });
+
+  test('purchase refuses at STREAK_FREEZE_CAP and charges nothing', async () => {
+    await devAddAmber(1000);
+    for (let i = 0; i < STREAK_FREEZE_CAP; i++) {
+      expect(await purchaseStreakFreeze()).toBe(true);
+    }
+    const balanceAtCap = await getAmberBalance();
+
+    expect(await purchaseStreakFreeze()).toBe(false);
+    expect(await getStreakFreezeCount()).toBe(STREAK_FREEZE_CAP);
+    expect(await getAmberBalance()).toBe(balanceAtCap);
+  });
+
+  test('free grant does not exceed the cap and does not burn the interval', async () => {
+    // Seed: at the cap, with the free-grant interval already elapsed.
+    const progress = await loadProgress();
+    progress.streakFreezes = STREAK_FREEZE_CAP;
+    progress.lastFreeStreakFreezeDate = getLocalDateStringDaysAgo(FREE_FREEZE_INTERVAL_DAYS + 1);
+
+    expect(await checkFreeStreakFreeze()).toBe(false);
+    expect(await getStreakFreezeCount()).toBe(STREAK_FREEZE_CAP);
+
+    // Consuming a freeze frees a slot — the banked grant lands on the next
+    // check (the last-grant date was NOT advanced while at the cap).
+    (await loadProgress()).streakFreezes = STREAK_FREEZE_CAP - 1;
+    expect(await checkFreeStreakFreeze()).toBe(true);
+    expect(await getStreakFreezeCount()).toBe(STREAK_FREEZE_CAP);
+  });
+
+  test('first-ever free grant also respects the cap', async () => {
+    // No lastFreeStreakFreezeDate, but already holding a full stack (purchases).
+    const progress = await loadProgress();
+    progress.streakFreezes = STREAK_FREEZE_CAP;
+    expect(await checkFreeStreakFreeze()).toBe(false);
+    expect(await getStreakFreezeCount()).toBe(STREAK_FREEZE_CAP);
   });
 
   test('checkFreeStreakFreeze grants one free freeze on first call', async () => {
@@ -917,6 +1003,142 @@ describe('post-revelation phase pinning (Phase 5)', () => {
 
     const progress = await loadProgress();
     expect(progress.currentPhase).toBe(4);
+  });
+});
+
+// ============================================================================
+// Deferred harvest credit — totalAmberEarned must count each amber ONCE
+// ============================================================================
+
+describe('deferred harvest credit (no totalAmberEarned double count)', () => {
+  test('a deferred win credited via word_offering increments totalAmberEarned exactly once', async () => {
+    // Victory: creditToBalance=false — amber queued for the pit, but the
+    // lifetime counter is incremented NOW.
+    const result = await awardPuzzleAmber('MEDIUM', 3);
+    const queued = result.amount
+      + result.milestoneBonus
+      + result.firstCompletionBonus
+      + result.streakMilestoneBonus;
+    expect(queued).toBeGreaterThan(0);
+    expect((await getFullProgress()).totalAmberEarned).toBe(queued);
+    expect(await getAmberBalance()).toBe(0);
+
+    // Pit offer: the SAME amber is released to the spendable balance.
+    const newBalance = await awardBonusAmber(queued, 'word_offering');
+    expect(newBalance).toBe(queued);
+
+    // Counted once, not twice — the amber-earned achievements pace correctly.
+    expect((await getFullProgress()).totalAmberEarned).toBe(queued);
+  });
+
+  test('the auto-collect credit source also skips totalAmberEarned', async () => {
+    const result = await awardPuzzleAmber('EASY', 1);
+    const queued = result.amount + result.firstCompletionBonus;
+    await awardBonusAmber(queued, 'auto_word_offering');
+    expect((await getFullProgress()).totalAmberEarned).toBe(queued);
+    expect(await getAmberBalance()).toBe(queued);
+  });
+
+  test('genuinely new bonus sources still increment totalAmberEarned', async () => {
+    await awardBonusAmber(50, 'quest_reward');
+    await awardBonusAmber(30, 'daily_streak_milestone');
+    const progress = await getFullProgress();
+    expect(progress.amber).toBe(80);
+    expect(progress.totalAmberEarned).toBe(80);
+  });
+});
+
+// ============================================================================
+// skipPhaseProgress — amber-only wins (shared-challenge-link farming guard)
+// ============================================================================
+
+describe('awardPuzzleAmber skipPhaseProgress option', () => {
+  test('default path accrues phaseProgress', async () => {
+    await awardPuzzleAmber('HARD', 3, 'standard', 0, true);
+    const progress = await getFullProgress();
+    expect(progress.phaseProgress).toBeGreaterThan(0);
+    expect(progress.puzzlesSolved).toBe(1);
+  });
+
+  test('skipPhaseProgress applies identical amber math but zero phaseProgress', async () => {
+    const normal = await awardPuzzleAmber('HARD', 3, 'standard', 0, true);
+    const normalProgress = (await getFullProgress()).phaseProgress;
+    expect(normalProgress).toBeGreaterThan(0);
+
+    await clearProgress();
+    const skipped = await awardPuzzleAmber('HARD', 3, 'standard', 0, true, {
+      skipPhaseProgress: true,
+    });
+    const progress = await getFullProgress();
+
+    // Zero narrative descent...
+    expect(progress.phaseProgress).toBe(0);
+    // ...but the amber reward is byte-identical to the normal win.
+    expect(skipped.amount).toBe(normal.amount);
+    expect(skipped.newBalance).toBe(normal.newBalance);
+    expect(skipped.firstCompletionBonus).toBe(normal.firstCompletionBonus);
+    // The win still counts as a solved puzzle (stats, milestones).
+    expect(skipped.puzzlesSolved).toBe(1);
+  });
+
+  test('repeated skipped wins never accumulate phaseProgress (farming hole closed)', async () => {
+    for (let i = 0; i < 5; i++) {
+      await awardPuzzleAmber('EASY', 3, 'standard', 0, false, { skipPhaseProgress: true });
+    }
+    const progress = await getFullProgress();
+    expect(progress.phaseProgress).toBe(0);
+    expect(progress.puzzlesSolved).toBe(5);
+    expect(progress.currentPhase).toBe(0);
+    expect(progress.pendingPhaseTransition).toBeNull();
+  });
+
+  test('recordRitualWords with zero energy records words but feeds no phaseProgress', async () => {
+    // The shared-challenge path passes energy 0: the ledger + trigger queue
+    // still fill (flavor stays) but the energy * 0.1 phase feed gets nothing.
+    const before = (await getFullProgress()).phaseProgress ?? 0;
+    const result = await recordRitualWords(['VOID', 'DOOM'], 0, ['VOID']);
+    const after = (await getFullProgress()).phaseProgress ?? 0;
+
+    expect(result.totalWordsFormed).toBe(2);
+    expect(result.triggerWordQueue).toContain('VOID');
+    expect(after).toBe(before);
+  });
+});
+
+// ============================================================================
+// phase_reached telemetry
+// ============================================================================
+
+describe('phase_reached telemetry', () => {
+  test('confirmPhaseTransition logs phase_reached with puzzles and install age', async () => {
+    await devAddPuzzles(19);
+    const result = await awardPuzzleAmber('EASY', 1); // queues the 0 -> 1 transition
+    expect(result.phaseChanged).toBe(true);
+    mockLogEvent.mockClear();
+
+    const confirmed = await confirmPhaseTransition();
+    expect(confirmed!.newPhase).toBe(1);
+    expect(mockLogEvent).toHaveBeenCalledTimes(1);
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      type: 'phase_reached',
+      data: { phase: 1, puzzlesSolved: 20, installAgeDays: 3 },
+    });
+  });
+
+  test('no phase_reached when there is no pending transition', async () => {
+    expect(await confirmPhaseTransition()).toBeNull();
+    expect(mockLogEvent).not.toHaveBeenCalled();
+  });
+
+  test('markPostRevelation logs the phase-5 pin', async () => {
+    await devAddPuzzles(235);
+    mockLogEvent.mockClear();
+
+    await markPostRevelation();
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      type: 'phase_reached',
+      data: { phase: 5, puzzlesSolved: 235, installAgeDays: 3 },
+    });
   });
 });
 

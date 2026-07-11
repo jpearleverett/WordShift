@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
+import { View, StyleSheet, Dimensions, Animated, Easing, Platform } from 'react-native';
 import { getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { getMaxParticleCount } from '../services/deviceTier';
@@ -40,6 +40,55 @@ const generateParticleLayout = (count: number): ParticleLayout[] => {
     });
   }
   return layout;
+};
+
+// ---------------------------------------------------------------------------
+// Soft vertical wash: replaces the old three hard-edged overlay rectangles
+// (whose bottoms cut visible horizontal seams at ~35%/50%/50% screen height).
+// Each phase-theme overlay color keeps its exact value; the softness comes
+// from a full-strength core band plus stepped-opacity falloff bands, so the
+// wash fades out gradually instead of stopping at a hard edge. Every band is
+// a plain static View: no animation, no JS work after mount, no new deps.
+// ---------------------------------------------------------------------------
+const WASH_FALLOFF_STEPS = 4;
+
+const SoftWash: React.FC<{
+  color: string;
+  /** Fraction of screen height at full strength, from the anchored edge */
+  core: number;
+  /** Fraction of screen height over which the wash fades to nothing */
+  tail: number;
+  anchor: 'top' | 'bottom';
+}> = ({ color, core, tail, anchor }) => {
+  const coreH = SCREEN_HEIGHT * core;
+  const stepH = (SCREEN_HEIGHT * tail) / WASH_FALLOFF_STEPS;
+  const place = (offset: number, height: number) =>
+    anchor === 'top' ? { top: offset, height } : { bottom: offset, height };
+  return (
+    <>
+      <View
+        pointerEvents="none"
+        style={[styles.washBand, place(0, coreH), { backgroundColor: color }]}
+      />
+      {Array.from({ length: WASH_FALLOFF_STEPS }, (_, i) => (
+        <View
+          key={i}
+          pointerEvents="none"
+          style={[
+            styles.washBand,
+            // +1px overlap between bands so rounding can't open seam gaps
+            place(coreH + i * stepH, stepH + 1),
+            {
+              backgroundColor: color,
+              // Steps down 0.8 / 0.6 / 0.4 / 0.2 — multiplies the color's own
+              // baked-in alpha, so each edge is a fraction of the old hard cut.
+              opacity: (WASH_FALLOFF_STEPS - i) / (WASH_FALLOFF_STEPS + 1),
+            },
+          ]}
+        />
+      ))}
+    </>
+  );
 };
 
 const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
@@ -266,21 +315,60 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
         pointerEvents="none"
       />
 
-      {/* Gradient overlay layers */}
-      <View style={[styles.gradientLayer1, { backgroundColor: theme.overlayTop }]} />
-      <View style={[styles.gradientLayer2, { backgroundColor: theme.overlayMid }]} />
-      <View style={[styles.gradientLayer3, { backgroundColor: theme.overlayBottom }]} />
+      {/* Gradient overlay wash — graduated static bands, no hard edges */}
+      <SoftWash color={theme.overlayTop} core={0.2} tail={0.28} anchor="top" />
+      <SoftWash color={theme.overlayMid} core={0.34} tail={0.28} anchor="top" />
+      <SoftWash color={theme.overlayBottom} core={0.34} tail={0.28} anchor="bottom" />
 
-      {/* Radial glow in center */}
-      <View style={[styles.centerGlow, { backgroundColor: theme.centerGlow }]} />
+      {/* Radial glow in center. iOS: soft shadow blur. Android ignores the
+          shadow-* props (and elevation would cast a hard directional shadow,
+          not a glow), so it gets concentric stepped-opacity circles instead,
+          the same layered-oval trick as the Offering Pit glow. Static Views. */}
+      {Platform.OS === 'ios' ? (
+        <View style={[styles.centerGlow, { backgroundColor: theme.centerGlow }]} />
+      ) : (
+        <>
+          <View
+            pointerEvents="none"
+            style={[styles.centerGlowOuter, { backgroundColor: theme.centerGlow }]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.centerGlowMid, { backgroundColor: theme.centerGlow }]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.centerGlowInner, { backgroundColor: theme.centerGlow }]}
+          />
+        </>
+      )}
 
       {/* Floating particles */}
       {particles.map((particle) => (
         <Particle key={particle.id} particle={particle} />
       ))}
 
-      {/* Top vignette */}
-      <View style={[styles.vignetteTop, { shadowColor: theme.vignetteColor }]} />
+      {/* Top vignette. iOS: shadow-based soft band. Android ignores those
+          shadow props entirely, so it gets three stepped translucent bands
+          fading downward instead (mirrors the bottom vignette's approach). */}
+      {Platform.OS === 'ios' ? (
+        <View style={[styles.vignetteTop, { shadowColor: theme.vignetteColor }]} />
+      ) : (
+        <>
+          <View
+            pointerEvents="none"
+            style={[styles.vignetteTopBand, { top: 0, backgroundColor: theme.vignetteColor + '4D' }]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.vignetteTopBand, { top: 40, backgroundColor: theme.vignetteColor + '33' }]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.vignetteTopBand, { top: 80, backgroundColor: theme.vignetteColor + '1A' }]}
+          />
+        </>
+      )}
       {/* Bottom vignette */}
       <View style={[styles.vignetteBottom, { backgroundColor: theme.vignetteColor + '4D' }]} />
     </View>
@@ -295,26 +383,10 @@ const styles = StyleSheet.create({
   pulseOverlay: {
     ...StyleSheet.absoluteFill,
   },
-  gradientLayer1: {
+  washBand: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
-    height: SCREEN_HEIGHT * 0.35,
-  },
-  gradientLayer2: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.5,
-  },
-  gradientLayer3: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.5,
   },
   centerGlow: {
     position: 'absolute',
@@ -328,6 +400,36 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 60,
   },
+  // Android center-glow fallback: three concentric circles sharing the iOS
+  // glow's center point (0.5W, 0.3H + 0.3W), stepping opacity up toward the
+  // core to read as a soft radial glow without shadow support.
+  centerGlowOuter: {
+    position: 'absolute',
+    top: SCREEN_HEIGHT * 0.3 - SCREEN_WIDTH * 0.1,
+    left: SCREEN_WIDTH * 0.1,
+    width: SCREEN_WIDTH * 0.8,
+    height: SCREEN_WIDTH * 0.8,
+    borderRadius: SCREEN_WIDTH * 0.4,
+    opacity: 0.35,
+  },
+  centerGlowMid: {
+    position: 'absolute',
+    top: SCREEN_HEIGHT * 0.3,
+    left: SCREEN_WIDTH * 0.2,
+    width: SCREEN_WIDTH * 0.6,
+    height: SCREEN_WIDTH * 0.6,
+    borderRadius: SCREEN_WIDTH * 0.3,
+    opacity: 0.65,
+  },
+  centerGlowInner: {
+    position: 'absolute',
+    top: SCREEN_HEIGHT * 0.3 + SCREEN_WIDTH * 0.1,
+    left: SCREEN_WIDTH * 0.3,
+    width: SCREEN_WIDTH * 0.4,
+    height: SCREEN_WIDTH * 0.4,
+    borderRadius: SCREEN_WIDTH * 0.2,
+    opacity: 1,
+  },
   vignetteTop: {
     position: 'absolute',
     top: 0,
@@ -339,6 +441,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 40 },
     shadowOpacity: 0.3,
     shadowRadius: 40,
+  },
+  // Android top-vignette fallback bands (40px each, stepped alpha 30%/20%/10%)
+  vignetteTopBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 40,
   },
   vignetteBottom: {
     position: 'absolute',

@@ -1,4 +1,5 @@
-import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents } from '../services/eventLogger';
+import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents, getInstallAgeDays } from '../services/eventLogger';
+import { getLocalDateString, getLocalDateStringDaysAgo } from '../services/dateUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 beforeEach(async () => {
@@ -122,5 +123,42 @@ describe('clearEvents', () => {
     await clearEvents();
     const events = await getEvents();
     expect(events).toEqual([]);
+  });
+});
+
+describe('getInstallAgeDays', () => {
+  test('first call persists today as the LOCAL install date and returns 0', async () => {
+    const age = await getInstallAgeDays();
+    expect(age).toBe(0);
+
+    const stored = await AsyncStorage.getItem('wordshift_install_date');
+    expect(stored).toBe(getLocalDateString());
+  });
+
+  test('reuses a persisted install date and reports whole local days since', async () => {
+    const fiveDaysAgo = getLocalDateStringDaysAgo(5);
+    await AsyncStorage.setItem('wordshift_install_date', fiveDaysAgo);
+
+    expect(await getInstallAgeDays()).toBe(5);
+    // Stable across calls; the stored date is never rewritten.
+    expect(await getInstallAgeDays()).toBe(5);
+    expect(await AsyncStorage.getItem('wordshift_install_date')).toBe(fiveDaysAgo);
+  });
+
+  test('never reports a negative age if the clock rolled backwards', async () => {
+    // A "future" install date (device clock moved back after install).
+    await AsyncStorage.setItem('wordshift_install_date', getLocalDateStringDaysAgo(-3));
+    expect(await getInstallAgeDays()).toBe(0);
+  });
+
+  test('clearEvents keeps the persisted install date (device meta, not reset)', async () => {
+    await getInstallAgeDays();
+    const stored = await AsyncStorage.getItem('wordshift_install_date');
+    expect(stored).not.toBeNull();
+
+    await clearEvents();
+    expect(await AsyncStorage.getItem('wordshift_install_date')).toBe(stored);
+    // And the age still resolves from the same persisted date after the reset.
+    expect(await getInstallAgeDays()).toBe(0);
   });
 });

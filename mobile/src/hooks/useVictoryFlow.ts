@@ -13,6 +13,76 @@ import { hapticLight, hapticHeavy } from '../services/haptics';
  */
 export type VictoryStage = 'idle' | 'recording' | 'choreographing' | 'settled';
 
+// ---------------------------------------------------------------------------
+// Swift Victories — routine-victory policy (pure, unit-tested)
+// ---------------------------------------------------------------------------
+
+/**
+ * Below this real-puzzle count every victory keeps the full ceremony — the
+ * early game's choreography is part of the delight, not the staleness.
+ */
+export const SWIFT_VICTORY_MIN_PUZZLES = 20;
+
+/**
+ * App.tsx fires a ritual micro-event at ritualEnergy >= 7; those wins carry a
+ * narrative beat and must never be compacted. Keep in sync with the App-side
+ * threshold if it ever moves.
+ */
+export const RITUAL_MICRO_EVENT_MIN_ENERGY = 7;
+
+/**
+ * The minimal victory signals the routine/special decision reads. Both the
+ * hook-level VictoryData (useGamePersistence) and the Victory modal's local
+ * copy are structurally assignable, so one policy serves both call sites.
+ */
+export interface RoutineVictorySignals {
+  isDaily?: boolean;
+  mandatoryHarvest?: boolean;
+  phaseTransitionPending?: boolean;
+  phaseChanged?: boolean;
+  firstCompletionBonus?: number;
+  milestoneBonus?: number;
+  streakMilestoneBonus?: number;
+  questsCompleted?: string[];
+  ritualEnergy?: number;
+  puzzlesSolved?: number;
+}
+
+/**
+ * True only for a ROUTINE victory — one with no special beat attached. Any of
+ * the following forces the full ceremony (returns false):
+ * - no victory data at all (safe default: full modal)
+ * - the Daily Challenge
+ * - the mandatory first-harvest gate
+ * - a pending/new phase transition (phaseTransitionPending or phaseChanged)
+ * - a one-time first-completion bonus for the difficulty
+ * - a puzzle-count milestone or a daily-streak milestone bonus
+ * - completed quests being turned in
+ * - a high-energy win that triggers a ritual micro-event
+ * - the player's first SWIFT_VICTORY_MIN_PUZZLES puzzles
+ */
+export function isRoutineVictory(victory: RoutineVictorySignals | null | undefined): boolean {
+  if (!victory) return false;
+  if (victory.isDaily) return false;
+  if (victory.mandatoryHarvest) return false;
+  if (victory.phaseTransitionPending || victory.phaseChanged) return false;
+  if ((victory.firstCompletionBonus ?? 0) > 0) return false;
+  if ((victory.milestoneBonus ?? 0) > 0) return false;
+  if ((victory.streakMilestoneBonus ?? 0) > 0) return false;
+  if ((victory.questsCompleted?.length ?? 0) > 0) return false;
+  if ((victory.ritualEnergy ?? 0) >= RITUAL_MICRO_EVENT_MIN_ENERGY) return false;
+  if ((victory.puzzlesSolved ?? 0) < SWIFT_VICTORY_MIN_PUZZLES) return false;
+  return true;
+}
+
+/** Compact mode = the Swift Victories setting is ON and the win is routine. */
+export function shouldUseCompactVictory(
+  victory: RoutineVictorySignals | null | undefined,
+  swiftEnabled: boolean
+): boolean {
+  return swiftEnabled === true && isRoutineVictory(victory);
+}
+
 /**
  * The record/persist gap after the final move is normally tens of ms — a
  * spinner there reads as a jarring flash at the emotional peak. Only surface
@@ -61,7 +131,7 @@ export interface VictoryFlowActions {
 }
 
 export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
-  const [victoryData, setVictoryData] = useState<VictoryData | null>(null);
+  const [victoryData, setVictoryDataState] = useState<VictoryData | null>(null);
   const [isProcessingVictory, setProcessingVictoryState] = useState(false);
   const [victoryStage, setVictoryStage] = useState<VictoryStage>('idle');
   const [victorySpinnerVisible, setVictorySpinnerVisible] = useState(false);
@@ -76,6 +146,17 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
   const spinnerTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Ref to the running victory sequence animation (so skipToEnd can stop it). */
   const runningAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  /**
+   * Synchronous mirror of victoryData: App sets the data and starts the
+   * choreography in the same tick, so playVictorySequence must read the fresh
+   * value (state would be one render behind) to decide the swift/compact path.
+   */
+  const victoryDataRef = useRef<VictoryData | null>(null);
+
+  const setVictoryData = useCallback((data: VictoryData | null) => {
+    victoryDataRef.current = data;
+    setVictoryDataState(data);
+  }, []);
 
   // Cleanup haptic/spinner timeouts and running animations on unmount
   useEffect(() => {
@@ -116,8 +197,17 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
 
   const playVictorySequence = useCallback((stars: number) => {
     clearSpinner();
-    const reducedMotion = getSettingsSync().reducedMotion;
-    if (reducedMotion) {
+    const settings = getSettingsSync();
+    const reducedMotion = settings.reducedMotion;
+    // Swift Victories: a routine win renders the compact result strip, which
+    // needs no entrance choreography — settle instantly (same path reduced
+    // motion takes, so the two compose instead of fighting). Special beats
+    // never reach here compact: isRoutineVictory gates them to the full mode.
+    const swiftCompact = shouldUseCompactVictory(
+      victoryDataRef.current,
+      settings.swiftVictories === true
+    );
+    if (reducedMotion || swiftCompact) {
       victoryStar1.setValue(stars >= 1 ? 1 : 0);
       victoryStar2.setValue(stars >= 2 ? 1 : 0);
       victoryStar3.setValue(stars >= 3 ? 1 : 0);
@@ -219,7 +309,8 @@ export function useVictoryFlow(): [VictoryFlowState, VictoryFlowActions] {
     hapticTimeouts.current.forEach(clearTimeout);
     hapticTimeouts.current = [];
     clearSpinner();
-    setVictoryData(null);
+    victoryDataRef.current = null;
+    setVictoryDataState(null);
     setProcessingVictoryState(false);
     setVictoryStage('idle');
   }, [clearSpinner]);

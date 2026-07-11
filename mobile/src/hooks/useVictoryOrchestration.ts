@@ -4,6 +4,7 @@ import {
   checkNarrativeMicroBeat,
   NarrativeMicroBeat,
   getAnimalWhisper,
+  getPersonalizedPhase5Whisper,
   getAnimalInterjection,
   getHomescreenNudge,
 } from '../services/phaseNarrative';
@@ -209,11 +210,21 @@ export function useVictoryOrchestration(): [
           if (gen !== generationRef.current) return;
           const fullProgress = await getFullProgress();
           if (gen !== generationRef.current) return;
-          const whisperData = getAnimalWhisper(
-            phase,
-            fullProgress.unlockedAnimals || [],
-            completedWords,
-          );
+          // At phase 5 the whispers turn personal: they weave the player's own
+          // fed ritual words back at them (falls back to the generic pool on an
+          // empty history, and keeps ~35% generic variety internally).
+          const whisperData = phase >= 5
+            ? getPersonalizedPhase5Whisper(
+                fullProgress.unlockedAnimals || [],
+                (fullProgress.ritualWords && fullProgress.ritualWords.length > 0)
+                  ? fullProgress.ritualWords
+                  : completedWords,
+              )
+            : getAnimalWhisper(
+                phase,
+                fullProgress.unlockedAnimals || [],
+                completedWords,
+              );
           if (whisperData) {
             setWhisper({ animalName: whisperData.animalName, text: whisperData.text });
             setShowWhisper(true);
