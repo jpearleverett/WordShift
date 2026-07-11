@@ -26,6 +26,14 @@ const CAMPAIGN_PATH = path.resolve(
   SCRIPT_DIR,
   '../../../docs/play-store/campaign.json'
 );
+const STORE_LISTING_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../../docs/STORE_LISTING.md'
+);
+const LANDING_PAGE_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../../docs/index.md'
+);
 const EXPECTED_SCENARIOS = [
   'puzzle-preview',
   'puzzle-chain',
@@ -168,6 +176,67 @@ describe('approved campaign manifest', () => {
     assert.ok(altTexts.every(text => text.trim().split(/\s+/).length >= 8));
     assert.ok(altTexts.every(text => /[.!?]$/.test(text)));
     assert.ok(campaign.every(item => item.altText !== item.headline));
+  });
+});
+
+describe('Google Play listing metadata', () => {
+  test('keeps listing fields and accessible image descriptions within store limits', async () => {
+    const [listing, campaign] = await Promise.all([
+      fs.readFile(STORE_LISTING_PATH, 'utf8'),
+      fs.readFile(CAMPAIGN_PATH, 'utf8').then(JSON.parse),
+    ]);
+    const title = listing.match(/^- \*\*App name:\*\* (.+)$/m)?.[1];
+    const shortDescription = listing.match(
+      /Android short description[^\n]*\n\s*`([^`]+)`/
+    )?.[1];
+    const fullDescription = listing.match(
+      /## Full description\s+```text\n([\s\S]*?)\n```/
+    )?.[1];
+    const tableAltTexts = listing
+      .split('\n')
+      .filter(line => /^\| [1-8] \|/.test(line))
+      .map(line => line.split('|').slice(1, -1).map(cell => cell.trim())[4]);
+    const featureAltText = listing.match(
+      /^Feature graphic alt text: (.+)$/m
+    )?.[1];
+
+    assert.equal(title, 'WordShift');
+    assert.ok(title.length <= 30);
+    assert.equal(
+      shortDescription,
+      "Shift letters in a cozy word puzzle. Meet animal friends. They've been waiting."
+    );
+    assert.ok(shortDescription.length <= 80);
+    assert.match(fullDescription, /\bletter game\b/i);
+    assert.ok(fullDescription.length <= 4_000);
+    assert.equal(tableAltTexts.length, 8);
+    assert.deepEqual(tableAltTexts, campaign.map(item => item.altText));
+    assert.ok(tableAltTexts.every(text => text.length <= 140));
+    assert.equal(
+      tableAltTexts[5],
+      'WordShift home after a completed Daily Challenge, showing a seven-day streak and a Today’s Standing dialog.'
+    );
+    assert.doesNotMatch(tableAltTexts[7], /\b(no|without|absent)\b/i);
+    assert.ok(featureAltText.length <= 140);
+    for (const detail of [
+      'Ember',
+      'exact WordShift logo',
+      'candy tiles',
+      'amber',
+      'sunny-to-dusk forest',
+      'distant eyes',
+    ]) {
+      assert.match(featureAltText, new RegExp(detail, 'i'));
+    }
+    assert.doesNotMatch(
+      [shortDescription, fullDescription, ...tableAltTexts, featureAltText].join('\n'),
+      /[—–]/
+    );
+  });
+
+  test('keeps the public landing page free of em and en dashes', async () => {
+    const landingPage = await fs.readFile(LANDING_PAGE_PATH, 'utf8');
+    assert.doesNotMatch(landingPage, /[—–]/);
   });
 });
 

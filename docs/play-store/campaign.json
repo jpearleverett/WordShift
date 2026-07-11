@@ -50,7 +50,7 @@
     "final": "06_new_puzzle_every_day.png",
     "headline": "A NEW PUZZLE EVERY DAY",
     "support": "Build your streak and compare your standing.",
-    "altText": "WordShift home screen with the completed Daily Challenge header control and a Today’s Standing dialog saying standings are gathering and the daily streak is seven days.",
+    "altText": "WordShift home after a completed Daily Challenge, showing a seven-day streak and a Today’s Standing dialog.",
     "theme": "dusk"
   },
   {
@@ -68,7 +68,7 @@
     "final": "08_theyve_been_waiting.png",
     "headline": "THEY'VE BEEN WAITING",
     "support": "Some houses remember every word.",
-    "altText": "The WordShift animal house at dusk with a subtly mysterious atmosphere and no explicit horror imagery.",
+    "altText": "WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms.",
     "theme": "mystery"
   }
 ]

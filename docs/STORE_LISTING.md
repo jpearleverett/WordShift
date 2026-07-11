@@ -9,14 +9,14 @@ spoiling the reveal, while the age rating must declare it honestly.
 - **App name:** WordShift
 - **iOS subtitle (≤30 chars):** `Cozy word game. Mostly.`
 - **Android short description (≤80 chars):**
-  `Shift letters, build a home, meet strange friends. They've been waiting.`
+  `Shift letters in a cozy word puzzle. Meet animal friends. They've been waiting.`
 
 ## Full description
 
 ```text
 SHIFT ONE LETTER. CHANGE EVERYTHING.
 
-WordShift is a cozy word puzzle with one satisfying rule: move a letter from one word into the next, and keep both words real.
+WordShift is a cozy letter game built around one satisfying rule: move a letter from one word into the next, and keep both words real.
 
 HOW IT WORKS
 
@@ -44,7 +44,7 @@ MASTER EVERY KIND OF SHIFT
 
 RETURN EACH DAY
 
-Take on a shared Daily Challenge, build protected streaks, complete daily and weekly quests, collect 51 achievements, and chase flawless solves with no hints, mistakes, or undos.
+Take on a shared Daily Challenge, protect your streak, complete daily and weekly quests, unlock 51 achievements, and chase flawless solves with no hints, mistakes, or undos.
 
 A COZY GAME. MOSTLY.
 
@@ -115,11 +115,12 @@ Legal pages are **LIVE and publicly accessible** via GitHub Pages (deployed from
 | 3 | `docs/play-store/final/03_build_a_home.png` | BUILD A HOME | Your words bring every room to life. | Sunny WordShift house with several furnished rooms and multiple animal companions. | Sunny house showing the Cozy Den, Rustic Kitchen, Scholar's Study, Aquarium Room, and their companions. |
 | 4 | `docs/play-store/final/04_meet_unlikely_friends.png` | MEET 13 UNLIKELY FRIENDS | They always have something to tell you. | Ember the fox speaking to the player in a warm dialogue scene over the animal house. | Ember's warm introductory dialogue open over the sunny animal house. |
 | 5 | `docs/play-store/final/05_master_every_mode.png` | MASTER EVERY MODE | Reverse, Double Shift, Speed, and Blind Offering. | WordShift setup menu displaying Standard, Reverse, Double Shift, Speed, and Blind Offering modes. | Puzzle setup menu with Standard selected and Reverse Shift, Speed Shift, Double Shift, and Blind Mode visible. |
-| 6 | `docs/play-store/final/06_new_puzzle_every_day.png` | A NEW PUZZLE EVERY DAY | Build your streak and compare your standing. | WordShift home screen with the completed Daily Challenge header control and a Today’s Standing dialog saying standings are gathering and the daily streak is seven days. | Phase 1 home with the completed Daily Challenge control and a Today’s Standing dialog showing a seven-day streak. |
+| 6 | `docs/play-store/final/06_new_puzzle_every_day.png` | A NEW PUZZLE EVERY DAY | Build your streak and compare your standing. | WordShift home after a completed Daily Challenge, showing a seven-day streak and a Today’s Standing dialog. | Phase 1 home with the completed Daily Challenge control and a Today’s Standing dialog showing a seven-day streak. |
 | 7 | `docs/play-store/final/07_flawless_offering.png` | CHASE A FLAWLESS OFFERING | No hints. No mistakes. One perfect chain. | WordShift victory screen showing a flawless three-star solve and amber rewards. | Phase 0 victory modal with three stars, a FLAWLESS ribbon, the PAY to PLAN to HEART chain, and amber rewards. |
-| 8 | `docs/play-store/final/08_theyve_been_waiting.png` | THEY'VE BEEN WAITING | Some houses remember every word. | The WordShift animal house at dusk with a subtly mysterious atmosphere and no explicit horror imagery. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
+| 8 | `docs/play-store/final/08_theyve_been_waiting.png` | THEY'VE BEEN WAITING | Some houses remember every word. | WordShift animal house at dusk beneath a purple-orange sky, with the Jungle Hammock locked above furnished rooms. | Phase 2 dusk house with the Jungle Hammock still locked and no late-story imagery. |
 
 Final feature graphic: `docs/play-store/final/feature-graphic.png`
+Feature graphic alt text: Ember the fox beside the exact WordShift logo, candy tiles, glowing amber, and a sunny-to-dusk forest with subtle distant eyes.
 
 Never show Phase 3+ content, the robed sprites, or the shadow figure in store
 assets — the reveal is the product.

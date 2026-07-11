@@ -1,6 +1,6 @@
 ---
 permalink: /
-title: WordShift — a word puzzle that slowly becomes something else
+title: WordShift, a word puzzle that slowly becomes something else
 ---
 
 # WordShift
@@ -12,7 +12,7 @@ into the next, and both must still be real English words. Solve puzzle chains,
 earn amber, and build a home for a growing family of animal friends who always
 have something to say.
 
-Play a little every day — the daily challenge, streaks, and quests reward
+Play a little every day. The daily challenge, streaks, and quests reward
 coming back. And pay attention to your animal friends. They notice things.
 
 ## Get the game
@@ -22,10 +22,10 @@ coming back. And pay attention to your animal friends. They notice things.
 
 ## Features
 
-- Thousands of hand-tuned word chains across four difficulties (4–6 letters)
+- Thousands of hand-tuned word chains across four difficulties (4 to 6 letters)
 - Three twist modes: Reverse Shift, Double Shift, and timed Speed Shift
 - A daily challenge shared by every player, with streaks and a leaderboard
-- Build a house, room by room, for 13 animal companions — each with their
+- Build a house, room by room, for 13 animal companions. Each has their
   own voice, moods, and an unfolding story
 - Challenge friends with a link to the exact puzzle you just solved
 - No account required; progress backs up automatically
