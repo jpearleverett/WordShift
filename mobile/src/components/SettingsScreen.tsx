@@ -69,6 +69,7 @@ import { clearCosmetics } from '../services/cosmetics';
 import { clearAdPacing, privacyOptionsRequired, showPrivacyOptions } from '../services/ads';
 import { clearHints } from '../services/hints';
 import { clearMonetPrompts } from '../services/monetizationPrompts';
+import { clearSharePrompts } from '../services/sharePrompts';
 import { clearDailyLoginReward } from '../services/dailyLoginReward';
 import { clearDailyAmberReward } from '../services/dailyAmberReward';
 import { clearMasteryRecords } from '../services/masteryRecords';
@@ -166,6 +167,7 @@ export async function performFullReset(): Promise<string[]> {
     ['tending', clearTendingState],
     ['hints', clearHints],
     ['monetPrompts', clearMonetPrompts],
+    ['sharePrompts', clearSharePrompts],
     ['dailyLogin', clearDailyLoginReward],
     ['dailyAmber', clearDailyAmberReward],
     ['masteryRecords', clearMasteryRecords],

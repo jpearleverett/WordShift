@@ -15,6 +15,11 @@ export const INTERJECTION_AUTODISMISS_MS = 4000;
 // === VICTORY GLITCH ===
 export const VICTORY_GLITCH_DELAY_MS = 300;
 export const VICTORY_GLITCH_DURATION_MS = 500;
+// The guaranteed FIRST-victory glitch is held longer and rendered louder than
+// the ~8% ambient ones — it is the game's first promise that something else is
+// here, and a 500ms flash is easy to miss. Long enough to register, short
+// enough to still read as a glitch, not a message.
+export const VICTORY_GLITCH_FIRST_DURATION_MS = 1400;
 
 // === STARBURST ===
 export const STARBURST_DURATION_MS = 600;

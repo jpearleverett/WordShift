@@ -44,7 +44,7 @@ export const MIN_PUZZLES_FOR_PHASE: Record<DialoguePhase, number> = {
   0: 0,
   1: 15,
   2: 40, // Pacing compression: accelerated players reach Deeper Questions inside week one (weighted PHASE_THRESHOLDS unchanged)
-  3: 135,
+  3: 110, // Was 135. Phase 2 was the longest single-tone stretch (the likeliest D14 break); shortening its floor brings Growing Shadows' visual/tonal shift ~25 puzzles sooner for accelerated players without touching the weighted thresholds or the house-unlock gates (Bamboo Attic 130).
   4: 155, // The Horizon — the cult reveal, just after the house completes
   5: 210, // Post-revelation — after house completion + final puzzle
 };
@@ -227,10 +227,12 @@ export const REMOVE_ADS_NUDGE_AFTER_INTERSTITIALS = 3;
 
 /**
  * Earliest puzzle count for Fox's one-time "Keeper's Welcome" starter-pack intro.
- * After the pit-harvest intro (puzzle 8) and before challenge mode (15), once the
- * player understands amber. Suppressed if the starter pack is already owned.
+ * Pushed past puzzle 20 so the store pitch never lands inside the first-session
+ * cluster of new-thing introductions (journal, daily, variants, challenge,
+ * mandatory harvest all fire before this) — the newcomer meets the game before
+ * the game asks for anything. Suppressed if the starter pack is already owned.
  */
-export const STARTER_INTRO_MIN_PUZZLES = 12;
+export const STARTER_INTRO_MIN_PUZZLES = 22;
 
 /**
  * Puzzle count where the Journal Hub (ledger, gallery, quests) and the header

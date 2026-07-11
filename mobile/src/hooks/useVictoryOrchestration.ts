@@ -17,6 +17,7 @@ import {
   INTERJECTION_AUTODISMISS_MS,
   VICTORY_GLITCH_DELAY_MS,
   VICTORY_GLITCH_DURATION_MS,
+  VICTORY_GLITCH_FIRST_DURATION_MS,
   MICRO_BEAT_GLITCH_DELAY_MS,
   MICRO_BEAT_WHISPER_DELAY_MS,
 } from '../constants/timing';
@@ -53,6 +54,8 @@ export interface VictoryOrchestrationState {
   victoryGlitch: string | null;
   /** Whether the victory glitch overlay is visible. */
   showVictoryGlitch: boolean;
+  /** The guaranteed first-ever-victory glitch: held longer + rendered louder. */
+  victoryGlitchProminent: boolean;
   /** Narrative micro-beat overlay at specific puzzle milestones. */
   microBeat: NarrativeMicroBeat | null;
   /** Whether the micro-beat overlay is visible. */
@@ -125,6 +128,7 @@ export function useVictoryOrchestration(): [
 
   const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
   const [showVictoryGlitch, setShowVictoryGlitch] = useState(false);
+  const [victoryGlitchProminent, setVictoryGlitchProminent] = useState(false);
 
   const [microBeat, setMicroBeat] = useState<NarrativeMicroBeat | null>(null);
   const [showMicroBeat, setShowMicroBeat] = useState(false);
@@ -178,10 +182,19 @@ export function useVictoryOrchestration(): [
     // ------ Victory glitch (Phase 0, ~8%, guaranteed on first puzzle) ------
     const glitchText = getVictoryGlitch(phase, totalPuzzlesCompleted);
     if (glitchText) {
+      // The FIRST-ever victory glitch is the game's opening promise that
+      // something else is here. Hold it longer and render it louder (App reads
+      // the prominent flag) so a new player actually registers it, instead of
+      // a 500ms flash they blink past.
+      const prominent = totalPuzzlesCompleted === 1;
       addTimeout(() => {
         setVictoryGlitch(glitchText);
+        setVictoryGlitchProminent(prominent);
         setShowVictoryGlitch(true);
-        addTimeout(() => setShowVictoryGlitch(false), VICTORY_GLITCH_DURATION_MS);
+        addTimeout(
+          () => setShowVictoryGlitch(false),
+          prominent ? VICTORY_GLITCH_FIRST_DURATION_MS : VICTORY_GLITCH_DURATION_MS,
+        );
       }, VICTORY_GLITCH_DELAY_MS);
     }
 
@@ -297,6 +310,7 @@ export function useVictoryOrchestration(): [
     setShowInterjection(false);
     setVictoryGlitch(null);
     setShowVictoryGlitch(false);
+    setVictoryGlitchProminent(false);
     setMicroBeat(null);
     setShowMicroBeat(false);
     setCompletionCoda(null);
@@ -319,6 +333,7 @@ export function useVictoryOrchestration(): [
     showInterjection,
     victoryGlitch,
     showVictoryGlitch,
+    victoryGlitchProminent,
     microBeat,
     showMicroBeat,
     completionCoda,

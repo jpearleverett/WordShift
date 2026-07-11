@@ -142,8 +142,20 @@ describe('onboarding', () => {
       expect(allText).toContain('scroll down');
     });
 
-    test('unlock_explained stays a tight closing beat (four lines)', () => {
-      expect(ONBOARDING_FOX_LINES.unlock_explained.length).toBe(4);
+    test('unlock_explained stays a tight closing beat (three lines)', () => {
+      // Trimmed from four to three beats: the text-dense tail landed right after
+      // the first-win dopamine peak, so it says the same things (cycle + pit
+      // location + come-back warmth) in fewer words.
+      expect(ONBOARDING_FOX_LINES.unlock_explained.length).toBe(3);
+    });
+
+    test('the puzzle-tutorial intro teaches BOTH the tap and drag input paths', () => {
+      // Many players' primary input is drag, which the old tutorial never named
+      // (it only ever said "tap"). The move-mechanic intro beat now mentions
+      // both, appended to the same rendered string (App reads intro[0] only).
+      const text = ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0].toLowerCase();
+      expect(text).toContain('tap');
+      expect(text).toContain('drag');
     });
 
     test('the between-moves beat teaches the both-words rule and the check/cross previews', () => {
@@ -157,6 +169,12 @@ describe('onboarding', () => {
       // The undo/hint recovery pointers must survive the rewrite.
       expect(text).toContain('undo');
       expect(text).toContain('hint');
+    });
+
+    test('the between-moves beat is trimmed tight (shorter wall of text)', () => {
+      // The dense three-line beat right between moves 1 and 2 was a wall at a
+      // bad moment; it keeps the rule but must stay short.
+      expect(ONBOARDING_FOX_LINES.puzzle_tutorial_valid_move[0].length).toBeLessThan(200);
     });
   });
 

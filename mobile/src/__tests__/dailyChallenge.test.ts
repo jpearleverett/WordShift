@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getTodayString,
   getDailyDifficulty,
+  getDailyRamp,
+  isFirstDailyEasing,
   isDailyChallengeUnlocked,
   getDailyChallengeUnlockProgress,
   isDailyCompleted,
@@ -95,11 +97,54 @@ describe('dailyChallenge', () => {
   });
 
   test('daily ramp is deterministic by date (same puzzle shape for everyone)', () => {
-    const { getDailyRamp } = require('../services/dailyChallenge');
     // Sunday is the peak: 6-letter / 5-row HARD.
     expect(getDailyRamp('2026-02-15')).toEqual({ difficulty: 'HARD', wordLength: 6, targetRows: 5 });
     // Monday is accessible: 4-letter / 4-row MEDIUM.
     expect(getDailyRamp('2026-02-09')).toEqual({ difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 });
+  });
+
+  describe('first-ever daily easing', () => {
+    test('getDailyRamp eases the FIRST daily to MEDIUM 4/4 regardless of weekday', () => {
+      // Sunday (normally HARD 6/5 peak) and Thursday (normally HARD 5/5) both
+      // ease to the gentle Monday shape for a newcomer's first daily.
+      expect(getDailyRamp('2026-02-15', true)).toEqual({ difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 });
+      expect(getDailyRamp('2026-02-12', true)).toEqual({ difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 });
+    });
+
+    test('getDailyDifficulty eases the first daily but the default is the normal ramp', () => {
+      expect(getDailyDifficulty('2026-02-15', true)).toBe('MEDIUM');  // eased
+      expect(getDailyDifficulty('2026-02-15', false)).toBe('HARD');   // normal Sunday
+      expect(getDailyDifficulty('2026-02-15')).toBe('HARD');          // default = not eased
+    });
+
+    test('the weekday ramp is UNCHANGED for non-first dailies (determinism preserved)', () => {
+      // Everyone past their first daily stays on the deterministic weekday ramp,
+      // so the shared board and the leaderboard stay fair.
+      expect(getDailyRamp('2026-02-15', false)).toEqual({ difficulty: 'HARD', wordLength: 6, targetRows: 5 });
+      expect(getDailyRamp('2026-02-09', false)).toEqual({ difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 });
+      expect(getDailyRamp('2026-02-13')).toEqual(getDailyRamp('2026-02-13')); // stable per date
+    });
+
+    test('isFirstDailyEasing is true only before the first daily completion', async () => {
+      const fresh = await loadDailyProgress();
+      expect(isFirstDailyEasing(fresh)).toBe(true);
+
+      await recordDailyCompletion(3, 0, 0);
+      const after = await loadDailyProgress();
+      expect(isFirstDailyEasing(after)).toBe(false);
+    });
+
+    test('generateDailyPuzzle flags the first daily as eased (not leaderboard-eligible)', async () => {
+      const daily = await generateDailyPuzzle();
+      expect(daily.eased).toBe(true);
+    });
+
+    test('generateDailyPuzzle does NOT ease once the player has completed a daily', async () => {
+      const p = await loadDailyProgress();
+      p.totalCompleted = 1; // returning player
+      const daily = await generateDailyPuzzle();
+      expect(daily.eased).toBe(false);
+    });
   });
 
   test('unlock threshold is 8 puzzles (aligned with the auto-collect window)', () => {

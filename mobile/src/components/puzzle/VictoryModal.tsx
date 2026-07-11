@@ -30,7 +30,7 @@ import {
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
-import { AMBER_REWARDS } from '../../constants/gameBalance';
+import { AMBER_REWARDS, AUTO_COLLECT_PUZZLE_LIMIT } from '../../constants/gameBalance';
 import { isRoutineVictory } from '../../hooks/useVictoryFlow';
 import type { AmberBreakdown } from '../../hooks/useGamePersistence';
 import { hapticSuccess } from '../../services/haptics';
@@ -1010,7 +1010,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         own (in-world, never a "tutorial" voice). */}
                     {victoryData.autoCollected && (
                       <Text style={[styles.autoCollectCaption, { color: phaseTheme.modalSecondaryTextColor }]}>
-                        {getAutoCollectCaption(phase as DialoguePhase)}
+                        {getAutoCollectCaption(
+                          phase as DialoguePhase,
+                          (victoryData.puzzlesSolved ?? 0) >= AUTO_COLLECT_PUZZLE_LIMIT,
+                        )}
                       </Text>
                     )}
                     {/* Optional "double the reward". Ad-free players (Patron /

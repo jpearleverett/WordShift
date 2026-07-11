@@ -69,6 +69,7 @@ import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
 import { ShareableResult, decodeChallengeLink, buildChallengeShareText } from './src/services/shareResults';
+import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePrompts';
 import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
@@ -310,6 +311,12 @@ function MainApp() {
   const [showStoreModal, setShowStoreModal] = useState(false);
   // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
   const puzzleStartTimeRef = useRef<number>(0);
+  // True while the current daily board was eased (first-ever daily) — its
+  // result skips the shared leaderboard submit (the board isn't the shared one).
+  const dailyEasedRef = useRef<boolean>(false);
+  // handleShare is defined far below; the share-prompt (declared above it) calls
+  // it through this ref, kept current each render, to avoid a TDZ cycle.
+  const handleShareRef = useRef<() => void>(() => {});
   // Daily Challenge leaderboard standing for the current victory (null = none/off)
   const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
   // Persistent daily-ladder "best this week / your history" line + trend for the
@@ -390,6 +397,9 @@ function MainApp() {
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
+  // Opacity stutter for the prominent first-victory glitch (held at 1 under
+  // reduced motion).
+  const glitchStutter = useRef(new Animated.Value(1)).current;
   // Dynamic background colors for smooth transitions — match overlay/root to destination screen
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
@@ -565,6 +575,25 @@ function MainApp() {
   useEffect(() => {
     setAudioPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  // Glitch stutter for the prominent first-victory glitch: a short on/off
+  // flicker so a held 1.4s glitch reads as a genuine tear, not a caption.
+  // Reduced motion pins it fully visible.
+  useEffect(() => {
+    if (!(orchestration.showVictoryGlitch && orchestration.victoryGlitchProminent)) return;
+    if (getSettingsSync().reducedMotion) {
+      glitchStutter.setValue(1);
+      return;
+    }
+    const flick = (to: number, duration: number) =>
+      Animated.timing(glitchStutter, { toValue: to, duration, useNativeDriver: true });
+    const seq = Animated.sequence([
+      flick(0.25, 60), flick(1, 70), flick(0.5, 50), flick(1, 90),
+      flick(0.35, 55), flick(1, 120),
+    ]);
+    seq.start();
+    return () => { seq.stop(); glitchStutter.setValue(1); };
+  }, [orchestration.showVictoryGlitch, orchestration.victoryGlitchProminent, glitchStutter]);
 
   // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
   // landing after it begins, the bright days announce themselves (wrongly).
@@ -1060,7 +1089,12 @@ function MainApp() {
         const daily = await generateDailyPuzzle();
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
         puzzleStartTimeRef.current = Date.now();
-        logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true } });
+        // The first-ever daily gets an eased (MEDIUM) board so it isn't a
+        // brutal first competitive impression; its board differs from the
+        // shared one, so its result must NOT hit the leaderboard (still pays
+        // full HARD reward + records to the local ladder).
+        dailyEasedRef.current = daily.eased === true;
+        logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true, eased: dailyEasedRef.current } });
         // First-daily mercy: a one-time hint cushion so the first HARD daily
         // (6-letter, 5-row) isn't a wall. Only fires after the board actually
         // started; null on every call after the one-time grant.
@@ -1508,14 +1542,19 @@ function MainApp() {
             : 0;
           let rank: DailyRank | null = null;
           try {
-            await submitDailyResult({
-              date,
-              timeMs: elapsedMs,
-              stars: victory.earnedStars,
-              hintsUsed: result.hintsUsed,
-            });
-            rank = await getDailyRank(date);
-            if (rank) setDailyRank(rank);
+            // Skip the shared leaderboard for an eased first-daily board — it
+            // isn't the same board everyone else played, so its time/stars
+            // aren't comparable. Full reward + local ladder still apply.
+            if (!dailyEasedRef.current) {
+              await submitDailyResult({
+                date,
+                timeMs: elapsedMs,
+                stars: victory.earnedStars,
+                hintsUsed: result.hintsUsed,
+              });
+              rank = await getDailyRank(date);
+              if (rank) setDailyRank(rank);
+            }
           } catch {
             // Leaderboard is non-critical — never block the victory flow.
           }
@@ -1661,10 +1700,15 @@ function MainApp() {
       ) {
         finalVictory = { ...finalVictory, mandatoryHarvest: true };
       }
-      // Fox introduces the Keeper's Welcome starter pack once, ~puzzle 12, but
-      // only for players who don't already own it. She frames it in-world (a
-      // welcome gift on "the shelf"); dismissing opens the Store.
+      // Fox introduces the Keeper's Welcome starter pack once, past puzzle 20,
+      // for players who don't already own it. Declutter rule: never stack it on
+      // a victory that ALREADY has another intro or the mandatory-harvest gate
+      // — the store pitch waits for a quiet win (it re-fires until seen, since
+      // hasSeenStarterIntro is only set on dismissal), so a newcomer never gets
+      // two new-thing beats on one victory.
       if (
+        immediateIntros.length === 0 &&
+        !finalVictory.mandatoryHarvest &&
         completedTotal >= STARTER_INTRO_MIN_PUZZLES &&
         !hasEntitlementSync(ENTITLEMENTS.STARTER_PACK) &&
         !(await hasSeenStarterIntro())
@@ -2172,6 +2216,10 @@ function MainApp() {
     try {
       if (onboardingFlow.isOnboarding) return;
       if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return;
+      // Declutter: never stack the permission prompt on a victory that already
+      // has a Fox intro playing/queued. Return WITHOUT marking prompted so it
+      // simply waits for a quiet victory exit.
+      if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return;
       if (await hasPromptedForNotifications()) return;
       if ((await getNotificationPermissionStatus()) === 'granted') return;
       await markPromptedForNotifications();
@@ -2269,6 +2317,44 @@ function MainApp() {
     }
   }, [onboardingFlow.isOnboarding, victoryFlow.victoryData, persistence.cumulativeStats]);
 
+  // One-time proactive SHARE invite at a genuine peak (first flawless win OR
+  // first phase transition). The game already nudges players to buy but never
+  // to share — this is the growth counterpart, frequency-capped exactly like
+  // the monetization nudges. Returns whether it fired so the exit flow can keep
+  // to one nudge per victory. Never on a mandatory-harvest / ceremony exit.
+  const maybeShowSharePrompt = useCallback(async (): Promise<boolean> => {
+    const vd = victoryFlow.victoryData;
+    if (!vd) return false;
+    if (onboardingFlow.isOnboarding) return false;
+    if (vd.mandatoryHarvest || vd.phaseTransitionPending || persistence.pendingPhaseTransition != null) return false;
+    const fired = await consumeSharePrompt({
+      isFlawlessWin: vd.flawless === true,
+      isPhaseTransition: vd.phaseChanged === true,
+      isOnboarding: false,
+    });
+    if (fired) {
+      showGameAlert(
+        '',
+        getSharePromptInvite(persistence.currentPhase),
+        [
+          { text: 'Not now', style: 'cancel' },
+          // handleShare is defined below; call through a ref to avoid a
+          // declaration-order (TDZ) cycle with the victory-exit handlers.
+          { text: 'Share', onPress: () => handleShareRef.current() },
+        ],
+      );
+    }
+    return fired;
+  }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase]);
+
+  // At most ONE of the victory-exit nudges (share / patron / notification
+  // permission) fires per exit — the share peak takes precedence when eligible.
+  const runVictoryExitNudges = useCallback(async () => {
+    if (await maybeShowSharePrompt()) return;
+    await maybePromptForNotifications();
+    await maybeShowPatronNudge();
+  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowPatronNudge]);
+
   const handleNextLevel = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
@@ -2278,9 +2364,8 @@ function MainApp() {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
-    maybePromptForNotifications().catch(() => {});
-    maybeShowPatronNudge().catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
+    runVictoryExitNudges().catch(() => {});
+  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -2304,9 +2389,8 @@ function MainApp() {
       puzzleActions.clearBoard();
       transitionTo('home');
     });
-    maybePromptForNotifications().catch(() => {});
-    maybeShowPatronNudge().catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
+    runVictoryExitNudges().catch(() => {});
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // The pit route is a victory exit too — same interstitial gate as
   // next/home. Its exemptions already cover the sensitive pit moments
@@ -2422,6 +2506,7 @@ function MainApp() {
       setShareChallengeText(null);
     }
   }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily]);
+  handleShareRef.current = handleShare;
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (!victoryFlow.victoryData) return;
@@ -3148,8 +3233,22 @@ function MainApp() {
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
         {orchestration.showVictoryGlitch && orchestration.victoryGlitch && (
-          <View style={styles.victoryGlitchOverlay} pointerEvents="none">
-            <Text style={styles.victoryGlitchText}>{orchestration.victoryGlitch}</Text>
+          <View
+            style={[
+              styles.victoryGlitchOverlay,
+              orchestration.victoryGlitchProminent && styles.victoryGlitchOverlayProminent,
+            ]}
+            pointerEvents="none"
+          >
+            <Animated.Text
+              style={[
+                styles.victoryGlitchText,
+                orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                orchestration.victoryGlitchProminent && { opacity: glitchStutter },
+              ]}
+            >
+              {orchestration.victoryGlitch}
+            </Animated.Text>
           </View>
         )}
 
@@ -3233,7 +3332,7 @@ function MainApp() {
                               : ''
                           }`
                         : tutorialGuidance?.letterToMove
-                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
+                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up. Or just drag it.`
                           : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
                     )
                     : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]

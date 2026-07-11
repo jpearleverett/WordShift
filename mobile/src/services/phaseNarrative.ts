@@ -2654,7 +2654,13 @@ export function getPitMandatoryCTA(phase: DialoguePhase): string {
  * first harvest). Auto-collect only ever runs in Phase 0, but kept phase-aware
  * for consistency.
  */
-export function getAutoCollectCaption(phase: DialoguePhase): string {
+export function getAutoCollectCaption(phase: DialoguePhase, isLastBeforeManual: boolean = false): string {
+  // On the LAST auto-collected win, foreshadow the handoff so the first
+  // mandatory-harvest gate reads as expected, not as a sudden wall.
+  if (isLastBeforeManual) {
+    if (phase >= 2) return 'The house carries your words to the pit one last time. Soon you will take them yourself.';
+    return 'The house carries your words to the pit for you, one last time. Soon you will take them down yourself.';
+  }
   if (phase >= 3) return 'The house carries your words down to the pit for you... for now.';
   if (phase >= 2) return 'The house still carries your words to the pit for you, for now.';
   return 'The house carries your words down to the pit for you, for now.';
