@@ -17,11 +17,10 @@ import { PuzzleVariant, VariantSelectorOption, getVariantDescription } from '../
 import { BODY_FONT, BODY_FONT_ITALIC, PIXEL_FONT_BOLD } from '../../theme/fonts';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-// The menu floats at top: 52. Size it to the device so DIFFICULTY + PUZZLE STYLE
-// (Standard/Reverse/Speed/Double + combos) + CHALLENGE/BLIND all fit without the
-// last row clipping the frame — taller than the old fixed 650 once Speed Shift
-// unlocks, but never so tall it runs off a short device.
-const MENU_MAX_HEIGHT = Math.max(560, Math.min(SCREEN_HEIGHT - 88, 900));
+// The menu floats at top: 52 inside the stats row, below the puzzle header.
+// Reserve that full chrome offset plus a bottom margin so the lower wood edge
+// stays on-screen; the ScrollView carries overflow on shorter devices.
+const MENU_MAX_HEIGHT = Math.max(400, Math.min(SCREEN_HEIGHT - 204, 900));
 // The scroll area must fit ABOVE the frame's ~21dp bottom wood band, or its
 // last row is clipped by the panel's overflow:hidden and can't be scrolled
 // into view. Reserve the top padding (18) + title (~26) + a bottom clearance

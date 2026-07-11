@@ -413,39 +413,72 @@ async function prepareScenario(page, scenario) {
     case 'variant-menu':
       await clickPlayPuzzle(page);
       await page.getByLabel(/^Difficulty .+Tap to change puzzle setup$/).click();
-      await page.getByLabel(/^Reverse Shift(?:,|$)/).waitFor();
-      await page.getByLabel(/^Double Shift(?:,|$)/).waitFor();
-      await page.getByLabel(/^Speed Shift(?:,|$)/).waitFor();
+      const advertisedModes = [
+        { name: 'Standard', locator: page.getByLabel(/^Standard(?:,|$)/) },
+        { name: 'Reverse Shift', locator: page.getByLabel(/^Reverse Shift(?:,|$)/) },
+        { name: 'Speed Shift', locator: page.getByLabel(/^Speed Shift(?:,|$)/) },
+        { name: 'Double Shift', locator: page.getByLabel(/^Double Shift(?:,|$)/) },
+        { name: 'Challenge', locator: page.getByLabel(/^Challenge mode,/) },
+        { name: 'Blind Mode', locator: page.getByLabel(/^Blind offering,/) },
+      ];
+      await Promise.all(advertisedModes.map(({ locator }) => locator.waitFor()));
       const blindOffering = page.getByLabel(/^Blind offering,/);
-      await blindOffering.waitFor();
-      const blindMetrics = await blindOffering.evaluate(element => {
+      const panelMetrics = await blindOffering.evaluate(async element => {
         let ancestor = element.parentElement;
+        let scrollArea = null;
+        let panel = null;
         while (ancestor && ancestor !== document.body) {
           const style = getComputedStyle(ancestor);
-          if (
+          if (!scrollArea &&
             ancestor.scrollHeight > ancestor.clientHeight
             && (style.overflowY === 'auto' || style.overflowY === 'scroll')
           ) {
-            ancestor.scrollTop = ancestor.scrollHeight - ancestor.clientHeight;
+            scrollArea = ancestor;
+          }
+          if (style.position === 'absolute' && style.overflowY === 'hidden') {
+            panel = ancestor;
             break;
           }
           ancestor = ancestor.parentElement;
         }
 
-        const overflow = element.getBoundingClientRect().bottom - window.innerHeight;
-        if (overflow > 0) window.scrollBy(0, overflow);
-        const rect = element.getBoundingClientRect();
+        if (!scrollArea) throw new Error('Difficulty menu scroll area was not found');
+        if (!panel) throw new Error('Difficulty menu panel frame was not found');
+        scrollArea.scrollTop = scrollArea.scrollHeight - scrollArea.clientHeight;
+        window.scrollTo(0, document.documentElement.scrollHeight - window.innerHeight);
+        await new Promise(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
+
+        const blindRect = element.getBoundingClientRect();
+        const panelRect = panel.getBoundingClientRect();
         return {
-          bottom: rect.bottom,
-          top: rect.top,
+          blindBottom: blindRect.bottom,
+          blindTop: blindRect.top,
+          panelBottom: panelRect.bottom,
+          panelTop: panelRect.top,
           viewportHeight: window.innerHeight,
         };
       });
-      if (blindMetrics.top < 0 || blindMetrics.bottom > blindMetrics.viewportHeight) {
+
+      const safeBottom = panelMetrics.viewportHeight - 12;
+      if (
+        panelMetrics.panelBottom > safeBottom
+        || panelMetrics.blindTop < panelMetrics.panelTop
+        || panelMetrics.blindBottom > panelMetrics.panelBottom - 18
+      ) {
         throw new Error(
-          `Blind offering is outside the viewport after scrolling: `
-          + JSON.stringify(blindMetrics)
+          `Difficulty menu lower frame is outside the safe area: `
+          + JSON.stringify(panelMetrics)
         );
+      }
+      for (const { name, locator } of advertisedModes) {
+        const box = await locator.boundingBox();
+        if (!box || box.y < 0 || box.y + box.height > safeBottom) {
+          throw new Error(
+            `${name} is outside the variant capture safe area: ${JSON.stringify(box)}`
+          );
+        }
       }
       return;
 
