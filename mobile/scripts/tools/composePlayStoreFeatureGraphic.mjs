@@ -388,7 +388,10 @@ function commonParent(paths) {
   return candidate;
 }
 
-async function publishStagedFiles(records) {
+async function publishStagedFiles(
+  records,
+  { renameFile = fs.rename } = {}
+) {
   for (const record of records) {
     await fs.mkdir(path.dirname(record.destination), { recursive: true });
     record.backup = path.join(
@@ -402,11 +405,11 @@ async function publishStagedFiles(records) {
   try {
     for (const record of records) {
       if (record.hadOriginal) {
-        await fs.rename(record.destination, record.backup);
+        await renameFile(record.destination, record.backup);
       }
     }
     for (const record of records) {
-      await fs.rename(record.staged, record.destination);
+      await renameFile(record.staged, record.destination);
       record.published = true;
     }
   } catch (error) {
@@ -417,7 +420,7 @@ async function publishStagedFiles(records) {
     }
     for (const record of records) {
       if (record.hadOriginal && await pathExists(record.backup)) {
-        await fs.rename(record.backup, record.destination);
+        await renameFile(record.backup, record.destination);
       }
     }
     throw error;
@@ -434,6 +437,7 @@ export async function withStagedFeaturePublication({
   finalPath,
   legacyPath,
   populateAndValidate,
+  renameFile = fs.rename,
 }) {
   if (typeof populateAndValidate !== 'function') {
     throw new Error('populateAndValidate must be a function');
@@ -473,7 +477,7 @@ export async function withStagedFeaturePublication({
     await publishStagedFiles([
       { staged: stagedFinalPath, destination: finalPath },
       { staged: stagedLegacyPath, destination: legacyPath },
-    ]);
+    ], { renameFile });
   } finally {
     await fs.rm(stagingDir, { recursive: true, force: true });
   }

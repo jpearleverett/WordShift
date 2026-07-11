@@ -1,5 +1,5 @@
 // World/UI art generator: shadow figure, clouds, ground, roof, foundation,
-// tree, star + amber icons, and the Play Store feature graphic.
+// tree, star + amber icons.
 // Pure Node (zlib only), supersampled 2x for anti-aliasing.
 // Run: node scripts/tools/generateWorldArt.mjs
 import zlib from 'zlib';
@@ -296,37 +296,4 @@ function starPts(cx, cy, rOut, rIn, rot = -Math.PI / 2) {
   ellipse(cv, c + 30, c + 18, 16, 24, '#8A5A0A', 0.45, 8);                   // the trapped fleck
   ellipse(cv, c - 38, c - 52, 16, 16, '#FFFFFF', 0.95, 6);
   savePNG(path.join(UI, 'amber.png'), W, W, down2(cv, W, W));
-}
-
-// === 9. feature graphic (1024x500, opaque) ===================================
-{
-  const W = 1024, H = 500, cv = C(W * 2, H * 2);
-  rect(cv, 0, 0, cv.w, cv.h, '#7C8BF0', 1, '#4E58B8');
-  gauss(cv, cv.w * 0.32, cv.h * 0.3, 700, 500, '#FFFFFF', 0.10);
-  // scattered floating tiles, deliberately echoing the icon
-  const tiles = [
-    [0.18, 0.46, 150, '#FF8FB8', '#E84B8A', 'W'], [0.38, 0.34, 110, '#5EEAD4', '#14B8A6', null],
-    [0.55, 0.56, 130, '#FFE08A', '#F0B429', null], [0.74, 0.36, 150, '#A78BFA', '#7C5CD6', null],
-    [0.88, 0.62, 100, '#FF8FB8', '#E84B8A', null],
-  ];
-  for (const [fx, fy, s, c1, c2, glyph] of tiles) {
-    const cx = cv.w * fx, cy = cv.h * fy;
-    roundRect(cv, cx, cy + s * 0.07, s, s, s * 0.22, '#1A1A2E', 0.25);
-    roundRect(cv, cx, cy, s, s, s * 0.22, c1, 1, c2);
-    roundRect(cv, cx, cy - s * 0.58, s * 0.86, s * 0.3, s * 0.14, '#FFFFFF', 0.3);
-    if (glyph === 'W') {
-      const wT = cy - s * 0.34, wB = cy + s * 0.42, wH = s * 0.56;
-      const segs = [[cx - wH, wT, cx - wH * 0.5, wB], [cx - wH * 0.5, wB, cx, wT + s * 0.2], [cx, wT + s * 0.2, cx + wH * 0.5, wB], [cx + wH * 0.5, wB, cx + wH, wT]];
-      for (const [ax, ay, bx, by] of segs) {
-        const steps = 40;
-        for (let i = 0; i <= steps; i++) ellipse(cv, ax + ((bx - ax) * i) / steps, ay + ((by - ay) * i) / steps, s * 0.085, s * 0.085, '#FFFFFF', 1, 3);
-      }
-    }
-  }
-  // faint shadow-figure silhouette on the right edge — the hook, barely there
-  gauss(cv, cv.w * 0.94, cv.h * 0.5, 160, 420, '#0A0518', 0.35);
-  for (const ex of [cv.w * 0.94 - 26, cv.w * 0.94 + 26]) gauss(cv, ex, cv.h * 0.34, 12, 8, '#E0244A', 0.7);
-  // sparkles
-  for (let i = 0; i < 26; i++) ellipse(cv, seeded() * cv.w, seeded() * cv.h, 4 + seeded() * 6, 4 + seeded() * 6, '#FFFFFF', 0.5 + seeded() * 0.4, 3);
-  savePNG(path.resolve(import.meta.dirname, '../../../docs/feature-graphic.png'), W, H, down2(cv, W, H));
 }

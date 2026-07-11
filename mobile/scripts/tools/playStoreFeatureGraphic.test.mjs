@@ -8,7 +8,7 @@ import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
-import { readPngMetadata } from './playStorePng.mjs';
+import { readPng, readPngMetadata } from './playStorePng.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../..');
@@ -17,6 +17,15 @@ const SOURCE_BACKGROUND_PATH = path.join(
   'docs/play-store/source/feature-background.png'
 );
 const WORDMARK_PATH = path.join(REPO_ROOT, 'mobile/assets/ui/wordmark.png');
+const WORLD_ART_GENERATOR_PATH = path.join(
+  REPO_ROOT,
+  'mobile/scripts/tools/generateWorldArt.mjs'
+);
+const FINAL_FEATURE_PATH = path.join(
+  REPO_ROOT,
+  'docs/play-store/final/feature-graphic.png'
+);
+const LEGACY_FEATURE_PATH = path.join(REPO_ROOT, 'docs/feature-graphic.png');
 const AUDITED_BACKGROUND_SHA256 =
   'd5e6371e06f458b91f15c7cfd2d3fc348cfd3937c2172a9d5fea3c2c3ce98c44';
 
@@ -48,7 +57,18 @@ function encodePng(width, height, { alpha = false } = {}) {
   });
 }
 
+function pixelDataHash(png) {
+  return createHash('sha256').update(png.data).digest('hex');
+}
+
 describe('Play Store feature graphic source and geometry', () => {
+  test('keeps the generic world-art generator from owning feature outputs', async () => {
+    const generatorSource = await fs.readFile(WORLD_ART_GENERATOR_PATH, 'utf8');
+
+    assert.doesNotMatch(generatorSource, /feature-graphic\.png/);
+    assert.doesNotMatch(generatorSource, /Play Store feature graphic/i);
+  });
+
   test('preserves the exact human-audited background bytes', async () => {
     const source = await fs.readFile(SOURCE_BACKGROUND_PATH).catch(error => {
       assert.fail(
@@ -213,6 +233,50 @@ describe('Play Store feature graphic composition', { concurrency: false }, () =>
     assert.deepEqual(await readPngMetadata(outputPath), result.metadata);
   });
 
+  test('reproduces both checked-in outputs pixel-for-pixel from real inputs', async () => {
+    const { composeFeatureGraphic } = await loadComposer();
+    const browserPngPath = path.join(tempDir, 'real-input-browser.png');
+    const outputPath = path.join(tempDir, 'real-input-output.png');
+
+    const result = await composeFeatureGraphic({
+      page,
+      backgroundPath: SOURCE_BACKGROUND_PATH,
+      wordmarkPath: WORDMARK_PATH,
+      browserPngPath,
+      outputPath,
+    });
+    const [generated, committedFinal, committedLegacy] = await Promise.all([
+      readPng(outputPath),
+      readPng(FINAL_FEATURE_PATH),
+      readPng(LEGACY_FEATURE_PATH),
+    ]);
+    const [finalMetadata, legacyMetadata] = await Promise.all([
+      readPngMetadata(FINAL_FEATURE_PATH),
+      readPngMetadata(LEGACY_FEATURE_PATH),
+    ]);
+    const expectedMetadata = {
+      width: 1024,
+      height: 500,
+      bitDepth: 8,
+      colorType: 2,
+    };
+    const generatedPixelHash = pixelDataHash(generated);
+
+    assert.deepEqual(result.metadata, expectedMetadata);
+    assert.deepEqual(finalMetadata, expectedMetadata);
+    assert.deepEqual(legacyMetadata, expectedMetadata);
+    assert.equal(
+      pixelDataHash(committedFinal),
+      generatedPixelHash,
+      'committed final does not reproduce from the canonical inputs'
+    );
+    assert.equal(
+      pixelDataHash(committedLegacy),
+      generatedPixelHash,
+      'legacy output does not reproduce from the canonical inputs'
+    );
+  });
+
   test('leaves both previous outputs untouched and cleans staging on failure', async () => {
     const { withStagedFeaturePublication } = await loadComposer();
     const publicationRoot = path.join(tempDir, 'publication');
@@ -249,6 +313,58 @@ describe('Play Store feature graphic composition', { concurrency: false }, () =>
 
     assert.equal(await fs.readFile(finalPath, 'utf8'), 'previous final');
     assert.equal(await fs.readFile(legacyPath, 'utf8'), 'previous legacy');
+    assert.deepEqual(
+      (await fs.readdir(publicationRoot)).sort(),
+      ['final', 'legacy']
+    );
+  });
+
+  test('rolls back both destinations when the second publication rename fails', async () => {
+    const { withStagedFeaturePublication } = await loadComposer();
+    const publicationRoot = path.join(tempDir, 'rename-failure-publication');
+    const finalPath = path.join(publicationRoot, 'final', 'feature-graphic.png');
+    const legacyPath = path.join(publicationRoot, 'legacy', 'feature-graphic.png');
+    let stagedLegacyPath;
+    await Promise.all([
+      fs.mkdir(path.dirname(finalPath), { recursive: true }),
+      fs.mkdir(path.dirname(legacyPath), { recursive: true }),
+    ]);
+    await Promise.all([
+      fs.writeFile(finalPath, 'previous final'),
+      fs.writeFile(legacyPath, 'previous legacy'),
+    ]);
+
+    await assert.rejects(
+      withStagedFeaturePublication({
+        finalPath,
+        legacyPath,
+        populateAndValidate: async staged => {
+          stagedLegacyPath = staged.stagedLegacyPath;
+          await Promise.all([
+            fs.mkdir(path.dirname(staged.stagedFinalPath), { recursive: true }),
+            fs.mkdir(path.dirname(staged.stagedLegacyPath), { recursive: true }),
+          ]);
+          await fs.writeFile(staged.stagedFinalPath, 'new feature');
+          await fs.writeFile(staged.stagedLegacyPath, 'new feature');
+        },
+        renameFile: async (source, destination) => {
+          if (source === stagedLegacyPath && destination === legacyPath) {
+            throw new Error('simulated second destination rename failure');
+          }
+          await fs.rename(source, destination);
+        },
+      }),
+      /simulated second destination rename failure/
+    );
+
+    assert.equal(await fs.readFile(finalPath, 'utf8'), 'previous final');
+    assert.equal(await fs.readFile(legacyPath, 'utf8'), 'previous legacy');
+    assert.deepEqual(await fs.readdir(path.dirname(finalPath)), [
+      'feature-graphic.png',
+    ]);
+    assert.deepEqual(await fs.readdir(path.dirname(legacyPath)), [
+      'feature-graphic.png',
+    ]);
     assert.deepEqual(
       (await fs.readdir(publicationRoot)).sort(),
       ['final', 'legacy']
