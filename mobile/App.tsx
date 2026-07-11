@@ -3099,6 +3099,7 @@ function MainApp() {
       </ErrorBoundary>
       {/* Screen transition overlay — solid cover that fades in/out during navigation */}
       <Animated.View
+        testID="screen-transition-overlay"
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
           backgroundColor: transitionOverlayColor,

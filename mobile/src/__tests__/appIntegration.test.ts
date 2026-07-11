@@ -70,6 +70,10 @@ describe('Play Store capture bootstrap isolation', () => {
     );
   });
 
+  test('screen transition exposes a stable capture-ready signal', () => {
+    expect(APP_TSX).toContain('testID="screen-transition-overlay"');
+  });
+
   test('capture bootstrap failures render an error instead of mounting MainApp', () => {
     expect(bootstrap).toMatch(
       /setBootstrapState\(captureActive \? 'capture-error' : 'ready'\);/

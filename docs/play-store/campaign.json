@@ -1,0 +1,74 @@
+[
+  {
+    "scenario": "puzzle-preview",
+    "source": "01_puzzle_preview.png",
+    "final": "01_shift_one_letter.png",
+    "headline": "SHIFT ONE LETTER",
+    "support": "Move it down. Keep both words real.",
+    "altText": "WordShift puzzle board with the letter L selected and valid and invalid destination word previews visible.",
+    "theme": "bright"
+  },
+  {
+    "scenario": "puzzle-chain",
+    "source": "02_puzzle_chain.png",
+    "final": "02_every_word_stays_real.png",
+    "headline": "EVERY WORD STAYS REAL",
+    "support": "Build a chain one clever move at a time.",
+    "altText": "WordShift puzzle showing PAY, PLANT, and HEAR midway through a valid letter-shifting chain.",
+    "theme": "bright"
+  },
+  {
+    "scenario": "home-sunny",
+    "source": "03_home_sunny.png",
+    "final": "03_build_a_home.png",
+    "headline": "BUILD A HOME",
+    "support": "Your words bring every room to life.",
+    "altText": "Sunny WordShift house with several furnished rooms and four animal companions.",
+    "theme": "bright"
+  },
+  {
+    "scenario": "animal-dialogue",
+    "source": "04_animal_dialogue.png",
+    "final": "04_meet_unlikely_friends.png",
+    "headline": "MEET 13 UNLIKELY FRIENDS",
+    "support": "They always have something to tell you.",
+    "altText": "Ember the fox speaking to the player in a warm dialogue scene over the animal house.",
+    "theme": "bright"
+  },
+  {
+    "scenario": "variant-menu",
+    "source": "05_variant_menu.png",
+    "final": "05_master_every_mode.png",
+    "headline": "MASTER EVERY MODE",
+    "support": "Reverse, Double Shift, Speed, and Blind Offering.",
+    "altText": "WordShift setup menu displaying Standard, Reverse, Double Shift, Speed, and Blind Offering modes.",
+    "theme": "dusk"
+  },
+  {
+    "scenario": "daily",
+    "source": "06_daily.png",
+    "final": "06_new_puzzle_every_day.png",
+    "headline": "A NEW PUZZLE EVERY DAY",
+    "support": "Build your streak and compare your standing.",
+    "altText": "WordShift home screen with a completed Daily Challenge card and a seven-day streak.",
+    "theme": "dusk"
+  },
+  {
+    "scenario": "flawless-victory",
+    "source": "07_flawless_victory.png",
+    "final": "07_flawless_offering.png",
+    "headline": "CHASE A FLAWLESS OFFERING",
+    "support": "No hints. No mistakes. One perfect chain.",
+    "altText": "WordShift victory screen showing a flawless three-star solve and amber rewards.",
+    "theme": "dusk"
+  },
+  {
+    "scenario": "home-dusk",
+    "source": "08_home_dusk.png",
+    "final": "08_theyve_been_waiting.png",
+    "headline": "THEY'VE BEEN WAITING",
+    "support": "Some houses remember every word.",
+    "altText": "The WordShift animal house at dusk with a subtly mysterious atmosphere and no explicit horror imagery.",
+    "theme": "mystery"
+  }
+]
