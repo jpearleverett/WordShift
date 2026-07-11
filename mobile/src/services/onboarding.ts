@@ -102,11 +102,14 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Oh! Hello up there! I'm down here, by the little den.\nTap the invite and I'll come say hello properly!",
   ],
 
-  // Step 2: Fox just invited — intro dialogue
+  // Step 2: Fox just invited — intro dialogue. Warm on the surface, with ONE
+  // faint wrong-note (the "someone like you... for the longest time" seed):
+  // adorable eagerness on a first read, quietly ominous once the descent lands.
+  // Per the narrative vision's Early Darkness Seeds — the trap is set in warmth.
   fox_invited: [
     "You let me in! Oh, I hoped you would. I have been practicing my hello all morning.\nI'm Ember!",
     "Here is the wonderful part: every puzzle you solve makes this house a little more real. I don't entirely know how that works, only that it does, and that it is my favorite thing.",
-    "Come on, one quick puzzle together, then we build.",
+    "Come on, one quick puzzle together, then we build. I have been hoping for someone like you for the longest time.",
   ],
 
   // Step 3: On puzzle screen — guide through the puzzle. This intro beat is the

@@ -517,9 +517,10 @@ ALL player-facing text shifts with phase. Key functions:
 ## Early Darkness Seeds (Phase 0)
 
 Phase 0 contains subtle foreshadowing:
-- **Victory Glitch**: ~8% chance of flash text ("WE SEE YOU", "CLOSER"). First victory always glitches.
+- **Victory Glitch**: ~8% ambient chance of flash text ("WE SEE YOU", "CLOSER") on Phase-0 wins. A GUARANTEED, prominent (held + stuttering) glitch fires once on the player's **first free-play win** (not the guided tutorial — `hasSeenFirstWinGlitch`/`getFirstWinGlitchText`), so the opening "something else is here" promise lands on a win the player owns rather than colliding with Fox's tutorial warmth.
 - **Seed Move Messages**: ~5% chance of "wrong" messages at Phase 0 ("The letters remember.").
-- **Onboarding Seeds**: Fox's lines have ominous undertones: "We've been waiting for someone like you.\n...A long time."
+- **Phase-0 background aberration**: a rare, subtle "did that just happen" visual wrong-note in `AnimatedBackground` at phases 0-1 (reduced-motion/tier gated) — foreshadows without revealing.
+- **Onboarding Seed**: Ember's warm intro carries ONE faint wrong-note ("I have been hoping for someone like you for the longest time" — `fox_invited`, onboarding.ts): adorable eagerness on a first read, quietly ominous in hindsight. Kept deliberately soft so the tutorial stays delightful (the trap is set in warmth), but present so the hook is teased from session one.
 
 ## Narrative Micro-Beats
 
