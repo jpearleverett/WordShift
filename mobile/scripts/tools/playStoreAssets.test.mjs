@@ -136,6 +136,32 @@ async function writeSourceSet(sourceDir, campaign) {
   ]);
 }
 
+async function writeFinalSet(finalDir, campaign) {
+  await writeScreenshotSet(finalDir, campaign);
+  await fs.writeFile(
+    path.join(finalDir, 'feature-graphic.png'),
+    encodeSolidPng(1024, 500)
+  );
+}
+
+async function addUnexpectedEntry(directory, kind) {
+  if (kind === 'nested directory') {
+    await fs.mkdir(path.join(directory, 'nested'));
+    return;
+  }
+  const filename = kind === 'temporary file' ? 'capture.tmp' : 'capture.jpg';
+  await fs.writeFile(path.join(directory, filename), 'unexpected');
+}
+
+async function snapshotDirectory(directory) {
+  const names = (await fs.readdir(directory)).sort();
+  const contents = await Promise.all(names.map(async name => ({
+    name,
+    bytes: await fs.readFile(path.join(directory, name)),
+  })));
+  return contents;
+}
+
 describe('shared PNG helpers', () => {
   test('writeOpaquePng emits an 8-bit RGB PNG and creates parent directories', async () => {
     const filePath = path.join(tempDir, 'nested', 'opaque.png');
@@ -559,7 +585,7 @@ describe('final Play Store asset validation', () => {
     );
     await assert.rejects(
       validateFinalAssets({ campaignPath, finalDir, screenshotsOnly: true }),
-      /unexpected PNG asset "unapproved\.png"/
+      /unexpected final asset "unapproved\.png"/
     );
   });
 
@@ -680,4 +706,113 @@ describe('exact Play Store source-set validation', () => {
       /08_home_dusk\.png is 1080x1919; expected 1080x1920/
     );
   });
+});
+
+describe('exact Play Store directory-entry validation', () => {
+  test('accepts exact source and final entry sets', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    const finalDir = path.join(tempDir, 'final');
+    await Promise.all([
+      writeSourceSet(sourceDir, campaign),
+      writeFinalSet(finalDir, campaign),
+    ]);
+
+    const [sources, finals] = await Promise.all([
+      validateSourceAssets({ campaignPath, sourceDir }),
+      validateFinalAssets({ campaignPath, finalDir }),
+    ]);
+
+    assert.equal(sources.length, 9);
+    assert.equal(finals.length, 9);
+  });
+
+  for (const kind of ['temporary file', 'JPEG file', 'nested directory']) {
+    test(`rejects an unexpected ${kind} in source`, async () => {
+      const campaign = makeCampaign();
+      const campaignPath = await writeCampaign(campaign);
+      const sourceDir = path.join(tempDir, 'source');
+      await writeSourceSet(sourceDir, campaign);
+      await addUnexpectedEntry(sourceDir, kind);
+
+      await assert.rejects(
+        validateSourceAssets({ campaignPath, sourceDir }),
+        /unexpected source asset/
+      );
+    });
+
+    test(`rejects an unexpected ${kind} in final`, async () => {
+      const campaign = makeCampaign();
+      const campaignPath = await writeCampaign(campaign);
+      const finalDir = path.join(tempDir, 'final');
+      await writeFinalSet(finalDir, campaign);
+      await addUnexpectedEntry(finalDir, kind);
+
+      await assert.rejects(
+        validateFinalAssets({ campaignPath, finalDir }),
+        /unexpected final asset/
+      );
+    });
+  }
+
+  for (const directoryKind of ['source', 'final']) {
+    test(`rejects an allowed-name symlink in ${directoryKind}`, async () => {
+      const campaign = makeCampaign();
+      const campaignPath = await writeCampaign(campaign);
+      const directory = path.join(tempDir, directoryKind);
+      const names = directoryKind === 'source'
+        ? campaign.map(item => item.source)
+        : campaign.map(item => item.final);
+      if (directoryKind === 'source') {
+        await writeSourceSet(directory, campaign);
+      } else {
+        await writeFinalSet(directory, campaign);
+      }
+      await fs.rm(path.join(directory, names[0]));
+      await fs.symlink(names[1], path.join(directory, names[0]));
+
+      const validation = directoryKind === 'source'
+        ? validateSourceAssets({ campaignPath, sourceDir: directory })
+        : validateFinalAssets({ campaignPath, finalDir: directory });
+      await assert.rejects(validation, /not a regular file/);
+    });
+
+    test(
+      `preserves the canonical ${directoryKind} directory when staged entry validation fails`,
+      async () => {
+        const campaign = makeCampaign();
+        const campaignPath = await writeCampaign(campaign);
+        const directory = path.join(tempDir, directoryKind);
+        if (directoryKind === 'source') {
+          await writeSourceSet(directory, campaign);
+        } else {
+          await writeFinalSet(directory, campaign);
+        }
+        const before = await snapshotDirectory(directory);
+
+        await assert.rejects(
+          withStagedPublication({
+            finalDir: directory,
+            populateAndValidate: async stagingDir => {
+              await fs.mkdir(path.join(stagingDir, 'nested'));
+              if (directoryKind === 'source') {
+                await validateSourceAssets({
+                  campaignPath,
+                  sourceDir: stagingDir,
+                });
+              } else {
+                await validateFinalAssets({
+                  campaignPath,
+                  finalDir: stagingDir,
+                });
+              }
+            },
+          })
+        );
+
+        assert.deepEqual(await snapshotDirectory(directory), before);
+      }
+    );
+  }
 });

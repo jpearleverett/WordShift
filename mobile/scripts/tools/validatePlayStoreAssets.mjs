@@ -80,6 +80,33 @@ async function loadCampaign(campaignPath) {
   return validateCampaign(campaign);
 }
 
+function validateDirectoryEntries(entries, {
+  allowedNames,
+  requiredNames,
+  context,
+  missingNoun,
+}) {
+  const allowedSet = new Set(allowedNames);
+  const entriesByName = new Map(entries.map(entry => [entry.name, entry]));
+
+  for (const entry of entries) {
+    if (!allowedSet.has(entry.name)) {
+      throw new Error(`unexpected ${context} asset "${entry.name}"`);
+    }
+    if (!entry.isFile()) {
+      throw new Error(
+        `${context} asset "${entry.name}" is not a regular file`
+      );
+    }
+  }
+  for (const name of requiredNames) {
+    if (!entriesByName.has(name)) {
+      throw new Error(`missing required ${missingNoun} "${name}"`);
+    }
+  }
+  return entriesByName;
+}
+
 export async function validateSourceAssets({
   campaignPath = DEFAULT_CAMPAIGN_PATH,
   sourceDir = DEFAULT_SOURCE_DIR,
@@ -87,20 +114,13 @@ export async function validateSourceAssets({
   const campaign = await loadCampaign(campaignPath);
   const screenshotNames = campaign.map(item => item.source);
   const expectedNames = [...screenshotNames, FEATURE_BACKGROUND_NAME];
-  const expectedSet = new Set(expectedNames);
   const entries = await fs.readdir(sourceDir, { withFileTypes: true });
-  const actualNames = entries.map(entry => entry.name).sort();
-
-  for (const name of actualNames) {
-    if (!expectedSet.has(name)) {
-      throw new Error(`unexpected source asset "${name}"`);
-    }
-  }
-  for (const name of expectedNames) {
-    if (!actualNames.includes(name)) {
-      throw new Error(`missing required source "${name}"`);
-    }
-  }
+  validateDirectoryEntries(entries, {
+    allowedNames: expectedNames,
+    requiredNames: expectedNames,
+    context: 'source',
+    missingNoun: 'source',
+  });
 
   const results = [];
   for (const name of screenshotNames) {
@@ -124,28 +144,16 @@ export async function validateFinalAssets({
 } = {}) {
   const campaign = await loadCampaign(campaignPath);
   const screenshotNames = campaign.map(item => item.final);
-  const expectedScreenshotSet = new Set(screenshotNames);
+  const expectedNames = [...screenshotNames, FEATURE_GRAPHIC_NAME];
   const entries = await fs.readdir(finalDir, { withFileTypes: true });
-  const pngNames = entries
-    .filter(entry => entry.isFile() && path.extname(entry.name) === '.png')
-    .map(entry => entry.name)
-    .sort();
-
-  for (const name of pngNames) {
-    if (!expectedScreenshotSet.has(name) && name !== FEATURE_GRAPHIC_NAME) {
-      throw new Error(`unexpected PNG asset "${name}"`);
-    }
-  }
-  for (const name of screenshotNames) {
-    if (!pngNames.includes(name)) {
-      throw new Error(`missing required asset "${name}"`);
-    }
-  }
-
-  const featureGraphicPresent = pngNames.includes(FEATURE_GRAPHIC_NAME);
-  if (!screenshotsOnly && !featureGraphicPresent) {
-    throw new Error(`missing required asset "${FEATURE_GRAPHIC_NAME}"`);
-  }
+  const requiredNames = screenshotsOnly ? screenshotNames : expectedNames;
+  const entriesByName = validateDirectoryEntries(entries, {
+    allowedNames: expectedNames,
+    requiredNames,
+    context: 'final',
+    missingNoun: 'asset',
+  });
+  const featureGraphicPresent = entriesByName.has(FEATURE_GRAPHIC_NAME);
 
   const results = [];
   for (const name of screenshotNames) {
