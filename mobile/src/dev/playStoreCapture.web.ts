@@ -16,7 +16,22 @@ function readScenarioName(): PlayStoreScenarioName | null {
   }
 
   try {
-    return parsePlayStoreScenario(window.location.search, __DEV__, 'web');
+    if (!__DEV__) return null;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('playStoreScenario')) return null;
+    const requestedScenario = params.get('playStoreScenario') ?? '';
+    const parsedScenario = parsePlayStoreScenario(
+      window.location.search,
+      __DEV__,
+      'web'
+    );
+    if (parsedScenario === null) {
+      console.warn(
+        `[play-store-capture] Ignored unknown scenario `
+        + `${JSON.stringify(requestedScenario)}.`
+      );
+    }
+    return parsedScenario;
   } catch {
     return null;
   }

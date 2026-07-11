@@ -161,6 +161,7 @@ describe('Play Store screenshot scenarios', () => {
 
   afterEach(() => {
     restoreCaptureGlobals();
+    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 
@@ -193,12 +194,48 @@ describe('Play Store screenshot scenarios', () => {
   });
 
   test('native capture API is a fixture-free no-op', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
     expect(isPlayStoreCaptureActive()).toBe(false);
     expect(getPlayStoreScenarioName()).toBeNull();
     expect(shouldFreezePlayStoreCaptureMotion()).toBe(false);
     await expect(preparePlayStoreCapture()).resolves.toBe(false);
     expect(NATIVE_CAPTURE_TS).toMatch(/import type \{ PlayStoreScenarioName \}/);
     expect(NATIVE_CAPTURE_TS).not.toMatch(/import \{[^}]*buildPlayStoreScenario/);
+    expect(NATIVE_CAPTURE_TS).not.toMatch(/console\.warn/);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test('unknown development web scenario warns once and never writes storage', async () => {
+    await AsyncStorage.setItem('existing_state', 'keep-me');
+    (AsyncStorage.clear as jest.Mock).mockClear();
+    (AsyncStorage.multiSet as jest.Mock).mockClear();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const capture = loadWebCapture('?playStoreScenario=unknown');
+
+    expect(capture.isPlayStoreCaptureActive()).toBe(false);
+    await expect(capture.preparePlayStoreCapture()).resolves.toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      '[play-store-capture] Ignored unknown scenario "unknown".'
+    );
+    expect(AsyncStorage.clear).not.toHaveBeenCalled();
+    expect(AsyncStorage.multiSet).not.toHaveBeenCalled();
+    await expect(AsyncStorage.getItem('existing_state')).resolves.toBe('keep-me');
+  });
+
+  test.each([
+    ['absent query', '?other=value', true],
+    ['missing window', null, true],
+    ['production', '?playStoreScenario=unknown', false],
+    ['known scenario', '?playStoreScenario=home-sunny', true],
+  ] as const)('does not warn for %s', (_label, search, isDev) => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    loadWebCapture(search, isDev);
+
+    expect(warn).not.toHaveBeenCalled();
   });
 
   test('web capture clears stale state and seeds the exact local-day scenario', async () => {
@@ -260,7 +297,6 @@ describe('Play Store screenshot scenarios', () => {
   });
 
   test.each([
-    ['unknown scenario', '?playStoreScenario=unknown', true],
     ['production web', '?playStoreScenario=home-sunny', false],
     ['missing window', null, true],
   ] as const)(
