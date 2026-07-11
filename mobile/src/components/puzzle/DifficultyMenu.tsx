@@ -81,7 +81,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
   const visibleOptions = variantOptions.filter(option => option.unlocked);
   const coreOptions = visibleOptions.filter(option => option.group === 'core');
   const baseOptions = visibleOptions.filter(option => option.group === 'base');
-  const comboOptions: VariantSelectorOption[] = [];
   const hasNonStandardVariants = !introMode && baseOptions.length > 0;
 
   const activeBadge = dark
@@ -189,20 +188,6 @@ export const DifficultyMenu: React.FC<DifficultyMenuProps> = ({
             <Text style={[styles.sectionTitle, { color: t.muted }]}>{styleTitle}</Text>
             {coreOptions.map(renderVariantItem)}
             {baseOptions.map(renderVariantItem)}
-
-            {comboOptions.length > 0 && (
-              <Text style={[styles.sectionTitle, { color: t.muted }]}>
-                COMBINATION STYLES
-              </Text>
-            )}
-            {comboOptions.map(renderVariantItem)}
-            {comboOptions.length === 0 && (
-              <Text style={[styles.combosComingText, { color: t.muted }]}>
-                {phase >= 3
-                  ? 'More layered arrangements will reveal themselves.'
-                  : 'More combo styles unlock later as you progress.'}
-              </Text>
-            )}
           </>
         ) : (
           <View
@@ -335,14 +320,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 3,
     paddingHorizontal: 6,
-  },
-  combosComingText: {
-    fontFamily: BODY_FONT,
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 2,
-    marginBottom: 4,
-    paddingHorizontal: 8,
   },
   menuRow: {
     flexDirection: 'row',

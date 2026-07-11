@@ -20,6 +20,10 @@ const HOME_PATH = path.resolve(
   SCRIPT_DIR,
   '../../src/components/home/HomeScreen.tsx'
 );
+const DIFFICULTY_MENU_PATH = path.resolve(
+  SCRIPT_DIR,
+  '../../src/components/puzzle/DifficultyMenu.tsx'
+);
 
 const makeCampaign = () => APPROVED_SCENARIOS.map((scenario, index) => ({
   scenario,
@@ -149,6 +153,19 @@ describe('capture publication and stability policy', () => {
     assert.match(row, /if \(freezeCaptureMotion\) \{/);
     assert.match(home, /shouldFreezePlayStoreCaptureMotion/);
     assert.match(home, /if \(shouldFreezePlayStoreCaptureMotion\(\)\) \{/);
+  });
+
+  test('production setup render contract has no nonexistent combination teaser', async () => {
+    const difficultyMenu = await fs.readFile(DIFFICULTY_MENU_PATH, 'utf8');
+
+    assert.doesNotMatch(
+      difficultyMenu,
+      /More combo styles unlock later as you progress\./
+    );
+    assert.doesNotMatch(
+      difficultyMenu,
+      /More layered arrangements will reveal themselves\./
+    );
   });
 
   test('flawless capture waits for the skip layer to unmount', async () => {
