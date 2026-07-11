@@ -11,6 +11,7 @@ import {
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
 import { withStagedPublication } from './composePlayStoreScreenshots.mjs';
+import { validateSourceAssets } from './validatePlayStoreAssets.mjs';
 
 const SCRIPT_DIR = import.meta.dirname
   ?? path.dirname(fileURLToPath(import.meta.url));
@@ -739,13 +740,24 @@ async function main() {
           );
         }
         await assertCapturesAreUnique(results);
+        const stagedSources = await validateSourceAssets({
+          campaignPath: CAMPAIGN_PATH,
+          sourceDir: stagingDir,
+        });
         if (results.length !== campaign.length) {
           throw new Error(
             `Staged capture count ${results.length} does not match campaign ${campaign.length}`
           );
         }
+        if (stagedSources.length !== campaign.length + 1) {
+          throw new Error(
+            `Staged source validation found ${stagedSources.length} files; `
+            + `expected ${campaign.length + 1}`
+          );
+        }
         console.log(
-          `[capture] staged validation complete: ${results.length} unique source PNGs`
+          `[capture] staged validation complete: ${results.length} unique `
+          + 'screenshots plus the audited feature background'
         );
       },
     });

@@ -19,7 +19,10 @@ import {
   composeCampaignItem,
   withStagedPublication,
 } from './composePlayStoreScreenshots.mjs';
-import { validateFinalAssets } from './validatePlayStoreAssets.mjs';
+import {
+  validateFinalAssets,
+  validateSourceAssets,
+} from './validatePlayStoreAssets.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const CAMPAIGN_PATH = path.resolve(
@@ -117,6 +120,20 @@ async function writeScreenshotSet(
   await Promise.all(
     campaign.map(item => fs.writeFile(path.join(finalDir, item.final), encoded))
   );
+}
+
+async function writeSourceSet(sourceDir, campaign) {
+  await fs.mkdir(sourceDir, { recursive: true });
+  await Promise.all([
+    ...campaign.map(item => fs.writeFile(
+      path.join(sourceDir, item.source),
+      encodeSolidPng(1080, 1920)
+    )),
+    fs.writeFile(
+      path.join(sourceDir, 'feature-background.png'),
+      encodeSolidPng(1536, 1024)
+    ),
+  ]);
 }
 
 describe('shared PNG helpers', () => {
@@ -562,6 +579,97 @@ describe('final Play Store asset validation', () => {
     await assert.rejects(
       validateFinalAssets({ campaignPath, finalDir, screenshotsOnly: true }),
       /08_theyve_been_waiting\.png exceeds 8 MB/
+    );
+  });
+});
+
+describe('exact Play Store source-set validation', () => {
+  test('accepts exactly eight decoded raw screenshots and the audited background', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    await writeSourceSet(sourceDir, campaign);
+
+    const results = await validateSourceAssets({ campaignPath, sourceDir });
+
+    assert.equal(results.length, 9);
+    assert.deepEqual(
+      results.map(result => result.filename),
+      [...EXPECTED_SOURCES, 'feature-background.png']
+    );
+    assert.deepEqual(results.at(-1)?.metadata, {
+      width: 1536,
+      height: 1024,
+      bitDepth: 8,
+      colorType: 2,
+    });
+  });
+
+  test('rejects a stale extra source PNG', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    await writeSourceSet(sourceDir, campaign);
+    await fs.writeFile(
+      path.join(sourceDir, 'stale.png'),
+      encodeSolidPng(1080, 1920)
+    );
+
+    await assert.rejects(
+      validateSourceAssets({ campaignPath, sourceDir }),
+      /unexpected source asset "stale\.png"/
+    );
+  });
+
+  test('rejects a missing campaign source', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    await writeSourceSet(sourceDir, campaign);
+    await fs.rm(path.join(sourceDir, campaign[2].source));
+
+    await assert.rejects(
+      validateSourceAssets({ campaignPath, sourceDir }),
+      /missing required source "03_home_sunny\.png"/
+    );
+  });
+
+  test('rejects a corrupt campaign source after full decode', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    await writeSourceSet(sourceDir, campaign);
+    const truncatedPng = encodeSolidPng(1080, 1920);
+    const corruptPath = path.join(sourceDir, campaign[4].source);
+    await fs.writeFile(
+      corruptPath,
+      truncatedPng.subarray(0, Math.floor(truncatedPng.length / 2))
+    );
+
+    assert.deepEqual(await readPngMetadata(corruptPath), {
+      width: 1080,
+      height: 1920,
+      bitDepth: 8,
+      colorType: 2,
+    });
+    await assert.rejects(
+      validateSourceAssets({ campaignPath, sourceDir })
+    );
+  });
+
+  test('rejects raw screenshots with non-campaign dimensions', async () => {
+    const campaign = makeCampaign();
+    const campaignPath = await writeCampaign(campaign);
+    const sourceDir = path.join(tempDir, 'source');
+    await writeSourceSet(sourceDir, campaign);
+    await fs.writeFile(
+      path.join(sourceDir, campaign[7].source),
+      encodeSolidPng(1080, 1919)
+    );
+
+    await assert.rejects(
+      validateSourceAssets({ campaignPath, sourceDir }),
+      /08_home_dusk\.png is 1080x1919; expected 1080x1920/
     );
   });
 });

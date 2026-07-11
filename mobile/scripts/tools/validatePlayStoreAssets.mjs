@@ -12,17 +12,20 @@ const DEFAULT_CAMPAIGN_PATH = path.join(
   REPO_ROOT,
   'docs/play-store/campaign.json'
 );
+const DEFAULT_SOURCE_DIR = path.join(REPO_ROOT, 'docs/play-store/source');
 const DEFAULT_FINAL_DIR = path.join(REPO_ROOT, 'docs/play-store/final');
 
 const FEATURE_GRAPHIC_NAME = 'feature-graphic.png';
+const FEATURE_BACKGROUND_NAME = 'feature-background.png';
 const MAX_ASSET_BYTES = 8 * 1024 * 1024;
 const SCREENSHOT_DIMENSIONS = { width: 1080, height: 1920 };
 const FEATURE_GRAPHIC_DIMENSIONS = { width: 1024, height: 500 };
+const FEATURE_BACKGROUND_DIMENSIONS = { width: 1536, height: 1024 };
 
 function expectedDimensions(kind) {
-  return kind === 'feature'
-    ? FEATURE_GRAPHIC_DIMENSIONS
-    : SCREENSHOT_DIMENSIONS;
+  if (kind === 'feature') return FEATURE_GRAPHIC_DIMENSIONS;
+  if (kind === 'feature-source') return FEATURE_BACKGROUND_DIMENSIONS;
+  return SCREENSHOT_DIMENSIONS;
 }
 
 async function validatePngAsset(filePath, kind) {
@@ -77,6 +80,43 @@ async function loadCampaign(campaignPath) {
   return validateCampaign(campaign);
 }
 
+export async function validateSourceAssets({
+  campaignPath = DEFAULT_CAMPAIGN_PATH,
+  sourceDir = DEFAULT_SOURCE_DIR,
+} = {}) {
+  const campaign = await loadCampaign(campaignPath);
+  const screenshotNames = campaign.map(item => item.source);
+  const expectedNames = [...screenshotNames, FEATURE_BACKGROUND_NAME];
+  const expectedSet = new Set(expectedNames);
+  const entries = await fs.readdir(sourceDir, { withFileTypes: true });
+  const actualNames = entries.map(entry => entry.name).sort();
+
+  for (const name of actualNames) {
+    if (!expectedSet.has(name)) {
+      throw new Error(`unexpected source asset "${name}"`);
+    }
+  }
+  for (const name of expectedNames) {
+    if (!actualNames.includes(name)) {
+      throw new Error(`missing required source "${name}"`);
+    }
+  }
+
+  const results = [];
+  for (const name of screenshotNames) {
+    results.push(
+      await validatePngAsset(path.join(sourceDir, name), 'source-screenshot')
+    );
+  }
+  results.push(
+    await validatePngAsset(
+      path.join(sourceDir, FEATURE_BACKGROUND_NAME),
+      'feature-source'
+    )
+  );
+  return results;
+}
+
 export async function validateFinalAssets({
   campaignPath = DEFAULT_CAMPAIGN_PATH,
   finalDir = DEFAULT_FINAL_DIR,
@@ -124,6 +164,24 @@ export async function validateFinalAssets({
   return results;
 }
 
+export async function validatePlayStoreAssets({
+  campaignPath = DEFAULT_CAMPAIGN_PATH,
+  sourceDir = DEFAULT_SOURCE_DIR,
+  finalDir = DEFAULT_FINAL_DIR,
+  screenshotsOnly = false,
+} = {}) {
+  const sourceAssets = await validateSourceAssets({
+    campaignPath,
+    sourceDir,
+  });
+  const finalAssets = await validateFinalAssets({
+    campaignPath,
+    finalDir,
+    screenshotsOnly,
+  });
+  return { sourceAssets, finalAssets };
+}
+
 function formatMegabytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
@@ -135,18 +193,28 @@ async function main() {
     throw new Error(`Unknown argument${unknownArgs.length === 1 ? '' : 's'}: ${unknownArgs.join(', ')}`);
   }
   const screenshotsOnly = args.includes('--screenshots-only');
-  const results = await validateFinalAssets({ screenshotsOnly });
+  const { sourceAssets, finalAssets } = await validatePlayStoreAssets({
+    screenshotsOnly,
+  });
 
-  for (const result of results) {
+  for (const result of sourceAssets) {
     const { width, height, bitDepth } = result.metadata;
     console.log(
-      `[validate] ${result.filename}: ${width}x${height}, `
+      `[validate] source/${result.filename}: ${width}x${height}, `
+      + `${bitDepth}-bit RGB, ${formatMegabytes(result.bytes)}, valid`
+    );
+  }
+  for (const result of finalAssets) {
+    const { width, height, bitDepth } = result.metadata;
+    console.log(
+      `[validate] final/${result.filename}: ${width}x${height}, `
       + `${bitDepth}-bit RGB, ${formatMegabytes(result.bytes)}, valid`
     );
   }
   console.log(
-    `[validate] complete: ${results.length} upload asset`
-    + `${results.length === 1 ? '' : 's'} validated`
+    `[validate] complete: ${sourceAssets.length} exact source assets and `
+    + `${finalAssets.length} upload asset`
+    + `${finalAssets.length === 1 ? '' : 's'} validated`
     + `${screenshotsOnly ? ' (screenshots-only mode)' : ''}`
   );
 }
