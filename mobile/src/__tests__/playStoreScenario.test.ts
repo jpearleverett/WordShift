@@ -224,6 +224,32 @@ describe('Play Store screenshot scenarios', () => {
     );
   });
 
+  test('web capture rejects without writing when storage clear fails', async () => {
+    const capture = loadWebCapture('?playStoreScenario=home-sunny');
+    (AsyncStorage.clear as jest.Mock).mockRejectedValueOnce(
+      new Error('clear failed')
+    );
+    (AsyncStorage.multiSet as jest.Mock).mockClear();
+
+    await expect(capture.preparePlayStoreCapture())
+      .rejects.toThrow('clear failed');
+    expect(AsyncStorage.multiSet).not.toHaveBeenCalled();
+  });
+
+  test('web capture rejects after clear when scenario multiSet fails', async () => {
+    await AsyncStorage.setItem('stale_capture_state', 'remove-me');
+    const capture = loadWebCapture('?playStoreScenario=home-sunny');
+    (AsyncStorage.clear as jest.Mock).mockClear();
+    (AsyncStorage.multiSet as jest.Mock).mockRejectedValueOnce(
+      new Error('multiSet failed')
+    );
+
+    await expect(capture.preparePlayStoreCapture())
+      .rejects.toThrow('multiSet failed');
+    expect(AsyncStorage.clear).toHaveBeenCalledTimes(1);
+    await expect(AsyncStorage.getAllKeys()).resolves.toEqual([]);
+  });
+
   test.each([
     ['unknown scenario', '?playStoreScenario=unknown', true],
     ['production web', '?playStoreScenario=home-sunny', false],

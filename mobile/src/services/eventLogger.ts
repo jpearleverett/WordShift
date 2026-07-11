@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isPlayStoreCaptureActive } from '../dev/playStoreCapture';
 
 const STORAGE_KEY = 'wordshift_event_log';
 const MAX_EVENTS = 500;
@@ -58,6 +59,8 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
  * flushed to AsyncStorage.
  */
 export function logEvent(event: GameEvent): void {
+  if (isPlayStoreCaptureActive()) return;
+
   const storedEvent: StoredEvent = {
     ...event,
     timestamp: event.timestamp ?? Date.now(),

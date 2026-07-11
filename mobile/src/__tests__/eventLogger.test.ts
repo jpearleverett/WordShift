@@ -1,7 +1,13 @@
+let mockCaptureActive = false;
+jest.mock('../dev/playStoreCapture', () => ({
+  isPlayStoreCaptureActive: () => mockCaptureActive,
+}));
+
 import { logEvent, getEvents, getEventSummary, getRecentEvents, clearEvents } from '../services/eventLogger';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 beforeEach(async () => {
+  mockCaptureActive = false;
   (AsyncStorage.clear as jest.Mock)();
   await clearEvents();
   jest.useFakeTimers();
@@ -12,8 +18,9 @@ afterEach(() => {
 });
 
 describe('logEvent', () => {
-  test('logs event with auto-generated timestamp', async () => {
+  test('normal mode logs event with auto-generated timestamp', async () => {
     logEvent({ type: 'puzzle_completed' });
+    expect(jest.getTimerCount()).toBe(1);
     jest.advanceTimersByTime(6000);
     await Promise.resolve();
 
@@ -21,6 +28,21 @@ describe('logEvent', () => {
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('puzzle_completed');
     expect(events[0].timestamp).toBeGreaterThan(0);
+  });
+
+  test('capture mode creates no timer, storage, or buffered event side effects', async () => {
+    mockCaptureActive = true;
+    (AsyncStorage.getItem as jest.Mock).mockClear();
+    (AsyncStorage.setItem as jest.Mock).mockClear();
+
+    logEvent({ type: 'app_open', data: { source: 'capture' } });
+
+    expect(jest.getTimerCount()).toBe(0);
+    expect(AsyncStorage.getItem).not.toHaveBeenCalled();
+    expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+
+    mockCaptureActive = false;
+    await expect(getEvents()).resolves.toEqual([]);
   });
 
   test('logs event with custom data', async () => {

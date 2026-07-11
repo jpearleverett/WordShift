@@ -3165,11 +3165,13 @@ function MainApp() {
 
 /**
  * Bootstrap gate: runs data migrations BEFORE MainApp mounts so that all
- * service caches read migrated data. Never blocks forever — the app renders
- * even if migrations fail (failures are logged, not fatal).
+ * service caches read migrated data. Normal launches fail open after logging;
+ * capture launches fail closed so partial fixture state never reaches MainApp.
  */
 function App() {
-  const [bootReady, setBootReady] = useState(false);
+  const [bootstrapState, setBootstrapState] = useState<
+    'loading' | 'ready' | 'capture-error'
+  >('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -3218,9 +3220,12 @@ function App() {
         await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
-      } finally {
-        if (!cancelled) setBootReady(true);
+        if (!cancelled) {
+          setBootstrapState(captureActive ? 'capture-error' : 'ready');
+        }
+        return;
       }
+      if (!cancelled) setBootstrapState('ready');
     })();
     return () => { cancelled = true; };
   }, []);
@@ -3230,7 +3235,20 @@ function App() {
   // branches so useSafeAreaInsets is available everywhere in MainApp.
   return (
     <SafeAreaProvider>
-      {bootReady ? <MainApp /> : <View style={{ flex: 1, backgroundColor: '#1A1A2E' }} />}
+      {bootstrapState === 'capture-error' ? (
+        <View
+          testID="play-store-capture-error"
+          accessibilityLabel="play-store-capture-error"
+          accessibilityRole="alert"
+          style={{ flex: 1, backgroundColor: '#1A1A2E', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#FFFFFF' }}>Play Store capture setup failed.</Text>
+        </View>
+      ) : bootstrapState === 'ready' ? (
+        <MainApp />
+      ) : (
+        <View style={{ flex: 1, backgroundColor: '#1A1A2E' }} />
+      )}
     </SafeAreaProvider>
   );
 }

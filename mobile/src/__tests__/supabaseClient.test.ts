@@ -2,12 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Mutable expo-config extra so we can toggle configured/unconfigured per test.
 let mockExtra: Record<string, unknown> = {};
+let mockCaptureActive = false;
 jest.mock('expo-constants', () => ({
   default: {
     get expoConfig() {
       return { extra: mockExtra, version: '1.0.0' };
     },
   },
+}));
+
+jest.mock('../dev/playStoreCapture', () => ({
+  isPlayStoreCaptureActive: () => mockCaptureActive,
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -28,6 +33,7 @@ describe('supabaseClient', () => {
   beforeEach(() => {
     (AsyncStorage.clear as jest.Mock)();
     mockExtra = {};
+    mockCaptureActive = false;
     (global as Record<string, unknown>).fetch = jest.fn();
   });
 
@@ -71,6 +77,25 @@ describe('supabaseClient', () => {
 
     test('helpers never throw when disabled', async () => {
       await expect(sbRpc('get_save', {})).resolves.toBeNull();
+    });
+  });
+
+  describe('capture isolation', () => {
+    test('configured RPC and insert paths never call fetch during capture', async () => {
+      mockExtra = {
+        supabaseUrl: 'https://x.supabase.co',
+        supabaseAnonKey: 'anon-key',
+      };
+      mockCaptureActive = true;
+
+      await expect(sbRpc('get_daily_rank', { date: '2026-07-11' }))
+        .resolves.toBeNull();
+      await expect(sbInsert(
+        'events',
+        { type: 'app_open' },
+        { returning: false }
+      )).resolves.toBeNull();
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 

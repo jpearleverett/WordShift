@@ -69,6 +69,26 @@ describe('Play Store capture bootstrap isolation', () => {
       /if \(!captureActive\) \{\s*addVictoryTimeout\(\(\) => \{\s*maybePromptReview/
     );
   });
+
+  test('capture bootstrap failures render an error instead of mounting MainApp', () => {
+    expect(bootstrap).toMatch(
+      /setBootstrapState\(captureActive \? 'capture-error' : 'ready'\);/
+    );
+    expect(bootstrap).toMatch(
+      /if \(!cancelled\) setBootstrapState\('ready'\);/
+    );
+
+    const errorRenderIndex = bootstrap.indexOf(
+      "bootstrapState === 'capture-error'"
+    );
+    const readyRenderIndex = bootstrap.indexOf(
+      "bootstrapState === 'ready'"
+    );
+    expect(errorRenderIndex).toBeGreaterThan(-1);
+    expect(readyRenderIndex).toBeGreaterThan(errorRenderIndex);
+    expect(bootstrap).toMatch(/testID="play-store-capture-error"/);
+    expect(bootstrap).toMatch(/accessibilityLabel="play-store-capture-error"/);
+  });
 });
 
 describe('local-day rollover', () => {
