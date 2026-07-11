@@ -50,7 +50,7 @@
     "final": "06_new_puzzle_every_day.png",
     "headline": "A NEW PUZZLE EVERY DAY",
     "support": "Build your streak and compare your standing.",
-    "altText": "WordShift home screen with a completed Daily Challenge card and a seven-day streak.",
+    "altText": "WordShift home screen with the completed Daily Challenge header control and a Today’s Standing dialog saying standings are gathering and the daily streak is seven days.",
     "theme": "dusk"
   },
   {

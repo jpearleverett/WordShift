@@ -257,6 +257,27 @@ async function waitForScreenTransition(page) {
   );
 }
 
+async function waitForLocatorAnimations(page, locator) {
+  await locator.waitFor();
+  const handle = await locator.elementHandle();
+  if (!handle) throw new Error('Animated capture surface is not attached');
+  await page.waitForFunction(element => {
+    let current = element;
+    while (current) {
+      const animations = typeof current.getAnimations === 'function'
+        ? current.getAnimations()
+        : [];
+      if (animations.some(animation =>
+        animation.playState === 'pending' || animation.playState === 'running'
+      )) {
+        return false;
+      }
+      current = current.parentElement;
+    }
+    return true;
+  }, handle);
+}
+
 async function waitForHome(page) {
   await page.getByLabel('Play puzzle', { exact: true }).waitFor();
   await page.getByLabel('Ember the fox', { exact: true }).waitFor();
@@ -429,7 +450,17 @@ async function prepareScenario(page, scenario) {
       return;
 
     case 'daily':
-      await page.getByLabel(/^Daily challenge completed\..*7 day streak\./).waitFor();
+      await page.getByLabel(/^Daily challenge completed\..*7 day streak\./).click();
+      await page.getByText('Today’s Standing', { exact: true }).waitFor();
+      await page.getByText(
+        'The standings are still gathering. Check back a little later. Daily streak: 7 days.',
+        { exact: true }
+      ).waitFor();
+      await page.getByLabel('OK', { exact: true }).waitFor();
+      await waitForLocatorAnimations(
+        page,
+        page.getByLabel('Dismiss alert', { exact: true })
+      );
       await page.getByLabel('Play puzzle', { exact: true }).waitFor();
       return;
 
