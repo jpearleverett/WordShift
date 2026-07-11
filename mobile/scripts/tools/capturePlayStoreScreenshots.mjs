@@ -1,11 +1,15 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { once } from 'node:events';
 import fs from 'node:fs/promises';
+import { createConnection } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
+import {
+  isAllowedCaptureRequest,
+  validateCampaign,
+} from './capturePlayStoreHelpers.mjs';
 
 const SCRIPT_DIR = import.meta.dirname
   ?? path.dirname(fileURLToPath(import.meta.url));
@@ -19,16 +23,8 @@ const VIEWPORT = { width: 432, height: 768 };
 const DEVICE_SCALE_FACTOR = 2.5;
 const EXPECTED_DIMENSIONS = { width: 1080, height: 1920 };
 const BASE_URL = 'http://127.0.0.1:8091';
-const APPROVED_SCENARIOS = [
-  'puzzle-preview',
-  'puzzle-chain',
-  'home-sunny',
-  'animal-dialogue',
-  'variant-menu',
-  'daily',
-  'flawless-victory',
-  'home-dusk',
-];
+const EXPO_HOST = '127.0.0.1';
+const EXPO_PORT = 8091;
 
 function describeError(error) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
@@ -44,48 +40,47 @@ async function loadCampaign() {
     );
   }
 
-  if (!Array.isArray(campaign) || campaign.length !== APPROVED_SCENARIOS.length) {
-    throw new Error(
-      `Campaign must contain exactly ${APPROVED_SCENARIOS.length} scenarios`
-    );
-  }
-
-  const actualScenarios = campaign.map(item => item.scenario);
-  if (actualScenarios.some((scenario, index) => scenario !== APPROVED_SCENARIOS[index])) {
-    throw new Error(
-      `Campaign scenarios are out of order: ${actualScenarios.join(', ')}`
-    );
-  }
-
-  const sourceNames = new Set();
-  const finalNames = new Set();
-  for (const item of campaign) {
-    for (const field of ['source', 'final', 'headline', 'support', 'altText', 'theme']) {
-      if (typeof item[field] !== 'string' || item[field].trim().length === 0) {
-        throw new Error(`${item.scenario}: campaign field "${field}" is missing`);
-      }
-    }
-    if (path.basename(item.source) !== item.source || !item.source.endsWith('.png')) {
-      throw new Error(`${item.scenario}: invalid source filename "${item.source}"`);
-    }
-    if (sourceNames.has(item.source) || finalNames.has(item.final)) {
-      throw new Error(`${item.scenario}: campaign filenames must be unique`);
-    }
-    sourceNames.add(item.source);
-    finalNames.add(item.final);
-  }
-
   await fs.access(path.join(MOBILE_DIR, 'package.json'));
   await fs.access(path.dirname(CAMPAIGN_PATH));
-  return campaign;
+  return validateCampaign(campaign);
+}
+
+async function assertCapturePortAvailable() {
+  await new Promise((resolve, reject) => {
+    const socket = createConnection({ host: EXPO_HOST, port: EXPO_PORT });
+    let settled = false;
+    const settle = callback => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      callback();
+    };
+
+    socket.setTimeout(2_000);
+    socket.once('connect', () => settle(() => reject(new Error(
+      `Port ${EXPO_PORT} already has a listener; stop it before running capture`
+    ))));
+    socket.once('timeout', () => settle(() => reject(new Error(
+      `Timed out while checking whether port ${EXPO_PORT} is available`
+    ))));
+    socket.once('error', error => settle(() => {
+      if (error?.code === 'ECONNREFUSED') {
+        resolve();
+      } else {
+        reject(new Error(
+          `Cannot verify port ${EXPO_PORT} is available: ${describeError(error)}`
+        ));
+      }
+    }));
+  });
 }
 
 async function waitForServer(url, expoChild, timeoutMs = 120_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (expoChild.exitCode !== null) {
+    if (expoChild.exitCode !== null || expoChild.signalCode !== null) {
       throw new Error(
-        `Expo exited with code ${expoChild.exitCode} before ${url} became ready`
+        `Expo exited (${expoChild.exitCode ?? expoChild.signalCode}) before ${url} became ready`
       );
     }
     try {
@@ -128,64 +123,125 @@ function startExpo(logLines) {
   return expoChild;
 }
 
-async function stopExpo(expoChild) {
-  if (
-    !expoChild
-    || expoChild.exitCode !== null
-    || expoChild.signalCode !== null
-    || !expoChild.pid
-  ) {
-    return;
-  }
-
-  const signalExactProcessTree = signal => {
-    try {
-      if (process.platform === 'win32') {
-        expoChild.kill(signal);
-      } else {
-        process.kill(-expoChild.pid, signal);
-      }
-      return true;
-    } catch (error) {
-      if (error?.code !== 'ESRCH') throw error;
-      return false;
-    }
-  };
-
-  signalExactProcessTree('SIGTERM');
-  const waitForExit = async () => {
-    if (expoChild.exitCode !== null || expoChild.signalCode !== null) return true;
-    return Promise.race([
-      once(expoChild, 'exit').then(() => true),
-      new Promise(resolve => setTimeout(() => resolve(false), 5_000)),
-    ]);
-  };
-
-  if (!await waitForExit()) {
-    signalExactProcessTree('SIGKILL');
-    if (!await waitForExit()) {
-      throw new Error(`Expo process tree ${expoChild.pid} did not exit after SIGKILL`);
-    }
-  }
-}
-
-function isAllowedRequest(urlString) {
-  if (urlString.startsWith('data:') || urlString.startsWith('blob:')) {
-    return true;
-  }
+function signalExpoProcessGroup(expoGroupId, expoChild, signal) {
   try {
-    const { hostname } = new URL(urlString);
-    return hostname === 'localhost' || hostname === '127.0.0.1';
-  } catch {
+    if (process.platform === 'win32') {
+      return expoChild?.kill(signal) ?? false;
+    }
+    process.kill(-expoGroupId, signal);
+    return true;
+  } catch (error) {
+    if (error?.code !== 'ESRCH') throw error;
     return false;
   }
 }
 
-async function waitForFontsAndPaint(page) {
+function isExpoProcessGroupRunning(expoGroupId, expoChild) {
+  if (!expoGroupId) return false;
+  if (process.platform === 'win32') {
+    return expoChild?.exitCode === null && expoChild?.signalCode === null;
+  }
+  try {
+    process.kill(-expoGroupId, 0);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+async function waitForExpoProcessGroupExit(expoGroupId, expoChild, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isExpoProcessGroupRunning(expoGroupId, expoChild)) return true;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return !isExpoProcessGroupRunning(expoGroupId, expoChild);
+}
+
+async function stopExpoProcessGroup(expoGroupId, expoChild) {
+  if (!expoGroupId || !isExpoProcessGroupRunning(expoGroupId, expoChild)) return;
+
+  signalExpoProcessGroup(expoGroupId, expoChild, 'SIGTERM');
+  if (await waitForExpoProcessGroupExit(expoGroupId, expoChild, 5_000)) return;
+
+  signalExpoProcessGroup(expoGroupId, expoChild, 'SIGKILL');
+  if (!await waitForExpoProcessGroupExit(expoGroupId, expoChild, 5_000)) {
+    throw new Error(`Expo process group ${expoGroupId} survived SIGKILL`);
+  }
+}
+
+async function waitForDocumentReadiness(page) {
   await page.evaluate(async () => {
     await document.fonts.ready;
-    await new Promise(resolve => {
-      requestAnimationFrame(() => requestAnimationFrame(resolve));
+
+    const imageFailures = [];
+    await Promise.all(Array.from(document.images).map(async (image, index) => {
+      const source = image.currentSrc || image.src || `image ${index + 1}`;
+      if (!image.complete) {
+        await new Promise(resolve => {
+          let settled = false;
+          const finish = failure => {
+            if (settled) return;
+            settled = true;
+            image.removeEventListener('load', handleLoad);
+            image.removeEventListener('error', handleError);
+            if (failure) imageFailures.push(failure);
+            resolve();
+          };
+          const handleLoad = () => finish();
+          const handleError = () => finish(`${source} failed to load`);
+          image.addEventListener('load', handleLoad, { once: true });
+          image.addEventListener('error', handleError, { once: true });
+          if (image.complete) {
+            finish(image.naturalWidth === 0 ? `${source} failed to load` : undefined);
+          }
+        });
+      }
+      if (image.naturalWidth === 0 || image.naturalHeight === 0) {
+        imageFailures.push(`${source} has no decoded dimensions`);
+        return;
+      }
+      if (typeof image.decode === 'function') {
+        try {
+          await image.decode();
+        } catch (error) {
+          imageFailures.push(
+            `${source} failed to decode: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+    }));
+
+    if (imageFailures.length > 0) {
+      throw new Error(`Broken document images: ${imageFailures.join(' | ')}`);
+    }
+
+    await new Promise((resolve, reject) => {
+      let previousSnapshot = '';
+      let stableFrameCount = 0;
+      let frameCount = 0;
+      const sampleFrame = () => {
+        const snapshot = [
+          document.documentElement.scrollWidth,
+          document.documentElement.scrollHeight,
+          document.body?.scrollWidth ?? 0,
+          document.body?.scrollHeight ?? 0,
+          document.images.length,
+          document.fonts.status,
+        ].join(':');
+        stableFrameCount = snapshot === previousSnapshot ? stableFrameCount + 1 : 0;
+        previousSnapshot = snapshot;
+        frameCount += 1;
+        if (stableFrameCount >= 2) {
+          resolve();
+        } else if (frameCount >= 120) {
+          reject(new Error('Document layout did not stabilize within 120 frames'));
+        } else {
+          requestAnimationFrame(sampleFrame);
+        }
+      };
+      requestAnimationFrame(sampleFrame);
     });
   });
 }
@@ -243,6 +299,70 @@ function getActiveLetter(page, letter) {
   return activeRow.locator(`button[aria-label="Letter ${letter}"]`);
 }
 
+const SUNNY_COMPANION_LABELS = [
+  'Ember the fox',
+  'Panko the pangolin',
+  'Archimedes the owl',
+  'Axel the axolotl',
+];
+
+async function getCompanionViewportMetrics(page) {
+  return Promise.all(SUNNY_COMPANION_LABELS.map(async label => {
+    const locator = page.getByLabel(label, { exact: true });
+    await locator.waitFor({ state: 'attached' });
+    return locator.evaluate((element, companionLabel) => {
+      const rect = element.getBoundingClientRect();
+      const intersectionWidth = Math.max(
+        0,
+        Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0)
+      );
+      const intersectionHeight = Math.max(
+        0,
+        Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0)
+      );
+      const area = Math.max(1, rect.width * rect.height);
+      return {
+        label: companionLabel,
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        visibleRatio: (intersectionWidth * intersectionHeight) / area,
+      };
+    }, label);
+  }));
+}
+
+async function panHouseToVisibleCompanions(page) {
+  let metrics = await getCompanionViewportMetrics(page);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const visible = metrics.filter(item => item.visibleRatio >= 0.6);
+    if (visible.length >= 3) {
+      const labels = visible.map(item => item.label);
+      console.log(`[capture] home-sunny: visible companions: ${labels.join(', ')}`);
+      return labels;
+    }
+
+    // HouseWorld starts at its positive maxPanY to frame the roof. Dragging the
+    // real RNGH pan surface upward reduces that state and reveals the lower
+    // occupied rooms. Keep the gesture left of the dock and animal controls.
+    await page.mouse.move(24, 620);
+    await page.mouse.down();
+    await page.mouse.move(24, 300, { steps: 16 });
+    await page.mouse.up();
+    await waitForDocumentReadiness(page);
+    metrics = await getCompanionViewportMetrics(page);
+  }
+
+  const visible = metrics.filter(item => item.visibleRatio >= 0.6);
+  if (visible.length < 3) {
+    throw new Error(
+      `House pan framed only ${visible.length}/4 companions: ${JSON.stringify(metrics)}`
+    );
+  }
+  const labels = visible.map(item => item.label);
+  console.log(`[capture] home-sunny: visible companions: ${labels.join(', ')}`);
+  return labels;
+}
+
 async function prepareScenario(page, scenario) {
   switch (scenario) {
     case 'puzzle-preview':
@@ -260,6 +380,7 @@ async function prepareScenario(page, scenario) {
 
     case 'home-sunny':
       await waitForHome(page);
+      await panHouseToVisibleCompanions(page);
       return;
 
     case 'animal-dialogue':
@@ -354,48 +475,82 @@ async function assertPngDimensions(filePath) {
   return `${png.width}x${png.height}`;
 }
 
+function collectPageIntegrity(context, page) {
+  const pageErrors = [];
+  const localResourceFailures = [];
+
+  page.on('pageerror', error => pageErrors.push(describeError(error)));
+  context.on('response', response => {
+    const url = response.url();
+    if (isAllowedCaptureRequest(url) && response.status() >= 400) {
+      localResourceFailures.push(`${response.status()} ${url}`);
+    }
+  });
+  context.on('requestfailed', request => {
+    const url = request.url();
+    if (isAllowedCaptureRequest(url)) {
+      localResourceFailures.push(
+        `${request.failure()?.errorText ?? 'request failed'} ${url}`
+      );
+    }
+  });
+
+  return () => {
+    const failures = [];
+    if (pageErrors.length > 0) {
+      failures.push(`page errors: ${pageErrors.join(' | ')}`);
+    }
+    if (localResourceFailures.length > 0) {
+      failures.push(`local resource failures: ${localResourceFailures.join(' | ')}`);
+    }
+    if (failures.length > 0) {
+      throw new Error(failures.join('; '));
+    }
+  };
+}
+
 async function captureScenario(browser, item) {
   const context = await browser.newContext({
     viewport: VIEWPORT,
     deviceScaleFactor: DEVICE_SCALE_FACTOR,
+    serviceWorkers: 'block',
   });
-  const page = await context.newPage();
-  const pageErrors = [];
-  page.on('pageerror', error => pageErrors.push(describeError(error)));
 
   try {
-    await page.route('**/*', async route => {
-      if (isAllowedRequest(route.request().url())) {
+    await context.route('**/*', async route => {
+      if (isAllowedCaptureRequest(route.request().url())) {
         await route.continue();
       } else {
         await route.abort('blockedbyclient');
       }
     });
+    const page = await context.newPage();
+    const assertPageIntegrity = collectPageIntegrity(context, page);
     page.setDefaultTimeout(45_000);
-    await page.goto(
-      `${BASE_URL}/?playStoreScenario=${encodeURIComponent(item.scenario)}`,
-      { waitUntil: 'domcontentloaded', timeout: 120_000 }
-    );
-    await waitForFontsAndPaint(page);
-    await prepareScenario(page, item.scenario);
-    await waitForScreenTransition(page);
-    await waitForFontsAndPaint(page);
+    try {
+      await page.goto(
+        `${BASE_URL}/?playStoreScenario=${encodeURIComponent(item.scenario)}`,
+        { waitUntil: 'domcontentloaded', timeout: 120_000 }
+      );
+      await waitForDocumentReadiness(page);
+      await prepareScenario(page, item.scenario);
+      await waitForScreenTransition(page);
+      await waitForDocumentReadiness(page);
+      assertPageIntegrity();
 
-    const outputPath = path.join(SOURCE_DIR, item.source);
-    await page.screenshot({ path: outputPath, fullPage: false });
-    const dimensions = await assertPngDimensions(outputPath);
-    return { outputPath, dimensions };
-  } catch (error) {
-    await fs.mkdir(DEBUG_DIR, { recursive: true });
-    const debugPath = path.join(DEBUG_DIR, `${item.scenario}-failure.png`);
-    await page.screenshot({ path: debugPath, fullPage: false }).catch(() => {});
-    const browserDetail = pageErrors.length > 0
-      ? ` Browser errors: ${pageErrors.join(' | ')}`
-      : '';
-    throw new Error(
-      `${item.scenario} failed: ${describeError(error)}`
-      + `${browserDetail} Debug screenshot: ${debugPath}`
-    );
+      const outputPath = path.join(SOURCE_DIR, item.source);
+      await page.screenshot({ path: outputPath, fullPage: false });
+      assertPageIntegrity();
+      const dimensions = await assertPngDimensions(outputPath);
+      return { outputPath, dimensions };
+    } catch (error) {
+      await fs.mkdir(DEBUG_DIR, { recursive: true });
+      const debugPath = path.join(DEBUG_DIR, `${item.scenario}-failure.png`);
+      await page.screenshot({ path: debugPath, fullPage: false }).catch(() => {});
+      throw new Error(
+        `${item.scenario} failed: ${describeError(error)} Debug screenshot: ${debugPath}`
+      );
+    }
   } finally {
     await context.close();
   }
@@ -431,18 +586,63 @@ async function main() {
   }
 
   await fs.mkdir(SOURCE_DIR, { recursive: true });
+  await assertCapturePortAvailable();
   const expoLogs = [];
   let expoChild;
+  let expoGroupId;
   let browser;
+  let receivedSignal;
+  let cleanupChain = Promise.resolve();
+
+  const cleanup = () => {
+    cleanupChain = cleanupChain.catch(() => {}).then(async () => {
+      const activeBrowser = browser;
+      browser = undefined;
+      await activeBrowser?.close().catch(() => {});
+
+      const activeExpoGroupId = expoGroupId;
+      if (activeExpoGroupId) {
+        await stopExpoProcessGroup(activeExpoGroupId, expoChild);
+        expoGroupId = undefined;
+      }
+    });
+    return cleanupChain;
+  };
+
+  const handleSignal = signal => {
+    if (receivedSignal) return;
+    receivedSignal = signal;
+    process.exitCode = signal === 'SIGINT' ? 130 : 143;
+    console.error(`[capture] ${signal} received; cleaning up capture processes`);
+    void cleanup().catch(error => {
+      console.error(`[capture] signal cleanup failed: ${describeError(error)}`);
+    });
+  };
+  const handleSigint = () => handleSignal('SIGINT');
+  const handleSigterm = () => handleSignal('SIGTERM');
+  const throwIfInterrupted = () => {
+    if (receivedSignal) {
+      throw new Error(`Capture interrupted by ${receivedSignal}`);
+    }
+  };
+
+  process.once('SIGINT', handleSigint);
+  process.once('SIGTERM', handleSigterm);
   try {
+    throwIfInterrupted();
     console.log('[capture] starting Expo web on 127.0.0.1:8091');
     expoChild = startExpo(expoLogs);
+    expoGroupId = expoChild.pid;
+    if (!expoGroupId) throw new Error('Expo child started without a process group id');
     await waitForServer(BASE_URL, expoChild);
+    throwIfInterrupted();
     console.log(`[capture] Expo ready (pid ${expoChild.pid})`);
 
     browser = await chromium.launch({ headless: true });
+    throwIfInterrupted();
     const results = [];
     for (const [index, item] of campaign.entries()) {
+      throwIfInterrupted();
       console.log(`[capture] ${index + 1}/${campaign.length} ${item.scenario}`);
       const result = await captureScenario(browser, item);
       results.push(result);
@@ -458,12 +658,13 @@ async function main() {
       : '';
     throw new Error(`${describeError(error)}${expoDetail}`);
   } finally {
-    await browser?.close().catch(() => {});
-    await stopExpo(expoChild);
+    process.removeListener('SIGINT', handleSigint);
+    process.removeListener('SIGTERM', handleSigterm);
+    await cleanup();
   }
 }
 
 main().catch(error => {
   console.error(`[capture] ERROR\n${describeError(error)}`);
-  process.exitCode = 1;
+  if (process.exitCode == null) process.exitCode = 1;
 });

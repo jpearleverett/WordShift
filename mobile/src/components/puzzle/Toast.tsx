@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CandyColors } from '../../theme/colors';
 import { getSettingsSync } from '../../services/settings';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
+import { hasVisibleToastMessage } from './toastMessage';
 
 interface ToastProps {
   message: string;
@@ -15,6 +16,7 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const enterAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const shakeAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const hasVisibleMessage = hasVisibleToastMessage(message);
 
   useEffect(() => {
     // Stop any in-flight animations from a previous message before starting new ones
@@ -24,6 +26,8 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
     slideAnim.setValue(-20);
     opacityAnim.setValue(0);
     shakeAnim.setValue(0);
+
+    if (!hasVisibleMessage) return;
 
     if (getSettingsSync().reducedMotion) {
       slideAnim.setValue(0);
@@ -64,7 +68,9 @@ export const Toast: React.FC<ToastProps> = ({ message, isError }) => {
       enterAnimRef.current?.stop();
       shakeAnimRef.current?.stop();
     };
-  }, [message, isError]);
+  }, [message, isError, hasVisibleMessage]);
+
+  if (!hasVisibleMessage) return null;
 
   return (
     <Animated.View
