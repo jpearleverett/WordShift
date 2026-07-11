@@ -6,9 +6,10 @@ the codebase and are the remaining gates to submission.
 
 ## Android (submission-blocking)
 
-- [ ] **Store screenshots** — capture at least 2 phone screenshots (8 recommended)
-      per the shot list in `docs/STORE_LISTING.md`, plus the existing
-      `docs/feature-graphic.png`. Upload in Play Console → Store listing.
+- [x] **Generate Play Store creative** — eight 1080x1920 phone screenshots and
+      the 1024x500 feature graphic are in `docs/play-store/final/`.
+- [ ] **Upload Play Store creative** — upload the generated phone screenshots
+      and feature graphic in Play Console, preserving their numbered order.
 - [ ] **Build & upload v13** — `eas build --platform android --profile production`
       then upload to internal testing (or `eas submit -p android`). v13 carries
       the foreground-service permission strip, so the Play Console

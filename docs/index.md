@@ -25,7 +25,7 @@ coming back. And pay attention to your animal friends. They notice things.
 - Thousands of hand-tuned word chains across four difficulties (4–6 letters)
 - Three twist modes: Reverse Shift, Double Shift, and timed Speed Shift
 - A daily challenge shared by every player, with streaks and a leaderboard
-- Build a house, room by room, for ten animal companions — each with their
+- Build a house, room by room, for 13 animal companions — each with their
   own voice, moods, and an unfolding story
 - Challenge friends with a link to the exact puzzle you just solved
 - No account required; progress backs up automatically
