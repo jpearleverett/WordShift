@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
@@ -44,6 +47,20 @@ import {
   parsePlayStoreScenario,
 } from '../dev/playStoreScenarios';
 import type { PlayStoreScenario } from '../dev/playStoreScenarios';
+import {
+  getPlayStoreScenarioName,
+  isPlayStoreCaptureActive,
+  preparePlayStoreCapture,
+} from '../dev/playStoreCapture';
+
+const NATIVE_CAPTURE_TS = fs.readFileSync(
+  path.resolve(__dirname, '../dev/playStoreCapture.ts'),
+  'utf8'
+);
+const originalWindowDescriptor = Object.getOwnPropertyDescriptor(global, 'window');
+const originalDevDescriptor = Object.getOwnPropertyDescriptor(global, '__DEV__');
+
+type WebCaptureModule = typeof import('../dev/playStoreCapture.web');
 
 function stored<T>(scenario: PlayStoreScenario, key: string): T {
   return JSON.parse(scenario.storage[key]) as T;
@@ -63,6 +80,41 @@ function localNoonTimestamp(dateString: string): number {
   const date = parseLocalDate(dateString);
   date.setHours(12, 0, 0, 0);
   return date.getTime();
+}
+
+function loadWebCapture(
+  search: string | null,
+  isDev: boolean = true
+): WebCaptureModule {
+  jest.resetModules();
+  jest.doMock('@react-native-async-storage/async-storage', () => ({
+    __esModule: true,
+    default: AsyncStorage,
+  }));
+
+  const globals = global as unknown as Record<string, unknown>;
+  if (search === null) {
+    delete globals.window;
+  } else {
+    globals.window = { location: { search } };
+  }
+  globals.__DEV__ = isDev;
+
+  return require('../dev/playStoreCapture.web');
+}
+
+function restoreCaptureGlobals(): void {
+  const globals = global as unknown as Record<string, unknown>;
+  if (originalWindowDescriptor) {
+    Object.defineProperty(global, 'window', originalWindowDescriptor);
+  } else {
+    delete globals.window;
+  }
+  if (originalDevDescriptor) {
+    Object.defineProperty(global, '__DEV__', originalDevDescriptor);
+  } else {
+    delete globals.__DEV__;
+  }
 }
 
 function resetModulesWithSeededStorage(): void {
@@ -106,6 +158,11 @@ describe('Play Store screenshot scenarios', () => {
     invalidatePuzzleStateCache();
   });
 
+  afterEach(() => {
+    restoreCaptureGlobals();
+    jest.useRealTimers();
+  });
+
   test('exposes the eight approved scenarios in campaign order', () => {
     expect(PLAY_STORE_SCENARIO_NAMES).toEqual([
       'puzzle-preview',
@@ -133,6 +190,61 @@ describe('Play Store screenshot scenarios', () => {
     expect(parsePlayStoreScenario('?playStoreScenario=home-sunny', true, 'ios'))
       .toBeNull();
   });
+
+  test('native capture API is a fixture-free no-op', async () => {
+    expect(isPlayStoreCaptureActive()).toBe(false);
+    expect(getPlayStoreScenarioName()).toBeNull();
+    await expect(preparePlayStoreCapture()).resolves.toBe(false);
+    expect(NATIVE_CAPTURE_TS).toMatch(/import type \{ PlayStoreScenarioName \}/);
+    expect(NATIVE_CAPTURE_TS).not.toMatch(/import \{[^}]*buildPlayStoreScenario/);
+  });
+
+  test('web capture clears stale state and seeds the exact local-day scenario', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 6, 11, 12, 0, 0));
+    await AsyncStorage.setItem('stale_capture_state', 'remove-me');
+    (AsyncStorage.clear as jest.Mock).mockClear();
+    (AsyncStorage.multiSet as jest.Mock).mockClear();
+
+    const capture = loadWebCapture('?playStoreScenario=home-sunny');
+
+    expect(capture.isPlayStoreCaptureActive()).toBe(true);
+    expect(capture.getPlayStoreScenarioName()).toBe('home-sunny');
+    await expect(capture.preparePlayStoreCapture()).resolves.toBe(true);
+
+    const expected = buildPlayStoreScenario('home-sunny', '2026-07-11');
+    expect(AsyncStorage.clear).toHaveBeenCalledTimes(1);
+    expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
+      Object.entries(expected.storage)
+    );
+    expect((AsyncStorage.clear as jest.Mock).mock.invocationCallOrder[0])
+      .toBeLessThan((AsyncStorage.multiSet as jest.Mock).mock.invocationCallOrder[0]);
+    await expect(AsyncStorage.getAllKeys()).resolves.toEqual(
+      Object.keys(expected.storage)
+    );
+  });
+
+  test.each([
+    ['unknown scenario', '?playStoreScenario=unknown', true],
+    ['production web', '?playStoreScenario=home-sunny', false],
+    ['missing window', null, true],
+  ] as const)(
+    'web capture leaves storage untouched for %s',
+    async (_label, search, isDev) => {
+      await AsyncStorage.setItem('existing_state', 'keep-me');
+      (AsyncStorage.clear as jest.Mock).mockClear();
+      (AsyncStorage.multiSet as jest.Mock).mockClear();
+
+      const capture = loadWebCapture(search, isDev);
+
+      expect(capture.isPlayStoreCaptureActive()).toBe(false);
+      expect(capture.getPlayStoreScenarioName()).toBeNull();
+      await expect(capture.preparePlayStoreCapture()).resolves.toBe(false);
+      expect(AsyncStorage.clear).not.toHaveBeenCalled();
+      expect(AsyncStorage.multiSet).not.toHaveBeenCalled();
+      await expect(AsyncStorage.getItem('existing_state')).resolves.toBe('keep-me');
+    }
+  );
 
   test('adds deterministic common storage that keeps captures unobstructed', () => {
     const scenario = buildPlayStoreScenario('home-sunny', '2026-07-11');

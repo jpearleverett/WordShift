@@ -2,12 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Mutable expo-config extra so we can toggle configured/unconfigured per test.
 let mockExtra: Record<string, unknown> = {};
+let mockCaptureActive = false;
 jest.mock('expo-constants', () => ({
   default: {
     get expoConfig() {
       return { extra: mockExtra, version: '1.2.3' };
     },
   },
+}));
+
+jest.mock('../dev/playStoreCapture', () => ({
+  isPlayStoreCaptureActive: () => mockCaptureActive,
 }));
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -33,6 +38,7 @@ describe('telemetry Supabase sink', () => {
   beforeEach(() => {
     (AsyncStorage.clear as jest.Mock)();
     mockExtra = {};
+    mockCaptureActive = false;
     (global as Record<string, unknown>).fetch = jest.fn().mockResolvedValue({ ok: true, status: 204 });
     (getAllStoredEvents as jest.Mock).mockClear();
     (removeOldestEvents as jest.Mock).mockClear();
@@ -55,6 +61,21 @@ describe('telemetry Supabase sink', () => {
   test('stays fully silent when nothing is configured', async () => {
     expect(isTelemetryEnabled()).toBe(false);
     await syncTelemetry();
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(removeOldestEvents).not.toHaveBeenCalled();
+  });
+
+  test('capture mode suppresses configured telemetry', async () => {
+    mockExtra = {
+      telemetryEndpoint: 'https://collector.example/capture',
+      supabaseUrl: 'https://x.supabase.co',
+      supabaseAnonKey: 'anon-key',
+    };
+    mockCaptureActive = true;
+
+    expect(isTelemetryEnabled()).toBe(false);
+    await syncTelemetry();
+    expect(getAllStoredEvents).not.toHaveBeenCalled();
     expect(global.fetch).not.toHaveBeenCalled();
     expect(removeOldestEvents).not.toHaveBeenCalled();
   });

@@ -153,6 +153,10 @@ import {
 import { appStyles as styles, getScreenBackgroundColor } from './src/styles/appStyles';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useScreenInsets } from './src/hooks/useScreenInsets';
+import {
+  isPlayStoreCaptureActive,
+  preparePlayStoreCapture,
+} from './src/dev/playStoreCapture';
 
 // App screen type — expanded with settings, stats, and ledger
 type AppScreen = 'home' | 'puzzle' | 'settings' | 'stats' | 'ledger' | 'gallery' | 'pit' | 'shop';
@@ -168,6 +172,12 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Speed rescue: seconds granted by the one-per-board rewarded continue.
 const SPEED_RESCUE_EXTRA_SEC = 30;
 const SPEED_RESCUE_PLACEMENT: RewardedPlacement = 'speed_rescue';
+const captureActive = isPlayStoreCaptureActive();
+
+function scheduleNotificationsUnlessCapturing(phase: number): void {
+  if (captureActive) return;
+  scheduleAllNotifications(phase).catch(() => {});
+}
 
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
@@ -182,7 +192,7 @@ installGlobalFont();
 // Errors routed through reportError() (ErrorBoundary, etc.) are forwarded with
 // their source/metadata context.
 const sentryDsn = getSentryDsn();
-if (sentryDsn) {
+if (!captureActive && sentryDsn) {
   Sentry.init({
     dsn: sentryDsn,
     // Crash + error capture only; no performance tracing by default.
@@ -560,7 +570,7 @@ function MainApp() {
     if (__DEV__) {
       startFrameMonitoring();
     }
-    scheduleAllNotifications(0).catch(() => {});
+    scheduleNotificationsUnlessCapturing(0);
     uploadToCloud().catch(() => {});
     return () => {
       if (__DEV__) {
@@ -643,7 +653,7 @@ function MainApp() {
     if (isRollover) {
       // A new local day invalidates day-bucketed state computed at launch:
       // reschedule the notification ladder and refresh streak/stats display.
-      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+      scheduleNotificationsUnlessCapturing(persistence.currentPhase);
       persistenceActions.refreshStats();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1522,15 +1532,17 @@ function MainApp() {
       // HARD-suppressed from Phase 2 on so the reveal's betrayal can't harvest
       // one-star reviews (assessment §9). Policy-gated + once-ever; deferred so
       // it lands after the victory choreography settles.
-      addVictoryTimeout(() => {
-        maybePromptReview({
-          phase: persistence.currentPhase,
-          stars: victory.earnedStars,
-          puzzlesSolved: completedTotal,
-          isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
-          isDaily: isPlayingDaily,
-        }).catch(() => {});
-      }, 1800);
+      if (!captureActive) {
+        addVictoryTimeout(() => {
+          maybePromptReview({
+            phase: persistence.currentPhase,
+            stars: victory.earnedStars,
+            puzzlesSolved: completedTotal,
+            isOnboarding: !(onboardingFlow.onboardingStep === undefined || onboardingFlow.onboardingStep === 'complete'),
+            isDaily: isPlayingDaily,
+          }).catch(() => {});
+        }, 1800);
+      }
 
       // Play choreographed victory sequence (the modal gates tap-to-skip to
       // its own entrance window via onSkip)
@@ -1594,7 +1606,7 @@ function MainApp() {
       });
 
       // Re-schedule notifications after puzzle completion
-      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+      scheduleNotificationsUnlessCapturing(persistence.currentPhase);
 
       // Mark cloud save as having pending changes
       markPendingChanges().catch(() => {});
@@ -1974,7 +1986,7 @@ function MainApp() {
       data: { granted },
     });
     if (granted) {
-      scheduleAllNotifications(persistence.currentPhase).catch(() => {});
+      scheduleNotificationsUnlessCapturing(persistence.currentPhase);
     }
   }, [persistence.currentPhase]);
 
@@ -2364,7 +2376,7 @@ function MainApp() {
               }
               victoryActions.playPhaseChangeFlash();
               // Update notifications with new phase
-              scheduleAllNotifications(newPhase).catch(() => {});
+              scheduleNotificationsUnlessCapturing(newPhase);
             }}
             isOnboarding={onboardingFlow.isOnboarding}
             onboardingStep={onboardingFlow.onboardingStep}
@@ -3161,32 +3173,40 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    logEvent({ type: 'app_open' });
+    if (!captureActive) {
+      logEvent({ type: 'app_open' });
+    }
     (async () => {
       try {
         // Install the cloud provider (no-op unless Supabase is configured), then
         // pull a cloud save BEFORE migrations/services read storage — so a fresh
         // install (or a device switch via recovery code) restores prior progress.
-        installCloudProviderIfConfigured();
-        await maybeAutoRestoreOnFreshInstall();
+        if (captureActive) {
+          await preparePlayStoreCapture();
+        } else {
+          installCloudProviderIfConfigured();
+          await maybeAutoRestoreOnFreshInstall();
+        }
         await runMigrations();
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
         // providers so isPatronSync() and ad gating read correct values. Safe in
         // Expo Go — no native modules until a real provider is wired.
         initShareImage(); // registers the native image capturer if present (no-op in Expo Go)
-        // RevenueCat billing: inert until react-native-purchases is installed AND
-        // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
-        setBillingProvider(createRevenueCatBillingProvider());
-        // AdMob: inert until react-native-google-mobile-ads is installed AND the
-        // admob*Id* keys are set in app.json → extra. initAds() initializes it
-        // (and the adapter requests GDPR/UMP consent on init).
-        setAdProvider(createAdMobAdProvider());
-        // Store/ad SDK init is fire-and-forget: the first frame must never wait
-        // on billing config or the ads consent → SDK init → preload chain (the
-        // adapter runs that whole chain in the background internally). Worst
-        // case the first eligible ad/purchase surface is briefly unavailable.
-        void initIAP().catch((err) => console.warn('initIAP failed:', err));
-        void initAds().catch((err) => console.warn('initAds failed:', err));
+        if (!captureActive) {
+          // RevenueCat billing: inert until react-native-purchases is installed AND
+          // revenueCatIosKey/AndroidKey are set in app.json → extra. initIAP() configures it.
+          setBillingProvider(createRevenueCatBillingProvider());
+          // AdMob: inert until react-native-google-mobile-ads is installed AND the
+          // admob*Id* keys are set in app.json → extra. initAds() initializes it
+          // (and the adapter requests GDPR/UMP consent on init).
+          setAdProvider(createAdMobAdProvider());
+          // Store/ad SDK init is fire-and-forget: the first frame must never wait
+          // on billing config or the ads consent → SDK init → preload chain (the
+          // adapter runs that whole chain in the background internally). Worst
+          // case the first eligible ad/purchase surface is briefly unavailable.
+          void initIAP().catch((err) => console.warn('initIAP failed:', err));
+          void initAds().catch((err) => console.warn('initAds failed:', err));
+        }
         // initHints seeds the one-time free hint stash; awaited before MainApp
         // mounts, so usePuzzleGame reads the correct balance on its first render.
         // loadEntitlements warms the sync cache (isPatronSync / ad suppression /
