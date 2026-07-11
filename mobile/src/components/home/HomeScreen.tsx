@@ -131,6 +131,7 @@ import {
   CombinedQuestState,
 } from '../../services/weeklyQuests';
 import { getSettingsSync } from '../../services/settings';
+import { shouldFreezePlayStoreCaptureMotion } from '../../dev/playStoreCapture';
 import { getUnlockedVariants } from '../../services/puzzleVariety';
 import { getPendingHarvestSummary, HarvestSummary } from '../../services/wordHarvest';
 import { getLocalDateString, daysAgoLocal } from '../../services/dateUtils';
@@ -1011,6 +1012,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   // Animate amber when it changes
   useEffect(() => {
+    if (shouldFreezePlayStoreCaptureMotion()) {
+      amberPulse.stopAnimation();
+      amberPulse.setValue(1);
+      return;
+    }
     if (progress) {
       Animated.sequence([
         Animated.timing(amberPulse, {

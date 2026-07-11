@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { TouchableOpacity, Animated, Easing } from 'react-native';
+import { shouldFreezePlayStoreCaptureMotion } from '../../dev/playStoreCapture';
 
 interface JuicyButtonProps {
   onPress: () => void;
@@ -20,10 +21,12 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
   accessibilityLabel,
   accessibilityRole = 'button',
 }) => {
+  const freezeCaptureMotion = shouldFreezePlayStoreCaptureMotion();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    if (freezeCaptureMotion) return;
     // Subtle scale pulse (not opacity - keeps button fully visible)
     const pulseLoop = Animated.loop(
       Animated.sequence([
@@ -43,7 +46,7 @@ export const JuicyButton: React.FC<JuicyButtonProps> = ({
     );
     pulseLoop.start();
     return () => pulseLoop.stop();
-  }, []);
+  }, [freezeCaptureMotion, pulseAnim]);
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {

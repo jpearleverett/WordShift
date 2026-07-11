@@ -15,6 +15,7 @@ import { CandyColors, getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
 import { shouldSimplifyAnimations } from '../services/deviceTier';
 import { getWordPhaseTier } from '../services/localGenerator';
+import { shouldFreezePlayStoreCaptureMotion } from '../dev/playStoreCapture';
 import {
   ROW_HORIZONTAL_MARGIN,
   ROW_PADDING,
@@ -438,6 +439,7 @@ export const Row: React.FC<RowProps> = memo(({
   onDragActiveChange,
   onMeasureRef,
 }) => {
+  const freezeCaptureMotion = shouldFreezePlayStoreCaptureMotion();
   const phaseColors = getPhaseRowColors(phase);
   const targetRowIndex = activeRowIndex + (moveDirection === 'down' ? 1 : -1);
   const isSource = rowIndex === activeRowIndex;
@@ -471,6 +473,36 @@ export const Row: React.FC<RowProps> = memo(({
   const stableMeasureRef = useRef((node: View | null) => measureCbRef.current(node)).current;
 
   useEffect(() => {
+    if (freezeCaptureMotion) {
+      scaleAnim.stopAnimation();
+      opacityAnim.stopAnimation();
+      slideAnim.stopAnimation();
+      glowLoopRef.current?.stop();
+      glowLoopRef.current = null;
+      if (isSource) {
+        scaleAnim.setValue(1);
+        opacityAnim.setValue(1);
+        slideAnim.setValue(0);
+        glowAnim.setValue(0.5);
+      } else if (isTarget) {
+        scaleAnim.setValue(guidanceActive ? 1 : 0.98);
+        opacityAnim.setValue(guidanceActive ? 1 : 0.9);
+        slideAnim.setValue(0);
+        glowAnim.setValue(0);
+      } else if (isCompleted) {
+        scaleAnim.setValue(0.92);
+        opacityAnim.setValue(0.4);
+        slideAnim.setValue(-8);
+        glowAnim.setValue(0);
+      } else {
+        scaleAnim.setValue(0.88);
+        opacityAnim.setValue(0.25);
+        slideAnim.setValue(0);
+        glowAnim.setValue(0);
+      }
+      return;
+    }
+
     // Animate row transitions
     if (isSource) {
       Animated.parallel([
@@ -563,11 +595,16 @@ export const Row: React.FC<RowProps> = memo(({
       glowLoopRef.current = null;
       glowAnim.stopAnimation();
     };
-  }, [isSource, isTarget, isCompleted, guidanceActive]);
+  }, [isSource, isTarget, isCompleted, guidanceActive, freezeCaptureMotion]);
 
   // Animate arc when slots appear/disappear - smooth glide effect
   // Depends on both showSlots AND selectedLetter to replay animation on each selection
   useEffect(() => {
+    if (freezeCaptureMotion) {
+      arcAnim.stopAnimation();
+      arcAnim.setValue(showSlots ? 1 : 0);
+      return;
+    }
     if (showSlots) {
       // Reset to 0 first, then animate to 1 - ensures animation replays each time
       arcAnim.setValue(0);
@@ -585,7 +622,7 @@ export const Row: React.FC<RowProps> = memo(({
         useNativeDriver: true,
       }).start();
     }
-  }, [showSlots, selectedLetter?.id]);
+  }, [showSlots, selectedLetter?.id, freezeCaptureMotion]);
 
   // Micro-shake the target row on invalid drop attempts. Visual-only: the
   // haptic + sound are owned by App.tsx's handleSlotPress so the rejection buzz

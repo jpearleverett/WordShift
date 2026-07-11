@@ -16,7 +16,7 @@
     "validate:play-store": "node scripts/tools/validatePlayStoreAssets.mjs",
     "generate:play-store": "npm run capture:play-store && npm run compose:play-store && npm run compose:play-store-feature && npm run validate:play-store",
     "test:play-store-capture": "node --test scripts/tools/capturePlayStoreScreenshots.test.mjs",
-    "test:play-store-assets": "node --test scripts/tools/playStoreAssets.test.mjs scripts/tools/playStoreFeatureGraphic.test.mjs",
+    "test:play-store-assets": "node --test scripts/tools/capturePlayStoreScreenshots.test.mjs scripts/tools/playStoreAssets.test.mjs scripts/tools/playStoreFeatureGraphic.test.mjs",
     "generate:puzzles": "jest --config scripts/jest.config.js --no-coverage --testTimeout 900000",
     "generate:assets": "node scripts/tools/processAppIcon.mjs && node scripts/tools/generateAppIcons.mjs && node scripts/tools/generateNotificationIcon.mjs && node scripts/tools/generateSounds.mjs && node scripts/tools/generateWorldArt.mjs && node scripts/tools/generatePixelWorld.mjs && node scripts/tools/generateUiIcons.mjs"
   },

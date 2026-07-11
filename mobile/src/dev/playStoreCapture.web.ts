@@ -1,6 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocalDateString } from '../services/dateUtils';
 import {
+  getSettings,
+  invalidateSettingsCache,
+} from '../services/settings';
+import {
   buildPlayStoreScenario,
   parsePlayStoreScenario,
 } from './playStoreScenarios';
@@ -28,6 +32,10 @@ export function getPlayStoreScenarioName(): PlayStoreScenarioName | null {
   return scenarioName;
 }
 
+export function shouldFreezePlayStoreCaptureMotion(): boolean {
+  return scenarioName !== null;
+}
+
 export async function preparePlayStoreCapture(): Promise<boolean> {
   if (scenarioName === null) return false;
 
@@ -37,5 +45,7 @@ export async function preparePlayStoreCapture(): Promise<boolean> {
   );
   await AsyncStorage.clear();
   await AsyncStorage.multiSet(Object.entries(scenario.storage));
+  invalidateSettingsCache();
+  await getSettings();
   return true;
 }

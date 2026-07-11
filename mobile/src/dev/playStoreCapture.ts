@@ -8,6 +8,10 @@ export function getPlayStoreScenarioName(): PlayStoreScenarioName | null {
   return null;
 }
 
+export function shouldFreezePlayStoreCaptureMotion(): false {
+  return false;
+}
+
 export async function preparePlayStoreCapture(): Promise<false> {
   return false;
 }

@@ -10,6 +10,7 @@ import {
   isAllowedCaptureRequest,
   validateCampaign,
 } from './capturePlayStoreHelpers.mjs';
+import { withStagedPublication } from './composePlayStoreScreenshots.mjs';
 
 const SCRIPT_DIR = import.meta.dirname
   ?? path.dirname(fileURLToPath(import.meta.url));
@@ -507,10 +508,15 @@ async function prepareScenario(page, scenario) {
       await page.getByLabel('Drop zone 2', { exact: true }).click();
       await getActiveLetter(page, 'T').click();
       await page.getByLabel('Drop zone 5', { exact: true }).click();
-      await page.getByLabel('Skip celebration animation', { exact: true }).waitFor({
+      const skipCelebration = page.getByLabel(
+        'Skip celebration animation',
+        { exact: true }
+      );
+      await skipCelebration.waitFor({
         timeout: 60_000,
       });
-      await page.getByLabel('Skip celebration animation', { exact: true }).click();
+      await skipCelebration.click();
+      await skipCelebration.waitFor({ state: 'detached', timeout: 60_000 });
       await page.getByLabel('3 of 3 stars', { exact: true }).waitFor({
         timeout: 60_000,
       });
@@ -573,14 +579,29 @@ function collectPageIntegrity(context, page) {
   };
 }
 
-async function captureScenario(browser, item) {
+async function captureScenario(browser, item, outputDir) {
   const context = await browser.newContext({
     viewport: VIEWPORT,
     deviceScaleFactor: DEVICE_SCALE_FACTOR,
+    reducedMotion: 'reduce',
     serviceWorkers: 'block',
   });
 
   try {
+    await context.addInitScript(({ seed }) => {
+      let state = 0x811c9dc5;
+      for (let index = 0; index < seed.length; index += 1) {
+        state ^= seed.charCodeAt(index);
+        state = Math.imul(state, 0x01000193);
+      }
+      Math.random = () => {
+        state += 0x6d2b79f5;
+        let value = state;
+        value = Math.imul(value ^ (value >>> 15), value | 1);
+        value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+        return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+      };
+    }, { seed: item.scenario });
     await context.route('**/*', async route => {
       if (isAllowedCaptureRequest(route.request().url())) {
         await route.continue();
@@ -602,7 +623,7 @@ async function captureScenario(browser, item) {
       await waitForDocumentReadiness(page);
       assertPageIntegrity();
 
-      const outputPath = path.join(SOURCE_DIR, item.source);
+      const outputPath = path.join(outputDir, item.source);
       await page.screenshot({ path: outputPath, fullPage: false });
       assertPageIntegrity();
       const dimensions = await assertPngDimensions(outputPath);
@@ -704,18 +725,31 @@ async function main() {
 
     browser = await chromium.launch({ headless: true });
     throwIfInterrupted();
-    const results = [];
-    for (const [index, item] of campaign.entries()) {
-      throwIfInterrupted();
-      console.log(`[capture] ${index + 1}/${campaign.length} ${item.scenario}`);
-      const result = await captureScenario(browser, item);
-      results.push(result);
-      console.log(
-        `[capture] ${item.scenario}: captured ${result.dimensions} -> ${item.source}`
-      );
-    }
-    await assertCapturesAreUnique(results);
-    console.log(`[capture] complete: ${results.length} unique source PNGs`);
+    await withStagedPublication({
+      finalDir: SOURCE_DIR,
+      populateAndValidate: async stagingDir => {
+        const results = [];
+        for (const [index, item] of campaign.entries()) {
+          throwIfInterrupted();
+          console.log(`[capture] ${index + 1}/${campaign.length} ${item.scenario}`);
+          const result = await captureScenario(browser, item, stagingDir);
+          results.push(result);
+          console.log(
+            `[capture] ${item.scenario}: staged ${result.dimensions} -> ${item.source}`
+          );
+        }
+        await assertCapturesAreUnique(results);
+        if (results.length !== campaign.length) {
+          throw new Error(
+            `Staged capture count ${results.length} does not match campaign ${campaign.length}`
+          );
+        }
+        console.log(
+          `[capture] staged validation complete: ${results.length} unique source PNGs`
+        );
+      },
+    });
+    console.log(`[capture] published: ${campaign.length} unique source PNGs`);
   } catch (error) {
     const expoDetail = expoLogs.length > 0
       ? `\n[capture] recent Expo output:\n${expoLogs.join('\n')}`

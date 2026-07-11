@@ -51,6 +51,7 @@ import {
   getPlayStoreScenarioName,
   isPlayStoreCaptureActive,
   preparePlayStoreCapture,
+  shouldFreezePlayStoreCaptureMotion,
 } from '../dev/playStoreCapture';
 
 const NATIVE_CAPTURE_TS = fs.readFileSync(
@@ -194,6 +195,7 @@ describe('Play Store screenshot scenarios', () => {
   test('native capture API is a fixture-free no-op', async () => {
     expect(isPlayStoreCaptureActive()).toBe(false);
     expect(getPlayStoreScenarioName()).toBeNull();
+    expect(shouldFreezePlayStoreCaptureMotion()).toBe(false);
     await expect(preparePlayStoreCapture()).resolves.toBe(false);
     expect(NATIVE_CAPTURE_TS).toMatch(/import type \{ PlayStoreScenarioName \}/);
     expect(NATIVE_CAPTURE_TS).not.toMatch(/import \{[^}]*buildPlayStoreScenario/);
@@ -210,7 +212,14 @@ describe('Play Store screenshot scenarios', () => {
 
     expect(capture.isPlayStoreCaptureActive()).toBe(true);
     expect(capture.getPlayStoreScenarioName()).toBe('home-sunny');
+    expect(capture.shouldFreezePlayStoreCaptureMotion()).toBe(true);
     await expect(capture.preparePlayStoreCapture()).resolves.toBe(true);
+    const captureSettings = require('../services/settings') as typeof import('../services/settings');
+    expect(captureSettings.getSettingsSync()).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: false,
+      reducedMotion: true,
+    });
 
     const expected = buildPlayStoreScenario('home-sunny', '2026-07-11');
     expect(AsyncStorage.clear).toHaveBeenCalledTimes(1);
@@ -265,6 +274,7 @@ describe('Play Store screenshot scenarios', () => {
 
       expect(capture.isPlayStoreCaptureActive()).toBe(false);
       expect(capture.getPlayStoreScenarioName()).toBeNull();
+      expect(capture.shouldFreezePlayStoreCaptureMotion()).toBe(false);
       await expect(capture.preparePlayStoreCapture()).resolves.toBe(false);
       expect(AsyncStorage.clear).not.toHaveBeenCalled();
       expect(AsyncStorage.multiSet).not.toHaveBeenCalled();
