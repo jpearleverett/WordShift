@@ -470,6 +470,7 @@ export function buildPlayStoreScenario(
       soundEnabled: false,
       hapticsEnabled: false,
       reducedMotion: true,
+      swiftVictories: false,
     }),
     wordshift_notification_prefs: JSON.stringify({
       dailyReminderEnabled: false,

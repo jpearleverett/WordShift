@@ -256,9 +256,16 @@ describe('Play Store screenshot scenarios', () => {
       soundEnabled: false,
       hapticsEnabled: false,
       reducedMotion: true,
+      swiftVictories: false,
     });
 
     const expected = buildPlayStoreScenario('home-sunny', '2026-07-11');
+    expect(JSON.parse(expected.storage.wordshift_settings)).toEqual({
+      soundEnabled: false,
+      hapticsEnabled: false,
+      reducedMotion: true,
+      swiftVictories: false,
+    });
     expect(AsyncStorage.clear).toHaveBeenCalledTimes(1);
     expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
       Object.entries(expected.storage)
@@ -329,6 +336,7 @@ describe('Play Store screenshot scenarios', () => {
       soundEnabled: false,
       hapticsEnabled: false,
       reducedMotion: true,
+      swiftVictories: false,
     });
     expect(stored(scenario, 'wordshift_daily_login')).toEqual({
       lastClaimedDate: '2026-07-11',

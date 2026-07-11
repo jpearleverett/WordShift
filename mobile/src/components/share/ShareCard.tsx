@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { getPhaseTheme } from '../../theme/colors';
 import { PIXEL_FONT_BOLD } from '../../theme/fonts';
 import { getShareCardTagline } from '../../services/phaseNarrative';
+import { pickShareIntrigueTagline } from '../../services/shareResults';
 import type { ShareableResult, MoveOutcome } from '../../services/shareResults';
 
 /**
@@ -212,9 +213,12 @@ export const ShareCard = forwardRef<View, ShareCardProps>(({ result }, ref) => {
           </Text>
         )}
 
-        {/* Mood signature — a spoiler-safe tagline that quietly decays with phase */}
-        <Text style={[styles.tagline, { color: subColor }]} numberOfLines={1}>
-          {getShareCardTagline(phase)}
+        {/* Mood signature. On an EARLY (Phase 0-1) non-daily card this is a
+            spoiler-safe curiosity hook ("Mostly." / "For now."); daily and
+            dark-phase (>= 2) cards keep the phaseNarrative mood tagline that
+            quietly decays with phase. */}
+        <Text style={[styles.tagline, { color: subColor }]} numberOfLines={2}>
+          {pickShareIntrigueTagline(result) ?? getShareCardTagline(phase)}
         </Text>
 
         {/* Footer */}

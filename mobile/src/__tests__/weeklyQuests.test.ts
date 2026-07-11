@@ -10,19 +10,31 @@ import {
   getQuestDescription,
   getUnclaimedAmber,
   clearWeeklyQuests,
+  invalidateQuestCache,
   recordAnimalVisit,
   getPhaseRewardMultiplier,
+  QUEST_GENERATION_MIN_PUZZLES,
   DAILY_QUEST_POOL,
   WEEKLY_QUEST_POOL,
+  EVENT_QUEST_TARGET,
+  EVENT_QUEST_REWARD_AMBER,
   Quest,
   QuestTemplate,
   CombinedQuestState,
 } from '../services/weeklyQuests';
+import { isEventDay } from '../services/liveEvents';
 
 // Mock AsyncStorage using shared factory
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
 );
+
+// The full-moon event flag is a pure function of the real calendar; mock it
+// so these tests are deterministic on ANY run date (an unmocked real event
+// day would append a 6th daily quest and break the count assertions).
+jest.mock('../services/liveEvents', () => ({
+  isEventDay: jest.fn(() => false),
+}));
 
 describe('weeklyQuests', () => {
   const unlockedQuestContext = {
@@ -120,7 +132,7 @@ describe('weeklyQuests', () => {
         await clearWeeklyQuests();
         await AsyncStorage.clear();
         const state = await loadWeeklyQuests(0, {
-          puzzlesSolved: 5, unlockedAnimalCount: 1, challengeUnlocked: false, unlockedVariants: [],
+          puzzlesSolved: 7, unlockedAnimalCount: 1, challengeUnlocked: false, unlockedVariants: [],
         });
         const all = [...state.daily.quests, ...state.weekly.quests];
         expect(all.find(q => q.type === 'variant_wins')).toBeUndefined();
@@ -193,7 +205,7 @@ describe('weeklyQuests', () => {
 
     it('filters out challenge_mode quests when challenge is not unlocked', async () => {
       const state = await loadWeeklyQuests(0, {
-        puzzlesSolved: 4,
+        puzzlesSolved: 6,
         unlockedAnimalCount: 1,
         challengeUnlocked: false,
       });
@@ -238,8 +250,9 @@ describe('weeklyQuests', () => {
       // Early-game context restricts the surviving template pool (no challenge,
       // no sacrifice/tend, few animals) — exercising the fill pass. The fill
       // pass must still respect the max-2-per-type guard the first pass uses.
+      // (puzzlesSolved 6 = just past the journal gate, so generation runs.)
       const state = await loadWeeklyQuests(0, {
-        puzzlesSolved: 1,
+        puzzlesSolved: 6,
         unlockedAnimalCount: 1,
         challengeUnlocked: false,
       });
@@ -860,6 +873,191 @@ describe('weeklyQuests', () => {
   // MEDIUM_PLUS difficulty matching
   // ===========================================================================
 
+  // ===========================================================================
+  // Cross-midnight rollover: context-less loads must use the persisted context
+  // ===========================================================================
+
+  describe('cross-midnight rollover uses the persisted generation context', () => {
+    // The bug: updateQuestProgress/recordAnimalVisit call loadWeeklyQuests with
+    // NO generationContext. If the first quest-touching action of a new
+    // day/week is a puzzle completion in a session held open past midnight,
+    // generation used optimistic defaults (10 animals unlocked) and could mint
+    // impossible visit_animals quests (target 2-9 with 1 animal) that then
+    // persist all period because the periodId matches on the next load.
+    const oneAnimalContext = {
+      puzzlesSolved: 10,
+      unlockedAnimalCount: 1,
+      challengeUnlocked: false,
+      unlockedVariants: [] as string[],
+    };
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    function expectNoImpossibleQuests(quests: Quest[]) {
+      for (const q of quests) {
+        // 1 unlocked animal → visit_animals is filtered entirely (needs >= 2)
+        expect(q.type).not.toBe('visit_animals');
+        expect(q.type).not.toBe('challenge_mode');
+        expect(q.type).not.toBe('variant_wins');
+      }
+    }
+
+    it('a context-less updateQuestProgress after midnight regenerates with the last-known context (session held open)', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 5, 10, 12, 0, 0)); // Wed Jun 10, noon
+
+      // Context-FULL load with 1 animal (e.g. HomeScreen loadAllData).
+      await loadWeeklyQuests(0, oneAnimalContext);
+
+      // Day rolls over mid-session; the first quest-touching action is a
+      // context-LESS puzzle completion.
+      jest.setSystemTime(new Date(2026, 5, 11, 0, 5, 0));
+      await updateQuestProgress({ difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
+
+      const state = await loadWeeklyQuests(0);
+      expect(state.daily.periodId).toBe('2026-06-11');
+      expect(state.daily.quests.length).toBe(5);
+      expectNoImpossibleQuests([...state.daily.quests, ...state.weekly.quests]);
+    });
+
+    it('survives a relaunch: the persisted context gates generation after the in-memory caches drop', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 5, 10, 12, 0, 0));
+
+      await loadWeeklyQuests(0, oneAnimalContext);
+
+      // Simulate a process restart: in-memory caches (including the session's
+      // last-known context) are gone, storage survives.
+      invalidateQuestCache();
+
+      jest.setSystemTime(new Date(2026, 5, 11, 0, 5, 0));
+      await updateQuestProgress({ difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
+
+      const state = await loadWeeklyQuests(0);
+      expect(state.daily.periodId).toBe('2026-06-11');
+      expect(state.daily.quests.length).toBe(5);
+      expectNoImpossibleQuests([...state.daily.quests, ...state.weekly.quests]);
+    });
+
+    it('holds across a 14-day context-less sweep (covers many daily seeds and a weekly rollover)', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 5, 10, 12, 0, 0));
+
+      await loadWeeklyQuests(0, oneAnimalContext);
+
+      // Jun 11 .. Jun 24 crosses the Mon Jun 15 weekly boundary, so the weekly
+      // tier also regenerates context-less at least once.
+      for (let day = 11; day <= 24; day++) {
+        jest.setSystemTime(new Date(2026, 5, day, 9, 0, 0));
+        await updateQuestProgress({ difficulty: 'EASY', stars: 3, hintsUsed: 0, amberEarned: 8 }, 0);
+        const state = await loadWeeklyQuests(0);
+        expectNoImpossibleQuests([...state.daily.quests, ...state.weekly.quests]);
+      }
+    });
+
+    it('a fresher context-full load updates the persisted context used at the next rollover', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(2026, 5, 10, 12, 0, 0));
+
+      await loadWeeklyQuests(0, oneAnimalContext);
+      // Later the same day the player has unlocked more (still no variants).
+      await loadWeeklyQuests(0, { ...oneAnimalContext, puzzlesSolved: 20, unlockedAnimalCount: 3 });
+      invalidateQuestCache(); // relaunch — only the persisted context remains
+
+      jest.setSystemTime(new Date(2026, 5, 11, 0, 5, 0));
+      const state = await loadWeeklyQuests(0);
+      // 3 animals → a daily visit_animals quest may appear, but never with an
+      // impossible target.
+      for (const q of state.daily.quests) {
+        if (q.type === 'visit_animals') {
+          expect(q.target).toBeLessThanOrEqual(3);
+        }
+        expect(q.type).not.toBe('variant_wins');
+      }
+    });
+  });
+
+  // ===========================================================================
+  // Pre-journal generation gate (quest surfaces appear at puzzle 6)
+  // ===========================================================================
+
+  describe('pre-journal quest generation gate', () => {
+    const preJournalContext = {
+      puzzlesSolved: 2,
+      unlockedAnimalCount: 1,
+      challengeUnlocked: false,
+      unlockedVariants: [] as string[],
+    };
+
+    it('exports the journal gate at puzzle 6 (mirrors the HomeScreen light-mode gate)', () => {
+      expect(QUEST_GENERATION_MIN_PUZZLES).toBe(6);
+    });
+
+    it('returns a dormant (empty) quest set when the context says puzzlesSolved < 6', async () => {
+      const state = await loadWeeklyQuests(0, preJournalContext);
+      expect(state.daily.quests).toEqual([]);
+      expect(state.weekly.quests).toEqual([]);
+      expect(state.daily.gatedInactive).toBe(true);
+      expect(state.weekly.gatedInactive).toBe(true);
+    });
+
+    it('updateQuestProgress no-ops while gated', async () => {
+      await loadWeeklyQuests(0, preJournalContext);
+      const completed = await updateQuestProgress({
+        difficulty: 'HARD', stars: 3, hintsUsed: 0, isChallenge: true, amberEarned: 500,
+      }, 0);
+      expect(completed).toEqual([]);
+      const state = await loadWeeklyQuests(0);
+      expect(state.daily.quests).toEqual([]);
+      expect(state.weekly.quests).toEqual([]);
+    });
+
+    it('context-less loads inherit the persisted gate (no quests minted behind the journal)', async () => {
+      await loadWeeklyQuests(0, preJournalContext);
+      invalidateQuestCache(); // relaunch — the gate must come from storage
+      const state = await loadWeeklyQuests(0);
+      expect(state.daily.quests).toEqual([]);
+      expect(state.weekly.quests).toEqual([]);
+    });
+
+    it('activates real quests mid-period once a context-full load crosses the gate', async () => {
+      const before = await loadWeeklyQuests(0, preJournalContext);
+      expect(before.daily.quests).toEqual([]);
+
+      const after = await loadWeeklyQuests(0, {
+        puzzlesSolved: QUEST_GENERATION_MIN_PUZZLES,
+        unlockedAnimalCount: 2,
+        challengeUnlocked: false,
+        unlockedVariants: [],
+      });
+      expect(after.daily.quests.length).toBe(5);
+      expect(after.weekly.quests.length).toBe(5);
+      expect(after.daily.gatedInactive).toBeUndefined();
+      // Same period — the activated set owns the same periodId the placeholder did.
+      expect(after.daily.periodId).toBe(before.daily.periodId);
+    });
+
+    it('keeps serving an existing quest state regardless of the gate (existing players mid-period)', async () => {
+      // Legacy path: state generated before the gate existed (context-less).
+      const before = await loadWeeklyQuests(0);
+      expect(before.daily.quests.length).toBe(5);
+
+      // A later context-full load reporting < 6 puzzles must NOT wipe it.
+      const after = await loadWeeklyQuests(0, preJournalContext);
+      expect(after.daily.quests.length).toBe(5);
+      expect(after.daily.quests.map(q => q.id)).toEqual(before.daily.quests.map(q => q.id));
+    });
+
+    it('generates with legacy defaults when player state has never been reported', async () => {
+      // No context anywhere (fresh module state + storage): behavior unchanged.
+      const state = await loadWeeklyQuests(0);
+      expect(state.daily.quests.length).toBe(5);
+      expect(state.weekly.quests.length).toBe(5);
+    });
+  });
+
   describe('solve_difficulty quest - MEDIUM_PLUS matching', () => {
     it('MEDIUM_PLUS quest accepts both MEDIUM_PLUS and HARD difficulty', async () => {
       await loadWeeklyQuests(0);
@@ -879,6 +1077,119 @@ describe('weeklyQuests', () => {
         const allQ1 = [...s1.daily.quests, ...s1.weekly.quests];
         expect(allQ1.find(q => q.id === mpQuest.id)?.progress).toBe(1);
       }
+    });
+  });
+
+  // ===========================================================================
+  // Full-moon event quest (bonus 6th daily slot on event days)
+  // ===========================================================================
+
+  describe('full-moon event quest', () => {
+    const isEventDayMock = isEventDay as jest.Mock;
+
+    afterEach(() => {
+      isEventDayMock.mockReturnValue(false);
+    });
+
+    it('appends exactly one event_ quest to the DAILY tier on an event day (6 total)', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const state = await loadWeeklyQuests(0, unlockedQuestContext);
+
+      expect(state.daily.quests.length).toBe(6);
+      const eventQuests = state.daily.quests.filter(q => q.id.startsWith('event_'));
+      expect(eventQuests.length).toBe(1);
+
+      const eq = eventQuests[0];
+      expect(eq.type).toBe('solve_count');
+      expect(eq.tier).toBe('daily');
+      expect(eq.target).toBe(EVENT_QUEST_TARGET);
+      expect(eq.rewardAmber).toBe(EVENT_QUEST_REWARD_AMBER);
+      expect(eq.title.length).toBeGreaterThan(0);
+      expect(eq.description).toContain(String(EVENT_QUEST_TARGET));
+      expect(eq.darkDescription).toContain(String(EVENT_QUEST_TARGET));
+
+      // The weekly tier never carries an event quest.
+      expect(state.weekly.quests.length).toBe(5);
+      expect(state.weekly.quests.some(q => q.id.startsWith('event_'))).toBe(false);
+    });
+
+    it('generates the plain 5 daily quests with no event quest on a non-event day', async () => {
+      // Default mock: not an event day.
+      const state = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(state.daily.quests.length).toBe(5);
+      expect(state.daily.quests.some(q => q.id.startsWith('event_'))).toBe(false);
+    });
+
+    it('event-day generation is deterministic for the same period', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const state1 = await loadWeeklyQuests(0, unlockedQuestContext);
+      await clearWeeklyQuests();
+      await AsyncStorage.clear();
+      const state2 = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(state1.daily.quests.map(q => q.id)).toEqual(state2.daily.quests.map(q => q.id));
+      expect(state1.daily.quests.map(q => q.type)).toEqual(state2.daily.quests.map(q => q.type));
+      expect(state1.daily.quests.map(q => q.title)).toEqual(state2.daily.quests.map(q => q.title));
+    });
+
+    it('the event quest vanishes naturally on a non-event regeneration', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const during = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(during.daily.quests.length).toBe(6);
+
+      // Simulate the next (non-event) day's regeneration: fresh period
+      // generation with the event flag off.
+      isEventDayMock.mockReturnValue(false);
+      await clearWeeklyQuests();
+      await AsyncStorage.clear();
+      const after = await loadWeeklyQuests(0, unlockedQuestContext);
+      expect(after.daily.quests.length).toBe(5);
+      expect(after.daily.quests.some(q => q.id.startsWith('event_'))).toBe(false);
+    });
+
+    it('progresses and claims through the existing pipeline untouched', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const state = await loadWeeklyQuests(0, unlockedQuestContext);
+      const eq = state.daily.quests.find(q => q.id.startsWith('event_'));
+      expect(eq).toBeDefined();
+
+      for (let i = 0; i < EVENT_QUEST_TARGET; i++) {
+        await updateQuestProgress({
+          difficulty: 'MEDIUM', stars: 2, hintsUsed: 1, amberEarned: 10,
+        }, 0);
+      }
+      const progressed = (await loadWeeklyQuests(0)).daily.quests.find(q => q.id === eq!.id);
+      expect(progressed?.progress).toBe(EVENT_QUEST_TARGET);
+      expect(progressed?.completed).toBe(true);
+
+      // Claim is phase-scaled like every other quest (x1.0 at phase 0).
+      const claim = await claimQuestReward(eq!.id, 0);
+      expect(claim).toEqual({ amber: EVENT_QUEST_REWARD_AMBER });
+      // Never double-claims.
+      expect(await claimQuestReward(eq!.id, 0)).toBeNull();
+    });
+
+    it('stays dormant behind the pre-journal gate, then activates WITH the event quest', async () => {
+      isEventDayMock.mockReturnValue(true);
+      const gated = await loadWeeklyQuests(0, {
+        puzzlesSolved: 2,
+        unlockedAnimalCount: 1,
+        challengeUnlocked: false,
+        unlockedVariants: [],
+      });
+      expect(gated.daily.quests).toEqual([]);
+      expect(gated.daily.gatedInactive).toBe(true);
+
+      const activated = await loadWeeklyQuests(0, {
+        puzzlesSolved: QUEST_GENERATION_MIN_PUZZLES,
+        unlockedAnimalCount: 2,
+        challengeUnlocked: false,
+        unlockedVariants: [],
+      });
+      expect(activated.daily.quests.length).toBe(6);
+      expect(activated.daily.quests.filter(q => q.id.startsWith('event_')).length).toBe(1);
+      expect(activated.daily.gatedInactive).toBeUndefined();
+      // Same period — activation replaces the placeholder in place.
+      expect(activated.daily.periodId).toBe(gated.daily.periodId);
     });
   });
 });

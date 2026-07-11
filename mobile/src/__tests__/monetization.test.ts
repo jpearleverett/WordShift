@@ -20,6 +20,9 @@ import {
   PRODUCT_IDS,
   entitlementsForProduct,
   purchaseProduct,
+  purchaseConsumable,
+  reconcilePendingConsumableGrants,
+  acknowledgeConsumableGrant,
   restorePurchases,
   setBillingProvider,
   isBillingReady,
@@ -29,6 +32,7 @@ import {
 import {
   interstitialFrequency,
   shouldShowInterstitial,
+  isDailyInterstitialAllowed,
   showRewarded,
   maybeShowInterstitial,
   isRewardedCapReached,
@@ -55,7 +59,12 @@ import {
   TILE_THEMES,
   CONFETTI_THEMES,
 } from '../theme/colors';
-import { REWARDED_DAILY_CAP } from '../constants/gameBalance';
+import {
+  REWARDED_DAILY_CAP,
+  AMBER_PACK_GRANTS,
+  HINT_PACK_GRANTS,
+  FIRST_PURCHASE_AMBER_MULTIPLIER,
+} from '../constants/gameBalance';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('./helpers/mockAsyncStorage').createMockAsyncStorage()
@@ -239,6 +248,123 @@ describe('iap', () => {
 });
 
 // ===========================================================================
+// iap — pending consumable-grant ledger (crash safety)
+// ===========================================================================
+
+describe('pending consumable-grant ledger', () => {
+  function successProvider(transactionId?: string): BillingProvider {
+    return {
+      initialize: async () => {},
+      getProducts: async () => [],
+      purchase: async (productId): Promise<PurchaseResult> => ({
+        success: true,
+        productId,
+        ...(transactionId ? { transactionId } : {}),
+      }),
+      restorePurchases: async () => ({ entitlements: [] }),
+      isReady: () => true,
+      getName: () => 'Fake',
+    };
+  }
+
+  it('persists the grant BEFORE returning — a kill between store success and apply is recoverable', async () => {
+    setBillingProvider(successProvider('GPA.1111-2222'));
+    const res = await purchaseConsumable(PRODUCT_IDS.HINTS_SMALL);
+    expect(res.success).toBe(true);
+    expect(res.grantId).toBe('GPA.1111-2222'); // store transaction id is the ledger id
+
+    // SIMULATED KILL: the caller (StoreModal) never applies the reward or
+    // acknowledges. The next boot/store-open reconcile still finds the paid grant.
+    const pending = await reconcilePendingConsumableGrants();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({
+      grantId: 'GPA.1111-2222',
+      productId: PRODUCT_IDS.HINTS_SMALL,
+      reward: { kind: 'hints', amount: HINT_PACK_GRANTS.small },
+    });
+    expect(typeof pending[0].purchasedAt).toBe('number');
+  });
+
+  it('acknowledge clears the grant after apply; re-acknowledging is a harmless no-op', async () => {
+    setBillingProvider(successProvider('GPA.3333-4444'));
+    const res = await purchaseConsumable(PRODUCT_IDS.HINTS_LARGE);
+    expect((await reconcilePendingConsumableGrants())).toHaveLength(1);
+
+    await acknowledgeConsumableGrant(res.grantId!);
+    expect(await reconcilePendingConsumableGrants()).toEqual([]);
+    // Idempotent — a double-ack (e.g. retried apply path) never throws.
+    await expect(acknowledgeConsumableGrant(res.grantId!)).resolves.toBeUndefined();
+  });
+
+  it('dedupes by store transaction id — a replayed transaction never double-enters the ledger', async () => {
+    setBillingProvider(successProvider('GPA.5555-6666'));
+    await purchaseConsumable(PRODUCT_IDS.HINTS_SMALL);
+    await purchaseConsumable(PRODUCT_IDS.HINTS_SMALL); // same store transaction replayed
+    const pending = await reconcilePendingConsumableGrants();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].grantId).toBe('GPA.5555-6666');
+  });
+
+  it('falls back to locally-unique grant ids when the provider reports no transaction id', async () => {
+    setBillingProvider(successProvider()); // no transactionId in the result
+    const a = await purchaseConsumable(PRODUCT_IDS.HINTS_SMALL);
+    const b = await purchaseConsumable(PRODUCT_IDS.HINTS_SMALL);
+    expect(a.grantId).toBeTruthy();
+    expect(b.grantId).toBeTruthy();
+    expect(a.grantId).not.toBe(b.grantId); // two real purchases → two ledger entries
+    expect(await reconcilePendingConsumableGrants()).toHaveLength(2);
+  });
+
+  it('ledgers the ALREADY-DOUBLED first-purchase amber amount, so a crash replay grants exactly what was paid for', async () => {
+    setBillingProvider(successProvider('GPA.7777-8888'));
+    const res = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL); // first amber pack ever
+    expect(res.firstPurchaseDoubled).toBe(true);
+
+    const pending = await reconcilePendingConsumableGrants();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].reward).toEqual({
+      kind: 'amber',
+      amount: AMBER_PACK_GRANTS.small * FIRST_PURCHASE_AMBER_MULTIPLIER,
+    });
+    expect(pending[0].firstPurchaseDoubled).toBe(true);
+  });
+
+  it('persists the first-purchase grant BEFORE consuming the one-time 2x flag (no paid-nothing window)', async () => {
+    // The first-amber-pack flag must never be spent unless the doubled grant is
+    // already on the replay ledger. Ordering guarantee: after a successful first
+    // purchase, the ledger carries the doubled grant AND the flag is set — a
+    // crash between the two could only ever replay the grant (never lose it).
+    setBillingProvider(successProvider('GPA.order-1'));
+    expect(hasMadeAmberPurchaseSync()).toBe(false);
+    const res = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    expect(res.firstPurchaseDoubled).toBe(true);
+    // Grant is on the ledger (survives a kill)...
+    expect(await reconcilePendingConsumableGrants()).toHaveLength(1);
+    // ...and only then is the one-time flag consumed.
+    await loadEntitlements();
+    expect(hasMadeAmberPurchaseSync()).toBe(true);
+    // A second amber pack no longer doubles.
+    const res2 = await purchaseConsumable(PRODUCT_IDS.AMBER_MEDIUM);
+    expect(res2.firstPurchaseDoubled).toBeUndefined();
+  });
+
+  it('a failed/cancelled purchase writes nothing to the ledger', async () => {
+    setBillingProvider({
+      ...successProvider(),
+      purchase: async (productId): Promise<PurchaseResult> => ({
+        success: false,
+        productId,
+        cancelled: true,
+      }),
+    });
+    const res = await purchaseConsumable(PRODUCT_IDS.AMBER_MEDIUM);
+    expect(res.success).toBe(false);
+    expect(res.grantId).toBeUndefined();
+    expect(await reconcilePendingConsumableGrants()).toEqual([]);
+  });
+});
+
+// ===========================================================================
 // ads — pure policy
 // ===========================================================================
 
@@ -281,6 +407,17 @@ describe('ads policy', () => {
     expect(shouldShowInterstitial({ ...base, phase: 3 as any, puzzlesSolved: 2 * lateFreq - 1, lastInterstitialPuzzle: 0 })).toBe(false);
     // At 2x → allowed.
     expect(shouldShowInterstitial({ ...base, phase: 3 as any, puzzlesSolved: 2 * lateFreq, lastInterstitialPuzzle: 0 })).toBe(true);
+  });
+
+  it('allows daily-challenge interstitials only at the bright phases (0-2)', () => {
+    // Monetize the daily's reliable session while the world is still candy;
+    // Phase 3+ stays exempt to protect the dread arc and ceremonies.
+    expect(isDailyInterstitialAllowed(0)).toBe(true);
+    expect(isDailyInterstitialAllowed(1)).toBe(true);
+    expect(isDailyInterstitialAllowed(2)).toBe(true);
+    expect(isDailyInterstitialAllowed(3)).toBe(false);
+    expect(isDailyInterstitialAllowed(4)).toBe(false);
+    expect(isDailyInterstitialAllowed(5)).toBe(false);
   });
 });
 

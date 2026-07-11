@@ -30,7 +30,9 @@ import {
 } from '../../services/phaseNarrative';
 import { DialoguePhase } from '../../types/homeWorld';
 import { VARIANT_CONFIGS } from '../../services/puzzleVariety';
-import { AMBER_REWARDS } from '../../constants/gameBalance';
+import { AMBER_REWARDS, AUTO_COLLECT_PUZZLE_LIMIT } from '../../constants/gameBalance';
+import { isRoutineVictory } from '../../hooks/useVictoryFlow';
+import type { AmberBreakdown } from '../../hooks/useGamePersistence';
 import { hapticSuccess } from '../../services/haptics';
 import { isDailyShareBonusAvailable, DAILY_SHARE_BONUS_AMBER } from '../../services/shareResults';
 import { getSettingsSync } from '../../services/settings';
@@ -76,6 +78,14 @@ export interface VictoryData {
   flawless?: boolean;
   /** Lifetime count of flawless offerings (for the honorific milestone copy) */
   flawlessCount?: number;
+  /** Real amber itemization from the economy (display falls back to local math when absent) */
+  amberBreakdown?: AmberBreakdown;
+  /** True when this victory was the Daily Challenge (never compact) */
+  isDaily?: boolean;
+  /** Phase transition queued for the pit ceremony (never compact) */
+  phaseTransitionPending?: boolean;
+  /** Monotonic real-puzzle count — early wins keep the full ceremony */
+  puzzlesSolved?: number;
 }
 
 interface VictoryModalProps {
@@ -94,6 +104,11 @@ interface VictoryModalProps {
   dailyTrend?: 'up' | 'down' | 'flat' | null;
   /** Quiet, spoiler-safe aggregate social-proof line (null = none / backend off) */
   socialProofLine?: string | null;
+  /** Full-moon event bonus line for daily completions on event days. */
+  eventBonusLine?: string | null;
+  /** App-level override: a queued cinematic (final puzzle / post-revelation)
+   *  must always get the full ceremony, never the compact strip. */
+  forceFullCeremony?: boolean;
   /** App-level gate for the optional rewarded "double the reward" affordance */
   rewardedDoubleEnabled?: boolean;
   /** True once the player has doubled this victory's reward */
@@ -182,6 +197,8 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   dailyHistoryLine,
   dailyTrend,
   socialProofLine,
+  eventBonusLine,
+  forceFullCeremony,
   rewardedDoubleEnabled,
   rewardedDoubleClaimed,
   onRewardedDouble,
@@ -213,6 +230,20 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   // a pit visit: the pit CTA becomes the only action (Next Level/Home/Share hide).
   const mandatoryHarvest = !!victoryData?.mandatoryHarvest;
   const mustVisitPit = !!phaseTransitionPending || mandatoryHarvest;
+
+  // Swift Victories: a ROUTINE win renders the compact result strip (instant,
+  // condensed) instead of the full ceremony. isRoutineVictory is the shared
+  // policy (also drives the instant animation path in useVictoryFlow); the
+  // extra guards here cover surfaces only the modal knows about (onboarding's
+  // single-button layout, the completion coda, the daily/pit props).
+  const compactMode =
+    getSettingsSync().swiftVictories === true &&
+    !isOnboarding &&
+    !isPlayingDaily &&
+    !mustVisitPit &&
+    !completionCoda &&
+    !forceFullCeremony &&
+    isRoutineVictory(victoryData);
 
   // Ritual echo chain + de-duplicated feedback register: the performance
   // feedback line and the ritual-echo footer occupy the same emotional slot,
@@ -255,8 +286,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   useEffect(() => {
     if (visible) {
       hapticSuccess();
-      if (getSettingsSync().reducedMotion) {
-        // Reveal all cascade groups instantly — skip the stagger
+      if (compactMode || getSettingsSync().reducedMotion) {
+        // Reveal all cascade groups instantly — skip the stagger. The compact
+        // strip has no entrance choreography at all (and renders no skip
+        // layer), so it must never leave entranceComplete false.
         contentOpacity1.setValue(1);
         contentOpacity2.setValue(1);
         contentOpacity3.setValue(1);
@@ -287,7 +320,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
       };
     }
     setEntranceComplete(false);
-  }, [visible]);
+  }, [visible, compactMode]);
 
   const handleSkipEntrance = useCallback(() => {
     cascadeAnimRef.current?.stop();
@@ -302,6 +335,195 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   }, [contentOpacity1, contentOpacity2, contentOpacity3, contentOpacity4, onSkip]);
 
   if (!visible) return null;
+
+  // ---------------------------------------------------------------------
+  // Compact result strip (Swift Victories, routine wins only): instant
+  // appearance, condensed content — title, stars, total amber (+ flawless
+  // marker) and the same Next Level / Share / Home actions. Phase-aware via
+  // the same theme accessors as the full modal; no entrance choreography and
+  // therefore no tap-to-skip layer.
+  // ---------------------------------------------------------------------
+  if (compactMode) {
+    const compactTotal = victoryData?.amberEarned ?? 0;
+    return (
+      <View style={[styles.modalOverlay, {
+        backgroundColor: phaseTheme.modalOverlayColor,
+      }]}>
+        <View style={styles.compactWrap}>
+          <View style={[styles.compactCard, {
+            backgroundColor: phaseTheme.modalBgColor,
+            borderColor: btn.modalBorder,
+          }]}>
+            <View
+              style={styles.compactStarsRow}
+              accessible
+              accessibilityLabel={`${earnedStars} of 3 stars`}
+            >
+              {[1, 2, 3].map(i => (
+                <Image
+                  key={i}
+                  source={earnedStars >= i ? STAR_FILLED : STAR_EMPTY}
+                  style={[styles.compactStarImage, earnedStars < i && styles.victoryStarEmpty]}
+                />
+              ))}
+            </View>
+            <Text style={[styles.compactTitle, { color: phaseTheme.victoryTitleColor }]}>
+              {getVictoryTitle(earnedStars, phase)}
+            </Text>
+            {victoryData?.flawless && (
+              <Text
+                style={[styles.compactFlawless, { color: phaseTheme.victoryTitleColor }]}
+                accessibilityLabel={getFlawlessHonorific(phase)}
+              >
+                {getFlawlessHonorific(phase)}
+              </Text>
+            )}
+            <View
+              style={styles.compactAmberRow}
+              accessible
+              accessibilityLabel={
+                victoryData?.autoCollected
+                  ? `${compactTotal} amber earned`
+                  : `${compactTotal} amber gathered for the pit`
+              }
+            >
+              <Image source={AMBER_ICON} style={styles.amberIconLarge} />
+              <Text style={[styles.compactAmberText, { color: phaseTheme.modalTextColor }]}>
+                +{compactTotal}
+              </Text>
+            </View>
+            {!!eventBonusLine && (
+              <Text style={[styles.compactFlawless, { color: phaseTheme.modalSecondaryTextColor }]}>
+                {eventBonusLine}
+              </Text>
+            )}
+            {/* The amber is QUEUED in a harvest batch, not credited — the strip
+                must keep the pit affordance (and the 2x opt-in) or routine wins
+                lose their only in-victory collection path. */}
+            {rewardedDoubleEnabled && !isOnboarding && onRewardedDouble && (
+              rewardedDoubleClaimed ? (
+                <Text style={[styles.rewardedDoubleConfirm, { color: phaseTheme.modalSecondaryTextColor }]}>
+                  {'✓ '}{getRewardedDoubleConfirm(phase as DialoguePhase)}
+                </Text>
+              ) : isAdFreeSync() ? (
+                <TouchableOpacity
+                  style={[styles.freeDoubleButton, phase >= 3 ? styles.freeDoubleButtonDark : styles.freeDoubleButtonLight]}
+                  onPress={onRewardedDouble}
+                  accessibilityRole="button"
+                  accessibilityLabel={getRewardedDoubleLabel(phase as DialoguePhase)}
+                >
+                  <Text style={[styles.freeDoubleText, phase >= 3 ? styles.freeDoubleTextDark : styles.freeDoubleTextLight]}>
+                    {'✦ '}{getRewardedDoubleLabel(phase as DialoguePhase)}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <RewardedAdButton
+                  placement="victory_double"
+                  phase={phase}
+                  label={getRewardedDoubleLabel(phase as DialoguePhase)}
+                  onReward={onRewardedDouble}
+                  style={styles.rewardedDoubleButton}
+                />
+              )
+            )}
+            {!victoryData?.autoCollected && (
+              <TouchableOpacity
+                onPress={onGoToPit}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Collect amber in the pit"
+                accessibilityRole="button"
+                style={[styles.collectNowPill, {
+                  backgroundColor: btn.harvestPill.bg,
+                  borderColor: btn.harvestPill.border,
+                }]}
+              >
+                <Text style={[styles.collectNowText, { color: btn.harvestPill.text }]}>
+                  {`${'🌾'} Collect Now  ›`}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={onNextLevel}
+              activeOpacity={0.85}
+              accessibilityLabel="Next level"
+              accessibilityRole="button"
+              style={{ width: '100%' }}
+            >
+              <View style={[styles.btn3dWrapper, { width: '100%' }]}>
+                <View style={[styles.btn3dBody, {
+                  backgroundColor: btn.primary.bg,
+                  shadowColor: btn.primary.shadow,
+                  width: '100%',
+                }]}>
+                  <View style={styles.btn3dBevel} />
+                  <View style={styles.btn3dGlossy} />
+                  <Text style={styles.btn3dPrimaryText}>NEXT LEVEL</Text>
+                </View>
+                <View style={[styles.btn3dEdge, {
+                  backgroundColor: btn.primary.edge,
+                }]} />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.victoryButtonRowSecondary}>
+              <TouchableOpacity
+                onPress={onShare}
+                activeOpacity={0.8}
+                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+                accessibilityLabel={shareBonusAvailable
+                  ? `Share result, earns ${DAILY_SHARE_BONUS_AMBER} amber for the first share today`
+                  : 'Share result'}
+                accessibilityRole="button"
+                style={{ flex: 1 }}
+              >
+                <View style={[styles.btnFlat, {
+                  backgroundColor: btn.share.bg,
+                  borderColor: btn.share.edge,
+                }]}>
+                  <View style={styles.shareBtnRow}>
+                    <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
+                      {'\uD83D\uDCE4'} Share
+                    </Text>
+                    {shareBonusAvailable && (
+                      <>
+                        <Image
+                          source={AMBER_ICON}
+                          style={styles.shareBonusIcon}
+                          importantForAccessibility="no"
+                          accessibilityElementsHidden
+                        />
+                        <Text numberOfLines={1} style={[styles.btnFlatUniform, { color: btn.share.text }]}>
+                          {`+${DAILY_SHARE_BONUS_AMBER}`}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={onReturnHome}
+                activeOpacity={0.8}
+                hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+                accessibilityLabel="Return home"
+                accessibilityRole="button"
+                style={{ flex: 1 }}
+              >
+                <View style={[styles.btnFlat, {
+                  backgroundColor: btn.secondary.bg,
+                  borderColor: btn.secondary.edge,
+                }]}>
+                  <Text style={[styles.btnFlatUniform, { color: btn.secondary.text }]}>{'\uD83C\uDFE0'} Home</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.modalOverlay, {
@@ -602,17 +824,39 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 {socialProofLine}
               </Text>
             )}
+
+            {/* Full-moon event bonus (daily completions on event days) — shown
+                here because the puzzle toast renders UNDER this overlay. */}
+            {!!eventBonusLine && (
+              <Text
+                style={[styles.socialProofLine, { color: phaseTheme.modalSecondaryTextColor }]}
+                accessibilityLabel={eventBonusLine}
+              >
+                {eventBonusLine}
+              </Text>
+            )}
             </Animated.View>
 
             {/* Group 3: Amber breakdown + Collect Now */}
             <Animated.View style={{ opacity: contentOpacity3, width: '100%' }}>
             {victoryData && (() => {
-              const baseAmber = AMBER_REWARDS[difficulty as keyof typeof AMBER_REWARDS] || 0;
-              const starBonus = earnedStars >= 3
+              // Prefer the REAL itemization from the economy (amberBreakdown,
+              // threaded through recordVictory) — the local AMBER_REWARDS +
+              // hardcoded 0.5/0.25 math survives ONLY as a fallback for
+              // victories recorded without a breakdown (guard/error paths,
+              // legacy autosave-restored data).
+              const breakdown = victoryData.amberBreakdown;
+              const baseAmber = breakdown
+                ? breakdown.base
+                : (AMBER_REWARDS[difficulty as keyof typeof AMBER_REWARDS] || 0);
+              const starBonus = breakdown
+                ? breakdown.starBonus
+                : earnedStars >= 3
                 ? Math.floor(baseAmber * 0.5)
                 : earnedStars === 2
                 ? Math.floor(baseAmber * 0.25)
                 : 0;
+              const patronBonusAmber = breakdown?.patronBonus ?? 0;
               const challengeBonusAmber = victoryData.challengeBonus ?? 0;
               const surpriseBonusAmber = victoryData.surpriseBonus ?? 0;
               const variantBonusAmber = victoryData.variantBonus ?? 0;
@@ -676,6 +920,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                               {'✨'} Lucky Find
                             </Text>
                             <Text style={[styles.bonusValue, { color: accent.gold }]}>+{surpriseBonusAmber}</Text>
+                          </View>
+                        )}
+                        {patronBonusAmber > 0 && (
+                          <View style={styles.bonusRow}>
+                            <Text style={[styles.bonusLabel, { color: phaseTheme.modalSecondaryTextColor }]}>
+                              {'✦'} Patron
+                            </Text>
+                            <Text style={[styles.bonusValue, { color: accent.gold }]}>+{patronBonusAmber}</Text>
                           </View>
                         )}
                         {variantBonusAmber > 0 && variant && variant !== 'standard' && (
@@ -758,7 +1010,10 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                         own (in-world, never a "tutorial" voice). */}
                     {victoryData.autoCollected && (
                       <Text style={[styles.autoCollectCaption, { color: phaseTheme.modalSecondaryTextColor }]}>
-                        {getAutoCollectCaption(phase as DialoguePhase)}
+                        {getAutoCollectCaption(
+                          phase as DialoguePhase,
+                          (victoryData.puzzlesSolved ?? 0) >= AUTO_COLLECT_PUZZLE_LIMIT,
+                        )}
                       </Text>
                     )}
                     {/* Optional "double the reward". Ad-free players (Patron /
@@ -989,6 +1244,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 48,
+  },
+
+  // === Compact result strip (Swift Victories, routine wins) ===
+  compactWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  compactCard: {
+    borderRadius: 24,
+    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 18,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1.5,
+    shadowColor: CandyColors.purple.dark,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 14,
+    overflow: 'hidden',
+  },
+  compactStarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  compactStarImage: {
+    width: 34,
+    height: 34,
+    marginHorizontal: 3,
+  },
+  compactTitle: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 26,
+    fontWeight: '900',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  compactFlawless: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  compactAmberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  compactAmberText: {
+    fontFamily: PIXEL_FONT_BOLD,
+    fontSize: 22,
+    fontWeight: '900',
   },
   victoryModal: {
     backgroundColor: CandyColors.white,

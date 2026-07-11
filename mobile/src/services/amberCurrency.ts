@@ -25,6 +25,7 @@ import {
   SURPRISE_BONUS_MIN_PUZZLES,
   NEW_CYCLE_ACCELERATION_PER_CYCLE,
   NEW_CYCLE_ACCELERATION_MAX,
+  STREAK_FREEZE_CAP,
 } from '../constants/gameBalance';
 import { isPatronSync } from './entitlements';
 
@@ -43,6 +44,9 @@ const MANDATORY_HARVEST_SEEN_KEY = 'wordshift_mandatory_harvest_seen';
 const SETUP_SELECTOR_INTRO_SEEN_KEY = 'wordshift_setup_selector_intro_seen';
 const JOURNAL_INTRO_SEEN_KEY = 'wordshift_journal_intro_seen';
 const STARTER_INTRO_SEEN_KEY = 'wordshift_starter_intro_seen';
+// The guaranteed, prominent first-FREE-victory glitch (opening promise); fired
+// once on the first non-onboarding win, cleared by Reset All so it replays.
+const FIRST_WIN_GLITCH_KEY = 'wordshift_first_win_glitch';
 const GATED_UNLOCK_INTRO_SEEN_KEY = 'wordshift_gated_unlock_intro_seen';
 const HARVEST_HOME_INTRO_SEEN_KEY = 'wordshift_harvest_home_intro_seen';
 
@@ -127,8 +131,9 @@ export function setSurpriseRng(rng?: () => number): void {
 }
 
 /**
- * Variable-ratio surprise bonus for a normal win. Returns 0 unless the player is
- * past the onboarding window and the injectable RNG lands within
+ * Variable-ratio surprise bonus, applied to EVERY win (standard, challenge, and
+ * daily alike — awardPuzzleAmber calls this unconditionally). Returns 0 unless
+ * the player is past the onboarding window and the injectable RNG lands within
  * SURPRISE_BONUS_CHANCE. Additive to the amber REWARD only — never phase progress.
  */
 function computeSurpriseBonus(difficulty: Difficulty, puzzlesSolved: number): number {
@@ -233,10 +238,13 @@ const FREE_FREEZE_INTERVAL_DAYS = 14;
 
 /**
  * Purchase a streak freeze using amber.
- * Returns true if purchased successfully, false if insufficient amber.
+ * Returns true if purchased successfully, false if insufficient amber
+ * or the player is already holding STREAK_FREEZE_CAP freezes.
  */
 export async function purchaseStreakFreeze(): Promise<boolean> {
   const progress = await loadProgress();
+  // Freezes are capped — an uncapped stack would make streaks unbreakable.
+  if ((progress.streakFreezes ?? 0) >= STREAK_FREEZE_CAP) return false;
   if (progress.amber < STREAK_FREEZE_COST) return false;
 
   progress.amber -= STREAK_FREEZE_COST;
@@ -262,12 +270,17 @@ export async function getStreakFreezeCount(): Promise<number> {
 
 /**
  * Check and grant a free streak freeze every 14 days.
- * Called on app launch.
+ * Called on app launch. Never grants past STREAK_FREEZE_CAP — while the player
+ * is at the cap the grant simply waits (the last-grant date is NOT advanced),
+ * so the free freeze arrives as soon as one is consumed.
  */
 export async function checkFreeStreakFreeze(): Promise<boolean> {
   const progress = await loadProgress();
   const today = getTodayDateString();
   const lastFree = progress.lastFreeStreakFreezeDate;
+
+  // At the cap: no grant, and no date bump — re-check next launch.
+  if ((progress.streakFreezes ?? 0) >= STREAK_FREEZE_CAP) return false;
 
   if (!lastFree) {
     // First time — grant one free freeze
@@ -402,16 +415,27 @@ export function calculatePhaseAcceleration(
  * (streak, phase progression, milestones, stats) still execute normally.
  * The caller is responsible for crediting later (e.g. via awardBonusAmber
  * when the player offers words in the pit).
+ *
+ * When `options.skipPhaseProgress` is true, ALL normal amber math still runs
+ * but the win accrues ZERO weighted phaseProgress — used for boards outside
+ * the sanctioned pacing curve (e.g. shared-challenge-link wins, where
+ * self-crafted trivial chains must never feed the narrative descent).
+ * Amber-only, exactly like the Patron/surprise bonuses' hard rule.
  */
 export async function awardPuzzleAmber(
   difficulty: Difficulty,
   starsEarned: number,
   gameMode: GameMode = 'standard',
   threeStarRate: number = 0,
-  creditToBalance: boolean = false
+  creditToBalance: boolean = false,
+  options: { skipPhaseProgress?: boolean } = {}
 ): Promise<{
   amount: number;
   baseAmount: number;
+  /** Pure difficulty base (AMBER_REWARDS[difficulty]) before the star bonus. */
+  baseAmber: number;
+  /** Star-rating increment folded into baseAmount (baseAmber + starBonusAmber = baseAmount). */
+  starBonusAmber: number;
   streakBonus: number;
   challengeBonus: number;
   patronBonus: number;
@@ -442,7 +466,8 @@ export async function awardPuzzleAmber(
   streakFreezeJustConsumed = false;
 
   // Base reward by difficulty
-  let baseAmount = AMBER_REWARDS[difficulty];
+  const baseAmber = AMBER_REWARDS[difficulty];
+  let baseAmount = baseAmber;
 
   // Star bonuses
   if (starsEarned === 3) {
@@ -452,6 +477,8 @@ export async function awardPuzzleAmber(
     // 2 stars: +25%
     baseAmount = Math.floor(baseAmount * 1.25);
   }
+  // Itemized star increment (kept separate so display never re-derives the math)
+  const starBonusAmber = baseAmount - baseAmber;
 
   // Apply streak bonus
   const streakMultiplier = calculateStreakMultiplier(currentStreak);
@@ -477,9 +504,10 @@ export async function awardPuzzleAmber(
     totalAmount += patronBonus;
   }
 
-  // Variable-ratio surprise bonus (normal wins only, post-onboarding). Additive
-  // to the REWARD only; uses the already-incremented puzzle count for the
-  // onboarding suppression check. NEVER touches phase progression.
+  // Variable-ratio surprise bonus (every win past the onboarding window —
+  // standard, challenge, and daily alike). Additive to the REWARD only; uses
+  // the pre-increment puzzle count for the onboarding suppression check.
+  // NEVER touches phase progression.
   const surpriseBonus = computeSurpriseBonus(difficulty, progress.puzzlesSolved);
   totalAmount += surpriseBonus;
 
@@ -494,7 +522,11 @@ export async function awardPuzzleAmber(
     threeStarRate, currentStreak, difficulty, gameMode
   );
   // New Cycle: each completed descent makes the next one faster (dread earlier).
-  const phaseProgressIncrement = phaseAcceleration * getCycleAcceleration(progress.cycleCount ?? 0);
+  // skipPhaseProgress: amber math above is untouched, but the win contributes
+  // NOTHING to the weighted descent (phaseProgress stays exactly where it was).
+  const phaseProgressIncrement = options.skipPhaseProgress === true
+    ? 0
+    : phaseAcceleration * getCycleAcceleration(progress.cycleCount ?? 0);
   // Initialize phaseProgress from puzzlesSolved for migrated players missing the field
   if (progress.phaseProgress === undefined || progress.phaseProgress === null) {
     progress.phaseProgress = progress.puzzlesSolved - 1; // -1 because we already incremented puzzlesSolved above
@@ -626,6 +658,8 @@ export async function awardPuzzleAmber(
   return {
     amount: totalAmount,
     baseAmount,
+    baseAmber,
+    starBonusAmber,
     streakBonus,
     challengeBonus,
     patronBonus,
@@ -841,6 +875,25 @@ export async function getCurrentPhase(): Promise<DialoguePhase> {
 }
 
 /**
+ * Log a `phase_reached` telemetry event with the player's install age, via the
+ * standard logEvent pathway. Guarded lazy require: logging must never block or
+ * break a phase transition, and test doubles of eventLogger may predate the
+ * getInstallAgeDays export (optional-chained for that reason).
+ */
+async function logPhaseReached(phase: DialoguePhase, puzzlesSolved: number): Promise<void> {
+  try {
+    const eventLogger = require('./eventLogger') as typeof import('./eventLogger');
+    const installAgeDays = (await eventLogger.getInstallAgeDays?.()) ?? -1;
+    eventLogger.logEvent?.({
+      type: 'phase_reached',
+      data: { phase, puzzlesSolved, installAgeDays },
+    });
+  } catch {
+    // Telemetry is non-critical.
+  }
+}
+
+/**
  * Confirm a pending phase transition (called from the pit screen).
  * Bumps currentPhase to the pending value and clears the pending flag.
  * Returns the new phase and previous phase, or null if no pending transition.
@@ -864,6 +917,10 @@ export async function confirmPhaseTransition(): Promise<{
 
   // Reset pit nudge so the next pending transition can show a new one
   await AsyncStorage.removeItem(PIT_NUDGE_SEEN_KEY).catch(() => {});
+
+  // Funnel telemetry: how deep (puzzles) and how old (days) players are when
+  // each phase actually lands.
+  await logPhaseReached(pending, progress.puzzlesSolved);
 
   return { newPhase: pending, previousPhase };
 }
@@ -1006,6 +1063,7 @@ export async function clearProgress(): Promise<void> {
     await AsyncStorage.removeItem(SETUP_SELECTOR_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(JOURNAL_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(STARTER_INTRO_SEEN_KEY);
+    await AsyncStorage.removeItem(FIRST_WIN_GLITCH_KEY);
     await AsyncStorage.removeItem(GATED_UNLOCK_INTRO_SEEN_KEY);
     await AsyncStorage.removeItem(HARVEST_HOME_INTRO_SEEN_KEY);
     for (let i = 1; i <= 4; i++) {
@@ -1441,6 +1499,9 @@ export async function markPostRevelation(): Promise<void> {
   progress.pendingPhaseTransition = null;
   progressCache = progress;
   await saveProgress();
+
+  // Phase 5 arrives via this pin (never confirmPhaseTransition) — log it here.
+  await logPhaseReached(progress.currentPhase, progress.puzzlesSolved);
 }
 
 /**
@@ -1692,6 +1753,22 @@ export async function markStarterIntroSeen(): Promise<void> {
   }
 }
 
+export async function hasSeenFirstWinGlitch(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(FIRST_WIN_GLITCH_KEY)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function markFirstWinGlitchSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(FIRST_WIN_GLITCH_KEY, 'true');
+  } catch {
+    // Non-critical
+  }
+}
+
 /**
  * Track whether Fox's one-time post-tutorial "play more" nudge has appeared.
  */
@@ -1852,13 +1929,29 @@ export async function markJournalIntroSeen(): Promise<void> {
 }
 
 /**
+ * Deferred-amber credit sources: amber that was ALREADY counted into
+ * totalAmberEarned at victory time (awardPuzzleAmber / applyVariantAmberBonus
+ * increment the lifetime counter even with creditToBalance=false) and is only
+ * being released to the spendable balance now — the pit tap-to-devour /
+ * Offer All path ('word_offering') and the early-game auto-collect path
+ * ('auto_word_offering'). Re-incrementing totalAmberEarned here would count
+ * the same amber twice and unlock the amber-earned achievements (1,000/5,000)
+ * at roughly half the intended earnings.
+ */
+const DEFERRED_CREDIT_SOURCES = new Set(['word_offering', 'auto_word_offering']);
+
+/**
  * Award bonus amber from non-puzzle sources (e.g., daily streak milestones).
  * Credits amber, records a transaction, and returns the new balance.
+ * For DEFERRED_CREDIT_SOURCES the spendable balance is credited WITHOUT
+ * touching totalAmberEarned (already counted at victory time — see above).
  */
 export async function awardBonusAmber(amount: number, source: string): Promise<number> {
   const progress = await loadProgress();
   progress.amber += amount;
-  progress.totalAmberEarned += amount;
+  if (!DEFERRED_CREDIT_SOURCES.has(source)) {
+    progress.totalAmberEarned += amount;
+  }
   progressCache = progress;
   await saveProgress();
   await recordTransaction({

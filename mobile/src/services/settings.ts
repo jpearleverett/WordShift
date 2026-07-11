@@ -9,12 +9,20 @@ export interface GameSettings {
   soundEnabled: boolean;
   hapticsEnabled: boolean;
   reducedMotion: boolean;
+  /**
+   * Swift Victories: routine wins show a compact result strip instead of the
+   * full victory ceremony. Big moments (daily, milestones, phase beats, early
+   * game) always keep the full modal. Off by default; old saves without the
+   * key inherit false via the DEFAULT_SETTINGS spread in getSettings().
+   */
+  swiftVictories: boolean;
 }
 
 const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
   hapticsEnabled: true,
   reducedMotion: false,
+  swiftVictories: false,
 };
 
 // In-memory cache for fast access

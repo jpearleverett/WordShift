@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Difficulty } from '../types';
+import { Difficulty, PuzzleSolutionStep } from '../types';
 import { DAILY_CHALLENGE_UNLOCK_PUZZLES, FIRST_DAILY_BONUS_HINTS } from '../constants/gameBalance';
 import { generateLocalPuzzle } from './localGenerator';
 import { getLocalDateString, getLocalDateStringDaysAgo, daysAgoLocal, parseLocalDate } from './dateUtils';
@@ -52,6 +52,14 @@ export interface DailyChallengeProgress {
 
 // In-memory cache
 let progressCache: DailyChallengeProgress | null = null;
+
+/**
+ * Drop the in-memory cache after an external storage write (cloud restore) so
+ * the next read reflects the restored save instead of writing stale state back.
+ */
+export function invalidateDailyProgressCache(): void {
+  progressCache = null;
+}
 
 function getDefaultProgress(): DailyChallengeProgress {
   return {
@@ -171,16 +179,31 @@ function seededRandom(seed: string): () => number {
  * always count as HARD (recordVictory isDaily=true) so the anchor stays
  * generous regardless of the day's board size.
  */
-export function getDailyDifficulty(dateStr?: string): Difficulty {
-  return getDailyRamp(dateStr).difficulty;
+export function getDailyDifficulty(dateStr?: string, isFirstDaily = false): Difficulty {
+  return getDailyRamp(dateStr, isFirstDaily).difficulty;
 }
 
-/** Board shape for a given day: difficulty + word length + row count. */
-export function getDailyRamp(dateStr?: string): {
+/**
+ * Board shape for a given day: difficulty + word length + row count.
+ *
+ * When `isFirstDaily` is true (the player has never completed a daily), the
+ * board is eased to the gentle MEDIUM 4-letter/4-row shape regardless of
+ * weekday — a newcomer fresh off the 4-letter EASY tutorial should not be
+ * dropped onto a HARD 6-letter/5-row wall for their first competitive
+ * impression. Rewards still count as HARD (recordVictory isDaily=true), so the
+ * anchor stays generous. Because the eased board differs from the shared board
+ * everyone else gets that day, the caller MUST NOT submit its result to the
+ * shared leaderboard (see isFirstDailyEasing / DailyPuzzleData.eased). Everyone
+ * else stays on the DETERMINISTIC weekday ramp, so the leaderboard stays fair.
+ */
+export function getDailyRamp(dateStr?: string, isFirstDaily = false): {
   difficulty: Difficulty;
   wordLength: number;
   targetRows: number;
 } {
+  if (isFirstDaily) {
+    return { difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 };
+  }
   const day = parseLocalDate(dateStr ?? getTodayString()).getDay(); // 0=Sun..6=Sat
   switch (day) {
     case 1: return { difficulty: 'MEDIUM', wordLength: 4, targetRows: 4 };      // Mon — accessible
@@ -193,12 +216,27 @@ export function getDailyRamp(dateStr?: string): {
   }
 }
 
+/**
+ * Whether the given progress record is the player's FIRST-EVER daily (none
+ * completed yet). The first daily is eased to the gentle MEDIUM 4/4 board (see
+ * getDailyRamp `isFirstDaily`). The eased board differs from the shared
+ * deterministic board everyone else gets that day, so a caller starting the
+ * eased board MUST NOT submit its result to the shared leaderboard (it would be
+ * an unfair, non-comparable entry). App reads this at daily-start time to skip
+ * the leaderboard submission; generateDailyPuzzle also flags the board via
+ * DailyPuzzleData.eased.
+ */
+export function isFirstDailyEasing(progress: DailyChallengeProgress): boolean {
+  return progress.totalCompleted === 0;
+}
+
 // Deterministic daily host order — the animal "preparing today's offering".
 // Same for every player on a given date (seeded by the date string). App only
 // surfaces the host line if the player has actually met the animal, else Fox.
 const DAILY_HOST_ORDER = [
   'fox', 'pangolin', 'owl', 'axolotl', 'capybara',
   'fennec_fox', 'sloth', 'wombat', 'rabbit', 'red_panda',
+  'tarsier', 'aye_aye', 'kakapo',
 ] as const;
 
 // Canonical animal display names (kept local so dailyChallenge doesn't depend on
@@ -206,7 +244,8 @@ const DAILY_HOST_ORDER = [
 const DAILY_HOST_NAMES: Record<string, string> = {
   fox: 'Ember', pangolin: 'Panko', owl: 'Archimedes', axolotl: 'Axel',
   capybara: 'Chill', fennec_fox: 'Fennick', sloth: 'Sloane', wombat: 'Warren',
-  rabbit: 'Thyme', red_panda: 'Bamboo',
+  rabbit: 'Thyme', red_panda: 'Bamboo', tarsier: 'Vesper', aye_aye: 'Tock',
+  kakapo: 'Moss',
 };
 
 /**
@@ -266,9 +305,24 @@ export async function isDailyCompleted(): Promise<boolean> {
 export interface DailyPuzzleData {
   words: string[];
   hint?: string;
+  /**
+   * The generator's solution steps, threaded through so daily hints use the
+   * stored solution (via startDailyGame's optional solution param) instead of
+   * the blind live search. Deterministic like the rest of the daily.
+   */
+  solution?: PuzzleSolutionStep[];
   difficulty: Difficulty;
   date: string;
   wordLength: number;
+  /**
+   * True when this board was eased to the gentle MEDIUM 4/4 shape because it is
+   * the player's FIRST-EVER daily (see getDailyRamp / isFirstDailyEasing). The
+   * eased board differs from the shared deterministic board everyone else gets
+   * that day, so the caller MUST NOT submit its result to the shared
+   * leaderboard. Rewards are unaffected (recordVictory isDaily=true still pays
+   * HARD).
+   */
+  eased?: boolean;
 }
 
 // Guard against concurrent daily puzzle generation
@@ -300,7 +354,13 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
   }
 
   const generationPromise = (async () => {
-    const ramp = getDailyRamp(today);
+    // A player's very first daily is eased to the gentle MEDIUM 4/4 board (see
+    // getDailyRamp). The seed is unchanged, so the eased board is still
+    // deterministic for this player; it simply differs from the shared weekday
+    // board, so its result is not leaderboard-eligible (DailyPuzzleData.eased).
+    const progress = await loadDailyProgress();
+    const eased = isFirstDailyEasing(progress);
+    const ramp = getDailyRamp(today, eased);
     const difficulty = ramp.difficulty;
     const rng = seededRandom(`wordshift-daily-${today}`);
 
@@ -317,9 +377,11 @@ export async function generateDailyPuzzle(): Promise<DailyPuzzleData> {
       const result: DailyPuzzleData = {
         words: puzzle.words,
         hint: puzzle.hint,
+        solution: puzzle.solution,
         difficulty,
         date: today,
         wordLength: puzzle.wordLength ?? ramp.wordLength,
+        eased,
       };
       dailyPuzzleCache = result;
       return result;

@@ -14,7 +14,7 @@ const ONBOARDING_KEY = 'wordshift_onboarding_step';
  * 5. puzzle_complete → Victory shown, Fox congratulates
  * 6. going_to_pit    → Fox introduces word harvesting concept
  * 7. pit_intro       → Fox explains the Offering Pit on the pit screen
- * 8. pit_offering    → Auto-offer words, Fox reacts to amber earned
+ * 8. pit_offering    → Player taps each floating word to offer it; Fox reacts once all are offered
  * 9. returning_home  → Transitioning back to home screen
  * 10. unlock_explained → Fox explains amber & unlock system
  * 11. complete        → Player is free
@@ -102,16 +102,21 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Oh! Hello up there! I'm down here, by the little den.\nTap the invite and I'll come say hello properly!",
   ],
 
-  // Step 2: Fox just invited — intro dialogue
+  // Step 2: Fox just invited — intro dialogue. Warm on the surface, with ONE
+  // faint wrong-note (the "someone like you... for the longest time" seed):
+  // adorable eagerness on a first read, quietly ominous once the descent lands.
+  // Per the narrative vision's Early Darkness Seeds — the trap is set in warmth.
   fox_invited: [
     "You let me in! Oh, I hoped you would. I have been practicing my hello all morning.\nI'm Ember!",
     "Here is the wonderful part: every puzzle you solve makes this house a little more real. I don't entirely know how that works, only that it does, and that it is my favorite thing.",
-    "Come on, one quick puzzle together, then we build.",
+    "Come on, one quick puzzle together, then we build. I have been hoping for someone like you for the longest time.",
   ],
 
-  // Step 3: On puzzle screen — guide through the puzzle
+  // Step 3: On puzzle screen — guide through the puzzle. This intro beat is the
+  // move mechanic's first mention, so it also names BOTH input paths: many
+  // players reach for drag first and the old tutorial only ever taught tap.
   puzzle_tutorial_intro: [
-    "See these rows? We'll move one letter from here into the row below.",
+    "See these rows? We'll move one letter from here into the row below.\nYou can tap a letter and tap where it goes, or just drag it down. Whatever feels good.",
   ],
   puzzle_tutorial_pick: [
     "See that glowing letter? Give it a tap!",
@@ -119,8 +124,12 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   puzzle_tutorial_drop: [
     "Beautiful! Now tuck it into the glowing spot below.",
   ],
+  // Between-moves reinforcement (App.tsx renders index 0 after the first
+  // guided move). This is also where Fox teaches the core rule: BOTH resulting
+  // words must stay valid, and the green check / red cross ghost previews show
+  // which drops keep them that way.
   puzzle_tutorial_valid_move: [
-    "There it is, that little click when a word falls into place.\nMade a wrong move? Tap undo, no harm done. Stuck? Tap hint.\nKeep going, all the way down.",
+    "There's that little click, it landed! A green check means both words stay real. A red cross means one would break.\nWrong move? Tap undo. Stuck? Tap hint.",
   ],
   puzzle_tutorial_invalid: [
     "Hmm, that didn't land quite right.\nTry undoing and picking a different spot.",
@@ -157,14 +166,13 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   ],
 
   // Step 8: Back on home screen — explain unlocks and keep playing (kept to
-  // four short beats so the text-dense tail right after the first-win dopamine
-  // hit doesn't drag). The third beat points at the pit entrance below the
-  // house — the in-world path is the only way back to the pit, so the player
+  // three short beats so the text-dense tail right after the first-win dopamine
+  // hit doesn't drag). The second beat points at the pit entrance below the
+  // house: the in-world path is the only way back to the pit, so the player
   // must hear where it lives before onboarding lets go of their hand.
   unlock_explained: [
-    "And that's the whole happy loop of it!\nSolve puzzles, offer your words, and the amber comes home with us.",
-    "Amber builds rooms, and rooms let us invite more friends in.",
+    "That's the whole happy loop! Solve puzzles, offer your words, and the amber comes home to build our rooms and invite more friends.",
     "When you have words to offer, the pit waits just below the house.\nScroll down and give it a tap.",
-    "Come back each day, and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
+    "Come back each day, and we'll fill this house together. They need you.",
   ],
 };

@@ -40,7 +40,7 @@ describe('Play Store capture bootstrap isolation', () => {
 
     const seedIndex = bootstrap.indexOf('await preparePlayStoreCapture();');
     const cloudRestoreIndex = bootstrap.indexOf(
-      'await maybeAutoRestoreOnFreshInstall();'
+      'const restorePromise = maybeAutoRestoreOnFreshInstall();'
     );
     const migrationIndex = bootstrap.indexOf('await runMigrations();');
     expect(seedIndex).toBeGreaterThan(-1);
@@ -53,10 +53,16 @@ describe('Play Store capture bootstrap isolation', () => {
       /if \(!captureActive\) \{\s*logEvent\(\{ type: 'app_open' \}\);\s*\}/
     );
     expect(bootstrap).toMatch(
-      /if \(captureActive\) \{\s*await preparePlayStoreCapture\(\);\s*\} else \{\s*installCloudProviderIfConfigured\(\);\s*await maybeAutoRestoreOnFreshInstall\(\);\s*\}/
+      /if \(captureActive\) \{\s*await preparePlayStoreCapture\(\);\s*\} else \{[\s\S]*installCloudProviderIfConfigured\(\);[\s\S]*const restorePromise = maybeAutoRestoreOnFreshInstall\(\);/
     );
     expect(bootstrap).toMatch(
       /if \(!captureActive\) \{[\s\S]*setBillingProvider\(createRevenueCatBillingProvider\(\)\);[\s\S]*setAdProvider\(createAdMobAdProvider\(\)\);[\s\S]*void initIAP\(\)\.catch[\s\S]*void initAds\(\)\.catch/
+    );
+    expect(bootstrap).toMatch(
+      /if \(!captureActive\) \{\s*try \{\s*const pendingGrants = await reconcilePendingConsumableGrants\(\);/
+    );
+    expect(APP_TSX).toMatch(
+      /if \(!captureActive\) \{\s*uploadToCloud\(\)\.catch\(\(\) => \{\}\);\s*\}/
     );
   });
 
@@ -186,9 +192,46 @@ describe('reset-all wiring', () => {
     // Without this, the Expo Go / dev fallback (Updates.reloadAsync throws)
     // returned the player to a home screen still rendering the old save.
     expect(APP_TSX).toMatch(/onReset=\{handleResetComplete\}/);
-    // The rebuild refreshes persistence and restarts onboarding live.
-    expect(APP_TSX).toMatch(/advanceOnboarding\('home_empty'\)/);
+    // The shared rebuild refreshes persistence; Reset All restarts onboarding
+    // live while the creator-snapshot path keeps it complete.
+    expect(APP_TSX).toMatch(/restartOnboarding \? 'home_empty' : 'complete'/);
+    expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: true \}\)/);
+    expect(APP_TSX).toMatch(/rebuildSessionFromStorage\(\{ restartOnboarding: false \}\)/);
     expect(APP_TSX).toMatch(/puzzleActions\.clearBoard\(\)/);
+  });
+});
+
+describe('drag input without previews', () => {
+  test('drops resolve slot geometry from the live board when previews are suppressed', () => {
+    // Previews are suppressed in blind AND challenge modes; the drop handler
+    // must derive slot count from the board or every drag in those modes dies
+    // as a "miss" and only tap input works.
+    expect(APP_TSX).toMatch(/slotCount = previews\?\.length \?\? 0/);
+    expect(APP_TSX).toMatch(/targetRow\.words\.length \+ 1/);
+    // Near-miss snapping stays preview-gated (no free validity tell in blind).
+    expect(APP_TSX).toMatch(/previews && !previews\[estimated\]\?\.isValid/);
+  });
+});
+
+describe('proactive share prompt', () => {
+  test('share payload is snapshotted BEFORE the exit flow resets victoryData', () => {
+    // The prompt's Share CTA opens the modal from a pre-teardown snapshot; if
+    // the snapshot were read after startVictoryExitFlow (which nulls
+    // victoryData), the CTA would be a dead no-op.
+    expect(APP_TSX).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);\s*\n\s*const adShown = maybeShowVictoryInterstitial\(\);\s*\n\s*startVictoryExitFlow/);
+    expect(APP_TSX).toMatch(/onPress: \(\) => \{ hapticLight\(\); openShareModalRef\.current\(snapshot\); \}/);
+  });
+
+  test('victory-exit nudges are skipped when an interstitial showed (one nudge per exit)', () => {
+    expect(APP_TSX).toMatch(/runVictoryExitNudges = useCallback\(async \(interstitialShown: boolean\)/);
+    expect(APP_TSX).toMatch(/if \(interstitialShown\) return;/);
+    // Share prompt inherits the same anti-stacking guard the notification prompt has.
+    expect(APP_TSX).toMatch(/if \(postVictoryIntro \|\| queuedPostVictoryIntrosRef\.current\.length > 0\) return false;/);
+  });
+
+  test('the prominent opening glitch fires on the first FREE win, not the tutorial', () => {
+    expect(APP_TSX).toMatch(/firstFreeWin = !\(await hasSeenFirstWinGlitch\(\)\)/);
+    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*\}\);/);
   });
 });
 

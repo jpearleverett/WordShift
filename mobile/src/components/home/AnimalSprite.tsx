@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
   nameText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.white,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
   },
   moodDot: {
@@ -955,7 +955,7 @@ const styles = StyleSheet.create({
   },
   cooldownIndicator: {
     fontFamily: BODY_FONT,
-    fontSize: 8,
+    fontSize: 10,
     marginLeft: 2,
   },
   nameTagDark: {
@@ -977,7 +977,7 @@ const styles = StyleSheet.create({
   cooldownCountText: {
     fontFamily: PIXEL_FONT_BOLD,
     color: CandyColors.gray[300],
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: '600',
     textAlign: 'center',
   },

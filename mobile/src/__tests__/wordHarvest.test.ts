@@ -7,6 +7,9 @@ import {
   offerAllBatches,
   clearHarvestState,
   generateBatchId,
+  acknowledgeBatchCredit,
+  reconcilePendingCredits,
+  invalidateHarvestCache,
   HarvestBatch,
 } from '../services/wordHarvest';
 
@@ -375,6 +378,118 @@ describe('wordHarvest', () => {
         'wordshift_word_harvest',
         expect.any(String)
       );
+    });
+  });
+
+  // ===========================================================================
+  // Crash-safe pending-credit ledger
+  // ===========================================================================
+
+  describe('pending-credit ledger (crash-safe amber credit)', () => {
+    it('offerBatch moves the batch amber into the ledger in the SAME single write', async () => {
+      await enqueueHarvestBatch(makeBatch({ id: 'b1', amberValue: 12 }));
+      jest.clearAllMocks();
+
+      const result = await offerBatch('b1');
+      expect(result!.amberAwarded).toBe(12);
+      expect(result!.creditId).toBe('b1');
+
+      // Single-write atomicity: exactly one setItem carries BOTH the batch
+      // removal and the ledger entry — no kill window between them.
+      expect(AsyncStorage.setItem).toHaveBeenCalledTimes(1);
+      const [, payload] = (AsyncStorage.setItem as jest.Mock).mock.calls[0];
+      const written = JSON.parse(payload);
+      expect(written.pendingBatches).toHaveLength(0);
+      expect(written.pendingCredits).toEqual([
+        expect.objectContaining({ id: 'b1', amber: 12 }),
+      ]);
+    });
+
+    it('recovers a credit lost to a kill between offer and award, exactly once until acked', async () => {
+      await enqueueHarvestBatch(makeBatch({ id: 'b1', amberValue: 12 }));
+      await offerBatch('b1');
+      // Simulate the app dying before awardBonusAmber + ack ran: a relaunch
+      // reloads harvest state from storage.
+      invalidateHarvestCache();
+
+      const recovered = await reconcilePendingCredits();
+      expect(recovered).toEqual([expect.objectContaining({ id: 'b1', amber: 12 })]);
+
+      // Kept until acknowledged — reconcile is a read, not a one-shot pop.
+      expect(await reconcilePendingCredits()).toHaveLength(1);
+
+      // After the UI credits the amber and acknowledges, the ledger clears...
+      await acknowledgeBatchCredit('b1');
+      expect(await reconcilePendingCredits()).toEqual([]);
+
+      // ...and stays clear across another relaunch (no double credit, ever).
+      invalidateHarvestCache();
+      expect(await reconcilePendingCredits()).toEqual([]);
+    });
+
+    it('acknowledgeBatchCredit is idempotent and ignores unknown ids', async () => {
+      await enqueueHarvestBatch(makeBatch({ id: 'b1', amberValue: 5 }));
+      await offerBatch('b1');
+
+      await acknowledgeBatchCredit('b1');
+      await acknowledgeBatchCredit('b1'); // second ack: no-op
+      await acknowledgeBatchCredit('never_existed'); // unknown id: no-op
+
+      expect(await reconcilePendingCredits()).toEqual([]);
+    });
+
+    it('offerAllBatches writes one merged credit for the whole sweep', async () => {
+      await enqueueHarvestBatch(makeBatch({ id: 'b1', amberValue: 10 }));
+      await enqueueHarvestBatch(makeBatch({ id: 'b2', amberValue: 15 }));
+
+      const result = await offerAllBatches();
+      expect(result.creditId).toBeDefined();
+      expect(result.creditId!.startsWith('hc_')).toBe(true);
+
+      const credits = await reconcilePendingCredits();
+      expect(credits).toEqual([
+        expect.objectContaining({ id: result.creditId, amber: 25 }),
+      ]);
+
+      await acknowledgeBatchCredit(result.creditId!);
+      expect(await reconcilePendingCredits()).toEqual([]);
+    });
+
+    it('an empty offer-all creates no ledger entry', async () => {
+      const result = await offerAllBatches();
+      expect(result.amberAwarded).toBe(0);
+      expect(result.creditId).toBeUndefined();
+      expect(await reconcilePendingCredits()).toEqual([]);
+    });
+
+    it('migrates pre-ledger stored state (no pendingCredits field)', async () => {
+      const legacy = {
+        pendingBatches: [makeBatch({ id: 'old1', amberValue: 7 })],
+        totalWordsOffered: 3,
+        totalBatchesOffered: 1,
+        totalAmberClaimed: 9,
+      };
+      await AsyncStorage.setItem('wordshift_word_harvest', JSON.stringify(legacy));
+      invalidateHarvestCache();
+
+      const state = await getHarvestState();
+      expect(state.pendingCredits).toEqual([]);
+
+      // Offering from a migrated save works and records its credit.
+      const result = await offerBatch('old1');
+      expect(result!.creditId).toBe('old1');
+      expect(await reconcilePendingCredits()).toEqual([
+        expect.objectContaining({ id: 'old1', amber: 7 }),
+      ]);
+    });
+
+    it('clearHarvestState also clears the credit ledger', async () => {
+      await enqueueHarvestBatch(makeBatch({ id: 'b1', amberValue: 10 }));
+      await offerBatch('b1');
+      expect(await reconcilePendingCredits()).toHaveLength(1);
+
+      await clearHarvestState();
+      expect(await reconcilePendingCredits()).toEqual([]);
     });
   });
 

@@ -37,7 +37,22 @@ export interface DailyAmberStatus {
   amountPerClaim: number;
 }
 
+export interface DailyAmberClaimResult extends DailyAmberStatus {
+  /**
+   * Whether THIS call actually recorded a claim. False at/past the daily cap
+   * (and while another claim is mid-flight) — callers must credit amber ONLY
+   * when this is true, so the tracker and the grant always move together.
+   */
+  recorded: boolean;
+}
+
 let cache: DailyAmberState | null = null;
+
+/** Drop the in-memory cache after an external storage write (cloud restore). */
+export function invalidateDailyAmberCache(): void {
+  cache = null;
+}
+
 
 const getDefault = (): DailyAmberState => ({ date: null, count: 0 });
 
@@ -73,6 +88,7 @@ function forToday(state: DailyAmberState, today: string): number {
 /** Test/reset helper — clears the in-memory cache. */
 export function _clearDailyAmberCache(): void {
   cache = null;
+  claimInProgress = false;
 }
 
 /** Clear daily-amber faucet state for Settings → Reset All. */
@@ -104,18 +120,42 @@ export async function isDailyAmberAvailable(): Promise<boolean> {
   return (await getDailyAmberStatus()).available;
 }
 
+/** Concurrent-claim guard (mirrors amberCurrency's spendInProgress pattern). */
+let claimInProgress = false;
+
 /**
  * Record one free-amber claim for today (call AFTER the ad completes / the Patron
- * grant lands). Increments the local-day counter and returns the updated status.
- * A no-op beyond the cap (returns the capped status) so it can never over-grant.
+ * grant lands). Increments the local-day counter and returns the updated status
+ * plus `recorded` — whether THIS call actually counted. A no-op beyond the cap
+ * (or while another claim is mid-flight): the capped status comes back with
+ * `recorded: false`, and the caller must not credit amber for it.
  */
-export async function recordDailyAmberClaim(): Promise<DailyAmberStatus> {
-  const state = await load();
-  const today = getLocalDateString();
-  const claimedToday = forToday(state, today);
-  if (claimedToday >= DAILY_AMBER_DAILY_CAP) {
-    return getDailyAmberStatus();
+export async function recordDailyAmberClaim(): Promise<DailyAmberClaimResult> {
+  if (claimInProgress) {
+    return { ...(await getDailyAmberStatus()), recorded: false };
   }
-  await save({ date: today, count: claimedToday + 1 });
-  return getDailyAmberStatus();
+  claimInProgress = true;
+  try {
+    const state = await load();
+    const today = getLocalDateString();
+    const claimedToday = forToday(state, today);
+    if (claimedToday >= DAILY_AMBER_DAILY_CAP) {
+      return { ...(await getDailyAmberStatus()), recorded: false };
+    }
+    await save({ date: today, count: claimedToday + 1 });
+    return { ...(await getDailyAmberStatus()), recorded: true };
+  } finally {
+    claimInProgress = false;
+  }
+}
+
+/**
+ * Pure decision for the Free Amber card: how much amber a claim result should
+ * credit. Zero when the claim was not recorded (already at the daily cap or a
+ * duplicate in-flight tap), so a stale or repeated tap can never over-grant.
+ */
+export function dailyAmberGrantFor(
+  result: Pick<DailyAmberClaimResult, 'recorded' | 'amountPerClaim'>,
+): number {
+  return result.recorded ? result.amountPerClaim : 0;
 }

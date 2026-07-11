@@ -13,6 +13,7 @@ import {
   Pressable,
   Linking,
   BackHandler,
+  Image,
 } from 'react-native';
 import { GameState, Difficulty } from './src/types';
 import { Row } from './src/components/Row';
@@ -38,10 +39,13 @@ import { ONBOARDING_FOX_LINES } from './src/services/onboarding';
 import {
   awardBonusAmber,
   spendAmber,
+  getCurrentPhase,
   hasSeenSetupSelectorIntro,
   markSetupSelectorIntroSeen,
   hasSeenMandatoryHarvest,
   hasSeenStarterIntro,
+  hasSeenFirstWinGlitch,
+  markFirstWinGlitchSeen,
   markStarterIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
@@ -67,6 +71,7 @@ import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
 import { ShareableResult, decodeChallengeLink, buildChallengeShareText } from './src/services/shareResults';
+import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePrompts';
 import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
@@ -97,7 +102,9 @@ import {
   getNewCycleOpeningLine,
   getDailyLadderLine,
   getDailyLadderTrendLabel,
+  getEventDailyBonusLine,
 } from './src/services/phaseNarrative';
+import { getActiveEvent, getEventDailyBonusAmber } from './src/services/liveEvents';
 import { recordSolveTime, getSolveTrend, recordSpeedRound } from './src/services/masteryRecords';
 import { maybePromptReview } from './src/services/reviewPrompt';
 import { getPhaseTransitionEvent, PhaseTransitionEvent, HOUSE_COMPLETION_EVENT, FINAL_PUZZLE_EVENT, POST_REVELATION_EVENT } from './src/services/phaseEvents';
@@ -116,8 +123,8 @@ import {
   markPromptedForNotifications,
 } from './src/services/notifications';
 import { runMigrations } from './src/services/dataMigration';
-import { initIAP, setBillingProvider } from './src/services/iap';
-import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement } from './src/services/ads';
+import { initIAP, setBillingProvider, reconcilePendingConsumableGrants, acknowledgeConsumableGrant } from './src/services/iap';
+import { initAds, setAdProvider, maybeShowInterstitial, showRewarded, isRewardedCapReached, RewardedPlacement, isDailyInterstitialAllowed } from './src/services/ads';
 import { RewardedAdButton } from './src/components/monetization/RewardedAdButton';
 import { initCosmetics } from './src/services/cosmetics';
 import { loadPixelFonts, installGlobalFont } from './src/theme/fonts';
@@ -130,7 +137,24 @@ import { createRevenueCatBillingProvider } from './src/services/providers/revenu
 import { createAdMobAdProvider } from './src/services/providers/googleAdMobAds';
 import { installGlobalErrorHandler, setErrorForwarder } from './src/services/errorReporting';
 import { AUTO_COLLECT_PUZZLE_LIMIT, AMBER_UNDO_REFILL_COST, STARTER_INTRO_MIN_PUZZLES, FINALE_DWELL_PUZZLES } from './src/constants/gameBalance';
-import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall } from './src/services/cloudSave';
+import { getCumulativeStats } from './src/services/starRating';
+
+// Defer the one-time difficulty-selector intro until a few boards are done —
+// firing on the very first post-onboarding Play hijacked the "just let me
+// play" beat (and the curated early window ignores difficulty anyway).
+const SETUP_SELECTOR_INTRO_MIN_PUZZLES = 3;
+
+// Module-scope launch-routing guards: an appEpoch remount (late cloud restore)
+// re-runs MainApp's mount effects, and both getInitialURL and
+// getLastNotificationResponseAsync keep returning the ORIGINAL launch payload —
+// these ensure each is routed at most once per process.
+let launchUrlProcessed = false;
+let coldStartNotificationProcessed = false;
+// Set when a slow fresh-install cloud restore lands after boot; the remounted
+// MainApp surfaces a one-time "progress restored" notice so the hard reset
+// mid-interaction doesn't read as the app glitching.
+let pendingRestoreNotice = false;
+import { markPendingChanges, uploadToCloud, installCloudProviderIfConfigured, maybeAutoRestoreOnFreshInstall, holdUploadsUntil } from './src/services/cloudSave';
 import * as Sentry from '@sentry/react-native';
 import { getSentryDsn } from './src/services/supabaseClient';
 import { estimateSlotIndex, findClosestValidSlot } from './src/services/slotEstimation';
@@ -138,7 +162,9 @@ import { DROP_SHAKE_KEYFRAME_MS, DROP_SHAKE_INTENSITY, SPEED_ESCALATION_STEP_SEC
 import { OfferingPitScreen } from './src/components/OfferingPitScreen';
 import { ShopScreen } from './src/components/shop/ShopScreen';
 import { loadPuzzleState, clearPuzzleState } from './src/services/puzzleSaveState';
-import { offerBatch } from './src/services/wordHarvest';
+import { offerBatch, acknowledgeBatchCredit } from './src/services/wordHarvest';
+import * as Updates from 'expo-updates';
+import { isCreatorKitEnabled, validateCreatorCode, applyCreatorSnapshot, isCreatorEra } from './src/services/creatorKit';
 import {
   hasVariantModifier,
   getNewlyUnlockedVariants,
@@ -182,8 +208,8 @@ function scheduleNotificationsUnlessCapturing(phase: number): void {
 // Install the global error handler at module load so it catches errors as
 // early as possible — including errors thrown during the first render.
 installGlobalErrorHandler();
-// Force the single app font (Kurale) onto every Text/TextInput before the
-// first render, so no screen can flash a system font while the font loads.
+// Force the body font onto every Text/TextInput before the first render, so no
+// screen can flash a system font while the font assets load.
 installGlobalFont();
 // Initialize Sentry's native SDK for crash reporting. Unlike the JS-only error
 // handler above, this captures NATIVE crashes (force-closes / SIGSEGV / Java
@@ -297,11 +323,26 @@ function MainApp() {
   const [showStoreModal, setShowStoreModal] = useState(false);
   // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
   const puzzleStartTimeRef = useRef<number>(0);
+  // True while the current daily board was eased (first-ever daily) — its
+  // result skips the shared leaderboard submit (the board isn't the shared one).
+  const dailyEasedRef = useRef<boolean>(false);
+  // handleShare is defined far below; the share-prompt (declared above it) calls
+  // it through this ref, kept current each render, to avoid a TDZ cycle.
+  const handleShareRef = useRef<() => void>(() => {});
+  const buildShareDataRef = useRef<() => { result: ShareableResult; challengeText: string | null } | null>(() => null);
+  const openShareModalRef = useRef<(d: { result: ShareableResult; challengeText: string | null }) => void>(() => {});
+  // Share payload snapshotted at victory-exit time, BEFORE startVictoryExitFlow
+  // resets victoryData — the proactive share prompt reads it so its Share CTA
+  // works after teardown.
+  const pendingShareSnapshotRef = useRef<{ result: ShareableResult; challengeText: string | null } | null>(null);
   // Daily Challenge leaderboard standing for the current victory (null = none/off)
   const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
   // Persistent daily-ladder "best this week / your history" line + trend for the
   // Victory modal. Works offline (independent of the live dailyRank fetch).
   const [dailyLadderLine, setDailyLadderLine] = useState<string | null>(null);
+  // Full-moon event bonus line, shown inside the VictoryModal on event-day
+  // daily completions (the puzzle toast renders UNDER the modal overlay).
+  const [eventBonusLine, setEventBonusLine] = useState<string | null>(null);
   const [dailyLadderTrend, setDailyLadderTrend] = useState<'up' | 'down' | 'flat' | null>(null);
   // Quiet, spoiler-safe aggregate social-proof line for the victory modal
   const [socialProofLine, setSocialProofLine] = useState<string | null>(null);
@@ -374,6 +415,9 @@ function MainApp() {
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
+  // Opacity stutter for the prominent first-victory glitch (held at 1 under
+  // reduced motion).
+  const glitchStutter = useRef(new Animated.Value(1)).current;
   // Dynamic background colors for smooth transitions — match overlay/root to destination screen
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
@@ -537,6 +581,7 @@ function MainApp() {
     lastFormedWord: puzzle.lastFormedWord,
     doubleShiftPhase: puzzle.doubleShiftPhase,
     speedTimeRemaining: speedTimer.speedTimeRemaining,
+    isSharedChallenge: puzzle.isSharedChallenge,
   });
 
   // ========================================================================
@@ -548,6 +593,25 @@ function MainApp() {
   useEffect(() => {
     setAudioPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  // Glitch stutter for the prominent first-victory glitch: a short on/off
+  // flicker so a held 1.4s glitch reads as a genuine tear, not a caption.
+  // Reduced motion pins it fully visible.
+  useEffect(() => {
+    if (!(orchestration.showVictoryGlitch && orchestration.victoryGlitchProminent)) return;
+    if (getSettingsSync().reducedMotion) {
+      glitchStutter.setValue(1);
+      return;
+    }
+    const flick = (to: number, duration: number) =>
+      Animated.timing(glitchStutter, { toValue: to, duration, useNativeDriver: true });
+    const seq = Animated.sequence([
+      flick(0.25, 60), flick(1, 70), flick(0.5, 50), flick(1, 90),
+      flick(0.35, 55), flick(1, 120),
+    ]);
+    seq.start();
+    return () => { seq.stop(); glitchStutter.setValue(1); };
+  }, [orchestration.showVictoryGlitch, orchestration.victoryGlitchProminent, glitchStutter]);
 
   // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
   // landing after it begins, the bright days announce themselves (wrongly).
@@ -570,14 +634,39 @@ function MainApp() {
     if (__DEV__) {
       startFrameMonitoring();
     }
-    scheduleNotificationsUnlessCapturing(0);
-    uploadToCloud().catch(() => {});
+    if (!captureActive) {
+      uploadToCloud().catch(() => {});
+    }
     return () => {
       if (__DEV__) {
         stopFrameMonitoring();
       }
     };
   }, []);
+
+  // One-time notice after a late cloud restore remounted the app: without it,
+  // a fresh-install player a minute into onboarding sees the screen silently
+  // hard-reset to their restored save with zero explanation.
+  useEffect(() => {
+    if (pendingRestoreNotice) {
+      pendingRestoreNotice = false;
+      showGameAlert('Restored', 'Your saved progress was found in the cloud and restored.');
+    }
+  }, []);
+
+  // Schedule notifications once persistence has hydrated, with the REAL phase.
+  // The old mount-time scheduleAllNotifications(0) rewrote the entire reminder
+  // ladder with bright Phase-0 copy on every browse-only launch — precisely for
+  // the lapsed dark-phase players the win-back ladder targets. cumulativeStats
+  // flips from null exactly once, when the initial persistence load lands (the
+  // same batch that sets currentPhase), so this fires once with correct data.
+  const notificationsScheduledRef = useRef(false);
+  useEffect(() => {
+    if (persistence.cumulativeStats === null) return;
+    if (notificationsScheduledRef.current) return;
+    notificationsScheduledRef.current = true;
+    scheduleNotificationsUnlessCapturing(persistence.currentPhase);
+  }, [persistence.cumulativeStats, persistence.currentPhase]);
 
   // (The Android hardware-back handler lives below handleGoToPit — its deps
   // array references that callback, which must be initialized first.)
@@ -770,6 +859,13 @@ function MainApp() {
     if (onboardingFlow.isOnboarding) return;
     const seen = await hasSeenSetupSelectorIntro();
     if (seen) return;
+    // Defer the one-time selector reveal until the player has a few boards
+    // behind them: firing on the very first free Play hijacked the "just let
+    // me play" beat with a second tutorial, before changing difficulty was
+    // ever relevant. The curated window (first 5 puzzles) ignores difficulty
+    // anyway, so the taught choice was inert at that moment.
+    const stats = await getCumulativeStats();
+    if ((stats?.totalPuzzlesCompleted ?? 0) < SETUP_SELECTOR_INTRO_MIN_PUZZLES) return;
 
     setSetupSelectorIntroIndex(0);
     setTimeout(() => {
@@ -781,7 +877,11 @@ function MainApp() {
   const dismissSetupSelectorIntro = useCallback(async () => {
     await markSetupSelectorIntroSeen();
     setShowSetupSelectorIntro(false);
-  }, []);
+    // Close the menu the intro auto-opened. Leaving it floating after the Fox
+    // card was dismissed read as a stuck modal (and picking a row regenerated
+    // the fresh board underneath).
+    puzzleActions.setShowDifficultyMenu(false);
+  }, [puzzleActions]);
 
   const handleAdvanceSetupSelectorIntro = useCallback(async () => {
     const nextIndex = setupSelectorIntroIndex + 1;
@@ -919,7 +1019,7 @@ function MainApp() {
   // no stats), an empty board, no victory/ceremony remnants, and onboarding
   // restarted from the empty den — instead of dumping the player back onto
   // a home screen still rendering their old save.
-  const handleResetComplete = useCallback(() => {
+  const rebuildSessionFromStorage = useCallback((opts: { restartOnboarding: boolean }) => {
     clearVictoryTimeouts();
     puzzleActions.clearBoard();
     puzzleActions.setShowConfetti(false);
@@ -932,6 +1032,7 @@ function MainApp() {
     setDailyRank(null);
     setDailyLadderLine(null);
     setDailyLadderTrend(null);
+    setEventBonusLine(null);
     setSocialProofLine(null);
     setShareResultData(null);
     setShareChallengeText(null);
@@ -943,12 +1044,14 @@ function MainApp() {
     pendingPostVictoryActionRef.current = null;
     setHomePanY(null);
     puzzlesSinceHomeVisit.current = 0;
-    // Re-read the wiped persistence (amber, phase, stats, pending transition).
+    // Re-read the rebuilt persistence (amber, phase, stats, pending transition).
     persistenceActions.refreshStats().catch(() => {});
-    // Onboarding storage is back to 'not_started'; mirror the fresh-launch
-    // init by advancing the live state machine to the first step so the
-    // intro actually replays this session.
-    onboardingActions.advanceOnboarding('home_empty').catch(() => {});
+    // Reset All: onboarding storage is back to 'not_started'; mirror the
+    // fresh-launch init so the intro replays this session. Creator snapshot:
+    // storage says 'complete' and must stay complete.
+    onboardingActions
+      .advanceOnboarding(opts.restartOnboarding ? 'home_empty' : 'complete')
+      .catch(() => {});
     transitionTo('home');
   }, [
     clearVictoryTimeouts,
@@ -961,10 +1064,40 @@ function MainApp() {
     transitionTo,
   ]);
 
-  // Start the Daily Challenge (seeded, always HARD: 6-letter words, 5 rows).
-  const handleStartDaily = useCallback((_difficulty: Difficulty) => {
+  const handleResetComplete = useCallback(() => {
+    rebuildSessionFromStorage({ restartOnboarding: true });
+  }, [rebuildSessionFromStorage]);
+
+  // Re-check today's daily leaderboard standing (tapping the completed daily
+  // card). The standing used to be shown exactly once, on completion; this gives
+  // it a re-check surface (assessment §7). Degrades gracefully when the backend
+  // is off or standings haven't aggregated yet.
+  const handleRecheckDailyStanding = useCallback(() => {
     hapticLight();
-    soundTap();
+    (async () => {
+      try {
+        // The card's corner badge is the daily streak — name it here so the
+        // number on the calendar icon always has an in-context explanation.
+        const daily = await getDailyStatus();
+        const streakLine = daily.streak > 1 ? `\nDaily streak: ${daily.streak} days.` : '';
+        const rank = await getDailyRank(getLocalDateString());
+        if (rank) {
+          showGameAlert(
+            'Today’s Standing',
+            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
+          );
+        } else {
+          showGameAlert('Today’s Standing', `The standings are still gathering. Check back a little later.${streakLine}`);
+        }
+      } catch {
+        // Non-critical — leaderboard is decorative.
+      }
+    })();
+  }, [persistence.currentPhase]);
+
+  // The daily board start proper — reached only through handleStartDaily's
+  // replay guard below.
+  const startDailyBoard = useCallback(() => {
     persistenceActions.refreshStats();
     orchestrationActions.setCompletionCoda(null);
     setIsPlayingDaily(true);
@@ -974,9 +1107,14 @@ function MainApp() {
       puzzleActions.setMessage(getLoadingMessage(persistence.currentPhase));
       try {
         const daily = await generateDailyPuzzle();
-        puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength);
+        puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
         puzzleStartTimeRef.current = Date.now();
-        logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true } });
+        // The first-ever daily gets an eased (MEDIUM) board so it isn't a
+        // brutal first competitive impression; its board differs from the
+        // shared one, so its result must NOT hit the leaderboard (still pays
+        // full HARD reward + records to the local ladder).
+        dailyEasedRef.current = daily.eased === true;
+        logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true, eased: dailyEasedRef.current } });
         // First-daily mercy: a one-time hint cushion so the first HARD daily
         // (6-letter, 5-row) isn't a wall. Only fires after the board actually
         // started; null on every call after the one-time grant.
@@ -1006,32 +1144,29 @@ function MainApp() {
     });
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase, maybeShowSetupSelectorIntro]);
 
-  // Re-check today's daily leaderboard standing (tapping the completed daily
-  // card). The standing used to be shown exactly once, on completion; this gives
-  // it a re-check surface (assessment §7). Degrades gracefully when the backend
-  // is off or standings haven't aggregated yet.
-  const handleRecheckDailyStanding = useCallback(() => {
+  // Start the Daily Challenge (seeded; difficulty follows the week ramp).
+  const handleStartDaily = useCallback((_difficulty: Difficulty) => {
     hapticLight();
+    soundTap();
     (async () => {
+      // Replay guard: the seeded daily board is identical all day and pays full
+      // HARD-tier amber plus phase progress, so replays (deep link, notification
+      // tap, any future surface) would be pure farming. A daily already
+      // completed today re-checks the standing instead — the same surface as
+      // tapping the completed card.
       try {
-        // The card's corner badge is the daily streak — name it here so the
-        // number on the calendar icon always has an in-context explanation.
-        const daily = await getDailyStatus();
-        const streakLine = daily.streak > 1 ? `\nDaily streak: ${daily.streak} days.` : '';
-        const rank = await getDailyRank(getLocalDateString());
-        if (rank) {
-          showGameAlert(
-            'Today’s Standing',
-            `${getBeatPercentText(rank.percentile, persistence.currentPhase)}\nRank ${rank.rank} of ${rank.total} today.${streakLine}`
-          );
-        } else {
-          showGameAlert('Today’s Standing', `The standings are still gathering. Check back a little later.${streakLine}`);
+        const status = await getDailyStatus();
+        if (status.isCompleted) {
+          transitionTo('home');
+          handleRecheckDailyStanding();
+          return;
         }
       } catch {
-        // Non-critical — leaderboard is decorative.
+        // Status read failed — fall through and let the daily start.
       }
+      startDailyBoard();
     })();
-  }, [persistence.currentPhase]);
+  }, [transitionTo, handleRecheckDailyStanding, startDailyBoard]);
 
   // Start a puzzle from a friend-shared challenge link. The hook validates the
   // decoded words (dictionary membership, uniform length) and returns false
@@ -1054,8 +1189,65 @@ function MainApp() {
   }, [puzzleActions, transitionTo, persistenceActions, orchestrationActions, persistence.currentPhase]);
 
   const handleIncomingLink = useCallback((url: string) => {
-    if (!url.startsWith('wordshift://')) return;
-    logEvent({ type: 'deep_link_opened', data: { url } });
+    // Scheme/host matching is case-insensitive on Android intents, so compare
+    // lowercased — a mixed-case link must neither bypass routing nor, worse,
+    // bypass the creator-code telemetry redaction below.
+    const lowerUrl = url.toLowerCase();
+    if (!lowerUrl.startsWith('wordshift://')) return;
+    // Never upload the creator code to telemetry.
+    logEvent({
+      type: 'deep_link_opened',
+      data: { url: lowerUrl.startsWith('wordshift://creator') ? 'wordshift://creator?<redacted>' : url },
+    });
+
+    // Creator/press fast-forward: wordshift://creator?code=CODE&era=dusk|shadows|reveal|peace.
+    // Deliberately BEFORE the onboarding guard (a reviewer on a fresh install is
+    // mid-onboarding; the snapshot itself completes onboarding). Fully inert
+    // unless a creatorCode is configured in app config extra.
+    if (lowerUrl.startsWith('wordshift://creator')) {
+      if (!isCreatorKitEnabled()) return;
+      let code = '';
+      let era = '';
+      try {
+        for (const pair of (url.split('?')[1] ?? '').split('&')) {
+          const [k, v] = pair.split('=');
+          // decodeURIComponent throws URIError on malformed escapes ("%E0%"),
+          // and this runs before any validation — a bad link must be ignored,
+          // never crash a press build.
+          if (k?.toLowerCase() === 'code') code = decodeURIComponent(v ?? '');
+          if (k?.toLowerCase() === 'era') era = decodeURIComponent(v ?? '').toLowerCase();
+        }
+      } catch {
+        return;
+      }
+      if (!validateCreatorCode(code) || !isCreatorEra(era)) return;
+      showGameAlert(
+        'Creator fast-forward',
+        `This replaces ALL progress on this device with a review save ("${era}"). This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Overwrite save',
+            onPress: async () => {
+              const ok = await applyCreatorSnapshot(era);
+              if (!ok) {
+                showGameAlert('Creator fast-forward', 'The snapshot could not be applied.');
+                return;
+              }
+              try {
+                await Updates.reloadAsync();
+              } catch {
+                // Expo Go / dev client: reload throws. The snapshot mutated
+                // storage through the services, so rebuilding App-level state
+                // (WITHOUT restarting onboarding) is sufficient.
+                rebuildSessionFromStorage({ restartOnboarding: false });
+              }
+            },
+          },
+        ],
+      );
+      return;
+    }
 
     if (onboardingFlow.onboardingStep && onboardingFlow.onboardingStep !== 'complete') {
       return;
@@ -1067,18 +1259,28 @@ function MainApp() {
       return;
     }
 
-    if (url.startsWith('wordshift://challenge/daily')) {
+    if (lowerUrl.startsWith('wordshift://challenge/daily')) {
       // The optional ?date= param is ignored — the daily is always today's.
-      if (isDailyChallengeUnlocked(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
-        handleStartDaily('HARD');
-      } else {
-        transitionTo('home');
-        showGameAlert('Daily Challenge', getDailyLockedMessage(persistence.currentPhase));
-      }
+      // Unlock inputs read FRESH from storage: a cold-start link routes ~1.2s
+      // after launch, before React persistence state may have hydrated (a
+      // stale zero showed unlocked players a false "still locked" alert).
+      (async () => {
+        try {
+          const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
+            handleStartDaily('HARD');
+          } else {
+            transitionTo('home');
+            showGameAlert('Daily Challenge', getDailyLockedMessage(phaseNow));
+          }
+        } catch {
+          handleStartDaily('HARD');
+        }
+      })();
       return;
     }
 
-    if (url.startsWith('wordshift://challenge/p')) {
+    if (lowerUrl.startsWith('wordshift://challenge/p')) {
       const words = decodeChallengeLink(url);
       if (words) {
         handleStartSharedChallenge(words);
@@ -1088,7 +1290,7 @@ function MainApp() {
       return;
     }
 
-    if (url.includes('home')) {
+    if (lowerUrl.includes('home')) {
       transitionTo('home');
     }
   }, [
@@ -1114,7 +1316,12 @@ function MainApp() {
   useEffect(() => {
     let launchTimer: ReturnType<typeof setTimeout> | null = null;
     Linking.getInitialURL().then(url => {
-      if (url) {
+      // Module-scope guard: an appEpoch remount (late cloud restore) re-runs
+      // this effect, and getInitialURL keeps returning the original launch URL
+      // — without the guard the remount would re-route the player into the
+      // launch link's board a second time.
+      if (url && !launchUrlProcessed) {
+        launchUrlProcessed = true;
         launchTimer = setTimeout(() => handleIncomingLinkRef.current(url), 1200);
       }
     }).catch(() => {});
@@ -1144,11 +1351,26 @@ function MainApp() {
       return;
     }
     if (target === 'daily') {
-      if (isDailyChallengeUnlocked(puzzlesSolvedForVariantUnlocks, persistence.currentPhase)) {
-        handleStartDaily('HARD');
-      } else {
-        transitionTo('home');
-      }
+      // Read the unlock inputs FRESH from storage: a cold-start tap routes
+      // ~1.2s after launch, and the React persistence state can still be
+      // unhydrated then — a stale zero here showed fully-unlocked players a
+      // false "still locked" alert.
+      (async () => {
+        try {
+          const [stats, phaseNow] = await Promise.all([getCumulativeStats(), getCurrentPhase()]);
+          if (isDailyChallengeUnlocked(stats.totalPuzzlesCompleted, phaseNow)) {
+            handleStartDaily('HARD');
+          } else {
+            // Same courtesy the deep-link path gives: say why the tap landed
+            // on home instead of silently swallowing it.
+            transitionTo('home');
+            showGameAlert('Daily Challenge', getDailyLockedMessage(phaseNow));
+          }
+        } catch {
+          // Storage read failed — let handleStartDaily's own guards decide.
+          handleStartDaily('HARD');
+        }
+      })();
     } else if (target === 'home') {
       transitionTo('home');
     }
@@ -1166,10 +1388,12 @@ function MainApp() {
       // Cold-start taps never reach the runtime listener — the notification
       // that LAUNCHED the app is only available via getLastNotificationResponseAsync.
       // Deferred briefly so persistence state hydrates before routing to the daily.
+      // Module-scope guard: an appEpoch remount must not re-route the tap.
       Notifications.getLastNotificationResponseAsync?.()
         .then((response: any) => {
           const target = response?.notification?.request?.content?.data?.target;
-          if (target != null) {
+          if (target != null && !coldStartNotificationProcessed) {
+            coldStartNotificationProcessed = true;
             coldStartTimer = setTimeout(() => routeNotificationTargetRef.current(target), 1200);
           }
         })
@@ -1278,7 +1502,9 @@ function MainApp() {
       const victory = await persistenceActions.recordVictory(
         // Daily Challenge always rewards as HARD regardless of the player's
         // chosen difficulty preference (which is left untouched during a daily).
-        isPlayingDaily ? 'HARD' : puzzle.difficulty,
+        // Shared-link boards price as EASY: the chain is attacker-craftable
+        // (a trivial 3-word link must not pay the crafter's HARD base).
+        isPlayingDaily ? 'HARD' : puzzle.isSharedChallenge ? 'EASY' : puzzle.difficulty,
         result.hintsUsed,
         result.invalidAttempts,
         result.gameMode,
@@ -1286,7 +1512,10 @@ function MainApp() {
         result.variant || 'standard',
         isPlayingDaily,
         result.undosUsed ?? 0,
-        result.blind ?? false
+        result.blind ?? false,
+        // Shared-link boards pay amber but never feed phase progress (the
+        // chain is attacker-craftable, so it must not advance the story).
+        puzzle.isSharedChallenge ?? false
       );
 
       // Aggregate social proof: contribute this puzzle's words to the global
@@ -1325,6 +1554,7 @@ function MainApp() {
         setDailyRank(null);
         setDailyLadderLine(null);
         setDailyLadderTrend(null);
+        setEventBonusLine(null);
         (async () => {
           const date = getLocalDateString();
           const elapsedMs = puzzleStartTimeRef.current > 0
@@ -1332,14 +1562,19 @@ function MainApp() {
             : 0;
           let rank: DailyRank | null = null;
           try {
-            await submitDailyResult({
-              date,
-              timeMs: elapsedMs,
-              stars: victory.earnedStars,
-              hintsUsed: result.hintsUsed,
-            });
-            rank = await getDailyRank(date);
-            if (rank) setDailyRank(rank);
+            // Skip the shared leaderboard for an eased first-daily board — it
+            // isn't the same board everyone else played, so its time/stars
+            // aren't comparable. Full reward + local ladder still apply.
+            if (!dailyEasedRef.current) {
+              await submitDailyResult({
+                date,
+                timeMs: elapsedMs,
+                stars: victory.earnedStars,
+                hintsUsed: result.hintsUsed,
+              });
+              rank = await getDailyRank(date);
+              if (rank) setDailyRank(rank);
+            }
           } catch {
             // Leaderboard is non-critical — never block the victory flow.
           }
@@ -1354,7 +1589,10 @@ function MainApp() {
               percentile: rank?.percentile ?? null,
               timeMs: elapsedMs,
               stars: victory.earnedStars,
-              difficulty: getDailyDifficulty(date),
+              // Record the ACTUAL board difficulty — an eased first daily is a
+              // MEDIUM board, so labelling it HARD would skew the local
+              // best-this-week / trend line with an easy fast time.
+              difficulty: getDailyDifficulty(date, dailyEasedRef.current),
             });
             const summary = await getDailyLadderSummary();
             setDailyLadderLine(getDailyLadderLine(summary, persistence.currentPhase));
@@ -1394,6 +1632,25 @@ function MainApp() {
               puzzleActions.setMessage('🛡️ A missed day, but your daily streak held.');
             }, 1100);
           }
+          // Full-moon event: +50% bonus on the daily's amber, credited as
+          // BONUS amber only. Never feeds phase progress (same rule as every
+          // bonus/purchased amber source). Basis: the solve's earned parts
+          // (base + stars + streak + challenge), NOT one-time milestone /
+          // first-completion windfalls — those can be huge in the endgame tail
+          // and aren't "today's daily". Surfaced inside the VictoryModal
+          // (a toast would render underneath the modal overlay and never show).
+          if (getActiveEvent()) {
+            const b = victory.amberBreakdown;
+            const bonusBasis = b
+              ? b.base + b.starBonus + b.streakBonus + b.challengeBonus
+              : victory.amberEarned;
+            const eventBonus = getEventDailyBonusAmber(bonusBasis);
+            if (eventBonus > 0) {
+              const newBalance = await awardBonusAmber(eventBonus, 'event_daily_bonus');
+              persistenceActions.setAmberBalance(newBalance);
+              setEventBonusLine(getEventDailyBonusLine(persistence.currentPhase, eventBonus));
+            }
+          }
         } catch {
           // Daily recording is non-critical — never block the victory flow.
         }
@@ -1411,6 +1668,11 @@ function MainApp() {
         const autoCollected = await offerBatch(victory.harvestBatchId);
         if (autoCollected && autoCollected.amberAwarded > 0) {
           const newBalance = await awardBonusAmber(autoCollected.amberAwarded, 'auto_word_offering');
+          // Apply-then-ack: clear the pending-credit ledger entry only after
+          // the amber landed (kill between the writes replays, never loses).
+          if (autoCollected.creditId) {
+            acknowledgeBatchCredit(autoCollected.creditId).catch(() => {});
+          }
           persistenceActions.setAmberBalance(newBalance);
           logEvent({
             type: 'harvest_auto_collected',
@@ -1461,10 +1723,15 @@ function MainApp() {
       ) {
         finalVictory = { ...finalVictory, mandatoryHarvest: true };
       }
-      // Fox introduces the Keeper's Welcome starter pack once, ~puzzle 12, but
-      // only for players who don't already own it. She frames it in-world (a
-      // welcome gift on "the shelf"); dismissing opens the Store.
+      // Fox introduces the Keeper's Welcome starter pack once, past puzzle 20,
+      // for players who don't already own it. Declutter rule: never stack it on
+      // a victory that ALREADY has another intro or the mandatory-harvest gate
+      // — the store pitch waits for a quiet win (it re-fires until seen, since
+      // hasSeenStarterIntro is only set on dismissal), so a newcomer never gets
+      // two new-thing beats on one victory.
       if (
+        immediateIntros.length === 0 &&
+        !finalVictory.mandatoryHarvest &&
         completedTotal >= STARTER_INTRO_MIN_PUZZLES &&
         !hasEntitlementSync(ENTITLEMENTS.STARTER_PACK) &&
         !(await hasSeenStarterIntro())
@@ -1596,6 +1863,18 @@ function MainApp() {
       // Check achievements after brief delay to not block victory display
       addVictoryTimeout(() => achievementActions.checkForAchievements(finalVictory), 500);
 
+      // The guaranteed, prominent opening-promise glitch fires on the player's
+      // FIRST free-play win (one-time), not the guided tutorial.
+      let firstFreeWin = false;
+      if (!onboardingFlow.isOnboarding) {
+        try {
+          firstFreeWin = !(await hasSeenFirstWinGlitch());
+          if (firstFreeWin) markFirstWinGlitchSeen().catch(() => {});
+        } catch {
+          firstFreeWin = false;
+        }
+      }
+
       // Post-victory orchestration: glitch, micro-beat, whisper, interjection
       orchestrationActions.processVictory({
         phase: persistence.currentPhase,
@@ -1603,14 +1882,17 @@ function MainApp() {
         completedWords: result.completedWords,
         isOnboarding: onboardingFlow.isOnboarding,
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
+        firstFreeWin,
       });
 
       // Re-schedule notifications after puzzle completion
       scheduleNotificationsUnlessCapturing(persistence.currentPhase);
 
       // Mark cloud save as having pending changes
-      markPendingChanges().catch(() => {});
-      uploadToCloud().catch(() => {});
+      if (!captureActive) {
+        markPendingChanges().catch(() => {});
+        uploadToCloud().catch(() => {});
+      }
     } else if (result === null && puzzle.selectedLetter) {
       // Slot press happened but was invalid
       hapticError();
@@ -1774,8 +2056,10 @@ function MainApp() {
   // and a registry of each row's measurable node for Y-bounds checking on drop.
   const activeRowIndexRef = useRef(puzzle.activeRowIndex);
   const moveDirectionRef = useRef(puzzle.moveDirection);
+  const rowsRef = useRef(puzzle.rows);
   activeRowIndexRef.current = puzzle.activeRowIndex;
   moveDirectionRef.current = puzzle.moveDirection;
+  rowsRef.current = puzzle.rows;
   const rowNodeRefs = useRef(new Map<number, any>());
   const registerRowNode = useCallback((rowIndex: number, node: any) => {
     if (node) rowNodeRefs.current.set(rowIndex, node);
@@ -1793,8 +2077,20 @@ function MainApp() {
     setTimeout(() => {
       const previews = slotPreviewsRef.current;
       const onSlotPress = handleSlotPressRef.current;
-      if (!previews || previews.length === 0) {
-        // Previews weren't ready when the drop resolved (rare: a slow frame
+      // Previews are SUPPRESSED in blind and challenge modes, but a drag still
+      // needs slot geometry to resolve a drop — otherwise every drag in those
+      // modes dies as a "miss" and only taps work. Compute the slot count from
+      // the live board; only the near-miss snapping (which keys off preview
+      // validity) genuinely requires previews.
+      let slotCount = previews?.length ?? 0;
+      if (slotCount === 0) {
+        const targetRowIdx =
+          activeRowIndexRef.current + (moveDirectionRef.current === 'down' ? 1 : -1);
+        const targetRow = rowsRef.current?.[targetRowIdx];
+        if (targetRow) slotCount = targetRow.words.length + 1;
+      }
+      if (slotCount === 0) {
+        // Board state wasn't ready when the drop resolved (rare: a slow frame
         // between onDragStart's selection commit and this deferred read). Don't
         // swallow the drop silently — that reads as "the game ate my letter."
         // The picked-up letter is still selected, so give the same gentle
@@ -1805,11 +2101,11 @@ function MainApp() {
       }
 
       // Estimate which slot the user dropped over based on X position.
-      const targetWordLength = previews.length - 1;
+      const targetWordLength = slotCount - 1;
       const estimateOut: { droppedRightOfCenter?: boolean } = {};
       const estimated = estimateSlotIndex(
         position.x,
-        previews.length,
+        slotCount,
         targetWordLength,
         estimateOut,
       );
@@ -1822,7 +2118,10 @@ function MainApp() {
       // a distant valid slot — an invalid drop that isn't a clear near-miss
       // still falls through to handleSlotPress's invalid feedback.
       let targetSlot = estimated;
-      if (!previews[estimated]?.isValid) {
+      // Near-miss snapping only when previews exist — in blind/challenge the
+      // absence of a snapping tell is part of the mode, and handleSlotPress
+      // gives real validation feedback on the raw estimated slot.
+      if (previews && !previews[estimated]?.isValid) {
         const closestValid = findClosestValidSlot(
           estimated,
           previews,
@@ -1957,6 +2256,10 @@ function MainApp() {
     try {
       if (onboardingFlow.isOnboarding) return;
       if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return;
+      // Declutter: never stack the permission prompt on a victory that already
+      // has a Fox intro playing/queued. Return WITHOUT marking prompted so it
+      // simply waits for a quiet victory exit.
+      if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return;
       if (await hasPromptedForNotifications()) return;
       if ((await getNotificationPermissionStatus()) === 'granted') return;
       await markPromptedForNotifications();
@@ -1995,26 +2298,29 @@ function MainApp() {
   // ignition, onboarding, or the serene post-revelation tone. Must run BEFORE
   // startVictoryExitFlow (which resets victoryData). Patron suppression + cadence
   // are handled inside ads.ts. Fire-and-forget: the ad overlays the transition.
-  const maybeShowVictoryInterstitial = useCallback(() => {
+  const maybeShowVictoryInterstitial = useCallback((): Promise<boolean> => {
     const vd = victoryFlow.victoryData;
-    if (!vd) return;
+    if (!vd) return Promise.resolve(false);
     const step = onboardingFlow.onboardingStep;
     const inOnboarding = step !== undefined && step !== 'complete';
     const exempt =
       inOnboarding ||
-      isPlayingDaily ||
+      // The daily is exempt only from Phase 3 on (protecting the dread arc);
+      // at the bright phases its reliably habitual session carries the normal
+      // interstitial cadence (policy in ads.isDailyInterstitialAllowed).
+      (isPlayingDaily && !isDailyInterstitialAllowed(vd.newPhase as number)) ||
       vd.mandatoryHarvest ||                           // first-harvest teaching beat: never interrupt with an ad
       vd.phaseTransitionPending ||                     // pit ignition ceremony incoming
       persistence.pendingPhaseTransition != null ||    // ward ceremony waiting in the pit
       phaseTransitionEvent != null ||                  // final / post-revelation cinematic queued
       (vd.newPhase as number) >= 5 ||                  // post-revelation: never break the serene tone
       vd.puzzlesSolved <= AUTO_COLLECT_PUZZLE_LIMIT;   // protect the early "pure delight" window — no ads in the first session
-    maybeShowInterstitial({
+    return maybeShowInterstitial({
       puzzlesSolved: vd.puzzlesSolved,
       phase: vd.newPhase,
       exempt,
     }).then(async (shown) => {
-      if (!shown) return;
+      if (!shown) return false;
       // After the player has actually seen a few interstitials, offer the
       // contextual one-time Remove-Ads upsell ("tired of these?").
       await recordInterstitialSeen();
@@ -2028,7 +2334,8 @@ function MainApp() {
           ],
         );
       }
-    }).catch(() => {});
+      return true;
+    }).catch(() => false);
   }, [victoryFlow.victoryData, onboardingFlow.onboardingStep, isPlayingDaily, phaseTransitionEvent, persistence.pendingPhaseTransition]);
 
   // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
@@ -2051,18 +2358,71 @@ function MainApp() {
     }
   }, [onboardingFlow.isOnboarding, victoryFlow.victoryData, persistence.cumulativeStats]);
 
+  // One-time proactive SHARE invite at a genuine peak (the first flawless win).
+  // The game already nudges players to buy but never to share — this is the
+  // growth counterpart, frequency-capped exactly like the monetization nudges.
+  // (Phase transitions were considered as a second trigger but are deferred to
+  // the pit ceremony, which never routes through this exit — flawless-only is
+  // the reachable peak, and it lands early for nearly every player.) Returns
+  // whether it fired so the exit flow can keep to one nudge per victory. Never
+  // on a mandatory-harvest / ceremony exit, and never stacked on a queued Fox
+  // intro or an interstitial that just showed.
+  const maybeShowSharePrompt = useCallback(async (): Promise<boolean> => {
+    const vd = victoryFlow.victoryData;
+    if (!vd) return false;
+    if (onboardingFlow.isOnboarding) return false;
+    if (vd.mandatoryHarvest || vd.phaseTransitionPending || persistence.pendingPhaseTransition != null) return false;
+    // Same anti-stacking guard the notification prompt uses: never layer on a
+    // Fox intro. Return WITHOUT consuming so it waits for a quiet exit.
+    if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+    // Snapshot taken at exit time (before teardown nulled victoryData); if it's
+    // missing, don't consume the one-time prompt on a broken exit.
+    const snapshot = pendingShareSnapshotRef.current;
+    if (!snapshot) return false;
+    const fired = await consumeSharePrompt({
+      isFlawlessWin: vd.flawless === true,
+      isPhaseTransition: false,
+      isOnboarding: false,
+    });
+    if (fired) {
+      showGameAlert(
+        '',
+        getSharePromptInvite(persistence.currentPhase),
+        [
+          { text: 'Not now', style: 'cancel' },
+          // Open the modal from the pre-teardown snapshot — victoryData/board
+          // state is already reset by the time this fires.
+          { text: 'Share', onPress: () => { hapticLight(); openShareModalRef.current(snapshot); } },
+        ],
+      );
+    }
+    return fired;
+  }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase, postVictoryIntro]);
+
+  // At most ONE of the victory-exit nudges (share / patron / notification
+  // permission) fires per exit — the share peak takes precedence when eligible.
+  // Skipped entirely when an interstitial just showed this exit, so a nudge
+  // never piles on top of an ad.
+  const runVictoryExitNudges = useCallback(async (interstitialShown: boolean) => {
+    if (interstitialShown) return;
+    if (await maybeShowSharePrompt()) return;
+    await maybePromptForNotifications();
+    await maybeShowPatronNudge();
+  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowPatronNudge]);
+
   const handleNextLevel = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
     setSpeedRescueUsed(false);
-    maybeShowVictoryInterstitial();
+    // Snapshot the share payload BEFORE the exit flow resets victoryData.
+    pendingShareSnapshotRef.current = buildShareDataRef.current();
+    const adShown = maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
-    maybePromptForNotifications().catch(() => {});
-    maybeShowPatronNudge().catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
+    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
+  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -2080,15 +2440,16 @@ function MainApp() {
   const handleReturnHome = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
-    maybeShowVictoryInterstitial();
+    // Snapshot the share payload BEFORE the exit flow resets victoryData.
+    pendingShareSnapshotRef.current = buildShareDataRef.current();
+    const adShown = maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('home');
     });
-    maybePromptForNotifications().catch(() => {});
-    maybeShowPatronNudge().catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
+    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // The pit route is a victory exit too — same interstitial gate as
   // next/home. Its exemptions already cover the sensitive pit moments
@@ -2172,11 +2533,15 @@ function MainApp() {
   // native capturer is present, else falls back to the emoji-grid text share).
   // It overlays the victory screen rather than exiting it, so sharing never
   // costs the player their victory moment.
-  const handleShare = useCallback(() => {
-    if (!victoryFlow.victoryData) return;
-    hapticLight();
+  // Build the share payload from CURRENT victory + board state. Returns null
+  // when there's no active victory. Kept separate so callers that fire around
+  // the victory-exit teardown (the proactive share prompt) can snapshot the
+  // payload while state is still valid, rather than reading it back after
+  // resetVictory() has nulled victoryData.
+  const buildShareData = useCallback((): { result: ShareableResult; challengeText: string | null } | null => {
+    if (!victoryFlow.victoryData) return null;
     const moveCount = puzzle.rows.length - 1;
-    setShareResultData({
+    const result: ShareableResult = {
       stars: victoryFlow.victoryData.earnedStars,
       difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
       hintsUsed: puzzle.hintsUsed,
@@ -2191,19 +2556,34 @@ function MainApp() {
       animalWhisper: orchestration.whisper?.text,
       phase: persistence.currentPhase,
       incantationName: puzzle.lastIncantationName || undefined,
-    });
+    };
     // Friend challenge: only a standard, non-daily board encodes into a link
     // the recipient can actually play (the deep link starts a standard board).
+    let challengeText: string | null = null;
     if (!isPlayingDaily && puzzle.currentVariant === 'standard') {
       try {
-        setShareChallengeText(buildChallengeShareText(puzzle.rows.map(r => r.originalWord)));
+        challengeText = buildChallengeShareText(puzzle.rows.map(r => r.originalWord));
       } catch {
-        setShareChallengeText(null);
+        challengeText = null;
       }
-    } else {
-      setShareChallengeText(null);
     }
+    return { result, challengeText };
   }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily]);
+
+  const openShareModal = useCallback((data: { result: ShareableResult; challengeText: string | null }) => {
+    setShareResultData(data.result);
+    setShareChallengeText(data.challengeText);
+  }, []);
+  openShareModalRef.current = openShareModal;
+
+  const handleShare = useCallback(() => {
+    const data = buildShareData();
+    if (!data) return;
+    hapticLight();
+    openShareModal(data);
+  }, [buildShareData, openShareModal]);
+  handleShareRef.current = handleShare;
+  buildShareDataRef.current = buildShareData;
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (!victoryFlow.victoryData) return;
@@ -2291,7 +2671,12 @@ function MainApp() {
       return (
         <View style={{ flex: 1 }}>
           <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-          <SettingsScreen phase={persistence.currentPhase} onClose={() => transitionTo('home')} onReset={handleResetComplete} />
+          <SettingsScreen
+            phase={persistence.currentPhase}
+            onClose={() => transitionTo('home')}
+            onReset={handleResetComplete}
+            onCloudRestored={() => rebuildSessionFromStorage({ restartOnboarding: false })}
+          />
         </View>
       );
     }
@@ -2647,7 +3032,7 @@ function MainApp() {
 
         {/* Toast Message */}
         <View style={styles.toastContainer}>
-          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} />
+          <Toast message={puzzle.error || puzzle.message} isError={!!puzzle.error} phase={persistence.currentPhase} />
         </View>
 
         {/* Speed Timer — prominent display */}
@@ -2897,6 +3282,8 @@ function MainApp() {
           dailyHistoryLine={dailyLadderLine}
           dailyTrend={dailyLadderTrend}
           socialProofLine={socialProofLine}
+          eventBonusLine={eventBonusLine}
+          forceFullCeremony={phaseTransitionEvent != null}
           rewardedDoubleEnabled={(persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) > AUTO_COLLECT_PUZZLE_LIMIT}
           rewardedDoubleClaimed={victoryDoubleClaimed}
           onRewardedDouble={handleRewardedDouble}
@@ -2923,8 +3310,22 @@ function MainApp() {
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
         {orchestration.showVictoryGlitch && orchestration.victoryGlitch && (
-          <View style={styles.victoryGlitchOverlay} pointerEvents="none">
-            <Text style={styles.victoryGlitchText}>{orchestration.victoryGlitch}</Text>
+          <View
+            style={[
+              styles.victoryGlitchOverlay,
+              orchestration.victoryGlitchProminent && styles.victoryGlitchOverlayProminent,
+            ]}
+            pointerEvents="none"
+          >
+            <Animated.Text
+              style={[
+                styles.victoryGlitchText,
+                orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                orchestration.victoryGlitchProminent && { opacity: glitchStutter },
+              ]}
+            >
+              {orchestration.victoryGlitch}
+            </Animated.Text>
           </View>
         )}
 
@@ -3008,7 +3409,7 @@ function MainApp() {
                               : ''
                           }`
                         : tutorialGuidance?.letterToMove
-                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
+                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up. Or just drag it.`
                           : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
                     )
                     : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]
@@ -3169,10 +3570,22 @@ function MainApp() {
  * service caches read migrated data. Normal launches fail open after logging;
  * capture launches fail closed so partial fixture state never reaches MainApp.
  */
+// How long the first frame may wait on the fresh-install cloud restore. The
+// restore is a single RPC that normally resolves well under a second; on a
+// slow/flaky network its 8s client timeout would otherwise hold the very first
+// launch hostage behind a boot screen. If the race times out we boot as a
+// fresh install and, should the slow restore eventually succeed, re-run
+// migrations and remount MainApp (restoreFromCloudData already invalidates
+// the service caches, so the remount re-reads the restored save).
+const BOOT_RESTORE_RACE_MS = 2500;
+
 function App() {
   const [bootstrapState, setBootstrapState] = useState<
     'loading' | 'ready' | 'capture-error'
   >('loading');
+  // Bumped when a slow cloud restore lands after boot — remounts MainApp so
+  // every hook re-reads the restored storage.
+  const [appEpoch, setAppEpoch] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -3187,8 +3600,35 @@ function App() {
         if (captureActive) {
           await preparePlayStoreCapture();
         } else {
+          // The wait is capped: first-launch state is decided on this exact
+          // launch, and a network stall must not read as a hung app.
           installCloudProviderIfConfigured();
-          await maybeAutoRestoreOnFreshInstall();
+          const restorePromise = maybeAutoRestoreOnFreshInstall();
+          // Background uploads wait for restore settlement so a slow first
+          // launch cannot push near-empty state over the cloud row.
+          holdUploadsUntil(restorePromise);
+          const raced = await Promise.race([
+            restorePromise.then((restored) => ({ restored, timedOut: false })),
+            new Promise<{ restored: boolean; timedOut: boolean }>((resolve) =>
+              setTimeout(
+                () => resolve({ restored: false, timedOut: true }),
+                BOOT_RESTORE_RACE_MS
+              )
+            ),
+          ]);
+          if (raced.timedOut) {
+            // Boot proceeds as a fresh install. If the restore later succeeds,
+            // migrate the restored data and remount every stateful hook.
+            void restorePromise
+              .then(async (restored) => {
+                if (restored && !cancelled) {
+                  await runMigrations();
+                  pendingRestoreNotice = true;
+                  setAppEpoch((epoch) => epoch + 1);
+                }
+              })
+              .catch(() => {});
+          }
         }
         await runMigrations();
         // Monetization scaffold: warm entitlement cache + init (NoOp) billing/ads
@@ -3219,6 +3659,27 @@ function App() {
         // loadPixelFonts registers the cottage dialogue/chrome font before the
         // first frame (never throws — falls back to system font on failure).
         await Promise.all([initCosmetics(), initHints(), loadEntitlements(), loadPixelFonts()]);
+        // Recover any consumable purchase whose reward never landed (app killed
+        // between the store success and the grant). Apply-then-ack gives
+        // at-least-once delivery: a crash mid-recovery replays rather than
+        // loses a paid purchase. Local-only reads/writes — cheap to await, and
+        // doing it before MainApp mounts means the first frame shows the
+        // recovered balance.
+        if (!captureActive) {
+          try {
+            const pendingGrants = await reconcilePendingConsumableGrants();
+            for (const grant of pendingGrants) {
+              if (grant.reward.kind === 'amber') {
+                await awardBonusAmber(grant.reward.amount, `iap_recovered_${grant.productId}`);
+              } else {
+                await addHints(grant.reward.amount, `iap_recovered_${grant.productId}`);
+              }
+              await acknowledgeConsumableGrant(grant.grantId);
+            }
+          } catch (error) {
+            console.warn('Pending IAP grant recovery failed:', error);
+          }
+        }
       } catch (error) {
         console.warn('Bootstrap init failed:', error);
         if (!cancelled) {
@@ -3231,9 +3692,10 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // Plain dark view while booting — matches the root default background
-  // so there's no flash before MainApp renders. SafeAreaProvider wraps both
-  // branches so useSafeAreaInsets is available everywhere in MainApp.
+  // Branded boot view while booting — the wordmark + a quiet spinner on the
+  // root background, so a slow first launch reads as loading rather than a
+  // hung black screen. SafeAreaProvider wraps both branches so
+  // useSafeAreaInsets is available everywhere in MainApp.
   return (
     <SafeAreaProvider>
       {bootstrapState === 'capture-error' ? (
@@ -3246,13 +3708,40 @@ function App() {
           <Text style={{ color: '#FFFFFF' }}>Play Store capture setup failed.</Text>
         </View>
       ) : bootstrapState === 'ready' ? (
-        <MainApp />
+        <MainApp key={appEpoch} />
       ) : (
-        <View style={{ flex: 1, backgroundColor: '#1A1A2E' }} />
+        <View style={bootStyles.container}>
+          <Image
+            source={require('./assets/ui/wordmark.png')}
+            style={bootStyles.wordmark}
+            resizeMode="contain"
+            accessibilityLabel="WordShift"
+          />
+          <ActivityIndicator size="small" color="#8B7BB8" style={bootStyles.spinner} />
+        </View>
       )}
     </SafeAreaProvider>
   );
 }
+
+const bootStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    // Matches the native splash background (#FFF0F5) so splash → boot is a
+    // seamless hold rather than a bright-pink-to-near-black hard cut on the
+    // first impression. The wooden wordmark reads well on both.
+    backgroundColor: '#FFF0F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wordmark: {
+    width: 260,
+    height: 65,
+  },
+  spinner: {
+    marginTop: 28,
+  },
+});
 
 // Wrap the root in Sentry's higher-order component so native crash context and
 // (if enabled) profiling attach to the running app. No-op when Sentry isn't

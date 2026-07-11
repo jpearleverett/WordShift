@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   PRODUCT_IDS,
@@ -251,5 +253,75 @@ describe('starter pack', () => {
 
     const amber = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
     expect(amber.firstPurchaseDoubled).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Store UI contracts (source-level, like appIntegration.test.ts): the modals
+// are heavy RN components, so these pin the load-bearing patterns in source.
+// ---------------------------------------------------------------------------
+
+const readComponent = (name: string): string =>
+  fs.readFileSync(
+    path.resolve(__dirname, '../components/monetization', name),
+    'utf8',
+  );
+
+describe('purchase CTAs are never price-less (fallbackPrice contract)', () => {
+  it('PatronModal defines dollar fallback prices for Patron and Remove Ads', () => {
+    const src = readComponent('PatronModal.tsx');
+    expect(src).toMatch(/export const PATRON_FALLBACK_PRICE = '\$\d+\.\d{2}'/);
+    expect(src).toMatch(/export const REMOVE_ADS_FALLBACK_PRICE = '\$\d+\.\d{2}'/);
+  });
+
+  it('PatronModal CTA labels fall back to the constants instead of dropping the price', () => {
+    const src = readComponent('PatronModal.tsx');
+    expect(src).toContain('priceString ?? PATRON_FALLBACK_PRICE');
+    expect(src).toContain('adsPriceString ?? REMOVE_ADS_FALLBACK_PRICE');
+    // The old price-less branches must not come back.
+    expect(src).not.toMatch(/priceString\s*\?\s*`Become a Patron/);
+    expect(src).not.toMatch(/adsPriceString\s*\?\s*`Remove Ads/);
+  });
+
+  it('every StoreModal purchase row falls back to a price label on fetch failure', () => {
+    const src = readComponent('StoreModal.tsx');
+    // Consumable amber/hint rows (fallbackPrice from the iap.ts catalog).
+    expect(src).toContain('?? info.fallbackPrice');
+    // Starter-pack hero.
+    expect(src).toContain('?? STARTER_PACK_INFO.fallbackPrice');
+    // Cosmetic bundle (named constant, not an inline magic string).
+    expect(src).toMatch(/export const COSMETIC_BUNDLE_FALLBACK_PRICE = '\$\d+\.\d{2}'/);
+    expect(src).toContain('?? COSMETIC_BUNDLE_FALLBACK_PRICE');
+  });
+});
+
+describe('daily free-amber grant honors the recorded claim (no Patron over-grant)', () => {
+  it('StoreModal credits amber only via the pure grant decision, after recording', () => {
+    const src = readComponent('StoreModal.tsx');
+    const start = src.indexOf('const handleClaimDailyAmber');
+    const end = src.indexOf('const handleBuyConsumable');
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const claimFn = src.slice(start, end);
+
+    // The claim is recorded first, then the grant amount comes from the pure
+    // decision helper (0 when the claim was not recorded), then amber is credited.
+    expect(claimFn).toContain('recordDailyAmberClaim');
+    expect(claimFn).toContain('dailyAmberGrantFor');
+    expect(claimFn).toMatch(/if\s*\(grant\s*<=\s*0\)/);
+    const grantIdx = claimFn.indexOf('dailyAmberGrantFor');
+    const awardIdx = claimFn.indexOf('awardBonusAmber');
+    expect(awardIdx).toBeGreaterThan(grantIdx);
+    // The award must credit the decided grant, never the raw constant.
+    expect(claimFn).toContain("awardBonusAmber(grant, 'rewarded_daily_amber')");
+    expect(claimFn).not.toContain('awardBonusAmber(DAILY_AMBER_REWARD');
+  });
+
+  it('the Free Amber card gates Patron Claim and the rewarded button identically', () => {
+    const src = readComponent('StoreModal.tsx');
+    // One shared availability gate: at cap the pill/button disappear for both
+    // Patrons and ad-watchers, and the copy flips to "Collected for today".
+    expect(src).toMatch(/amberFaucet\.available\s*&&\s*\(isPatronSync\(\)/);
+    expect(src).toContain('Collected for today. Come back tomorrow!');
   });
 });

@@ -24,16 +24,21 @@ export const VICTORY_GLITCH_TEXTS = [
   'WE REMEMBER',
 ];
 
+/** The text for the guaranteed, prominent first-free-victory glitch. */
+export function getFirstWinGlitchText(): string {
+  return VICTORY_GLITCH_TEXTS[0];
+}
+
 /**
- * Whether a victory glitch should appear at Phase 0.
- * Returns glitch text or null. First victory always glitches.
+ * Whether an AMBIENT victory glitch should appear at Phase 0 (~8% chance). The
+ * guaranteed first-win glitch is handled separately (getFirstWinGlitchText,
+ * fired on the first free-play win), so this no longer force-fires on
+ * puzzlesSolved===1 — that used to land the glitch on the guided tutorial.
  */
-export function getVictoryGlitch(phase: number, puzzlesSolved: number): string | null {
+export function getVictoryGlitch(phase: number, _puzzlesSolved: number): string | null {
   if (phase !== 0) return null;
-  // First victory always gets a brief glitch
-  if (puzzlesSolved === 1) return VICTORY_GLITCH_TEXTS[0];
-  // ~8% chance on subsequent Phase 0 victories — enough for ~2 glitches
-  // across 25 puzzles, creating subliminal unease that pays off later
+  // ~8% chance on Phase 0 victories — enough for ~2 glitches across 25 puzzles,
+  // creating subliminal unease that pays off later.
   if (Math.random() < 0.08) {
     return VICTORY_GLITCH_TEXTS[Math.floor(Math.random() * VICTORY_GLITCH_TEXTS.length)];
   }
@@ -1465,6 +1470,18 @@ export function getPersonalizedPhase5Whisper(
       `${name} breathes in ${word}. Breathes out silence.`,
       `${word} is the thread. ${name} is the loom. You are the weaver.`,
     ],
+    tarsier: [
+      `${name} saw ${word} between the stars long before you spelled it.`,
+      `${name} does not blink. "${word}," she says. "It is still there."`,
+    ],
+    aye_aye: [
+      `${name} taps the wall twice. The hollow answers: ${word}.`,
+      `${name} says the bell very nearly rang for ${word}.`,
+    ],
+    kakapo: [
+      `${name} called ${word} into the dark once. The dark finally said it back.`,
+      `${name} says ${word} was the answer he waited a lifetime to hear.`,
+    ],
   };
 
   const animalTemplates = templates[selectedType];
@@ -1872,6 +1889,29 @@ export function getNewCycleOpeningLine(cycle: number): string {
   if (cycle >= 3) return 'Bright morning. Again. You have all stopped pretending this is the first time.';
   if (cycle >= 2) return 'The sun comes up over the house once more. The animals smile. They remember your face from before, though none of them will say so.';
   return 'Morning breaks bright and warm, as if none of it had happened. The animals greet you like an old friend. Somewhere beneath the warmth, something already knows how this ends.';
+}
+
+/**
+ * Serene Phase-5 pointers toward beginning again. Exported so the em-dash
+ * guard sweeps every variant; player-facing via getNewCyclePointerLine.
+ * In-world only: never names settings, buttons, or any UI surface.
+ */
+export const NEW_CYCLE_POINTER_LINES = [
+  'When you are ready to walk the pattern from its first bright morning again, the house remembers the way.',
+  'Someday, if you wish it, the bright days can come around once more. The house keeps that door open for you.',
+  'The pattern has no true ending. Whenever you want the warmth of the beginning back, the house will carry you there.',
+];
+
+/**
+ * A soft pointer toward the New Cycle, surfaced at Tending milestones.
+ * Returns null below Phase 5. The pick is deterministic (no Math.random):
+ * it rotates with the local calendar day, so the line varies across visits
+ * but never flickers within one.
+ */
+export function getNewCyclePointerLine(phase: DialoguePhase): string | null {
+  if (phase < 5) return null;
+  const idx = new Date().getDate() % NEW_CYCLE_POINTER_LINES.length;
+  return NEW_CYCLE_POINTER_LINES[idx];
 }
 
 export function getDreadOfferingLine(word: string, phase: DialoguePhase): string {
@@ -2568,27 +2608,27 @@ export function getChallengeIntroLines(phase: DialoguePhase): string[] {
   if (phase >= 5) {
     return [
       'The arrangement has infinite depth, friend. Some paths through it are harder than others.',
-      'Challenge Mode strips away the hints you no longer need. The pattern has already shown you everything.',
+      'Challenge Mode takes away the little marks and the hints you no longer need. The pattern has already shown you everything.',
       'It waits in the puzzle setup. If you want to face what you helped build, face it bare.',
     ];
   }
   if (phase >= 3) {
     return [
       'The patterns grow more complex. There are harder paths, if you dare.',
-      'Challenge Mode strips away your safety. No hints, limited undos. But the amber flows thicker.',
+      'Challenge Mode strips away your safety. No previews of what a move will make, no hints, limited undos. But the amber flows thicker.',
       'Look for it in the puzzle setup. The arrangement rewards those who commit fully.',
     ];
   }
   if (phase >= 2) {
     return [
       "You've grown stronger with the letters, friend. Curious about a harder path?",
-      'Challenge Mode takes away your hints and limits your undos. Rougher going, but the amber comes back half again as heavy.',
+      'Challenge Mode hides the little check marks, takes away your hints, and limits your undos. Rougher going, but the amber comes back half again as heavy.',
       'You\'ll find it in the puzzle setup. The words feel different when there\'s no safety net.',
     ];
   }
   return [
     "I've been watching you work, friend. You've got a feel for this now.",
-    'There\'s something called Challenge Mode. No hints, fewer undos. Tougher, but the amber reward is half again as much.',
+    'There\'s something called Challenge Mode. No previews telling you if a move works, no hints, fewer undos. Tougher, but the amber reward is half again as much.',
     'It\'s tucked into the puzzle setup. Give it a try when you want the letters to push back a little.',
   ];
 }
@@ -2619,7 +2659,13 @@ export function getPitMandatoryCTA(phase: DialoguePhase): string {
  * first harvest). Auto-collect only ever runs in Phase 0, but kept phase-aware
  * for consistency.
  */
-export function getAutoCollectCaption(phase: DialoguePhase): string {
+export function getAutoCollectCaption(phase: DialoguePhase, isLastBeforeManual: boolean = false): string {
+  // On the LAST auto-collected win, foreshadow the handoff so the first
+  // mandatory-harvest gate reads as expected, not as a sudden wall.
+  if (isLastBeforeManual) {
+    if (phase >= 2) return 'The house carries your words to the pit one last time. Soon you will take them yourself.';
+    return 'The house carries your words to the pit for you, one last time. Soon you will take them down yourself.';
+  }
   if (phase >= 3) return 'The house carries your words down to the pit for you... for now.';
   if (phase >= 2) return 'The house still carries your words to the pit for you, for now.';
   return 'The house carries your words down to the pit for you, for now.';
@@ -3040,3 +3086,103 @@ export function getDailyLoginFirstClaimCopy(phase: number): { title: string; sub
   }
   return { title: 'Welcome to the House', subtitle: 'A little gift for every day you visit' };
 }
+
+// ============================================================================
+// FULL-MOON LIVE EVENT COPY — "the night the sky thins" (liveEvents.ts).
+// Deterministic client-side event, roughly monthly. Bright phases frame it
+// as a warm little festival; the descent recasts the same moon as pale,
+// watchful, and finally thin. Never names phases, mechanics, or "events".
+// Pools are exported so the em-dash sweep covers them.
+// ============================================================================
+
+function clampEventPhase(phase: number): DialoguePhase {
+  const n = Math.floor(Number(phase));
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(5, Math.max(0, n)) as DialoguePhase;
+}
+
+/** In-world names for the full-moon nights, per phase. */
+export const EVENT_NAMES: Record<DialoguePhase, string> = {
+  0: 'The Lantern Moon',
+  1: 'The Lantern Moon',
+  2: 'The Pale Moon',
+  3: 'The Watching Moon',
+  4: 'The Thinning',
+  5: 'The Quiet Moon',
+};
+
+export function getEventName(phase: number): string {
+  return EVENT_NAMES[clampEventPhase(phase)];
+}
+
+/** Very short badge label for the daily card during the event. */
+export const EVENT_BADGE_LABELS: Record<DialoguePhase, string> = {
+  0: 'Lantern Moon tonight',
+  1: 'Lantern Moon tonight',
+  2: 'The moon is pale tonight',
+  3: 'The moon is watching',
+  4: 'The sky thins tonight',
+  5: 'The moon is full and quiet',
+};
+
+export function getEventBadgeLabel(phase: number): string {
+  return EVENT_BADGE_LABELS[clampEventPhase(phase)];
+}
+
+/** One in-world home line about the moon, per phase, for the ambient slot. */
+export const EVENT_AMBIENT_LINES: Record<DialoguePhase, string> = {
+  0: 'The moon is huge and golden tonight! Nobody in the house wants to sleep.',
+  1: 'The moon looks closer than it should tonight. Pretty, though.',
+  2: 'The moon is too bright tonight. The rooms feel thin under it.',
+  3: 'The moon has not blinked all night. Neither has the house.',
+  4: 'The sky is thin tonight. Something leans against it from the other side.',
+  5: 'The moon is full again. The house regards it like an old friend.',
+};
+
+export function getEventAmbientLine(phase: number): string {
+  return EVENT_AMBIENT_LINES[clampEventPhase(phase)];
+}
+
+/**
+ * Victory-side line when the full moon adds bonus amber to the daily.
+ * In-world; states the amber plainly, never percentages at dark phases.
+ */
+export const EVENT_DAILY_BONUS_LINES: Record<DialoguePhase, string> = {
+  0: 'The Lantern Moon loved that! +{bonus} bonus amber!',
+  1: 'Solved under the Lantern Moon! +{bonus} bonus amber!',
+  2: 'The pale moon was watching. +{bonus} amber found its way to you.',
+  3: 'The moon saw every word. It left +{bonus} amber behind.',
+  4: 'The sky is thin, and it is generous. +{bonus} amber.',
+  5: 'The full moon remembers you. +{bonus} amber.',
+};
+
+export function getEventDailyBonusLine(phase: number, bonus: number): string {
+  return EVENT_DAILY_BONUS_LINES[clampEventPhase(phase)].replace(
+    '{bonus}',
+    String(bonus)
+  );
+}
+
+/** Title for the bonus event quest appended to the daily tier on event days. */
+export const EVENT_QUEST_TITLES: Record<DialoguePhase, string> = {
+  0: 'Moonlight Party',
+  1: 'Under the Lantern Moon',
+  2: 'Under the Pale Moon',
+  3: 'While the Moon Watches',
+  4: 'While the Sky Thins',
+  5: 'By the Quiet Moon',
+};
+
+export function getEventQuestTitle(phase: number): string {
+  return EVENT_QUEST_TITLES[clampEventPhase(phase)];
+}
+
+/**
+ * Description templates for the event quest ({target} replaced by the quest
+ * system). `bright` fills Quest.description, `dark` fills darkDescription
+ * (the quest UI switches at phase 3+, like every other quest).
+ */
+export const EVENT_QUEST_DESCRIPTION_TEMPLATES = {
+  bright: 'Solve {target} puzzles under the full moon',
+  dark: 'The moon asks for {target} arrangements tonight',
+} as const;

@@ -34,7 +34,10 @@ import {
   shareChallengeText,
   MIN_CHALLENGE_WORDS,
   MAX_CHALLENGE_WORDS,
+  pickShareIntrigueTagline,
+  SHARE_INTRIGUE_TAGLINES,
 } from '../services/shareResults';
+import type { ShareableResult } from '../services/shareResults';
 import { PLAY_STORE_URL, WEB_LANDING_URL } from '../constants/links';
 import { Share } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -423,5 +426,75 @@ describe('shareResults', () => {
 
     const progress = await getFullProgress();
     expect(progress.amber).toBe(DAILY_SHARE_BONUS_AMBER);
+  });
+
+  describe('spoiler-safe intrigue tagline (early share card)', () => {
+    const base = (over: Partial<ShareableResult> = {}): ShareableResult => ({
+      stars: 3,
+      difficulty: 'MEDIUM',
+      hintsUsed: 0,
+      invalidAttempts: 0,
+      moveCount: 3,
+      wordChain: ['FLAME', 'FAME', 'FRAME'],
+      ...over,
+    });
+
+    test('Phase 0 non-daily card gets an intrigue tagline from the pool', () => {
+      const tag = pickShareIntrigueTagline(base({ phase: 0 }));
+      expect(tag).not.toBeNull();
+      expect(SHARE_INTRIGUE_TAGLINES[0]).toContain(tag);
+    });
+
+    test('Phase 1 non-daily card gets an intrigue tagline from the pool', () => {
+      const tag = pickShareIntrigueTagline(base({ phase: 1 }));
+      expect(tag).not.toBeNull();
+      expect(SHARE_INTRIGUE_TAGLINES[1]).toContain(tag);
+    });
+
+    test('daily cards get no intrigue tagline (kept spoiler-free / unchanged)', () => {
+      expect(
+        pickShareIntrigueTagline(base({ phase: 0, isDaily: true, dailyDate: '2026-06-21' }))
+      ).toBeNull();
+      expect(
+        pickShareIntrigueTagline(base({ phase: 1, isDaily: true, dailyDate: '2026-06-21' }))
+      ).toBeNull();
+    });
+
+    test('dark phases (>= 2) get no intrigue tagline (keep existing tagline)', () => {
+      for (const phase of [2, 3, 4, 5]) {
+        expect(pickShareIntrigueTagline(base({ phase }))).toBeNull();
+      }
+    });
+
+    test('missing phase defaults to Phase 0 intrigue', () => {
+      const tag = pickShareIntrigueTagline(base({ phase: undefined }));
+      expect(SHARE_INTRIGUE_TAGLINES[0]).toContain(tag);
+    });
+
+    test('deterministic per result: same result yields the same tagline', () => {
+      const r = base({ phase: 0 });
+      expect(pickShareIntrigueTagline(r)).toBe(pickShareIntrigueTagline(r));
+    });
+
+    test('taglines vary across different results (seed spreads over the pool)', () => {
+      const seen = new Set<string | null>();
+      for (let i = 0; i < 40; i++) {
+        seen.add(
+          pickShareIntrigueTagline(
+            base({ phase: 0, moveCount: i, stars: (i % 3) + 1, wordChain: [`AA${i}`] })
+          )
+        );
+      }
+      expect(seen.size).toBeGreaterThan(1);
+    });
+
+    test('intrigue tagline pools are dash-free', () => {
+      const DASH = /[–—]/;
+      for (const pool of Object.values(SHARE_INTRIGUE_TAGLINES)) {
+        for (const line of pool) {
+          expect(DASH.test(line)).toBe(false);
+        }
+      }
+    });
   });
 });

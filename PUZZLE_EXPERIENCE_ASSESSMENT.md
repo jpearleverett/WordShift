@@ -18,6 +18,8 @@ Every recommendation in the priority list below has now been implemented, with o
 - ✅ **8. Rating-prompt choreography** (`reviewPrompt.ts`, Phase 0-1 only, hard-suppressed Phase 2+) **+ win-back ladder extension** (+1/+3/+7/+14/+30) **+ interstitial throttle** (suppressed Phase 4, halved Phase 3) **+ leaderboard re-check surface.** *(Reverse-bank regeneration-for-size remains a documented offline follow-up — banks are correct/diverse/solvable; regen is a multi-hour offline job.)*
 - ✅ **9. New Cycle (NG+)** — `startNewCycle`, faster re-descent, collection kept.
 
+> **Addendum (2026-07-10, pre-launch):** §2's Challenge-mode conclusion — keep the ✓/✗ previews in Challenge and ship Blind Offering as a *new* modifier instead of retrofitting — was **superseded** in the ship-readiness pass. Challenge mode now **hides slot previews** (same suppression path as Blind, including the drag-snap tell and the double-shift look-ahead): with previews on, "no hints, limited undos" cost almost nothing while paying 1.5x amber / 2x phase progression, and pre-launch there is no installed base of Challenge users to punish. Blind Offering still shipped as its own opt-in modifier per the original recommendation. The analysis below is left as written.
+
 ---
 
 ## The headline verdict

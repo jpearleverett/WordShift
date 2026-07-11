@@ -1,4 +1,4 @@
-import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord } from '../services/localGenerator';
+import { validateWord, generateLocalPuzzle, isReverseSolvable, getInsertionIndex, getIncantationName, getStrongestDreadWord, FORCED_START_MIN_SCORE } from '../services/localGenerator';
 
 // Mock amberCurrency to avoid AsyncStorage issues during generation
 jest.mock('../services/amberCurrency', () => ({
@@ -112,6 +112,26 @@ describe('generateLocalPuzzle', () => {
       .rejects
       .toThrow('Forced start word');
   }, 10000);
+
+  test('forced-start (echo) generation keeps a modest quality floor', () => {
+    // Echo boards no longer bypass the quality gate entirely (the old floor
+    // was 0), but the floor stays modest because the start word is fixed.
+    expect(FORCED_START_MIN_SCORE).toBe(20);
+    expect(FORCED_START_MIN_SCORE).toBeLessThan(45); // below the standard gate
+  });
+
+  test('forced-start generation never fails when a chain exists (graceful relaxation)', async () => {
+    // If no chain clears the floor within the attempt budget, the best valid
+    // below-floor chain must ship instead of throwing — echo generation used
+    // to accept ANY chain and must not start failing. Repeated forced-start
+    // runs must therefore always produce a board.
+    for (const startWord of ['TIME', 'WARM']) {
+      const puzzle = await generateLocalPuzzle('EASY', { startWord });
+      expect(puzzle.words[0]).toBe(startWord);
+      expect(puzzle.solution).toBeDefined();
+      expect(puzzle.solution!.length).toBe(puzzle.words.length - 1);
+    }
+  }, 30000);
 
   test('generates different puzzles on repeated calls', async () => {
     const puzzle1 = await generateLocalPuzzle('MEDIUM');
