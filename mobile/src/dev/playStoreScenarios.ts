@@ -1,11 +1,17 @@
-import { PHASE_THRESHOLDS } from '../constants/gameBalance';
+import {
+  DAILY_CHALLENGE_UNLOCK_PUZZLES,
+  PHASE_THRESHOLDS,
+} from '../constants/gameBalance';
 import { GameState } from '../types';
 import type {
+  Difficulty,
   MoveDelta,
   PuzzleSolutionStep,
   RowData,
 } from '../types';
-import type { HomeWorldProgress } from '../types/homeWorld';
+import type { DialoguePhase, HomeWorldProgress } from '../types/homeWorld';
+import { CURRENT_SCHEMA_VERSION } from '../services/dataMigration';
+import type { AchievementProgress } from '../services/achievements';
 import type {
   DailyChallengeProgress,
   DailyChallengeResult,
@@ -34,6 +40,19 @@ export interface PlayStoreScenario {
 const SCENARIO_SET = new Set<string>(PLAY_STORE_SCENARIO_NAMES);
 const SUNNY_ANIMALS = ['fox', 'pangolin', 'owl', 'axolotl'];
 const SUNNY_ROOMS = ['cozy_den', 'kitchen', 'study', 'aquarium'];
+const ALL_DIFFICULTIES: Difficulty[] = [
+  'EASY',
+  'MEDIUM',
+  'MEDIUM_PLUS',
+  'HARD',
+];
+const DAILY_CAPTURE_PUZZLES = Math.max(10, DAILY_CHALLENGE_UNLOCK_PUZZLES);
+const FIRST_FLAWLESS_ACHIEVEMENTS = [
+  'first_puzzle',
+  'first_perfect',
+  'flawless_first',
+  'first_animal',
+];
 
 export function parsePlayStoreScenario(
   search: string,
@@ -88,7 +107,8 @@ function baseProgress(
     variantFreshDates: {},
     cycleCount: 0,
     cycleOpeningSeen: 0,
-    streakFreezes: 0,
+    streakFreezes: 1,
+    lastFreeStreakFreezeDate: today,
     pendingPhaseTransition: null,
     phaseProgressFraction: 0,
     ...overrides,
@@ -102,8 +122,8 @@ function sunnyProgress(today: string): HomeWorldProgress {
     unlockedAnimals: [...SUNNY_ANIMALS],
     unlockedRooms: [...SUNNY_ROOMS],
     currentPhase: 0,
-    puzzlesSolved: 22,
-    phaseProgress: 19,
+    puzzlesSolved: 12,
+    phaseProgress: 12,
     lastDialogueRead: {
       fox: 0,
       pangolin: 0,
@@ -113,7 +133,7 @@ function sunnyProgress(today: string): HomeWorldProgress {
     introsSeen: [...SUNNY_ANIMALS],
     currentStreak: 3,
     completedDifficulties: ['EASY', 'MEDIUM'],
-    phaseProgressFraction: 0.95,
+    phaseProgressFraction: 0.6,
   });
 }
 
@@ -127,10 +147,10 @@ function duskProgress(today: string): HomeWorldProgress {
     puzzlesSolved: 60,
     phaseProgress: 70,
     lastDialogueRead: {
-      fox: 52,
-      pangolin: 52,
-      owl: 52,
-      axolotl: 52,
+      fox: 0,
+      pangolin: 0,
+      owl: 0,
+      axolotl: 0,
     },
     introsSeen: [...SUNNY_ANIMALS],
     currentStreak: 7,
@@ -142,10 +162,42 @@ function duskProgress(today: string): HomeWorldProgress {
   });
 }
 
-function baseStats(completed: number): CumulativeStats {
-  const threeStarCount = Math.min(34, completed);
-  const twoStarCount = Math.min(4, completed - threeStarCount);
-  const oneStarCount = Math.max(0, completed - threeStarCount - twoStarCount);
+function baseStats(
+  completed: number,
+  completedDifficulties: Difficulty[]
+): CumulativeStats {
+  const threeStarCount = Math.floor(completed * 0.85);
+  const twoStarCount = completed - threeStarCount;
+  const oneStarCount = 0;
+  const byDifficulty: CumulativeStats['byDifficulty'] = {
+    EASY: { completed: 0, stars: 0 },
+    MEDIUM: { completed: 0, stars: 0 },
+    MEDIUM_PLUS: { completed: 0, stars: 0 },
+    HARD: { completed: 0, stars: 0 },
+  };
+  const difficulties = completedDifficulties.length > 0
+    ? completedDifficulties
+    : ['EASY' as const];
+  const baseCompleted = Math.floor(completed / difficulties.length);
+  let completionRemainder = completed % difficulties.length;
+
+  for (const difficulty of difficulties) {
+    byDifficulty[difficulty].completed = baseCompleted +
+      (completionRemainder-- > 0 ? 1 : 0);
+  }
+
+  let remainingThreeStars = threeStarCount;
+  for (const difficulty of ALL_DIFFICULTIES) {
+    const difficultyCompleted = byDifficulty[difficulty].completed;
+    const difficultyThreeStars = Math.min(
+      difficultyCompleted,
+      remainingThreeStars
+    );
+    byDifficulty[difficulty].stars =
+      difficultyThreeStars * 3 +
+      (difficultyCompleted - difficultyThreeStars) * 2;
+    remainingThreeStars -= difficultyThreeStars;
+  }
 
   return {
     totalPuzzlesCompleted: completed,
@@ -153,16 +205,11 @@ function baseStats(completed: number): CumulativeStats {
     threeStarCount,
     twoStarCount,
     oneStarCount,
-    totalInvalidAttempts: 8,
-    totalHintsUsed: 2,
-    noHintPuzzleCount: 38,
-    flawlessCount: 30,
-    byDifficulty: {
-      EASY: { completed: 10, stars: 30 },
-      MEDIUM: { completed: 10, stars: 29 },
-      MEDIUM_PLUS: { completed: 10, stars: 28 },
-      HARD: { completed: 10, stars: 25 },
-    },
+    totalInvalidAttempts: twoStarCount * 2,
+    totalHintsUsed: 0,
+    noHintPuzzleCount: completed,
+    flawlessCount: Math.floor(threeStarCount * 0.75),
+    byDifficulty,
     personalBests: {
       EASY: { fewestHints: 0, fewestInvalidAttempts: 0 },
       MEDIUM: { fewestHints: 0, fewestInvalidAttempts: 0 },
@@ -212,7 +259,10 @@ function canonicalSolution(): PuzzleSolutionStep[] {
   ];
 }
 
-function baseSave(rows: RowData[]): SavedPuzzleState {
+function baseSave(
+  rows: RowData[],
+  currentPhase: DialoguePhase = 0
+): SavedPuzzleState {
   return {
     rows,
     activeRowIndex: 0,
@@ -233,7 +283,7 @@ function baseSave(rows: RowData[]): SavedPuzzleState {
     selectedVariant: 'standard',
     moveDirection: 'down',
     blindMode: false,
-    currentPhase: 0,
+    currentPhase,
     lastFormedWord: null,
     doubleShiftPhase: null,
     isPlayingDaily: false,
@@ -244,10 +294,10 @@ function baseSave(rows: RowData[]): SavedPuzzleState {
   };
 }
 
-function previewSave(): SavedPuzzleState {
+function previewSave(currentPhase: DialoguePhase = 0): SavedPuzzleState {
   const rows = tutorialRows();
   return {
-    ...baseSave(rows),
+    ...baseSave(rows, currentPhase),
     selectedLetter: rows[0].words[1],
   };
 }
@@ -292,6 +342,15 @@ function progressForScenario(
   today: string
 ): HomeWorldProgress {
   switch (name) {
+    case 'puzzle-preview':
+    case 'puzzle-chain':
+      return baseProgress(today, {
+        puzzlesSolved: 5,
+        phaseProgress: 5,
+        currentStreak: 1,
+        completedDifficulties: ['EASY'],
+        phaseProgressFraction: 0.25,
+      });
     case 'home-sunny':
     case 'animal-dialogue':
       return sunnyProgress(today);
@@ -300,20 +359,30 @@ function progressForScenario(
         amber: 180,
         totalAmberEarned: 900,
         puzzlesSolved: 40,
-        phaseProgress: 19,
+        currentPhase: 1,
+        phaseProgress: 40,
+        currentStreak: 4,
         completedDifficulties: ['EASY', 'MEDIUM', 'MEDIUM_PLUS', 'HARD'],
         variantWins: { reverse: 4, double_shift: 3, speed: 5 },
-        phaseProgressFraction: 0.95,
+        phaseProgressFraction:
+          (40 - PHASE_THRESHOLDS[1]) /
+          (PHASE_THRESHOLDS[2] - PHASE_THRESHOLDS[1]),
       });
     case 'daily':
       return baseProgress(today, {
         amber: 180,
         totalAmberEarned: 400,
-        puzzlesSolved: 10,
-        phaseProgress: 10,
+        puzzlesSolved: DAILY_CAPTURE_PUZZLES,
+        phaseProgress: DAILY_CAPTURE_PUZZLES,
         currentStreak: 7,
         completedDifficulties: ['EASY', 'HARD'],
-        phaseProgressFraction: 0.5,
+        phaseProgressFraction:
+          DAILY_CAPTURE_PUZZLES / PHASE_THRESHOLDS[1],
+      });
+    case 'flawless-victory':
+      return baseProgress(today, {
+        currentStreak: 0,
+        lastPlayDate: null,
       });
     case 'home-dusk':
       return duskProgress(today);
@@ -328,7 +397,7 @@ function dailyProgress(today: string): DailyChallengeProgress {
     stars: 3,
     hintsUsed: 0,
     invalidAttempts: 0,
-    completedAt: Date.parse(`${today}T12:00:00`),
+    completedAt: Date.parse(`${today}T12:00:00Z`),
   };
 
   return {
@@ -343,12 +412,23 @@ function dailyProgress(today: string): DailyChallengeProgress {
   };
 }
 
+function flawlessAchievementProgress(): AchievementProgress {
+  return {
+    unlockedIds: [...FIRST_FLAWLESS_ACHIEVEMENTS],
+    unlockDates: Object.fromEntries(
+      FIRST_FLAWLESS_ACHIEVEMENTS.map(id => [id, 1])
+    ),
+    lastChecked: 1,
+  };
+}
+
 export function buildPlayStoreScenario(
   name: PlayStoreScenarioName,
   today: string
 ): PlayStoreScenario {
+  const progress = progressForScenario(name, today);
   const storage: Record<string, string> = {
-    wordshift_schema_version: '4',
+    wordshift_schema_version: String(CURRENT_SCHEMA_VERSION),
     wordshift_onboarding_step: 'complete',
     wordshift_tutorial_completed: 'true',
     wordshift_settings: JSON.stringify({
@@ -384,21 +464,32 @@ export function buildPlayStoreScenario(
       removeAdsNudgeShown: true,
       interstitialsSeen: 0,
     }),
-    wordshift_home_progress: JSON.stringify(progressForScenario(name, today)),
+    wordshift_home_progress: JSON.stringify(progress),
   };
 
   if (name === 'puzzle-preview' || name === 'variant-menu') {
-    storage.wordshift_in_progress_puzzle = JSON.stringify(previewSave());
+    storage.wordshift_in_progress_puzzle = JSON.stringify(
+      previewSave(progress.currentPhase)
+    );
   } else if (name === 'puzzle-chain') {
     storage.wordshift_in_progress_puzzle = JSON.stringify(chainSave());
   }
 
-  if (name === 'variant-menu') {
-    storage.wordshift_star_stats = JSON.stringify(baseStats(40));
+  if (progress.puzzlesSolved > 0) {
+    storage.wordshift_star_stats = JSON.stringify(baseStats(
+      progress.puzzlesSolved,
+      (progress.completedDifficulties ?? []) as Difficulty[]
+    ));
   }
 
   if (name === 'daily') {
     storage.wordshift_daily_challenge = JSON.stringify(dailyProgress(today));
+  }
+
+  if (name === 'flawless-victory') {
+    storage.wordshift_achievements = JSON.stringify(
+      flawlessAchievementProgress()
+    );
   }
 
   return { name, storage };
