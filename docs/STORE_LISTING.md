@@ -60,7 +60,7 @@ PLAY YOUR WAY
 • Reduced-motion support
 • Free to play with occasional ads
 • Optional purchases for convenience and cosmetic expression
-• Purchases never accelerate the story
+• The main mystery unfolds through play, not purchases.
 
 WordShift is a slow-burn word game and mystery for players 13 and older.
 

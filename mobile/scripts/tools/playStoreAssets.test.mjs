@@ -226,6 +226,14 @@ describe('Google Play listing metadata', () => {
     assert.ok(shortDescription.length <= 80);
     assert.match(fullDescription, /\bletter game\b/i);
     assert.ok(fullDescription.length <= 4_000);
+    assert.match(
+      fullDescription,
+      /The main mystery unfolds through play, not purchases\./
+    );
+    assert.doesNotMatch(
+      fullDescription,
+      /Purchases never accelerate the story/
+    );
     assert.equal(tableAltTexts.length, 8);
     assert.deepEqual(tableAltTexts, campaign.map(item => item.altText));
     assert.ok(tableAltTexts.every(text => text.length <= 140));
