@@ -142,6 +142,28 @@ describe('drag input without previews', () => {
   });
 });
 
+describe('proactive share prompt', () => {
+  test('share payload is snapshotted BEFORE the exit flow resets victoryData', () => {
+    // The prompt's Share CTA opens the modal from a pre-teardown snapshot; if
+    // the snapshot were read after startVictoryExitFlow (which nulls
+    // victoryData), the CTA would be a dead no-op.
+    expect(APP_TSX).toMatch(/pendingShareSnapshotRef\.current = buildShareDataRef\.current\(\);\s*\n\s*const adShown = maybeShowVictoryInterstitial\(\);\s*\n\s*startVictoryExitFlow/);
+    expect(APP_TSX).toMatch(/onPress: \(\) => \{ hapticLight\(\); openShareModalRef\.current\(snapshot\); \}/);
+  });
+
+  test('victory-exit nudges are skipped when an interstitial showed (one nudge per exit)', () => {
+    expect(APP_TSX).toMatch(/runVictoryExitNudges = useCallback\(async \(interstitialShown: boolean\)/);
+    expect(APP_TSX).toMatch(/if \(interstitialShown\) return;/);
+    // Share prompt inherits the same anti-stacking guard the notification prompt has.
+    expect(APP_TSX).toMatch(/if \(postVictoryIntro \|\| queuedPostVictoryIntrosRef\.current\.length > 0\) return false;/);
+  });
+
+  test('the prominent opening glitch fires on the first FREE win, not the tutorial', () => {
+    expect(APP_TSX).toMatch(/firstFreeWin = !\(await hasSeenFirstWinGlitch\(\)\)/);
+    expect(APP_TSX).toMatch(/firstFreeWin,\s*\n\s*\}\);/);
+  });
+});
+
 describe('victory flow', () => {
   test('spinner overlay uses the grace-window flag, not raw isProcessingVictory', () => {
     expect(APP_TSX).toMatch(/victoryFlow\.victorySpinnerVisible/);

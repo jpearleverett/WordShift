@@ -329,6 +329,25 @@ describe('pending consumable-grant ledger', () => {
     expect(pending[0].firstPurchaseDoubled).toBe(true);
   });
 
+  it('persists the first-purchase grant BEFORE consuming the one-time 2x flag (no paid-nothing window)', async () => {
+    // The first-amber-pack flag must never be spent unless the doubled grant is
+    // already on the replay ledger. Ordering guarantee: after a successful first
+    // purchase, the ledger carries the doubled grant AND the flag is set — a
+    // crash between the two could only ever replay the grant (never lose it).
+    setBillingProvider(successProvider('GPA.order-1'));
+    expect(hasMadeAmberPurchaseSync()).toBe(false);
+    const res = await purchaseConsumable(PRODUCT_IDS.AMBER_SMALL);
+    expect(res.firstPurchaseDoubled).toBe(true);
+    // Grant is on the ledger (survives a kill)...
+    expect(await reconcilePendingConsumableGrants()).toHaveLength(1);
+    // ...and only then is the one-time flag consumed.
+    await loadEntitlements();
+    expect(hasMadeAmberPurchaseSync()).toBe(true);
+    // A second amber pack no longer doubles.
+    const res2 = await purchaseConsumable(PRODUCT_IDS.AMBER_MEDIUM);
+    expect(res2.firstPurchaseDoubled).toBeUndefined();
+  });
+
   it('a failed/cancelled purchase writes nothing to the ledger', async () => {
     setBillingProvider({
       ...successProvider(),

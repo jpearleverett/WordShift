@@ -44,6 +44,8 @@ import {
   markSetupSelectorIntroSeen,
   hasSeenMandatoryHarvest,
   hasSeenStarterIntro,
+  hasSeenFirstWinGlitch,
+  markFirstWinGlitchSeen,
   markStarterIntroSeen,
   consumePendingVariantTutorial,
   checkFreeStreakFreeze,
@@ -69,6 +71,7 @@ import { StatsScreen } from './src/components/StatsScreen';
 import { AchievementToast } from './src/components/AchievementToast';
 import { PhaseTransitionOverlay } from './src/components/PhaseTransitionOverlay';
 import { ShareableResult, decodeChallengeLink, buildChallengeShareText } from './src/services/shareResults';
+import { consumeSharePrompt, getSharePromptInvite } from './src/services/sharePrompts';
 import { initShareImage } from './src/services/shareImage';
 import { ShareResultModal } from './src/components/share/ShareResultModal';
 import { getLocalDateString } from './src/services/dateUtils';
@@ -310,6 +313,18 @@ function MainApp() {
   const [showStoreModal, setShowStoreModal] = useState(false);
   // Solve-time stopwatch for the Daily Challenge leaderboard (ms since board ready)
   const puzzleStartTimeRef = useRef<number>(0);
+  // True while the current daily board was eased (first-ever daily) — its
+  // result skips the shared leaderboard submit (the board isn't the shared one).
+  const dailyEasedRef = useRef<boolean>(false);
+  // handleShare is defined far below; the share-prompt (declared above it) calls
+  // it through this ref, kept current each render, to avoid a TDZ cycle.
+  const handleShareRef = useRef<() => void>(() => {});
+  const buildShareDataRef = useRef<() => { result: ShareableResult; challengeText: string | null } | null>(() => null);
+  const openShareModalRef = useRef<(d: { result: ShareableResult; challengeText: string | null }) => void>(() => {});
+  // Share payload snapshotted at victory-exit time, BEFORE startVictoryExitFlow
+  // resets victoryData — the proactive share prompt reads it so its Share CTA
+  // works after teardown.
+  const pendingShareSnapshotRef = useRef<{ result: ShareableResult; challengeText: string | null } | null>(null);
   // Daily Challenge leaderboard standing for the current victory (null = none/off)
   const [dailyRank, setDailyRank] = useState<DailyRank | null>(null);
   // Persistent daily-ladder "best this week / your history" line + trend for the
@@ -390,6 +405,9 @@ function MainApp() {
 
   // Screen transition overlay — fades in to cover old screen, swaps, fades out to reveal new screen
   const transitionOverlay = useRef(new Animated.Value(0)).current;
+  // Opacity stutter for the prominent first-victory glitch (held at 1 under
+  // reduced motion).
+  const glitchStutter = useRef(new Animated.Value(1)).current;
   // Dynamic background colors for smooth transitions — match overlay/root to destination screen
   const [transitionOverlayColor, setTransitionOverlayColor] = useState('#1A1A2E');
   const [rootBgColor, setRootBgColor] = useState('#1A1A2E');
@@ -565,6 +583,25 @@ function MainApp() {
   useEffect(() => {
     setAudioPhase(persistence.currentPhase);
   }, [persistence.currentPhase]);
+
+  // Glitch stutter for the prominent first-victory glitch: a short on/off
+  // flicker so a held 1.4s glitch reads as a genuine tear, not a caption.
+  // Reduced motion pins it fully visible.
+  useEffect(() => {
+    if (!(orchestration.showVictoryGlitch && orchestration.victoryGlitchProminent)) return;
+    if (getSettingsSync().reducedMotion) {
+      glitchStutter.setValue(1);
+      return;
+    }
+    const flick = (to: number, duration: number) =>
+      Animated.timing(glitchStutter, { toValue: to, duration, useNativeDriver: true });
+    const seq = Animated.sequence([
+      flick(0.25, 60), flick(1, 70), flick(0.5, 50), flick(1, 90),
+      flick(0.35, 55), flick(1, 120),
+    ]);
+    seq.start();
+    return () => { seq.stop(); glitchStutter.setValue(1); };
+  }, [orchestration.showVictoryGlitch, orchestration.victoryGlitchProminent, glitchStutter]);
 
   // New Cycle (NG+) opening beat — once per new cycle, on the first quiet home
   // landing after it begins, the bright days announce themselves (wrongly).
@@ -1060,7 +1097,12 @@ function MainApp() {
         const daily = await generateDailyPuzzle();
         puzzleActions.startDailyGame(daily.words, daily.hint, daily.wordLength, daily.solution);
         puzzleStartTimeRef.current = Date.now();
-        logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true } });
+        // The first-ever daily gets an eased (MEDIUM) board so it isn't a
+        // brutal first competitive impression; its board differs from the
+        // shared one, so its result must NOT hit the leaderboard (still pays
+        // full HARD reward + records to the local ladder).
+        dailyEasedRef.current = daily.eased === true;
+        logEvent({ type: 'puzzle_started', data: { difficulty: 'HARD', daily: true, eased: dailyEasedRef.current } });
         // First-daily mercy: a one-time hint cushion so the first HARD daily
         // (6-letter, 5-row) isn't a wall. Only fires after the board actually
         // started; null on every call after the one-time grant.
@@ -1508,14 +1550,19 @@ function MainApp() {
             : 0;
           let rank: DailyRank | null = null;
           try {
-            await submitDailyResult({
-              date,
-              timeMs: elapsedMs,
-              stars: victory.earnedStars,
-              hintsUsed: result.hintsUsed,
-            });
-            rank = await getDailyRank(date);
-            if (rank) setDailyRank(rank);
+            // Skip the shared leaderboard for an eased first-daily board — it
+            // isn't the same board everyone else played, so its time/stars
+            // aren't comparable. Full reward + local ladder still apply.
+            if (!dailyEasedRef.current) {
+              await submitDailyResult({
+                date,
+                timeMs: elapsedMs,
+                stars: victory.earnedStars,
+                hintsUsed: result.hintsUsed,
+              });
+              rank = await getDailyRank(date);
+              if (rank) setDailyRank(rank);
+            }
           } catch {
             // Leaderboard is non-critical — never block the victory flow.
           }
@@ -1530,7 +1577,10 @@ function MainApp() {
               percentile: rank?.percentile ?? null,
               timeMs: elapsedMs,
               stars: victory.earnedStars,
-              difficulty: getDailyDifficulty(date),
+              // Record the ACTUAL board difficulty — an eased first daily is a
+              // MEDIUM board, so labelling it HARD would skew the local
+              // best-this-week / trend line with an easy fast time.
+              difficulty: getDailyDifficulty(date, dailyEasedRef.current),
             });
             const summary = await getDailyLadderSummary();
             setDailyLadderLine(getDailyLadderLine(summary, persistence.currentPhase));
@@ -1661,10 +1711,15 @@ function MainApp() {
       ) {
         finalVictory = { ...finalVictory, mandatoryHarvest: true };
       }
-      // Fox introduces the Keeper's Welcome starter pack once, ~puzzle 12, but
-      // only for players who don't already own it. She frames it in-world (a
-      // welcome gift on "the shelf"); dismissing opens the Store.
+      // Fox introduces the Keeper's Welcome starter pack once, past puzzle 20,
+      // for players who don't already own it. Declutter rule: never stack it on
+      // a victory that ALREADY has another intro or the mandatory-harvest gate
+      // — the store pitch waits for a quiet win (it re-fires until seen, since
+      // hasSeenStarterIntro is only set on dismissal), so a newcomer never gets
+      // two new-thing beats on one victory.
       if (
+        immediateIntros.length === 0 &&
+        !finalVictory.mandatoryHarvest &&
         completedTotal >= STARTER_INTRO_MIN_PUZZLES &&
         !hasEntitlementSync(ENTITLEMENTS.STARTER_PACK) &&
         !(await hasSeenStarterIntro())
@@ -1794,6 +1849,18 @@ function MainApp() {
       // Check achievements after brief delay to not block victory display
       addVictoryTimeout(() => achievementActions.checkForAchievements(finalVictory), 500);
 
+      // The guaranteed, prominent opening-promise glitch fires on the player's
+      // FIRST free-play win (one-time), not the guided tutorial.
+      let firstFreeWin = false;
+      if (!onboardingFlow.isOnboarding) {
+        try {
+          firstFreeWin = !(await hasSeenFirstWinGlitch());
+          if (firstFreeWin) markFirstWinGlitchSeen().catch(() => {});
+        } catch {
+          firstFreeWin = false;
+        }
+      }
+
       // Post-victory orchestration: glitch, micro-beat, whisper, interjection
       orchestrationActions.processVictory({
         phase: persistence.currentPhase,
@@ -1801,6 +1868,7 @@ function MainApp() {
         completedWords: result.completedWords,
         isOnboarding: onboardingFlow.isOnboarding,
         puzzlesSinceHomeVisit: puzzlesSinceHomeVisit.current,
+        firstFreeWin,
       });
 
       // Re-schedule notifications after puzzle completion
@@ -2172,6 +2240,10 @@ function MainApp() {
     try {
       if (onboardingFlow.isOnboarding) return;
       if ((persistence.cumulativeStats?.totalPuzzlesCompleted ?? 0) < 3) return;
+      // Declutter: never stack the permission prompt on a victory that already
+      // has a Fox intro playing/queued. Return WITHOUT marking prompted so it
+      // simply waits for a quiet victory exit.
+      if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return;
       if (await hasPromptedForNotifications()) return;
       if ((await getNotificationPermissionStatus()) === 'granted') return;
       await markPromptedForNotifications();
@@ -2210,9 +2282,9 @@ function MainApp() {
   // ignition, onboarding, or the serene post-revelation tone. Must run BEFORE
   // startVictoryExitFlow (which resets victoryData). Patron suppression + cadence
   // are handled inside ads.ts. Fire-and-forget: the ad overlays the transition.
-  const maybeShowVictoryInterstitial = useCallback(() => {
+  const maybeShowVictoryInterstitial = useCallback((): Promise<boolean> => {
     const vd = victoryFlow.victoryData;
-    if (!vd) return;
+    if (!vd) return Promise.resolve(false);
     const step = onboardingFlow.onboardingStep;
     const inOnboarding = step !== undefined && step !== 'complete';
     const exempt =
@@ -2227,12 +2299,12 @@ function MainApp() {
       phaseTransitionEvent != null ||                  // final / post-revelation cinematic queued
       (vd.newPhase as number) >= 5 ||                  // post-revelation: never break the serene tone
       vd.puzzlesSolved <= AUTO_COLLECT_PUZZLE_LIMIT;   // protect the early "pure delight" window — no ads in the first session
-    maybeShowInterstitial({
+    return maybeShowInterstitial({
       puzzlesSolved: vd.puzzlesSolved,
       phase: vd.newPhase,
       exempt,
     }).then(async (shown) => {
-      if (!shown) return;
+      if (!shown) return false;
       // After the player has actually seen a few interstitials, offer the
       // contextual one-time Remove-Ads upsell ("tired of these?").
       await recordInterstitialSeen();
@@ -2246,7 +2318,8 @@ function MainApp() {
           ],
         );
       }
-    }).catch(() => {});
+      return true;
+    }).catch(() => false);
   }, [victoryFlow.victoryData, onboardingFlow.onboardingStep, isPlayingDaily, phaseTransitionEvent, persistence.pendingPhaseTransition]);
 
   // One-time, low-pressure Patron nudge once the player has settled in. Suppressed
@@ -2269,18 +2342,71 @@ function MainApp() {
     }
   }, [onboardingFlow.isOnboarding, victoryFlow.victoryData, persistence.cumulativeStats]);
 
+  // One-time proactive SHARE invite at a genuine peak (the first flawless win).
+  // The game already nudges players to buy but never to share — this is the
+  // growth counterpart, frequency-capped exactly like the monetization nudges.
+  // (Phase transitions were considered as a second trigger but are deferred to
+  // the pit ceremony, which never routes through this exit — flawless-only is
+  // the reachable peak, and it lands early for nearly every player.) Returns
+  // whether it fired so the exit flow can keep to one nudge per victory. Never
+  // on a mandatory-harvest / ceremony exit, and never stacked on a queued Fox
+  // intro or an interstitial that just showed.
+  const maybeShowSharePrompt = useCallback(async (): Promise<boolean> => {
+    const vd = victoryFlow.victoryData;
+    if (!vd) return false;
+    if (onboardingFlow.isOnboarding) return false;
+    if (vd.mandatoryHarvest || vd.phaseTransitionPending || persistence.pendingPhaseTransition != null) return false;
+    // Same anti-stacking guard the notification prompt uses: never layer on a
+    // Fox intro. Return WITHOUT consuming so it waits for a quiet exit.
+    if (postVictoryIntro || queuedPostVictoryIntrosRef.current.length > 0) return false;
+    // Snapshot taken at exit time (before teardown nulled victoryData); if it's
+    // missing, don't consume the one-time prompt on a broken exit.
+    const snapshot = pendingShareSnapshotRef.current;
+    if (!snapshot) return false;
+    const fired = await consumeSharePrompt({
+      isFlawlessWin: vd.flawless === true,
+      isPhaseTransition: false,
+      isOnboarding: false,
+    });
+    if (fired) {
+      showGameAlert(
+        '',
+        getSharePromptInvite(persistence.currentPhase),
+        [
+          { text: 'Not now', style: 'cancel' },
+          // Open the modal from the pre-teardown snapshot — victoryData/board
+          // state is already reset by the time this fires.
+          { text: 'Share', onPress: () => { hapticLight(); openShareModalRef.current(snapshot); } },
+        ],
+      );
+    }
+    return fired;
+  }, [victoryFlow.victoryData, onboardingFlow.isOnboarding, persistence.pendingPhaseTransition, persistence.currentPhase, postVictoryIntro]);
+
+  // At most ONE of the victory-exit nudges (share / patron / notification
+  // permission) fires per exit — the share peak takes precedence when eligible.
+  // Skipped entirely when an interstitial just showed this exit, so a nudge
+  // never piles on top of an ad.
+  const runVictoryExitNudges = useCallback(async (interstitialShown: boolean) => {
+    if (interstitialShown) return;
+    if (await maybeShowSharePrompt()) return;
+    await maybePromptForNotifications();
+    await maybeShowPatronNudge();
+  }, [maybeShowSharePrompt, maybePromptForNotifications, maybeShowPatronNudge]);
+
   const handleNextLevel = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
     setSpeedRescueUsed(false);
-    maybeShowVictoryInterstitial();
+    // Snapshot the share payload BEFORE the exit flow resets victoryData.
+    pendingShareSnapshotRef.current = buildShareDataRef.current();
+    const adShown = maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       clearPuzzleState().catch(() => {});
       puzzleActions.handleNextLevel();
     });
-    maybePromptForNotifications().catch(() => {});
-    maybeShowPatronNudge().catch(() => {});
-  }, [puzzleActions, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
+    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
+  }, [puzzleActions, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // During onboarding, "Continue" on the victory modal dismisses the modal and
   // surfaces the puzzle-screen completion beat ("Feel how the house settled...").
@@ -2298,15 +2424,16 @@ function MainApp() {
   const handleReturnHome = useCallback(() => {
     hapticLight();
     setIsPlayingDaily(false);
-    maybeShowVictoryInterstitial();
+    // Snapshot the share payload BEFORE the exit flow resets victoryData.
+    pendingShareSnapshotRef.current = buildShareDataRef.current();
+    const adShown = maybeShowVictoryInterstitial();
     startVictoryExitFlow(() => {
       puzzlesSinceHomeVisit.current = 0;
       puzzleActions.clearBoard();
       transitionTo('home');
     });
-    maybePromptForNotifications().catch(() => {});
-    maybeShowPatronNudge().catch(() => {});
-  }, [puzzleActions, transitionTo, startVictoryExitFlow, maybePromptForNotifications, maybeShowVictoryInterstitial, maybeShowPatronNudge]);
+    Promise.resolve(adShown).then((shown) => runVictoryExitNudges(shown === true)).catch(() => {});
+  }, [puzzleActions, transitionTo, startVictoryExitFlow, runVictoryExitNudges, maybeShowVictoryInterstitial]);
 
   // The pit route is a victory exit too — same interstitial gate as
   // next/home. Its exemptions already cover the sensitive pit moments
@@ -2390,11 +2517,15 @@ function MainApp() {
   // native capturer is present, else falls back to the emoji-grid text share).
   // It overlays the victory screen rather than exiting it, so sharing never
   // costs the player their victory moment.
-  const handleShare = useCallback(() => {
-    if (!victoryFlow.victoryData) return;
-    hapticLight();
+  // Build the share payload from CURRENT victory + board state. Returns null
+  // when there's no active victory. Kept separate so callers that fire around
+  // the victory-exit teardown (the proactive share prompt) can snapshot the
+  // payload while state is still valid, rather than reading it back after
+  // resetVictory() has nulled victoryData.
+  const buildShareData = useCallback((): { result: ShareableResult; challengeText: string | null } | null => {
+    if (!victoryFlow.victoryData) return null;
     const moveCount = puzzle.rows.length - 1;
-    setShareResultData({
+    const result: ShareableResult = {
       stars: victoryFlow.victoryData.earnedStars,
       difficulty: isPlayingDaily ? 'HARD' : puzzle.difficulty,
       hintsUsed: puzzle.hintsUsed,
@@ -2409,19 +2540,34 @@ function MainApp() {
       animalWhisper: orchestration.whisper?.text,
       phase: persistence.currentPhase,
       incantationName: puzzle.lastIncantationName || undefined,
-    });
+    };
     // Friend challenge: only a standard, non-daily board encodes into a link
     // the recipient can actually play (the deep link starts a standard board).
+    let challengeText: string | null = null;
     if (!isPlayingDaily && puzzle.currentVariant === 'standard') {
       try {
-        setShareChallengeText(buildChallengeShareText(puzzle.rows.map(r => r.originalWord)));
+        challengeText = buildChallengeShareText(puzzle.rows.map(r => r.originalWord));
       } catch {
-        setShareChallengeText(null);
+        challengeText = null;
       }
-    } else {
-      setShareChallengeText(null);
     }
+    return { result, challengeText };
   }, [victoryFlow.victoryData, puzzle, orchestration.whisper, persistence.currentPhase, isPlayingDaily]);
+
+  const openShareModal = useCallback((data: { result: ShareableResult; challengeText: string | null }) => {
+    setShareResultData(data.result);
+    setShareChallengeText(data.challengeText);
+  }, []);
+  openShareModalRef.current = openShareModal;
+
+  const handleShare = useCallback(() => {
+    const data = buildShareData();
+    if (!data) return;
+    hapticLight();
+    openShareModal(data);
+  }, [buildShareData, openShareModal]);
+  handleShareRef.current = handleShare;
+  buildShareDataRef.current = buildShareData;
 
   const handleVictoryTapAccelerate = useCallback(() => {
     if (!victoryFlow.victoryData) return;
@@ -3148,8 +3294,22 @@ function MainApp() {
 
         {/* Victory Glitch — brief flash text during Phase 0 victories */}
         {orchestration.showVictoryGlitch && orchestration.victoryGlitch && (
-          <View style={styles.victoryGlitchOverlay} pointerEvents="none">
-            <Text style={styles.victoryGlitchText}>{orchestration.victoryGlitch}</Text>
+          <View
+            style={[
+              styles.victoryGlitchOverlay,
+              orchestration.victoryGlitchProminent && styles.victoryGlitchOverlayProminent,
+            ]}
+            pointerEvents="none"
+          >
+            <Animated.Text
+              style={[
+                styles.victoryGlitchText,
+                orchestration.victoryGlitchProminent && styles.victoryGlitchTextProminent,
+                orchestration.victoryGlitchProminent && { opacity: glitchStutter },
+              ]}
+            >
+              {orchestration.victoryGlitch}
+            </Animated.Text>
           </View>
         )}
 
@@ -3233,7 +3393,7 @@ function MainApp() {
                               : ''
                           }`
                         : tutorialGuidance?.letterToMove
-                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up.`
+                          ? `Tap the glowing "${tutorialGuidance.letterToMove}" tile to pick it up. Or just drag it.`
                           : ONBOARDING_FOX_LINES.puzzle_tutorial_pick[0]
                     )
                     : ONBOARDING_FOX_LINES.puzzle_tutorial_intro[0]

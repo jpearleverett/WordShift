@@ -28,6 +28,13 @@ the codebase and are the remaining gates to submission.
       in `mobile/app.json` on the press/reviewer build only (empty string =
       feature fully inert in shipping builds); hand the code out with
       `docs/PRESS_KIT.md`.
+- [ ] **Flip `expo.extra.adsUseTestIds` to `false` for the PRODUCTION build
+      only** — it ships `true` so every dev/internal-testing build serves
+      Google TEST ad units. Serving LIVE ads to yourself on a test build and
+      tapping them is an AdMob policy violation that can get the account
+      limited. Leave it `true` through all internal testing; set it `false`
+      only when cutting the public production build (and confirm live ads fill
+      on a real production install before wide rollout).
 - [ ] **Bump `android.versionCode`** in `mobile/app.json` for the next release
       (currently 43; autoIncrement is intentionally off — bump manually every
       time).

@@ -2,9 +2,42 @@ import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Dimensions, Animated, Easing, Platform } from 'react-native';
 import { getPhaseTheme } from '../theme/colors';
 import { getSettingsSync } from '../services/settings';
-import { getMaxParticleCount } from '../services/deviceTier';
+import { getMaxParticleCount, getDeviceTier } from '../services/deviceTier';
+import type { DeviceTier } from '../services/deviceTier';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// ---------------------------------------------------------------------------
+// Phase 0-1 "something is off" aberration
+// ---------------------------------------------------------------------------
+// The horror payoff is buried deep, so session one must PROMISE that something
+// is subtly wrong without revealing anything. Two rare, low-odds channels do
+// this, both reusing existing animation loops (no new RAF, no new timers):
+//   1) A single floating sparkle occasionally "dies wrong" — it desaturates to
+//      a dim ashen ember tone and sinks a few px faster before vanishing.
+//   2) The ambient pulse very occasionally takes one slower, off-rhythm breath.
+// Both are hard-gated to Phase 0-1, off under reduced motion, and skipped on
+// low-tier devices. Nothing crimson, no eyes, no words — just "did I imagine
+// that?". Kept deliberately low-frequency so it never reads as a light show.
+export const ABERRATION_CHANCE = 0.03; // per particle float cycle (Phase 0-1 only)
+export const BREATH_ABERRATION_CHANCE = 0.06; // per ambient pulse breath (Phase 0-1 only)
+// A dim, desaturated ashen-warm grey. Reads as a light going out wrong, NOT as
+// fire/crimson — the reveal must stay earned.
+const ABERRATION_EMBER_COLOR = 'rgba(115, 100, 92, 0.9)';
+
+/**
+ * Whether the Phase 0-1 aberration is allowed to fire, given the narrative
+ * phase, device tier, and reduced-motion setting. Pure so it can be pinned by a
+ * test — this gate is the make-or-break contract (Phase 0-1 only; the descent
+ * itself must still feel earned).
+ */
+export function isAberrationEnabled(
+  phase: number,
+  tier: DeviceTier,
+  reducedMotion: boolean
+): boolean {
+  return phase <= 1 && tier !== 'low' && !reducedMotion;
+}
 
 interface ParticleLayout {
   id: number;
@@ -91,13 +124,23 @@ const SoftWash: React.FC<{
   );
 };
 
-const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
+const Particle: React.FC<{ particle: FloatingParticle; aberrationEnabled: boolean }> = ({
+  particle,
+  aberrationEnabled,
+}) => {
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT + 50)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.5)).current;
+  // Aberration drivers (Phase 0-1 only, idle at 0): an ember tone floods in and
+  // the sparkle sinks a few px faster as it "dies wrong".
+  const emberOpacity = useRef(new Animated.Value(0)).current;
+  const sinkY = useRef(new Animated.Value(0)).current;
   const mountedRef = useRef(true);
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
+  // Kept fresh so a phase change (0/1 -> 2+) stops future aberrations mid-loop.
+  const aberrationRef = useRef(aberrationEnabled);
+  aberrationRef.current = aberrationEnabled;
 
   useEffect(() => {
     const animate = () => {
@@ -106,57 +149,89 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
       opacity.setValue(0);
       rotate.setValue(0);
       scale.setValue(0.5);
+      sinkY.setValue(0);
+      emberOpacity.setValue(0);
+
+      const d = particle.duration;
+      // Rare: this cycle the sparkle dies wrong. Very low odds so it reads as
+      // "did that just happen?", never a light show.
+      const aberrant = aberrationRef.current && Math.random() < ABERRATION_CHANCE;
+
+      const opacityBranch = aberrant
+        ? Animated.sequence([
+            Animated.timing(opacity, { toValue: 1, duration: d * 0.2, useNativeDriver: true }),
+            Animated.timing(opacity, { toValue: 0.6, duration: d * 0.55, useNativeDriver: true }),
+            // a brief wrong flicker, then the light gutters out
+            Animated.timing(opacity, { toValue: 0.82, duration: 110, useNativeDriver: true }),
+            Animated.timing(opacity, {
+              toValue: 0,
+              duration: d * 0.25,
+              easing: Easing.in(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ])
+        : Animated.sequence([
+            Animated.timing(opacity, { toValue: 1, duration: d * 0.2, useNativeDriver: true }),
+            Animated.timing(opacity, { toValue: 0.6, duration: d * 0.6, useNativeDriver: true }),
+            Animated.timing(opacity, { toValue: 0, duration: d * 0.2, useNativeDriver: true }),
+          ]);
+
+      const branches: Animated.CompositeAnimation[] = [
+        // Float upward
+        Animated.timing(translateY, {
+          toValue: -100,
+          duration: d,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        opacityBranch,
+        // Rotate
+        Animated.timing(rotate, {
+          toValue: 1,
+          duration: d,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        // Scale pulse
+        Animated.sequence([
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: d * 0.3,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 0.8,
+            duration: d * 0.7,
+            useNativeDriver: true,
+          }),
+        ]),
+      ];
+
+      if (aberrant) {
+        branches.push(
+          // Ember tone floods in over the last stretch of life
+          Animated.sequence([
+            Animated.delay(d * 0.75),
+            Animated.timing(emberOpacity, { toValue: 0.85, duration: 160, useNativeDriver: true }),
+            Animated.timing(emberOpacity, { toValue: 0.4, duration: d * 0.22, useNativeDriver: true }),
+          ]),
+          // ...and the sparkle sinks a few px faster as it goes out
+          Animated.sequence([
+            Animated.delay(d * 0.78),
+            Animated.timing(sinkY, {
+              toValue: 20,
+              duration: d * 0.22,
+              easing: Easing.in(Easing.quad),
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      }
 
       animRef.current = Animated.sequence([
         Animated.delay(particle.delay),
-        Animated.parallel([
-          // Float upward
-          Animated.timing(translateY, {
-            toValue: -100,
-            duration: particle.duration,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
-          // Fade in then out
-          Animated.sequence([
-            Animated.timing(opacity, {
-              toValue: 1,
-              duration: particle.duration * 0.2,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0.6,
-              duration: particle.duration * 0.6,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0,
-              duration: particle.duration * 0.2,
-              useNativeDriver: true,
-            }),
-          ]),
-          // Rotate
-          Animated.timing(rotate, {
-            toValue: 1,
-            duration: particle.duration,
-            easing: Easing.linear,
-            useNativeDriver: true,
-          }),
-          // Scale pulse
-          Animated.sequence([
-            Animated.timing(scale, {
-              toValue: 1,
-              duration: particle.duration * 0.3,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: true,
-            }),
-            Animated.timing(scale, {
-              toValue: 0.8,
-              duration: particle.duration * 0.7,
-              useNativeDriver: true,
-            }),
-          ]),
-        ]),
+        Animated.parallel(branches),
       ]);
       animRef.current.start(() => {
         if (mountedRef.current) animate();
@@ -176,33 +251,20 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
     outputRange: ['0deg', '360deg'],
   });
 
-  const getShape = () => {
+  const renderShape = (color: string) => {
     switch (particle.type) {
-      case 'star':
+      case 'star': {
+        // 4/8-point sparkle: an axis-aligned square plus a same-size 45deg
+        // diamond. Each shape's points poke past the other, so it reads as a
+        // star instead of the old plus sign. Two Views — cheap per particle.
+        const s = particle.size * 0.62;
         return (
-          <View style={styles.starContainer}>
-            <View
-              style={[
-                styles.starH,
-                {
-                  width: particle.size,
-                  height: particle.size * 0.35,
-                  backgroundColor: particle.color,
-                },
-              ]}
-            />
-            <View
-              style={[
-                styles.starV,
-                {
-                  width: particle.size * 0.35,
-                  height: particle.size,
-                  backgroundColor: particle.color,
-                },
-              ]}
-            />
+          <View style={[styles.starContainer, { width: s, height: s }]}>
+            <View style={[styles.starSquare, { backgroundColor: color }]} />
+            <View style={[styles.starDiamond, { backgroundColor: color }]} />
           </View>
         );
+      }
       case 'diamond':
         return (
           <View
@@ -211,7 +273,7 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
               {
                 width: particle.size * 0.7,
                 height: particle.size * 0.7,
-                backgroundColor: particle.color,
+                backgroundColor: color,
               },
             ]}
           />
@@ -224,7 +286,7 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
               {
                 width: particle.size,
                 height: particle.size,
-                backgroundColor: particle.color,
+                backgroundColor: color,
                 borderRadius: particle.size / 2,
               },
             ]}
@@ -241,6 +303,7 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
           left: particle.x,
           transform: [
             { translateY },
+            { translateY: sinkY },
             { rotate: spin },
             { scale },
           ],
@@ -248,7 +311,15 @@ const Particle: React.FC<{ particle: FloatingParticle }> = ({ particle }) => {
         },
       ]}
     >
-      {getShape()}
+      {renderShape(particle.color)}
+      {aberrationEnabled && (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.emberOverlay, { opacity: emberOpacity }]}
+        >
+          {renderShape(ABERRATION_EMBER_COLOR)}
+        </Animated.View>
+      )}
     </Animated.View>
   );
 };
@@ -276,30 +347,53 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
   );
   // Use opacity-based pulse with native driver instead of JS-bridge backgroundColor
   const pulseOpacity = useRef(new Animated.Value(0)).current;
+  // Phase 0-1 aberration gate (shared by particles + the ambient breath).
+  const aberrationEnabled = isAberrationEnabled(phase, getDeviceTier(), reducedMotion);
+  // Read inside the self-scheduling breath loop so a phase change flips it
+  // without restarting the loop.
+  const breathAberrationRef = useRef(aberrationEnabled);
+  breathAberrationRef.current = aberrationEnabled;
 
   useEffect(() => {
     if (reducedMotion) return;
-    // Subtle pulse: animate opacity of a secondary color overlay (native driver)
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
+    // Subtle pulse: animate opacity of a secondary color overlay (native driver).
+    // Self-scheduling instead of Animated.loop so a single breath can rarely run
+    // slower and linger — a barely-perceptible off-rhythm beat at Phase 0-1. No
+    // new perpetual loop: this replaces the old Animated.loop one-for-one.
+    let cancelled = false;
+    let current: Animated.CompositeAnimation | null = null;
+
+    const runBreath = () => {
+      if (cancelled) return;
+      const aberrant =
+        breathAberrationRef.current && Math.random() < BREATH_ABERRATION_CHANCE;
+      const dur = aberrant ? 6800 : 4000;
+      const seq = Animated.sequence([
         Animated.timing(pulseOpacity, {
           toValue: 1,
-          duration: 4000,
+          duration: dur,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
+        // An off-rhythm breath holds at the top a beat before releasing.
+        ...(aberrant ? [Animated.delay(650)] : []),
         Animated.timing(pulseOpacity, {
           toValue: 0,
-          duration: 4000,
+          duration: dur,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      ])
-    );
-    pulseLoop.start();
+      ]);
+      current = seq;
+      seq.start(({ finished }) => {
+        if (finished && !cancelled) runBreath();
+      });
+    };
+    runBreath();
 
     return () => {
-      pulseLoop.stop();
+      cancelled = true;
+      current?.stop();
       pulseOpacity.stopAnimation();
     };
   }, [reducedMotion]);
@@ -345,7 +439,11 @@ export const AnimatedBackground: React.FC<AnimatedBackgroundProps> = ({ phase = 
 
       {/* Floating particles */}
       {particles.map((particle) => (
-        <Particle key={particle.id} particle={particle} />
+        <Particle
+          key={particle.id}
+          particle={particle}
+          aberrationEnabled={aberrationEnabled}
+        />
       ))}
 
       {/* Top vignette. iOS: shadow-based soft band. Android ignores those
@@ -466,17 +564,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  starH: {
-    position: 'absolute',
-    borderRadius: 2,
+  // Axis-aligned square + a 45deg diamond of equal size = a compact sparkle.
+  starSquare: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 1,
   },
-  starV: {
-    position: 'absolute',
-    borderRadius: 2,
+  starDiamond: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 1,
+    transform: [{ rotate: '45deg' }],
   },
   diamond: {
     transform: [{ rotate: '45deg' }],
     borderRadius: 2,
+  },
+  // Ember overlay: a same-shape copy tinted dim ashen ember, faded in only
+  // during an aberrant "dies wrong" cycle. Fills the particle box and centers.
+  emberOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

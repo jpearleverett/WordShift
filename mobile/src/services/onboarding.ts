@@ -109,9 +109,11 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
     "Come on, one quick puzzle together, then we build.",
   ],
 
-  // Step 3: On puzzle screen — guide through the puzzle
+  // Step 3: On puzzle screen — guide through the puzzle. This intro beat is the
+  // move mechanic's first mention, so it also names BOTH input paths: many
+  // players reach for drag first and the old tutorial only ever taught tap.
   puzzle_tutorial_intro: [
-    "See these rows? We'll move one letter from here into the row below.",
+    "See these rows? We'll move one letter from here into the row below.\nYou can tap a letter and tap where it goes, or just drag it down. Whatever feels good.",
   ],
   puzzle_tutorial_pick: [
     "See that glowing letter? Give it a tap!",
@@ -124,7 +126,7 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   // words must stay valid, and the green check / red cross ghost previews show
   // which drops keep them that way.
   puzzle_tutorial_valid_move: [
-    "There it is, that little click when a word falls into place.\nSee the little marks when you pick up a letter? A green check means both words stay real words. A red cross means one of them would break.\nWrong move? Tap undo. Stuck? Tap hint. Keep going, all the way down.",
+    "There's that little click, it landed! A green check means both words stay real. A red cross means one would break.\nWrong move? Tap undo. Stuck? Tap hint.",
   ],
   puzzle_tutorial_invalid: [
     "Hmm, that didn't land quite right.\nTry undoing and picking a different spot.",
@@ -161,14 +163,13 @@ export const ONBOARDING_FOX_LINES: Record<string, string[]> = {
   ],
 
   // Step 8: Back on home screen — explain unlocks and keep playing (kept to
-  // four short beats so the text-dense tail right after the first-win dopamine
-  // hit doesn't drag). The third beat points at the pit entrance below the
-  // house — the in-world path is the only way back to the pit, so the player
+  // three short beats so the text-dense tail right after the first-win dopamine
+  // hit doesn't drag). The second beat points at the pit entrance below the
+  // house: the in-world path is the only way back to the pit, so the player
   // must hear where it lives before onboarding lets go of their hand.
   unlock_explained: [
-    "And that's the whole happy loop of it!\nSolve puzzles, offer your words, and the amber comes home with us.",
-    "Amber builds rooms, and rooms let us invite more friends in.",
+    "That's the whole happy loop! Solve puzzles, offer your words, and the amber comes home to build our rooms and invite more friends.",
     "When you have words to offer, the pit waits just below the house.\nScroll down and give it a tap.",
-    "Come back each day, and we'll fill this whole house together.\nThe others are going to love you.\nThey need you.",
+    "Come back each day, and we'll fill this house together. They need you.",
   ],
 };

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   getVictoryGlitch,
+  getFirstWinGlitchText,
   checkNarrativeMicroBeat,
   NarrativeMicroBeat,
   getAnimalWhisper,
@@ -17,6 +18,7 @@ import {
   INTERJECTION_AUTODISMISS_MS,
   VICTORY_GLITCH_DELAY_MS,
   VICTORY_GLITCH_DURATION_MS,
+  VICTORY_GLITCH_FIRST_DURATION_MS,
   MICRO_BEAT_GLITCH_DELAY_MS,
   MICRO_BEAT_WHISPER_DELAY_MS,
 } from '../constants/timing';
@@ -53,6 +55,8 @@ export interface VictoryOrchestrationState {
   victoryGlitch: string | null;
   /** Whether the victory glitch overlay is visible. */
   showVictoryGlitch: boolean;
+  /** The guaranteed first-ever-victory glitch: held longer + rendered louder. */
+  victoryGlitchProminent: boolean;
   /** Narrative micro-beat overlay at specific puzzle milestones. */
   microBeat: NarrativeMicroBeat | null;
   /** Whether the micro-beat overlay is visible. */
@@ -95,6 +99,9 @@ export interface ProcessVictoryParams {
   isOnboarding: boolean;
   /** Consecutive puzzles without visiting home screen. */
   puzzlesSinceHomeVisit: number;
+  /** The player's FIRST free-play (non-onboarding) win — fires the guaranteed,
+   *  prominent opening-promise glitch here rather than on the guided tutorial. */
+  firstFreeWin?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,6 +132,7 @@ export function useVictoryOrchestration(): [
 
   const [victoryGlitch, setVictoryGlitch] = useState<string | null>(null);
   const [showVictoryGlitch, setShowVictoryGlitch] = useState(false);
+  const [victoryGlitchProminent, setVictoryGlitchProminent] = useState(false);
 
   const [microBeat, setMicroBeat] = useState<NarrativeMicroBeat | null>(null);
   const [showMicroBeat, setShowMicroBeat] = useState(false);
@@ -171,17 +179,33 @@ export function useVictoryOrchestration(): [
       completedWords,
       isOnboarding: onboarding,
       puzzlesSinceHomeVisit,
+      firstFreeWin,
     } = params;
 
     const gen = ++generationRef.current;
 
-    // ------ Victory glitch (Phase 0, ~8%, guaranteed on first puzzle) ------
-    const glitchText = getVictoryGlitch(phase, totalPuzzlesCompleted);
+    // ------ Victory glitch ------
+    // The player's first FREE-PLAY win gets the guaranteed, prominent opening
+    // promise (held longer + louder). The guided tutorial gets NO glitch (pure
+    // warmth — the promise belongs on a win the player owns). Every other
+    // Phase-0 win keeps the ~8% ambient glitch.
+    let glitchText: string | null = null;
+    let prominent = false;
+    if (firstFreeWin) {
+      glitchText = getFirstWinGlitchText();
+      prominent = true;
+    } else if (!onboarding) {
+      glitchText = getVictoryGlitch(phase, totalPuzzlesCompleted);
+    }
     if (glitchText) {
       addTimeout(() => {
         setVictoryGlitch(glitchText);
+        setVictoryGlitchProminent(prominent);
         setShowVictoryGlitch(true);
-        addTimeout(() => setShowVictoryGlitch(false), VICTORY_GLITCH_DURATION_MS);
+        addTimeout(
+          () => setShowVictoryGlitch(false),
+          prominent ? VICTORY_GLITCH_FIRST_DURATION_MS : VICTORY_GLITCH_DURATION_MS,
+        );
       }, VICTORY_GLITCH_DELAY_MS);
     }
 
@@ -297,6 +321,7 @@ export function useVictoryOrchestration(): [
     setShowInterjection(false);
     setVictoryGlitch(null);
     setShowVictoryGlitch(false);
+    setVictoryGlitchProminent(false);
     setMicroBeat(null);
     setShowMicroBeat(false);
     setCompletionCoda(null);
@@ -319,6 +344,7 @@ export function useVictoryOrchestration(): [
     showInterjection,
     victoryGlitch,
     showVictoryGlitch,
+    victoryGlitchProminent,
     microBeat,
     showMicroBeat,
     completionCoda,

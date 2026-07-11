@@ -585,6 +585,16 @@ export const appStyles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 12,
   },
+  // The guaranteed first-victory glitch, held longer and rendered louder — the
+  // game's opening promise that something else is here.
+  victoryGlitchOverlayProminent: {
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+  },
+  victoryGlitchTextProminent: {
+    fontSize: 40,
+    letterSpacing: 6,
+    textShadowRadius: 22,
+  },
   microBeatWhisperOverlay: {
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
