@@ -3,16 +3,22 @@ import { Platform } from 'react-native';
 import * as Font from 'expo-font';
 
 /**
- * Single-typeface system — Shantell Sans everywhere.
+ * Two-typeface system: Figtree for the header/title chrome, Shantell Sans for
+ * everything else.
  *
- * The whole game renders in Shantell Sans (SIL OFL, Google Fonts): every
- * screen, every element, no exceptions. There is intentionally no second face.
+ * - HEADERS / titles / plaques / buttons / prominent bold-and-bigger UI text
+ *   render in Figtree (SIL OFL, Google Fonts) — a clean geometric-humanist sans
+ *   that sharpens hierarchy. This is the `PIXEL_FONT` role (the "chrome" face).
+ * - BODY / running text / dialogue / inline emphasis stay in Shantell Sans (the
+ *   cozy handwritten face). This is the `BODY_FONT` role — including its BOLD
+ *   and ITALIC, so inline bold-within-a-sentence and the letter tiles keep the
+ *   handwritten feel and never switch font mid-line.
  *
- * Shantell Sans ships real weights and italics, so we register four faces and
- * map them by ROLE. Crucially, bold text uses the BOLD family and italic text
- * uses the ITALIC family — the family name itself carries the weight/slant, so
- * a `fontWeight`/`fontStyle` on top always matches an available face and iOS
- * never falls back to the system font (the trap the single-weight Kurale hit).
+ * Both faces ship real weights, so we register them per-face and map by ROLE.
+ * The family name itself carries the weight/slant (e.g. `Figtree-Bold`,
+ * `ShantellSans-Italic`), so a `fontWeight`/`fontStyle` on top always matches an
+ * available face and iOS never falls back to the system font (the trap the
+ * single-weight Kurale hit).
  *
  * Registration is PLATFORM-SPLIT because the platforms resolve custom fonts
  * differently:
@@ -28,17 +34,21 @@ import * as Font from 'expo-font';
  *   (below) is enough there and needs no config-plugin ambiguity.
  */
 
-// The four faces. These strings are the family names used everywhere.
+// Shantell Sans faces (the BODY / running-text role).
 export const SHANTELL_REGULAR = 'ShantellSans-Regular';
 export const SHANTELL_BOLD = 'ShantellSans-Bold';
 export const SHANTELL_ITALIC = 'ShantellSans-Italic';
 export const SHANTELL_BOLD_ITALIC = 'ShantellSans-BoldItalic';
 
-// Legacy aliases — mapped to Shantell by role. Kept so the ~320 existing
-// `fontFamily` references (PIXEL_FONT_BOLD / BODY_FONT / BODY_FONT_ITALIC ...)
-// and their imports keep working unchanged.
-export const PIXEL_FONT = SHANTELL_REGULAR;
-export const PIXEL_FONT_BOLD = SHANTELL_BOLD;
+// Figtree faces (the HEADER / title / prominent-bold chrome role).
+export const FIGTREE_REGULAR = 'Figtree-Regular';
+export const FIGTREE_BOLD = 'Figtree-Bold';
+
+// Role aliases. The ~320 existing `fontFamily` references keep working; only the
+// FACE behind each role changes. PIXEL_FONT* (headers/chrome, 245+ uses) now
+// resolves to Figtree; BODY_FONT* (body/tiles/inline emphasis) stays Shantell.
+export const PIXEL_FONT = FIGTREE_REGULAR;
+export const PIXEL_FONT_BOLD = FIGTREE_BOLD;
 export const BODY_FONT = SHANTELL_REGULAR;
 export const BODY_FONT_BOLD = SHANTELL_BOLD;
 export const BODY_FONT_ITALIC = SHANTELL_ITALIC;
@@ -59,6 +69,8 @@ export async function loadPixelFonts(): Promise<void> {
       [SHANTELL_BOLD]: require('../../assets/fonts/ShantellSans-Bold.ttf'),
       [SHANTELL_ITALIC]: require('../../assets/fonts/ShantellSans-Italic.ttf'),
       [SHANTELL_BOLD_ITALIC]: require('../../assets/fonts/ShantellSans-BoldItalic.ttf'),
+      [FIGTREE_REGULAR]: require('../../assets/fonts/Figtree-Regular.ttf'),
+      [FIGTREE_BOLD]: require('../../assets/fonts/Figtree-Bold.ttf'),
     });
   } catch {
     // Non-fatal — the UI falls back to the system font for these families.
