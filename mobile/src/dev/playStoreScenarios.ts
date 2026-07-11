@@ -18,6 +18,10 @@ import type {
 } from '../services/dailyChallenge';
 import type { SavedPuzzleState } from '../services/puzzleSaveState';
 import type { CumulativeStats } from '../services/starRating';
+import {
+  getLocalDateString,
+  parseLocalDate,
+} from '../services/dateUtils';
 
 export const PLAY_STORE_SCENARIO_NAMES = [
   'puzzle-preview',
@@ -46,7 +50,12 @@ const ALL_DIFFICULTIES: Difficulty[] = [
   'MEDIUM_PLUS',
   'HARD',
 ];
-const DAILY_CAPTURE_PUZZLES = Math.max(10, DAILY_CHALLENGE_UNLOCK_PUZZLES);
+const DAILY_HISTORICAL_STREAK = 12;
+const DAILY_CURRENT_STREAK = 7;
+const DAILY_CAPTURE_COMPLETIONS =
+  DAILY_HISTORICAL_STREAK + DAILY_CURRENT_STREAK;
+const DAILY_CAPTURE_PUZZLES =
+  DAILY_CHALLENGE_UNLOCK_PUZZLES + DAILY_CAPTURE_COMPLETIONS;
 const FIRST_FLAWLESS_ACHIEVEMENTS = [
   'first_puzzle',
   'first_perfect',
@@ -199,6 +208,16 @@ function baseStats(
     remainingThreeStars -= difficultyThreeStars;
   }
 
+  const personalBests: NonNullable<CumulativeStats['personalBests']> = {};
+  for (const difficulty of ALL_DIFFICULTIES) {
+    if (byDifficulty[difficulty].completed > 0) {
+      personalBests[difficulty] = {
+        fewestHints: 0,
+        fewestInvalidAttempts: 0,
+      };
+    }
+  }
+
   return {
     totalPuzzlesCompleted: completed,
     totalStars: threeStarCount * 3 + twoStarCount * 2 + oneStarCount,
@@ -210,12 +229,7 @@ function baseStats(
     noHintPuzzleCount: completed,
     flawlessCount: Math.floor(threeStarCount * 0.75),
     byDifficulty,
-    personalBests: {
-      EASY: { fewestHints: 0, fewestInvalidAttempts: 0 },
-      MEDIUM: { fewestHints: 0, fewestInvalidAttempts: 0 },
-      MEDIUM_PLUS: { fewestHints: 0, fewestInvalidAttempts: 0 },
-      HARD: { fewestHints: 0, fewestInvalidAttempts: 0 },
-    },
+    personalBests,
     lastUpdated: 0,
   };
 }
@@ -371,13 +385,15 @@ function progressForScenario(
     case 'daily':
       return baseProgress(today, {
         amber: 180,
-        totalAmberEarned: 400,
+        totalAmberEarned: 900,
         puzzlesSolved: DAILY_CAPTURE_PUZZLES,
-        phaseProgress: DAILY_CAPTURE_PUZZLES,
-        currentStreak: 7,
-        completedDifficulties: ['EASY', 'HARD'],
+        currentPhase: 1,
+        phaseProgress: 50,
+        currentStreak: DAILY_CURRENT_STREAK,
+        completedDifficulties: ['HARD'],
         phaseProgressFraction:
-          DAILY_CAPTURE_PUZZLES / PHASE_THRESHOLDS[1],
+          (50 - PHASE_THRESHOLDS[1]) /
+          (PHASE_THRESHOLDS[2] - PHASE_THRESHOLDS[1]),
       });
     case 'flawless-victory':
       return baseProgress(today, {
@@ -391,20 +407,39 @@ function progressForScenario(
   }
 }
 
-function dailyProgress(today: string): DailyChallengeProgress {
-  const completedChallenge: DailyChallengeResult = {
-    date: today,
+function dailyResult(today: string, daysBeforeToday: number): DailyChallengeResult {
+  const completedDate = parseLocalDate(today);
+  completedDate.setDate(completedDate.getDate() - daysBeforeToday);
+  completedDate.setHours(12, 0, 0, 0);
+
+  return {
+    date: getLocalDateString(completedDate),
     stars: 3,
     hintsUsed: 0,
     invalidAttempts: 0,
-    completedAt: Date.parse(`${today}T12:00:00Z`),
+    completedAt: completedDate.getTime(),
   };
+}
+
+function dailyProgress(today: string): DailyChallengeProgress {
+  const historicalRun = Array.from(
+    { length: DAILY_HISTORICAL_STREAK },
+    (_, index) => dailyResult(
+      today,
+      DAILY_HISTORICAL_STREAK + DAILY_CURRENT_STREAK - index
+    )
+  );
+  const currentRun = Array.from(
+    { length: DAILY_CURRENT_STREAK },
+    (_, index) => dailyResult(today, DAILY_CURRENT_STREAK - index - 1)
+  );
+  const completedChallenges = [...historicalRun, ...currentRun];
 
   return {
-    completedChallenges: [completedChallenge],
-    totalCompleted: 15,
-    currentStreak: 7,
-    bestStreak: 12,
+    completedChallenges,
+    totalCompleted: completedChallenges.length,
+    currentStreak: DAILY_CURRENT_STREAK,
+    bestStreak: DAILY_HISTORICAL_STREAK,
     lastCompletedDate: today,
     streakFreezes: 1,
     lastFreezeGrantDate: today,
