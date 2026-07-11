@@ -8,10 +8,38 @@
 // Minimal react-native stub (the adapters only read Platform.OS).
 jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
+  Share: {
+    share: jest.fn(),
+    sharedAction: 'sharedAction',
+  },
 }));
 
+jest.mock('../services/shareResults', () => ({
+  generateShareText: jest.fn().mockReturnValue('share text'),
+  recordShareSuccess: jest.fn().mockResolvedValue(undefined),
+}));
+
+import { Share } from 'react-native';
 import { createRevenueCatBillingProvider } from '../services/providers/revenueCatBilling';
 import { createAdMobAdProvider } from '../services/providers/googleAdMobAds';
+import { createAdMobAdProvider as createWebAdProvider } from '../services/providers/googleAdMobAds.web';
+import { createRevenueCatBillingProvider as createWebBillingProvider } from '../services/providers/revenueCatBilling.web';
+import {
+  initShareImage as initWebShareImage,
+  isImageShareAvailable as isWebImageShareAvailable,
+  setShareImageProvider as setWebShareImageProvider,
+  shareResultImage as shareWebResult,
+} from '../services/shareImage.web';
+import { recordShareSuccess } from '../services/shareResults';
+import type { ShareableResult } from '../services/shareResults';
+
+const SHARE_RESULT: ShareableResult = {
+  stars: 3,
+  difficulty: 'MEDIUM',
+  hintsUsed: 0,
+  invalidAttempts: 0,
+  moveCount: 3,
+};
 
 describe('RevenueCat billing adapter (SDK absent)', () => {
   it('stays inert with no configured key', async () => {
@@ -62,5 +90,51 @@ describe('AdMob ad adapter (SDK absent)', () => {
       reason: 'no_provider',
     });
     expect(await a.showInterstitial()).toBe(false);
+  });
+});
+
+describe('web provider adapters', () => {
+  test('AdMob web provider is inert and never grants rewards', async () => {
+    const provider = createWebAdProvider();
+    await provider.initialize();
+    expect(provider.getName()).toBe('Google AdMob (Web NoOp)');
+    expect(provider.isReady()).toBe(false);
+    expect(await provider.showInterstitial()).toBe(false);
+    expect(await provider.showRewarded('daily_amber')).toEqual({
+      completed: false,
+      reason: 'no_provider',
+    });
+  });
+
+  test('RevenueCat web provider fails purchases cleanly', async () => {
+    const provider = createWebBillingProvider();
+    await provider.initialize();
+    expect(provider.getName()).toBe('RevenueCat (Web NoOp)');
+    expect(provider.isReady()).toBe(false);
+    expect(await provider.getProducts(['com.wordshift.amber_small'])).toEqual([]);
+    expect(await provider.purchase('com.wordshift.amber_small')).toEqual({
+      success: false,
+      productId: 'com.wordshift.amber_small',
+      error: 'billing_unavailable',
+    });
+    expect(await provider.restorePurchases()).toEqual({ entitlements: [] });
+  });
+
+  test('web image sharing always uses text and records only completed shares', async () => {
+    initWebShareImage();
+    setWebShareImageProvider({
+      capture: jest.fn(),
+      shareFile: jest.fn(),
+    });
+    expect(isWebImageShareAvailable()).toBe(false);
+
+    jest.mocked(Share.share).mockResolvedValueOnce({ action: Share.sharedAction });
+    await expect(shareWebResult({}, SHARE_RESULT)).resolves.toBe(true);
+    expect(Share.share).toHaveBeenLastCalledWith({ message: 'share text' });
+    expect(recordShareSuccess).toHaveBeenCalledTimes(1);
+
+    jest.mocked(Share.share).mockResolvedValueOnce({ action: 'dismissedAction' });
+    await expect(shareWebResult({}, SHARE_RESULT)).resolves.toBe(false);
+    expect(recordShareSuccess).toHaveBeenCalledTimes(1);
   });
 });
