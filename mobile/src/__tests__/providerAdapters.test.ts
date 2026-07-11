@@ -5,7 +5,7 @@
  * resolves to the same "nothing happened" result as the NoOp providers.
  */
 
-// Minimal react-native stub (the adapters only read Platform.OS).
+// Minimal react-native stub for the adapters and web share fallback.
 jest.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   Share: {
@@ -17,6 +17,10 @@ jest.mock('react-native', () => ({
 jest.mock('../services/shareResults', () => ({
   generateShareText: jest.fn().mockReturnValue('share text'),
   recordShareSuccess: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../services/eventLogger', () => ({
+  logEvent: jest.fn(),
 }));
 
 import { Share } from 'react-native';
@@ -31,6 +35,7 @@ import {
   shareResultImage as shareWebResult,
 } from '../services/shareImage.web';
 import { recordShareSuccess } from '../services/shareResults';
+import { logEvent } from '../services/eventLogger';
 import type { ShareableResult } from '../services/shareResults';
 
 const SHARE_RESULT: ShareableResult = {
@@ -94,6 +99,10 @@ describe('AdMob ad adapter (SDK absent)', () => {
 });
 
 describe('web provider adapters', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   test('AdMob web provider is inert and never grants rewards', async () => {
     const provider = createWebAdProvider();
     await provider.initialize();
@@ -120,21 +129,47 @@ describe('web provider adapters', () => {
     expect(await provider.restorePurchases()).toEqual({ entitlements: [] });
   });
 
-  test('web image sharing always uses text and records only completed shares', async () => {
+  test('web image sharing stays text-only', () => {
     initWebShareImage();
     setWebShareImageProvider({
       capture: jest.fn(),
       shareFile: jest.fn(),
     });
     expect(isWebImageShareAvailable()).toBe(false);
+  });
 
-    jest.mocked(Share.share).mockResolvedValueOnce({ action: Share.sharedAction });
+  test('undefined web share resolution records and logs completion', async () => {
+    (Share.share as jest.Mock).mockResolvedValueOnce(undefined);
     await expect(shareWebResult({}, SHARE_RESULT)).resolves.toBe(true);
     expect(Share.share).toHaveBeenLastCalledWith({ message: 'share text' });
     expect(recordShareSuccess).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith({
+      type: 'share_completed',
+      data: { phase: 0, kind: 'text' },
+    });
+  });
 
-    jest.mocked(Share.share).mockResolvedValueOnce({ action: 'dismissedAction' });
-    await expect(shareWebResult({}, SHARE_RESULT)).resolves.toBe(false);
+  test('native shared action records and logs completion', async () => {
+    (Share.share as jest.Mock).mockResolvedValueOnce({ action: Share.sharedAction });
+    await expect(shareWebResult({}, { ...SHARE_RESULT, phase: 3 })).resolves.toBe(true);
     expect(recordShareSuccess).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith({
+      type: 'share_completed',
+      data: { phase: 3, kind: 'text' },
+    });
+  });
+
+  test('native dismissed action remains incomplete', async () => {
+    (Share.share as jest.Mock).mockResolvedValueOnce({ action: 'dismissedAction' });
+    await expect(shareWebResult({}, SHARE_RESULT)).resolves.toBe(false);
+    expect(recordShareSuccess).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  test('rejected web share returns false without recording completion', async () => {
+    (Share.share as jest.Mock).mockRejectedValueOnce(new Error('Share cancelled'));
+    await expect(shareWebResult({}, SHARE_RESULT)).resolves.toBe(false);
+    expect(recordShareSuccess).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
   });
 });

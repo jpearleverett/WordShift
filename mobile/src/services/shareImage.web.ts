@@ -3,6 +3,7 @@ import {
   generateShareText,
   recordShareSuccess,
 } from './shareResults';
+import { logEvent } from './eventLogger';
 import type { ShareableResult } from './shareResults';
 
 export interface ShareImageProvider {
@@ -22,8 +23,15 @@ export async function shareResultImage(
   _viewRef: unknown,
   result: ShareableResult
 ): Promise<boolean> {
-  const shared = await Share.share({ message: generateShareText(result) });
-  if (shared.action !== Share.sharedAction) return false;
-  await recordShareSuccess();
-  return true;
+  try {
+    const shared = (await Share.share({
+      message: generateShareText(result),
+    })) as Awaited<ReturnType<typeof Share.share>> | undefined;
+    if (shared !== undefined && shared.action !== Share.sharedAction) return false;
+    await recordShareSuccess();
+    logEvent({ type: 'share_completed', data: { phase: result.phase ?? 0, kind: 'text' } });
+    return true;
+  } catch {
+    return false;
+  }
 }
