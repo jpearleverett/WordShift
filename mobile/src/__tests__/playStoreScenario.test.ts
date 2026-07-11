@@ -17,11 +17,22 @@ import {
   getCumulativeStats,
   invalidateStatsCache,
 } from '../services/starRating';
-import { ACHIEVEMENTS, AchievementCheckState } from '../services/achievements';
+import type {
+  AchievementCheckState,
+  AchievementProgress,
+} from '../services/achievements';
+import {
+  loadPuzzleState,
+  invalidatePuzzleStateCache,
+} from '../services/puzzleSaveState';
 import {
   DAILY_CHALLENGE_UNLOCK_PUZZLES,
   isDailyChallengeUnlocked,
 } from '../services/dailyChallenge';
+import {
+  AMBER_REWARDS,
+  FIRST_COMPLETION_BONUS,
+} from '../constants/gameBalance';
 import { getLocalDateString } from '../services/dateUtils';
 import { getUnlockedVariants } from '../services/puzzleVariety';
 import {
@@ -39,6 +50,27 @@ function rowWords(save: { rows: { words: { char: string }[] }[] }): string[] {
   return save.rows.map(row => row.words.map(letter => letter.char).join(''));
 }
 
+function resetModulesWithSeededStorage(): void {
+  jest.resetModules();
+  jest.doMock('@react-native-async-storage/async-storage', () => ({
+    __esModule: true,
+    default: AsyncStorage,
+  }));
+  jest.doMock('../services/eventLogger', () => ({
+    logEvent: jest.fn(),
+  }));
+}
+
+function loadFreshDailyChallengeService(): typeof import('../services/dailyChallenge') {
+  resetModulesWithSeededStorage();
+  return require('../services/dailyChallenge');
+}
+
+function loadFreshAchievementService(): typeof import('../services/achievements') {
+  resetModulesWithSeededStorage();
+  return require('../services/achievements');
+}
+
 async function seedScenario(
   name: PlayStoreScenario['name'],
   today: string
@@ -47,6 +79,7 @@ async function seedScenario(
   await AsyncStorage.multiSet(Object.entries(scenario.storage));
   invalidateProgressCache();
   invalidateStatsCache();
+  invalidatePuzzleStateCache();
   return scenario;
 }
 
@@ -55,6 +88,7 @@ describe('Play Store screenshot scenarios', () => {
     await AsyncStorage.clear();
     invalidateProgressCache();
     invalidateStatsCache();
+    invalidatePuzzleStateCache();
   });
 
   test('exposes the eight approved scenarios in campaign order', () => {
@@ -429,18 +463,71 @@ describe('Play Store screenshot scenarios', () => {
     }
   );
 
-  test('flawless victory pre-unlocks every achievement triggered by its first win', () => {
-    const scenario = buildPlayStoreScenario('flawless-victory', '2026-07-11');
-    const achievementProgress = stored<{
-      unlockedIds: string[];
-      unlockDates: Record<string, number>;
-      lastChecked: number;
-    }>(scenario, 'wordshift_achievements');
+  test.each([
+    ['puzzle-preview', 0, 'L'],
+    ['puzzle-chain', 1, null],
+  ] as const)(
+    '%s hydrates its saved board through the production puzzle loader',
+    async (name, activeRowIndex, selectedLetter) => {
+      await seedScenario(name, '2026-07-11');
+
+      const save = await loadPuzzleState();
+
+      expect(save).not.toBeNull();
+      expect(save?.activeRowIndex).toBe(activeRowIndex);
+      expect(save?.selectedLetter?.char ?? null).toBe(selectedLetter);
+      expect(save?.undosRemaining).toBe(Infinity);
+    }
+  );
+
+  test('daily hydrates the supplied completed date through production loaders', async () => {
+    const today = getLocalDateString();
+    await seedScenario('daily', today);
+    const {
+      getDailyStatus,
+      loadDailyProgress,
+    } = loadFreshDailyChallengeService();
+
+    const progress = await loadDailyProgress();
+    const status = await getDailyStatus();
+
+    expect(progress.lastCompletedDate).toBe(today);
+    expect(progress.currentStreak).toBe(7);
+    expect(progress.completedChallenges).toContainEqual(expect.objectContaining({
+      date: today,
+      stars: 3,
+      completedAt: Date.parse(`${today}T12:00:00Z`),
+    }));
+    expect(status).toEqual(expect.objectContaining({
+      isCompleted: true,
+      streak: 7,
+    }));
+    expect(status.todayResult).toEqual(expect.objectContaining({
+      date: today,
+      stars: 3,
+    }));
+  });
+
+  test('flawless victory hydrates its pre-unlocked achievements', async () => {
+    await seedScenario('flawless-victory', '2026-07-11');
+    const { loadAchievements } = loadFreshAchievementService();
+
+    const progress = await loadAchievements();
+
+    expect([...progress.unlockedIds].sort()).toEqual([
+      'first_animal',
+      'first_perfect',
+      'first_puzzle',
+      'flawless_first',
+    ]);
+  });
+
+  test('flawless victory emits no achievements after its first curated win', async () => {
+    const scenario = await seedScenario('flawless-victory', '2026-07-11');
     const progress = stored<{
       currentPhase: number;
       unlockedAnimals: string[];
       unlockedRooms: string[];
-      totalAmberEarned: number;
     }>(scenario, 'wordshift_home_progress');
     const postWinState: AchievementCheckState = {
       stats: {
@@ -459,31 +546,29 @@ describe('Play Store screenshot scenarios', () => {
           MEDIUM_PLUS: { completed: 0, stars: 0 },
           HARD: { completed: 0, stars: 0 },
         },
-        lastUpdated: 0,
+        lastUpdated: Date.parse('2026-07-11T12:00:00Z'),
       },
       puzzlesSolved: 1,
       currentPhase: progress.currentPhase,
       currentStreak: 1,
       unlockedAnimals: progress.unlockedAnimals.length,
       unlockedRooms: progress.unlockedRooms.length,
-      amberEarned: progress.totalAmberEarned,
+      amberEarned:
+        Math.floor(AMBER_REWARDS.EASY * 1.5) +
+        FIRST_COMPLETION_BONUS.EASY,
       dailyChallengesCompleted: 0,
       shareCount: 0,
       challengeCompletions: 0,
       variantWins: {},
       blindWins: 0,
     };
-    const triggeredIds = ACHIEVEMENTS
-      .filter(achievement => achievement.check(postWinState))
-      .map(achievement => achievement.id);
+    const {
+      checkAchievements,
+      loadAchievements,
+    } = loadFreshAchievementService();
+    const achievementProgress: AchievementProgress = await loadAchievements();
 
-    expect(triggeredIds.sort()).toEqual([
-      'first_animal',
-      'first_perfect',
-      'first_puzzle',
-      'flawless_first',
-    ]);
-    expect(achievementProgress.unlockedIds)
-      .toEqual(expect.arrayContaining(triggeredIds));
+    expect(achievementProgress.unlockedIds).toHaveLength(4);
+    await expect(checkAchievements(postWinState)).resolves.toEqual([]);
   });
 });
