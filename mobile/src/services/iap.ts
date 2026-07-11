@@ -443,7 +443,6 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
     let doubled = false;
     if (reward.kind === 'amber') {
       const isFirst = !(await hasMadeAmberPurchase());
-      await markAmberPurchaseMade();
       if (isFirst) {
         grantedReward = { kind: 'amber', amount: reward.amount * FIRST_PURCHASE_AMBER_MULTIPLIER };
         doubled = true;
@@ -457,6 +456,14 @@ export async function purchaseConsumable(productId: ProductId): Promise<Consumab
       transactionId: result.transactionId,
       firstPurchaseDoubled: doubled,
     });
+    // Mark the one-time 2x flag AFTER the grant is safely on the ledger. If a
+    // kill lands between the two, the grant still replays on reconcile (player
+    // keeps their money) and the worst case is the next amber pack also doubles
+    // — strictly player-favorable, versus the old ordering where a crash here
+    // burned the flag AND left no ledger entry (paid, got nothing).
+    if (doubled) {
+      await markAmberPurchaseMade();
+    }
     if (doubled) {
       return { success: true, productId, reward: grantedReward, grantId, firstPurchaseDoubled: true };
     }
